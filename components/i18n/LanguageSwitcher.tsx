@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LOCALE_NATIVE_NAME, isMigratedRoute, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 import { useAppLocale } from "./locale-context";
 import styles from "./LanguageSwitcher.module.css";
@@ -9,7 +9,8 @@ import styles from "./LanguageSwitcher.module.css";
 /**
  * Lien vers **la même page** dans l'autre langue (`docs/features/I18N.md`).
  *
- * - Il garde la page courante : `/regles` ↔ `/en/regles`, rien d'autre — ni
+ * - Il garde la page courante, requête et ancre comprises : `/regles?x=1#a`
+ *   ↔ `/en/regles?x=1#a`, rien d'autre — ni
  *   redirection selon `Accept-Language`, ni cookie : l'URL reste la seule
  *   source de vérité de la langue.
  * - Il se tait sur une route **pas encore traduite** : il mènerait à une
@@ -27,6 +28,13 @@ export function LanguageSwitcher({ className }: Readonly<{ className?: string }>
   return <SwitcherLink href={localeHref(path, target)} target={target} className={className} />;
 }
 
+/** L'adresse de l'autre langue, avec la requête (`a=1`) et l'ancre (`#x`) de la page courante. */
+export function switcherHref(path: string, query: string, hash = ""): string {
+  const search = query ? "?" + query : "";
+  const anchor = hash.startsWith("#") && hash.length > 1 ? hash : "";
+  return path + search + anchor;
+}
+
 /**
  * Le lien lui-même, à part : `useTranslations` exige un fournisseur de
  * messages, qu'une page non traduite n'a pas à fournir pour un lien qu'elle ne
@@ -34,8 +42,19 @@ export function LanguageSwitcher({ className }: Readonly<{ className?: string }>
  */
 function SwitcherLink({ href, target, className }: Readonly<{ href: string; target: Locale; className?: string }>) {
   const t = useTranslations("common.languageSwitcher");
+  // La requête suit (un filtre, un onglet, le `?redirect=` de la connexion) :
+  // changer de langue ne doit pas perdre l'état de la page.
+  const query = useSearchParams()?.toString() ?? "";
   return (
-    <a href={href} hrefLang={target} className={className ? `${styles.link} ${className}` : styles.link}>
+    <a
+      href={switcherHref(href, query)}
+      hrefLang={target}
+      className={className ? `${styles.link} ${className}` : styles.link}
+      // L'ancre n'atteint jamais le serveur : ajoutée au clic seulement.
+      onClick={(event) => {
+        event.currentTarget.href = switcherHref(href, query, globalThis.location?.hash);
+      }}
+    >
       <span lang={target}>{LOCALE_NATIVE_NAME[target]}</span>
       <span className="sr-only"> — {t("label")}</span>
     </a>

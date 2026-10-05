@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import Image from "next/image";
 import { AccountMenu } from "@/components/account-menu";
 import { CyberButton } from "@/components/cyber";
@@ -45,7 +45,7 @@ export async function PublicHeader() {
             contient pas ce qu'on lit dessus est inutilisable à la commande
             vocale : on prononce ce qui est écrit, rien ne répond (WCAG 2.5.3).
           */}
-          <Link href="/" className={styles.brand}>
+          <LocaleLink href="/" className={styles.brand}>
             <span className={styles.logo}>
               <Image src="/logo_bg.webp" alt="" width={28} height={28} />
             </span>
@@ -53,7 +53,7 @@ export async function PublicHeader() {
               <span className="logotype">BlueGenji</span>
               <span className="mono">ESPORT</span>
             </span>
-          </Link>
+          </LocaleLink>
         </div>
 
         <div className={styles.actions}>
@@ -62,10 +62,10 @@ export async function PublicHeader() {
           {user ? (
             <>
               <CyberButton variant="primary" asChild>
-                <Link href="/tournois">
+                <LocaleLink href="/tournois">
                   <span className={styles.ctaFull}>Accéder à la partie compétitive →</span>
                   <span className={styles.ctaShort}>Compétition →</span>
-                </Link>
+                </LocaleLink>
               </CyberButton>
               {/* Profil, équipe et déconnexion : le même menu que dans
                   l'espace connecté. Son nom accessible commence par le pseudo
@@ -74,7 +74,7 @@ export async function PublicHeader() {
             </>
           ) : (
             <CyberButton variant="primary" asChild>
-              <Link href="/connexion">Rejoindre →</Link>
+              <LocaleLink href="/connexion">Rejoindre →</LocaleLink>
             </CyberButton>
           )}
         </div>
