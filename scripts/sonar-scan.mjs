@@ -45,6 +45,9 @@ const MAX_DUPLICATION = 3;
 const SOURCE_EXCLUSIONS = [
     "node_modules/**", ".next/**", "coverage/**", ".scannerwork/**", ".claude/**",
     "dist/**", "docs/**", "public/uploads/**", "tests/**", "e2e/**",
+    // Messages de traduction (docs/features/I18N.md) : des données, et deux
+    // fichiers par espace de noms aux mêmes clés — Sonar y verrait des doublons.
+    "messages/**",
 ];
 const TEST_DIRECTORIES = ["tests", "e2e"];
 // Ce qui ne s'exécute pas sous Jest : configuration, scripts d'exploitation.

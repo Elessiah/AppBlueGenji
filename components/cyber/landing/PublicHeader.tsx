@@ -4,6 +4,7 @@ import { AccountMenu } from "@/components/account-menu";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { PublicNavMenu } from "./PublicNavMenu";
 import styles from "./PublicHeader.module.css";
 
@@ -56,6 +57,8 @@ export async function PublicHeader() {
         </div>
 
         <div className={styles.actions}>
+          {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
+          <LanguageSwitcher />
           {user ? (
             <>
               <CyberButton variant="primary" asChild>

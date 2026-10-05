@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import type { CSSProperties, ReactNode } from "react";
 
 /**
@@ -17,6 +17,10 @@ import type { CSSProperties, ReactNode } from "react";
  * Ne pas confondre avec `entrantHref` (`lib/shared/participants.ts`) : un
  * *engagé* de tournoi est une équipe **ou** un joueur selon le tournoi, et se
  * résout par le contexte de la page de tournoi (`_lib/entrant-link.tsx`).
+ *
+ * Le chemin est écrit **sans** préfixe de langue : `LocaleLink` le résout dans
+ * la langue de la page (`docs/features/I18N.md`) — un seul endroit pour les
+ * trois liens d'entité, `EntrantLink` compris.
  */
 export interface EntityLinkProps {
   children: ReactNode;
@@ -34,9 +38,9 @@ export function EntityLink({
   ...rest
 }: Readonly<EntityLinkProps & { href: string }>) {
   return (
-    <Link href={href} className={className ? `entity-link ${className}` : "entity-link"} {...rest}>
+    <LocaleLink href={href} className={className ? `entity-link ${className}` : "entity-link"} {...rest}>
       {children}
-    </Link>
+    </LocaleLink>
   );
 }
 

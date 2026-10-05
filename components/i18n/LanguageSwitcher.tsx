@@ -1,0 +1,43 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
+import { LOCALE_NATIVE_NAME, isMigratedRoute, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
+import { useAppLocale } from "./locale-context";
+import styles from "./LanguageSwitcher.module.css";
+
+/**
+ * Lien vers **la même page** dans l'autre langue (`docs/features/I18N.md`).
+ *
+ * - Il garde la page courante : `/regles` ↔ `/en/regles`, rien d'autre — ni
+ *   redirection selon `Accept-Language`, ni cookie : l'URL reste la seule
+ *   source de vérité de la langue.
+ * - Il se tait sur une route **pas encore traduite** : il mènerait à une
+ *   redirection vers la page même où l'on est.
+ * - Un `<a>` et pas un `next/link` : changer de langue recharge le document,
+ *   seul moyen de rendre de nouveau `<html lang>` et les messages du client.
+ * - Son nom accessible commence par le texte visible (WCAG 2.5.3), écrit dans
+ *   la langue visée (`lang`), et `hrefLang` l'annonce aux robots.
+ */
+export function LanguageSwitcher({ className }: Readonly<{ className?: string }>) {
+  const path = splitLocalePrefix(usePathname() ?? "/").path;
+  const locale = useAppLocale();
+  if (!isMigratedRoute(path)) return null;
+  const target: Locale = locale === "fr" ? "en" : "fr";
+  return <SwitcherLink href={localeHref(path, target)} target={target} className={className} />;
+}
+
+/**
+ * Le lien lui-même, à part : `useTranslations` exige un fournisseur de
+ * messages, qu'une page non traduite n'a pas à fournir pour un lien qu'elle ne
+ * rend pas.
+ */
+function SwitcherLink({ href, target, className }: Readonly<{ href: string; target: Locale; className?: string }>) {
+  const t = useTranslations("common.languageSwitcher");
+  return (
+    <a href={href} hrefLang={target} className={className ? `${styles.link} ${className}` : styles.link}>
+      <span lang={target}>{LOCALE_NATIVE_NAME[target]}</span>
+      <span className="sr-only"> — {t("label")}</span>
+    </a>
+  );
+}

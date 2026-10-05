@@ -1,4 +1,18 @@
+import path from "node:path";
 import type { NextConfig } from "next";
+
+/**
+ * Configuration par requête de `next-intl` (messages et formats, **sans son
+ * routage** — `docs/features/I18N.md`), que la bibliothèque importe sous le nom
+ * `next-intl/config`.
+ *
+ * Désignée par deux alias, et non par `createNextIntlPlugin` : le greffon ne
+ * fait rien d'autre pour ce site, mais son module charge à l'import l'extracteur
+ * de messages, donc le binaire natif de `@swc/core` — un binaire de plus à
+ * réussir à charger à chaque `next build`, `next dev` et lecture de ce fichier
+ * (tests compris), pour une fonction qu'on n'utilise pas.
+ */
+const I18N_REQUEST_CONFIG = "./lib/server/i18n-request.ts";
 
 /**
  * En-têtes de sécurité posés sur **toutes** les réponses.
@@ -62,6 +76,18 @@ const nextConfig: NextConfig = {
    * Sans effet en production, où l'indicateur n'existe pas.
    */
   devIndicators: { position: "top-right" },
+
+  // `next-intl/config` → {@link I18N_REQUEST_CONFIG}, pour Turbopack (`next
+  // dev`, chemin relatif exigé) comme pour webpack (`next build`, chemin absolu).
+  turbopack: { resolveAlias: { "next-intl/config": I18N_REQUEST_CONFIG } },
+  webpack(config: { context?: string; resolve?: { alias?: Record<string, string> } }) {
+    config.resolve ??= {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "next-intl/config": path.resolve(config.context ?? process.cwd(), I18N_REQUEST_CONFIG),
+    };
+    return config;
+  },
 
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];

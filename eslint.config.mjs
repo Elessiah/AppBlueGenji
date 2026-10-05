@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FlatCompat } from "@eslint/eslintrc";
 import sonarjs from "eslint-plugin-sonarjs";
+import noLiteralUiText from "./eslint-rules/no-literal-ui-text.cjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,6 +12,14 @@ const compat = new FlatCompat({
 });
 
 const SONAR_FILES = ["app/**", "components/**", "lib/**", "tests/**"];
+
+/**
+ * Dossiers **traduits** (docs/features/I18N.md) : tout texte d'interface y
+ * passe par une clé de traduction, et tout lien interne par `LocaleLink`.
+ * La liste s'allonge à chaque lot de migration, dans la PR qui traduit le
+ * dossier — en même temps que `lib/shared/i18n-routes.ts`.
+ */
+const I18N_MIGRATED_FILES = ["components/i18n/**"];
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
@@ -36,6 +45,24 @@ const eslintConfig = [
         { object: "globalThis", property: "confirm", message: "Utiliser ConfirmActionDialog (components/ui/confirm-action-dialog)." },
       ],
     },
+  },
+  // Langues : dans un dossier traduit, ni texte en dur ni `next/link` nu (un
+  // lien y perdrait la langue de la page). `locale-navigation.tsx` enveloppe
+  // justement `next/link`.
+  {
+    files: I18N_MIGRATED_FILES,
+    plugins: { bluegenji: { rules: { "no-literal-ui-text": noLiteralUiText } } },
+    rules: {
+      "bluegenji/no-literal-ui-text": "error",
+      "no-restricted-imports": [
+        "error",
+        { name: "next/link", message: "Utiliser LocaleLink (components/i18n/locale-navigation) — docs/features/I18N.md." },
+      ],
+    },
+  },
+  {
+    files: ["components/i18n/locale-navigation.tsx"],
+    rules: { "no-restricted-imports": "off" },
   },
   // Règles SonarQube (docs/WORKFLOW.md) : la CI refuse tout nouveau constat.
   { ...sonarjs.configs.recommended, files: SONAR_FILES },

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoWithGlow } from "./logo-with-glow";
 import { AccountMenu } from "./account-menu";
+import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import s from "./arena-nav.module.css";
@@ -101,6 +102,8 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
           )}
           {/* Profil, équipe et déconnexion, à portée de main sur toutes les
               largeurs — sous 720 px, c'est le seul chemin vers sa propre équipe. */}
+          {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
+          <LanguageSwitcher />
           <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
       </div>

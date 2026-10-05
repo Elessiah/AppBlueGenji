@@ -1,0 +1,20 @@
+/* Sélecteur de langue : un lien discret, en capitales mono comme les autres
+   libellés d'en-tête. Cible d'au moins 44 px de haut (WCAG 2.5.8 / confort). */
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.link:hover {
+  color: var(--blue-300);
+}

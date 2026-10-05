@@ -1,0 +1,21 @@
+/**
+ * Liste blanche des routes **traduites** — la seule porte vers une page `/en/…`.
+ *
+ * Une route n'entre ici que dans la PR qui extrait **tous** ses textes en clés
+ * de traduction et rédige leur anglais (`docs/features/I18N.md`). Tant qu'elle
+ * n'y est pas :
+ *
+ * - `/en/<route>` répond **307** vers `/<route>` (`middleware.ts`) : jamais un
+ *   contenu français servi sous une adresse anglaise, que les moteurs
+ *   prendraient pour un doublon ;
+ * - aucun lien n'y mène en anglais (`localeHref`), le sélecteur de langue se
+ *   tait, ni `hreflang` ni entrée anglaise au sitemap.
+ *
+ * Un motif est un chemin sans préfixe de langue ; un segment `[x]` vaut un
+ * segment quelconque (`/regles/[slug]`). Vide au lot 0 : l'infrastructure est
+ * en place, aucune page n'est encore traduite.
+ *
+ * Module à part de `locales.ts` pour que les tests puissent simuler une liste
+ * remplie sans toucher aux fonctions qui la lisent.
+ */
+export const MIGRATED_ROUTES: readonly string[] = [];
