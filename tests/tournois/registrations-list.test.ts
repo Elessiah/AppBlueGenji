@@ -42,7 +42,8 @@ describe("repli de la liste des inscrites", () => {
       join(__dirname, "..", "..", "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx"),
       "utf8",
     );
-    const move = panel.slice(panel.indexOf("const move = async"));
+    // Le geste vit dans `performMove` (que `move` appelle, ou la confirmation).
+    const move = panel.slice(panel.indexOf("const performMove = async"));
     expect(move.indexOf("mustExpandToShow(")).toBeGreaterThan(-1);
     expect(move.indexOf("setExpanded(true)")).toBeLessThan(move.indexOf("await applyOrder("));
     // Plus de glissement : rien ne déplie la liste au pointeur.

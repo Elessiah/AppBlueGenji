@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -22,7 +22,10 @@ import {
   forfeitParties,
   pendingScoreProposal,
   scoreBlockerMessage,
+  scoreCorrectionNeedsConfirmation,
+  storedResultSignature,
 } from "../_lib/score-form";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
@@ -156,12 +159,35 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const proposalNotice = adminProposalNotice(proposal, team1, team2, form.dirty);
   const forfeitToggleLabel = showForfeit ? "Annuler" : "Déclarer un forfait sur cette manche";
 
-  const run = async (action: "save" | "resolve") => {
+  // Correction d'un match déjà tranché : l'écriture attend la confirmation
+  // (`scoreCorrectionNeedsConfirmation`), le premier résultat part directement.
+  const [confirmingCorrection, setConfirmingCorrection] = useState<"save" | "resolve" | null>(null);
+  const storedLabel = storedResultLabel(match, team1, team2);
+  // Un autre arbitre écrit pendant qu'on lit la confirmation : l'avertissement
+  // de conflit s'affiche dans le dialogue de score, que la confirmation
+  // recouvre. On la referme à **chaque** changement du résultat stocké (et non
+  // au seul passage de `form.conflict` à vrai, qui ne bouge plus s'il l'était
+  // déjà) pour que la nouvelle valeur soit lue avant tout envoi.
+  const storedSignature = storedResultSignature(match);
+  useEffect(() => {
+    setConfirmingCorrection(null);
+  }, [storedSignature]);
+
+  const perform = async (action: "save" | "resolve"): Promise<boolean> => {
     const ok = await form.submit(action);
     if (ok) {
       onSubmitted();
       onClose();
     }
+    return ok;
+  };
+
+  const run = async (action: "save" | "resolve") => {
+    if (scoreCorrectionNeedsConfirmation(match)) {
+      setConfirmingCorrection(action);
+      return;
+    }
+    await perform(action);
   };
 
   // `Entrée` dans un champ vaut « valider le résultat » : c'est l'issue
@@ -417,6 +443,23 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
           </div>
         </form>
       </div>
+      {confirmingCorrection !== null && (
+        <ConfirmActionDialog
+          title="Corriger un résultat déjà validé ?"
+          confirmLabel="Corriger le résultat"
+          pendingLabel="Correction…"
+          onClose={() => setConfirmingCorrection(null)}
+          onConfirm={() => perform(confirmingCorrection)}
+        >
+          {storedLabel !== null && <p>{storedLabel}</p>}
+          <p>Ce résultat publié sera remplacé par la nouvelle saisie.</p>
+          <p>
+            Si l&apos;issue change, ce qui en découlait est défait : une rencontre suivante encore sans score peut
+            changer d&apos;adversaire (son horaire conservé), le classement est recalculé, et un tournoi déjà
+            terminé repasse en cours.
+          </p>
+        </ConfirmActionDialog>
+      )}
     </div>,
     document.body,
   );
