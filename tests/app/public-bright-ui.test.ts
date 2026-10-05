@@ -79,6 +79,11 @@ describe("teintes des modes de tournoi", () => {
   it("n'ajoute aucune teinte chaude aux feuilles d'index", () => {
     expect(INDEX_CSS).not.toMatch(/orange|amber|245, 165, 36/);
   });
+
+  it("dessine les schémas sans ambre ni rouge, contours comme fonds", () => {
+    const diagram = readSource(join(ROOT, "components", "rules", "RuleDiagram.tsx"));
+    expect(diagram).not.toMatch(/var\(--amber\)|var\(--red-live\)|245,\s*165,\s*36|255,\s*77,\s*94/);
+  });
 });
 
 describe("pastilles des pages vitrine", () => {
