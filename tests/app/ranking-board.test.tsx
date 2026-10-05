@@ -156,6 +156,12 @@ describe("RankingBoard — affichage progressif", () => {
     expect(markup).toContain('href="/classement?n=150#rang-101"');
   });
 
+  it("garde la colonne « N » d'une page à l'autre quand un nul existe plus bas", () => {
+    const markup = render({ rows: page, hasMore: true, anyDraws: true });
+    expect(markup).toContain('<span role="columnheader">N</span>');
+    expect(render({ rows: [row(1, { draws: 1 })], anyDraws: false })).not.toContain('<span role="columnheader">N</span>');
+  });
+
   it("annonce le nombre de lignes ajoutées, et la fin du classement", () => {
     expect(rankingAddedMessage(50, "more")).toBe("50 équipes ajoutées.");
     expect(rankingAddedMessage(1, "end")).toBe("1 équipe ajoutée. Fin du classement.");
