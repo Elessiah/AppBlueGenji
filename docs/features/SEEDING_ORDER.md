@@ -102,6 +102,17 @@ pose la première manche dans tous les formats (`SINGLE` / `DOUBLE` par
 l'entretien, les formats à classement par leur amorçage), et rien n'existe
 avant.
 
+Le coup d'envoi se lit sur **deux sources** (`seedingWindowState`) : l'état
+stocké **ou** celui de l'horloge (`computeTournamentState`). La colonne `state`
+ne bascule qu'au prochain entretien ; l'heure passée, elle peut dire encore
+`REGISTRATION` tant que personne n'a rien écrit ni ouvert. Lue seule, elle
+laissait réordonner après l'heure — et l'écriture déclenchait alors la
+synchronisation qui lance le tournoi avec cet ordre tardif. Le stocké rattrape
+un lancement anticipé, le calculé une heure passée sans recalage : même paire
+que le retrait d'un engagé (`ENTRANT_REMOVAL.md`). Côté client, l'heure vient de
+`useTournamentNow` (minuteur posé sur la prochaine bascule) : les flèches
+disparaissent à la seconde du coup d'envoi, sans attendre un instantané.
+
 Le verrou réutilise `hasScoreInput` de `lib/shared/match-lock.ts` : compte comme
 saisie un score (même 0), un vainqueur, un forfait ou un report en attente. Les
 byes et matchs fantômes sont ignorés — leur score est posé par le moteur.
