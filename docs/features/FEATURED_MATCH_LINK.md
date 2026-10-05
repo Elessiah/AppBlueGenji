@@ -214,6 +214,36 @@ les tournois : « FR · SEED 1 » / « FR · SEED 4 », et un bloc « CARTE EN C
   (`manual_seeding`) rend le seed à tous les formats.
 - Le drapeau « FR » disparaît : le site ne porte aucune donnée de pays.
 
+## 7. Quel match est mis en avant
+
+Retour terrain : l'arbitrage avait daté tous les matchs, et l'accueil présentait
+toujours comme match du moment un match « À planifier » — la sélection prenait
+le premier match `READY` du plateau, sans lire la planification.
+
+`pickFeaturedMatchIndex` (`lib/shared/landing.ts`) choisit désormais d'après la
+phase de lancement (`matchLaunchPhase`, `lib/shared/match-launch.ts`, la même
+que la fiche du tournoi) :
+
+1. le match **à l'antenne** (`isMatchLive`), quelle que soit sa phase ;
+2. un match **lancé** (`LAUNCHED` : il se joue) ;
+3. un match **en lancement** (`LOBBY` : son heure est venue) ;
+4. le **prochain match daté** (`SCHEDULED`, horaire le plus proche).
+
+Un match « À planifier » (`TO_PLAN`), terminé ou sans adversaire (`NONE`) n'est
+jamais retenu ; sans candidat, la carte se réduit au tournoi. À rang égal,
+l'ordre du plateau départage.
+
+La carte dit ce qu'elle montre (`featuredMatchStatusLabel`) : « Prochain match ·
+21 sept. · 20:30 » pour un match daté, « Lancement » quand l'heure est venue,
+rien pour un match lancé. La pastille « EN COURS » reste l'état du **tournoi**.
+
+**Fraîcheur.** Le choix dépend de l'horaire et du lancement : `match-schedule.ts`
+(horaire), `setMatchReady` / `forceLaunchMatch` et le lancement d'office
+(`tournaments/index.ts`) publient avec `{ landingLive: true }`, qui oublie
+`landing:live` (`REALTIME_REFRESH.md`). Côté client, `useLandingLive` reprend la
+valeur d'un nouveau rendu serveur (`router.refresh()`, retour sur l'accueil)
+au lieu de garder la première jusqu'au sondage suivant.
+
 ## Fichiers
 
 | Fichier | Rôle |
