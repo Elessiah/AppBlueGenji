@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useRef, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
@@ -10,10 +10,12 @@ import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import {
+  MATCH_ENTRY_DEFAULT_TIME,
   MATCH_ENTRY_MONTHS,
   formatMatchStartEntryPreview,
   localMatchTimeIfDifferent,
   matchEntryReference,
+  matchEntryTimeOptions,
   matchEntryTimeValue,
   matchStartEntryOf,
   readMatchStartEntry,
@@ -47,7 +49,7 @@ const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
 /** Refus de saisie, avant tout envoi. */
 function entryRefusal(state: MatchStartEntryState): string | null {
   if (state.kind === "incomplete") {
-    return "Date incomplète : choisis le jour, le mois et l'heure, ou vide les trois champs pour ne pas annoncer d'horaire.";
+    return "Date incomplète : choisis le jour et le mois, ou vide les deux pour ne pas annoncer d'horaire.";
   }
   if (state.kind === "invalid") return "Ce jour n'existe pas dans ce mois.";
   return null;
@@ -65,11 +67,10 @@ function pendingPreview(state: MatchStartEntryState): string | null {
 
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit automatiquement : vérifie l'aperçu.";
   if (refereeScheduling) {
-    return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
+    return "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.";
   }
-  return `${year} Vide = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.`;
+  return "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.";
 }
 
 /** Confirmation après enregistrement. */
@@ -154,16 +155,10 @@ export function MatchScheduleDialog({
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
   const [day, setDay] = useState(initial ? String(initial.day) : "");
   const [month, setMonth] = useState(initial ? String(initial.month) : "");
-  const [time, setTime] = useState(initial ? matchEntryTimeValue(initial) : "");
-  // Saisie d'heure commencée mais incomplète (« 20:__ ») : le champ rend alors
-  // `value === ""`, indiscernable d'un champ vidé. Le navigateur n'émet pas
-  // toujours d'événement pendant cette saisie (Chrome, champ parti de vide) :
-  // l'état sert à l'affichage, et l'envoi relit le champ lui-même (`timeRef`).
-  const [timeBadInput, setTimeBadInput] = useState(false);
-  const timeRef = useRef<HTMLInputElement>(null);
-  // Changer la clé remonte le champ : seul moyen d'effacer une saisie partielle,
-  // que `value=""` ne touche pas (la valeur est déjà vide).
-  const [timeKey, setTimeKey] = useState(0);
+  // Une liste de demi-heures, 21:00 par défaut ; une heure déjà posée entre
+  // deux demi-heures (posée par un autre chemin) y reste proposée telle quelle.
+  const [time, setTime] = useState(initial ? matchEntryTimeValue(initial) : MATCH_ENTRY_DEFAULT_TIME);
+  const [timeOptions] = useState(() => matchEntryTimeOptions(initial ? matchEntryTimeValue(initial) : null));
   // Figée à l'ouverture : l'année déduite ne doit pas changer pendant la saisie.
   const [reference] = useState(() =>
     matchEntryReference(
@@ -190,7 +185,7 @@ export function MatchScheduleDialog({
   const [planning] = useState(
     () => matchLaunchPhase({ ...match, refereeScheduling }, Date.now()) === "TO_PLAN",
   );
-  const deduced = readMatchStartEntry({ day, month, time, timeBadInput }, reference, match.startAt);
+  const deduced = readMatchStartEntry({ day, month, time }, reference, match.startAt);
   const entry = withYearShift(deduced, yearShift);
   // Décalage de chaque bouton : un cran, ou quatre pour un 29 février. Libellés
   // fixes (« Année précédente ») : un libellé qui changerait au clic, sous le
@@ -228,9 +223,7 @@ export function MatchScheduleDialog({
   const clearAll = () => {
     setDay("");
     setMonth("");
-    setTime("");
-    setTimeBadInput(false);
-    setTimeKey((key) => key + 1);
+    setTime(MATCH_ENTRY_DEFAULT_TIME);
     setYearShift(0);
     fieldErrors.clear();
     // Le bouton « Vider la date » disparaît avec la date : le focus, qu'il
@@ -240,18 +233,9 @@ export function MatchScheduleDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const badInputNow = timeRef.current?.validity.badInput ?? timeBadInput;
-    const sent =
-      badInputNow === timeBadInput
-        ? entry
-        : withYearShift(
-            readMatchStartEntry({ day, month, time, timeBadInput: badInputNow }, reference, match.startAt),
-            yearShift,
-          );
-    if (badInputNow !== timeBadInput) setTimeBadInput(badInputNow);
-    if (sent.kind === "incomplete" || sent.kind === "invalid") {
-      const message = entryRefusal(sent) ?? "Date non reconnue.";
-      fieldErrors.flag(sent.field, message);
+    if (entry.kind === "incomplete" || entry.kind === "invalid") {
+      const message = entryRefusal(entry) ?? "Date non reconnue.";
+      fieldErrors.flag(entry.field, message);
       showError(message);
       return;
     }
@@ -262,7 +246,7 @@ export function MatchScheduleDialog({
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          startAt: sent.kind === "ready" ? new Date(sent.instant).toISOString() : null,
+          startAt: entry.kind === "ready" ? new Date(entry.instant).toISOString() : null,
         }),
       });
       const payload = (await response.json()) as { error?: string };
@@ -270,7 +254,7 @@ export function MatchScheduleDialog({
         const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
         throw new CodedError(code, mapError(code));
       }
-      showSuccess(savedMessage(sent.kind === "ready", planning));
+      showSuccess(savedMessage(entry.kind === "ready", planning));
       onSaved();
       onClose();
     } catch (error) {
@@ -379,25 +363,22 @@ export function MatchScheduleDialog({
               </div>
               <div className="field" style={fieldStyle}>
                 <label htmlFor={FIELD_IDS.time}>Heure</label>
-                <input
-                  key={timeKey}
-                  ref={timeRef}
+                <select
                   id={FIELD_IDS.time}
-                  type="time"
                   value={time}
                   disabled={busy}
                   onChange={(e) => {
                     setTime(e.target.value);
-                    setTimeBadInput(e.target.validity.badInput);
                     fieldErrors.clear();
                   }}
-                  // Chrome ne signale pas une heure tapée à moitié dans un champ
-                  // parti de vide (`onChange` muet) : on relit sa validité à
-                  // chaque touche et à la sortie.
-                  onKeyUp={(e) => setTimeBadInput(e.currentTarget.validity.badInput)}
-                  onBlur={(e) => setTimeBadInput(e.target.validity.badInput)}
                   {...fieldErrors.aria("time", PREVIEW_ID)}
-                />
+                >
+                  {timeOptions.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
                 <FieldErrorText fieldId={FIELD_IDS.time} message={fieldErrors.message("time")} />
               </div>
             </div>
