@@ -3,6 +3,7 @@ import {
   buildSeedMap,
   compareSectionMatches,
   matchSectionOf,
+  MATCH_SECTION_LABELS,
   MATCH_SECTION_ORDER,
   nextSectionChangeAt,
   sectionCountLabel,
@@ -38,7 +39,7 @@ describe("matchSectionOf", () => {
     expect(matchSectionOf(bracketMatch(ready), false, NOW)).toBe("LOBBY");
   });
 
-  it("range un match daté à venir dans « En attente de lancement »", () => {
+  it("range un match daté à venir dans « Planifié »", () => {
     expect(matchSectionOf(bracketMatch({ ...ready, startAt: FUTURE }), false, NOW)).toBe("WAITING");
   });
 
@@ -112,13 +113,34 @@ describe("sectionRoundMatches", () => {
     ];
     const sections = sectionRoundMatches(matches, { refereeScheduling: true, now: NOW, seeds: {} });
     expect(sections.map((s) => [s.key, s.label, s.matches.map((m) => m.id)])).toEqual([
-      ["TO_PLAN", "À planifier", [3]],
-      ["WAITING", "En attente de lancement", [2, 6]],
-      ["LOBBY", "Lancement", [4]],
       ["PLAYING", "En cours", [5]],
+      ["LOBBY", "Lancement", [4]],
+      ["WAITING", "Planifié", [2, 6]],
+      ["TO_PLAN", "À planifier", [3]],
       ["DONE", "Terminé", [1]],
     ]);
     expect(sections.map((s) => s.key)).toEqual(MATCH_SECTION_ORDER);
+  });
+
+  it("fige l'ordre En cours → Lancement → Planifié → À planifier → Terminé", () => {
+    expect(MATCH_SECTION_ORDER).toEqual(["PLAYING", "LOBBY", "WAITING", "TO_PLAN", "DONE"]);
+    expect(MATCH_SECTION_ORDER.map((key) => MATCH_SECTION_LABELS[key])).toEqual([
+      "En cours",
+      "Lancement",
+      "Planifié",
+      "À planifier",
+      "Terminé",
+    ]);
+  });
+
+  it("garde l'ordre des sections présentes quand d'autres sont vides", () => {
+    const matches = [
+      bracketMatch({ id: 1, ...ready, status: "COMPLETED" }),
+      bracketMatch({ id: 2, ...ready, startAt: FUTURE }),
+      bracketMatch({ id: 3, ...ready, launchedAt: PAST }),
+    ];
+    const sections = sectionRoundMatches(matches, { refereeScheduling: false, now: NOW, seeds: {} });
+    expect(sections.map((s) => s.key)).toEqual(["PLAYING", "WAITING", "DONE"]);
   });
 
   it("omet les sections vides, et ne rend rien sans match", () => {
