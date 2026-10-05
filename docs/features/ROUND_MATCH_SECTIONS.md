@@ -50,13 +50,13 @@ diffusées par `EntrantProvider` (`useEntrantSeeds`).
 
 ## Horloge
 
-Seul le temps fait passer « En attente de lancement » → « Lancement ». Le
-composant `RoundMatchSections` lit `useClock(15 s)` — régime de charge
-respecté (`CLIENT_POWER_MODES.md`) — et **seulement** tant qu'un match de la
-manche, ses deux engagées connues, attend une heure pas encore atteinte
-(`needsSectionClock`) : elle s'arrête d'elle-même ensuite, et seule une donnée
-nouvelle du flux la relance. Avant le montage (`now` nul), un match daté est
-tenu « en attente » : l'heure du lecteur n'est pas encore connue.
+Seul le temps fait passer « En attente de lancement » → « Lancement ».
+`RoundMatchSections` arme **un seul minuteur** sur la prochaine heure de début
+(`nextSectionChangeAt`, qui reprend `nextLaunchPhaseChangeAt`) — la règle de la
+carte de match (`useMatchLaunchPhase`) : la carte et son filet basculent à la
+même seconde. Aucun intervalle ; sans match daté en attente, aucun minuteur.
+Avant le montage (`now` nul), un match daté est tenu « en attente » : l'heure
+du lecteur n'est pas encore connue.
 
 ## Filet
 
@@ -70,7 +70,7 @@ libellé passe à la ligne dans une colonne étroite (210 px).
 ## Code
 
 - `lib/shared/match-sections.ts` — `matchSectionOf`, `compareSectionMatches`,
-  `sectionRoundMatches`, `needsSectionClock`, `buildSeedMap`.
+  `sectionRoundMatches`, `nextSectionChangeAt`, `buildSeedMap`.
 - `app/(secured)/tournois/[id]/_components/RoundMatchSections.tsx` (+ `.module.css`).
 - Tests : `tests/lib/shared/match-sections.test.ts`,
   `tests/tournois/round-match-sections-render.test.tsx`.
