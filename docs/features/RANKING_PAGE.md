@@ -28,8 +28,12 @@ les équipes restées à 500. L'utilisatrice a choisi de corriger l'ordre plutô
 que de masquer les équipes sans match.
 
 `isRankedTeam` reste, mais ne décide plus de l'ordre : il choisit la légende
-de la cote (« Aucun match joué ») et le dénominateur « n-ième sur N équipes
-classées » de la fiche d'équipe.
+de la cote (« Aucun match joué ») et si la fiche d'équipe affiche une place.
+
+**Place sur la fiche** (`getTeamRankingPosition`) : comptée sur la même liste
+que `/classement` (toutes les équipes, celles sans match à 500), « #n sur N
+équipes » — sinon la perdante à 483 lirait « 2ᵉ sur 2 » sur sa fiche et 40ᵉ
+sur la page. Égalité de cote = même place.
 
 ### Effet sur le seeding
 

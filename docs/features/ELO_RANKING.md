@@ -94,7 +94,7 @@ Jusqu'au 2026-10-05, les équipes sans match passaient après **toutes** les
 classées, quelle que soit leur cote : avec un seul match joué sur le site, la
 perdante (483) se retrouvait deuxième devant toutes les équipes à 500. Détail et
 effet sur le seeding : `RANKING_PAGE.md`. Une équipe sans match reste « non
-classée » au sens de `isRankedTeam` (légende de la cote, dénominateur de la
+classée » au sens de `isRankedTeam` (légende de la cote, pas de place sur la
 fiche).
 
 ### Équipes dissoutes
