@@ -46,8 +46,13 @@ describe("teintes des modes de tournoi", () => {
     }
   });
 
-  it("distingue les deux modes à élimination", () => {
+  it("distingue deux modes voisins dans l'ordre du registre (cinq néons pour six modes)", () => {
     expect(RULE_MODE_TONE.SINGLE).not.toBe(RULE_MODE_TONE.DOUBLE);
+    for (let i = 1; i < TOURNAMENT_RULE_MODES.length; i++) {
+      expect(RULE_MODE_TONE[TOURNAMENT_RULE_MODES[i].diagram]).not.toBe(
+        RULE_MODE_TONE[TOURNAMENT_RULE_MODES[i - 1].diagram],
+      );
+    }
   });
 
   it("définit chaque teinte, texte et fond, dans les deux feuilles des règles", () => {
