@@ -80,13 +80,6 @@ async function loadTeamListForms(): Promise<Map<number, TeamListForm>> {
 }
 
 /**
- * Annuaire des équipes.
- *
- * @param viewerId Lecteur de la liste. Sert au seul masquage d'avatar : sans
- *   lui, un joueur qui a masqué le sien ne le verrait pas non plus sur la carte
- *   de sa propre équipe.
- */
-/**
  * La forme de toutes les équipes (dix derniers résultats, le plus récent en
  * tête), par la même photo mutualisée que l'annuaire — la page `/classement`
  * lit donc exactement les barres de `/equipes`.
@@ -95,6 +88,13 @@ export function loadCachedTeamForms(): Promise<Map<number, TeamListForm>> {
   return cachedStats("team-list-forms", loadTeamListForms);
 }
 
+/**
+ * Annuaire des équipes.
+ *
+ * @param viewerId Lecteur de la liste. Sert au seul masquage d'avatar : sans
+ *   lui, un joueur qui a masqué le sien ne le verrait pas non plus sur la carte
+ *   de sa propre équipe.
+ */
 export async function listTeams(viewerId: number | null = null): Promise<TeamListItem[]> {
   const db = await getDatabase();
 

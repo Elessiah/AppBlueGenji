@@ -451,7 +451,7 @@ export function rankingMatchJoinSql(teamExpr: string, match = "m"): string {
  *
  * Ce drapeau ne décide **pas** de l'ordre ({@link compareRankedTeams} ne lit
  * que la cote et le bilan) : il choisit la légende de la cote (« Aucun match
- * joué ») et le dénominateur « n-ième sur N équipes classées » de la fiche.
+ * joué ») et si la fiche affiche une place (`getTeamRankingPosition`).
  */
 export function isRankedTeam(team: { wins: number; losses: number; draws?: number }): boolean {
   // Le nul compte : une équipe dont l'unique rencontre s'est close sur 2-2 a

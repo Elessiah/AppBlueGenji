@@ -239,7 +239,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
                 label="Classement du site"
                 value={ranking.position ? `#${ranking.position}` : "—"}
                 hint={
-                  ranking.position ? `sur ${ranking.total} équipes classées` : "Aucun match joué"
+                  ranking.position ? `sur ${ranking.total} équipes` : "Aucun match joué"
                 }
               />
               <Tile

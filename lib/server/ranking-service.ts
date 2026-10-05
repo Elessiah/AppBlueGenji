@@ -38,6 +38,7 @@ import { cachedRanking } from "./ranking-cache";
 import {
   baseRankedTeamState,
   compareRankedTeams,
+  isRankedTeam,
   PLAYED_MATCH_SQL,
   RANKING_BASE_POINTS,
   replayRanking,
@@ -472,22 +473,27 @@ function rankingKey(state: RankedTeamState) {
  * affichée sur la fiche et la place posée juste à côté sortent donc du même
  * calcul, sur la même assiette que le bilan des matchs.
  *
- * Une équipe sans match n'est pas classée : `total` compte les équipes ayant
- * réellement joué, là où le leaderboard de la landing part de **toutes** les
- * équipes (une équipe sans match y figure, rangée à sa cote de départ). Les deux vues n'ont pas le même dénominateur, mais bien la même
- * cote par équipe.
+ * La place se compte sur **la même liste** que `/classement` et le leaderboard
+ * (`includeUnplayed`) : toutes les équipes, celles sans match rangées à leur
+ * cote de départ. Compter seulement les équipes ayant joué ferait dire
+ * « 2ᵉ sur 2 » à une équipe à 483 que `/classement` place derrière toutes les
+ * équipes à 500. Deux équipes à égalité de cote partagent leur place.
+ *
+ * Une équipe sans match n'a pas de place (`position: null`, « Aucun match
+ * joué ») ; elle compte pourtant dans `total`, comme elle figure à la page.
  */
 export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {
-  const scored = await loadTeamRanking();
-  const self = scored.find((row) => row.teamId === teamId);
+  const listed = await loadTeamRanking({ includeUnplayed: true });
+  const found = listed.find((row) => row.teamId === teamId);
+  const self = found && isRankedTeam(found) ? found : undefined;
 
   const states = await loadRankingState();
 
   if (self) {
-    const ahead = scored.filter((row) => row.points > self.points).length;
+    const ahead = listed.filter((row) => row.points > self.points).length;
     return {
       position: ahead + 1,
-      total: scored.length,
+      total: listed.length,
       points: self.points,
       placementPoints: states.get(teamId)?.placementPoints ?? 0,
     };
@@ -500,7 +506,7 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
   // mutualisée : c'est le même rejeu, pas un second.
   return {
     position: null,
-    total: scored.length,
+    total: listed.length,
     points: states.get(teamId)?.points ?? RANKING_BASE_POINTS,
     placementPoints: states.get(teamId)?.placementPoints ?? 0,
   };
