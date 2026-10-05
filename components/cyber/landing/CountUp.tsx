@@ -29,6 +29,9 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
     mountedAt.current ??= performance.now();
     const element = ref.current;
     if (!element || played.current || !decorativeMotion || typeof IntersectionObserver === "undefined") {
+      // Affiché à sa valeur sans animation : il ne rejouera pas au retour des
+      // animations, sur un chiffre déjà lu.
+      if (element && !decorativeMotion) played.current = true;
       setShown(value);
       return undefined;
     }

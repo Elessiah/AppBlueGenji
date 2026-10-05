@@ -18,10 +18,13 @@ import { shouldDeferReveal } from "@/lib/shared/landing-motion";
 export function Reveal({ children }: Readonly<{ children: ReactNode }>) {
   const ref = useRef<HTMLDivElement>(null);
   const { decorativeMotion } = useClientPower();
+  // Montrée une fois, sans animation ou non, la section ne se masque plus :
+  // le retour des animations (focus regagné) ne la refait pas apparaître.
+  const settled = useRef(false);
 
   useEffect(() => {
     const element = ref.current;
-    if (!element || element.classList.contains("reveal-in")) return undefined;
+    if (!element || settled.current || element.classList.contains("reveal-in")) return undefined;
     const defer = shouldDeferReveal({
       motion: decorativeMotion,
       observerSupported: typeof IntersectionObserver !== "undefined",
@@ -29,6 +32,7 @@ export function Reveal({ children }: Readonly<{ children: ReactNode }>) {
       viewportHeight: window.innerHeight,
     });
     if (!defer) {
+      settled.current = true;
       element.classList.remove("reveal-pending");
       return undefined;
     }
