@@ -81,8 +81,10 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
   qui a le plus de place, **sans jamais recouvrir le pied** ni sortir de la
   fenêtre (8 px de marge) ; plus haut que cette place, sa liste
   (`<ScrollArea>` verticale) est bornée et défile. Elles suivent le
-  défilement de la page, le redimensionnement et l'ajout ou le retrait d'une
-  action par le flux,
+  défilement de la page, le redimensionnement, l'ajout ou le retrait d'une
+  action par le flux et tout déplacement de la carte sans défilement (une
+  ligne ajoutée par le flux, une voisine qui grandit : les ancêtres de la
+  carte sont observés par un `ResizeObserver` tant que le panneau est ouvert),
   origine du repère retranchée (la page est sous un ancêtre transformé,
   `.fade-in`). Le défilement d'une zone **qui contient la carte** (arbre,
   colonnes de manche) le referme, focus rendu au bouton : la carte pourrait y
