@@ -9,7 +9,7 @@ Marvel Rivals. Corrections apportées à un audit UI/UX antérieur
 
 | Avant | Après |
 | --- | --- |
-| « Voir le classement complet » menait à `/joueurs`, alors que le tableau classe des **équipes**. | Le lien mène à `/equipes`. |
+| « Voir le classement complet » menait à `/joueurs`, alors que le tableau classe des **équipes**. | Le lien mène à `/equipes`, puis (2026-10-05) à la page dédiée `/classement` (`RANKING_PAGE.md`). |
 | Une requête de filtre en échec laissait la pastille du nouveau jeu allumée sur les lignes de l'ancien filtre, sans message ; aucun état de chargement ; l'effet refaisait au montage la requête « all » qu'`initialRows` couvre déjà. | La pastille ne change qu'au succès — un échec la ramène au dernier filtre chargé et affiche un toast d'erreur (`useToast`) ; le premier rendu ne refait pas la requête de `initialRows` ; le tableau porte `aria-busy` pendant le chargement. |
 | Un classement vide n'affichait qu'un en-tête sans rangée. | Une phrase « Aucune équipe classée pour le moment. » remplace le corps du tableau. |
 | « Top équipes » / « Prochains événements » (`CalendarCard`) étaient des `<span>`, sans niveau de titre ; le titre de l'appel final (`JoinCTA`, « Ton équipe. Notre bracket. ») était un `h3` qui se rattachait à la section Partenaires faute de `h2` propre. | `h3` pour les deux cartes de la section « Classement et calendrier » (sous son `h2`), `h2` pour l'appel final, qui a sa propre section (RGAA 9.1). |

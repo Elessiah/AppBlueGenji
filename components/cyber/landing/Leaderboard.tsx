@@ -6,6 +6,7 @@ import { TeamSigil } from "@/components/cyber";
 import { TeamLink } from "@/components/entity-link";
 import { useToast } from "@/components/ui/toast";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
+import { rankingFilterHref, type RankingGameFilter } from "@/lib/shared/ranking-page";
 import styles from "./Leaderboard.module.css";
 
 type LeaderboardProps = {
@@ -16,7 +17,8 @@ type LeaderboardResponse = {
   leaderboard: LandingLeaderboardRow[];
 };
 
-type GameFilter = "all" | "ow" | "mr";
+/** Mêmes identifiants que les pastilles de `/classement` : le lien garde l'onglet. */
+type GameFilter = RankingGameFilter;
 
 const TREND_CLASSES: Record<LandingLeaderboardRow["trend"], string | undefined> = {
   up: styles.trendUp,
@@ -129,7 +131,9 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 </span>
                 <span className={styles.wl} role="cell">
                   <span className={styles.wins}>{row.wins}</span>
-                  <span className={styles.losses}>–{row.losses}</span>
+                  <span className={styles.losses}>–</span>
+                  {/* Une défaite se lit dans sa couleur ; zéro reste neutre. */}
+                  <span className={row.losses > 0 ? "result-loss" : styles.losses}>{row.losses}</span>
                 </span>
                 <span className="num" role="cell">{row.points}</span>
                 <span className={`${styles.trend} ${trendClass}`} role="cell">{trend}</span>
@@ -140,7 +144,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
       </div>
 
       <div className={styles.footer}>
-        <Link href="/equipes" className="mono">VOIR LE CLASSEMENT COMPLET →</Link>
+        <Link href={rankingFilterHref(game)} className="mono">VOIR LE CLASSEMENT COMPLET →</Link>
       </div>
     </div>
   );

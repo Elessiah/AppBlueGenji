@@ -292,18 +292,23 @@ describe("loadTeamRanking", () => {
     expect((await loadTeamRanking()).map((row) => row.teamId)).toEqual([1, 2]);
   });
 
-  it("les garde à la cote de départ quand on le demande, mais en fin de liste", async () => {
+  // Retour du 2026-10-05 : un seul match joué sur le site, et la perdante
+  // passait deuxième, devant toutes les équipes restées à 500.
+  it("les garde à la cote de départ quand on le demande, rangées à cette cote", async () => {
     await mockDb(
-      fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Zulu")]),
+      fakeDb(
+        [matchRow(1, 1, 2, 1)],
+        [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Zulu"), teamRow(4, "Yankee")],
+      ),
     );
 
     const rows = await loadTeamRanking({ includeUnplayed: true });
 
-    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Bravo", "Zulu"]);
-    // Bravo, battue, est passée sous la cote de départ ; Zulu, qui n'a rien
-    // joué, y est restée — et se range pourtant derrière elle.
-    expect(rows[1].points).toBeLessThan(RANKING_BASE_POINTS);
-    expect(rows[2]).toMatchObject({ points: RANKING_BASE_POINTS, wins: 0, losses: 0 });
+    // Alpha a gagné ; Yankee et Zulu, sans match, restent à 500 ; Bravo,
+    // battue, est passée sous la cote de départ : elle ferme la marche.
+    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Yankee", "Zulu", "Bravo"]);
+    expect(rows[3].points).toBeLessThan(RANKING_BASE_POINTS);
+    expect(rows[1]).toMatchObject({ points: RANKING_BASE_POINTS, wins: 0, losses: 0 });
   });
 
   // Une entrée solo n'est pas une équipe : la laisser dans la liste décalerait
@@ -381,17 +386,39 @@ describe("getTeamRankingPosition", () => {
     expect(ranking.position).toBe(rows.findIndex((row) => row.teamId === 3) + 1);
   });
 
-  it("donne le même rang à deux équipes à égalité de cote", async () => {
-    // Deux paires symétriques : 1 et 3 finissent exactement à la même cote.
+  it("départage deux équipes à égalité de cote comme /classement", async () => {
+    // Deux paires symétriques : 1 et 3 finissent exactement à la même cote ;
+    // le nom tranche, comme dans la liste affichée.
     await mockDb(
       fakeDb(
         [matchRow(1, 1, 2, 1), matchRow(2, 3, 4, 3)],
-        [teamRow(1), teamRow(2), teamRow(3), teamRow(4)],
+        [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Charlie"), teamRow(4, "Delta")],
       ),
     );
 
     expect((await getTeamRankingPosition(1)).position).toBe(1);
-    expect((await getTeamRankingPosition(3)).position).toBe(1);
+    expect((await getTeamRankingPosition(3)).position).toBe(2);
+  });
+
+  // Retour du 2026-10-05 : la place de la fiche se compte sur la même liste
+  // que `/classement`, sinon la perdante lisait « 2ᵉ sur 2 » sur sa fiche.
+  it("place une équipe battue derrière les équipes restées à la cote de départ", async () => {
+    await mockDb(
+      fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2), teamRow(3), teamRow(4)]),
+    );
+
+    const ranking = await getTeamRankingPosition(2);
+
+    expect(ranking.position).toBe(4);
+    expect(ranking.total).toBe(4);
+  });
+
+  it("ne donne pas de place à une équipe listée sans match, mais la compte", async () => {
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2), teamRow(3)]));
+
+    const ranking = await getTeamRankingPosition(3);
+
+    expect(ranking).toMatchObject({ position: null, total: 3, points: RANKING_BASE_POINTS });
   });
 
   it("laisse non classée une équipe sans match, à la cote de départ", async () => {
@@ -444,7 +471,7 @@ describe("loadEntrantsBySiteRanking", () => {
     expect(ordered[0].teamName).toBe("Alpha");
   });
 
-  it("range les inscrites jamais vues derrière celles qui ont joué", async () => {
+  it("seede une inscrite jamais vue à sa cote de départ, devant une battue", async () => {
     const connection = connectionWith(
       [matchRow(1, 1, 2, 1)],
       [
@@ -453,9 +480,21 @@ describe("loadEntrantsBySiteRanking", () => {
       ],
     );
 
-    // Alpha est en tête alphabétiquement et à la cote de départ ; Zulu a joué
-    // et perdu — elle passe pourtant devant.
-    expect((await loadEntrantsBySiteRanking(connection, 7)).map((e) => e.teamId)).toEqual([2, 9]);
+    // Alpha n'a rien joué et reste à 500 ; Zulu a joué et perdu, sous 500 : la
+    // cote prime, comme sur le leaderboard (même `compareRankedTeams`).
+    expect((await loadEntrantsBySiteRanking(connection, 7)).map((e) => e.teamId)).toEqual([9, 2]);
+  });
+
+  it("seede une gagnante devant une inscrite jamais vue", async () => {
+    const connection = connectionWith(
+      [matchRow(1, 1, 2, 1)],
+      [
+        { team_id: 9, team_name: "Alpha" },
+        { team_id: 1, team_name: "Zulu" },
+      ],
+    );
+
+    expect((await loadEntrantsBySiteRanking(connection, 7)).map((e) => e.teamId)).toEqual([1, 9]);
   });
 
   it("ne trie plus rien en SQL : l'ordre vient du rejeu", async () => {

@@ -334,12 +334,25 @@ describe("ordre du classement", () => {
   // Sans cette règle, une équipe de remplissage — encore à la cote de départ —
   // se placerait au milieu du tableau sans avoir rien joué, et le leaderboard
   // de l'accueil, qui n'affiche que huit lignes, s'en serait rempli.
-  it("range toute équipe sans match après les classées, même mieux cotée", () => {
+  // Retour du 2026-10-05 : après un seul match du site, la perdante (483)
+  // passait deuxième, devant toutes les équipes restées à 500.
+  it("range une équipe sans match à sa cote : devant une équipe battue, plus bas cotée", () => {
     const jamais = team("Alpha", RANKING_BASE_POINTS, 0, 0);
     const battue = team("Zulu", RANKING_BASE_POINTS - 100, 0, 3);
 
-    expect(compareRankedTeams(battue, jamais)).toBeLessThan(0);
-    expect(compareRankedTeams(jamais, battue)).toBeGreaterThan(0);
+    expect(compareRankedTeams(jamais, battue)).toBeLessThan(0);
+    expect(compareRankedTeams(battue, jamais)).toBeGreaterThan(0);
+  });
+
+  it("à cote égale, range une équipe qui a gagné devant une équipe sans match", () => {
+    const jamais = team("Alpha", RANKING_BASE_POINTS, 0, 0);
+    const gagnante = team("Zulu", RANKING_BASE_POINTS, 1, 1);
+
+    expect(compareRankedTeams(gagnante, jamais)).toBeLessThan(0);
+  });
+
+  it("départage à cote et victoires égales par le moins de défaites", () => {
+    expect(compareRankedTeams(team("Zulu", 600, 2, 1), team("Alpha", 600, 2, 3))).toBeLessThan(0);
   });
 
   it("classe d'abord à la cote", () => {
@@ -369,8 +382,8 @@ describe("ordre du classement", () => {
     expect([...rows].sort(compareRankedTeams).map((row) => row.name)).toEqual([
       "Alpha",
       "Bravo",
-      "Zulu",
       "Neuve",
+      "Zulu",
     ]);
   });
 });

@@ -81,18 +81,21 @@ pour rester lisible. **C'est la seule entorse à la symétrie** : le vainqueur
 prend ses points même quand le perdant n'a plus rien à donner. Elle est
 documentée et couverte par son propre test.
 
-### Une équipe sans match n'est pas classée
+### Une équipe sans match se range à sa cote
 
-Tout le monde part de 500, y compris les ~140 équipes de remplissage du jeu de
-test et toute équipe qui vient d'être créée. Les laisser se mêler aux classées
-les placerait **au milieu du tableau sans avoir rien joué**, et le leaderboard
-de l'accueil, qui n'affiche que huit lignes, s'en serait rempli devant des
-équipes qui jouent.
+Tout le monde part de 500, y compris toute équipe qui vient d'être créée.
+`compareRankedTeams` trie **strictement à la cote**, puis aux victoires, aux
+défaites (moins d'abord), aux nuls, au nom : une équipe sans match se range à
+500, derrière toute équipe qui a gagné des points et devant toute équipe qui en
+a perdu. C'est la **règle de tri unique** : annuaire, fiche, leaderboard,
+`/classement` et seeding l'appliquent tous.
 
-`compareRankedTeams` range donc toute équipe sans match comptée après les
-classées, quelle que soit sa cote — puis trie à la cote, aux victoires, au nom.
-C'est la **règle de tri unique** : annuaire, fiche, leaderboard et seeding
-l'appliquent tous.
+Jusqu'au 2026-10-05, les équipes sans match passaient après **toutes** les
+classées, quelle que soit leur cote : avec un seul match joué sur le site, la
+perdante (483) se retrouvait deuxième devant toutes les équipes à 500. Détail et
+effet sur le seeding : `RANKING_PAGE.md`. Une équipe sans match reste « non
+classée » au sens de `isRankedTeam` (légende de la cote, pas de place sur la
+fiche).
 
 ### Équipes dissoutes
 

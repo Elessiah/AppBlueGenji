@@ -84,6 +84,10 @@ Décision du 2026-10-05 : la défaite ne partage sa couleur avec **rien d'autre*
 
 **Garde-fou.** `tests/app/loss-colour.test.ts` balaie `app/` et `components/` : `--result-loss*` et `.result-loss` n'apparaissent que dans une règle ou un composant de défaite, et aucune barre de défaite ne reprend le rose.
 
+### Podium du classement (2026-10)
+
+Un podium à trois marches (`/classement`) distingue chaque place, sans teinte chaude : **1re** au dégradé de marque (`--grad-brand`) avec couronne cyan, **2e** `--cyan-400`, **3e** violet (`--violet-300` / `--violet-400`). Le rose (`--pink-400`) reste le repère commun « top 3 » des cartes d'annuaire `/equipes` (une grille, pas un podium). Détail : `RANKING_PAGE.md`.
+
 ### Composants
 Primitives dans `components/cyber/` :
 - **CyberButton** — `variant="primary"|"ghost"`, support `asChild` (Radix Slot)
