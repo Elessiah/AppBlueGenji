@@ -92,7 +92,7 @@ describe("feuilles de la carte et de la fiche — jetons définis", () => {
   it("la carte colore le forfait et le vainqueur par jeton", () => {
     const css = stripComments(MATCH_ROW_CSS);
     expect(css).toMatch(/\.forfeitScore\s*\{[^}]*color:\s*var\(--amber\)/);
-    expect(css).toMatch(/\.winner \.score\s*\{[^}]*color:\s*var\(--accent-green\)/);
+    expect(css).toMatch(/\.winner \.score\s*\{[^}]*color:\s*var\(--teal-400\)/);
     expect(css).toMatch(/\.card\s*\{[^}]*background:\s*var\(--cyber-bg-2\)/);
   });
 });
