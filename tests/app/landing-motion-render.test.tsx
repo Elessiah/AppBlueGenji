@@ -61,6 +61,11 @@ describe("animations de l'accueil — contenu visible sans JavaScript", () => {
     expect(source).not.toMatch(/rootMargin:\s*"[^"]*-\d/);
   });
 
+  it("une section ou un chiffre montré sans animation ne rejoue pas au retour des animations", () => {
+    expect(readSource("components/cyber/landing/Reveal.tsx")).toMatch(/if \(!defer\) \{\s*settled\.current = true;/);
+    expect(readSource("components/cyber/landing/CountUp.tsx")).toContain("if (element && !decorativeMotion) played.current = true;");
+  });
+
   it("l'accueil enveloppe ses sections sous le hero, pas le hero (LCP)", () => {
     const page = readSource("app/page.tsx");
     expect(page).not.toMatch(/<Reveal>\s*<Hero/);
