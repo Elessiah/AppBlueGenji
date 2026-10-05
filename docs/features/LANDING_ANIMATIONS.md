@@ -24,6 +24,7 @@ Contenus, liens, structure SEO, repères (`PublicPageShell`), noms accessibles, 
 - **Animations CSS infinies** (éclats, reflet, pastille d'attente) : `animation-play-state: var(--deco-anim-state)` (balayage `deco-animations.test.ts`), plus une variante fixe sous `prefers-reduced-motion` pour le reflet.
 - **Transform et opacité seulement** : aucune animation ne touche la mise en page. Le décompte réserve sa largeur (`min-width` en `ch` sur la valeur finale, chiffres tabulaires).
 - **Visible sans JavaScript** : le rendu serveur n'écrit aucune classe de masquage ; `reveal-pending` n'est posée qu'après hydratation, et **jamais** sur une section déjà à l'écran (pas d'éclair plein → vide, pas de recul du LCP). Le hero n'est pas enveloppé. `CountUp` écrit la valeur finale côté serveur.
+- **Pas d'éclair au décompte** : un chiffre déjà à l'écran au chargement roule de 85 % à sa valeur (`countUpStart`), seul un chiffre hors de l'écran part de 0. À l'impression, `reveal-pending` est neutralisée (`@media print`).
 - **Une fois** : l'observateur se déconnecte à la première entrée à l'écran ; la boucle `requestAnimationFrame` du décompte s'arrête au bout de `COUNT_UP_MS` (1,2 s).
 - **Coût** : éclats en dégradés radiaux sans `filter: blur`, reflet sur une barre de 2 px ; aucune dépendance ajoutée.
 
