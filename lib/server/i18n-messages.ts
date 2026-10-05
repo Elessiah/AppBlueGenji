@@ -6,7 +6,9 @@
  * demande (`components/i18n/IntlMessages.tsx`).
  *
  * Le typage `Record<Locale, Messages>` fait du français la référence : une clé
- * anglaise manquante ou en trop casse `npm run typecheck`.
+ * anglaise manquante casse `npm run typecheck`. Une clé **en trop** passe (un
+ * import JSON n'est pas un littéral) : c'est le test de parité qui la refuse
+ * (`tests/lib/shared/i18n-messages-parity.test.ts`).
  */
 import enCommon from "@/messages/en/common.json";
 import frCommon from "@/messages/fr/common.json";
