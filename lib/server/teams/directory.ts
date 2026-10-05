@@ -234,9 +234,13 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
   });
 
   // Même ordre que le leaderboard de la landing et `/classement` : la cote, puis
-  // les victoires, les défaites et le nom. `TeamListItem` porte les quatre champs que
-  // `compareRankedTeams` lit, donc la carte se trie avec la règle unique.
-  unsorted.sort(compareRankedTeams);
+  // les victoires, les défaites, les nuls et le nom. `TeamListItem` ne porte
+  // pas les nuls : ils sont relus sur la ligne du classement, sans quoi deux
+  // équipes à égalité se départageraient autrement qu'à `/classement`.
+  const drawsOf = (id: number) => rankingByTeam.get(id)?.draws ?? 0;
+  unsorted.sort((a, b) =>
+    compareRankedTeams({ ...a, draws: drawsOf(a.id) }, { ...b, draws: drawsOf(b.id) }),
+  );
 
   const teams: TeamListItem[] = unsorted.map((team, index) => ({
     ...team,

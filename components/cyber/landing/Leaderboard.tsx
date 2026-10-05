@@ -6,6 +6,7 @@ import { TeamSigil } from "@/components/cyber";
 import { TeamLink } from "@/components/entity-link";
 import { useToast } from "@/components/ui/toast";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
+import { rankingFilterHref, type RankingGameFilter } from "@/lib/shared/ranking-page";
 import styles from "./Leaderboard.module.css";
 
 type LeaderboardProps = {
@@ -16,7 +17,8 @@ type LeaderboardResponse = {
   leaderboard: LandingLeaderboardRow[];
 };
 
-type GameFilter = "all" | "ow" | "mr";
+/** Mêmes identifiants que les pastilles de `/classement` : le lien garde l'onglet. */
+type GameFilter = RankingGameFilter;
 
 const TREND_CLASSES: Record<LandingLeaderboardRow["trend"], string | undefined> = {
   up: styles.trendUp,
@@ -142,7 +144,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
       </div>
 
       <div className={styles.footer}>
-        <Link href="/classement" className="mono">VOIR LE CLASSEMENT COMPLET →</Link>
+        <Link href={rankingFilterHref(game)} className="mono">VOIR LE CLASSEMENT COMPLET →</Link>
       </div>
     </div>
   );

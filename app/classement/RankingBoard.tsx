@@ -69,7 +69,9 @@ export function podiumGapText(rows: readonly { points: number }[], index: number
   const leaderGap = rows[0].points - rows[index].points;
   if (leaderGap <= 0) return "À égalité avec la tête";
   const gap = pointsBehind(rows, index);
-  const above = gap !== null && gap !== leaderGap ? ` · ${gap} du rang au-dessus` : "";
+  let above = "";
+  if (gap === 0) above = " · à égalité avec le rang au-dessus";
+  else if (gap !== null && gap !== leaderGap) above = ` · ${gap} du rang au-dessus`;
   return `À ${leaderGap} pts de la tête${above}`;
 }
 

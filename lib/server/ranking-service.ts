@@ -477,7 +477,8 @@ function rankingKey(state: RankedTeamState) {
  * (`includeUnplayed`) : toutes les équipes, celles sans match rangées à leur
  * cote de départ. Compter seulement les équipes ayant joué ferait dire
  * « 2ᵉ sur 2 » à une équipe à 483 que `/classement` place derrière toutes les
- * équipes à 500. Deux équipes à égalité de cote partagent leur place.
+ * équipes à 500. La place est l'index dans cette liste : à cote égale, les
+ * départages de `compareRankedTeams` tranchent, comme sur la page.
  *
  * Une équipe sans match n'a pas de place (`position: null`, « Aucun match
  * joué ») ; elle compte pourtant dans `total`, comme elle figure à la page.
@@ -490,9 +491,11 @@ export async function getTeamRankingPosition(teamId: number): Promise<TeamRankin
   const states = await loadRankingState();
 
   if (self) {
-    const ahead = listed.filter((row) => row.points > self.points).length;
     return {
-      position: ahead + 1,
+      // L'index dans la liste triée, comme le rang affiché par `/classement`
+      // (`loadLeaderboardRows`) : à cote égale, les départages documentés
+      // (`compareRankedTeams`) tranchent, ici comme là.
+      position: listed.indexOf(self) + 1,
       total: listed.length,
       points: self.points,
       placementPoints: states.get(teamId)?.placementPoints ?? 0,
