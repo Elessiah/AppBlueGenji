@@ -2,7 +2,7 @@
 
 import type { TournamentPhase } from "@/lib/shared/types";
 import { Pill, ScrollArea } from "@/components/cyber";
-import { phaseFormatLabel, phaseStateLabel, phaseSubtitle } from "../_lib/phases";
+import { phaseFormatLabel, phaseStateLabel, phaseStateVariant, phaseSubtitle } from "../_lib/phases";
 
 interface PhaseTimelineProps {
   phases: TournamentPhase[];
@@ -89,9 +89,10 @@ export function PhaseTimeline({
               )}
               {/* Jamais `live` : une phase en cours n'est pas une diffusion,
                   et le rouge est réservé à ce qui est réellement à l'antenne
-                  (CLAUDE.md, « trois sens de live »). */}
+                  (CLAUDE.md, « trois sens de live »). Teinte par état
+                  (`phaseStateVariant`). */}
               <Pill
-                variant={isCurrent ? "blue" : "neutral"}
+                variant={phaseStateVariant(phase.state, isCurrent)}
                 style={{ fontSize: 11, padding: "2px 8px" }}
               >
                 {state}

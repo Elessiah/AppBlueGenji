@@ -125,8 +125,8 @@
 
 /* Tons : engagé (vert), arbitrage (bleu glacier), geste qui presse (ambre). */
 .tonePrimary {
-  border-color: color-mix(in srgb, var(--accent-green) 50%, transparent);
-  background: color-mix(in srgb, var(--accent-green) 14%, transparent);
+  border-color: color-mix(in srgb, var(--teal-400) 50%, transparent);
+  background: color-mix(in srgb, var(--teal-400) 14%, transparent);
 }
 
 .toneStaff {
@@ -140,7 +140,7 @@
 }
 
 .tonePrimary:hover {
-  background: color-mix(in srgb, var(--accent-green) 22%, transparent);
+  background: color-mix(in srgb, var(--teal-400) 22%, transparent);
 }
 
 .toneStaff:hover {

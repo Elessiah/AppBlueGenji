@@ -1,4 +1,5 @@
 import type { TournamentPhase, PhaseFormat, PhaseState, TournamentFormat } from "@/lib/shared/types";
+import type { PillVariant } from "@/components/cyber/Pill";
 
 export function phaseFormatLabel(format: PhaseFormat): string {
   switch (format) {
@@ -24,6 +25,22 @@ export function phaseStateLabel(state: PhaseState): string {
     case "SKIPPED":
       return "Ignorée";
   }
+}
+
+/** Variante de pastille d'une phase de la frise (`PhaseTimeline`). */
+export type PhaseStateVariant = Extract<PillVariant, "info" | "accent" | "success" | "neutral">;
+
+/**
+ * Teinte de l'état d'une phase, alignée sur celle des tournois
+ * (`STATE_META`) : une phase terminée est `success` — même courante, la
+ * dernière phase d'un tournoi fini le restant —, la phase courante ou en cours
+ * `info`, une phase à venir `accent` ; seule une phase ignorée reste `neutral`.
+ * Jamais `live` : une phase en cours n'est pas une diffusion.
+ */
+export function phaseStateVariant(state: PhaseState, isCurrent: boolean): PhaseStateVariant {
+  if (state === "SKIPPED") return "neutral";
+  if (state === "FINISHED") return "success";
+  return isCurrent || state === "RUNNING" ? "info" : "accent";
 }
 
 export function phaseSubtitle(phase: TournamentPhase, isLast: boolean): string {

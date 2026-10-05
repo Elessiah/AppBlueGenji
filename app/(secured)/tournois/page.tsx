@@ -490,7 +490,7 @@ export default function TournamentsPage() {
                   key={entry.key}
                   href={`#${pageSectionAnchor(entry.key)}`}
                   className={s.sectionNavLink}
-                  data-tone={entry.key === "mine" ? "mine" : undefined}
+                  data-tone={entry.key}
                   // Mène parfois à une section repliée (« Terminés ») : on la
                   // déplie, sans quoi le lien aboutirait sur un en-tête vide.
                   onClick={() => setSectionOpen(entry.key, true)}
@@ -578,6 +578,7 @@ export default function TournamentsPage() {
                 id={pageSectionAnchor("running")}
                 ix={ix("running")}
                 title="EN COURS"
+                tone="running"
                 count={totalRunning}
                 open={isOpen("running")}
                 onOpenChange={(open) => setSectionOpen("running", open)}
@@ -600,6 +601,7 @@ export default function TournamentsPage() {
                 id={pageSectionAnchor("registration")}
                 ix={ix("registration")}
                 title="INSCRIPTIONS OUVERTES"
+                tone="registration"
                 count={totalRegistration}
                 open={isOpen("registration")}
                 onOpenChange={(open) => setSectionOpen("registration", open)}
@@ -621,6 +623,7 @@ export default function TournamentsPage() {
                 id={pageSectionAnchor("upcoming")}
                 ix={ix("upcoming")}
                 title="PROCHAINEMENT"
+                tone="upcoming"
                 count={totalUpcoming}
                 open={isOpen("upcoming")}
                 onOpenChange={(open) => setSectionOpen("upcoming", open)}
@@ -642,6 +645,7 @@ export default function TournamentsPage() {
                 id={pageSectionAnchor("finished")}
                 ix={ix("finished")}
                 title="TERMINÉS"
+                tone="finished"
                 count={totalFinished}
                 open={isOpen("finished")}
                 onOpenChange={(open) => setSectionOpen("finished", open)}

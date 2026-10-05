@@ -117,10 +117,10 @@ describe("en-tête de tournoi — libellés", () => {
     const states: TournamentState[] = ["UPCOMING", "REGISTRATION", "RUNNING", "FINISHED"];
     for (const state of states) {
       expect(STATE_META[state].label).toBeTruthy();
-      expect(["neutral", "green", "blue", "muted"]).toContain(STATE_META[state].tone);
+      expect(["accent", "highlight", "info", "success"]).toContain(STATE_META[state].tone);
     }
     // Un tournoi « en cours » n'est pas une diffusion (CLAUDE.md).
-    expect(STATE_META.RUNNING.tone).toBe("blue");
+    expect(STATE_META.RUNNING.tone).toBe("info");
     expect(STATE_META.RUNNING.label).toBe("En cours");
   });
 });

@@ -35,6 +35,26 @@
   border-color: rgba(var(--blue-500-rgb), 0.4);
 }
 
+/* Survol : liseré glacier et halo néon froid, sans aucun déplacement — la
+   carte porte les connecteurs de `BracketTree`, qui ne suivraient pas. Pointeur
+   fin seulement (au toucher, le halo resterait collé) ; la carte visée par une
+   ancre garde son anneau (`.match-anchor-target`). */
+.card {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover:not(:global(.match-anchor-target)) {
+    border-color: rgba(var(--blue-500-rgb), 0.55);
+    box-shadow:
+      0 0 0 1px rgba(var(--blue-500-rgb), 0.15),
+      0 8px 26px -8px rgba(var(--blue-500-rgb), 0.38),
+      0 0 18px -6px rgba(var(--violet-400-rgb), 0.35);
+  }
+}
+
 /* Ligne d'un engagé : le nom et le score sont ce qu'on vient lire — 14 px,
    score en 16 px gras à chiffres tabulaires, plus haut que tout le reste. */
 .row {
@@ -53,14 +73,14 @@
 }
 
 /* Rencontre tranchée : la ligne perdante passe en retrait, la gagnante porte
-   le vert et la graisse. */
+   le turquoise (`success`) et la graisse. */
 .decided {
   background: color-mix(in srgb, var(--ink) 3%, transparent);
   color: var(--ink-mute);
 }
 
 .winner {
-  background: color-mix(in srgb, var(--accent-green) 15%, transparent);
+  background: color-mix(in srgb, var(--teal-400) 15%, transparent);
   color: var(--ink);
   font-weight: 600;
 }
@@ -81,7 +101,7 @@
 }
 
 .winner .score {
-  color: var(--accent-green);
+  color: var(--teal-400);
 }
 
 /* « FF » : l'ambre du forfait, qu'il soit tranché ou seulement noté. */

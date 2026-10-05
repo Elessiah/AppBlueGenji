@@ -62,19 +62,36 @@ Règles :
 
 ## Couleurs d'état
 
-`STATE_META` associe à chaque état un **ton**, jamais le rouge :
+`STATE_META` associe à chaque état un **ton** — une variante sémantique des
+pastilles (`DESIGN_SYSTEM.md` § Pastilles et étiquettes), jamais le rouge ni un
+gris. Ce sont les teintes des rubans de `/tournois`
+(`TOURNAMENT_LIST_CARDS.md` § Couleurs d'état) :
 
-| État | Libellé | Ton |
-| --- | --- | --- |
-| `UPCOMING` | Prochainement | neutre |
-| `REGISTRATION` | Inscriptions ouvertes | vert |
-| `RUNNING` | En cours | bleu |
-| `FINISHED` | Terminé | atténué |
+| État | Libellé | Ton | Teinte |
+| --- | --- | --- | --- |
+| `UPCOMING` | Prochainement | `accent` | `--violet-300` |
+| `REGISTRATION` | Inscriptions ouvertes | `highlight` | `--pink-400` |
+| `RUNNING` | En cours | `info` | `--blue-300` |
+| `FINISHED` | Terminé | `success` | `--teal-400` |
 
 Le rouge (`pill-live`) reste réservé à ce qui est **réellement à l'antenne**.
 Un tournoi « en cours » n'est pas une diffusion — c'est la règle des trois sens
-de « live » de `CLAUDE.md`, et `PhaseTimeline` s'y range aussi : la phase
-courante y passe du rouge au bleu.
+de « live » de `CLAUDE.md`, et `PhaseTimeline` s'y range aussi : sa pastille
+suit `phaseStateVariant` (terminée `success`, même courante ; courante ou en cours `info`, à venir `accent`,
+ignorée `neutral`). `⚙ Admin` prend `accent`.
+
+### Habillage néon froid
+
+- **Cadre** (`.header`, sur `.ds-header`) : liseré haut au dégradé de marque
+  (`--grad-brand`), éclat violet dans le coin haut droit, bordure glacier.
+- **Nom** (`.title`, sur `.ds-title`) : dégradé blanc glacé → cyan → violet.
+- **Lien de retour** glacier (`--blue-300`, `--cyan-400` au survol) ; jauge
+  d'effectif au dégradé de marque.
+- **Panneaux de la fiche** (`page.module.css`, `.sheet` posé sur la section qui
+  enveloppe la fiche) : titres de panneau (`.ds-section-title` `green`/`blue`)
+  au dégradé de marque — texte et trait —, aplat `--ink` sous « Contraste
+  renforcé » et à l'impression ; panneaux à liseré glacier et halo au survol
+  (pointeur fin). « Zone de danger » garde son rouge.
 
 ## Tests
 

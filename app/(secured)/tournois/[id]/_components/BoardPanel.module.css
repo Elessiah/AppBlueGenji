@@ -104,8 +104,8 @@
 /* Manche entièrement jouée : la pastille le dit en vert, sans concurrencer
    l'accent du volet. */
 .pillDone {
-  color: var(--accent-green, #4fe0a2);
-  border-color: rgba(var(--green-rgb, 79, 224, 162), 0.4);
+  color: var(--teal-400);
+  border-color: rgba(var(--teal-400-rgb), 0.4);
 }
 
 .flag {
