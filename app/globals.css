@@ -1637,12 +1637,23 @@ html {
 
 /* « En attente de lancement » : un match daté, à venir — teinte violette et
    halo doux qui respire, l'horaire mis en valeur à côté (`LiveCard` `.when`). Le
-   halo est une `box-shadow` animée sur la pastille seule (petite surface) et se
-   fige avec le régime de charge. */
+   halo est fixe, posé sur un `::after` dont seule l'opacité s'anime (aucun
+   repeint par image), et se fige avec le régime de charge. */
 .pill-waiting {
+  position: relative;
   color: var(--violet-300);
   border-color: rgba(var(--violet-400-rgb), 0.55);
   background: rgba(var(--violet-400-rgb), 0.14);
+}
+
+.pill-waiting::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: 0 0 14px 1px rgba(var(--violet-400-rgb), 0.4);
+  opacity: 0;
+  pointer-events: none;
   animation: pill-waiting-glow 2.8s ease-in-out infinite;
   animation-play-state: var(--deco-anim-state);
 }
@@ -1650,10 +1661,10 @@ html {
 @keyframes pill-waiting-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(var(--violet-400-rgb), 0);
+    opacity: 0;
   }
   50% {
-    box-shadow: 0 0 14px 1px rgba(var(--violet-400-rgb), 0.38);
+    opacity: 1;
   }
 }
 
@@ -1711,11 +1722,17 @@ html {
 }
 
 /* À l'impression, rien n'entre « à l'écran » : une section jamais atteinte
-   resterait blanche. */
+   resterait blanche. Et les fonds ne s'impriment pas : un texte en dégradé
+   (transparent, peint par son fond) sortirait blanc — il reprend une couleur. */
 @media print {
   .reveal-pending {
     opacity: 1;
     transform: none;
+  }
+
+  .text-gradient {
+    background: none;
+    color: var(--blue-500);
   }
 }
 

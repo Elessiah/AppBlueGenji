@@ -35,8 +35,12 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
       setShown(value);
       return undefined;
     }
-    const onScreen = element.getBoundingClientRect().top < window.innerHeight;
-    if (!countUpMayStart(onScreen, performance.now() - mountedAt.current)) {
+    const rect = element.getBoundingClientRect();
+    const onScreen = rect.top < window.innerHeight && rect.bottom > 0;
+    // Au-dessus de la fenêtre (rechargement qui restaure le défilement) : déjà
+    // dépassé, donc tenu pour lu — on n'y revient pas avec un décompte.
+    const above = rect.bottom <= 0;
+    if (above || !countUpMayStart(onScreen, performance.now() - mountedAt.current)) {
       played.current = true;
       setShown(value);
       return undefined;
