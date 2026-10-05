@@ -34,6 +34,10 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 chaude (ni rouge du direct, ni ambre, ni `--result-loss`), et porte
 `aria-current="page"` sur sa section (`isNavLinkActive`). En mobile (≤ 720 px)
 les liens passent sur une seconde ligne qui se replie : pas de menu à part.
+Entre 721 et 1000 px, les quatre liens tiennent dans leur tiers de grille par
+un interlettrage resserré (0,08 em) et, en dernier recours, passent à la ligne
+plutôt que de décentrer le logo ou de rogner le pseudo (vérifié à 721, 768,
+900 et 1010 px : aucun débordement horizontal).
 
 Accessibilité du menu (Échap, sortie au clavier, `aria-current`) →
 `ACCESSIBILITY_LANDMARKS_FOCUS.md`.
