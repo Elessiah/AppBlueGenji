@@ -89,8 +89,9 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
   `.fade-in`). Le défilement d'une zone **qui contient la carte** (arbre,
   colonnes de manche) le referme, focus rendu au bouton : la carte pourrait y
   sortir de la partie visible. Le panneau reste dans le DOM de
-  la carte — l'ordre de tabulation suit le bouton — toujours rendu, masqué par
-  `hidden` (sa zone défilante n'est montée qu'à l'ouverture). La carte garde
+  la carte — l'ordre de tabulation suit le bouton. Son conteneur est toujours
+  rendu (masqué par `hidden`, visé par `aria-controls`), mais sa liste n'est
+  montée qu'à l'ouverture : un plateau compte jusqu'à 254 cartes. La carte garde
   son `overflow: hidden` : un descendant en `position: fixed` a son repère
   hors d'elle, elle ne le rogne pas.
 - Échap referme et rend le focus au bouton (`handleMenuEscape`) ; un clic
@@ -107,7 +108,12 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
 ## Tests
 
 - `tests/tournois/match-card-actions.test.tsx` — liste et rangement (pur),
-  public de chaque action par rendu de la carte, divulgation reliée à son
-  panneau, branchements clavier et confirmation du lancement forcé.
+  rendu du pied (principale, divulgation reliée à un conteneur vide, « Caster »
+  bloqué), placement du panneau, branchements clavier et confirmation du
+  lancement forcé.
+- `tests/tournois/match-card-roles.test.tsx` — public de chaque action sur la
+  carte entière ; le pied y est remplacé par une sonde qui écrit toutes ses
+  actions (`tests/helpers/match-card-actions-probe.ts`), un rendu statique ne
+  pouvant pas ouvrir le panneau.
 - `tests/tournois/match-launch-strip.test.tsx`, `match-replay-strip.test.tsx` —
-  bandeaux sans bouton, boutons retrouvés dans le pied d'action.
+  bandeaux sans bouton, boutons retrouvés dans le pied d'action (même sonde).
