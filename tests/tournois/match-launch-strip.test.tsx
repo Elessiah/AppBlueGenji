@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { MatchLaunchStrip } from "@/app/(secured)/tournois/[id]/_components/MatchLaunchStrip";
+import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { matchLaunchPhase, type CastBlock } from "@/lib/shared/match-launch";
@@ -21,7 +23,7 @@ type Viewer = {
   castBlock?: CastBlock | null;
 };
 
-function render(match: BracketMatch, viewer: Viewer = {}) {
+function providers(viewer: Viewer, child: ReactNode) {
   return renderToStaticMarkup(
     <ToastProvider>
       <LiveProvider
@@ -35,17 +37,35 @@ function render(match: BracketMatch, viewer: Viewer = {}) {
         myTeamId={viewer.myTeamId ?? null}
         castBlock={viewer.castBlock === undefined ? "NOT_CASTER" : viewer.castBlock}
       >
-        {/* La phase vient de la carte (`MatchRow`) : le test la dérive de la
-            même règle, à l'instant du rendu. */}
-        <MatchLaunchStrip
-          match={match}
-          phase={matchLaunchPhase(
-            { ...match, refereeScheduling: viewer.refereeScheduling ?? false },
-            Date.now(),
-          )}
-        />
+        {child}
       </LiveProvider>
     </ToastProvider>,
+  );
+}
+
+/** La carte entière, pied d'action compris. */
+function card(match: BracketMatch, viewer: Viewer = {}) {
+  return providers(
+    viewer,
+    <MatchRow
+      match={match}
+      adminResolvable={false}
+      onOpenAdminModal={() => undefined}
+      scoreLocked={false}
+      roundNumber={1}
+    />,
+  );
+}
+
+function render(match: BracketMatch, viewer: Viewer = {}) {
+  // La phase vient de la carte (`MatchRow`) : le test la dérive de la même
+  // règle, à l'instant du rendu.
+  return providers(
+    viewer,
+    <MatchLaunchStrip
+      match={match}
+      phase={matchLaunchPhase({ ...match, refereeScheduling: viewer.refereeScheduling ?? false }, Date.now())}
+    />,
   );
 }
 
@@ -92,49 +112,54 @@ describe("MatchLaunchStrip — ce que tout le monde lit", () => {
   });
 });
 
-describe("MatchLaunchStrip — boutons selon le lecteur", () => {
+/**
+ * Les boutons du lancement vivent dans le pied d'action de la carte
+ * (`MatchCardActions`) : ces cas rendent la carte entière (`MatchRow`), dont le
+ * panneau « Plus d'actions » est toujours dans le balisage (masqué par
+ * `hidden`) — chaque bouton se repère à son `data-action`.
+ */
+describe("pied d'action — boutons du lancement selon le lecteur", () => {
   it("offre l'ouverture de la modale aux joueurs du match, pas aux autres", () => {
-    expect(render(lobby(), { myTeamId: 10 })).toContain("Ouvrir le lancement");
-    expect(render(lobby(), { myTeamId: 99 })).not.toContain("Ouvrir le lancement");
+    expect(card(lobby(), { myTeamId: 10 })).toContain("Ouvrir le lancement : Alpha contre Bravo");
+    expect(card(lobby(), { myTeamId: 99 })).not.toContain('data-action="openLaunch"');
   });
 
   it("offre « Caster » à un caster, même sans identité vérifiée — le bouton dit ce qui manque", () => {
-    const blocked = render(lobby(), { canManage: true, castBlock: "CASTER_IDENTITY_REQUIRED" });
-    expect(blocked).toContain("🎙 Caster");
-    expect(blocked).toContain('aria-disabled="true"');
-    expect(blocked).toContain("Battle.net");
+    const blocked = card(lobby(), { canManage: true, castBlock: "CASTER_IDENTITY_REQUIRED" });
+    expect(blocked).toContain("Caster ce match");
+    expect(blocked).toMatch(/aria-disabled="true"[^>]*Battle\.net|Battle\.net[^>]*aria-disabled="true"/);
 
-    const allowed = render(lobby(), { canManage: true, castBlock: null });
+    const allowed = card(lobby(), { canManage: true, castBlock: null });
     expect(allowed).toContain('aria-disabled="false"');
   });
 
   it("ne propose pas de caster son propre match ni un match déjà casté", () => {
-    expect(render(lobby(), { canManage: true, castBlock: null, myTeamId: 10 })).not.toContain("🎙 Caster");
-    expect(render(lobby({ casterUserId: 5, casterPseudo: "Autre" }), { canManage: true, castBlock: null })).not.toContain(
-      "🎙 Caster",
+    expect(card(lobby(), { canManage: true, castBlock: null, myTeamId: 10 })).not.toContain('data-action="claimCast"');
+    expect(card(lobby({ casterUserId: 5, casterPseudo: "Autre" }), { canManage: true, castBlock: null })).not.toContain(
+      'data-action="claimCast"',
     );
   });
 
   it("laisse le caster se retirer, et l'arbitrage retirer un caster", () => {
     const mine = lobby({ casterUserId: 1, casterPseudo: "Moi" });
-    expect(render(mine, { viewerUserId: 1 })).toContain("Ne plus caster");
-    expect(render(lobby({ casterUserId: 5, casterPseudo: "Autre" }), { canSchedule: true })).toContain(
-      "Retirer caster",
+    expect(card(mine, { viewerUserId: 1 })).toContain("Ne plus caster");
+    expect(card(lobby({ casterUserId: 5, casterPseudo: "Autre" }), { canSchedule: true })).toContain(
+      "Retirer le caster",
     );
   });
 
   it("donne à l'arbitrage le changement d'hôte et le lancement forcé", () => {
-    const html = render(lobby(), { canSchedule: true });
-    expect(html).toContain("⇄ Hôte");
-    expect(html).toContain("▶ Forcer");
-    const player = render(lobby(), { myTeamId: 10 });
-    expect(player).not.toContain("⇄ Hôte");
-    expect(player).not.toContain("▶ Forcer");
+    const html = card(lobby(), { canSchedule: true });
+    expect(html).toContain("Changer l&#x27;équipe hôte : Alpha contre Bravo");
+    expect(html).toContain("Forcer le lancement : Alpha contre Bravo");
+    const player = card(lobby(), { myTeamId: 10 });
+    expect(player).not.toContain('data-action="hostSwap"');
+    expect(player).not.toContain('data-action="force"');
   });
 
   it("ne propose plus de forcer un match déjà lancé", () => {
-    expect(render(lobby({ launchedAt: "2026-09-24T20:00:00.000Z" }), { canSchedule: true })).not.toContain(
-      "▶ Forcer",
+    expect(card(lobby({ launchedAt: "2026-09-24T20:00:00.000Z" }), { canSchedule: true })).not.toContain(
+      'data-action="force"',
     );
   });
 });
@@ -151,21 +176,26 @@ describe("MatchLaunchStrip — planification par l'arbitrage", () => {
     expect(html).not.toContain("Ouvrir le lancement");
   });
 
-  it("n'offre « Planifier » qu'à l'arbitrage", () => {
-    expect(render(lobby(), { refereeScheduling: true, canSchedule: true })).toContain("Planifier Alpha contre Bravo");
-    expect(render(lobby(), { refereeScheduling: true, canManage: true })).not.toContain("🗓 Planifier");
-    expect(render(lobby(), { refereeScheduling: true, myTeamId: 10 })).not.toContain("🗓 Planifier");
+  it("n'offre « Planifier » qu'à l'arbitrage — en action principale", () => {
+    const staff = card(lobby(), { refereeScheduling: true, canSchedule: true });
+    expect(staff).toContain("Planifier : Alpha contre Bravo");
+    // Action principale : hors du panneau replié.
+    expect(staff.indexOf('data-action="plan"')).toBeLessThan(staff.indexOf('hidden=""'));
+    expect(card(lobby(), { refereeScheduling: true, canManage: true })).not.toContain('data-action="plan"');
+    expect(card(lobby(), { refereeScheduling: true, myTeamId: 10 })).not.toContain('data-action="plan"');
   });
 
   it("laisse l'arbitrage forcer un match à planifier — forcer vaut planification", () => {
-    expect(render(lobby(), { refereeScheduling: true, canSchedule: true })).toContain("Forcer le lancement");
+    expect(card(lobby(), { refereeScheduling: true, canSchedule: true })).toContain("Forcer le lancement");
   });
 
   it("dit « En attente de départ » une fois planifié, avec la date pour les lecteurs d'écran", () => {
     const html = render(lobby({ startAt: future }), { refereeScheduling: true, canSchedule: true });
     expect(html).toContain("En attente de départ");
     expect(html).toContain("début le");
-    expect(html).not.toContain("🗓 Planifier");
+    expect(card(lobby({ startAt: future }), { refereeScheduling: true, canSchedule: true })).not.toContain(
+      'data-action="plan"',
+    );
   });
 
   it("dit aussi « En attente de départ » sur un match daté, option éteinte", () => {

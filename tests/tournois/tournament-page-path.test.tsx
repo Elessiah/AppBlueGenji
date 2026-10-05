@@ -17,7 +17,8 @@ const hook = readSource(`${DIR}/_hooks/useTournamentLive.ts`);
 const connection = readSource(`${DIR}/_lib/live-connection.ts`);
 const page = readSource(`${DIR}/page.tsx`);
 const header = readSource(`${DIR}/_components/TournamentHeader.tsx`);
-const launchStrip = readSource(`${DIR}/_components/MatchLaunchStrip.tsx`);
+// Le lancement forcé et sa confirmation vivent dans le pied d'action de la carte.
+const launchStrip = readSource(`${DIR}/_components/MatchCardActions.tsx`);
 const dialog = readSource("components/ui/confirm-action-dialog.tsx");
 
 /** Tranche de `source` qui s'ouvre sur `start` et se ferme au premier `end` qui suit. */
@@ -115,12 +116,12 @@ describe("confirmations des gestes sans retour", () => {
     expect(page).toContain("run: () => performForfeit(teamId, teamName, false)");
     expect(page).toContain("run: () => performLiftPenalty(penalty)");
     expect(launchStrip).toContain("<ConfirmActionDialog");
-    expect(launchStrip).toContain("onClick={() => setConfirmForce(true)}");
+    expect(launchStrip).toContain("force: () => setConfirmForce(true),");
   });
 
   it("se referment quand l'action n'est plus offerte", () => {
     expect(page).toContain("{pendingConfirm !== null && !frozen && (");
-    expect(launchStrip).toContain("{confirmForce && showForce && (");
+    expect(launchStrip).toContain("{confirmForce && hasForce && (");
   });
 
   it("ne se ferment que sur un geste abouti, et s'ouvrent sur « Annuler »", () => {
@@ -140,7 +141,7 @@ describe("confirmations des gestes sans retour", () => {
       expect(body).toContain("return false;");
     }
     expect(launchStrip).toContain(
-      "const run = async (action: () => Promise<void>, success: string): Promise<boolean> => {",
+      "const run = async (action: () => Promise<void>, success: string, refresh = true): Promise<boolean> => {",
     );
   });
 
