@@ -399,6 +399,27 @@ describe("getTeamRankingPosition", () => {
     expect((await getTeamRankingPosition(3)).position).toBe(1);
   });
 
+  // Retour du 2026-10-05 : la place de la fiche se compte sur la même liste
+  // que `/classement`, sinon la perdante lisait « 2ᵉ sur 2 » sur sa fiche.
+  it("place une équipe battue derrière les équipes restées à la cote de départ", async () => {
+    await mockDb(
+      fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2), teamRow(3), teamRow(4)]),
+    );
+
+    const ranking = await getTeamRankingPosition(2);
+
+    expect(ranking.position).toBe(4);
+    expect(ranking.total).toBe(4);
+  });
+
+  it("ne donne pas de place à une équipe listée sans match, mais la compte", async () => {
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2), teamRow(3)]));
+
+    const ranking = await getTeamRankingPosition(3);
+
+    expect(ranking).toMatchObject({ position: null, total: 3, points: RANKING_BASE_POINTS });
+  });
+
   it("laisse non classée une équipe sans match, à la cote de départ", async () => {
     await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2)]));
 
