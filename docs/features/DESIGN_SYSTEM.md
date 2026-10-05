@@ -18,7 +18,7 @@ Demande : un site plus lumineux, « qui fasse rêver » côté jeu, sans dégrad
 - **Règle « jamais tout gris »** : un texte secondaire est teinté de bleu froid (composante bleue > rouge d'au moins 16), jamais un gris neutre ; une pastille, un badge ou une étiquette choisit une **variante sémantique** — le neutre seulement pour ce qui l'est vraiment.
 - **Dégradé de marque** `--grad-brand` sur la chute des titres (`.text-gradient`, accent du hero), les traits d'accent (`.eyebrow::before`, `.section-head::before`, titres de section de l'accueil), et le bouton principal (glacier → cyan, texte sombre).
 - **Halos** colorés (`--glow-blue`, `--glow-violet`) : `box-shadow` statiques ou au survol ; aucune `filter: blur` ni `backdrop-filter` ajoutée. Toute animation infinie lit `var(--deco-anim-state)` (`CLIENT_POWER_MODES.md`).
-- **Survol** : `.hover-lift` et `CyberCard lift` soulèvent de 3 px en `transform` (aucun décalage de mise en page), neutralisé sous `prefers-reduced-motion`.
+- **Survol** : `.hover-lift`, `CyberCard lift` et `CyberButton` grandissent à peine (`scale`, aucun décalage de mise en page ; pas de translation, qui clignote sous un pointeur posé sur le bord), neutralisé sous `prefers-reduced-motion` et `data-a11y~="motion"`.
 
 #### Contrastes (WCAG 2.x, vérifiés par `tests/app/neon-palette.test.ts`, `lib/shared/color-contrast.ts`)
 

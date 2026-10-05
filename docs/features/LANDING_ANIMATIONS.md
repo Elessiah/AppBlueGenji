@@ -13,7 +13,7 @@ Demande du 2026-10-05 : un accueil « plus vivant », plus lumineux, qui fasse r
 | « En attente de lancement » | pastille grise | `pill-waiting` : violet, halo qui respire ; l'horaire à côté en cyan gras (`.when`) |
 | Titres de section | texte seul | trait d'accent en dégradé sous le titre |
 | Sections sous le hero | statiques | apparition au défilement, une fois (`Reveal`) |
-| Cartes et boutons | bordure au survol | soulèvement de 3 px + halo (`CyberCard lift`, `CyberButton`) |
+| Cartes et boutons | bordure au survol | léger agrandissement + halo (`CyberCard lift`, `CyberButton`) — un agrandissement, pas une translation : la carte ne fuit pas un pointeur posé sur son bord |
 | Calendrier | état gris, barre grise | état en violet, barre en dégradé |
 
 Contenus, liens, structure SEO, repères (`PublicPageShell`), noms accessibles, plancher de 11 px, logique et rafraîchissement du match mis en avant (`FEATURED_MATCH_LINK.md`) : inchangés. `featuredMatchPill` rend désormais la teinte `waiting` (au lieu de `default`) pour un match daté.
@@ -24,7 +24,7 @@ Contenus, liens, structure SEO, repères (`PublicPageShell`), noms accessibles, 
 - **Animations CSS infinies** (éclats, reflet, pastille d'attente) : `animation-play-state: var(--deco-anim-state)` (balayage `deco-animations.test.ts`), plus une variante fixe pour le reflet et des survols sans déplacement, posées **à la fois** sous `prefers-reduced-motion` et sous `:root[data-a11y~="motion"]` (`:global(...)` dans les modules) — le menu ne fait sinon que raccourcir les transitions.
 - **Transform et opacité seulement** : aucune animation ne touche la mise en page. Le décompte réserve sa largeur (`min-width` en `ch` sur la valeur finale, chiffres tabulaires).
 - **Visible sans JavaScript** : le rendu serveur n'écrit aucune classe de masquage ; `reveal-pending` n'est posée qu'après hydratation, et **jamais** sur une section déjà à l'écran (pas d'éclair plein → vide, pas de recul du LCP). Le hero n'est pas enveloppé. `CountUp` écrit la valeur finale côté serveur.
-- **Pas d'éclair au décompte** : un chiffre déjà à l'écran au chargement roule de 85 % à sa valeur (`countUpStart`), seul un chiffre hors de l'écran part de 0. À l'impression, `reveal-pending` est neutralisée (`@media print`).
+- **Pas d'éclair au décompte** : un chiffre déjà à l'écran au chargement roule de 85 % à sa valeur (`countUpStart`), seul un chiffre hors de l'écran part de 0 ; déjà à l'écran, il ne part que dans les 1,5 s du chargement (`countUpMayStart`) — une fenêtre ouverte sans focus ne le lance pas au premier clic. À l'impression, `reveal-pending` est neutralisée (`@media print`).
 - **Une fois** : l'observateur se déconnecte à la première entrée à l'écran ; la boucle `requestAnimationFrame` du décompte s'arrête au bout de `COUNT_UP_MS` (1,2 s).
 - **Coût** : éclats en dégradés radiaux sans `filter: blur`, reflet sur une barre de 2 px ; aucune dépendance ajoutée.
 
