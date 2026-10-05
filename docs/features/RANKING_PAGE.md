@@ -15,7 +15,9 @@ connecté, le gabarit de l'espace `(secured)` (**`ArenaShell`**,
 `components/arena-shell.tsx` : `ArenaNav`, `<main>`, `SiteFooterBar`), lien
 « Classement » en `aria-current="page"`. Le choix se fait au serveur
 (`getCurrentUser`, mémoïsé par requête et déjà lu par le layout racine) : ni
-flash, ni requête de plus ; une session illisible retombe sur la vitrine. La
+flash, ni requête côté client ; un connecté coûte au serveur la lecture de son
+équipe active (et du compteur de signalements pour la modération), chacune
+avec son repli. Une session illisible retombe sur la vitrine. La
 page était déjà `force-dynamic` : lire le cookie ne change pas son mode de
 rendu. Le `<main>` garde le style vitrine dans les deux cas (contenu, SEO,
 repères uniques, lien d'évitement et pagination sans JS inchangés). Tests :
