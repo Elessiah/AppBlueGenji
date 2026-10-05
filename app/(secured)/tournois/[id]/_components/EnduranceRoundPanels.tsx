@@ -123,20 +123,16 @@ export function EnduranceRoundPanels({
               </>
             }
           >
-            <RoundMatchSections matches={section.matches}>
-              {(sectionMatches) => (
-                <div className={styles.matchGrid}>
-                  {sectionMatches.map((match) => (
-                    <MatchRow
-                      key={match.id}
-                      match={match}
-                      adminResolvable={adminResolvable(match)}
-                      onOpenAdminModal={onOpenAdminModal}
-                      scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
-                      roundNumber={match.roundNumber}
-                    />
-                  ))}
-                </div>
+            <RoundMatchSections matches={section.matches} className={styles.matchGrid}>
+              {(match) => (
+                <MatchRow
+                  key={match.id}
+                  match={match}
+                  adminResolvable={adminResolvable(match)}
+                  onOpenAdminModal={onOpenAdminModal}
+                  scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
+                  roundNumber={match.roundNumber}
+                />
               )}
             </RoundMatchSections>
           </BoardPanel>

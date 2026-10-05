@@ -106,8 +106,7 @@ export function RoundColumns({
   emptyLabel,
 }: Readonly<RoundColumnsProps>) {
   // Matchs par manche, mémorisés sur la liste reçue : `RoundMatchSections`
-  // trie et découpe sur l'identité de ce tableau, qu'un tableau refait à
-  // chaque rendu (chaque instantané du flux) rendrait inutile.
+  // trie et découpe sous `useMemo` sur l'identité de ce tableau.
   const matchesByRound = useMemo(() => {
     const byRound = new Map<number, BracketMatch[]>();
     for (const match of matches) {
@@ -162,52 +161,51 @@ export function RoundColumns({
                     <RoundBadge key={mark}>{mark}</RoundBadge>
                   ))}
                 </div>
-                <RoundMatchSections matches={roundMatches}>
-                  {(sectionMatches) => (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {sectionMatches.map((match) => {
-                        // L'exempté est la seule équipe posée sur la manche ;
-                        // le lier demande un identifiant non nul.
-                        const byeTeamId = match.team2Id === null ? match.team1Id : null;
-                        if (byeTeamId !== null) {
-                          return (
-                            <div
-                              key={match.id}
-                              style={{
-                                border: `1px dashed ${BORDER}`,
-                                borderRadius: 6,
-                                padding: "8px 10px",
-                                fontSize: 13,
-                                background: "var(--surface-1)",
-                              }}
-                            >
-                              <EntrantName
-                                teamId={byeTeamId}
-                                name={match.team1Name}
-                                title={match.team1Name ?? undefined}
-                                truncate
-                                style={{ display: "flex" }}
-                                textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
-                              />
-                              <span style={{ fontSize: 11, color: ACCENT }}>
-                                ✓ Victoire d&apos;office
-                              </span>
-                            </div>
-                          );
-                        }
-                        return (
-                          <MatchRow
-                            key={match.id}
-                            match={match}
-                            adminResolvable={adminResolvable(match)}
-                            onOpenAdminModal={onOpenAdminModal}
-                            scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
-                            roundNumber={match.roundNumber}
+                <RoundMatchSections
+                  matches={roundMatches}
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {(match) => {
+                    // L'exempté est la seule équipe posée sur la manche ;
+                    // le lier demande un identifiant non nul.
+                    const byeTeamId = match.team2Id === null ? match.team1Id : null;
+                    if (byeTeamId !== null) {
+                      return (
+                        <div
+                          key={match.id}
+                          style={{
+                            border: `1px dashed ${BORDER}`,
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 13,
+                            background: "var(--surface-1)",
+                          }}
+                        >
+                          <EntrantName
+                            teamId={byeTeamId}
+                            name={match.team1Name}
+                            title={match.team1Name ?? undefined}
+                            truncate
+                            style={{ display: "flex" }}
+                            textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
                           />
-                        );
-                      })}
-                    </div>
-                  )}
+                          <span style={{ fontSize: 11, color: ACCENT }}>
+                            ✓ Victoire d&apos;office
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <MatchRow
+                        key={match.id}
+                        match={match}
+                        adminResolvable={adminResolvable(match)}
+                        onOpenAdminModal={onOpenAdminModal}
+                        scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
+                        roundNumber={match.roundNumber}
+                      />
+                    );
+                  }}
                 </RoundMatchSections>
               </div>
             );
