@@ -278,7 +278,10 @@ a.sectionNavLink:focus-visible {
 }
 
 /* « Contraste renforcé » rend la bordure à jeton, que ce réglage renforce. */
-:global(:root[data-a11y~="contrast"]) .sectionNavLink[data-tone] {
+:global(:root[data-a11y~="contrast"]) .sectionNavLink[data-tone="running"],
+:global(:root[data-a11y~="contrast"]) .sectionNavLink[data-tone="registration"],
+:global(:root[data-a11y~="contrast"]) .sectionNavLink[data-tone="upcoming"],
+:global(:root[data-a11y~="contrast"]) .sectionNavLink[data-tone="finished"] {
   border-color: var(--line-strong-cy);
 }
 

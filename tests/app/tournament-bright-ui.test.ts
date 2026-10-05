@@ -87,6 +87,8 @@ describe("frise des phases — variante par état", () => {
     ["PENDING", true, "info"],
     ["PENDING", false, "accent"],
     ["FINISHED", false, "success"],
+    // Dernière phase d'un tournoi fini : reste courante, mais se dit terminée.
+    ["FINISHED", true, "success"],
     ["SKIPPED", false, "neutral"],
     ["SKIPPED", true, "neutral"],
   ])("%s (courante : %s) → %s", (state, isCurrent, variant) => {
@@ -184,9 +186,11 @@ describe("fiche — filets de section, cartes de match, panneaux", () => {
     expect(PAGE_CSS).toMatch(
       /:global\(:root\[data-a11y~="contrast"\]\) \.sheet :global\(\.ds-block\.ds-block\):not\(\.danger\)\s*\{[^}]*border-color:\s*var\(--line\)/,
     );
+    // Les quatre teintes d'état seulement : « Mes tournois » garde son liseré.
     expect(LIST_CSS).toMatch(
-      /:global\(:root\[data-a11y~="contrast"\]\) \.sectionNavLink\[data-tone\]\s*\{[^}]*border-color:\s*var\(--line-strong-cy\)/,
+      /:global\(:root\[data-a11y~="contrast"\]\) \.sectionNavLink\[data-tone="finished"\]\s*\{[^}]*border-color:\s*var\(--line-strong-cy\)/,
     );
+    expect(LIST_CSS).not.toMatch(/\.sectionNavLink\[data-tone\]\s*[{,]/);
     // À l'impression, le repli reprend **les mêmes sélecteurs** que le dégradé :
     // moins spécifique, il perdrait, et le titre (texte transparent, fond non
     // imprimé) sortirait blanc.

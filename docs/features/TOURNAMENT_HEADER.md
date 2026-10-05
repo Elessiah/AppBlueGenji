@@ -77,8 +77,8 @@ gris. Ce sont les teintes des rubans de `/tournois`
 Le rouge (`pill-live`) reste réservé à ce qui est **réellement à l'antenne**.
 Un tournoi « en cours » n'est pas une diffusion — c'est la règle des trois sens
 de « live » de `CLAUDE.md`, et `PhaseTimeline` s'y range aussi : sa pastille
-suit `phaseStateVariant` (courante ou en cours `info`, à venir `accent`,
-terminée `success`, ignorée `neutral`). `⚙ Admin` prend `accent`.
+suit `phaseStateVariant` (terminée `success`, même courante ; courante ou en cours `info`, à venir `accent`,
+ignorée `neutral`). `⚙ Admin` prend `accent`.
 
 ### Habillage néon froid
 

@@ -32,14 +32,15 @@ export type PhaseStateVariant = Extract<PillVariant, "info" | "accent" | "succes
 
 /**
  * Teinte de l'état d'une phase, alignée sur celle des tournois
- * (`STATE_META`) : la phase courante est `info`, une phase à venir `accent`,
- * une phase terminée `success` ; seule une phase ignorée reste `neutral`.
+ * (`STATE_META`) : une phase terminée est `success` — même courante, la
+ * dernière phase d'un tournoi fini le restant —, la phase courante ou en cours
+ * `info`, une phase à venir `accent` ; seule une phase ignorée reste `neutral`.
  * Jamais `live` : une phase en cours n'est pas une diffusion.
  */
 export function phaseStateVariant(state: PhaseState, isCurrent: boolean): PhaseStateVariant {
   if (state === "SKIPPED") return "neutral";
-  if (isCurrent || state === "RUNNING") return "info";
-  return state === "FINISHED" ? "success" : "accent";
+  if (state === "FINISHED") return "success";
+  return isCurrent || state === "RUNNING" ? "info" : "accent";
 }
 
 export function phaseSubtitle(phase: TournamentPhase, isLast: boolean): string {
