@@ -144,10 +144,16 @@ describe("la défaite ne sert qu'à la défaite", () => {
     expect(profile).toMatch(/\[data-tone="loss"\]\s*\{[^}]*var\(--result-loss-ink\)[^}]*\}/);
   });
 
-  it("garde l'ambre au forfait du perdant", () => {
+  it("teinte le score du seul vrai perdant : ni forfait, ni exemption", () => {
     const css = stripComments(
       readSource(join(ROOT, "app", "(secured)", "tournois", "[id]", "_components", "MatchRow.module.css")),
     );
-    expect(css).toMatch(/\.decided \.score:not\(\.forfeitScore\)\s*\{[^}]*--result-loss-ink/);
+    expect(css).toMatch(/\.lostScore\s*\{[^}]*--result-loss-ink/);
+    const row = readSource(join(ROOT, "app", "(secured)", "tournois", "[id]", "_components", "MatchRow.tsx"));
+    // Un forfait passe avant la défaite ; la case vide d'une exemption n'a pas perdu.
+    expect(row).toMatch(/if \(forfeits\) return[^;]*forfeitScore/);
+    for (const side of ["1", "2"]) {
+      expect(row).toContain(`scoreClass(team${side}Forfeits, hasWinner && !team${side}Win && match.team${side}Id !== null)`);
+    }
   });
 });
