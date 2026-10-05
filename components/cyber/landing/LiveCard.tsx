@@ -9,7 +9,11 @@ import { featuredMatchStatusLabel, inferPhaseLabel, visibleLiveViewerCount } fro
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
+import { useClock } from "@/lib/shared/hooks/useClock";
 import styles from "./LiveCard.module.css";
+
+/** Relecture de l'horloge pour un match daté : à la demi-minute près. */
+const LIVE_CARD_CLOCK_MS = 30_000;
 
 type LiveCardProps = {
   /**
@@ -71,6 +75,10 @@ function noLiveTournamentMessage(iso: string | null | undefined): string {
  * match à montrer, elle se réduit au tournoi.
  */
 export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
+  // Seule l'horloge fait passer un match daté en lancement : sans elle, la
+  // carte annoncerait « Prochain match · 20:30 » jusqu'au sondage suivant.
+  // Elle ne tourne que pour un tel match (`useClock` respecte le mode économe).
+  const clock = useClock(LIVE_CARD_CLOCK_MS, live?.currentMatch?.launchPhase === "SCHEDULED");
   if (!live) {
     return (
       <CyberCard ticks className={styles.root}>
@@ -95,7 +103,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   const title = live.tournament.name.toUpperCase();
   const matchIsLive = currentMatch?.liveState === "LIVE";
   const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
-  const matchStatus = currentMatch ? featuredMatchStatusLabel(currentMatch) : null;
+  const matchStatus = currentMatch ? featuredMatchStatusLabel(currentMatch, clock ?? undefined) : null;
   const matchPlatform = streamPlatform(currentMatch?.liveUrl);
   // Le bouton de diffusion n'apparaît **que** pour un match réellement à
   // l'antenne. `SCHEDULED` annonce un cast à venir : la chaîne ne montre pas
