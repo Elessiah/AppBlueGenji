@@ -73,7 +73,6 @@ const AMBER_WARNINGS: Record<string, string> = {
   "app/rgpd/page.module.css": "lot pages publiques",
   "components/cyber/landing/PublicFooter.module.css": "lot pages publiques",
   "components/legal/SiteFooterBar.module.css": "lot pages publiques",
-  "components/rules/RuleDiagram.tsx": "lot pages publiques",
 };
 
 function sources(): string[] {
