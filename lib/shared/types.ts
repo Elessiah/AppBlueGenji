@@ -622,8 +622,9 @@ export type TournamentSnapshot = {
    * liste des inscrites est bien celle que jouera le moteur. En `RANKING`, avant
    * le coup d'envoi, l'instantané range `registrations` par le classement du
    * site, rangs renumérotés (`registrationsFollowRanking`) : la liste est alors
-   * le tirage prévu. Une fois lancé, elle retombe sur la colonne `seed` (ordre
-   * d'arrivée), qui n'est pas le tirage.
+   * le tirage prévu. Une fois lancé, elle suit les rangs figés au coup d'envoi
+   * (`registrationsFollowFrozenDraw`) : `registrations[].seed` est alors ce
+   * rang, `null` pour une engagée sans rang figé (rangée en dernier).
    */
   seedingSource: SeedingSource;
   /**

@@ -53,11 +53,10 @@ export function seedingSource(format: TournamentFormat, manualSeeding: boolean):
  * évite le malentendu — le staff croit lire le tirage, il ne lit que des
  * inscriptions.
  *
- * Ne suffit pas, seul, à décider d'un avertissement : avant le coup d'envoi,
- * l'instantané range lui-même la liste par le classement
- * (`registrationsFollowRanking`), qui **est** alors le tirage prévu. Seule une
- * liste en `RANKING` qui ne suit pas le classement (tournoi lancé) mérite
- * l'avertissement.
+ * Ne dit rien de la liste de l'instantané : en `RANKING`, celui-ci la range
+ * lui-même par le classement avant le coup d'envoi
+ * (`registrationsFollowRanking`), puis par les rangs figés au lancement
+ * (`registrationsFollowFrozenDraw`) — son `seed` est toujours le tirage.
  */
 export function isSeedOrderEffective(source: SeedingSource): boolean {
   return source !== "RANKING";
@@ -79,13 +78,49 @@ export function isPreLaunchState(state: TournamentState): boolean {
  * alors, dès son inscription, la place que lui donne sa cote — celle que le
  * moteur lui donnera au coup d'envoi si rien ne bouge d'ici là. Une fois lancé,
  * le classement continue d'évoluer (les matchs du tournoi le font bouger) alors
- * que le tirage, lui, est fait : la liste retombe sur la colonne `seed`.
+ * que le tirage, lui, est fait : la liste suit les rangs figés au coup d'envoi
+ * (`registrationsFollowFrozenDraw`).
  */
 export function registrationsFollowRanking(
   source: SeedingSource,
   state: TournamentState,
 ): boolean {
   return source === "RANKING" && isPreLaunchState(state);
+}
+
+/**
+ * La liste des inscrites suit-elle le tirage **figé au coup d'envoi** ?
+ *
+ * Oui en `RANKING` une fois lancé : le moteur a écrit, au lancement, le rang de
+ * classement de chaque engagée dans sa table d'état ; l'instantané range alors
+ * la liste par ce rang (`orderByFrozenSeeds`) plutôt que par la colonne `seed`,
+ * qui n'est que l'ordre d'arrivée. Avec `registrationsFollowRanking` (avant le
+ * lancement), un tournoi seedé par le classement montre toujours son tirage.
+ */
+export function registrationsFollowFrozenDraw(
+  source: SeedingSource,
+  state: TournamentState,
+): boolean {
+  return source === "RANKING" && !isPreLaunchState(state);
+}
+
+/**
+ * Range les inscrites par leur tête de série figée (`teamId → seed`) et porte
+ * ce rang dans `seed`. Une engagée sans rang figé (absente de la table d'état)
+ * passe après les autres, `seed` à `null`, dans son ordre d'origine.
+ */
+export function orderByFrozenSeeds<T extends { teamId: number; seed: number | null }>(
+  rows: readonly T[],
+  frozen: ReadonlyMap<number, number>,
+): T[] {
+  const ranked = rows
+    .filter((row) => frozen.has(row.teamId))
+    .map((row) => ({ ...row, seed: frozen.get(row.teamId)! }))
+    .sort((a, b) => a.seed - b.seed);
+  const unranked = rows
+    .filter((row) => !frozen.has(row.teamId))
+    .map((row) => ({ ...row, seed: null }));
+  return [...ranked, ...unranked];
 }
 
 /**

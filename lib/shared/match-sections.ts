@@ -22,7 +22,9 @@
  *
  * Tri dans une section : date de début croissante (sans date en dernier),
  * puis meilleure tête de série des deux engagées (1 d'abord), puis l'autre
- * engagée, puis l'identifiant du match pour un ordre stable.
+ * engagée, puis l'identifiant du match pour un ordre stable. La tête de série
+ * est le `seed` de l'instantané : rang figé au coup d'envoi quand le tournoi
+ * seede depuis le classement du site (`registrationsFollowFrozenDraw`).
  *
  * Voir `docs/features/ROUND_MATCH_SECTIONS.md`.
  */

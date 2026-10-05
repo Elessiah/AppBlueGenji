@@ -26,7 +26,7 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { canOpenPlayerScoreDialog } from "@/lib/shared/player-score-report";
-import { isPreLaunchState, isSeedOrderEffective } from "@/lib/shared/seeding";
+import { isPreLaunchState } from "@/lib/shared/seeding";
 import {
   planRoundRollback,
   rollbackStageLabelWithArticle,
@@ -466,13 +466,13 @@ export default function TournamentDetailPage() {
     [detail?.registrations],
   );
   // Têtes de série, pour l'ordre des matchs dans les sections d'une manche
-  // (`lib/shared/match-sections.ts`). Seulement quand la colonne `seed` porte
-  // le vrai ordre (`isSeedOrderEffective`) : sous un seeding par classement,
-  // elle ne garde que l'ordre d'inscription, et départager par elle mentirait.
-  const seedOrderEffective = detail ? isSeedOrderEffective(detail.seedingSource) : false;
+  // (`lib/shared/match-sections.ts`). L'instantané porte dans `seed` la tête
+  // de série réelle : colonne `seed` en ordre manuel ou d'inscription, rang de
+  // classement (avant le lancement) ou figé au coup d'envoi (après) quand le
+  // tournoi seede depuis le classement du site — jamais l'ordre d'arrivée.
   const entrantSeeds = useMemo(
-    () => buildSeedMap(seedOrderEffective ? (detail?.registrations ?? []) : []),
-    [seedOrderEffective, detail?.registrations],
+    () => buildSeedMap(detail?.registrations ?? []),
+    [detail?.registrations],
   );
 
   // Le match est lancé et le lecteur y est engagé : la modale offre la saisie

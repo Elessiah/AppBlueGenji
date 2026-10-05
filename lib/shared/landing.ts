@@ -42,13 +42,11 @@ export type LandingLiveMatch = {
   team1Score: number | null;
   team2Score: number | null;
   /**
-   * Rang de l'engagé dans l'ordre de seeding du tournoi, ou `null` quand ce
-   * rang n'existe pas — place vide, ou tournoi dont le tirage ne suit **pas**
-   * la colonne `seed` (`isSeedOrderEffective`, `lib/shared/seeding.ts`). La
-   * carte affichait « SEED 1 » et « SEED 4 » en dur, identiques pour tous les
-   * matchs : plutôt que de remplacer une invention par une autre — l'ordre
-   * d'inscription lu comme un seed en Suisse ou en Survie, qui seedent depuis
-   * le classement du site —, on ne dit rien quand on ne sait pas.
+   * Tête de série réelle de l'engagé, ou `null` quand elle n'existe pas (place
+   * vide, rang introuvable). Colonne `seed` en ordre manuel ou d'inscription ;
+   * rang figé au coup d'envoi quand le tournoi seede depuis le classement du
+   * site (`loadFrozenRankingSeeds`) — la colonne n'y garde que l'ordre
+   * d'arrivée. On ne dit rien quand on ne sait pas, plutôt qu'inventer.
    */
   team1Seed: number | null;
   team2Seed: number | null;
