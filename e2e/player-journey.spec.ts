@@ -1,3 +1,4 @@
+import type { Locator } from "@playwright/test";
 import { dismissSiteOverlays, test, expect, type Page } from "./helpers/test";
 import {
   apiAs,
@@ -55,6 +56,35 @@ test.describe("Parcours joueur dans un tournoi", () => {
   const toasts = (page: Page) => page.getByRole("region", { name: "Notifications" });
 
   /**
+   * Remplit la map `index` de la modale (`MapScoreList`, MAP_SCORES.md) — en
+   * l'ajoutant si besoin : code de replay, puis score de chaque équipe, nommée.
+   */
+  const fillMap = async (dialog: Locator, index: number, code: string, scores: Record<string, number>) => {
+    const rows = dialog.getByRole("listitem");
+    if ((await rows.count()) <= index) await dialog.getByRole("button", { name: "Ajouter une map" }).click();
+    const row = rows.nth(index);
+    await row.getByRole("textbox", { name: "Code de replay" }).fill(code);
+    for (const [team, score] of Object.entries(scores)) {
+      await row.getByRole("spinbutton", { name: team }).fill(String(score));
+    }
+  };
+
+  /** Corps `maps` d'un report par l'API : `wins` maps gagnées par `teamId`. */
+  const mapsWonBy = async (f: JourneyFixture, tournamentId: number, matchId: number, teamId: number, wins: number) => {
+    const api = await apiAs(f.baseURL, f.playerA.token);
+    const detail = (await (await api.get(`/api/tournaments/${tournamentId}`)).json()) as {
+      matches: { id: number; team1Id: number | null }[];
+    };
+    await api.dispose();
+    const team1Wins = detail.matches.find((m) => m.id === matchId)?.team1Id === teamId;
+    return Array.from({ length: wins }, (_, i) => ({
+      replayCode: `APIA0${i + 1}`,
+      team1Score: team1Wins ? 2 : 0,
+      team2Score: team1Wins ? 0 : 2,
+    }));
+  };
+
+  /**
    * Centre de lancement du match, qui s'ouvre de lui-même sur la fiche : on le
    * referme par Échap avant d'agir. Les pages de ce parcours naissent de
    * contextes propres à chaque joueur, hors de la fixture `page` : le garde
@@ -92,16 +122,14 @@ test.describe("Parcours joueur dans un tournoi", () => {
     await matchCard(pageA, matchId).getByRole("button", { name: /Saisir le score/ }).click();
     const dialogA = scoreDialog(pageA);
     await expect(dialogA).toBeVisible();
-    // Champs vides à l'ouverture : aucun « 0 – 0 » inventé.
-    const [fieldA1, fieldA2] = [
-      dialogA.getByRole("spinbutton", { name: `Manches gagnées par ${f.playerA.teamName}` }),
-      dialogA.getByRole("spinbutton", { name: `Manches gagnées par ${f.playerB.teamName}` }),
-    ];
-    await expect(fieldA1).toHaveValue("");
+    // Aucune map à l'ouverture : aucun score inventé (MAP_SCORES.md).
+    await expect(dialogA.getByRole("textbox", { name: "Code de replay" })).toHaveCount(0);
     await expect(dialogA.getByRole("button", { name: "Envoyer le score" })).toBeDisabled();
 
-    await fieldA1.fill("2");
-    await fieldA2.fill("1");
+    // 2 – 1 pour A, map par map : deux maps gagnées, une perdue.
+    await fillMap(dialogA, 0, "AAAA01", { [f.playerA.teamName]: 2, [f.playerB.teamName]: 0 });
+    await fillMap(dialogA, 1, "AAAA02", { [f.playerA.teamName]: 0, [f.playerB.teamName]: 2 });
+    await fillMap(dialogA, 2, "AAAA03", { [f.playerA.teamName]: 3, [f.playerB.teamName]: 1 });
     await dialogA.getByRole("button", { name: "Envoyer le score" }).click();
     await expect(toasts(pageA).getByText(/Score transmis/)).toBeVisible();
     await expect(dialogA).toHaveCount(0);
@@ -120,9 +148,8 @@ test.describe("Parcours joueur dans un tournoi", () => {
     await matchCard(pageB, matchId).getByRole("button", { name: /Confirmer le score/ }).click();
     const dialogB = scoreDialog(pageB);
     await expect(dialogB).toContainText(`${f.playerA.teamName} propose 2 – 1`);
-    await expect(
-      dialogB.getByRole("spinbutton", { name: `Manches gagnées par ${f.playerA.teamName}` }),
-    ).toHaveValue("2");
+    // Les maps de la proposition sont reprises telles quelles.
+    await expect(dialogB.getByRole("textbox", { name: "Code de replay" }).first()).toHaveValue("AAAA01");
     await dialogB.getByRole("button", { name: "Confirmer le score" }).click();
     await expect(toasts(pageB).getByText(/Score confirmé/)).toBeVisible();
 
@@ -152,7 +179,7 @@ test.describe("Parcours joueur dans un tournoi", () => {
     // A annonce sa victoire par l'API ; B, dans l'interface, annonce la sienne.
     const apiA = await apiAs(f.baseURL, f.playerA.token);
     const reported = await apiA.post(`/api/tournaments/${tournamentId}/matches/${matchId}/report`, {
-      data: { myScore: 2, opponentScore: 0 },
+      data: { maps: await mapsWonBy(f, tournamentId, matchId, f.playerA.teamId, 2) },
     });
     expect(reported.ok()).toBe(true);
     await apiA.dispose();
@@ -163,8 +190,9 @@ test.describe("Parcours joueur dans un tournoi", () => {
 
     await matchCard(pageB, matchId).getByRole("button", { name: /Confirmer le score/ }).click();
     const dialog = scoreDialog(pageB);
-    await dialog.getByRole("spinbutton", { name: `Manches gagnées par ${f.playerA.teamName}` }).fill("1");
-    await dialog.getByRole("spinbutton", { name: `Manches gagnées par ${f.playerB.teamName}` }).fill("2");
+    // B réécrit les deux maps à son avantage.
+    await fillMap(dialog, 0, "BBBB01", { [f.playerA.teamName]: 0, [f.playerB.teamName]: 2 });
+    await fillMap(dialog, 1, "BBBB02", { [f.playerA.teamName]: 0, [f.playerB.teamName]: 2 });
     // Le score diffère de la proposition : le bouton redevient un envoi.
     await dialog.getByRole("button", { name: "Envoyer le score" }).click();
     await expect(dialog).toHaveCount(0);
