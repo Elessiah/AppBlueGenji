@@ -70,32 +70,33 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
 
 ## « Plus d'actions » — clavier et accessibilité
 
-- Bouton de **divulgation** (`aria-expanded`, `aria-controls`), pas
-  `role="menu"` : même motif que le menu du compte. Le panneau se déplie
-  sous le pied (au-dessus faute de place), **en `position: fixed` par-dessus
-  les cartes voisines** : la carte garde sa taille. Déplié dans la carte, il
-  la grandissait, et l'arbre — qui mesure ses cartes (`useSlotHeight`) pour
-  régler la hauteur de **tous** ses créneaux — sautait sous le pointeur ; en
-  `absolute`, il était rogné par le cadre des plateaux et les zones
-  défilantes. Ses coordonnées (`panelPlacement`) le posent du côté du pied
-  qui a le plus de place, **sans jamais recouvrir le pied** ni sortir de la
-  fenêtre (8 px de marge) ; plus haut que cette place, sa liste
+- Bouton de **divulgation** (`aria-expanded`, `aria-controls` posé quand le
+  panneau existe), pas `role="menu"` : même motif que le menu du compte. Le
+  panneau n'est monté qu'à l'ouverture (un plateau compte jusqu'à 254
+  cartes), **porté dans `document.body`** comme les modales et posé en
+  `position: fixed` par-dessus les cartes voisines : la carte garde sa
+  taille. Déplié dans la carte, il la grandissait, et l'arbre — qui mesure
+  ses cartes (`useSlotHeight`) pour régler la hauteur de **tous** ses
+  créneaux — sautait sous le pointeur ; laissé dans la carte, il était rogné
+  par le cadre des plateaux et masqué par le dégradé de bord des zones
+  défilantes au toucher (`mask-image`). Ses coordonnées (`panelPlacement`)
+  le posent du côté du pied qui a le plus de place, **sans jamais recouvrir
+  le pied** ni sortir de la fenêtre, en hauteur comme en largeur (8 px de
+  marge) ; plus haut que cette place, sa liste
   (`<ScrollArea>` verticale) est bornée et défile. Elles suivent le
   défilement de la page, le redimensionnement, l'ajout ou le retrait d'une
   action par le flux et tout déplacement de la carte sans défilement (une
   ligne ajoutée par le flux, une voisine qui grandit : les ancêtres de la
   carte sont observés par un `ResizeObserver` tant que le panneau est ouvert),
-  origine du repère retranchée (la page est sous un ancêtre transformé,
-  `.fade-in`). Le défilement d'une zone **qui contient la carte** (arbre,
-  colonnes de manche) le referme, focus rendu au bouton : la carte pourrait y
-  sortir de la partie visible. Le panneau reste dans le DOM de
-  la carte — l'ordre de tabulation suit le bouton. Son conteneur est toujours
-  rendu (masqué par `hidden`, visé par `aria-controls`), mais sa liste n'est
-  montée qu'à l'ouverture : un plateau compte jusqu'à 254 cartes. La carte garde
-  son `overflow: hidden` : un descendant en `position: fixed` a son repère
-  hors d'elle, elle ne le rogne pas.
+  origine d'un éventuel repère transformé retranchée. Le défilement d'une
+  zone **qui contient la carte** (arbre, colonnes de manche) le referme,
+  focus rendu au bouton : la carte pourrait y sortir de la partie visible.
+- À l'ouverture, le focus entre dans le panneau (premier bouton) : porté en
+  fin de page, il n'est pas sur le chemin de la tabulation. La tabulation
+  qui en sort par un bout le referme et rend le focus au bouton.
 - Échap referme et rend le focus au bouton (`handleMenuEscape`) ; un clic
-  extérieur ou une tabulation qui sort du pied le referme (`focusLeftMenu`).
+  extérieur ou un focus qui quitte le pied **et** le panneau le referme
+  (`focusLeftMenu`).
 - Choisir une action referme le panneau et pose le focus sur « Plus
   d'actions » **avant** d'exécuter le geste : la modale ouverte rend ensuite
   le focus à un bouton qui existe encore.
