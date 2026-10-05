@@ -1,4 +1,14 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
+
+// La carte entière est rendue avec une sonde à la place du pied d'action
+// (`tests/helpers/match-card-actions-probe.ts`) : le vrai ne monte la liste
+// « Plus d'actions » qu'à l'ouverture.
+jest.mock("@/app/(secured)/tournois/[id]/_components/MatchCardActions", () =>
+  jest
+    .requireActual<typeof import("../helpers/match-card-actions-probe")>("../helpers/match-card-actions-probe")
+    .probeModule(),
+);
+
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { MatchLaunchStrip } from "@/app/(secured)/tournois/[id]/_components/MatchLaunchStrip";
@@ -114,9 +124,10 @@ describe("MatchLaunchStrip — ce que tout le monde lit", () => {
 
 /**
  * Les boutons du lancement vivent dans le pied d'action de la carte
- * (`MatchCardActions`) : ces cas rendent la carte entière (`MatchRow`), dont le
- * panneau « Plus d'actions » est toujours dans le balisage (masqué par
- * `hidden`) — chaque bouton se repère à son `data-action`.
+ * (`MatchCardActions`) : ces cas rendent la carte entière (`MatchRow`), pied
+ * d'action remplacé par une sonde qui écrit toutes ses actions — chacune se
+ * repère à son `data-action`. Le bouton lui-même (motif d'un « Caster »
+ * bloqué…) se teste dans `match-card-actions.test.tsx`.
  */
 describe("pied d'action — boutons du lancement selon le lecteur", () => {
   it("offre l'ouverture de la modale aux joueurs du match, pas aux autres", () => {
@@ -124,13 +135,11 @@ describe("pied d'action — boutons du lancement selon le lecteur", () => {
     expect(card(lobby(), { myTeamId: 99 })).not.toContain('data-action="openLaunch"');
   });
 
-  it("offre « Caster » à un caster, même sans identité vérifiée — le bouton dit ce qui manque", () => {
-    const blocked = card(lobby(), { canManage: true, castBlock: "CASTER_IDENTITY_REQUIRED" });
-    expect(blocked).toContain("Caster ce match");
-    expect(blocked).toMatch(/aria-disabled="true"[^>]*Battle\.net|Battle\.net[^>]*aria-disabled="true"/);
-
-    const allowed = card(lobby(), { canManage: true, castBlock: null });
-    expect(allowed).toContain('aria-disabled="false"');
+  it("offre « Caster » à un caster, même sans identité vérifiée", () => {
+    expect(card(lobby(), { canManage: true, castBlock: "CASTER_IDENTITY_REQUIRED" })).toContain(
+      "Caster ce match : Alpha contre Bravo",
+    );
+    expect(card(lobby(), { canManage: true, castBlock: null })).toContain('data-action="claimCast"');
   });
 
   it("ne propose pas de caster son propre match ni un match déjà casté", () => {
@@ -179,8 +188,8 @@ describe("MatchLaunchStrip — planification par l'arbitrage", () => {
   it("n'offre « Planifier » qu'à l'arbitrage — en action principale", () => {
     const staff = card(lobby(), { refereeScheduling: true, canSchedule: true });
     expect(staff).toContain("Planifier : Alpha contre Bravo");
-    // Action principale : hors du panneau replié.
-    expect(staff.indexOf('data-action="plan"')).toBeLessThan(staff.indexOf('hidden=""'));
+    // Action principale : la seule visible sans ouvrir « Plus d'actions ».
+    expect(staff).toContain('data-action="plan" data-primary="true"');
     expect(card(lobby(), { refereeScheduling: true, canManage: true })).not.toContain('data-action="plan"');
     expect(card(lobby(), { refereeScheduling: true, myTeamId: 10 })).not.toContain('data-action="plan"');
   });

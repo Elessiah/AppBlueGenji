@@ -1,13 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
-import { panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
+import { MatchCardActions, panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
-import { IssueReportProvider } from "@/app/(secured)/tournois/[id]/_lib/issue-report-context";
-import { PlayerScoreProvider } from "@/app/(secured)/tournois/[id]/_lib/player-score-context";
+import type { CastBlock } from "@/lib/shared/match-launch";
 import {
   groupMatchCardActions,
   matchCardActionList,
@@ -16,7 +13,6 @@ import {
 } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
 import type { LaunchStripControls } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 import { ToastProvider } from "@/components/ui/toast";
-import type { BracketMatch } from "@/lib/shared/types";
 import { bracketMatch } from "../helpers/bracket-match";
 
 /**
@@ -175,134 +171,70 @@ describe("groupMatchCardActions — une principale, le reste au menu", () => {
   });
 });
 
-type Viewer = {
-  canManage?: boolean;
-  canSchedule?: boolean;
-  myTeamId?: number | null;
-  canReport?: boolean;
-  playerScore?: boolean;
-  adminResolvable?: boolean;
-  scoreLocked?: boolean;
-};
-
-function wrap(viewer: Viewer, child: ReactNode) {
+function renderFooter(actions: Partial<MatchCardActionInput>, castBlock: CastBlock | null = null) {
   return renderToStaticMarkup(
     <ToastProvider>
       <LiveProvider
-        canManage={viewer.canManage ?? false}
-        canSchedule={viewer.canSchedule ?? false}
+        canManage
+        canSchedule
         refereeScheduling={false}
         openConfig={() => undefined}
         openSchedule={() => undefined}
         openReplay={() => undefined}
         viewerUserId={1}
-        myTeamId={viewer.myTeamId ?? null}
-        castBlock={null}
+        myTeamId={null}
+        castBlock={castBlock}
       >
-        <IssueReportProvider canReport={viewer.canReport ?? false} openReport={() => undefined}>
-          <PlayerScoreProvider
-            canOpen={() => viewer.playerScore ?? false}
-            canReportScore={() => true}
-            open={() => undefined}
-          >
-            {child}
-          </PlayerScoreProvider>
-        </IssueReportProvider>
+        <MatchCardActions
+          match={bracketMatch({ id: 42, team1Id: 10, team2Id: 20, team1Name: "Alpha", team2Name: "Bravo" })}
+          phase="LOBBY"
+          actions={matchCardActionList({ ...NOTHING, ...actions })}
+          matchLabel="Alpha contre Bravo"
+          isCaster={false}
+          onAir={false}
+          onPlayerScore={() => undefined}
+          onAdminScore={() => undefined}
+          onReport={() => undefined}
+        />
       </LiveProvider>
     </ToastProvider>,
   );
 }
 
-function card(match: BracketMatch, viewer: Viewer = {}) {
-  return wrap(
-    viewer,
-    <MatchRow
-      match={match}
-      adminResolvable={viewer.adminResolvable ?? false}
-      onOpenAdminModal={() => undefined}
-      scoreLocked={viewer.scoreLocked ?? false}
-      roundNumber={1}
-    />,
-  );
-}
-
-const launched = (overrides: Partial<BracketMatch> = {}) =>
-  bracketMatch({
-    id: 42,
-    status: "READY",
-    team1Id: 10,
-    team2Id: 20,
-    team1Name: "Alpha",
-    team2Name: "Bravo",
-    launchedAt: "2026-09-24T20:00:00.000Z",
-    ...overrides,
+describe("MatchCardActions — rendu du pied", () => {
+  it("ne rend rien sans action", () => {
+    // Seules restent les régions d'annonce du `ToastProvider`.
+    expect(renderFooter({})).not.toContain("<button");
   });
 
-const played = bracketMatch({
-  id: 43,
-  status: "COMPLETED",
-  team1Id: 10,
-  team2Id: 20,
-  team1Name: "Alpha",
-  team2Name: "Bravo",
-  team1Score: 2,
-  team2Score: 1,
-  winnerTeamId: 10,
-  loserTeamId: 20,
-});
-
-/** Partie du balisage avant le panneau replié : ce qui est visible d'emblée. */
-const visiblePart = (html: string) => {
-  const at = html.indexOf('hidden=""');
-  return at === -1 ? html : html.slice(0, at);
-};
-
-describe("MatchRow — chaque public retrouve ses actions", () => {
-  it("spectateur : aucun pied d'action", () => {
-    const html = card(launched());
-    expect(html).not.toContain("data-action=");
-    expect(html).not.toContain("Plus d&#x27;actions");
+  it("une action seule : bouton visible, pas de « Plus d'actions »", () => {
+    const html = renderFooter({ canReport: true });
+    expect(html).toContain('data-action="report"');
+    expect(html).toContain('aria-label="Signaler un problème : Alpha contre Bravo"');
+    expect(html).not.toContain("aria-expanded");
   });
 
-  it("engagé : saisie du score visible, lancement et signalement au menu", () => {
-    const html = card(launched(), { myTeamId: 10, canReport: true, playerScore: true });
-    expect(visiblePart(html)).toContain('data-action="playerScore"');
-    expect(visiblePart(html)).not.toContain('data-action="report"');
-    expect(html).toContain('data-action="openLaunch"');
-    expect(html).toContain("Signaler un problème : Alpha contre Bravo");
-  });
-
-  it("engagé d'un autre match : ni saisie ni signalement sur cette carte", () => {
-    const html = card(launched(), { myTeamId: 99, canReport: true });
-    expect(html).not.toContain('data-action="report"');
-    expect(html).not.toContain('data-action="playerScore"');
-  });
-
-  it("arbitrage : le score en principale, la date et le reste au menu", () => {
-    const html = card(launched(), { canSchedule: true, adminResolvable: true });
-    expect(visiblePart(html)).toContain("Éditer le score : Alpha contre Bravo");
-    expect(html).toContain('data-action="schedule"');
-    expect(html).toContain('data-action="hostSwap"');
-  });
-
-  it("arbitrage, score verrouillé : plus de bouton de score, le constat reste", () => {
-    const html = card(played, { adminResolvable: true, scoreLocked: true });
-    expect(html).not.toContain('data-action="adminScore"');
-    expect(html).toContain("Score verrouillé");
-  });
-
-  it("diffusion : la rediff d'un match joué reste offerte", () => {
-    const html = card(played, { canManage: true });
-    expect(html).toContain("Ajouter la rediff : Alpha contre Bravo");
-  });
-
-  it("« Plus d'actions » : bouton de divulgation fermé, relié à un panneau masqué", () => {
-    const html = card(launched(), { canSchedule: true, adminResolvable: true });
+  it("replié : la principale seule est montée, le panneau est un conteneur vide masqué", () => {
+    const html = renderFooter({ adminScoreLabel: "Éditer le score", showSchedule: true, showOnAir: true });
+    expect(html).toContain('data-action="adminScore"');
+    expect(html).not.toContain('data-action="schedule"');
+    expect(html).not.toContain('data-action="onAir"');
     const toggle = /<button[^>]*aria-expanded="false"[^>]*aria-controls="([^"]+)"[^>]*>/.exec(html);
     expect(toggle).not.toBeNull();
     expect(toggle?.[0]).toContain('aria-label="Plus d&#x27;actions : Alpha contre Bravo"');
-    expect(html).toContain(`id="${toggle?.[1]}"`);
-    expect(html).toMatch(new RegExp(`id="${toggle?.[1]}"[^>]*hidden=""`));
+    expect(html).toMatch(new RegExp(`<div id="${toggle?.[1]}"[^>]*hidden=""[^>]*></div>`));
+  });
+
+  it("sans principale : « Plus d'actions » prend la largeur et montre son libellé", () => {
+    const html = renderFooter({ showOnAir: true, showLiveConfig: true });
+    expect(html).toMatch(/aria-expanded="false"[\s\S]*Plus d&#x27;actions<\/span>/);
+    expect(html).not.toContain('class="sr-only">Plus d');
+  });
+
+  it("« Caster » bloqué faute d'identité : aria-disabled et motif", () => {
+    const blocked = renderFooter({ launch: { ...NO_LAUNCH, showClaim: true } }, "CASTER_IDENTITY_REQUIRED");
+    expect(blocked).toMatch(/aria-disabled="true"[^>]*Battle\.net|Battle\.net[^>]*aria-disabled="true"/);
+    expect(renderFooter({ launch: { ...NO_LAUNCH, showClaim: true } }, null)).toContain('aria-disabled="false"');
   });
 });
 
@@ -383,7 +315,7 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
   });
 
   it("ne monte la zone défilante qu'à l'ouverture (un plateau compte 254 cartes)", () => {
-    expect(source).toMatch(/\{expanded \? \(\s*<ScrollArea/);
+    expect(source).toMatch(/\{expanded && \(\s*<ScrollArea/);
   });
 
   it("le lancement forcé garde sa confirmation", () => {
