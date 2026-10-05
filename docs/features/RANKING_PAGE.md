@@ -33,7 +33,8 @@ de la cote (« Aucun match joué ») et si la fiche d'équipe affiche une place.
 **Place sur la fiche** (`getTeamRankingPosition`) : comptée sur la même liste
 que `/classement` (toutes les équipes, celles sans match à 500), « #n sur N
 équipes » — sinon la perdante à 483 lirait « 2ᵉ sur 2 » sur sa fiche et 40ᵉ
-sur la page. Égalité de cote = même place.
+sur la page. La place est l'index dans cette liste triée : à cote égale, les
+départages ci-dessus tranchent, comme sur la page.
 
 ### Effet sur le seeding
 
