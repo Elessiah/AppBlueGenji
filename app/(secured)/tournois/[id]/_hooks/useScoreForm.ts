@@ -47,7 +47,7 @@ export function useScoreForm(
   const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
   // Détail map par map (`docs/features/MAP_SCORES.md`) : quand l'arbitre en
   // saisit, il **fait** le score — les deux champs suivent le score dérivé.
-  const [maps, setMapsState] = useState<MatchMapInput[]>(() => initialAdminMaps(match));
+  const [maps, setMaps] = useState<MatchMapInput[]>(() => initialAdminMaps(match));
   const [submitting, setSubmitting] = useState(false);
 
   // Le dialogue reste monté entre deux ouvertures : sans resynchronisation, il
@@ -84,7 +84,7 @@ export function useScoreForm(
 
     if (untouched) {
       setState(next);
-      setMapsState(nextMaps);
+      setMaps(nextMaps);
       setConflict(false);
     } else if (signature !== synced.signature && !submitting) {
       // Seul un résultat **enregistré** fait conflit : une proposition
@@ -104,7 +104,7 @@ export function useScoreForm(
     const nextMaps = initialAdminMaps(match);
     setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
     setState(next);
-    setMapsState(nextMaps);
+    setMaps(nextMaps);
     setConflict(false);
   };
 
@@ -132,9 +132,9 @@ export function useScoreForm(
   // écrirait par-dessus le score dérivé des maps restantes, que personne n'a
   // saisi.
   const manualScores = useRef<{ score1: string; score2: string } | null>(null);
-  const setMaps = (next: MatchMapInput[]) => {
+  const updateMaps = (next: MatchMapInput[]) => {
     if (maps.length === 0 && next.length > 0) manualScores.current = { score1: state.score1, score2: state.score2 };
-    setMapsState(next);
+    setMaps(next);
     if (next.length === 0) {
       const restored = manualScores.current ?? { score1: synced.baseline.score1, score2: synced.baseline.score2 };
       manualScores.current = null;
@@ -209,7 +209,7 @@ export function useScoreForm(
     score1: state.score1,
     score2: state.score2,
     maps,
-    setMaps,
+    setMaps: updateMaps,
     game,
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,

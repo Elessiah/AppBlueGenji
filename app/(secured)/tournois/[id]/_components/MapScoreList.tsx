@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -71,13 +72,32 @@ export function MapScoreList({
   const score = deriveMatchScore(maps);
   const hintId = `${idPrefix}-map-hint`;
 
+  // Clés de ligne stables : retirer la map 2 ne doit pas faire hériter la
+  // ligne suivante de l'état React (focus, saisie en cours) de celle retirée.
+  // Réalignées sur la longueur quand la liste est remplacée de l'extérieur
+  // (proposition reçue par le flux, réouverture).
+  const nextKey = useRef(0);
+  const keys = useRef<number[]>([]);
+  const newKey = () => {
+    nextKey.current += 1;
+    return nextKey.current;
+  };
+  if (keys.current.length !== maps.length) {
+    keys.current = maps.map((_, i) => keys.current[i] ?? newKey());
+  }
+
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
     fieldErrors.clear(mapFieldKey(index, field));
     onChange(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
   };
   const remove = (index: number) => {
     fieldErrors.clear();
+    keys.current = keys.current.filter((_, i) => i !== index);
     onChange(maps.filter((_, i) => i !== index));
+  };
+  const add = () => {
+    keys.current = [...keys.current, newKey()];
+    onChange([...maps, emptyMap()]);
   };
 
   return (
@@ -99,9 +119,7 @@ export function MapScoreList({
             const t1Id = mapFieldId(idPrefix, index, "team1Score");
             const t2Id = mapFieldId(idPrefix, index, "team2Score");
             return (
-              // Les maps n'ont pas d'identité propre hors de leur rang : la clé
-              // est le numéro de map, ce qu'affiche la ligne.
-              <li key={index} className={styles.row}>
+              <li key={keys.current[index]} className={styles.row}>
                 <span className={styles.mapLabel}>Map {index + 1}</span>
                 <label className={styles.code} htmlFor={codeId}>
                   <span className={styles.fieldLabel}>Code de replay</span>
@@ -163,7 +181,7 @@ export function MapScoreList({
       <button
         type="button"
         className={styles.add}
-        onClick={() => onChange([...maps, emptyMap()])}
+        onClick={add}
         disabled={!canAddMap(format, maps)}
       >
         <Plus size={16} aria-hidden="true" /> Ajouter une map
