@@ -33,9 +33,10 @@ export const LEGACY_SUSPENSION_NOTICE_PATH = "/connexion";
  * en-tête de réponse, qui, lui, suit {@link CSP_MODE}.
  *
  * Les adresses anglaises (`/en/…`) passent par {@link localeGate}, puis sont
- * **réécrites** vers la même route sans préfixe — l'arborescence `app/` est
- * unique —, la langue voyageant dans `x-bg-locale`, posé dans les mêmes
- * en-têtes de requête que le nonce.
+ * marquées `x-bg-locale: en`, posé dans les mêmes en-têtes de requête que le
+ * nonce. Leur **réécriture** vers la même route sans préfixe — l'arborescence
+ * `app/` est unique — n'est pas faite ici mais par `next.config.ts`
+ * (`rewrites`), sur la foi de cet en-tête : voir {@link forward}.
  */
 export function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/api/")) return guardApiRequest(request);
@@ -87,7 +88,7 @@ export function middleware(request: NextRequest) {
   requestHeaders.delete(SUSPENSION_NOTICE_HEADER);
   if (suspensionNotice) requestHeaders.set(SUSPENSION_NOTICE_HEADER, suspensionNotice);
 
-  const response = forward(request, prefixed, path, requestHeaders);
+  const response = forward(requestHeaders);
   response.headers.set(CSP_HEADER, policy);
   // Le cookie `g_state` que posait le script de l'invite Google One Tap,
   // retirée depuis : il n'a plus de lecteur, et `/rgpd` ne déclare plus aucun
@@ -170,12 +171,30 @@ function localizedRequestHeaders(request: NextRequest, locale: Locale, path: str
   return requestHeaders;
 }
 
-/** Laisse passer la requête, réécrite vers la route sans préfixe si elle en portait un. */
-function forward(request: NextRequest, prefixed: Locale | null, path: string, requestHeaders: Headers): NextResponse {
-  if (prefixed === null) return NextResponse.next({ request: { headers: requestHeaders } });
-  const target = request.nextUrl.clone();
-  target.pathname = path;
-  return NextResponse.rewrite(target, { request: { headers: requestHeaders } });
+/**
+ * Laisse passer la requête, en-têtes de requête remplacés — **jamais** de
+ * `NextResponse.rewrite` : la réécriture `/en/…` → `/…` vit dans
+ * `next.config.ts` (`LOCALE_REWRITES`), déclenchée par `x-bg-locale: en`.
+ *
+ * Une réécriture de middleware porte une adresse **absolue**, que le routeur
+ * de Next compare à l'origine interne de la requête (`getRelativeURL` dans
+ * `next/dist/server/lib/router-utils/resolve-routes.js`) : d'origine
+ * différente, elle est traitée comme **externe** et relayée par HTTP
+ * (`proxyRequest`). Or les deux origines ne sont pas rédigées pareil : celle du
+ * routeur garde l'hôte d'écoute tel quel (`127.0.0.1`, `next start -H
+ * 127.0.0.1` en production), celle du middleware passe par `NextURL`, qui
+ * récrit `127.x.x.x` et `[::1]` en `localhost` (`REGEX_LOCALHOST_HOSTNAME`,
+ * `next/dist/server/web/next-url.js`) — y compris l'adresse de réécriture,
+ * re-normalisée par l'adaptateur. Derrière nginx (`X-Forwarded-Proto: https`),
+ * le relais visait `https://localhost:3000`, qui ne parle que HTTP : 500 et
+ * `EPROTO` sur toute page anglaise (production, 2026-10-06). En HTTP simple, le
+ * relais aboutissait, mais la requête relayée repassait par le middleware sous
+ * son chemin réécrit — servie en **français**. Aucune adresse rédigée ici ne
+ * peut retrouver l'hôte d'écoute ; une réécriture de configuration, elle, ne
+ * porte qu'un chemin.
+ */
+function forward(requestHeaders: Headers): NextResponse {
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 /**
@@ -216,9 +235,10 @@ function guardApiRequest(request: NextRequest) {
  *
  * La troisième couvre les adresses anglaises, **préchargements compris** : sans
  * elle, un préchargement de `/en/regles` échapperait au middleware, ne serait
- * pas réécrit et viserait une route inexistante (404 mis en cache, navigation
- * client cassée). Pas de repli par les `rewrites` de `next.config.ts` : elles
- * passent **après** le middleware, qui verrait `/en/api/…` sans le garder.
+ * pas marqué `x-bg-locale: en` — donc pas réécrit par `next.config.ts` — et
+ * viserait une route inexistante (404 mis en cache, navigation client cassée).
+ * Les `rewrites` passent **après** le middleware : c'est lui qui refuse
+ * `/en/api/…` (404) avant qu'elles ne le voient.
  */
 export const config = {
   matcher: [

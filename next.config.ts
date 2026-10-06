@@ -1,6 +1,8 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
+import { LOCALE_REWRITES } from "./lib/shared/locale-rewrites";
+
 /**
  * Configuration par requête de `next-intl` (messages et formats, **sans son
  * routage** — `docs/features/I18N.md`), que la bibliothèque importe sous le nom
@@ -104,6 +106,16 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
+
+  /**
+   * `/en/…` → `/…`, pour les seules requêtes que le middleware a marquées
+   * anglaises (`lib/shared/locale-rewrites.ts`). En `beforeFiles` : passées
+   * juste après le middleware, avant toute route — `/en/regles` n'existe pas
+   * dans `app/`.
+   */
+  async rewrites() {
+    return { beforeFiles: [...LOCALE_REWRITES], afterFiles: [], fallback: [] };
   },
 };
 
