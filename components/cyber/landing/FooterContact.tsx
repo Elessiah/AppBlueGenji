@@ -5,6 +5,7 @@ import { type ContactInfo, type PublicContactInfo, toPublicContact, validateCont
 import { decodeContact } from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { useToast } from "@/components/ui/toast";
+import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./FooterContact.module.css";
@@ -28,6 +29,12 @@ interface FooterContactProps {
  */
 export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContactProps>) {
   const { showError, showSuccess } = useToast();
+  // Textes lus par le visiteur ; la fenêtre d'édition (staff) reste en
+  // français jusqu'au lot des éditeurs de la vitrine (I18N_MIGRATION_PLAN.md, lot 5).
+  const { t, locale } = useShellText();
+  // Parties restées en français (édition staff → lot 5, `ProtectedContact` →
+  // lot 7b) : marquées comme telles sur une page d'une autre langue (WCAG 3.1.2).
+  const frenchPart = locale === "fr" ? undefined : "fr";
   const [contact, setContact] = useState<PublicContactInfo>(initialContact);
   const [form, setForm] = useState<ContactInfo>(() => editableContact(initialContact));
   const [open, setOpen] = useState(false);
@@ -47,7 +54,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
   async function submit() {
     const validation = validateContactInfo(form);
     if (!validation.ok) {
-      showError(ERROR_MESSAGES[validation.error] ?? "Coordonnées invalides.");
+      showError(ERROR_MESSAGES[validation.error] ?? "Coordonnées invalides.", { lang: frenchPart });
       return;
     }
 
@@ -60,14 +67,14 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
       });
       const data = (await res.json()) as { contact?: ContactInfo; error?: string };
       if (!res.ok || !data.contact) {
-        showError(data.error ? ERROR_MESSAGES[data.error] ?? `Échec : ${data.error}` : "Échec de l'enregistrement.");
+        showError(data.error ? ERROR_MESSAGES[data.error] ?? `Échec : ${data.error}` : "Échec de l'enregistrement.", { lang: frenchPart });
         return;
       }
       setContact(toPublicContact(data.contact));
       setOpen(false);
-      showSuccess("Coordonnées de contact mises à jour.");
+      showSuccess("Coordonnées de contact mises à jour.", { lang: frenchPart });
     } catch {
-      showError("Erreur réseau, réessaye.");
+      showError("Erreur réseau, réessaye.", { lang: frenchPart });
     } finally {
       setBusy(false);
     }
@@ -80,7 +87,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
       <ul>
         {contact.emailEncoded && (
           <li className={styles.item}>
-            <span className={styles.itemLabel}>Email</span>
+            <span className={styles.itemLabel}>{t("footer.contact.email")}</span>
             {/* `key` : une adresse révélée puis modifiée par le staff doit
                 repartir masquée, pas garder l'ancienne valeur décodée. */}
             <ProtectedContact
@@ -88,31 +95,33 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               encoded={contact.emailEncoded}
               kind="email"
               owner="de l'association"
+              lang={frenchPart}
             />
           </li>
         )}
         {contact.discordTag && (
           <li className={styles.item}>
-            <span className={styles.itemLabel}>Discord</span>
+            <span className={styles.itemLabel}>{t("footer.contact.discord")}</span>
             <span className={styles.tag}>{contact.discordTag}</span>
           </li>
         )}
         {contact.discordUrl && (
           <li className={styles.item}>
-            <span className={styles.itemLabel}>Serveur</span>
+            <span className={styles.itemLabel}>{t("footer.contact.server")}</span>
             <a className="tap-target" href={contact.discordUrl} target="_blank" rel="noreferrer">
-              Serveur Discord
+              {t("footer.contact.discordServer")}
             </a>
           </li>
         )}
         {!hasAny && (
           <li>
-            <span className={styles.empty}>Non renseigné</span>
+            <span className={styles.empty}>{t("footer.contact.empty")}</span>
           </li>
         )}
         {isAdmin && (
           <li>
-            <button type="button" className={styles.edit} onClick={openEdit}>
+            <button type="button" className={styles.edit} onClick={openEdit} lang={frenchPart}>
+              {/* Commande staff : reste en français jusqu'au lot 5, comme sa fenêtre. */}
               Modifier
             </button>
           </li>
@@ -124,6 +133,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
           onClose={close}
           busy={busy}
           className={styles.modal}
+          lang={frenchPart}
           label="Modifier les coordonnées de contact"
         >
           <h3 className={styles.modalTitle}>Modifier le contact</h3>

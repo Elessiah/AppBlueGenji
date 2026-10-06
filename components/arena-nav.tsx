@@ -6,6 +6,8 @@ import { AccountMenu } from "./account-menu";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
+import type { ShellKey } from "@/lib/shared/shell-text";
+import { useShellText } from "./i18n/shell-text";
 import s from "./arena-nav.module.css";
 
 type ArenaNavProps = {
@@ -31,11 +33,11 @@ type ArenaNavProps = {
  * ni ambre, ni couleur de défaite).
  */
 export const ARENA_NAV_LINKS = [
-  { href: "/joueurs", label: "Joueurs", rgb: "var(--blue-500-rgb)" },
-  { href: "/equipes", label: "Équipes", rgb: "var(--violet-400-rgb)" },
-  { href: "/tournois", label: "Tournois", rgb: "var(--teal-400-rgb)" },
-  { href: "/classement", label: "Classement", rgb: "var(--pink-400-rgb)" },
-] as const;
+  { href: "/joueurs", labelKey: "nav.links.players", rgb: "var(--blue-500-rgb)" },
+  { href: "/equipes", labelKey: "nav.links.teams", rgb: "var(--violet-400-rgb)" },
+  { href: "/tournois", labelKey: "nav.links.tournaments", rgb: "var(--teal-400-rgb)" },
+  { href: "/classement", labelKey: "nav.links.ranking", rgb: "var(--pink-400-rgb)" },
+] as const satisfies ReadonlyArray<{ href: string; labelKey: ShellKey; rgb: string }>;
 const links = ARENA_NAV_LINKS;
 
 export function ArenaNav({
@@ -47,9 +49,10 @@ export function ArenaNav({
 }: Readonly<ArenaNavProps>) {
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
+  const { t } = useShellText();
 
   return (
-    <nav className={s.nav} aria-label="Navigation principale" data-sticky-header>
+    <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
       <div className={`container ${s.navInner}`}>
         <div className={s.navLeft}>
           {links.map((link) => {
@@ -62,16 +65,16 @@ export function ArenaNav({
                 className={`${s.navLink} ${isActive ? s.navLinkActive : ""}`}
                 style={{ "--nav-rgb": link.rgb } as React.CSSProperties}
               >
-                {link.label}
+                {t(link.labelKey)}
               </LocaleLink>
             );
           })}
         </div>
 
-        <LocaleLink href="/" className={s.navLogo} aria-label="Accueil">
+        <LocaleLink href="/" className={s.navLogo} aria-label={t("nav.home")}>
           <LogoWithGlow
             src="/logo_bg.webp"
-            alt="BlueGenji"
+            alt={t("nav.logoAlt")}
             width={32}
             height={32}
             size="sm"
@@ -84,16 +87,16 @@ export function ArenaNav({
           {/* Les pictogrammes sont décoratifs : lus à voix haute, « ⌂ » et
               « 🛡 » précédaient le nom du lien d'un mot sans rapport. */}
           <LocaleLink href="/" className={s.navHome}>
-            <span aria-hidden="true">⌂</span> <span className={s.navHomeLabel}>Accueil</span>
+            <span aria-hidden="true">⌂</span> <span className={s.navHomeLabel}>{t("nav.home")}</span>
           </LocaleLink>
           {activeTeam && (
             <LocaleLink
               href={`/equipes/${activeTeam.teamId}`}
               className={s.navHome}
-              aria-label={`Mon équipe : ${activeTeam.teamName}`}
+              aria-label={t("nav.myTeamLabel", { team: activeTeam.teamName })}
               title={activeTeam.teamName}
             >
-              <span aria-hidden="true">🛡</span> <span className={s.navHomeLabel}>Mon équipe</span>
+              <span aria-hidden="true">🛡</span> <span className={s.navHomeLabel}>{t("nav.myTeam")}</span>
             </LocaleLink>
           )}
           {openReports !== null && (
@@ -102,11 +105,11 @@ export function ArenaNav({
               className={`${s.navHome} ${s.navReports}`}
               aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
             >
-              <span aria-hidden="true">⚑</span> <span className={s.navReportsLabel}>Signalements</span>
+              <span aria-hidden="true">⚑</span> <span className={s.navReportsLabel}>{t("nav.reports")}</span>
               {openReports > 0 && (
                 <span className={s.navBadge}>
                   {openReports}
-                  <span className="sr-only"> à traiter</span>
+                  <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
                 </span>
               )}
             </LocaleLink>

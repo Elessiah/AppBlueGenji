@@ -29,6 +29,8 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ConfirmActionDialog, runConfirmation } from "@/components/ui/confirm-action-dialog";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
 import { diffPlatformRoles, roleChangeNeedsConfirmation } from "@/lib/shared/permissions";
 import { readSource } from "../helpers/read-source";
 
@@ -105,6 +107,24 @@ describe("ConfirmActionDialog — balisage", () => {
     expect(html).not.toContain("<input");
   });
 
+  it("contenu resté en français sur une page anglaise : modale entière en français, `lang=\"fr\"`", () => {
+    const dialog = (
+      <ConfirmActionDialog title="Supprimer ?" confirmLabel="Supprimer" pendingLabel="…" contentLang="fr" onClose={noop} onConfirm={resolved}>
+        <p>Perdu.</p>
+      </ConfirmActionDialog>
+    );
+    const english = render(
+      <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+        {dialog}
+      </ShellTextProvider>,
+    );
+    expect(english).toMatch(/role="alertdialog"[^>]*lang="fr"/);
+    expect(english).toContain(">Annuler</button>");
+    expect(english).not.toContain("Cancel");
+    // Page française : rien n'est ajouté.
+    expect(render(dialog)).not.toContain("lang=");
+  });
+
   it("ton primary pour un engagement", () => {
     const html = render(
       <ConfirmActionDialog title="T" confirmLabel="Inscrire" pendingLabel="…" tone="primary" onClose={noop} onConfirm={resolved}>
@@ -124,6 +144,19 @@ describe("ConfirmActionDialog — balisage", () => {
     expect(html).toMatch(/<input[^>]*data-autofocus="true"/);
     expect(html).toMatch(/<button type="button" class="btn ghost">Annuler<\/button>/);
     expect(html).toMatch(/<button type="submit" class="btn danger" disabled="">Dissoudre<\/button>/);
+  });
+
+  it("libellés communs en anglais sous la coquille anglaise (le texte à recopier n'est pas traduit)", () => {
+    const html = render(
+      <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+        <ConfirmActionDialog title="T" confirmLabel="Disband" pendingLabel="…" requireText="Les Bleus" onClose={noop} onConfirm={resolved}>
+          <p>x</p>
+        </ConfirmActionDialog>
+      </ShellTextProvider>,
+    );
+    expect(html).toContain("Type <strong>Les Bleus</strong> to confirm");
+    expect(html).toMatch(/<button type="button" class="btn ghost">Cancel<\/button>/);
+    expect(html).not.toMatch(/Recopie|Annuler/);
   });
 
   it("champ requis du contenu : `disabled` désarme, `focusContent` laisse le focus au contenu", () => {

@@ -10,19 +10,29 @@ import {
   type Countdown,
   type CountdownOverride,
 } from "@/lib/shared/pausable-countdown";
+import { useShellText } from "@/components/i18n/shell-text";
 import styles from "./toast.module.css";
 
 type ToastType = "error" | "success";
+
+/**
+ * `lang` : langue du message quand elle diffère de la page (un texte resté en
+ * français sur une page anglaise — WCAG 3.1.2). Absent, rien n'est ajouté.
+ */
+export interface ToastOptions {
+  lang?: string;
+}
 
 interface Toast {
   id: number;
   message: string;
   type: ToastType;
+  lang?: string;
 }
 
 interface ToastContextValue {
-  showError: (message: string) => void;
-  showSuccess: (message: string) => void;
+  showError: (message: string, options?: ToastOptions) => void;
+  showSuccess: (message: string, options?: ToastOptions) => void;
 }
 
 /** Durée d'affichage d'une notification, décompte suspendu exclu. */
@@ -43,20 +53,24 @@ const ToastContext = createContext<ToastContextValue | null>(null);
  * des zones montées une fois, que chaque notification remplit d'une ligne.
  */
 export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
+  const { t } = useShellText();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
-  const add = useCallback((message: string, type: ToastType) => {
+  const add = useCallback((message: string, type: ToastType, lang?: string) => {
     const id = ++nextId.current;
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type, lang }]);
   }, []);
 
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const showError = useCallback((message: string) => add(message, "error"), [add]);
-  const showSuccess = useCallback((message: string) => add(message, "success"), [add]);
+  const showError = useCallback((message: string, options?: ToastOptions) => add(message, "error", options?.lang), [add]);
+  const showSuccess = useCallback(
+    (message: string, options?: ToastOptions) => add(message, "success", options?.lang),
+    [add],
+  );
   // Valeur stable : un objet neuf à chaque rendu du fournisseur — donc à chaque
   // notification ajoutée *et* retirée — re-rendait tous les consommateurs de
   // `useToast`, fiche d'un tournoi et tout son plateau compris.
@@ -69,18 +83,22 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
         {toasts
           .filter((toast) => toast.type === "success")
           .map((toast) => (
-            <p key={toast.id}>{toast.message}</p>
+            <p key={toast.id} lang={toast.lang}>
+              {toast.message}
+            </p>
           ))}
       </div>
       <div className="sr-only" role="alert" aria-live="assertive">
         {toasts
           .filter((toast) => toast.type === "error")
           .map((toast) => (
-            <p key={toast.id}>{toast.message}</p>
+            <p key={toast.id} lang={toast.lang}>
+              {toast.message}
+            </p>
           ))}
       </div>
       {toasts.length > 0 && (
-        <section className={styles.stack} aria-label="Notifications">
+        <section className={styles.stack} aria-label={t("toast.regionLabel")}>
           {toasts.map((toast) => (
             <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
           ))}
@@ -114,7 +132,8 @@ function isKeyboardFocus(element: Element): boolean {
  * souris laisse le focus sur le bouton cliqué, et le décompte ne reprendrait
  * jamais. La barre de progression lit le même état par `data-paused`.
  */
-function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
+export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
+  const { t } = useShellText();
   const [override, setOverride] = useState<CountdownOverride>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -150,7 +169,7 @@ function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id
     return () => window.clearTimeout(timer);
   }, [paused, dismissSelf]);
 
-  const kind = toast.type === "error" ? "Erreur" : "Succès";
+  const prefix = t(toast.type === "error" ? "toast.errorPrefix" : "toast.successPrefix");
 
   return (
     <div
@@ -181,15 +200,15 @@ function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id
       }}
     >
       <p className={styles.message}>
-        <span className="sr-only">{kind} : </span>
-        {toast.message}
+        <span className="sr-only">{`${prefix} `}</span>
+        {toast.lang ? <span lang={toast.lang}>{toast.message}</span> : toast.message}
       </p>
       <div className={styles.actions}>
         <button
           type="button"
           className={styles.action}
-          aria-label={manualPause ? "Reprendre le décompte de la notification" : "Mettre en pause la notification"}
-          title={manualPause ? "Reprendre" : "Pause"}
+          aria-label={manualPause ? t("toast.resume") : t("toast.pause")}
+          title={manualPause ? t("toast.resumeTitle") : t("toast.pauseTitle")}
           onClick={() => setOverride(manualPause ? "RUNNING" : "PAUSED")}
         >
           <span aria-hidden="true">{manualPause ? "▶" : "❚❚"}</span>
@@ -197,8 +216,8 @@ function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id
         <button
           type="button"
           className={styles.action}
-          aria-label="Fermer la notification"
-          title="Fermer"
+          aria-label={t("toast.close")}
+          title={t("toast.closeTitle")}
           onClick={dismissSelf}
         >
           <span aria-hidden="true">×</span>

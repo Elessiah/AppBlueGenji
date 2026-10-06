@@ -81,9 +81,9 @@ describe("barre de navigation", () => {
   const nav = readSource(join(ROOT, "components", "arena-nav.tsx"));
 
   it("passe « Équipes » au violet des pages d'équipe, sans aucune teinte chaude", () => {
-    expect(nav).toMatch(/label: "Équipes", rgb: "var\(--violet-400-rgb\)"/);
-    expect(nav).toMatch(/label: "Joueurs", rgb: "var\(--blue-500-rgb\)"/);
-    expect(nav).toMatch(/label: "Tournois", rgb: "var\(--teal-400-rgb\)"/);
+    expect(nav).toMatch(/labelKey: "nav\.links\.teams", rgb: "var\(--violet-400-rgb\)"/);
+    expect(nav).toMatch(/labelKey: "nav\.links\.players", rgb: "var\(--blue-500-rgb\)"/);
+    expect(nav).toMatch(/labelKey: "nav\.links\.tournaments", rgb: "var\(--teal-400-rgb\)"/);
     expect(nav).not.toMatch(/255, 157, 46|orange/);
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { FR_SHELL_MESSAGES } from "@/lib/shared/shell-text";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -50,12 +51,13 @@ describe("AGPL art. 13: the source is offered on every page", () => {
     (file) => {
       const source = read(file);
       expect(source).toMatch(/href=\{SOURCE_CODE_URL\} target="_blank" rel="noreferrer"/);
-      expect(source).toContain("{SOURCE_CODE_LINK_LABEL}");
+      expect(source).toMatch(/\{t\("(footer\.)?links\.sourceCode"\)\}/);
     },
   );
 
   it("labels the link the same everywhere", () => {
     expect(SOURCE_CODE_LINK_LABEL).toBe("Code source");
+    expect(FR_SHELL_MESSAGES.footer.links.sourceCode).toBe(SOURCE_CODE_LINK_LABEL);
   });
 
   it("drops the blanket « tous droits réservés », which the AGPL contradicts for the code", () => {

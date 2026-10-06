@@ -4,6 +4,8 @@ import { FormEvent, ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { richNodes, useShellText } from "@/components/i18n/shell-text";
+import { shellText } from "@/lib/shared/shell-text";
 import styles from "./confirm-action-dialog.module.css";
 
 export interface ConfirmActionDialogProps {
@@ -42,6 +44,13 @@ export interface ConfirmActionDialogProps {
    * un refus la laisse ouverte pour qu'on puisse réessayer ou renoncer.
    */
   onConfirm: () => Promise<boolean>;
+  /**
+   * Contenu fourni resté en français (écran staff pas encore traduit) : sur une
+   * page d'une autre langue, toute la modale passe en français et le dit
+   * (`lang="fr"`, WCAG 3.1.2) plutôt que de mêler « Cancel » et « Supprimer ».
+   * Sans effet sur une page française.
+   */
+  contentLang?: "fr";
 }
 
 /**
@@ -99,7 +108,11 @@ export function ConfirmActionDialog({
   focusContent = false,
   onClose,
   onConfirm,
+  contentLang,
 }: Readonly<ConfirmActionDialogProps>) {
+  const pageText = useShellText();
+  const foreign = contentLang !== undefined && contentLang !== pageText.locale;
+  const { t, rich } = foreign ? shellText(contentLang) : pageText;
   const titleId = useId();
   const bodyId = useId();
   const inputId = useId();
@@ -130,6 +143,7 @@ export function ConfirmActionDialog({
         aria-describedby={focusContent ? undefined : bodyId}
         tabIndex={-1}
         className={styles.dialog}
+        lang={foreign ? contentLang : undefined}
       >
         <h3 id={titleId} className={styles.title}>
           {title}
@@ -141,7 +155,11 @@ export function ConfirmActionDialog({
           {requireText === undefined ? null : (
             <div className={`field ${styles.confirmField}`}>
               <label htmlFor={inputId}>
-                Recopie <strong>{requireText}</strong> pour confirmer
+                {richNodes(
+                  rich("confirmDialog.typeToConfirm", { text: requireText }, {
+                    strong: (children) => <strong>{children}</strong>,
+                  }),
+                )}
               </label>
               <input
                 id={inputId}
@@ -161,7 +179,7 @@ export function ConfirmActionDialog({
               disabled={busy}
               data-autofocus={requireText === undefined && !focusContent ? true : undefined}
             >
-              Annuler
+              {t("confirmDialog.cancel")}
             </button>
             <button type="submit" className={tone === "danger" ? "btn danger" : "btn"} disabled={busy || !armed}>
               {busy ? pendingLabel : confirmLabel}

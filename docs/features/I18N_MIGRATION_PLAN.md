@@ -1,6 +1,6 @@
 # Site bilingue FR/EN — plan de migration
 
-> **Statut : lot 0 (infrastructure) livré — aucune page traduite.** Ce qui existe est décrit dans
+> **Statut : lots 0 (infrastructure) et 1 (coquille partagée) livrés — aucune route traduite.** Ce qui existe est décrit dans
 > `I18N.md` ; ce document garde la mesure, le choix technique et le découpage en lots. Décision du
 > 2026-10-05 : le site devient bilingue avec des **adresses indexées distinctes** par langue.
 > Les arbitrages sont rendus (§ Décisions prises, 2026-10-06).
@@ -210,6 +210,21 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   contrôles `lang="en"`/`hreflang` d'une page anglaise s'y ajoutent avec la première route
   traduite.
 
+### Ce que le lot 1 a établi (2026-10-06) — écarts au plan
+
+- **Aucune route ajoutée** à la liste blanche : la coquille se rend en anglais sur les seules routes
+  traduites. Elle est donc **prête** pour le lot 2 et reste française partout aujourd'hui.
+- **Pas de `next-intl` côté client pour la coquille** : rendue sur toutes les pages, elle aurait
+  chargé le formateur partout. Formateur ICU réduit (`lib/shared/message-format.ts`, `{arg}`,
+  `plural`, balises), garanti équivalent à `next-intl` message par message par un test ; français
+  inclus dans le paquet, anglais sérialisé par la mise en page racine **seulement** sous `/en`.
+  Détail : `I18N.md` § Coquille partagée.
+- **Reporté** : fenêtre d'édition du contact (staff → lot 5), `ProtectedContact` (pages légales →
+  lot 7b), formulaire « Signaler un problème » (→ lot 9, seul le bouton est traduit), place du
+  sélecteur de langue sur mobile (→ lot 2, avec une vraie page anglaise).
+- `SiteFooterBar` devient composant client (sans état) : un composant serveur asynchrone ne se rend
+  pas dans les tests de `ArenaShell`, et ses textes n'ont besoin d'aucune donnée serveur.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -238,7 +253,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | # | Lot | Contenu | Chaînes ~ | Risques | Revue |
 |---|---|---|---:|---|---|
 | 0 | **Infrastructure** | `next-intl`, `i18n/request.ts`, `messages/fr/*.json` + `messages/en/*.json` par espace de noms, réécriture `/en` dans `middleware.ts`, en-tête `x-bg-locale`, liste blanche, `<html lang>`, `LocaleLink`/`localeHref`/`useLocaleRouter`, sélecteur, `pageMetadata` + sitemap + JSON-LD multilingues, formateurs, test de parité des clés, règle ESLint, glossaire, doc `I18N.md`, règle `CLAUDE.md`. **Aucune page migrée** (liste blanche vide → `/en/*` redirige). | ~0 | Middleware (CSP, provenance API, suspension) ; `usePathname` après réécriture ; double TypeScript | **Critique** : deux cycles propres consécutifs + sécurité + performance |
-| 1 | Coquille partagée | Nav, pied de page, `PublicPageShell`, lien d'évitement, menu d'accessibilité, toasts, `ConfirmActionDialog`, pages d'erreur / 404 / `global-error` | ~250 (C1 + part de C2) | Composants partout : tester FR inchangé | Standard + UI |
+| 1 ✅ | Coquille partagée | Nav, pied de page, `PublicPageShell`, lien d'évitement, menu d'accessibilité, toasts, `ConfirmActionDialog`, pages d'erreur / 404 / `global-error` | ~250 (C1 + part de C2) | Composants partout : tester FR inchangé | Standard + UI |
 | 2 | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
 | 3 | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
 | 4 | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |

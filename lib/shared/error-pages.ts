@@ -4,15 +4,20 @@
  *
  * Sans ces fichiers, Next rendait ses propres pages : en anglais (« This page
  * could not be found. », « Application error »), sur un fond blanc imposé en
- * thème clair, sans en-tête ni lien de retour — un cul-de-sac. Les textes sont
- * réunis ici, purs, pour être partagés et testés sans rendu.
+ * thème clair, sans en-tête ni lien de retour — un cul-de-sac. Les phrases
+ * vivent dans les messages de la coquille (`shell.errorPages`, français et
+ * anglais) ; ce module les assemble, pur, pour être partagé et testé sans rendu.
  */
 
 import { SITE_NAME } from "./share-metadata";
+import { shellText, type ShellKey, type ShellTranslate } from "./shell-text";
+
+/** Le français, langue d'une page sans préfixe — repli des fonctions ci-dessous. */
+const FRENCH: ShellTranslate = shellText("fr").t;
 
 export interface ErrorPageLink {
   href: string;
-  label: string;
+  labelKey: ShellKey;
 }
 
 export interface ErrorPageCopy {
@@ -22,19 +27,14 @@ export interface ErrorPageCopy {
   message: string;
 }
 
-export const NOT_FOUND_COPY: ErrorPageCopy = {
-  eyebrow: "ERREUR 404",
-  title: "Page introuvable",
-  message:
-    "Cette adresse ne mène à aucune page du site : le lien est peut-être erroné, ou la page a été déplacée ou retirée.",
-};
-
-export const RUNTIME_ERROR_COPY: ErrorPageCopy = {
-  eyebrow: "ERREUR",
-  title: "Un problème est survenu",
-  message:
-    "La page n'a pas pu s'afficher. Réessaie dans un instant ; si le problème persiste, signale-le.",
-};
+/** Textes de la page introuvable. */
+export function notFoundCopy(t: ShellTranslate = FRENCH): ErrorPageCopy {
+  return {
+    eyebrow: t("errorPages.notFound.eyebrow"),
+    title: t("errorPages.notFound.title"),
+    message: t("errorPages.notFound.message"),
+  };
+}
 
 /**
  * Textes d'une erreur d'exécution selon qu'une référence l'accompagne : seule
@@ -42,24 +42,20 @@ export const RUNTIME_ERROR_COPY: ErrorPageCopy = {
  * dans le navigateur n'en a pas, et la phrase ne doit pas renvoyer à une
  * référence absente.
  */
-export function runtimeErrorCopy(reference: string | null): ErrorPageCopy {
-  if (!reference) return RUNTIME_ERROR_COPY;
+export function runtimeErrorCopy(reference: string | null, t: ShellTranslate = FRENCH): ErrorPageCopy {
   return {
-    ...RUNTIME_ERROR_COPY,
-    message:
-      "La page n'a pas pu s'afficher. Réessaie dans un instant ; si le problème persiste, signale-le avec la référence ci-dessous.",
+    eyebrow: t("errorPages.runtime.eyebrow"),
+    title: t("errorPages.runtime.title"),
+    message: t(reference ? "errorPages.runtime.messageWithReference" : "errorPages.runtime.message"),
   };
 }
 
 /** Destinations proposées depuis une page introuvable, dans l'ordre d'affichage. */
 export const NOT_FOUND_LINKS: readonly ErrorPageLink[] = [
-  { href: "/", label: "Retour à l'accueil" },
-  { href: "/tournois", label: "Voir les tournois" },
-  { href: "/regles", label: "Lire les règles" },
+  { href: "/", labelKey: "errorPages.links.home" },
+  { href: "/tournois", labelKey: "errorPages.links.tournaments" },
+  { href: "/regles", labelKey: "errorPages.links.rules" },
 ];
-
-/** Libellé du bouton qui relance le rendu après une erreur d'exécution. */
-export const RETRY_LABEL = "Réessayer";
 
 /**
  * Référence de l'erreur à citer dans un signalement : l'empreinte (`digest`)
@@ -77,6 +73,6 @@ export function errorReference(digest: string | null | undefined): string | null
  * est un composant client et ne peut pas exporter de métadonnées : elle rend ce
  * titre dans un `<title>`, que React remonte dans `<head>`.
  */
-export function errorPageTitle(copy: ErrorPageCopy): string {
-  return `${copy.title} · ${SITE_NAME}`;
+export function errorPageTitle(copy: ErrorPageCopy, t: ShellTranslate = FRENCH): string {
+  return t("errorPages.documentTitle", { title: copy.title, site: SITE_NAME });
 }

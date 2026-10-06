@@ -78,13 +78,12 @@ describe("ToastItem — comportement (source)", () => {
   });
 
   it("nomme ses boutons pause, reprise et fermeture", () => {
-    expect(source).toContain('"Mettre en pause la notification"');
-    expect(source).toContain('"Reprendre le décompte de la notification"');
-    expect(source).toContain('aria-label="Fermer la notification"');
+    expect(source).toContain('aria-label={manualPause ? t("toast.resume") : t("toast.pause")}');
+    expect(source).toContain('aria-label={t("toast.close")}');
   });
 
   it("n'annonce le type qu'aux lecteurs d'écran, sans le répéter à l'œil", () => {
-    expect(source).toMatch(/<span className="sr-only">\{kind\} : <\/span>/);
+    expect(source).toMatch(/<span className="sr-only">\{`\$\{prefix\} `\}<\/span>/);
   });
 
   it("n'écrit plus aucun style en ligne, barre de progression exceptée", () => {

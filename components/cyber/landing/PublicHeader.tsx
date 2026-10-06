@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import Image from "next/image";
 import { AccountMenu } from "@/components/account-menu";
@@ -32,6 +33,7 @@ export async function PublicHeader() {
   const team = user ? await getUserActiveTeam(user.id).catch(() => null) : null;
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
   const switcherLabel = await languageSwitcherLabel();
+  const t = await getTranslations("shell.header");
 
   return (
     <header className={styles.root} data-sticky-header>
@@ -52,8 +54,8 @@ export async function PublicHeader() {
               <Image src="/logo_bg.webp" alt="" width={28} height={28} />
             </span>
             <span className={styles.brandText}>
-              <span className="logotype">BlueGenji</span>
-              <span className="mono">ESPORT</span>
+              <span className="logotype">{t("brandName")}</span>
+              <span className="mono">{t("brandTagline")}</span>
             </span>
           </LocaleLink>
         </div>
@@ -65,8 +67,8 @@ export async function PublicHeader() {
             <>
               <CyberButton variant="primary" asChild>
                 <LocaleLink href="/tournois">
-                  <span className={styles.ctaFull}>Accéder à la partie compétitive →</span>
-                  <span className={styles.ctaShort}>Compétition →</span>
+                  <span className={styles.ctaFull}>{t("competitionFull")}</span>
+                  <span className={styles.ctaShort}>{t("competitionShort")}</span>
                 </LocaleLink>
               </CyberButton>
               {/* Profil, équipe et déconnexion : le même menu que dans
@@ -76,7 +78,7 @@ export async function PublicHeader() {
             </>
           ) : (
             <CyberButton variant="primary" asChild>
-              <LocaleLink href="/connexion">Rejoindre →</LocaleLink>
+              <LocaleLink href="/connexion">{t("join")}</LocaleLink>
             </CyberButton>
           )}
         </div>

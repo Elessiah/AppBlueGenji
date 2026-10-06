@@ -105,14 +105,14 @@ describe("public footer wires legal documents", () => {
   });
 
   it("routes Partenaires to the landing sponsors section, once", () => {
-    expect(source).toContain('href="/#sponsors">Partenaires');
+    expect(source).toContain('href="/#sponsors">{t("links.partners")}');
     expect(source).not.toContain("Partenariats");
   });
 
   it("renders a dedicated CONTACT category in the footer", () => {
     // Catégorie « Contact » éditable (email / Discord), plus de lien vers une
     // section /association ni de composant presse inline historique.
-    expect(source).toContain(">CONTACT<");
+    expect(source).toContain('{t("headings.contact")}');
     expect(source).toContain("FooterContact");
     expect(source).not.toContain("FooterPressContact");
     expect(source).not.toContain('href="/association#contact"');

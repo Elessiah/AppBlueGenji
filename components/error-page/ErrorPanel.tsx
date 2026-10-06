@@ -11,11 +11,14 @@ export function ErrorPanel({
   copy,
   children,
   reference,
+  referenceLabel,
 }: Readonly<{
   copy: ErrorPageCopy;
   /** Actions proposées (liens, bouton « Réessayer »). */
   children: ReactNode;
   reference?: string | null;
+  /** « Référence : », dans la langue de la page (`shell.errorPages.reference`). */
+  referenceLabel: string;
 }>) {
   return (
     <section className={styles.wrap} aria-labelledby="error-page-title">
@@ -28,7 +31,8 @@ export function ErrorPanel({
         <div className={styles.actions}>{children}</div>
         {reference && (
           <p className={styles.reference}>
-            Référence : <span className="mono">{reference}</span>
+            {`${referenceLabel} `}
+            <span className="mono">{reference}</span>
           </p>
         )}
       </div>

@@ -1,0 +1,157 @@
+{
+  "skipLink": {
+    "label": "Skip to content"
+  },
+  "nav": {
+    "mainLabel": "Main navigation",
+    "links": {
+      "players": "Players",
+      "teams": "Teams",
+      "tournaments": "Tournaments",
+      "ranking": "Ranking",
+      "recruitment": "Recruitment",
+      "bot": "Bot",
+      "association": "The association",
+      "volunteers": "Volunteers"
+    },
+    "home": "Home",
+    "logoAlt": "BlueGenji",
+    "myTeam": "My team",
+    "myTeamLabel": "My team: {team}",
+    "reports": "Reports",
+    "reportsPending": "{count, plural, other {to review}}",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "menuButton": "MENU"
+  },
+  "header": {
+    "brandName": "BlueGenji",
+    "brandTagline": "ESPORT",
+    "competitionFull": "Go to competitions →",
+    "competitionShort": "Compete →",
+    "join": "Join →"
+  },
+  "account": {
+    "menuLabel": "{pseudo}, account menu",
+    "profile": "My profile",
+    "logout": "Log out",
+    "loggingOut": "Logging out…",
+    "logoutFailed": "Couldn't log you out. Try again in a moment."
+  },
+  "footer": {
+    "brandName": "BlueGenji",
+    "tagline": "Nonprofit association (French law of 1901). Overwatch and Marvel Rivals tournaments for the French-speaking amateur scene.",
+    "headings": {
+      "competitions": "COMPETITIONS",
+      "association": "ASSOCIATION",
+      "contact": "CONTACT",
+      "legal": "LEGAL"
+    },
+    "links": {
+      "tournaments": "Tournaments",
+      "ranking": "Ranking",
+      "bot": "Bot",
+      "manifesto": "Manifesto",
+      "volunteers": "Volunteers",
+      "partners": "Partners",
+      "legalNotice": "Legal notice",
+      "terms": "Terms of use",
+      "rgpd": "GDPR",
+      "privacy": "Privacy",
+      "statutes": "Bylaws (in French)",
+      "internalRules": "Internal rules (in French)",
+      "cookies": "Cookies",
+      "sourceCode": "Source code"
+    },
+    "legalNavLabel": "Legal information",
+    "accessibilitySettings": "Accessibility settings",
+    "accessibilityStatus": "Accessibility: {status}",
+    "conformity": {
+      "TOTAL": "fully compliant",
+      "PARTIAL": "partially compliant",
+      "NONE": "non-compliant"
+    },
+    "reportProblem": "Report a problem",
+    "copyright": "© 2026 {association}",
+    "contact": {
+      "email": "Email",
+      "discord": "Discord",
+      "server": "Server",
+      "discordServer": "Discord server",
+      "empty": "Not provided"
+    }
+  },
+  "a11yMenu": {
+    "button": "Accessibility settings",
+    "buttonActive": "Accessibility settings ({count, plural, one {# active} other {# active}})",
+    "title": "Accessibility",
+    "close": "Close accessibility menu",
+    "intro": "All off by default. Your choice is saved in this browser.",
+    "listLabel": "Accessibility settings",
+    "zoomHint": "To enlarge text, use your browser's zoom (press Ctrl and +, or ⌘ and + on a Mac).",
+    "statement": "Accessibility statement",
+    "resetAll": "Turn all off",
+    "settings": {
+      "contrast": {
+        "label": "Higher contrast",
+        "description": "Lighter secondary text, stronger borders and separators, readable placeholder text."
+      },
+      "focus": {
+        "label": "Highly visible focus",
+        "description": "A thick ring around the element reached with the keyboard."
+      },
+      "links": {
+        "label": "Underlined links",
+        "description": "All text links are underlined, not just colored."
+      },
+      "font": {
+        "label": "Simplified font",
+        "description": "A single sans-serif font, with no forced capitals or letter spacing."
+      },
+      "spacing": {
+        "label": "Text spacing",
+        "description": "More room between lines, words, letters and paragraphs."
+      },
+      "motion": {
+        "label": "Reduce motion",
+        "description": "Stops decorative animations and transitions, even if your system doesn't ask for it."
+      }
+    }
+  },
+  "toast": {
+    "regionLabel": "Notifications",
+    "errorPrefix": "Error:",
+    "successPrefix": "Success:",
+    "pause": "Pause notification",
+    "pauseTitle": "Pause",
+    "resume": "Resume notification countdown",
+    "resumeTitle": "Resume",
+    "close": "Close notification",
+    "closeTitle": "Close"
+  },
+  "confirmDialog": {
+    "cancel": "Cancel",
+    "typeToConfirm": "Type <strong>{text}</strong> to confirm"
+  },
+  "errorPages": {
+    "notFound": {
+      "eyebrow": "ERROR 404",
+      "title": "Page not found",
+      "message": "This address doesn't lead to any page on the site: the link may be wrong, or the page was moved or removed."
+    },
+    "runtime": {
+      "eyebrow": "ERROR",
+      "title": "Something went wrong",
+      "message": "The page couldn't be displayed. Try again in a moment; if the problem persists, report it.",
+      "messageWithReference": "The page couldn't be displayed. Try again in a moment; if the problem persists, report it with the reference below."
+    },
+    "links": {
+      "home": "Back to home",
+      "tournaments": "See tournaments",
+      "rules": "Read the rules"
+    },
+    "retry": "Try again",
+    "reference": "Reference:",
+    "documentTitle": "{title} · {site}"
+  }
+}

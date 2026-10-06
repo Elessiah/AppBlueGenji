@@ -11,7 +11,9 @@ import { createTranslator } from "next-intl";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { SITE_TIME_ZONE } from "@/lib/shared/locales";
 
-export async function getTranslations(namespace?: "common" | "common.languageSwitcher") {
+export async function getTranslations(
+  namespace?: "common" | "common.languageSwitcher" | "shell" | "shell.header" | "shell.footer",
+) {
   return createTranslator({
     locale: "fr",
     messages: messagesFor("fr"),

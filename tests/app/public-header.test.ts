@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { FR_SHELL_MESSAGES } from "@/lib/shared/shell-text";
 
 const ROOT = join(__dirname, "..", "..");
 const source = readFileSync(
@@ -12,7 +13,8 @@ const source = readFileSync(
 // le câblage au niveau source, comme pour les autres pages (cf. legal-page.test).
 describe("PublicHeader — bouton « partie compétitive »", () => {
   it("affiche le CTA compétitif pour l'utilisateur connecté", () => {
-    expect(source).toContain("Accéder à la partie compétitive");
+    expect(source).toContain('{t("competitionFull")}');
+    expect(FR_SHELL_MESSAGES.header.competitionFull).toBe("Accéder à la partie compétitive →");
   });
 
   it("pointe le CTA vers l'espace sécurisé /tournois", () => {
@@ -25,9 +27,9 @@ describe("PublicHeader — bouton « partie compétitive »", () => {
     const connectedJsx = connectedBranch.slice(0, elseSplit);
     const loggedOutJsx = connectedBranch.slice(elseSplit);
 
-    expect(connectedJsx).toContain("Accéder à la partie compétitive");
+    expect(connectedJsx).toContain('t("competitionFull")');
     // Pas de fuite du CTA côté déconnecté (qui ne propose que Connexion/Rejoindre).
-    expect(loggedOutJsx).not.toContain("Accéder à la partie compétitive");
+    expect(loggedOutJsx).not.toContain('t("competition');
     expect(loggedOutJsx).toContain("/connexion");
   });
 

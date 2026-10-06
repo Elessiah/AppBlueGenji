@@ -18,8 +18,30 @@ const SONAR_FILES = ["app/**", "components/**", "lib/**", "tests/**"];
  * passe par une clé de traduction, et tout lien interne par `LocaleLink`.
  * La liste s'allonge à chaque lot de migration, dans la PR qui traduit le
  * dossier — en même temps que `lib/shared/i18n-routes.ts`.
+ *
+ * Lot 1 : la coquille partagée, rendue sur toutes les pages (aucune route
+ * ajoutée — elle ne se lit en anglais que sur les routes déjà traduites).
+ * `FooterContact` n'y est pas : sa fenêtre d'édition (staff) attend le lot 5.
  */
-const I18N_MIGRATED_FILES = ["components/i18n/**"];
+const I18N_MIGRATED_FILES = [
+  "components/i18n/**",
+  "app/error.tsx",
+  "app/global-error.tsx",
+  "app/not-found.tsx",
+  "components/accessibility/**",
+  "components/account-menu.tsx",
+  "components/arena-nav.tsx",
+  "components/arena-shell.tsx",
+  "components/cyber/landing/PublicFooter.tsx",
+  "components/cyber/landing/PublicHeader.tsx",
+  "components/cyber/landing/PublicNavMenu.tsx",
+  "components/cyber/landing/PublicPageShell.tsx",
+  "components/cyber/landing/SessionPageShell.tsx",
+  "components/error-page/**",
+  "components/legal/SiteFooterBar.tsx",
+  "components/ui/confirm-action-dialog.tsx",
+  "components/ui/toast.tsx",
+];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */
 const I18N_LOCALE_LINK_FILES = [

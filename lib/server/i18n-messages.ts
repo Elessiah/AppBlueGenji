@@ -12,12 +12,14 @@
  */
 import enCommon from "@/messages/en/common.json";
 import frCommon from "@/messages/fr/common.json";
+import enShell from "@/messages/en/shell.json";
+import frShell from "@/messages/fr/shell.json";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 
 const CATALOG: Readonly<Record<Locale, Messages>> = {
-  fr: { common: frCommon },
-  en: { common: enCommon },
+  fr: { common: frCommon, shell: frShell },
+  en: { common: enCommon, shell: enShell },
 };
 
 export function messagesFor(locale: Locale): Messages {

@@ -11,12 +11,15 @@
  * {@link MESSAGE_NAMESPACES}, à {@link Messages} et au catalogue serveur.
  */
 import type frCommon from "@/messages/fr/common.json";
+import type frShell from "@/messages/fr/shell.json";
 
-export const MESSAGE_NAMESPACES = ["common"] as const;
+export const MESSAGE_NAMESPACES = ["common", "shell"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
   common: typeof frCommon;
+  /** Coquille partagée (en-têtes, pieds de page, menus, notifications, pages d'erreur) — `components/i18n/shell-text.tsx`. */
+  shell: typeof frShell;
 };
 
 /**
