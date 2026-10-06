@@ -132,7 +132,8 @@ describe("année de fondation", () => {
     "%s lit la constante plutôt qu'une année écrite à la main",
     (file) => {
       const source = read(file);
-      expect(source).toContain("{ORGANIZATION_FOUNDING_YEAR}");
+      // Accueil traduit (lot 2) : la constante passe en argument du message.
+      expect(source).toMatch(/\{\s*(year:\s*)?ORGANIZATION_FOUNDING_YEAR\s*\}/);
       expect(source).not.toMatch(/\b2020\b/);
     },
   );

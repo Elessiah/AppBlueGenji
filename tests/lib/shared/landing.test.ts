@@ -240,10 +240,11 @@ describe("featuredMatchPill", () => {
   ) => featuredMatchPill({ launchPhase, startAt, liveState }, now);
 
   it("reprend les mots des sections de manche, phase par phase", () => {
-    expect(pill("LAUNCHED", null)).toEqual({ label: MATCH_SECTION_LABELS.PLAYING, tone: "blue", when: null });
-    expect(pill("LOBBY", null)).toEqual({ label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null });
+    expect(pill("LAUNCHED", null)).toEqual({ kind: "playing", label: MATCH_SECTION_LABELS.PLAYING, tone: "blue", when: null });
+    expect(pill("LOBBY", null)).toEqual({ kind: "lobby", label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null });
     // L'horaire est rendu à côté de la pastille, pas dedans : elle tient sur une ligne.
     expect(pill("SCHEDULED", "2026-10-05T18:30:00Z")).toEqual({
+      kind: "waiting",
       label: FEATURED_PILL_WAITING_LABEL,
       tone: "waiting",
       when: "5 oct. · 20:30",
@@ -259,7 +260,7 @@ describe("featuredMatchPill", () => {
 
   it("ne dit « En direct », en rouge, que pour un match réellement à l'antenne", () => {
     for (const phase of ["LAUNCHED", "LOBBY", "SCHEDULED"] as const) {
-      expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "LIVE")).toEqual({ label: "En direct", tone: "live", when: null });
+      expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "LIVE")).toEqual({ kind: "live", label: "En direct", tone: "live", when: null });
       // Une diffusion seulement annoncée n'est pas à l'antenne.
       expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "SCHEDULED").tone).not.toBe("live");
     }
@@ -278,7 +279,7 @@ describe("featuredMatchPill", () => {
   });
 
   it("se passe d'un horaire illisible ou absent", () => {
-    expect(pill("SCHEDULED", "pas une date")).toEqual({ label: "En attente de lancement", tone: "waiting", when: null });
+    expect(pill("SCHEDULED", "pas une date")).toEqual({ kind: "waiting", label: "En attente de lancement", tone: "waiting", when: null });
     expect(pill("SCHEDULED", null).when).toBeNull();
   });
 

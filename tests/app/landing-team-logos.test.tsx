@@ -125,6 +125,7 @@ function match(overrides: Partial<LandingLiveMatch> = {}): LandingLiveMatch {
     team2Seed: null,
     bracket: "UPPER",
     roundLabel: "Quart de finale",
+    round: { kind: "quarter", number: 1 },
     matchFormat: null,
     liveState: "OFF",
     liveUrl: null,

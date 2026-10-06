@@ -58,8 +58,17 @@ describe("nom accessible des liens de la vitrine", () => {
   });
 
   it("fait commencer le libellé du bouton de direct par son texte affiché", () => {
+    // Accueil traduit (lot 2) : texte et libellé viennent de `landing.json`, et
+    // chaque libellé commence par le texte du bouton, dans les deux langues.
     const hero = readFileSync(join(ROOT, "components/cyber/landing/Hero.tsx"), "utf8");
-    expect(hero).toContain("Regarder le live");
-    expect(hero).toMatch(/aria-label=\{`Regarder le live/);
+    expect(hero).toContain('t("common.watchLive")');
+    expect(hero).toContain('t("hero.watchLiveLabelOn"');
+    expect(hero).toContain('t("hero.watchLiveLabel"');
+    for (const locale of ["fr", "en"] as const) {
+      const messages = JSON.parse(readFileSync(join(ROOT, `messages/${locale}/landing.json`), "utf8"));
+      expect(messages.hero.watchLiveLabel.startsWith(messages.common.watchLive)).toBe(true);
+      expect(messages.hero.watchLiveLabelOn.startsWith(messages.common.watchLive)).toBe(true);
+    }
+    expect(JSON.parse(readFileSync(join(ROOT, "messages/fr/landing.json"), "utf8")).common.watchLive).toBe("Regarder le live");
   });
 });

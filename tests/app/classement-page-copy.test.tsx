@@ -5,7 +5,7 @@ jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
 }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn() }));
-jest.mock("@/lib/server/site-copy-service", () => ({ getSiteCopy: jest.fn() }));
+jest.mock("@/lib/server/site-copy-service", () => ({ getSiteCopy: jest.fn(), getSiteCopyEditor: jest.fn() }));
 jest.mock("@/lib/server/landing-service", () => ({ loadLeaderboardRows: jest.fn() }));
 jest.mock("@/lib/server/teams/directory", () => ({ loadCachedTeamForms: jest.fn() }));
 // Le gabarit (asynchrone) a ses propres tests : seul le contenu compte ici.
