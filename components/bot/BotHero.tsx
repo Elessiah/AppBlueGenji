@@ -1,11 +1,13 @@
-import Link from "next/link";
 import { DiscordIcon } from "./DiscordIcon";
 import { CyberButton } from "@/components/cyber";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
 import { botInviteScopesLabel, botInviteUrl } from "@/lib/server/bot-invite";
 import { botStatusOf, isBotOnline } from "@/lib/shared/bot-status-summary";
 import type { BotStatus } from "@/lib/shared/types";
 
-export function BotHero({ status }: Readonly<{ status: BotStatus | null }>) {
+export function BotHero({ status, text = FR_BOT_TEXT }: Readonly<{ status: BotStatus | null; text?: BotText }>) {
+  const { t } = text;
   const inviteUrl = botInviteUrl();
   // La pastille verte de l'avatar suit la case « État » : allumée sur un bot
   // opérationnel, absente sinon (injoignable, dégradé, état illisible).
@@ -35,17 +37,17 @@ export function BotHero({ status }: Readonly<{ status: BotStatus | null }>) {
           <span className="bot-tag">
             <span className="sq" />
             {/* NOSONAR S6772 — étiquette en flex avec `gap` */}
-            BOT DISCORD · INTER-SERVEURS
+            {t("hero.tag")}
           </span>
           <h1 className="bot-title">
-            BlueGenji <span className="accent">Bot</span>
+            {t("hero.titleLead")} <span className="accent">{t("hero.titleAccent")}</span>
           </h1>
           {/* Ni identifiant ni « vérifié » : le site ne lit ni le pseudo
               Discord du bot ni son statut de vérification, et un « #8242 »
               inventé se lisait comme l'adresse à laquelle le trouver. */}
           <div className="bot-handle">
             <span className="badge">
-              <DiscordIcon /> APP
+              <DiscordIcon /> {t("hero.app")}
             </span>
           </div>
         </div>
@@ -54,12 +56,12 @@ export function BotHero({ status }: Readonly<{ status: BotStatus | null }>) {
       <div className="bot-cta">
         <div className="row-actions">
           <CyberButton asChild variant="ghost">
-            <Link href="/bot/docs">Documentation</Link>
+            <LocaleLink href="/bot/docs">{t("hero.docs")}</LocaleLink>
           </CyberButton>
           <CyberButton asChild variant="primary">
             <a href={inviteUrl} target="_blank" rel="noreferrer">
               <DiscordIcon />
-              Inviter sur mon serveur
+              {t("hero.invite")}
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path
                   d="M3 8h10M9 4l4 4-4 4"
@@ -73,7 +75,7 @@ export function BotHero({ status }: Readonly<{ status: BotStatus | null }>) {
           </CyberButton>
         </div>
         <span className="mono" style={{ fontSize: 11, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
-          OAUTH2 · {botInviteScopesLabel()} · GRATUIT
+          {t("hero.oauth", { scopes: botInviteScopesLabel() })}
         </span>
       </div>
     </div>

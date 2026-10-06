@@ -83,6 +83,19 @@ test.describe("Langues — adresses /en", () => {
     await expect(page.locator("a[hreflang]")).toHaveCount(0);
   });
 
+  // Lot 5a : la documentation du bot sert un fichier par langue (le dépôt du
+  // bot peut manquer en E2E : la page dit alors le fichier introuvable).
+  test("/en/bot/docs/guide : anglais, canonique et hreflang ; l'ancien guide anglais y redirige", async ({ page }) => {
+    const response = await page.goto("/en/bot/docs/guide");
+    expect(response?.status()).toBe(200);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/bot\/docs\/guide$/);
+    await expect(page.locator('link[rel="alternate"][hreflang="fr"]')).toHaveAttribute("href", /\/bot\/docs\/guide$/);
+    await expect(page.getByText("Back to the dashboard")).toBeVisible();
+    await page.goto("/bot/docs/user-guide-en");
+    expect(new URL(page.url()).pathname).toBe("/en/bot/docs/guide");
+  });
+
   test("l'accueil traduit : /en en anglais, hreflang réciproques fr/en/x-default", async ({ page }) => {
     for (const [path, lang] of [
       ["/", "fr"],

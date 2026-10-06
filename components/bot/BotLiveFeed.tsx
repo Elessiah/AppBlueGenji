@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { BotFeedEvent } from '@/lib/shared/types';
 import { useClientPower } from '@/lib/shared/hooks/useClientPower';
+import { useBotText } from '@/components/i18n/bot-text';
 
 export function BotLiveFeed() {
+  const { t, locale } = useBotText();
   const [items, setItems] = useState<BotFeedEvent[]>([]);
   const [paused, setPaused] = useState(false);
   const [buffer, setBuffer] = useState<BotFeedEvent[]>([]);
@@ -90,26 +92,28 @@ export function BotLiveFeed() {
   return (
     <section className="panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <div className="panel-head">
-        <span className="title">Flux temps réel</span>
+        <span className="title">{t('feed.title')}</span>
         <button
           // L'état « allumé » dit que la pause est **posée** : allumé pendant
           // que le flux défile, « ■ PAUSE » en bleu se lisait « en pause ».
           className={'chip' + (paused ? ' chip-on' : '')}
           onClick={handlePauseToggle}
-          aria-label={paused ? 'Reprendre le flux' : 'Mettre en pause le flux'}
+          aria-label={paused ? t('feed.resume') : t('feed.pause')}
         >
-          {paused ? '▶ REPRENDRE' : '■ PAUSE'}
+          {paused ? t('feed.resumeChip') : t('feed.pauseChip')}
         </button>
       </div>
       <div className="feed" style={{ flex: 1, maxHeight: 420, overflow: 'hidden' }}>
         {items.length === 0 ? (
-          <div style={{ padding: '1rem', color: 'var(--ink-mute)' }}>En attente d'événements...</div>
+          <div style={{ padding: '1rem', color: 'var(--ink-mute)' }}>{t('feed.waiting')}</div>
         ) : (
           items.slice(0, 13).map((f) => (
             <div key={f.id} className="feed-row">
               <span className="ts">{f.ts}</span>
               <span className={'tag ' + f.type}>{f.type.toUpperCase()}</span>
-              <span className="msg">{f.summary}</span>
+              {/* Le résumé est rédigé par le bot, en français : une donnée, pas
+                  un texte du site. Sous `/en`, il est annoncé comme tel. */}
+              <span className="msg" lang={locale === 'fr' ? undefined : 'fr'}>{f.summary}</span>
             </div>
           ))
         )}

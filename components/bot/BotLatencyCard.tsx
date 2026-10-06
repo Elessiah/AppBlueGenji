@@ -1,5 +1,6 @@
 import { BotStatus } from "@/lib/shared/types";
 import { botPayloadNumber } from "@/lib/shared/bot-payload";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
 
 /** Une mesure affichable : un nombre fini **et positif ou nul**, sinon `null`. */
 function measure(value: unknown): number | null {
@@ -7,7 +8,8 @@ function measure(value: unknown): number | null {
   return n !== null && n >= 0 ? n : null;
 }
 
-export function BotLatencyCard({ status }: Readonly<{ status: BotStatus | null }>) {
+export function BotLatencyCard({ status, text = FR_BOT_TEXT }: Readonly<{ status: BotStatus | null; text?: BotText }>) {
+  const { t } = text;
   // La carte reçoit **la même charge** que la bande d'état juste au-dessus, et
   // `fetchBotStatus` la rend par un simple `as BotStatus` sur du JSON reçu : un
   // `?? 0` ne rattrape que `null` et `undefined`, si bien qu'un `cpuUsage`
@@ -33,20 +35,20 @@ export function BotLatencyCard({ status }: Readonly<{ status: BotStatus | null }
   // Le repli à zéro ne vaut que pour la **largeur** : une barre vide ne dit
   // rien de faux, un « 0 » écrit à côté, si.
   const cells = [
-    { label: "GATEWAY", value: gateway?.toFixed(0) ?? "—", unit: "ms", width: bar((gateway ?? 0) / 100) },
-    { label: "CPU", value: cpu?.toFixed(1) ?? "—", unit: "%", width: bar((cpu ?? 0) / 100) },
-    { label: "RAM", value: ram?.toFixed(0) ?? "—", unit: "MB", width: bar((ram ?? 0) / 1024) },
+    { key: "gateway", label: t("health.gateway"), value: gateway?.toFixed(0) ?? "—", unit: "ms", width: bar((gateway ?? 0) / 100) },
+    { key: "cpu", label: t("health.cpu"), value: cpu?.toFixed(1) ?? "—", unit: "%", width: bar((cpu ?? 0) / 100) },
+    { key: "ram", label: t("health.ram"), value: ram?.toFixed(0) ?? "—", unit: "MB", width: bar((ram ?? 0) / 1024) },
   ];
 
   return (
     <section className="panel lat-card">
       <div className="panel-head">
-        <span className="title">Santé du système</span>
-        <span className="meta">SAMPLED 5s</span>
+        <span className="title">{t("health.title")}</span>
+        <span className="meta">{t("health.sampled")}</span>
       </div>
       <div className="panel-body">
         {cells.map((cell) => (
-          <div key={cell.label} className="lat-cell">
+          <div key={cell.key} className="lat-cell">
             <span className="l">{cell.label}</span>
             <span className="v ok">
               {cell.value} <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>{cell.unit}</span>

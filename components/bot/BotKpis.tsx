@@ -2,31 +2,35 @@ import { Sparkline } from "./Sparkline";
 import { BotKpis as BotKpisType } from "@/lib/shared/types";
 import { botPayloadNumber } from "@/lib/shared/bot-payload";
 import { resolveBotKpiDelta } from "@/lib/shared/bot-kpi-delta";
-import { BOT_MESSAGE_WINDOW_LABEL } from "@/lib/shared/bot-message-window";
+import { BOT_MESSAGE_WINDOW_DAYS } from "@/lib/shared/bot-message-window";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
+import { INTL_LOCALE } from "@/lib/shared/locales";
 
-export function BotKpis({ kpis }: Readonly<{ kpis: BotKpisType | null }>) {
+export function BotKpis({ kpis, text = FR_BOT_TEXT }: Readonly<{ kpis: BotKpisType | null; text?: BotText }>) {
+  const { t } = text;
+  const windowLabel = t("kpis.window", { days: BOT_MESSAGE_WINDOW_DAYS });
   const entries = [
     {
       key: "servers",
-      lbl: "Serveurs",
+      lbl: t("kpis.servers"),
       data: kpis?.servers,
     },
     {
       key: "channels",
-      lbl: "Salons relayés",
+      lbl: t("kpis.channels"),
       data: kpis?.channels,
     },
     {
       key: "messages",
-      lbl: "Messages traités",
-      unit: BOT_MESSAGE_WINDOW_LABEL,
+      lbl: t("kpis.messages"),
+      unit: windowLabel,
       comparable: false,
       data: kpis?.messages,
     },
     {
       key: "relays",
-      lbl: "Relais inter-serveur",
-      unit: BOT_MESSAGE_WINDOW_LABEL,
+      lbl: t("kpis.relays"),
+      unit: windowLabel,
       comparable: false,
       data: kpis?.relays,
     },
@@ -40,7 +44,7 @@ export function BotKpis({ kpis }: Readonly<{ kpis: BotKpisType | null }>) {
         // child » — la page entière en 500. Et le ton était écrit en dur
         // (`up`, `▲`) : une baisse annoncée `-8 %` sortait en vert, flèche
         // vers le haut. La règle vit dans `lib/shared/bot-kpi-delta.ts`.
-        const delta = resolveBotKpiDelta(entry.data?.delta);
+        const delta = resolveBotKpiDelta(entry.data?.delta, text);
         return (
           <div key={entry.key} className="card card-ticks kpi">
             <div className="kpi-head">
@@ -71,7 +75,7 @@ export function BotKpis({ kpis }: Readonly<{ kpis: BotKpisType | null }>) {
                   `{"servers": {}}` passait donc la condition et `.toLocaleString`
                   levait sur `undefined`. Même charge non validée (`as BotKpis`)
                   que la bande d'état et le tableau des serveurs. */}
-              {botPayloadNumber(entry.data?.value)?.toLocaleString("fr-FR") ?? "—"}
+              {botPayloadNumber(entry.data?.value)?.toLocaleString(INTL_LOCALE[text.locale]) ?? "—"}
               {entry.unit && <span className="unit">/ {entry.unit}</span>}
             </div>
             <div className="kpi-spark">

@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { BotDocSection } from "@/lib/shared/bot-doc-sections";
+import { botDocFile, type BotDocSection } from "@/lib/shared/bot-doc-sections";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { cached } from "@/lib/server/cache";
 
 /**
@@ -24,6 +25,8 @@ export { BOT_DOC_SECTIONS, findBotDocSection } from "@/lib/shared/bot-doc-sectio
 
 export interface LoadedBotDoc {
   section: BotDocSection;
+  /** Fichier réellement lu (`botDocFile` : `help.md` pour le guide sous `/en`). */
+  file: string;
   /** HTML rendu, ou `null` si le fichier est introuvable. */
   html: string | null;
   /** Dernière modification du fichier source, ISO, ou `null`. */
@@ -34,8 +37,9 @@ export interface LoadedBotDoc {
  * Lit et rend un document du bot depuis le disque, à chaque appel — la page
  * passe par {@link loadBotDocCached}.
  */
-export async function loadBotDoc(section: BotDocSection): Promise<LoadedBotDoc> {
-  const filePath = path.join(BOT_PROJECT_DIR, section.file);
+export async function loadBotDoc(section: BotDocSection, locale: Locale = DEFAULT_LOCALE): Promise<LoadedBotDoc> {
+  const file = botDocFile(section, locale);
+  const filePath = path.join(BOT_PROJECT_DIR, file);
   try {
     const [raw, stat] = await Promise.all([
       fs.readFile(filePath, "utf8"),
@@ -43,11 +47,12 @@ export async function loadBotDoc(section: BotDocSection): Promise<LoadedBotDoc> 
     ]);
     return {
       section,
+      file,
       html: renderMarkdown(raw),
       updatedAt: stat.mtime.toISOString(),
     };
   } catch {
-    return { section, html: null, updatedAt: null };
+    return { section, file, html: null, updatedAt: null };
   }
 }
 
@@ -65,8 +70,9 @@ export const BOT_DOC_TTL_MS = 60_000;
  * registre (`BOT_DOC_SECTIONS`), jamais une saisie : l'espace des clés est
  * borné par construction.
  */
-export function loadBotDocCached(section: BotDocSection): Promise<LoadedBotDoc> {
-  return cached(`bot-doc:${section.file}`, BOT_DOC_TTL_MS, () => loadBotDoc(section));
+export function loadBotDocCached(section: BotDocSection, locale: Locale = DEFAULT_LOCALE): Promise<LoadedBotDoc> {
+  // Clé : le fichier lu, pas la section — le guide a deux fichiers, un par langue.
+  return cached(`bot-doc:${botDocFile(section, locale)}`, BOT_DOC_TTL_MS, () => loadBotDoc(section, locale));
 }
 
 /* ------------------------------------------------------------------ */

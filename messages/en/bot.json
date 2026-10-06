@@ -1,0 +1,253 @@
+{
+  "meta": {
+    "title": "BlueGenji Bot",
+    "description": "The BlueGenji Discord bot: announcements synced across affiliated servers, statistics and tournament commands.",
+    "shareDescription": "Synced announcements, statistics and tournament commands, right inside Discord."
+  },
+  "crumb": {
+    "brand": "BLUEGENJI",
+    "dashboard": "DASHBOARD",
+    "here": "DISCORD BOT",
+    "docs": "DOCUMENTATION",
+    "endpoint": "bluegenji-esport.fr/en/bot"
+  },
+  "hero": {
+    "tag": "DISCORD BOT · CROSS-SERVER",
+    "titleLead": "BlueGenji",
+    "titleAccent": "Bot",
+    "app": "APP",
+    "docs": "Documentation",
+    "invite": "Add to my server",
+    "oauth": "OAUTH2 · {scopes} · FREE"
+  },
+  "strip": {
+    "state": "Status",
+    "uptime": "Uptime",
+    "uptimeSub": "Since the last restart",
+    "uptimeValue": "{days}d {hours}h {minutes}m {seconds}s",
+    "version": "Version",
+    "build": "Build · {date}",
+    "latency": "Gateway latency",
+    "latencyValue": "{value} ms",
+    "latencySub": "Discord gateway · WebSocket",
+    "shards": "Shards",
+    "shardsSub": "Gateway connections"
+  },
+  "status": {
+    "display": {
+      "OPERATIONAL": "Operational",
+      "DEGRADED": "Degraded",
+      "DOWN": "Down"
+    },
+    "summary": {
+      "OPERATIONAL": "All services are responding",
+      "DEGRADED": "Degraded service — some replies are slow",
+      "DOWN": "The bot is no longer responding",
+      "UNREACHABLE": "The bot didn't answer the page",
+      "UNREADABLE": "The bot sent a status this page can't read"
+    }
+  },
+  "kpis": {
+    "servers": "Servers",
+    "channels": "Relayed channels",
+    "messages": "Messages processed",
+    "relays": "Cross-server relays",
+    "window": "{days}d",
+    "up": "up",
+    "down": "down"
+  },
+  "activity": {
+    "title": "Activity · relays & scrims",
+    "range": "LAST 7 DAYS",
+    "unavailable": "Data unavailable",
+    "relayBar": "{count, plural, one {# relay} other {# relays}}",
+    "scrimBar": "{count, plural, one {# scrim} other {# scrims}}",
+    "legendRelays": "CROSS-SERVER RELAYS",
+    "legendScrims": "SCRIMS POSTED",
+    "average": "AVG. {value} / DAY"
+  },
+  "servers": {
+    "title": "Connected servers",
+    "tableLabel": "Servers connected to the bot",
+    "unreachable": "BOT UNREACHABLE",
+    "unreadable": "UNREADABLE RESPONSE",
+    "none": "NO SERVERS",
+    "shown": "{count, plural, one {# SERVER SHOWN} other {# SERVERS SHOWN}}",
+    "rank": "#",
+    "server": "SERVER",
+    "members": "MEMBERS",
+    "relays": "RELAYS 7D",
+    "relayQualifier": "RELAY ",
+    "relayState": "STATUS",
+    "trend": "TREND"
+  },
+  "relay": {
+    "ok": {
+      "label": "Up to date",
+      "hint": "Announcements are relayed to this server without delay."
+    },
+    "lag": {
+      "label": "Lagging",
+      "hint": "The relay works but is running behind on this server."
+    },
+    "off": {
+      "label": "Offline",
+      "hint": "The bot no longer relays anything to this server."
+    },
+    "unknown": {
+      "label": "Unknown",
+      "hint": "The bot sent a status this page can't name yet."
+    }
+  },
+  "feed": {
+    "title": "Real-time feed",
+    "resume": "Resume the feed",
+    "pause": "Pause the feed",
+    "resumeChip": "▶ RESUME",
+    "pauseChip": "■ PAUSE",
+    "waiting": "Waiting for events..."
+  },
+  "health": {
+    "title": "System health",
+    "sampled": "SAMPLED 5s",
+    "gateway": "GATEWAY",
+    "cpu": "CPU",
+    "ram": "RAM"
+  },
+  "commands": {
+    "eyebrow": "DOCUMENTATION · BOT REPOSITORY",
+    "title": "Commands and documentation",
+    "meta": "CONTENT READ FROM THE BOT REPOSITORY",
+    "prompt": "~/bluegenji_bot $ help",
+    "count": "{count, plural, one {# DOCUMENT} other {# DOCUMENTS}}",
+    "intro": "The list of slash commands, their arguments and their permissions is published by the bot itself. This page links to it rather than keeping a copy that would quietly go stale: every page is read straight from the bot repository, so a fix made there shows up here within a minute."
+  },
+  "invite": {
+    "eyebrow": "INVITE",
+    "titleLead": "Connect your server to the",
+    "titleAccent": "French-speaking amateur scene.",
+    "body": "One OAuth and every module is on by default. When it joins, the bot sends the server owner a direct message — if they accept DMs — listing the modules and the commands to configure them.",
+    "invite": "Add the bot",
+    "docs": "Documentation",
+    "permissions": "REQUESTED PERMISSIONS",
+    "unreadable": "Unreadable permissions value",
+    "none": "No server permissions",
+    "scopes": "SCOPES · {scopes}",
+    "integer": "INTEGER · {value}"
+  },
+  "permissions": {
+    "CREATE_INSTANT_INVITE": "Create invite",
+    "KICK_MEMBERS": "Kick members",
+    "BAN_MEMBERS": "Ban members",
+    "ADMINISTRATOR": "Administrator",
+    "MANAGE_CHANNELS": "Manage channels",
+    "MANAGE_GUILD": "Manage server",
+    "ADD_REACTIONS": "Add reactions",
+    "VIEW_AUDIT_LOG": "View audit log",
+    "PRIORITY_SPEAKER": "Priority speaker",
+    "STREAM": "Video",
+    "VIEW_CHANNEL": "View channels",
+    "SEND_MESSAGES": "Send messages",
+    "SEND_TTS_MESSAGES": "Send text-to-speech messages",
+    "MANAGE_MESSAGES": "Manage messages",
+    "EMBED_LINKS": "Embed links",
+    "ATTACH_FILES": "Attach files",
+    "READ_MESSAGE_HISTORY": "Read message history",
+    "MENTION_EVERYONE": "Mention @everyone",
+    "USE_EXTERNAL_EMOJIS": "Use external emojis",
+    "VIEW_GUILD_INSIGHTS": "View server insights",
+    "CONNECT": "Connect to voice",
+    "SPEAK": "Speak in voice",
+    "MUTE_MEMBERS": "Mute members",
+    "DEAFEN_MEMBERS": "Deafen members",
+    "MOVE_MEMBERS": "Move members",
+    "USE_VAD": "Use voice activity",
+    "CHANGE_NICKNAME": "Change nickname",
+    "MANAGE_NICKNAMES": "Manage nicknames",
+    "MANAGE_ROLES": "Manage roles",
+    "MANAGE_WEBHOOKS": "Manage webhooks",
+    "MANAGE_GUILD_EXPRESSIONS": "Manage expressions",
+    "USE_APPLICATION_COMMANDS": "Use application commands",
+    "REQUEST_TO_SPEAK": "Request to speak",
+    "MANAGE_EVENTS": "Manage events",
+    "MANAGE_THREADS": "Manage threads",
+    "CREATE_PUBLIC_THREADS": "Create public threads",
+    "CREATE_PRIVATE_THREADS": "Create private threads",
+    "USE_EXTERNAL_STICKERS": "Use external stickers",
+    "SEND_MESSAGES_IN_THREADS": "Send messages in threads",
+    "USE_EMBEDDED_ACTIVITIES": "Use activities",
+    "MODERATE_MEMBERS": "Time out members",
+    "VIEW_CREATOR_MONETIZATION_ANALYTICS": "View monetization analytics",
+    "USE_SOUNDBOARD": "Use soundboard",
+    "CREATE_GUILD_EXPRESSIONS": "Create expressions",
+    "CREATE_EVENTS": "Create events",
+    "USE_EXTERNAL_SOUNDS": "Use external sounds",
+    "SEND_VOICE_MESSAGES": "Send voice messages",
+    "SET_VOICE_CHANNEL_STATUS": "Set voice channel status",
+    "SEND_POLLS": "Create polls",
+    "USE_EXTERNAL_APPS": "Use external apps",
+    "PIN_MESSAGES": "Pin messages",
+    "BYPASS_SLOWMODE": "Bypass slow mode",
+    "unknown": "Unknown permission (bit {bit})"
+  },
+  "docs": {
+    "meta": {
+      "title": "Bot documentation",
+      "description": "The documentation of the BlueGenji Discord bot.",
+      "sectionTitle": "{section} — Bot documentation"
+    },
+    "titleLead": "Docu",
+    "titleAccent": "mentation",
+    "back": "Back to the dashboard",
+    "source": "SOURCE · BLUEGENJIBOT/{file}",
+    "navTitle": "Contents",
+    "pages": "{count, plural, one {# PAGE} other {# PAGES}}",
+    "live": "MARKDOWN · SYNCED",
+    "missing": "This documentation page is temporarily unavailable: the file <code>{file}</code> couldn't be read from the bot project.",
+    "synced": "DOCS SYNCED FROM THE BOT REPOSITORY",
+    "updated": "UPDATED · {date}",
+    "frenchOnly": "Staff-only page, written in French.",
+    "sections": {
+      "guide": {
+        "title": "User guide",
+        "eyebrow": "GETTING STARTED · EN",
+        "summary": "Supported games, services, message format and slash commands."
+      },
+      "adhesions": {
+        "title": "Membership commands",
+        "eyebrow": "BLUEGENJI SERVERS",
+        "summary": "Sending membership documents, reminders and approvals."
+      },
+      "apiInterne": {
+        "title": "Internal API",
+        "eyebrow": "INTEGRATION · EXPRESS",
+        "summary": "HTTP endpoints used by the platform."
+      },
+      "architecture": {
+        "title": "Architecture",
+        "eyebrow": "TECHNICAL · MAIN",
+        "summary": "Discord client, intents and listeners of the bot."
+      },
+      "baseDeDonnees": {
+        "title": "Database",
+        "eyebrow": "TECHNICAL · SQLITE",
+        "summary": "Tables, duplicated messages and partner channels."
+      },
+      "repriseApresSinistre": {
+        "title": "Disaster recovery",
+        "eyebrow": "OPERATIONS · BACKUPS",
+        "summary": "Rebuilding the bot and the site on a fresh machine from the backups."
+      }
+    },
+    "legal": {
+      "confidentialite": {
+        "title": "Privacy policy",
+        "summary": "What data the bot collects, how it's used and how long it's kept."
+      },
+      "conditions": {
+        "title": "Terms of service",
+        "summary": "Rules for using the bot, eligibility and termination of access."
+      }
+    }
+  }
+}

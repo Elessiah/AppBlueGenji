@@ -17,6 +17,7 @@
  */
 
 import { botPayloadText } from "@/lib/shared/bot-payload";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
 
 export interface BotKpiDelta {
   /** Le texte à afficher — jamais vide, jamais un objet. */
@@ -62,15 +63,15 @@ const MINUS_SIGNS = ["-", "−"];
  * ne le décide pas à sa place. Le jour où le bot enverra des variations
  * signées, elles seront colorées ; d'ici là, rien n'est affirmé.
  */
-export function resolveBotKpiDelta(value: unknown): BotKpiDelta {
+export function resolveBotKpiDelta(value: unknown, copy: BotText = FR_BOT_TEXT): BotKpiDelta {
   const text = botPayloadText(value)?.trim();
   if (!text) return UNKNOWN_DELTA;
 
   if (MINUS_SIGNS.some((sign) => text.startsWith(sign))) {
-    return { label: text, tone: "down", glyph: "▼", direction: "en baisse" };
+    return { label: text, tone: "down", glyph: "▼", direction: copy.t("kpis.down") };
   }
   if (text.startsWith("+")) {
-    return { label: text, tone: "up", glyph: "▲", direction: "en hausse" };
+    return { label: text, tone: "up", glyph: "▲", direction: copy.t("kpis.up") };
   }
   return { label: text, tone: "flat", glyph: "", direction: "" };
 }
