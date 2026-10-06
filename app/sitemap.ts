@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { visibleBotDocSections } from "@/lib/shared/bot-doc-sections";
 import { siteCanonicalBase } from "@/lib/server/site-url";
-import { publicSitemapRoutes } from "@/lib/shared/sitemap";
+import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
 
 /**
  * `sitemap.xml`, qui n'existait pas non plus — la route répondait `404`.
@@ -28,10 +28,20 @@ export const dynamic = "force-dynamic";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteCanonicalBase();
+  const absolute = (path: string) => `${base}${path === "/" ? "" : path}`;
+  const routes = publicSitemapRoutes(visibleBotDocSections(false).map((section) => section.slug));
 
-  return publicSitemapRoutes(visibleBotDocSections(false).map((section) => section.slug)).map((route) => ({
-    url: `${base}${route.path === "/" ? "" : route.path}`,
-    changeFrequency: route.changeFrequency,
-    priority: route.priority,
+  // Une entrée par langue et par route traduite, avec ses `hreflang`
+  // (`docs/features/I18N.md`) ; une route pas encore traduite n'a que la
+  // française.
+  return localizedSitemapEntries(routes).map((entry) => ({
+    url: absolute(entry.path),
+    changeFrequency: entry.changeFrequency,
+    priority: entry.priority,
+    ...(entry.languages && {
+      alternates: {
+        languages: Object.fromEntries(Object.entries(entry.languages).map(([lang, path]) => [lang, absolute(path)])),
+      },
+    }),
   }));
 }

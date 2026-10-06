@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import styles from "./PublicNavMenu.module.css";
 
@@ -78,7 +77,7 @@ export function PublicNavPanel({
       {PUBLIC_NAV_LINKS.map((link) => {
         const isActive = isNavLinkActive(pathname, link.href);
         return (
-          <Link
+          <LocaleLink
             key={link.href}
             href={link.href}
             aria-current={isActive ? "page" : undefined}
@@ -86,7 +85,7 @@ export function PublicNavPanel({
             onClick={onNavigate}
           >
             {link.label}
-          </Link>
+          </LocaleLink>
         );
       })}
     </nav>
@@ -103,7 +102,8 @@ export function PublicNavPanel({
  * l'en-tête (avant la marque) pour la même raison.
  */
 export function PublicNavMenu() {
-  const pathname = usePathname();
+  // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
+  const { path: pathname } = useLocalePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);

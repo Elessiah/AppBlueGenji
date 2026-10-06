@@ -24,6 +24,7 @@
  * (`app/sitemap.ts`) rend les chemins absolus.
  */
 import { TOURNAMENT_RULE_MODES } from "./tournament-rules";
+import { LOCALES, localeAlternates, type Locale } from "./locales";
 
 /** Rythme de changement annoncé au robot, dans le vocabulaire du protocole. */
 export type SitemapChangeFrequency = "daily" | "weekly" | "monthly" | "yearly";
@@ -122,3 +123,26 @@ export const SITEMAP_DISALLOWED_PATHS: readonly string[] = ["/api/"];
  * plus longue que l'interdiction qui la couvre suffit à rouvrir le sous-arbre.
  */
 export const SITEMAP_ALLOWED_PATHS: readonly string[] = ["/", "/api/uploads/"];
+
+/** Une entrée du sitemap dans une langue, chemins encore relatifs. */
+export type LocalizedSitemapEntry = SitemapRoute & {
+  /** Adresses de chaque langue (`hreflang`), pour une route traduite seulement. */
+  languages?: Record<Locale | "x-default", string>;
+};
+
+/**
+ * Les entrées du sitemap **par langue** (`docs/features/I18N.md`).
+ *
+ * Chaque route a son entrée française ; une route **traduite**
+ * (`lib/shared/i18n-routes.ts`) y ajoute son entrée anglaise, et les deux
+ * portent les mêmes `hreflang` réciproques. Une route pas encore traduite n'a
+ * **aucune** entrée anglaise : son adresse `/en/…` redirige, et un sitemap
+ * n'annonce pas de renvois.
+ */
+export function localizedSitemapEntries(routes: readonly SitemapRoute[]): LocalizedSitemapEntry[] {
+  return routes.flatMap((route) => {
+    const languages = localeAlternates(route.path);
+    if (!languages) return [route];
+    return LOCALES.map((locale) => ({ ...route, path: languages[locale], languages }));
+  });
+}

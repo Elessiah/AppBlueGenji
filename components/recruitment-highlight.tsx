@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { CyberButton } from "@/components/cyber";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -241,7 +241,7 @@ function RecruitmentBanner({
         </span>
       </span>
       {onAdPage ? (
-        // Déjà sur la page : un `<Link>` vers la même route ne changerait le
+        // Déjà sur la page : un lien vers la même route ne changerait le
         // fragment que par `pushState`, qui n'émet aucun événement — la modale
         // de lecture ne s'ouvrirait pas. L'ancre native, elle, déclenche bien
         // `hashchange`.
@@ -249,9 +249,9 @@ function RecruitmentBanner({
           Voir <span aria-hidden="true">→</span>
         </a>
       ) : (
-        <Link href={adHref(ad)} className={styles.bannerLink} aria-label={bannerLinkLabel(ad)}>
+        <LocaleLink href={adHref(ad)} className={styles.bannerLink} aria-label={bannerLinkLabel(ad)}>
           Voir <span aria-hidden="true">→</span>
-        </Link>
+        </LocaleLink>
       )}
       {multiple && (
         <span className={styles.bannerControls} data-tap-zone>
@@ -424,9 +424,9 @@ function RecruitmentArrivalModal({
           {/* La lecture complète se fait toujours sur la page de recrutement :
               la modale d'accueil reste un teaser, jamais un pavé de 2 000 signes. */}
           <CyberButton variant={ad.contactUrl ? "ghost" : "primary"} asChild>
-            <Link href={adHref(ad)} onClick={dismiss}>
+            <LocaleLink href={adHref(ad)} onClick={dismiss}>
               Lire l&apos;annonce →
-            </Link>
+            </LocaleLink>
           </CyberButton>
           {ad.contactUrl && (
             <CyberButton variant="primary" asChild>

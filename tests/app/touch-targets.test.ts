@@ -29,8 +29,8 @@ describe("zones de tap étendues", () => {
   });
 
   it.each<[string, RegExp]>([
-    ["components/cyber/landing/PublicFooter.tsx", /<Link className="tap-target" href="\/rgpd">/],
-    ["components/legal/SiteFooterBar.tsx", /<Link className="tap-target" href="\/rgpd">/],
+    ["components/cyber/landing/PublicFooter.tsx", /<LocaleLink className="tap-target" href="\/rgpd">/],
+    ["components/legal/SiteFooterBar.tsx", /<LocaleLink className="tap-target" href="\/rgpd">/],
     ["app/(secured)/tournois/[id]/_components/TournamentHeader.tsx", /\$\{s\.back\} tap-target/],
     ["app/(secured)/tournois/[id]/_components/SurvivalView.tsx", /btn tap-target"/],
     ["app/(secured)/tournois/[id]/_components/SwissView.tsx", /btn tap-target"/],

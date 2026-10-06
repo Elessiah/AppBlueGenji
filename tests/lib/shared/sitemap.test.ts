@@ -2,8 +2,10 @@ import { describe, expect, it } from "@jest/globals";
 import {
   SITEMAP_ALLOWED_PATHS,
   SITEMAP_DISALLOWED_PATHS,
+  localizedSitemapEntries,
   publicSitemapRoutes,
 } from "@/lib/shared/sitemap";
+import { isMigratedRoute, splitLocalePrefix } from "@/lib/shared/locales";
 import { TOURNAMENT_RULE_MODES } from "@/lib/shared/tournament-rules";
 
 /**
@@ -116,6 +118,24 @@ describe("SITEMAP_ALLOWED_PATHS", () => {
     for (const allowed of SITEMAP_ALLOWED_PATHS) {
       const covering = SITEMAP_DISALLOWED_PATHS.find((path) => allowed.startsWith(path));
       if (covering) expect(allowed.length).toBeGreaterThan(covering.length);
+    }
+  });
+});
+
+describe("localizedSitemapEntries — liste blanche réelle", () => {
+  const entries = localizedSitemapEntries(publicSitemapRoutes(["guide"]));
+
+  it("n'annonce en anglais que des routes traduites (sinon : une redirection)", () => {
+    for (const entry of entries.filter((e) => splitLocalePrefix(e.path).locale === "en")) {
+      expect(isMigratedRoute(splitLocalePrefix(entry.path).path)).toBe(true);
+    }
+  });
+
+  it("garde une entrée française pour chaque route, hreflang réciproques si traduite", () => {
+    const french = entries.filter((e) => splitLocalePrefix(e.path).locale === "fr").map((e) => e.path);
+    expect(french).toEqual(publicSitemapRoutes(["guide"]).map((r) => r.path));
+    for (const entry of entries) {
+      if (entry.languages) expect(Object.values(entry.languages)).toContain(entry.path);
     }
   });
 });

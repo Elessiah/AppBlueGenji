@@ -298,13 +298,17 @@ async function completeLogin(
     // Compte suspendu : l'exposé de la décision voyage dans un cookie
     // `httpOnly` de courte durée, jamais dans l'URL — il porte un motif, que
     // l'historique du navigateur et les journaux des relais n'ont pas à garder.
+    // Chemin `/` et non `/connexion` : la page de connexion vit aussi sous
+    // `/en/connexion`, qu'un cookie borné à `/connexion` n'atteindrait pas.
+    // Seul le middleware le lit, et seulement sur la page de connexion, qu'il
+    // compare sans préfixe de langue (`middleware.ts`).
     if (error instanceof AccountSuspendedError) {
       const response = loginFailure(base, provider, "suspended");
       response.cookies.set(SUSPENSION_NOTICE_COOKIE, encodeSuspensionNotice(error.notice), {
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
-        path: "/connexion",
+        path: "/",
         maxAge: SUSPENSION_NOTICE_COOKIE_MAX_AGE_SECONDS,
       });
       return response;

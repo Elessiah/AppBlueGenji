@@ -1,9 +1,11 @@
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import Image from "next/image";
 import { AccountMenu } from "@/components/account-menu";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
 import { PublicNavMenu } from "./PublicNavMenu";
 import styles from "./PublicHeader.module.css";
 
@@ -29,6 +31,7 @@ export async function PublicHeader() {
   // la retire, elle ne fait pas tomber l'en-tête.
   const team = user ? await getUserActiveTeam(user.id).catch(() => null) : null;
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
+  const switcherLabel = await languageSwitcherLabel();
 
   return (
     <header className={styles.root} data-sticky-header>
@@ -44,7 +47,7 @@ export async function PublicHeader() {
             contient pas ce qu'on lit dessus est inutilisable à la commande
             vocale : on prononce ce qui est écrit, rien ne répond (WCAG 2.5.3).
           */}
-          <Link href="/" className={styles.brand}>
+          <LocaleLink href="/" className={styles.brand}>
             <span className={styles.logo}>
               <Image src="/logo_bg.webp" alt="" width={28} height={28} />
             </span>
@@ -52,17 +55,19 @@ export async function PublicHeader() {
               <span className="logotype">BlueGenji</span>
               <span className="mono">ESPORT</span>
             </span>
-          </Link>
+          </LocaleLink>
         </div>
 
         <div className={styles.actions}>
+          {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
+          <LanguageSwitcher label={switcherLabel} />
           {user ? (
             <>
               <CyberButton variant="primary" asChild>
-                <Link href="/tournois">
+                <LocaleLink href="/tournois">
                   <span className={styles.ctaFull}>Accéder à la partie compétitive →</span>
                   <span className={styles.ctaShort}>Compétition →</span>
-                </Link>
+                </LocaleLink>
               </CyberButton>
               {/* Profil, équipe et déconnexion : le même menu que dans
                   l'espace connecté. Son nom accessible commence par le pseudo
@@ -71,7 +76,7 @@ export async function PublicHeader() {
             </>
           ) : (
             <CyberButton variant="primary" asChild>
-              <Link href="/connexion">Rejoindre →</Link>
+              <LocaleLink href="/connexion">Rejoindre →</LocaleLink>
             </CyberButton>
           )}
         </div>

@@ -360,7 +360,8 @@ describe("completeOAuth — connexion", () => {
     const cookie = response.cookies.get(SUSPENSION_NOTICE_COOKIE);
     expect(cookie).toBeDefined();
     expect(cookie?.httpOnly).toBe(true);
-    expect(cookie?.path).toBe("/connexion");
+    // `/` pour atteindre aussi `/en/connexion` ; le middleware borne sa lecture.
+    expect(cookie?.path).toBe("/");
     expect(cookie?.maxAge).toBe(600);
     expect(parseSuspensionNotice(cookie?.value)).toEqual(notice);
   });
