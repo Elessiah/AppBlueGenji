@@ -186,7 +186,9 @@ La seconde équipe ne ressaisit rien :
   arrivée par le flux), la phrase le dit, pour que le joueur ne ressaisisse pas
   ce qui va pré-remplir le formulaire. Saisir les maps au **même score** qu'une
   proposition sans détail vaut confirmation (« Confirmer », contrôle de
-  péremption compris) : le serveur la compare au seul score.
+  péremption compris) : le serveur la compare au seul score. Pas tant que le
+  détail est en lecture : l'envoi reste alors une proposition ordinaire, sans
+  faux `PROPOSAL_STALE`.
 - **Code de replay** saisi brut (majuscules par la CSS, normalisé à la
   validation et au serveur) : le curseur reste en place pendant une correction.
 
