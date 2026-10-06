@@ -168,7 +168,7 @@ import { mapCard } from "./_internal";
 import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore, type ProposalConfirmation } from "./scoring";
-import { loadViewerProposals } from "./match-maps";
+import { loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import type { AdminMapEntry } from "./admin";
@@ -1053,9 +1053,13 @@ export async function getTournamentViewerContext(
   // match, et à l'arbitrage — jamais dans l'instantané diffusé. Calculé ici,
   // porte commune du flux et de la lecture REST de secours.
   const reportTeamIds = myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles)) ? [myTeamId] : [];
-  const matchProposals = await withConnection((connection) =>
-    loadViewerProposals(connection, snapshot.matches, { all: canManage, teamIds: reportTeamIds }),
-  );
+  // Une place du pool n'est prise que s'il y a quelque chose à lire — presque
+  // jamais : la plupart des lecteurs n'ont aucune proposition en attente.
+  const proposalScope = { all: canManage, teamIds: reportTeamIds };
+  const matchProposals =
+    proposalMatches(snapshot.matches, proposalScope).length === 0
+      ? []
+      : await withConnection((connection) => loadViewerProposals(connection, snapshot.matches, proposalScope));
 
   return {
     preview,

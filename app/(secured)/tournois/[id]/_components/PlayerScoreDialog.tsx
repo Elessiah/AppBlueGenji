@@ -220,7 +220,7 @@ export function PlayerScoreDialog({
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       showSuccess(
-        confirmsTheirs
+        confirmsAsIs
           ? `Score confirmé : ${team1} ${entered1} – ${entered2} ${team2}`
           : scoreSubmittedMessage(myTeamIsTeam1, body.myScore, body.opponentScore, team1, team2),
       );

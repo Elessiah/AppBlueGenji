@@ -257,6 +257,21 @@ function toResult(row: MapRow): MatchMapResult {
   };
 }
 
+/** Qui lit des propositions : toutes (arbitrage) ou celles de ses engagés. */
+export type ProposalScope = { all: boolean; teamIds: ReadonlyArray<number> };
+
+/** Matchs ouverts où un report attend, et que ce lecteur a le droit de lire. */
+export function proposalMatches(matches: ReadonlyArray<BracketMatch>, scope: ProposalScope): BracketMatch[] {
+  return matches.filter(
+    (match) =>
+      !isMatchPlayed(match) &&
+      (match.team1Report !== null || match.team2Report !== null) &&
+      (scope.all ||
+        (match.team1Id !== null && scope.teamIds.includes(match.team1Id)) ||
+        (match.team2Id !== null && scope.teamIds.includes(match.team2Id))),
+  );
+}
+
 /**
  * Propositions map par map **lisibles par un lecteur** (`TournamentViewerContext.matchProposals`) :
  * celles des matchs ouverts où un report attend, restreintes aux matchs de ses
@@ -266,16 +281,9 @@ function toResult(row: MapRow): MatchMapResult {
 export async function loadViewerProposals(
   connection: PoolConnection,
   matches: ReadonlyArray<BracketMatch>,
-  scope: { all: boolean; teamIds: ReadonlyArray<number> },
+  scope: ProposalScope,
 ): Promise<MatchProposalMaps[]> {
-  const eligible = matches.filter(
-    (match) =>
-      !isMatchPlayed(match) &&
-      (match.team1Report !== null || match.team2Report !== null) &&
-      (scope.all ||
-        (match.team1Id !== null && scope.teamIds.includes(match.team1Id)) ||
-        (match.team2Id !== null && scope.teamIds.includes(match.team2Id))),
-  );
+  const eligible = proposalMatches(matches, scope);
   if (eligible.length === 0) return [];
   const byMatch = await loadMapsByMatch(connection, eligible.map((match) => match.id));
   return eligible.map((match) => {
