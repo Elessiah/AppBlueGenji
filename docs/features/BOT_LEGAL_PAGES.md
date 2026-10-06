@@ -72,6 +72,16 @@ n'affiche plus d'anglais. Habillage seulement, le texte légal ne change pas. Ca
 d'aperçu par langue
 (`/og/<langue>/botPrivacy.png`, `botTerms`).
 
+Sous `/en`, un lien vers une page encore française (`/rgpd`, `/mentions-legales`) porte
+`hrefLang="fr"`, et le lien vers l'hébergeur reçoit la mention « (in French) »
+(`legalPages.inFrench`, habillage hors texte légal). Le lien « legal notice » de la
+section Contact, lui, est dans le texte légal : il garde `hrefLang` sans mention ajoutée.
+
+**Texte légal anglais figé.** Le texte anglais garde des tournures qui s'écartent du
+glossaire de `I18N.md` (« licence » britannique, « French non-profit association under
+the law of 1901 ») : il est repris mot pour mot du dépôt du bot. Toute retouche se fait
+là-bas, comme une nouvelle version du document.
+
 Il ne rend **pas** `PublicHeader` / `PublicFooter` : la page les pose
 (`PublicPageShell`).
 
