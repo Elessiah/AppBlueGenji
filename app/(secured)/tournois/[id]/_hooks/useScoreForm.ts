@@ -18,6 +18,8 @@ import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context"
 import {
   checkMapList,
   deriveMatchScore,
+  progressiveMapRows,
+  trimTrailingBlankMaps,
   refusalOnTouchedRow,
   mapListViolationMessage,
   type MapField,
@@ -54,7 +56,12 @@ export function useScoreForm(
   const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
   // Détail map par map (`docs/features/MAP_SCORES.md`) : quand l'arbitre en
   // saisit, il **fait** le score — les deux champs suivent le score dérivé.
-  const [maps, setMaps] = useState<MatchMapInput[]>(() => initialAdminMaps(match));
+  // Lignes affichées, une à une au fil du format (`progressiveMapRows`, sans
+  // ligne d'emblée : sans map, l'arbitre pose le score à la main) ; ce qui se
+  // valide et part en retire la ligne vierge de fin (`sentMaps`).
+  const openingRows = () => progressiveMapRows(matchFormat, game, initialAdminMaps(match), 0);
+  const [maps, setMaps] = useState<MatchMapInput[]>(openingRows);
+  const sentMaps = trimTrailingBlankMaps(maps);
   // Score d'avant les maps (voir `updateMaps`), oublié à chaque réalignement.
   const manualScores = useRef<{ score1: string; score2: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -79,7 +86,7 @@ export function useScoreForm(
     baseline: scoreFormStateFor(match),
     // Même rôle pour les maps : corriger un code ou ajouter une map nulle ne
     // change pas le score, et doit pourtant compter comme une saisie.
-    mapsBaseline: initialAdminMaps(match),
+    mapsBaseline: openingRows(),
   }));
   const [conflict, setConflict] = useState(false);
 
@@ -88,7 +95,7 @@ export function useScoreForm(
   if (signature !== synced.signature || proposals !== synced.proposals) {
     const untouched = sameFormState(state, synced.baseline) && sameMaps(maps, synced.mapsBaseline);
     const next = scoreFormStateFor(match);
-    const nextMaps = initialAdminMaps(match);
+    const nextMaps = openingRows();
     setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
 
     if (untouched) {
@@ -112,7 +119,7 @@ export function useScoreForm(
   /** Reprendre la valeur enregistrée, en abandonnant la saisie en cours. */
   const adoptStoredResult = () => {
     const next = scoreFormStateFor(match);
-    const nextMaps = initialAdminMaps(match);
+    const nextMaps = openingRows();
     setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
     setState(next);
     setMaps(nextMaps);
@@ -124,15 +131,15 @@ export function useScoreForm(
   // Le serveur ne rend qu'un code : la même règle, rejouée ici, retrouve le
   // champ qu'il désigne.
   const flagMapRefusal = (code: string, decisive: boolean) => {
-    const local = checkMapList(matchFormat, game, maps, { decisive });
+    const local = checkMapList(matchFormat, game, sentMaps, { decisive });
     if (!local.field || local.error !== code || !options.onMapRefusal) return;
-    const index = Math.min(local.field.index, Math.max(maps.length - 1, 0));
+    const index = Math.min(local.field.index, Math.max(sentMaps.length - 1, 0));
     options.onMapRefusal({ index, field: local.field.field }, mapListViolationMessage(local.error, matchFormat, game));
   };
 
   /** Contrôle des maps avant l'envoi ; `true` (refus signalé) bloque l'envoi. */
   const refuseMaps = (decisive: boolean): boolean => {
-    const mapCheck = checkMapList(matchFormat, game, maps, { decisive });
+    const mapCheck = checkMapList(matchFormat, game, sentMaps, { decisive });
     if (!mapCheck.error) return false;
     flagMapRefusal(mapCheck.error, decisive);
     showError(mapListViolationMessage(mapCheck.error, matchFormat, game));
@@ -196,7 +203,7 @@ export function useScoreForm(
           : `/api/admin/matches/${match.id}/resolve`;
       const method = action === "save" ? "PATCH" : "POST";
 
-      const body = adminScoreBody(state, sendMaps ? maps : null, decision.scores);
+      const body = adminScoreBody(state, sendMaps ? sentMaps : null, decision.scores);
       if (!body) {
         showError(scoreBlockerMessage("INCOMPLETE", matchFormat));
         return false;
@@ -239,7 +246,7 @@ export function useScoreForm(
      * que l'infobulle du bouton affiche à la place du blocage de score.
      * Rien sous un forfait : la liste est masquée et ses maps ne partent pas.
      */
-    mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : [], decision),
+    mapsRefused: mapRefusals(matchFormat, game, mapsSent ? sentMaps : [], decision),
     game,
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,
@@ -249,7 +256,7 @@ export function useScoreForm(
     conflict,
     adoptStoredResult,
     /** Une saisie est en cours, non enregistrée. */
-    dirty: !isUntouched(state, match) || !sameMaps(maps, initialAdminMaps(match)),
+    dirty: !isUntouched(state, match) || !sameMaps(maps, openingRows()),
     setScore1: (val: string) => setState((s) => ({ ...s, score1: val })),
     setScore2: (val: string) => setState((s) => ({ ...s, score2: val })),
     // Forfait nominatif et double forfait s'excluent : en choisir un retire

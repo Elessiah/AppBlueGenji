@@ -16,6 +16,8 @@ import {
   checkMapList,
   mapFieldKey,
   isMapTouched,
+  progressiveMapRows,
+  trimTrailingBlankMaps,
   refusalOnTouchedRow,
   type MapListCheck,
   mapListViolationMessage,
@@ -215,26 +217,31 @@ export function PlayerScoreDialog({
   const game = useTournamentGame();
   // Saisie **map par map** (`docs/features/MAP_SCORES.md`) : le score du match
   // se dérive des maps, chacune avec son code de replay.
-  const [maps, setMaps] = useState<MatchMapInput[]>(() => playerReportInitialMaps(view));
-  const fieldErrors = useFieldErrors<string>({}, mapFieldIds("player-score", maps.length));
+  // Lignes affichées, une à une au fil du format (`progressiveMapRows`) ; ce qui
+  // se valide et part en retire la ligne vierge de fin (`trimTrailingBlankMaps`).
+  const [rows, setRows] = useState<MatchMapInput[]>(() =>
+    progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), 1),
+  );
+  const maps = trimTrailingBlankMaps(rows);
+  const fieldErrors = useFieldErrors<string>({}, mapFieldIds("player-score", rows.length));
   // Réalignement sur le flux : tant que le lecteur n'a rien touché, une
   // proposition qui arrive (l'adversaire vient d'envoyer la sienne) remplit les
   // champs. Une saisie en cours, elle, n'est jamais écrasée en silence.
-  const baseline = useRef(maps);
-  const current = useRef(maps);
-  current.current = maps;
+  const baseline = useRef(rows);
+  const current = useRef(rows);
+  current.current = rows;
   // Une proposition arrivée **pendant** une saisie ne la remplace pas : son
   // détail s'affiche alors à part (`theirMapsWorthShowing`).
   const [missedProposal, setMissedProposal] = useState(false);
   const signature = reportsSignature(match);
   useEffect(() => {
-    const next = playerReportInitialMaps(playerReportView(match, myTeamId));
+    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(playerReportView(match, myTeamId)), 1);
     const typing = JSON.stringify(current.current) !== JSON.stringify(baseline.current);
     if (!typing) {
       // Les maps remplacées par la nouvelle proposition : les refus rattachés
       // aux anciennes valeurs ne valent plus.
       fieldErrors.clear();
-      setMaps(next);
+      setRows(next);
     }
     setMissedProposal(typing && !sameMapLists(current.current, next));
     baseline.current = next;
@@ -426,8 +433,9 @@ export function PlayerScoreDialog({
             <>
               <MapScoreList
                 idPrefix="player-score"
-                maps={maps}
-                onChange={setMaps}
+                maps={rows}
+                onChange={setRows}
+                minRows={1}
                 format={matchFormat}
                 game={game}
                 team1Name={team1}

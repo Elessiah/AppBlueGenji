@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -9,11 +9,11 @@ import { matchMaxMaps, type MatchFormat } from "@/lib/shared/match-format";
 import {
   MAP_SCORE_MAX,
   REPLAY_CODE_MAX_LENGTH,
-  canAddMap,
   deriveMatchScore,
   emptyMap,
   mapFieldKey,
   mapListLimit,
+  progressiveMapRows,
   replayCodeHint,
   type MapField,
   type MatchMapInput,
@@ -38,6 +38,12 @@ interface MapScoreListProps {
   /** Engagés de chaque colonne — leur emblème distingue deux noms proches. */
   team1Id?: number | null;
   team2Id?: number | null;
+  /**
+   * Lignes minimales : 1 pour un engagé (une ligne vierge d'emblée), 0 pour
+   * l'arbitrage (sans map, il pose le score à la main). Les suivantes viennent
+   * d'elles-mêmes au fil du format (`progressiveMapRows`).
+   */
+  minRows?: 0 | 1;
   disabled: boolean;
   fieldErrors: FieldErrors<string>;
 }
@@ -75,6 +81,7 @@ export function MapScoreList({
   team2Name,
   team1Id = null,
   team2Id = null,
+  minRows = 0,
   disabled,
   fieldErrors,
 }: Readonly<MapScoreListProps>) {
@@ -101,6 +108,22 @@ export function MapScoreList({
     keys.current = maps.map((_, i) => keys.current[i] ?? newKey());
   }
 
+  // Lignes progressives : la suivante apparaît quand la dernière est complète
+  // et que le match n'est pas acquis ; les lignes vierges devenues inutiles
+  // s'en vont, les lignes renseignées restent (refusées sur leur champ).
+  const change = (next: MatchMapInput[]) => onChange(progressiveMapRows(format, game, next, minRows));
+
+  // Ligne ajoutée d'elle-même : annoncée poliment, sans déplacer le focus de
+  // celui qui tape (une ligne retirée ne s'annonce pas, elle était vierge).
+  const [announcement, setAnnouncement] = useState("");
+  const previousLength = useRef(maps.length);
+  useEffect(() => {
+    if (maps.length > previousLength.current && !focusNewRow.current) {
+      setAnnouncement(`Map ${maps.length} ajoutée : à renseigner.`);
+    }
+    previousLength.current = maps.length;
+  }, [maps.length]);
+
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
     // Rien de changé (un champ de score vide quitté sans saisie rend `NaN`, et
     // `NaN !== NaN`) : ni mise à jour, ni levée des refus.
@@ -108,7 +131,7 @@ export function MapScoreList({
     // Tout refus se lève : un code en double, une map de trop ou un match
     // inachevé se corrigent souvent sur un **autre** champ que celui désigné.
     fieldErrors.clear();
-    onChange(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
+    change(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
   };
   // Le bouton « Retirer » activé disparaît avec sa ligne : le focus va au
   // « Retirer » de la ligne qui prend sa place (ou de la dernière), sinon à
@@ -125,7 +148,7 @@ export function MapScoreList({
     fieldErrors.clear();
     keys.current = keys.current.filter((_, i) => i !== index);
     focusAfterRemove.current = index;
-    onChange(maps.filter((_, i) => i !== index));
+    change(maps.filter((_, i) => i !== index));
   };
   // Après un ajout, le focus va au code de la nouvelle ligne : c'est la suite
   // de la saisie, et le bouton « Ajouter » peut se désactiver sous le focus
@@ -253,15 +276,16 @@ export function MapScoreList({
         </ol>
       )}
 
-      <button
-        id={`${idPrefix}-map-add`}
-        type="button"
-        className={styles.add}
-        onClick={add}
-        disabled={!canAddMap(format, maps)}
-      >
-        <Plus size={16} aria-hidden="true" /> Ajouter une map
-      </button>
+      {/* Sans ligne (arbitrage, score à la main) : la première s'ajoute ici ;
+          les suivantes viennent d'elles-mêmes. */}
+      {maps.length === 0 && (
+        <button id={`${idPrefix}-map-add`} type="button" className={styles.add} onClick={add}>
+          <Plus size={16} aria-hidden="true" /> Ajouter une map
+        </button>
+      )}
+      <p className="sr-only" aria-live="polite">
+        {announcement}
+      </p>
 
       {/* Région d'état : le score dérivé change à chaque frappe. Rien sans map —
           un « 0 – 0 » contredirait le score posé à la main au-dessus. */}

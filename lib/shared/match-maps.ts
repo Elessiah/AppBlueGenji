@@ -352,6 +352,49 @@ export function canAddMap(format: MatchFormat | null, maps: ReadonlyArray<MatchM
   return !isSettled(format, team1, team2, maps.length);
 }
 
+/** Une ligne est-elle complète : code de replay valable et deux scores de map valables ? */
+export function isMapComplete(map: MatchMapInput, game: TournamentGame | null | undefined): boolean {
+  const code = normalizeReplayCode(map.replayCode);
+  return code !== "" && isValidReplayCode(code, game) && isValidMapScore(map.team1Score) && isValidMapScore(map.team2Score);
+}
+
+/**
+ * Les lignes **vierges** en fin de liste retirées, une au moins gardée : ce qui
+ * se valide et part. La ligne vierge qu'ajoute l'affichage progressif
+ * (`progressiveMapRows`) n'est pas une map jouée ; une ligne vierge seule, si,
+ * pour qu'un envoi la désigne plutôt que de partir sans détail.
+ */
+export function trimTrailingBlankMaps(maps: ReadonlyArray<MatchMapInput>): MatchMapInput[] {
+  let end = maps.length;
+  while (end > 1 && !isMapTouched(maps[end - 1])) end -= 1;
+  return maps.slice(0, end);
+}
+
+/**
+ * Lignes affichées, **une à une** au fil du format (demande du 2026-10-06) :
+ * les lignes vierges de fin retirées, puis une ligne vierge ajoutée quand la
+ * dernière est complète et que le match n'est pas acquis (même dérivation que
+ * le serveur : map gagnée = 1 point, map nulle = rien ; objectif FT/BO ;
+ * égalités ouvertes) dans le plafond (`mapListLimit`, maps nulles rejouées
+ * comprises). Une ligne **renseignée** devenue superflue reste : la validation
+ * la refuse sur son champ (`MAP_AFTER_DECISION`), rien ne se perd en silence.
+ *
+ * `minRows` : 1 pour un engagé (une ligne vierge d'emblée), 0 pour l'arbitrage
+ * (sans map, il pose le score à la main).
+ */
+export function progressiveMapRows(
+  format: MatchFormat | null,
+  game: TournamentGame | null | undefined,
+  maps: ReadonlyArray<MatchMapInput>,
+  minRows: 0 | 1,
+): MatchMapInput[] {
+  const rows = trimTrailingBlankMaps(maps);
+  if (rows.length === 0) return minRows === 1 ? [emptyMap()] : [];
+  const last = rows[rows.length - 1];
+  if (isMapComplete(last, game) && canAddMap(format, rows)) rows.push(emptyMap());
+  return rows;
+}
+
 /** Clé d'un champ de la liste, pour le rattachement des erreurs. */
 export function mapFieldKey(index: number, field: MapField): string {
   return `${index}:${field}`;
