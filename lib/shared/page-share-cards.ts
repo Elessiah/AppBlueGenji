@@ -201,7 +201,7 @@ export const PODIUM_NAME_MAX_LENGTH = 24;
 /** Une marche du podium telle que la carte la dessine. */
 export type PodiumShareEntry = {
   place: PodiumTier;
-  /** Libellé de la marche dans la langue (« 1er », « 2nd »…). */
+  /** Libellé de la marche dans la langue (« 1re », « 2nd »…). */
   placeLabel: string;
   /** Nom d'équipe nettoyé (`visibleText`) et borné. */
   name: string;

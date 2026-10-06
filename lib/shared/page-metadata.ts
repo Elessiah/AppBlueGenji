@@ -74,6 +74,11 @@ export type PageMetadataInput = {
    * du site ({@link DEFAULT_SHARE_IMAGE}).
    */
   shareCard?: string;
+  /**
+   * Texte de remplacement de la carte quand elle ne montre pas le titre de
+   * l'encart (le podium de `/classement`). Par défaut, ce titre.
+   */
+  shareImageAlt?: string;
 };
 
 /** L'image d'aperçu d'une page : sa carte dans sa langue, ou celle du site. */
@@ -89,6 +94,7 @@ export function pageMetadata({
   selfTitled = false,
   locale = DEFAULT_LOCALE,
   shareCard,
+  shareImageAlt,
 }: PageMetadataInput): Metadata {
   const share = shareDescription ?? description;
   const image = shareImageFor(shareCard, locale);
@@ -116,8 +122,9 @@ export function pageMetadata({
       title: shareTitle,
       description: share,
       url: canonical,
-      // Le texte de l'image est le titre de l'encart : c'est ce qu'elle montre.
-      images: [{ url: image, width: 1200, height: 630, alt: shareCard ? shareTitle : SITE_NAME }],
+      // Le texte de l'image est le titre de l'encart : c'est ce qu'elle montre,
+      // sauf carte au contenu propre (podium), qui fournit le sien.
+      images: [{ url: image, width: 1200, height: 630, alt: shareCard ? (shareImageAlt ?? shareTitle) : SITE_NAME }],
     },
     twitter: {
       card: "summary_large_image",
