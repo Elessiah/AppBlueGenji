@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
+import { SITE_NAME } from "@/lib/shared/share-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import "../../bot.css";
@@ -41,6 +42,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: section.summary,
     path: `/bot/docs/${section.slug}`,
     shareCard: "botDocs",
+    // La carte est celle de la documentation entière : elle ne nomme pas la section.
+    shareImageAlt: `Documentation du bot · ${SITE_NAME}`,
   });
 }
 
