@@ -144,9 +144,12 @@ refonte (`DESIGN_SYSTEM.md`), chaque valeur recopiée d'un jeton de
   pour rester lisible dans la vignette Discord (la carte y est réduite de
   moitié, voire au tiers ; les mêmes faits sont en texte dans la description), avec un liseré à gauche, la valeur en `--ink` ;
 - **logo** BlueGenji en pied, lu sur le disque (`lib/server/share-card-logo.ts` :
-  `public/icons/icon-192.png` en URL `data:`, mémorisé par processus). Satori ne
-  décode pas le WebP de la vitrine ; un fichier absent rend `null` et la carte
-  garde le seul nom « BLUEGENJI » plutôt que d'échouer.
+  `public/icons/icon-192.png` en URL `data:`). Satori ne décode pas le WebP de
+  la vitrine. Seule une lecture réussie est mémorisée par processus : un échec
+  rend `null`, la carte garde le seul nom « BLUEGENJI » plutôt que d'échouer, et
+  `console.warn` le signale (`[share-card] logo illisible (<code>)`) avant une
+  nouvelle lecture au rendu suivant — un avertissement répété à chaque rendu
+  veut dire que le fichier manque vraiment à la livraison.
 
 **Contraste.** Les cœurs des halos sont posés hors de la zone de texte, et
 `tests/components/og/share-card.test.tsx` recompose le fond tous les 8 px dans
