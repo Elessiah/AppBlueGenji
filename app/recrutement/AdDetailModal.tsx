@@ -6,6 +6,7 @@ import { ContactTags } from "@/components/recruitment/ContactTags";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { RecruitmentBody } from "@/components/recruitment/RecruitmentBody";
 import { useRecruitmentText } from "@/components/i18n/recruitment-text";
+import { FR_RECRUITMENT_TEXT } from "@/lib/shared/recruitment-text";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -56,7 +57,12 @@ export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
           <div className={styles.tags}>
             <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{t(`domains.${ad.domain}`)}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
-            {!ad.active && <Pill variant="neutral">{t("card.inactive")}</Pill>}
+            {/* Statut du staff (seul à voir une annonce inactive) : en français, D4. */}
+            {!ad.active && (
+              <Pill variant="neutral" lang={locale === "fr" ? undefined : "fr"}>
+                {FR_RECRUITMENT_TEXT.t("card.inactive")}
+              </Pill>
+            )}
           </div>
           <button
             type="button"

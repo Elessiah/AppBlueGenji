@@ -6,6 +6,7 @@ import { ContactTags } from "@/components/recruitment/ContactTags";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { useRecruitmentText } from "@/components/i18n/recruitment-text";
+import { FR_RECRUITMENT_TEXT } from "@/lib/shared/recruitment-text";
 import { EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -384,7 +385,12 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
           <div className={styles.cardTags}>
             <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{t(`domains.${ad.domain}`)}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
-            {!ad.active && <Pill variant="neutral">{t("card.inactive")}</Pill>}
+            {/* Statut du staff (seul à voir une annonce inactive) : en français, D4. */}
+            {!ad.active && (
+              <Pill variant="neutral" lang={staffLang}>
+                {FR_RECRUITMENT_TEXT.t("card.inactive")}
+              </Pill>
+            )}
             {/* Le statut ne se lit publiquement que par ses effets (pastille,
                 section) : la gestion, elle, a besoin de le voir nommé. */}
             {isAdmin && (

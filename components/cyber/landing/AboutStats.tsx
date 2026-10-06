@@ -268,8 +268,10 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
             {editing ? "Modifier la carte" : "Ajouter une carte"}
           </h3>
 
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Valeur</span>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel} htmlFor={STAT_FIELD_IDS.value}>
+              Valeur
+            </label>
             <input
               id={STAT_FIELD_IDS.value}
               className={styles.modalInput}
@@ -283,8 +285,9 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
                 setForm((f) => ({ ...f, value: e.target.value }));
               }}
             />
+            {/* Hors du <label> : la phrase d'erreur ne s'ajoute pas au nom du champ. */}
             <FieldErrorText fieldId={STAT_FIELD_IDS.value} message={fieldErrors.message("value")} />
-          </label>
+          </div>
 
           <div className={styles.modalField}>
             <BilingualField
