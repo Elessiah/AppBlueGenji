@@ -13,9 +13,13 @@
  */
 import type { Metadata } from "next";
 import { SITE_NAME } from "./share-metadata";
+import enRules from "@/messages/en/rules.json";
+import enShare from "@/messages/en/share.json";
+import frRules from "@/messages/fr/rules.json";
 import frShare from "@/messages/fr/share.json";
 import { DEFAULT_LOCALE, OPEN_GRAPH_LOCALE, localeAlternates, localeHref, type Locale } from "./locales";
-import { pageShareImagePath, type PageShareCardKey } from "./page-share-cards";
+import { pageShareImagePath, resolvePageShareCard, type PageShareCardKey } from "./page-share-cards";
+import { localizedRuleModes } from "./tournament-rules";
 
 /** Le gabarit de titre du site, celui que déclare la mise en page racine. */
 export const SITE_TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -86,6 +90,21 @@ export function shareImageFor(shareCard: string | undefined, locale: Locale = DE
   return shareCard ? pageShareImagePath(shareCard, locale) : DEFAULT_SHARE_IMAGE;
 }
 
+/**
+ * Le texte de remplacement d'une carte : **ce qu'elle montre** — son titre
+ * dans la langue de la page, suivi du nom du site (que la carte porte en pied),
+ * et non le titre de l'encart (« L'Association Esport » sur une carte qui dit
+ * « Une association par et pour les joueurs »). Clé inconnue : `null`.
+ */
+export function shareCardAlt(key: string, locale: Locale = DEFAULT_LOCALE): string | null {
+  const messages = locale === "en" ? enShare : frShare;
+  const rules = locale === "en" ? enRules : frRules;
+  const modes = new Map(localizedRuleModes(rules).map((mode) => [mode.slug, mode]));
+  const card = resolvePageShareCard(key, messages, modes);
+  if (!card) return null;
+  return card.title === SITE_NAME ? SITE_NAME : siteTitle(card.title);
+}
+
 export function pageMetadata({
   title,
   description,
@@ -101,6 +120,7 @@ export function pageMetadata({
   // L'encart, lui, n'hérite d'aucun gabarit : son titre porte le nom du site,
   // sans quoi « Bénévoles » collé seul dans un salon ne dit pas de qui il parle.
   const shareTitle = siteTitle(title);
+  const imageAlt = shareCard ? (shareImageAlt ?? shareCardAlt(shareCard, locale) ?? shareTitle) : SITE_NAME;
   // Chaque langue est sa propre canonique — jamais l'anglais vers le
   // français, que Google lirait comme un doublon à écarter. Les `hreflang`
   // réciproques (`x-default` = français) n'existent que pour une route
@@ -122,9 +142,9 @@ export function pageMetadata({
       title: shareTitle,
       description: share,
       url: canonical,
-      // Le texte de l'image est le titre de l'encart : c'est ce qu'elle montre,
-      // sauf carte au contenu propre (podium), qui fournit le sien.
-      images: [{ url: image, width: 1200, height: 630, alt: shareCard ? (shareImageAlt ?? shareTitle) : SITE_NAME }],
+      // Le texte de l'image dit ce qu'elle montre : le titre de sa carte, sauf
+      // carte au contenu propre (podium), qui fournit le sien.
+      images: [{ url: image, width: 1200, height: 630, alt: imageAlt }],
     },
     twitter: {
       card: "summary_large_image",
