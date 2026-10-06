@@ -43,6 +43,7 @@ import { AccessibilityPanel, accessibilityButtonLabel } from "@/components/acces
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { AccountMenuPanel } from "@/components/account-menu";
 import { ArenaNav } from "@/components/arena-nav";
+import { FooterContact } from "@/components/cyber/landing/FooterContact";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicNavMenu } from "@/components/cyber/landing/PublicNavMenu";
@@ -52,6 +53,7 @@ import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
 import { ToastItem, ToastProvider } from "@/components/ui/toast";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { shellText } from "@/lib/shared/shell-text";
+import { encodeContact } from "@/lib/shared/obfuscated-contact";
 
 const noop = () => undefined;
 const EN_SHELL = messagesFor("en").shell;
@@ -115,6 +117,19 @@ describe("coquille en anglais — composants client", () => {
     // Le nom d'équipe n'est jamais traduit ; aucune route n'est encore traduite.
     expect(html).toContain('href="/equipes/7"');
     expect(html).not.toMatch(FRENCH_LEFTOVERS);
+  });
+
+  it("coordonnées : parties restées en français marquées `lang=\"fr\"` (WCAG 3.1.2), muettes en français", () => {
+    const contact = { emailEncoded: encodeContact("asso@example.org"), discordTag: "", discordUrl: "" };
+    const html = english(<FooterContact initialContact={contact} isAdmin />);
+    expect(html).toMatch(/<button[^>]*lang="fr"[^>]*>Afficher/);
+    expect(html).toMatch(/<button[^>]*lang="fr"[^>]*>Modifier<\/button>/);
+    const french = renderToStaticMarkup(
+      <ToastProvider>
+        <FooterContact initialContact={contact} isAdmin />
+      </ToastProvider>,
+    );
+    expect(french).not.toContain('lang="fr"');
   });
 
   it("menu du compte", () => {
