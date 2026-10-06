@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AppIntlProvider } from "@/components/i18n/locale-context";
+import { AppIntlProvider } from "@/components/i18n/intl-provider";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { MESSAGE_NAMESPACES, pickMessages, type MessageNamespace } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
