@@ -332,8 +332,10 @@ describe("détail map par map — saisie au clavier et au toucher", () => {
   });
 
   it("Entrée dans un champ de map ne soumet pas le formulaire", () => {
-    expect(list()).toContain('if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();');
-    expect(list()).toContain("onKeyDown={keepEnterInList}");
+    expect(list()).toContain('if (event.key === "Enter") event.preventDefault();');
+    // Sur chaque champ (code et deux scores), pas sur le `<fieldset>` (S6847).
+    expect(list().match(/onKeyDown=\{keepEnterInList\}/g)).toHaveLength(3);
+    expect(list()).not.toContain("disabled={disabled} onKeyDown");
   });
 });
 
