@@ -9,6 +9,8 @@ import {
   scoreBlockerMessage,
   scoreFormStateFor,
   storedResultSignature,
+  type ScoreFormBlocker,
+  type ScoreFormDecision,
   type ScoreFormState,
 } from "../_lib/score-form";
 import { useToast } from "@/components/ui/toast";
@@ -237,7 +239,7 @@ export function useScoreForm(
      * que l'infobulle du bouton affiche à la place du blocage de score.
      * Rien sous un forfait : la liste est masquée et ses maps ne partent pas.
      */
-    mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : []),
+    mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : [], decision),
     game,
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,
@@ -273,18 +275,32 @@ export function useScoreForm(
  * Corps d'une saisie d'arbitrage : double forfait, forfait, maps, ou score à la
  * main — dans cet ordre de priorité. `null` quand il n'y a rien à envoyer.
  */
+const STRUCTURAL_BLOCKERS: ReadonlySet<ScoreFormBlocker> = new Set<ScoreFormBlocker>([
+  "ALREADY_DECIDED",
+  "DOUBLE_FORFEIT",
+  "NOT_IN_LAUNCH",
+]);
+
+function isStructuralBlocker(blocker: ScoreFormBlocker | null): boolean {
+  return blocker !== null && STRUCTURAL_BLOCKERS.has(blocker);
+}
+
 /** Refus des maps qui partiraient, pour l'enregistrement et pour la validation. */
 function mapRefusals(
   format: MatchFormat | null,
   game: TournamentGame | null | undefined,
   maps: ReadonlyArray<MatchMapInput>,
+  decision: Pick<ScoreFormDecision, "saveBlocker" | "resolveBlocker">,
 ): { save: MapListViolation | null; resolve: MapListViolation | null; onBlankRow: boolean } {
   if (maps.length === 0) return { save: null, resolve: null, onBlankRow: false };
   const save = checkMapList(format, game, maps, { decisive: false });
   const resolve = checkMapList(format, game, maps, { decisive: true });
+  // Un geste interdit pour une autre raison que les maps (résultat déjà
+  // tranché, double forfait, saisie fermée) le reste : le refus de map ne
+  // rouvre pas le bouton, et c'est cette raison-là qui s'affiche.
   return {
-    save: save.error,
-    resolve: resolve.error,
+    save: isStructuralBlocker(decision.saveBlocker) ? null : save.error,
+    resolve: isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error,
     // Le refus affiché désigne une ligne vierge, qu'on vient d'ajouter : il se tait.
     onBlankRow: !refusalOnTouchedRow(resolve.error ? resolve : save, maps),
   };
