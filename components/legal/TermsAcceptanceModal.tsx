@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import Link from "next/link";
-import { useLocalePathname } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
@@ -166,9 +165,9 @@ export function TermsAcceptanceModal({ initiallyRequired, request = null, privac
           <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
           <span>
             {TERMS_CHECKBOX_LABEL} (
-            <Link href={TERMS_PATH} target="_blank" rel="noreferrer">
+            <LocaleLink href={TERMS_PATH} target="_blank" rel="noreferrer">
               lire les conditions
-            </Link>
+            </LocaleLink>
             ).
           </span>
         </label>

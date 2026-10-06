@@ -1,8 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
-import { useLocalePathname } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -158,9 +157,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
                   <ul className={styles.changeLinks}>
                     {change.links.map((link) => (
                       <li key={link.href}>
-                        <Link href={link.href} onClick={() => followLink(change.id)}>
+                        <LocaleLink href={link.href} onClick={() => followLink(change.id)}>
                           {link.label}
-                        </Link>
+                        </LocaleLink>
                       </li>
                     ))}
                   </ul>
@@ -174,9 +173,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
           Ce qui repose sur ton choix se règle dans « Mon profil », sans rien perdre d&apos;autre.
           Tu peux t&apos;opposer à un traitement ou exercer tes autres droits comme l&apos;explique
           la{" "}
-          <Link href="/rgpd" target="_blank" rel="noreferrer">
+          <LocaleLink href="/rgpd" target="_blank" rel="noreferrer">
             politique de confidentialité
-          </Link>
+          </LocaleLink>
           .
         </p>
 

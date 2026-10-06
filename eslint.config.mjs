@@ -21,6 +21,20 @@ const SONAR_FILES = ["app/**", "components/**", "lib/**", "tests/**"];
  */
 const I18N_MIGRATED_FILES = ["components/i18n/**"];
 
+/** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */
+const I18N_LOCALE_LINK_FILES = [
+  "components/arena-nav.tsx",
+  "components/account-menu.tsx",
+  "components/entity-link.tsx",
+  "components/recruitment-highlight.tsx",
+  "components/accessibility/AccessibilityMenu.tsx",
+  "components/cyber/landing/PublicHeader.tsx",
+  "components/cyber/landing/PublicNavMenu.tsx",
+  "components/legal/TermsAcceptanceModal.tsx",
+  "components/match-launch/MatchLaunchCenter.tsx",
+  "components/privacy/PrivacyChangesModal.tsx",
+];
+
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   ...compat.config({
@@ -52,8 +66,16 @@ const eslintConfig = [
   {
     files: I18N_MIGRATED_FILES,
     plugins: { bluegenji: { rules: { "no-literal-ui-text": noLiteralUiText } } },
+    rules: { "bluegenji/no-literal-ui-text": "error" },
+  },
+  // `next/link` nu interdit dans les dossiers traduits **et** dans les
+  // composants rendus sur toutes les pages (mise en page racine, en-têtes) :
+  // pas encore traduits, leurs liens gardent déjà la langue de la page — un
+  // `next/link` nu ramènerait une page anglaise en français sans recharger
+  // `<html lang>` ni les messages.
+  {
+    files: [...I18N_MIGRATED_FILES, ...I18N_LOCALE_LINK_FILES],
     rules: {
-      "bluegenji/no-literal-ui-text": "error",
       "no-restricted-imports": [
         "error",
         { name: "next/link", message: "Utiliser LocaleLink (components/i18n/locale-navigation) — docs/features/I18N.md." },

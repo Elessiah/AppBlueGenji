@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useRouter } from "next/navigation";
 import { UserAvatar } from "./user-avatar";
 import { useToast } from "./ui/toast";
@@ -129,11 +129,11 @@ export function AccountMenuPanel({
 }>) {
   return (
     <div id={id} className={s.panel}>
-      <Link href="/profil" className={s.item} onClick={onNavigate}>
+      <LocaleLink href="/profil" className={s.item} onClick={onNavigate}>
         Mon profil
-      </Link>
+      </LocaleLink>
       {activeTeam && (
-        <Link
+        <LocaleLink
           href={`/equipes/${activeTeam.teamId}`}
           className={s.item}
           onClick={onNavigate}
@@ -144,7 +144,7 @@ export function AccountMenuPanel({
           <span className={s.itemHint} aria-hidden="true">
             {activeTeam.teamName}
           </span>
-        </Link>
+        </LocaleLink>
       )}
       <button type="button" className={`${s.item} ${s.logout}`} onClick={onLogout} disabled={leaving}>
         {leaving ? "Déconnexion…" : "Déconnexion"}

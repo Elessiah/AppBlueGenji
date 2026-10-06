@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
-import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -431,13 +430,13 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                   Autre match ({pending.filter((info) => info.matchId !== current.matchId).length})
                 </button>
               )}
-              <Link
+              <LocaleLink
                 className="btn ghost"
                 href={tournamentMatchHref(current.tournamentId, current.matchId)}
                 onClick={close}
               >
                 Voir le match
-              </Link>
+              </LocaleLink>
               <button type="button" className="btn ghost" onClick={close}>
                 Fermer
               </button>
