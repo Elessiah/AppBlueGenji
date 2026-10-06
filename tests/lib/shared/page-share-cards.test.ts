@@ -262,8 +262,8 @@ describe("carte nominative d'une équipe", () => {
   });
 
   it("nettoie un nom saisi (visibleText), le borne sur un mot, et remplace un nom invisible", () => {
-    expect(teamShareCard({ ...team, teamName: "Dra​gon‮" }, frShare).title).toBe("Dragon");
-    expect(teamShareCard({ ...team, teamName: "​" }, frShare)).toMatchObject({ title: "?", initial: "?" });
+    expect(teamShareCard({ ...team, teamName: "Dra\u200Bgon\u202E" }, frShare).title).toBe("Dragon");
+    expect(teamShareCard({ ...team, teamName: "\u200B" }, frShare)).toMatchObject({ title: "?", initial: "?" });
     const long = teamShareCard({ ...team, teamName: "Les Invincibles Chevaliers De La Table Ronde Du Grand Ouest" }, frShare);
     expect(Array.from(long.title).length).toBeLessThanOrEqual(TEAM_SHARE_NAME_MAX_LENGTH);
     expect(long.title.endsWith("…")).toBe(true);
