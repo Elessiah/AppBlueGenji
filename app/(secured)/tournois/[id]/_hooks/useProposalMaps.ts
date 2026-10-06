@@ -17,9 +17,15 @@ export function useProposalMaps(
   liveMatch: BracketMatch,
   proposals: ReadonlyArray<MatchProposalMaps>,
   onRefresh: () => void,
+  /**
+   * Le lecteur a-t-il le droit de lire ces propositions (il mène le match, ou
+   * l'arbitrage) ? Sinon le serveur ne les lui enverra jamais : relire serait
+   * une requête pour rien, à chaque nouvelle proposition.
+   */
+  canRead = true,
 ): BracketMatch {
   const match = useMemo(() => withProposalMaps(liveMatch, proposals), [liveMatch, proposals]);
-  const needsRefresh = proposalsNeedRefresh(liveMatch, proposals);
+  const needsRefresh = canRead && proposalsNeedRefresh(liveMatch, proposals);
   const refreshAsked = useRef<string | null>(null);
   const reportsKey = `${liveMatch.team1Report?.reportedAt ?? ""}|${liveMatch.team2Report?.reportedAt ?? ""}`;
   useEffect(() => {

@@ -124,7 +124,7 @@ export function PlayerScoreDialog({
 }: Readonly<PlayerScoreDialogProps>) {
   // Les propositions complétées de leur détail : la modale s'ouvre sur les maps
   // de l'adversaire (codes et scores), à confirmer d'un clic.
-  const match = useProposalMaps(liveMatch, proposals, onRefresh);
+  const match = useProposalMaps(liveMatch, proposals, onRefresh, canReportScore);
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
@@ -154,9 +154,13 @@ export function PlayerScoreDialog({
   const signature = reportsSignature(match);
   useEffect(() => {
     const next = playerReportInitialMaps(playerReportView(match, myTeamId));
-    setMaps((current) =>
-      JSON.stringify(current) === JSON.stringify(baseline.current) ? next : current,
-    );
+    setMaps((current) => {
+      if (JSON.stringify(current) !== JSON.stringify(baseline.current)) return current;
+      // Les maps remplacées par la nouvelle proposition : les refus rattachés
+      // aux anciennes valeurs ne valent plus.
+      fieldErrors.clear();
+      return next;
+    });
     baseline.current = next;
     // `signature` résume exactement ce qui change la valeur d'ouverture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
