@@ -29,7 +29,7 @@ describe("BotActivityChart — une charge saine", () => {
   it("trace les deux séries et la moyenne", () => {
     const html = render(activity());
     expect(html).toContain("3 relais");
-    expect(html).toContain("1 scrims");
+    expect(html).toContain('title="1 scrim"');
     expect(html).toContain("MOY. 4 / JOUR");
     expect(html).toContain("01/09");
   });
@@ -60,13 +60,13 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
     const html = render(activity({ scrims: undefined as unknown as number[] }));
     expect(html).not.toContain("NaN");
     expect(html).not.toContain("undefined");
-    expect(html).toContain("0 scrims");
+    expect(html).toContain('title="0 scrim"');
   });
 
   it("comble une série de scrims plus courte que celle des relais", () => {
     const html = render(activity({ relays: [3, 5, 2], scrims: [1] }));
     expect(html).not.toContain("NaN");
-    expect(html).toContain("0 scrims");
+    expect(html).toContain('title="0 scrim"');
   });
 
   it("écarte les points qui ne sont pas des nombres", () => {
@@ -142,7 +142,7 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
   it("comble l'autre sens aussi, sans jamais inventer de point", () => {
     const html = render(activity({ relays: [3, 5, 2], scrims: [] }));
     expect(html).toContain("3 relais");
-    expect(html).toContain("0 scrims");
+    expect(html).toContain('title="0 scrim"');
     expect(html).not.toContain("NaN");
   });
 
