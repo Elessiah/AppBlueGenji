@@ -181,12 +181,11 @@ describe("noms du podium — la marche de l'onglet affiché", () => {
     expect(table).not.toMatch(/podium-tier/);
   });
 
-  it("sans podium (moins de trois équipes), les rangs 1 et 2 du tableau portent leur marche", () => {
+  it("sans podium (moins de trois équipes), le tableau ne porte aucune marche", () => {
     const markup = render({ rows: [row(1), row(2)] });
     expect(markup).not.toContain('aria-label="Podium"');
-    expect(markup).toContain("podium-tier-1");
-    expect(markup).toContain("podium-tier-2");
-    expect(markup).not.toContain("podium-tier-3");
+    expect(markup).toContain("Équipe 1");
+    expect(markup).not.toMatch(/podium-tier/);
   });
 });
 

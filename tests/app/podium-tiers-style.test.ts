@@ -135,3 +135,20 @@ describe("marches du podium — accessibilité et impression", () => {
     expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.podium-tier,\s*\.podium-member \{\s*background-image: none;[^}]*-webkit-text-fill-color: currentColor;/);
   });
 });
+
+describe("marches du podium — écrans où elles s'effacent", () => {
+  it("éteint dégradé, lueur, mouvement et graisse du perdant d'un match, repère gardé", () => {
+    const matchRow = readSource("app/(secured)/tournois/[id]/_components/MatchRow.module.css");
+    const body = /\.decided :global\(\.podium-tier\),\s*\.decided :global\(\.podium-member\) \{([^}]*)\}/.exec(matchRow)?.[1];
+    expect(body).toBeDefined();
+    for (const declaration of ["background-image: none", "-webkit-text-fill-color: currentColor", "filter: none", "animation: none", "font-weight: inherit"]) {
+      expect(body).toContain(declaration);
+    }
+    expect(matchRow).not.toMatch(/\.decided :global\(\.podium-tier\)::before/);
+  });
+
+  it("garde sobre l'aperçu d'arbitrage de l'Endurance", () => {
+    const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
+    expect(view).toMatch(/<PodiumTiersOff>\s*<EnduranceNextRoundPanel/);
+  });
+});
