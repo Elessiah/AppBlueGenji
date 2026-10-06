@@ -91,3 +91,7 @@ trois règles communes à toutes les modales : `docs/features/MODAL_DIALOGS.md`.
 - `tests/lib/server/about-stats-service.test.ts` — CRUD + fallback (DB mockée).
 - `tests/app/api/association/about-stats.test.ts` — gardes d'auth, validation,
   codes HTTP des routes.
+
+## Langues (lot 5b de l'i18n)
+
+Le titre a son anglais (`label_en`, `labelEn`), obligatoire à la saisie (`LABEL_EN_REQUIRED` / `LABEL_EN_TOO_LONG`). La valeur (« 100% », « 12 ») ne se traduit pas. Sous `/en`, un chiffre sans titre anglais n'est pas rendu ; les chiffres de secours ont leur anglais. Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.

@@ -76,3 +76,7 @@ initiale et le flag `isAdmin`. Pour les admins :
 - `tests/lib/server/bureau-service.test.ts` — CRUD + fallback (DB mockée).
 - `tests/app/api/association/bureau.test.ts` — gardes d'auth, validation, codes
   HTTP des routes.
+
+## Langues (lot 5b de l'i18n)
+
+Le rôle a son anglais (`role_en`, `roleEn`), obligatoire à la saisie (`ROLE_EN_REQUIRED` / `ROLE_EN_TOO_LONG`, rattachés au champ anglais). Sous `/en/association`, un membre sans rôle anglais n'est pas rendu ; son bouton « Modifier » porte la marque **EN**. Le nom ne se traduit pas. Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.

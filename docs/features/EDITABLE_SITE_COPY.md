@@ -68,6 +68,30 @@ parcourt l'accueil, la page association et `/classement` ; chaque crayon marqué
 **EN** s'ouvre, on y saisit l'anglais du texte français affiché à gauche, on
 enregistre. Quand plus aucun crayon n'est marqué, le rattrapage est fini.
 
+### Contenus du staff de la page association (lot 5b)
+
+Bureau, chiffres et cartes « À propos », description d'un partenaire, catégories
+de bénévoles et annonces de recrutement ont leur anglais dans une colonne
+`<colonne>_en` (`lib/shared/staff-translation.ts`), **obligatoire à la saisie**
+(`BilingualField`, même contrat que cet éditeur). Les lignes écrites avant le
+lot 5b n'en ont pas : **sous `/en`, elles ne sont pas rendues** — jamais de
+français sur une page anglaise —, et leur bouton « Modifier » porte la marque
+**EN** (« (EN à rédiger) » pour un lecteur d'écran).
+
+**Action requise en production** après déploiement, sur les pages **françaises**
+(où tout le contenu reste visible) :
+
+- `/association` et l'accueil (`showcase`) : chaque membre du bureau, chiffre et
+  carte « À propos » marqué **EN**, et chaque partenaire marqué **EN** (sa
+  description attend son anglais) ;
+- `/benevoles` (`showcase`) : chaque catégorie marquée **EN** — traduire **un**
+  de ses bénévoles suffit, l'anglais vaut pour toute la catégorie ;
+- `/recrutement` (`recruitment`) : chaque annonce marquée **EN** (titre, et
+  missions / description si elles sont saisies) — sans quoi elle manque aussi à
+  la banderole et à la modale de la page anglaise.
+
+Quand plus aucun bouton n'est marqué, les pages anglaises montrent tout.
+
 ## Stockage
 
 Table clé/valeur `bg_settings`, une ligne par texte modifié **et par langue** :
@@ -111,7 +135,9 @@ de la section « Adhérer ».
 restent figées, comme pour l'accueil et l'association (`RANKING_PAGE.md`).
 
 Les textes éditables ne sont pas des données personnelles : rien à déclarer
-au registre des traitements ni à `PRIVACY_CHANGES`.
+au registre des traitements ni à `PRIVACY_CHANGES`. Les colonnes anglaises du
+lot 5b non plus : un rôle, une catégorie, un titre traduits ne disent rien de
+plus sur une personne que leur français (les noms ne se traduisent pas).
 
 **Langues** : toutes les clés sont bilingues depuis le lot 2 (§ Deux langues).
 Seul l'accueil est servi sous `/en` ; l'association et le classement le seront

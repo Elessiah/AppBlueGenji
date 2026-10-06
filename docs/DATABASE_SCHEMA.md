@@ -46,7 +46,9 @@ Un `CREATE TABLE` par table, à son état final, groupé par domaine : comptes,
 envoyées, vitrine. Les colonnes y sont rangées par famille et commentées là où
 leur nom ne suffit pas. Le groupe le plus long, la vitrine, est une liste
 (`SHOWCASE_TABLES`) jouée dans l'ordre plutôt qu'une suite d'appels
-`createTable` identiques. Les instructions émises sont figées par une empreinte
+`createTable` identiques. Les contenus de la vitrine saisis par le staff portent
+leur anglais dans une colonne `<colonne>_en` nullable (lot 5b de l'i18n,
+`lib/shared/staff-translation.ts`). Les instructions émises sont figées par une empreinte
 (`database-migrations-run.test.ts`) : une réécriture du fichier doit la laisser
 intacte, un changement de schéma voulu la met à jour (`-u`).
 
