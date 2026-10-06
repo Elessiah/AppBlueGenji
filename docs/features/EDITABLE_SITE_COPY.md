@@ -77,6 +77,7 @@ longue : 36 caractères, colonne `VARCHAR(80)`, aucun changement de schéma). Un
 clé absente **ou vide** retombe sur la valeur d'origine de sa langue : un texte
 ne peut donc pas disparaître de la page. Un enregistrement écrit les deux lignes
 dans **une** instruction ; « Rétablir l'original » supprime les deux, après une confirmation (`ConfirmActionDialog`, en français sous `/en`) qui le dit.
+Un français réécrit sous un anglais laissé intact fait paraître, sous le champ anglais, « Le français a changé, pas l’anglais » (`isSiteCopyEnStale`) : rien n’est refusé, une coquille corrigée ne change pas le sens.
 
 Base injoignable → `getSiteCopy()` / `getSiteCopyBundle()` renvoient les
 défauts, la page reste peuplée.
