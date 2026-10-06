@@ -238,3 +238,14 @@ describe("détail map par map — refus d'un score de map en cours de correction
     expect(list).toContain("onEdit={() => fieldErrors.clear(t2Key)}");
   });
 });
+
+describe("détail map par map — correction d'un résultat validé", () => {
+  it("une map refusée se désigne avant la confirmation de correction, qui couvrirait le champ", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook).toContain('refuseMapsBefore: (action: "save" | "resolve") => mapsSent && refuseMaps(action === "resolve"),');
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    const run = dialog.slice(dialog.indexOf('const run = async (action: "save" | "resolve") => {'));
+    expect(run.indexOf("if (form.refuseMapsBefore(action)) return;")).toBeGreaterThan(0);
+    expect(run.indexOf("if (form.refuseMapsBefore(action)) return;")).toBeLessThan(run.indexOf("setConfirmingCorrection(action);"));
+  });
+});
