@@ -299,7 +299,15 @@ describe("détail map par map — saisie au clavier et au toucher", () => {
 
   it("le détail adverse reste visible quand le formulaire ne le reprend pas (saisie commencée)", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain('return phase === "THEIRS_PENDING" && !sameMapLists(maps, theirMaps);');
+    expect(dialog).toContain('return phase === "THEIRS_PENDING" && missedProposal;');
+    expect(dialog).toContain("setMissedProposal(typing && !sameMapLists(current.current, next));");
+    // L'effet ne fait plus d'effet de bord dans un `setMaps(updater)`.
+    expect(dialog).not.toContain("setMaps((current) =>");
+  });
+
+  it("ajouter une map lève les refus affichés", () => {
+    const add = list().slice(list().indexOf("const add = () => {"));
+    expect(add.slice(0, add.indexOf("};"))).toContain("fieldErrors.clear();");
   });
 
   it("chaque colonne de score porte l'emblème de son engagé", () => {
