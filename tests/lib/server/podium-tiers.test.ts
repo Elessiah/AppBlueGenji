@@ -51,6 +51,7 @@ describe("loadPodiumTiers", () => {
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toMatch(/FROM bg_team_members/);
     expect(sql).toMatch(/left_at IS NULL/);
+    expect(sql).toMatch(/u\.is_deleted = 0/);
     expect(sql).toMatch(/team_id IN \(\?, \?, \?\)/);
     expect(params).toEqual([7, 8, 9]);
     expect(tiers.teams).toEqual({ 7: 1, 8: 2, 9: 3 });
