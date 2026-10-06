@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { EntityLink, type EntityLinkProps } from "@/components/entity-link";
+import { EntityLink, joinEntityClasses, useEntrantPodiumClass, type EntityLinkProps } from "@/components/entity-link";
 import { entrantHref, participantWording, type ParticipantType } from "@/lib/shared/participants";
 import { entrantLogoUrl, type EntrantLogoMap } from "@/lib/shared/entrant-logos";
 import type { SeedMap } from "@/lib/shared/match-sections";
@@ -79,11 +79,17 @@ export function useParticipantWording() {
  * `<Link href={entrantLink(id)} style={{ color: "inherit", … }}>` : le composant
  * porte la résolution du lien *et* l'affordance, pour qu'un nom d'engagé se
  * comporte de la même façon d'une vue à l'autre.
+ *
+ * Il porte aussi la marche du podium de l'engagé (`PODIUM_TIERS.md`) : celle de
+ * l'équipe, ou celle — adoucie — du joueur d'une entrée solo.
  */
 export function EntrantLink({
   teamId,
+  className,
   ...rest
 }: Readonly<EntityLinkProps & { teamId: number }>) {
+  const { soloUserIds } = useContext(EntrantContext);
   const entrantLink = useEntrantLink();
-  return <EntityLink href={entrantLink(teamId)} {...rest} />;
+  const tier = useEntrantPodiumClass(teamId, soloUserIds[teamId]);
+  return <EntityLink href={entrantLink(teamId)} className={joinEntityClasses(tier, className)} {...rest} />;
 }

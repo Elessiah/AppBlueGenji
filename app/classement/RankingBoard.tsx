@@ -47,11 +47,14 @@ const FORM_CLASSES: Record<FormResult, string | undefined> = {
 const PLACE_LABELS =["1re place", "2e place", "3e place"] as const;
 
 /**
- * Effet du nom sur le podium, un par marche et de plus en plus sobre : 1re
- * irisée et animée, 2e givre chromé, 3e liseré néon (RANKING_PAGE.md). Le nom
- * reste du vrai texte dans son `TeamLink` : l'effet n'est que de la peinture.
+ * Marche du nom sur le podium, une par place et de plus en plus sobre : 1re
+ * irisée, couronnée et balayée d'un reflet, 2e chrome glacier, 3e néon violet
+ * (`.podium-tier-N`, `PODIUM_TIERS.md`). Posée **explicitement** depuis l'onglet
+ * affiché : un onglet par jeu a son propre podium, que le contexte du site
+ * (podium « Général ») ne connaît pas. Le nom reste du vrai texte dans son
+ * `TeamLink` : l'effet n'est que de la peinture.
  */
-const PODIUM_NAME_TIERS = [styles.nameTier1, styles.nameTier2, styles.nameTier3] as const;
+const PODIUM_TIERS = [1, 2, 3] as const;
 
 /** Une défaite se lit dans sa couleur ; zéro défaite reste neutre (`DESIGN_SYSTEM.md`). */
 function lossClass(losses: number): string {
@@ -127,8 +130,8 @@ function Podium({
               </span>
               <TeamSigil label={row.teamName.charAt(0)} size={40} logoUrl={row.logoUrl} />
             </div>
-            <h3 className={`${styles.podiumName} ${PODIUM_NAME_TIERS[index]}`}>
-              <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
+            <h3 className={styles.podiumName}>
+              <TeamLink teamId={row.teamId} podiumTier={PODIUM_TIERS[index]} title={`Voir la fiche de ${row.teamName}`}>
                 {row.teamName}
               </TeamLink>
             </h3>
@@ -214,7 +217,12 @@ function RankingTable({ rows, forms, showDraws, afterPodium }: Readonly<RankingT
             <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
             <span className={styles.team} role="cell">
               <TeamSigil label={row.teamName.charAt(0)} size={32} logoUrl={row.logoUrl} />
-              <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
+              {/* Rang de l'onglet affiché, pas du podium « Général » : sur un
+                  onglet par jeu, la marche du site contredirait la ligne. */}
+              <TeamLink
+                teamId={row.teamId}
+                podiumTier={row.rank <= 3 ? (row.rank as 1 | 2 | 3) : null}
+                title={`Voir la fiche de ${row.teamName}`}>
                 {row.teamName}
               </TeamLink>
             </span>

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { PlayerPodiumName } from "@/components/podium-tiers";
 import { UserX } from "lucide-react";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
@@ -71,7 +72,9 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
             )}
           </div>
         </div>
-        <div className={s.plPseudo}>{player.pseudo}</div>
+        <div className={s.plPseudo}>
+          <PlayerPodiumName userId={player.id}>{player.pseudo}</PlayerPodiumName>
+        </div>
         {player.isDeleted && (
           <div className={s.plDeletedMark}>
             <UserX size={10} aria-hidden="true" />

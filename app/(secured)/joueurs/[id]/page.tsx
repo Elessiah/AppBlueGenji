@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { TeamLink } from "@/components/entity-link";
+import { PlayerPodiumName } from "@/components/podium-tiers";
 import { DiscordTag } from "@/components/discord-tag";
 import { useParams, useRouter } from "next/navigation";
 import { UserX } from "lucide-react";
@@ -116,7 +117,11 @@ export default function PlayerDetailPage() {
                   }
                   style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}
                 >
-                  {data.profile.pseudo}
+                  {deleted ? (
+                    data.profile.pseudo
+                  ) : (
+                    <PlayerPodiumName userId={data.profile.id}>{data.profile.pseudo}</PlayerPodiumName>
+                  )}
                 </h1>
                 <fieldset
                   // `<fieldset>` (rôle `group`) : un nom n'est admis que sur un
