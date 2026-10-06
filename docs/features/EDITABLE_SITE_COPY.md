@@ -25,26 +25,74 @@ wrapper, aucune classe en plus. Le crayon n'existe que pour un éditeur.
 au crayon ; crayon et éditeur sont `position: relative` pour passer au-dessus
 des calques décoratifs absolus d'un en-tête (trame, aurore).
 
+## Deux langues (lot 2 de l'i18n, D9)
+
+Chaque entrée du registre porte **deux** valeurs d'origine : `defaultValue`
+(français) et `defaultValueEn` (anglais, rédigé au lot 2 d'après le glossaire
+d'`I18N.md`). Cela vaut pour **toutes** les clés, celles de l'association et du
+classement comprises, bien que ces deux pages ne soient pas encore ouvertes sous
+`/en` (lots 4 et 5).
+
+**L'éditeur est bilingue** : le crayon ouvre le français et l'anglais côte à
+côte (`lang="fr"` / `lang="en"` sur les champs, empilés sur un écran étroit).
+L'anglais est **obligatoire** : sans lui, l'éditeur refuse avant l'envoi et le
+serveur refuse de même (`COPY_EN_EMPTY`) ; le refus passe en notification
+**et** est rattaché au champ anglais (`useFieldErrors` : `aria-invalid`,
+phrase en `aria-describedby`, focus ramené). Table « code → champ » :
+`SITE_COPY_FIELD_ERRORS` ; phrases : `SITE_COPY_ERROR_MESSAGES` (staff, en
+français — l'administration n'est pas traduite, D4 ; sous `/en`, l'éditeur porte
+`lang="fr"`).
+
+Les textes de l'éditeur ne voyagent que pour le staff : la page pose
+`SiteCopyEditorProvider` avec `getSiteCopyEditor()` (accueil : `copyBundle.editor`)
+si `can(user, "showcase")`, `null` sinon.
+
+### Rattrapage de l'existant (« action requise en production »)
+
+Le contenu déjà en base n'a pas d'anglais. Règle (`resolveSiteCopy`), qui
+garantit qu'**aucun français n'est servi sous `/en`** :
+
+| Français | Anglais enregistré | Servi sous `/en` | Éditeur |
+| --- | --- | --- | --- |
+| d'origine | non | anglais d'origine | anglais d'origine pré-rempli |
+| d'origine ou édité | oui | anglais enregistré | anglais enregistré |
+| **édité** (avant le lot 2) | non | anglais d'origine (faute de mieux) | champ anglais **vide**, crayon marqué **EN** (ambre, avertissement), aide sous le champ |
+
+Le troisième cas forme la **liste de rattrapage** (`SiteCopyBundle.missingEn`) :
+la page anglaise y montre un anglais juste mais qui peut ne plus dire ce que dit
+le français édité. Rien n'est écrit en base à la place du staff — aucun texte
+de production n'est connu du code.
+
+**Action requise en production** après déploiement : un porteur de `showcase`
+parcourt l'accueil, la page association et `/classement` ; chaque crayon marqué
+**EN** s'ouvre, on y saisit l'anglais du texte français affiché à gauche, on
+enregistre. Quand plus aucun crayon n'est marqué, le rattrapage est fini.
+
 ## Stockage
 
-Table clé/valeur `bg_settings`, une ligne par texte modifié, préfixée `copy_`
-(`siteCopySettingKey`). Une clé absente **ou vide** retombe sur la valeur
-d'origine : un texte ne peut donc pas disparaître de la page, et
-« Rétablir l'original » se contente de supprimer la ligne.
+Table clé/valeur `bg_settings`, une ligne par texte modifié **et par langue** :
+`copy_<clé>` pour le français (inchangée — aucune migration de données),
+`copy_<clé>__en` pour l'anglais (`siteCopySettingKey(key, locale)` ; clé la plus
+longue : 36 caractères, colonne `VARCHAR(80)`, aucun changement de schéma). Une
+clé absente **ou vide** retombe sur la valeur d'origine de sa langue : un texte
+ne peut donc pas disparaître de la page. Un enregistrement écrit les deux lignes
+dans **une** instruction ; « Rétablir l'original » supprime les deux.
 
-Base injoignable → `getSiteCopy()` renvoie les défauts, la page reste peuplée.
+Base injoignable → `getSiteCopy()` / `getSiteCopyBundle()` renvoient les
+défauts, la page reste peuplée.
 
 ## API
 
 | Verbe | Route | Accès |
 | --- | --- | --- |
-| `GET` | `/api/site-copy` | public (les textes sont affichés à tous) |
-| `PATCH` | `/api/site-copy` `{ key, value }` | `showcase` |
-| `DELETE` | `/api/site-copy?key=…` | `showcase` |
+| `GET` | `/api/site-copy` → `{ copy, copyEn }` | public (les textes sont affichés à tous) |
+| `PATCH` | `/api/site-copy` `{ key, value, valueEn }` | `showcase` |
+| `DELETE` | `/api/site-copy?key=…` (les deux langues) | `showcase` |
 
-Erreurs : `UNKNOWN_COPY_KEY` (404), `COPY_EMPTY` / `COPY_TOO_LONG` (400).
-Un texte vide est refusé — vider un titre casserait la page sans retour arrière
-possible autrement qu'en le retapant.
+Erreurs : `UNKNOWN_COPY_KEY` (404), `COPY_EMPTY` / `COPY_TOO_LONG` (400, champ
+français), `COPY_EN_EMPTY` / `COPY_EN_TOO_LONG` (400, champ anglais). Un texte
+vide est refusé — vider un titre casserait la page sans retour arrière possible
+autrement qu'en le retapant.
 
 ## Textes couverts
 
@@ -64,20 +112,22 @@ restent figées, comme pour l'accueil et l'association (`RANKING_PAGE.md`).
 Les textes éditables ne sont pas des données personnelles : rien à déclarer
 au registre des traitements ni à `PRIVACY_CHANGES`.
 
-**Langues** : français seulement à ce jour. Le lot 2 de l'i18n rend **toutes**
-les clés du registre bilingues (`copy_<clé>__en`, anglais obligatoire, D9) et
-rattrape l'anglais de celles déjà saisies — classement compris
-(`I18N_MIGRATION_PLAN.md`).
+**Langues** : toutes les clés sont bilingues depuis le lot 2 (§ Deux langues).
+Seul l'accueil est servi sous `/en` ; l'association et le classement le seront
+aux lots 5 et 4, leur anglais étant déjà saisissable.
 
 Les titres multilignes se saisissent avec de vrais retours à la ligne ; le rendu
 les convertit en `<br />`, la dernière ligne portant l'accent de couleur.
 
 ## Tests
 
-- `tests/lib/shared/site-copy.test.ts` — registre et validation.
-- `tests/lib/server/site-copy-service.test.ts` — défauts, upsert, réinitialisation,
-  résilience à une base injoignable.
-- `tests/app/api/site-copy.test.ts` — permissions et codes d'erreur.
+- `tests/lib/shared/site-copy.test.ts` — registre, validation bilingue, règle de
+  rattrapage (`resolveSiteCopy`), longueur des clés de stockage.
+- `tests/lib/server/site-copy-service.test.ts` — défauts des deux langues, upsert
+  des deux lignes, refus sans anglais, réinitialisation, base injoignable.
+- `tests/app/api/site-copy.test.ts` — permissions et codes d'erreur (`COPY_EN_EMPTY`).
+- `tests/components/editable-copy-bilingual.test.tsx` — éditeur FR/EN, refus
+  rattaché au champ anglais, marque **EN** du rattrapage.
 
 ## Notes reprises de CLAUDE.md
 
