@@ -313,9 +313,12 @@
 
 .nameTier3 :global(.entity-link) {
   color: var(--violet-300);
-  text-shadow:
-    0 0 1px rgba(var(--violet-400-rgb), 0.9),
-    0 0 8px rgba(var(--violet-400-rgb), 0.5);
+}
+
+/* Néon par un halo large et léger, comme aux deux autres marches : un
+   `text-shadow` serré éclaircirait le bord des lettres sous 4,5:1. */
+.nameTier3 {
+  filter: drop-shadow(0 0 10px rgba(var(--violet-400-rgb), 0.3));
 }
 
 /* Filet sous le nom : irisé et plus large à la 1re, givré et court à la 2e. */
