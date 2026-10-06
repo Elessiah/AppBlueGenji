@@ -3,9 +3,11 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
+import { useShellText } from "@/components/i18n/shell-text";
+import type { ShellKey } from "@/lib/shared/shell-text";
 import styles from "./PublicNavMenu.module.css";
 
-type NavLink = { href: string; label: string };
+type NavLink = { href: string; labelKey: ShellKey };
 
 /**
  * Une entrée par page, jamais deux vers la même adresse ; les règles des
@@ -14,14 +16,14 @@ type NavLink = { href: string; label: string };
  * (docs/features/PUBLIC_NAVIGATION.md).
  */
 export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
-  { href: "/tournois", label: "Tournois" },
-  { href: "/equipes", label: "Équipes" },
-  { href: "/classement", label: "Classement" },
-  { href: "/joueurs", label: "Joueurs" },
-  { href: "/recrutement", label: "Recrutement" },
-  { href: "/bot", label: "Bot" },
-  { href: "/association", label: "L'asso" },
-  { href: "/benevoles", label: "Bénévoles" },
+  { href: "/tournois", labelKey: "nav.links.tournaments" },
+  { href: "/equipes", labelKey: "nav.links.teams" },
+  { href: "/classement", labelKey: "nav.links.ranking" },
+  { href: "/joueurs", labelKey: "nav.links.players" },
+  { href: "/recrutement", labelKey: "nav.links.recruitment" },
+  { href: "/bot", labelKey: "nav.links.bot" },
+  { href: "/association", labelKey: "nav.links.association" },
+  { href: "/benevoles", labelKey: "nav.links.volunteers" },
 ];
 
 /**
@@ -72,8 +74,9 @@ export function PublicNavPanel({
   pathname: string | null;
   onNavigate: () => void;
 }>) {
+  const { t } = useShellText();
   return (
-    <nav id={id} className={styles.panel} aria-label="Navigation principale">
+    <nav id={id} className={styles.panel} aria-label={t("nav.mainLabel")}>
       {PUBLIC_NAV_LINKS.map((link) => {
         const isActive = isNavLinkActive(pathname, link.href);
         return (
@@ -84,7 +87,7 @@ export function PublicNavPanel({
             className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
             onClick={onNavigate}
           >
-            {link.label}
+            {t(link.labelKey)}
           </LocaleLink>
         );
       })}
@@ -104,6 +107,7 @@ export function PublicNavPanel({
 export function PublicNavMenu() {
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
+  const { t } = useShellText();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -143,7 +147,7 @@ export function PublicNavMenu() {
         ref={buttonRef}
         type="button"
         className={`${styles.burger} ${open ? styles.burgerOpen : ""}`}
-        aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}
+        aria-label={open ? t("nav.closeMenu") : t("nav.openMenu")}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((v) => !v)}
@@ -153,7 +157,7 @@ export function PublicNavMenu() {
           <span className={styles.bar} />
           <span className={styles.bar} />
         </span>
-        <span className={styles.label}>MENU</span>
+        <span className={styles.label}>{t("nav.menuButton")}</span>
       </button>
 
       {open && (

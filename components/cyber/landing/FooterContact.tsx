@@ -5,6 +5,7 @@ import { type ContactInfo, type PublicContactInfo, toPublicContact, validateCont
 import { decodeContact } from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { useToast } from "@/components/ui/toast";
+import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./FooterContact.module.css";
@@ -28,6 +29,9 @@ interface FooterContactProps {
  */
 export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContactProps>) {
   const { showError, showSuccess } = useToast();
+  // Textes lus par le visiteur ; la fenêtre d'édition (staff) reste en
+  // français jusqu'au lot des éditeurs de la vitrine (I18N_MIGRATION_PLAN.md, lot 5).
+  const { t } = useShellText();
   const [contact, setContact] = useState<PublicContactInfo>(initialContact);
   const [form, setForm] = useState<ContactInfo>(() => editableContact(initialContact));
   const [open, setOpen] = useState(false);
@@ -80,7 +84,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
       <ul>
         {contact.emailEncoded && (
           <li className={styles.item}>
-            <span className={styles.itemLabel}>Email</span>
+            <span className={styles.itemLabel}>{t("footer.contact.email")}</span>
             {/* `key` : une adresse révélée puis modifiée par le staff doit
                 repartir masquée, pas garder l'ancienne valeur décodée. */}
             <ProtectedContact
@@ -93,27 +97,27 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
         )}
         {contact.discordTag && (
           <li className={styles.item}>
-            <span className={styles.itemLabel}>Discord</span>
+            <span className={styles.itemLabel}>{t("footer.contact.discord")}</span>
             <span className={styles.tag}>{contact.discordTag}</span>
           </li>
         )}
         {contact.discordUrl && (
           <li className={styles.item}>
-            <span className={styles.itemLabel}>Serveur</span>
+            <span className={styles.itemLabel}>{t("footer.contact.server")}</span>
             <a className="tap-target" href={contact.discordUrl} target="_blank" rel="noreferrer">
-              Serveur Discord
+              {t("footer.contact.discordServer")}
             </a>
           </li>
         )}
         {!hasAny && (
           <li>
-            <span className={styles.empty}>Non renseigné</span>
+            <span className={styles.empty}>{t("footer.contact.empty")}</span>
           </li>
         )}
         {isAdmin && (
           <li>
             <button type="button" className={styles.edit} onClick={openEdit}>
-              Modifier
+              {t("footer.contact.edit")}
             </button>
           </li>
         )}

@@ -1,0 +1,158 @@
+{
+  "skipLink": {
+    "label": "Aller au contenu"
+  },
+  "nav": {
+    "mainLabel": "Navigation principale",
+    "links": {
+      "players": "Joueurs",
+      "teams": "Équipes",
+      "tournaments": "Tournois",
+      "ranking": "Classement",
+      "recruitment": "Recrutement",
+      "bot": "Bot",
+      "association": "L'asso",
+      "volunteers": "Bénévoles"
+    },
+    "home": "Accueil",
+    "logoAlt": "BlueGenji",
+    "myTeam": "Mon équipe",
+    "myTeamLabel": "Mon équipe : {team}",
+    "reports": "Signalements",
+    "reportsPending": "à traiter",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "menuButton": "MENU"
+  },
+  "header": {
+    "brandName": "BlueGenji",
+    "brandTagline": "ESPORT",
+    "competitionFull": "Accéder à la partie compétitive →",
+    "competitionShort": "Compétition →",
+    "join": "Rejoindre →"
+  },
+  "account": {
+    "menuLabel": "{pseudo}, menu du compte",
+    "profile": "Mon profil",
+    "logout": "Déconnexion",
+    "loggingOut": "Déconnexion…",
+    "logoutFailed": "La déconnexion a échoué. Réessaie dans un instant."
+  },
+  "footer": {
+    "brandName": "BlueGenji",
+    "tagline": "Association loi 1901. Tournois Overwatch et Marvel Rivals pour la scène amateur francophone.",
+    "headings": {
+      "competitions": "COMPÉTITIONS",
+      "association": "ASSOCIATION",
+      "contact": "CONTACT",
+      "legal": "LÉGAL"
+    },
+    "links": {
+      "tournaments": "Tournois",
+      "ranking": "Classement",
+      "bot": "Bot",
+      "manifesto": "Manifeste",
+      "volunteers": "Bénévoles",
+      "partners": "Partenaires",
+      "legalNotice": "Mentions légales",
+      "terms": "Conditions d'utilisation",
+      "rgpd": "RGPD",
+      "privacy": "Confidentialité",
+      "statutes": "Statuts",
+      "internalRules": "Règlement intérieur",
+      "cookies": "Cookies",
+      "sourceCode": "Code source"
+    },
+    "legalNavLabel": "Informations légales",
+    "accessibilitySettings": "Réglages d'accessibilité",
+    "accessibilityStatus": "Accessibilité : {status}",
+    "conformity": {
+      "TOTAL": "totalement conforme",
+      "PARTIAL": "partiellement conforme",
+      "NONE": "non conforme"
+    },
+    "reportProblem": "Signaler un problème",
+    "copyright": "© 2026 {association}",
+    "contact": {
+      "email": "Email",
+      "discord": "Discord",
+      "server": "Serveur",
+      "discordServer": "Serveur Discord",
+      "empty": "Non renseigné",
+      "edit": "Modifier"
+    }
+  },
+  "a11yMenu": {
+    "button": "Réglages d'accessibilité",
+    "buttonActive": "Réglages d'accessibilité ({count, plural, one {# actif} other {# actifs}})",
+    "title": "Accessibilité",
+    "close": "Fermer le menu d'accessibilité",
+    "intro": "Tous désactivés par défaut. Votre choix est gardé dans ce navigateur.",
+    "listLabel": "Réglages d'accessibilité",
+    "zoomHint": "Pour agrandir le texte, utilisez le zoom de votre navigateur (Ctrl + ou ⌘ + sur Mac).",
+    "statement": "Déclaration d'accessibilité",
+    "resetAll": "Tout désactiver",
+    "settings": {
+      "contrast": {
+        "label": "Contraste renforcé",
+        "description": "Textes secondaires plus clairs, bordures et séparateurs plus marqués, texte indicatif lisible."
+      },
+      "focus": {
+        "label": "Focus très visible",
+        "description": "Un anneau épais autour de l'élément atteint au clavier."
+      },
+      "links": {
+        "label": "Liens soulignés",
+        "description": "Tous les liens de texte sont soulignés, pas seulement colorés."
+      },
+      "font": {
+        "label": "Police simplifiée",
+        "description": "Une seule police sans empattement, sans majuscules forcées ni lettres espacées."
+      },
+      "spacing": {
+        "label": "Espacement du texte",
+        "description": "Plus d'air entre les lignes, les mots, les lettres et les paragraphes."
+      },
+      "motion": {
+        "label": "Réduire les animations",
+        "description": "Arrête les animations décoratives et les transitions, même si votre système ne le demande pas."
+      }
+    }
+  },
+  "toast": {
+    "regionLabel": "Notifications",
+    "errorPrefix": "Erreur :",
+    "successPrefix": "Succès :",
+    "pause": "Mettre en pause la notification",
+    "pauseTitle": "Pause",
+    "resume": "Reprendre le décompte de la notification",
+    "resumeTitle": "Reprendre",
+    "close": "Fermer la notification",
+    "closeTitle": "Fermer"
+  },
+  "confirmDialog": {
+    "cancel": "Annuler",
+    "typeToConfirm": "Recopie <strong>{text}</strong> pour confirmer"
+  },
+  "errorPages": {
+    "notFound": {
+      "eyebrow": "ERREUR 404",
+      "title": "Page introuvable",
+      "message": "Cette adresse ne mène à aucune page du site : le lien est peut-être erroné, ou la page a été déplacée ou retirée."
+    },
+    "runtime": {
+      "eyebrow": "ERREUR",
+      "title": "Un problème est survenu",
+      "message": "La page n'a pas pu s'afficher. Réessaie dans un instant ; si le problème persiste, signale-le.",
+      "messageWithReference": "La page n'a pas pu s'afficher. Réessaie dans un instant ; si le problème persiste, signale-le avec la référence ci-dessous."
+    },
+    "links": {
+      "home": "Retour à l'accueil",
+      "tournaments": "Voir les tournois",
+      "rules": "Lire les règles"
+    },
+    "retry": "Réessayer",
+    "reference": "Référence :",
+    "documentTitle": "{title} · {site}"
+  }
+}

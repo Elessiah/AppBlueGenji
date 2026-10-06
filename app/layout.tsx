@@ -44,7 +44,9 @@ import { DEFAULT_SHARE_IMAGE, SITE_TITLE_TEMPLATE } from "@/lib/shared/page-meta
 import { APP_BACKGROUND_COLOR } from "@/lib/shared/web-manifest";
 import { appleStartupImageLinks } from "@/lib/shared/apple-startup-images";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
-import { LOCALE_HEADER, localeFromHeader } from "@/lib/shared/locales";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { DEFAULT_LOCALE, LOCALE_HEADER, localeFromHeader } from "@/lib/shared/locales";
 
 /**
  * Socle des métadonnées de partage, hérité par toutes les pages.
@@ -226,13 +228,17 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Langue de la page, posée par le middleware d'après l'URL (`/en/…`) : elle
   // fixe `<html lang>` et la langue des liens côté client. **Aucun** message
   // n'est remis ici : le code client de `next-intl` (~12 Ko compressés) ne se
-  // charge que sous un segment traduit, par son propre `IntlMessages`.
+  // charge que sous un segment traduit, par son propre `IntlMessages`. Seuls
+  // les textes de la coquille (menus, notifications…) suivent, formatés sans
+  // `next-intl` — et seulement hors français, déjà inclus dans le paquet.
   const locale = localeFromHeader(requestHeaders.get(LOCALE_HEADER));
+  const shellMessages = locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).shell;
 
   return (
     <html lang={locale} data-a11y={a11yAttribute(a11ySettings)}>
       <body style={FONT_VARIABLES}>
         <AppLocaleProvider locale={locale}>
+        <ShellTextProvider locale={locale} messages={shellMessages}>
         <ToastProvider>
           {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
               réglages ne doit pas traverser toute la page pour les trouver. */}
@@ -276,6 +282,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}
           {children}
         </ToastProvider>
+        </ShellTextProvider>
         </AppLocaleProvider>
       </body>
     </html>

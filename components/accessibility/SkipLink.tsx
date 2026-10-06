@@ -1,6 +1,7 @@
 "use client";
 
 import type { MouseEvent } from "react";
+import { useShellText } from "@/components/i18n/shell-text";
 import { skipLinkTarget } from "@/lib/shared/skip-link";
 
 /** Ancre de repli, sans effet quand JavaScript tourne. */
@@ -53,13 +54,14 @@ export function focusMainContent(
  * pas le focus (`.skip-link`, `app/globals.css`) — aucun effet visuel sinon.
  */
 export function SkipLink() {
+  const { t } = useShellText();
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (focusMainContent()) event.preventDefault();
   };
 
   return (
     <a href={SKIP_LINK_HREF} className="skip-link" onClick={onClick}>
-      Aller au contenu
+      {t("skipLink.label")}
     </a>
   );
 }

@@ -1,23 +1,27 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import "./globals.css";
 import { FONT_VARIABLES } from "./site-fonts";
 import { CyberButton } from "@/components/cyber";
 import { ErrorPanel } from "@/components/error-page/ErrorPanel";
-import {
-  RETRY_LABEL,
-  errorPageTitle,
-  errorReference,
-  runtimeErrorCopy,
-} from "@/lib/shared/error-pages";
+import enShell from "@/messages/en/shell.json";
+import { errorPageTitle, errorReference, runtimeErrorCopy } from "@/lib/shared/error-pages";
+import { localeHref, splitLocalePrefix } from "@/lib/shared/locales";
+import { shellText } from "@/lib/shared/shell-text";
 
 /**
  * Dernier filet : une erreur levée par la mise en page racine elle-même. Elle
- * remplace alors tout le document, d'où `<html lang="fr">` et `<body>` rendus
- * ici, sans en-tête ni menu (ils vivent dans la mise en page qui vient de
- * tomber). Un lien simple plutôt que `next/link` : le routeur client peut être
- * dans l'état qui a provoqué l'erreur, un rechargement complet repart de zéro.
+ * remplace alors tout le document, d'où `<html lang>` et `<body>` rendus ici,
+ * sans en-tête ni menu (ils vivent dans la mise en page qui vient de tomber).
+ * Un lien simple plutôt que `next/link` : le routeur client peut être dans
+ * l'état qui a provoqué l'erreur, un rechargement complet repart de zéro.
+ *
+ * La mise en page tombée emporte aussi la langue et les textes de la coquille :
+ * la langue se relit ici dans l'adresse (`/en/…` n'est servie que pour une
+ * route traduite, le middleware renvoie les autres vers le français), et les
+ * textes anglais sont inclus dans ce seul fichier.
  */
 export default function GlobalError({
   error,
@@ -25,8 +29,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   // Next passe aussi `reset`, volontairement ignoré : voir `retry` plus bas.
 }>) {
+  const { locale } = splitLocalePrefix(usePathname() ?? "/");
+  const { t } = locale === "en" ? shellText("en", enShell) : shellText("fr");
   const reference = errorReference(error.digest);
-  const copy = runtimeErrorCopy(reference);
+  const copy = runtimeErrorCopy(reference, t);
 
   useEffect(() => {
     console.error(error);
@@ -38,17 +44,17 @@ export default function GlobalError({
   const retry = () => window.location.reload();
 
   return (
-    <html lang="fr">
+    <html lang={locale}>
       <body style={FONT_VARIABLES}>
-        <title>{errorPageTitle(copy)}</title>
+        <title>{errorPageTitle(copy, t)}</title>
         <main>
-          <ErrorPanel copy={copy} reference={reference}>
+          <ErrorPanel copy={copy} reference={reference} referenceLabel={t("errorPages.reference")}>
             <CyberButton type="button" onClick={retry}>
-              {RETRY_LABEL}
+              {t("errorPages.retry")}
             </CyberButton>
             <CyberButton asChild variant="ghost">
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- rechargement complet voulu */}
-              <a href="/">Retour à l&apos;accueil</a>
+              {/* `<a>` nu : rechargement complet voulu. */}
+              <a href={localeHref("/", locale)}>{t("errorPages.links.home")}</a>
             </CyberButton>
           </ErrorPanel>
         </main>

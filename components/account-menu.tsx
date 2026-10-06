@@ -5,6 +5,7 @@ import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation
 import { UserAvatar } from "./user-avatar";
 import { useToast } from "./ui/toast";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
+import { useShellText } from "./i18n/shell-text";
 import s from "./account-menu.module.css";
 
 export type AccountMenuTeam = { teamId: number; teamName: string };
@@ -14,9 +15,6 @@ type AccountMenuProps = {
   avatarUrl: string | null;
   activeTeam?: AccountMenuTeam | null;
 };
-
-/** Message du toast quand la déconnexion n'a pas abouti. */
-export const LOGOUT_FAILED_MESSAGE = "La déconnexion a échoué. Réessaie dans un instant.";
 
 /**
  * Menu du compte, sous l'avatar : « Mon profil », « Mon équipe » et
@@ -34,6 +32,7 @@ export const LOGOUT_FAILED_MESSAGE = "La déconnexion a échoué. Réessaie dans
 export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<AccountMenuProps>) {
   const router = useLocaleRouter();
   const { showError } = useToast();
+  const { t } = useShellText();
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -64,7 +63,7 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<A
     const done = await requestLogout();
     setLeaving(false);
     if (!done) {
-      showError(LOGOUT_FAILED_MESSAGE);
+      showError(t("account.logoutFailed"));
       return;
     }
     setOpen(false);
@@ -87,7 +86,7 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<A
         ref={buttonRef}
         type="button"
         className={`${s.trigger} ${open ? s.triggerOpen : ""}`}
-        aria-label={`${pseudo}, menu du compte`}
+        aria-label={t("account.menuLabel", { pseudo })}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((v) => !v)}
@@ -126,19 +125,20 @@ export function AccountMenuPanel({
   onNavigate: () => void;
   onLogout: () => void;
 }>) {
+  const { t } = useShellText();
   return (
     <div id={id} className={s.panel}>
       <LocaleLink href="/profil" className={s.item} onClick={onNavigate}>
-        Mon profil
+        {t("account.profile")}
       </LocaleLink>
       {activeTeam && (
         <LocaleLink
           href={`/equipes/${activeTeam.teamId}`}
           className={s.item}
           onClick={onNavigate}
-          aria-label={`Mon équipe : ${activeTeam.teamName}`}
+          aria-label={t("nav.myTeamLabel", { team: activeTeam.teamName })}
         >
-          Mon équipe
+          {t("nav.myTeam")}
           {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
           <span className={s.itemHint} aria-hidden="true">
             {activeTeam.teamName}
@@ -146,7 +146,7 @@ export function AccountMenuPanel({
         </LocaleLink>
       )}
       <button type="button" className={`${s.item} ${s.logout}`} onClick={onLogout} disabled={leaving}>
-        {leaving ? "Déconnexion…" : "Déconnexion"}
+        {leaving ? t("account.loggingOut") : t("account.logout")}
       </button>
     </div>
   );

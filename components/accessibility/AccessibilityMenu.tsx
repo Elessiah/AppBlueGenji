@@ -17,6 +17,8 @@ import {
   type AccessibilityMenuRequest,
 } from "@/lib/shared/accessibility-menu-request";
 import { OPEN_MODAL_SELECTOR } from "@/lib/shared/floating-button-scroll";
+import { useShellText } from "@/components/i18n/shell-text";
+import { shellText, type ShellText } from "@/lib/shared/shell-text";
 import styles from "./AccessibilityMenu.module.css";
 
 /**
@@ -37,9 +39,9 @@ function applySettings(keys: A11ySettingKey[]): void {
 }
 
 /** Intitulé du bouton flottant : il dit combien de réglages sont actifs. */
-export function accessibilityButtonLabel(activeCount: number): string {
-  if (activeCount === 0) return "Réglages d'accessibilité";
-  return `Réglages d'accessibilité (${activeCount} actif${activeCount > 1 ? "s" : ""})`;
+export function accessibilityButtonLabel(activeCount: number, { t }: Pick<ShellText, "t"> = shellText("fr")): string {
+  if (activeCount === 0) return t("a11yMenu.button");
+  return t("a11yMenu.buttonActive", { count: activeCount });
 }
 
 interface AccessibilityMenuProps {
@@ -158,7 +160,8 @@ export function AccessibilityMenu({ initialSettings }: Readonly<AccessibilityMen
     restoreFocus();
   };
 
-  const label = accessibilityButtonLabel(settings.length);
+  const text = useShellText();
+  const label = accessibilityButtonLabel(settings.length, text);
 
   return (
     // `a11y-always-contrast` : le menu se lit toujours en contraste renforcé,
@@ -225,20 +228,21 @@ export function AccessibilityPanel({
   onClose,
   onNavigate,
 }: Readonly<AccessibilityPanelProps>) {
+  const { t } = useShellText();
   return (
     // `tabIndex={-1}` : le panneau reçoit le focus quand le menu est ouvert
     // depuis le pied de page, sans devenir un arrêt de la tabulation.
     <section id={id} className={styles.panel} aria-labelledby={titleId} tabIndex={-1}>
       <div className={styles.head}>
         <p id={titleId} className={styles.title}>
-          Accessibilité
+          {t("a11yMenu.title")}
         </p>
-        <button type="button" className={styles.close} aria-label="Fermer le menu d'accessibilité" onClick={onClose}>
+        <button type="button" className={styles.close} aria-label={t("a11yMenu.close")} onClick={onClose}>
           <span aria-hidden="true">×</span>
         </button>
       </div>
-      <p className={styles.intro}>Tous désactivés par défaut. Votre choix est gardé dans ce navigateur.</p>
-      <ScrollArea orientation="y" className={styles.list} ariaLabel="Réglages d'accessibilité">
+      <p className={styles.intro}>{t("a11yMenu.intro")}</p>
+      <ScrollArea orientation="y" className={styles.list} ariaLabel={t("a11yMenu.listLabel")}>
         <ul className={styles.options}>
           {A11Y_SETTINGS.map((setting) => {
             const descriptionId = `${id}-${setting.key}`;
@@ -259,10 +263,10 @@ export function AccessibilityPanel({
                   />
                   <span className={styles.optionText}>
                     <span id={labelId} className={styles.optionLabel}>
-                      {setting.label}
+                      {t(`a11yMenu.settings.${setting.key}.label`)}
                     </span>
                     <span id={descriptionId} className={styles.optionDescription}>
-                      {setting.description}
+                      {t(`a11yMenu.settings.${setting.key}.description`)}
                     </span>
                   </span>
                 </label>
@@ -271,7 +275,7 @@ export function AccessibilityPanel({
           })}
         </ul>
         <p className={styles.hint}>
-          Pour agrandir le texte, utilisez le zoom de votre navigateur (Ctrl + ou ⌘ + sur Mac).
+          {t("a11yMenu.zoomHint")}
         </p>
       </ScrollArea>
       <div className={styles.foot}>
@@ -279,7 +283,7 @@ export function AccessibilityPanel({
             pages, espace connecté compris (qui n'a pas de pied de page) : la
             déclaration s'y atteint de partout. */}
         <LocaleLink href="/accessibilite" className={styles.statementLink} onClick={onNavigate}>
-          Déclaration d&apos;accessibilité
+          {t("a11yMenu.statement")}
         </LocaleLink>
         {/* `aria-disabled` et non `disabled` : le bouton garde le focus après
             avoir servi, au lieu de le jeter au `<body>` en se désactivant. */}
@@ -291,7 +295,7 @@ export function AccessibilityPanel({
             if (settings.length > 0) onReset();
           }}
         >
-          Tout désactiver
+          {t("a11yMenu.resetAll")}
         </button>
       </div>
     </section>

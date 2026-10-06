@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import styles from "./confirm-action-dialog.module.css";
 
 export interface ConfirmActionDialogProps {
@@ -100,6 +101,7 @@ export function ConfirmActionDialog({
   onClose,
   onConfirm,
 }: Readonly<ConfirmActionDialogProps>) {
+  const { t, rich } = useShellText();
   const titleId = useId();
   const bodyId = useId();
   const inputId = useId();
@@ -141,7 +143,11 @@ export function ConfirmActionDialog({
           {requireText === undefined ? null : (
             <div className={`field ${styles.confirmField}`}>
               <label htmlFor={inputId}>
-                Recopie <strong>{requireText}</strong> pour confirmer
+                {richNodes(
+                  rich("confirmDialog.typeToConfirm", { text: requireText }, {
+                    strong: (children) => <strong>{children}</strong>,
+                  }),
+                )}
               </label>
               <input
                 id={inputId}
@@ -161,7 +167,7 @@ export function ConfirmActionDialog({
               disabled={busy}
               data-autofocus={requireText === undefined && !focusContent ? true : undefined}
             >
-              Annuler
+              {t("confirmDialog.cancel")}
             </button>
             <button type="submit" className={tone === "danger" ? "btn danger" : "btn"} disabled={busy || !armed}>
               {busy ? pendingLabel : confirmLabel}

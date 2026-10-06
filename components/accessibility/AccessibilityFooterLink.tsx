@@ -1,5 +1,6 @@
 "use client";
 
+import { useShellText } from "@/components/i18n/shell-text";
 import { requestAccessibilityMenu } from "@/lib/shared/accessibility-menu-request";
 
 interface AccessibilityFooterLinkProps {
@@ -15,9 +16,10 @@ interface AccessibilityFooterLinkProps {
  * l'un sous l'autre ne disaient pas lequel des deux ouvre quoi.
  */
 export function AccessibilityFooterLink({ className }: Readonly<AccessibilityFooterLinkProps>) {
+  const { t } = useShellText();
   return (
     <button type="button" className={className} onClick={(event) => requestAccessibilityMenu(event.currentTarget)}>
-      Réglages d&apos;accessibilité
+      {t("footer.accessibilitySettings")}
     </button>
   );
 }

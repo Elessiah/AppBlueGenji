@@ -10,6 +10,7 @@ import {
   type Countdown,
   type CountdownOverride,
 } from "@/lib/shared/pausable-countdown";
+import { useShellText } from "@/components/i18n/shell-text";
 import styles from "./toast.module.css";
 
 type ToastType = "error" | "success";
@@ -43,6 +44,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
  * des zones montées une fois, que chaque notification remplit d'une ligne.
  */
 export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
+  const { t } = useShellText();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
@@ -80,7 +82,7 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
           ))}
       </div>
       {toasts.length > 0 && (
-        <section className={styles.stack} aria-label="Notifications">
+        <section className={styles.stack} aria-label={t("toast.regionLabel")}>
           {toasts.map((toast) => (
             <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
           ))}
@@ -115,6 +117,7 @@ function isKeyboardFocus(element: Element): boolean {
  * jamais. La barre de progression lit le même état par `data-paused`.
  */
 function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
+  const { t } = useShellText();
   const [override, setOverride] = useState<CountdownOverride>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -150,7 +153,7 @@ function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id
     return () => window.clearTimeout(timer);
   }, [paused, dismissSelf]);
 
-  const kind = toast.type === "error" ? "Erreur" : "Succès";
+  const prefix = t(toast.type === "error" ? "toast.errorPrefix" : "toast.successPrefix");
 
   return (
     <div
@@ -181,15 +184,15 @@ function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id
       }}
     >
       <p className={styles.message}>
-        <span className="sr-only">{kind} : </span>
+        <span className="sr-only">{`${prefix} `}</span>
         {toast.message}
       </p>
       <div className={styles.actions}>
         <button
           type="button"
           className={styles.action}
-          aria-label={manualPause ? "Reprendre le décompte de la notification" : "Mettre en pause la notification"}
-          title={manualPause ? "Reprendre" : "Pause"}
+          aria-label={manualPause ? t("toast.resume") : t("toast.pause")}
+          title={manualPause ? t("toast.resumeTitle") : t("toast.pauseTitle")}
           onClick={() => setOverride(manualPause ? "RUNNING" : "PAUSED")}
         >
           <span aria-hidden="true">{manualPause ? "▶" : "❚❚"}</span>
@@ -197,8 +200,8 @@ function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id
         <button
           type="button"
           className={styles.action}
-          aria-label="Fermer la notification"
-          title="Fermer"
+          aria-label={t("toast.close")}
+          title={t("toast.closeTitle")}
           onClick={dismissSelf}
         >
           <span aria-hidden="true">×</span>
