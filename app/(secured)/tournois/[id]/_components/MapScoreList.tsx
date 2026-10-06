@@ -23,8 +23,10 @@ import type { TournamentGame } from "@/lib/shared/types";
 import { EntrantLogo } from "./EntrantName";
 import styles from "./MapScoreList.module.css";
 
-function keepEnterInList(event: KeyboardEvent<HTMLFieldSetElement>) {
-  if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
+// `Entrée` dans un champ de map ne soumet pas le formulaire : corriger un code
+// puis valider d'un même geste trancherait le match sans relecture.
+function keepEnterInList(event: KeyboardEvent<HTMLInputElement>) {
+  if (event.key === "Enter") event.preventDefault();
 }
 
 interface MapScoreListProps {
@@ -183,9 +185,7 @@ export function MapScoreList({
   };
 
   return (
-    // `Entrée` dans un champ de map ne soumet pas le formulaire : corriger un
-    // code puis valider d'un même geste trancherait le match sans relecture.
-    <fieldset className={styles.list} disabled={disabled} onKeyDown={keepEnterInList}>
+    <fieldset className={styles.list} disabled={disabled}>
       <legend className={styles.legend}>
         Maps jouées{" "}
         <span className={styles.limit}>
@@ -228,6 +228,7 @@ export function MapScoreList({
                     autoComplete="off"
                     autoCapitalize="characters"
                     spellCheck={false}
+                    onKeyDown={keepEnterInList}
                     // Saisie brute : majuscules par la CSS, normalisation à la
                     // validation et au serveur (`normalizeReplayCode`). Réécrire
                     // la valeur à chaque frappe renverrait le curseur en fin de
@@ -251,6 +252,7 @@ export function MapScoreList({
                     min={0}
                     max={MAP_SCORE_MAX}
                     inputMode="numeric"
+                    onKeyDown={keepEnterInList}
                     value={map.team1Score}
                     onValueChange={(value) => update(index, { team1Score: value }, "team1Score")}
                     // Un champ vidé pour être ressaisi n'émet pas de valeur :
@@ -274,6 +276,7 @@ export function MapScoreList({
                     min={0}
                     max={MAP_SCORE_MAX}
                     inputMode="numeric"
+                    onKeyDown={keepEnterInList}
                     value={map.team2Score}
                     onValueChange={(value) => update(index, { team2Score: value }, "team2Score")}
                     // Un champ vidé pour être ressaisi n'émet pas de valeur :

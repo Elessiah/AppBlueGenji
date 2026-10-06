@@ -390,8 +390,8 @@ export function progressiveMapRows(
 ): MatchMapInput[] {
   const rows = trimTrailingBlankMaps(maps);
   if (rows.length === 0) return minRows === 1 ? [emptyMap()] : [];
-  const last = rows[rows.length - 1];
-  if (isMapComplete(last, game) && canAddMap(format, rows)) rows.push(emptyMap());
+  const last = rows.at(-1);
+  if (last && isMapComplete(last, game) && canAddMap(format, rows)) rows.push(emptyMap());
   return rows;
 }
 
