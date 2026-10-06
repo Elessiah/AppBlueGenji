@@ -137,16 +137,17 @@ function refusalWorthShowing(check: MapListCheck, maps: ReadonlyArray<MatchMapIn
 
 /**
  * Le détail adverse s'affiche à part en désaccord, et quand le formulaire ne
- * le reprend pas tel quel (proposition arrivée pendant une saisie).
+ * l'a pas repris (proposition arrivée pendant une saisie) — pas dès qu'une
+ * retouche l'écarte du pré-remplissage : le bloc ferait sauter le champ saisi.
  */
 function theirMapsWorthShowing(
   phase: string | undefined,
   theirMaps: ReadonlyArray<MatchMapInput>,
-  maps: ReadonlyArray<MatchMapInput>,
+  missedProposal: boolean,
 ): boolean {
   if (theirMaps.length === 0) return false;
   if (phase === "CONFLICT") return true;
-  return phase === "THEIRS_PENDING" && !sameMapLists(maps, theirMaps);
+  return phase === "THEIRS_PENDING" && missedProposal;
 }
 
 /** Détail adverse en lecture — seulement pour qui peut le lire (`canReportScore`). */
@@ -220,16 +221,22 @@ export function PlayerScoreDialog({
   // proposition qui arrive (l'adversaire vient d'envoyer la sienne) remplit les
   // champs. Une saisie en cours, elle, n'est jamais écrasée en silence.
   const baseline = useRef(maps);
+  const current = useRef(maps);
+  current.current = maps;
+  // Une proposition arrivée **pendant** une saisie ne la remplace pas : son
+  // détail s'affiche alors à part (`theirMapsWorthShowing`).
+  const [missedProposal, setMissedProposal] = useState(false);
   const signature = reportsSignature(match);
   useEffect(() => {
     const next = playerReportInitialMaps(playerReportView(match, myTeamId));
-    setMaps((current) => {
-      if (JSON.stringify(current) !== JSON.stringify(baseline.current)) return current;
+    const typing = JSON.stringify(current.current) !== JSON.stringify(baseline.current);
+    if (!typing) {
       // Les maps remplacées par la nouvelle proposition : les refus rattachés
       // aux anciennes valeurs ne valent plus.
       fieldErrors.clear();
-      return next;
-    });
+      setMaps(next);
+    }
+    setMissedProposal(typing && !sameMapLists(current.current, next));
     baseline.current = next;
     // `signature` résume exactement ce qui change la valeur d'ouverture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -249,7 +256,7 @@ export function PlayerScoreDialog({
   // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
   // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
   const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? [], detailLoading);
-  const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], maps);
+  const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], missedProposal);
 
   const forfeitMaps = forfeitMapCount(matchFormat);
   const deadline = deadlineText(match.scoreDeadlineAt);

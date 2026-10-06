@@ -137,6 +137,8 @@ export function MapScoreList({
     if (maps.length > 0) document.getElementById(mapFieldId(idPrefix, maps.length - 1, "replayCode"))?.focus();
   }, [maps.length, idPrefix]);
   const add = () => {
+    // Ajouter une map répond souvent au refus d'une autre (match inachevé) : il se lève.
+    fieldErrors.clear();
     keys.current = [...keys.current, newKey()];
     focusNewRow.current = true;
     onChange([...maps, emptyMap()]);
