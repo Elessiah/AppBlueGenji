@@ -98,7 +98,7 @@
       "legendBottom": "Bottom group"
     },
     "survival": {
-      "ariaLabel": "Survival mode: a single standings table, adjacent pairings and the bottom two cut.",
+      "ariaLabel": "Survival (cuts) mode: a single standings table, adjacent pairings and the bottom two cut.",
       "standings": "Round standings",
       "versus": "vs",
       "pairing": "1 vs 2, 3 vs 4…",
@@ -661,7 +661,7 @@
         {
           "title": "Possible combinations",
           "body": [
-            "Swiss and Survival naturally trim the field and can start a cascade. Double elimination is only allowed as the final stage (it needs too many matches to be used earlier)."
+            "Swiss and Survival (cuts) naturally trim the field and can start a cascade. Double elimination is only allowed as the final stage (it needs too many matches to be used earlier)."
           ],
           "bullets": [
             "Workable example: Swiss → Survival (cuts) → single elimination.",
