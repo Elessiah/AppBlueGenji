@@ -96,7 +96,7 @@
   "board": {
     "title": "Tournois en cours et à venir",
     "openCount": "{count, plural, one {# TOURNOI OUVERT} other {# TOURNOIS OUVERTS}}",
-    "emptyEyebrow": "TOURNAMENTS",
+    "emptyEyebrow": "TOURNOIS",
     "emptyTitle": "Aucun tournoi en cours ni à venir pour le moment.",
     "start": "DÉBUT",
     "teams": "ÉQUIPES",
@@ -155,7 +155,7 @@
   },
   "sponsors": {
     "title": "Partenaires et soutiens",
-    "count": "{count} PARTENAIRES",
+    "count": "{count, plural, one {# PARTENAIRE} other {# PARTENAIRES}}",
     "websiteSuffix": "— site du partenaire (nouvel onglet)",
     "tier": {
       "GOLD": "Or",

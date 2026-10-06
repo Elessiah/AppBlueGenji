@@ -116,6 +116,10 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   };
 
   const field = siteCopyField(copyKey);
+  // Français réécrit, anglais laissé tel quel : l'anglais enregistré ne
+  // suivrait plus. Rien n'est refusé (une coquille corrigée ne change pas le
+  // sens), mais l'éditeur le signale avant l'envoi.
+  const enStale = draft.trim() !== entry.fr.trim() && draftEn === entry.en && entry.en !== "";
   const label = field?.label ?? copyKey;
   const staffLang = locale === "fr" ? undefined : "fr";
 
@@ -182,7 +186,11 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
         lang,
         maxLength: field?.maxLength,
         required: true,
-        ...fieldErrors.aria(lang, lang === "en" && entry.enMissing && `${ids.en}-hint`),
+        ...fieldErrors.aria(
+          lang,
+          lang === "en" && entry.enMissing && `${ids.en}-hint`,
+          lang === "en" && enStale && `${ids.en}-stale`,
+        ),
         ref: lang === "fr" ? focusOnMount : undefined,
       };
       return field?.multiline ? (
@@ -211,7 +219,12 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             {entry.enMissing && (
               <span id={`${ids.en}-hint`} className={styles.hint}>
                 Français modifié avant la traduction du site : la page anglaise montre encore l&apos;anglais
-                d&apos;origine. Traduis le texte ci-contre.
+                d&apos;origine. Traduis le texte français.
+              </span>
+            )}
+            {enStale && (
+              <span id={`${ids.en}-stale`} className={styles.hint}>
+                Le français a changé, pas l&apos;anglais : vérifie qu&apos;il dit toujours la même chose.
               </span>
             )}
             <FieldErrorText fieldId={ids.en} message={fieldErrors.message("en")} />

@@ -66,7 +66,7 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<Calen
                     `::after` : la ligne entière mène à la fiche, et le nom
                     accessible du lien reste celui du tournoi — pas la date,
                     le jeu et l'état concaténés. */}
-                <div className={styles.title} title={date.toLocaleString(tag, { dateStyle: "medium", timeStyle: "short", hourCycle: "h23", timeZone: BOARD_TIME_ZONE })}>
+                <div className={styles.title} title={date.toLocaleString(tag, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: BOARD_TIME_ZONE, timeZoneName: "short" })}>
                   <a className={styles.link} href={tournamentMatchHref(event.tournamentId)}>
                     {event.name}
                   </a>
