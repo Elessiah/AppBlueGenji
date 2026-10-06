@@ -250,7 +250,7 @@ export function SwissView({
                             name={team.teamName}
                             title={team.teamName}
                             truncate
-                            textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null) }}
+                            textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null, team.status === "FORFEIT") }}
                           />
                         </span>
                         <span role="cell" className="num" style={{ ...RIGHT, fontWeight: 700 }}>

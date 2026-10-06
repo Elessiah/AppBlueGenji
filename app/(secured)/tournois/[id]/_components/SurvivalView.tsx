@@ -175,7 +175,7 @@ export function SurvivalView({
                     // quelques pixels par les colonnes fixes et le bouton
                     // d'abandon. Il retrecit desormais comme les autres.
                     style={{ flex: "1 1 72px" }}
-                    textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null) }}
+                    textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null, team.status !== "ACTIVE") }}
                   />
                   <span className="mono" style={{ fontSize: 12, color: "var(--ink-quiet)" }}>
                     {team.wins}-<span className="result-loss">{team.losses}</span>

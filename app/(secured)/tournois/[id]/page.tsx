@@ -33,6 +33,7 @@ import {
 } from "@/lib/shared/tournament-rollback";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
+import { PodiumTiersOff } from "@/components/podium-tiers";
 import { PlayerScoreProvider } from "./_lib/player-score-context";
 import { LiveProvider } from "./_lib/live-context";
 import { canPlayersReportScore } from "@/lib/shared/match-launch";
@@ -747,7 +748,10 @@ export default function TournamentDetailPage() {
   // (`isPreLaunchState`), inscriptions closes comprises.
   const previewBlock = detail.preview ? (
     <div className={styles.preview}>
-      <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
+      {/* Outil du staff (têtes de série) : noms sobres, sans marche du podium. */}
+      <PodiumTiersOff>
+        <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
+      </PodiumTiersOff>
     </div>
   ) : null;
 
