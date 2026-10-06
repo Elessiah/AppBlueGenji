@@ -471,6 +471,7 @@ export function EnduranceView({
             <div
               key={standing.teamId}
               className={rowClassName}
+              data-podium-muted={ROW_OPACITY[standing.status] < 1 ? "" : undefined}
               style={{
                 opacity: ROW_OPACITY[standing.status],
                 background: isMine ? "rgba(89,212,255,0.06)" : undefined,

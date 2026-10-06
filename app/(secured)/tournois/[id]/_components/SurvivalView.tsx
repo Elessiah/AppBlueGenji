@@ -148,6 +148,7 @@ export function SurvivalView({
                 <div
                   key={team.teamId}
                   className={styles.survivalRow}
+                  data-podium-muted={team.status === "ELIMINATED" ? "" : undefined}
                   style={{
                     padding: "7px 10px",
                     borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,

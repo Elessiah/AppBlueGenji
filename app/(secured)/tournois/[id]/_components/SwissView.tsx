@@ -220,6 +220,7 @@ export function SwissView({
                       <div
                         key={team.teamId}
                         role="row"
+                        data-podium-muted={team.status === "FORFEIT" ? "" : undefined}
                         style={{
                           ...SUBGRID,
                           alignItems: "center",

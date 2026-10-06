@@ -325,6 +325,18 @@ a {
   -webkit-text-fill-color: var(--blue-100);
 }
 
+/* Ligne en retrait (perdant d'un match, éliminée, forfait) : le repère reste,
+   l'éclat s'éteint — sinon le nom distancé brillerait plus fort que les autres. */
+[data-podium-muted] .podium-tier,
+[data-podium-muted] .podium-member {
+  background-image: none;
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
+  filter: none;
+  animation: none;
+  font-weight: inherit;
+}
+
 /* Contraste renforcé : la lueur s'efface, les lettres restent nettes. */
 :root[data-a11y~="contrast"] .podium-tier {
   filter: none;

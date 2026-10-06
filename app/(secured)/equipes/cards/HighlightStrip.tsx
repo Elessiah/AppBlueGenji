@@ -5,6 +5,7 @@ import {
   RANKING_POINTS_LABEL,
   rankingPointsHint,
 } from "@/lib/shared/ranking";
+import { TeamPodiumName } from "@/components/podium-tiers";
 import s from "./HighlightStrip.module.css";
 
 /**
@@ -32,7 +33,9 @@ export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
           />
           <div className={s.rank}>{String(t.rank).padStart(2, "0")}</div>
           <div>
-            <div className={s.name}>{t.name}</div>
+            <div className={s.name}>
+              <TeamPodiumName teamId={t.id}>{t.name}</TeamPodiumName>
+            </div>
             <div className={s.meta}>
               {t.wins}V – <span className="result-loss">{t.losses}D</span>{t.region ? ` · ${t.region}` : ""}
             </div>
