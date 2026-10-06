@@ -1,8 +1,8 @@
 {
   "meta": {
     "indexTitle": "Tournament rules",
-    "indexDescription": "The rules of every BlueGenji mode: single and double elimination, BlueGenji's Survival, Survival, Swiss and multi-stage — with diagrams and edge cases.",
-    "indexShareDescription": "The rules of every tournament mode, explained with diagrams: single and double elimination, BlueGenji's Survival, Survival, Swiss, multi-stage.",
+    "indexDescription": "The rules of every BlueGenji mode: single and double elimination, BlueGenji's Survival, Survival (cuts), Swiss and multi-stage — with diagrams and edge cases.",
+    "indexShareDescription": "The rules of every tournament mode, explained with diagrams: single and double elimination, BlueGenji's Survival, Survival (cuts), Swiss, multi-stage.",
     "modeTitle": "Rules: {mode}",
     "unknownModeDescription": "The rules of every BlueGenji tournament mode."
   },
@@ -201,7 +201,7 @@
       ],
       "bullets": [
         "In elimination, both teams are out and nobody advances: the next match becomes a walkover for the other qualified team.",
-        "In Swiss and Survival (cuts), each takes a loss; in the BlueGenji's Survival qualifier, each loses the format's full score.",
+        "In Swiss and Survival (cuts), each takes a loss; in the qualifier of BlueGenji's Survival, each loses the format's full score.",
         "In a final, a double forfeit crowns no champion: both finalists are ranked tied 2nd."
       ]
     }
@@ -354,7 +354,7 @@
       "principles": [
         "Each team starts with an endurance pool: a map won raises it, a map lost lowers it.",
         "Hitting zero eliminates you immediately — nobody is eliminated by a cut, only by their own results. That's what sets it apart from <b>Survival (cuts)</b>, where the bottom two are out at regular intervals.",
-        "Once only eight teams are left — or after the announced number of rounds, if the tournament sets one —, the qualifier stops and gives way to a single-elimination bracket."
+        "Once only eight teams are left — or after the announced number of rounds, if the tournament sets one — the qualifier stops and gives way to a single-elimination bracket."
       ],
       "diagramCaption": "Endurance goes up and down with every map; at zero the team is out. The last eight meet in a fixed bracket.",
       "sections": [
