@@ -44,7 +44,9 @@ describe("findBotDocSection", () => {
 
   it("garde les pages publiques accessibles sans rôle", () => {
     expect(findBotDocSection("guide", false)?.file).toBe("helpfr.md");
-    expect(findBotDocSection("user-guide-en", false)?.file).toBe("help.md");
+    // Le guide anglais n'a plus d'entrée à lui : c'est le guide sous `/en`.
+    expect(findBotDocSection("guide", false)?.fileEn).toBe("help.md");
+    expect(findBotDocSection("user-guide-en", false)).toBeNull();
   });
 });
 
@@ -52,7 +54,7 @@ describe("visibleBotDocSections", () => {
   it("filtre les sections réservées au staff pour un visiteur sans rôle", () => {
     const sections = visibleBotDocSections(false);
     expect(sections.every((s) => !s.staffOnly)).toBe(true);
-    expect(sections.map((s) => s.slug)).toEqual(["guide", "user-guide-en"]);
+    expect(sections.map((s) => s.slug)).toEqual(["guide"]);
   });
 
   it("rend toutes les sections au staff", () => {

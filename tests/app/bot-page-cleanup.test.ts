@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { BOT_DOC_SECTIONS } from "@/lib/shared/bot-doc-sections";
+import { FR_BOT_MESSAGES } from "@/lib/shared/bot-text";
 import { readSource } from "../helpers/read-source";
 
 const ROOT = join(__dirname, "..", "..");
@@ -92,7 +93,8 @@ describe("/bot — les commandes renvoient à leur source", () => {
     expect(BOT_DOC_SECTIONS.length).toBeGreaterThan(0);
     for (const section of BOT_DOC_SECTIONS) {
       expect(typeof section.slug).toBe("string");
-      expect(section.summary.length).toBeGreaterThan(0);
+      // Titres et résumés : messages `bot.docs.sections` (lot 5a), un par section.
+      expect(FR_BOT_MESSAGES.docs.sections[section.textKey].summary.length).toBeGreaterThan(0);
     }
   });
 
@@ -122,7 +124,8 @@ describe("/bot — les commandes renvoient à leur source", () => {
     // pages est relu chez le bot. Promettre une « mise à jour continue » de la
     // liste serait la même fausse promesse en plus discret.
     expect(commands).not.toContain("MISE À JOUR CONTINUE");
-    expect(commands).toContain("CONTENU RELU DANS LE DÉPÔT DU BOT");
+    expect(commands).toContain('t("commands.meta")');
+    expect(FR_BOT_MESSAGES.commands.meta).toBe("CONTENU RELU DANS LE DÉPÔT DU BOT");
   });
 });
 
@@ -216,7 +219,8 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     // installé sur trente serveurs était faux, de la même famille que le
     // « BUILD 4f8a » retiré par ailleurs.
     expect(servers).not.toContain("ACTIFS · TRIÉS PAR ACTIVITÉ 30J");
-    expect(servers).toContain("SERVEURS AFFICHÉS");
+    expect(servers).toContain('t("servers.shown", { count: list.length })');
+    expect(FR_BOT_MESSAGES.servers.shown).toContain("SERVEURS AFFICHÉS");
     expect(page).toContain("cachedBotServers(8)");
   });
 
@@ -244,7 +248,7 @@ describe("/bot — la page ne parle plus de modules", () => {
     // testée dans `tests/lib/shared/bot-status-summary.test.ts`.
     const strip = read("components/bot/BotStatusStrip.tsx");
     expect(strip).not.toMatch(/"sub">Tous les modules/);
-    expect(strip).toContain("botStatusSummary(statusLabel)");
+    expect(strip).toContain("botStatusSummary(statusLabel, text)");
   });
 });
 
@@ -281,7 +285,7 @@ describe("/bot — aucune lecture pour rien, aucun cache promis en vain", () => 
     expect(page).not.toContain("@/lib/server/bot-integration");
     expect(page).toContain("@/lib/server/bot-showcase-cache");
     expect(page).toContain("cachedBotActivity()");
-    expect(docsPage).toContain("loadBotDocCached(section)");
+    expect(docsPage).toContain("loadBotDocCached(section, locale)");
     expect(docsPage).not.toMatch(/\bloadBotDoc\(/);
   });
 
