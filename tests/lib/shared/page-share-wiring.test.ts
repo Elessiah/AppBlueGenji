@@ -79,3 +79,15 @@ describe("memberAreaShareMetadata", () => {
     expect(metadata.twitter).toMatchObject({ card: "summary_large_image", images: [`/og/fr/${key}.png`] });
   });
 });
+
+describe("og:image:alt des cartes qui ne montrent pas le titre de l'encart", () => {
+  it("le classement décrit le podium comme son repli", () => {
+    expect(readSource("app/classement/page.tsx")).toContain("shareImageAlt: messages.share.podium.alt");
+  });
+
+  it("une section de la documentation du bot ne nomme pas la section", () => {
+    expect(readSource("app/bot/docs/[[...slug]]/page.tsx")).toContain(
+      "shareImageAlt: `Documentation du bot · ${SITE_NAME}`",
+    );
+  });
+});
