@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
@@ -100,6 +101,8 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   const [draft, setDraft] = useState(entry.fr);
   const [draftEn, setDraftEn] = useState(entry.en);
   const [busy, setBusy] = useState(false);
+  // La remise à l'origine efface le français **et** l'anglais : elle se confirme.
+  const [confirmReset, setConfirmReset] = useState(false);
   const ids: Record<CopyLang, string> = { fr: `copy-${copyKey}`, en: `copy-${copyKey}-en` };
   const fieldErrors = useFieldErrors(SITE_COPY_FIELD_ERRORS, ids);
   // L'éditeur remplace le texte : à sa fermeture, le focus revient au crayon
@@ -107,6 +110,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   const returnFocus = useRef(false);
   const closeEditor = () => {
     fieldErrors.clear();
+    setConfirmReset(false);
     returnFocus.current = true;
     setEditing(false);
   };
@@ -139,7 +143,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
     }
   };
 
-  const reset = async () => {
+  const reset = async (): Promise<boolean> => {
     setBusy(true);
     try {
       const res = await fetch(`/api/site-copy?key=${encodeURIComponent(copyKey)}`, {
@@ -148,13 +152,15 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) {
         refuse(payload.error ?? "", "Échec de la remise à l'origine.");
-        return;
+        return false;
       }
       showSuccess("Texte d'origine rétabli.", staffLang ? { lang: staffLang } : undefined);
       closeEditor();
       router.refresh();
+      return true;
     } catch {
       refuse("", "Erreur réseau, réessaye.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -192,7 +198,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
         <div className={styles.columns}>
           <div className={styles.column}>
             <label className={styles.langLabel} htmlFor={ids.fr}>
-              Français
+              Français (obligatoire)
             </label>
             {control("fr")}
             <FieldErrorText fieldId={ids.fr} message={fieldErrors.message("fr")} />
@@ -212,7 +218,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
           </div>
         </div>
         <div className={styles.actions}>
-          <button type="button" className="btn ghost" onClick={reset} disabled={busy}>
+          <button type="button" className="btn ghost" onClick={() => setConfirmReset(true)} disabled={busy}>
             Rétablir l&apos;original
           </button>
           <span className={styles.spacer} />
@@ -232,6 +238,22 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             {busy ? "Enregistrement…" : "Enregistrer"}
           </button>
         </div>
+        {confirmReset ? (
+          <ConfirmActionDialog
+            title={`Rétablir le texte d'origine : ${label} ?`}
+            confirmLabel="Rétablir l'original"
+            pendingLabel="Remise à l'origine…"
+            contentLang={staffLang}
+            closeOnSuccess={false}
+            onClose={() => setConfirmReset(false)}
+            onConfirm={reset}
+          >
+            <p>
+              Le français <strong>et</strong> l&apos;anglais reviennent tous deux au texte livré avec le
+              site ; ce qui a été saisi ici est perdu.
+            </p>
+          </ConfirmActionDialog>
+        ) : null}
       </fieldset>
     );
   }

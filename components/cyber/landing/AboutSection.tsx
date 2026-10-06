@@ -40,7 +40,9 @@ export function AboutSection({ stats, pillars, isAdmin, copy, locale = DEFAULT_L
         <div className={styles.meta}>{t("about.meta", { year: ORGANIZATION_FOUNDING_YEAR })}</div>
       </div>
 
-      <div className={styles.grid}>
+      {/* Sans chiffres ni piliers (masqués sous `/en` jusqu'au lot 5), une seule
+          colonne : la seconde resterait vide. */}
+      <div className={showStaffContent ? styles.grid : `${styles.grid} ${styles.gridSingle}`}>
         <div className={styles.left}>
           <EditableCopy copyKey="home.about.lede" value={copy["home.about.lede"]} canEdit={isAdmin}>
             <p className={styles.lede}>{copy["home.about.lede"]}</p>
