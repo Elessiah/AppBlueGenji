@@ -170,6 +170,19 @@ describe("liste blanche — la connexion est traduite", () => {
   });
 });
 
+describe("fournisseur des textes", () => {
+  // Pas de DOM ici (environnement `node`) : le contrat se lit dans le source.
+  // Un `router.refresh()` renvoie un nouvel objet `messages` au même contenu ;
+  // un `text` neuf relancerait l'effet de `LoginForm` qui lit `?error=` et
+  // réafficherait le toast du refus.
+  it("garde le même `text` tant que la langue ne change pas", () => {
+    const provider = readSource("components/i18n/login-text.tsx");
+    expect(provider).not.toContain("[locale, messages]");
+    expect(provider).toContain("useState(() => loginText(locale, messages))");
+    expect(provider).toContain("if (value.locale !== locale) setValue(loginText(locale, messages));");
+  });
+});
+
 describe("métadonnées par langue", () => {
   it("anglais : titre, description, canonique, hreflang, toujours noindex", async () => {
     mockLocale = "en";
