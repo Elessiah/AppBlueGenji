@@ -148,9 +148,9 @@ describe("détail map par map — retours de la revue UI/UX", () => {
     expect(hook).toContain("resolve: checkMapList(format, game, maps, { decisive: true }).error,");
   });
 
-  it("un forfait tait les refus de map : la liste est masquée et ses maps ne partent pas", () => {
+  it("un forfait ou une saisie fermée taisent les refus de map : la liste est masquée et ses maps ne partent pas", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(hook).toContain("const mapsSent = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;");
+    expect(hook).toMatch(/const mapsSent =\s*maps\.length > 0 &&\s*options\.scoreEntryClosed !== true &&\s*state\.forfeitTeamId === undefined &&\s*state\.doubleForfeit !== true;/);
     expect(hook).toContain("mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : []),");
     expect(hook).toContain("const sendMaps = mapsSent;");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
