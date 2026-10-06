@@ -116,6 +116,9 @@ import { formatMessage } from "@/lib/shared/message-format";
 import { RECRUITMENT_DOMAIN_LABELS, localizeRecruitmentAds, type RecruitmentAd } from "@/lib/shared/recruitment";
 import { recruitmentClientMessages } from "@/lib/shared/recruitment-text";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
+import { listBenevoles } from "@/lib/server/benevoles-service";
+import { listBureauMembers } from "@/lib/server/bureau-service";
+import { listRecruitmentAds } from "@/lib/server/recruitment-service";
 
 async function render(page: () => Promise<unknown>, locale: Locale): Promise<string> {
   mockLocale = locale;
@@ -280,6 +283,48 @@ describe("rendu anglais — aucune phrase française, contenu du staff sans angl
     mockUser = authUserForMock();
     expect(await render(AssociationPage, "en")).not.toMatch(/aria-label="Déplacer /);
     expect(await render(AssociationPage, "fr")).toMatch(/aria-label="Déplacer /);
+  });
+});
+
+describe("rendu anglais — rien encore traduit : le dire, sans « 0 » ni « aucun »", () => {
+  it("/en/association : le bureau annonce sa version anglaise, sans compteur à zéro", async () => {
+    jest.mocked(listBureauMembers).mockResolvedValueOnce([
+      { id: 2, name: "Bryan Boulleaux", role: "Trésorier", roleEn: null, initials: "BB", color: "c" },
+    ]);
+    const text = readable(await render(AssociationPage, "en"));
+    expect(text).toContain("The English version of the board is on its way.");
+    expect(text).not.toContain("0 MEMBERS");
+  });
+
+  it("/en/benevoles : ni « 0 VOLUNTEERS » ni « No volunteers yet », et pas d'« ajouter le premier » au staff", async () => {
+    mockUser = authUserForMock();
+    jest.mocked(listBenevoles).mockResolvedValueOnce([
+      { id: 3, firstName: "Zoé", pseudo: null, lastName: "Bernard", category: "Développeuse", categoryEn: null, photoUrl: null, joinedAt: "2024-05-01" },
+    ]);
+    const text = readable(await render(BenevolesPage, "en"));
+    expect(text).toContain("The English version of this list is on its way.");
+    expect(text).not.toContain("No volunteers yet.");
+    expect(text).not.toContain("0 VOLUNTEERS");
+    expect(text).not.toContain("Ajouter le premier bénévole");
+  });
+
+  it("/en/recrutement : les annonces arrivent, au lieu de « aucun poste » ou « aucune urgence »", async () => {
+    mockUser = authUserForMock();
+    const all = await listRecruitmentAds();
+    jest.mocked(listRecruitmentAds).mockResolvedValueOnce(all.filter((ad) => ad.titleEn === null));
+    const text = readable(await render(RecrutementPage, "en"));
+    expect(text).toContain("Our openings are being translated into English.");
+    expect(text).not.toContain("No open staff positions right now.");
+    expect(text).not.toContain("0 OPENINGS");
+    expect(text).not.toContain("Publier la première annonce");
+
+    jest.mocked(listRecruitmentAds).mockResolvedValueOnce([
+      ...all.filter((ad) => ad.titleEn !== null).map((ad) => ({ ...ad, priority: "OPTIONAL" as const })),
+      ...all.filter((ad) => ad.titleEn === null).map((ad) => ({ ...ad, priority: "PRIORITY" as const })),
+    ]);
+    const partial = readable(await render(RecrutementPage, "en"));
+    expect(partial).not.toContain("No urgent openings right now.");
+    expect(partial).toContain("Our openings are being translated into English.");
   });
 });
 
