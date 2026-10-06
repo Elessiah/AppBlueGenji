@@ -718,6 +718,24 @@ export type TournamentViewerContext = {
    * Battle.net rattaché (`castBlockReason`, `lib/shared/match-launch.ts`).
    */
   castBlock: CastBlock | null;
+  /**
+   * Détail map par map des propositions **en attente** que ce lecteur a le
+   * droit de lire (`docs/features/MAP_SCORES.md`) : celles des matchs de son
+   * engagé s'il mène le match (`canCreateReportsForTeamIds`), toutes pour
+   * l'arbitrage. Jamais dans l'instantané diffusé : les codes de replay d'une
+   * proposition ne regardent que les deux engagés et le staff.
+   */
+  matchProposals: MatchProposalMaps[];
+};
+
+/** Proposition map par map d'un engagé, datée de son dépôt. */
+export type ProposalMaps = { reportedAt: string; maps: MatchMapResult[] };
+
+/** Détail des propositions en attente sur un match, par côté du plateau. */
+export type MatchProposalMaps = {
+  matchId: number;
+  team1: ProposalMaps | null;
+  team2: ProposalMaps | null;
 };
 
 /** Détail complet d'un tournoi pour un lecteur donné. */

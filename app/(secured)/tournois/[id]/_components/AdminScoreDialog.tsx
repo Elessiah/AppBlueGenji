@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, MatchProposalMaps } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDoubleForfeit, isMatchDrawn, isMatchPlayed } from "@/lib/shared/match-outcome";
@@ -16,6 +16,7 @@ import {
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
+import { useProposalMaps } from "../_hooks/useProposalMaps";
 import { useLiveControls } from "../_lib/live-context";
 import {
   adminProposalNotice,
@@ -62,9 +63,16 @@ function forfeitHint(input: {
 interface AdminScoreDialogProps {
   /** Match **résolu à chaque rendu** depuis la liste rafraîchie par le flux. */
   match: BracketMatch;
+  /** Détail des propositions en attente (contexte du lecteur, `MAP_SCORES.md`). */
+  proposals?: MatchProposalMaps[];
+  /** Relit le contexte du lecteur quand une proposition a changé. */
+  onRefreshProposals?: () => void;
   onClose: () => void;
   onSubmitted: () => void;
 }
+
+const NO_PROPOSALS: MatchProposalMaps[] = [];
+const NO_REFRESH = () => undefined;
 
 /** Résultat déjà enregistré, en une phrase — ou `null` s'il n'y en a pas. */
 function storedResultLabel(match: BracketMatch, team1: string, team2: string): string | null {
@@ -112,7 +120,16 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
 /** Lignes de maps adressables par `useFieldErrors` — au-delà de tout plafond. */
 const MAP_FIELD_ID_SLOTS = 32;
 
-export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<AdminScoreDialogProps>) {
+export function AdminScoreDialog({
+  match: liveMatch,
+  proposals = NO_PROPOSALS,
+  onRefreshProposals = NO_REFRESH,
+  onClose,
+  onSubmitted,
+}: Readonly<AdminScoreDialogProps>) {
+  // Propositions complétées de leur détail map par map : l'arbitre s'ouvre sur
+  // les maps de la proposition unique, et voit celles des deux en désaccord.
+  const match = useProposalMaps(liveMatch, proposals, onRefreshProposals);
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
   // attente de départ » s'ouvre de lui-même à l'heure dite.

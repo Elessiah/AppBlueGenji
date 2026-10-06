@@ -353,8 +353,6 @@ export function attachMatchMaps(
   mapsByMatch: ReadonlyMap<number, { final: MatchMapResult[]; team1: MatchMapResult[]; team2: MatchMapResult[] }>,
 ): BracketMatch[] {
   if (mapsByMatch.size === 0) return matches;
-  const withReport = (report: MatchScoreReport | null, maps: MatchMapResult[]): MatchScoreReport | null =>
-    report && mapsMatchStoredScore(maps, report.team1Score, report.team2Score) ? { ...report, maps } : report;
   return matches.map((match) => {
     const sets = mapsByMatch.get(match.id);
     if (!sets) return match;
@@ -365,9 +363,10 @@ export function attachMatchMaps(
     const final = !forfeited && mapsMatchStoredScore(sets.final, match.team1Score, match.team2Score);
     return {
       ...match,
+      // Les propositions gardent `maps: []` ici : l'instantané part à tous les
+      // abonnés, leur détail ne voyage que dans le contexte des deux engagés et
+      // de l'arbitrage (`loadViewerProposals`, `./match-maps`).
       maps: final ? sets.final : [],
-      team1Report: withReport(match.team1Report, sets.team1),
-      team2Report: withReport(match.team2Report, sets.team2),
     };
   });
 }

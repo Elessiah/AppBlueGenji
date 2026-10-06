@@ -167,7 +167,8 @@ import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
 import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { getTournamentListRow, loadTournamentRow } from "./repository";
-import { reportMatchScore } from "./scoring";
+import { reportMatchScore, type ProposalConfirmation } from "./scoring";
+import { loadViewerProposals } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import type { AdminMapEntry } from "./admin";
@@ -1048,6 +1049,14 @@ export async function getTournamentViewerContext(
   // identité vérifiée (`castBlockReason`).
   const castBlock = await loadViewerCastBlock(userId, canManageLive);
 
+  // Détail des propositions en attente : aux deux engagés qui mènent leur
+  // match, et à l'arbitrage — jamais dans l'instantané diffusé. Calculé ici,
+  // porte commune du flux et de la lecture REST de secours.
+  const reportTeamIds = myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles)) ? [myTeamId] : [];
+  const matchProposals = await withConnection((connection) =>
+    loadViewerProposals(connection, snapshot.matches, { all: canManage, teamIds: reportTeamIds }),
+  );
+
   return {
     preview,
     // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
@@ -1059,13 +1068,13 @@ export async function getTournamentViewerContext(
     // Reporter un score revient à ceux qui mènent le match — capitaine, manager,
     // propriétaire (`reportMatchScore` refuse `NOT_TEAM_MATCH_LEADER`) : un
     // bouton qui mène à un 403 est un bouton qui ment.
-    canCreateReportsForTeamIds:
-      myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles)) ? [myTeamId] : [],
+    canCreateReportsForTeamIds: reportTeamIds,
     isAdmin: canManage,
     canDelete,
     canManageLive,
     viewerUserId: userId,
     castBlock,
+    matchProposals,
   };
 }
 
@@ -1212,13 +1221,14 @@ export async function reportMatchScorePublic(
   matchId: number,
   userId: number,
   maps: ReadonlyArray<MatchMapInput>,
+  confirm?: ProposalConfirmation,
 ): Promise<void> {
   // Deux reports simultanés sur des matchs voisins peuvent s'interbloquer sur
   // `bg_match_maps` : InnoDB annule l'un, qui est rejoué tel quel plutôt que de
   // rendre un 500 à l'équipe.
   await retryOnDeadlock(() =>
     runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-      reportMatchScore(connection, tournamentId, matchId, userId, maps),
+      reportMatchScore(connection, tournamentId, matchId, userId, maps, confirm),
     ),
   );
 }

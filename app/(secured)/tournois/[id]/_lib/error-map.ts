@@ -41,6 +41,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   MAP_SCORE_INVALID: "Score de map invalide.",
   MAP_AFTER_DECISION: "Une map suit la fin du match : le résultat était déjà acquis.",
   INVALID_MAPS: "Détail des maps illisible.",
+  PROPOSAL_STALE: "La proposition adverse a changé ou n'est plus en attente : la fenêtre affiche la version à jour.",
   INVALID_MATCH_FORMAT: "Format de match invalide.",
   INVALID_MATCH_FORMAT_MAX_MAPS:
     "Plafond de maps invalide : il doit rester entre l'objectif du format et son maximum naturel.",

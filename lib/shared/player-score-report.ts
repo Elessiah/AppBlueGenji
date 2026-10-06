@@ -12,7 +12,7 @@
  *
  * Module pur : la carte, la modale et les tests partagent les mêmes décisions.
  */
-import type { BracketMatch, MatchScoreReport } from "./types";
+import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "./types";
 import { isMatchPlayed } from "./match-outcome";
 import { sameMapLists, type MatchMapInput } from "./match-maps";
 
@@ -213,4 +213,37 @@ export function pendingReportNotice(
   if (!report) return null;
   const reporter = team1Report ? match.team1Name ?? "Équipe 1" : match.team2Name ?? "Équipe 2";
   return `${report.team1Score} – ${report.team2Score} proposé par ${reporter} · à confirmer`;
+}
+
+/**
+ * Le match, propositions **complétées de leur détail** map par map lu dans le
+ * contexte du lecteur (`TournamentViewerContext.matchProposals`) : l'instantané
+ * diffusé ne le porte pas (`docs/features/MAP_SCORES.md`). Un détail ne se pose
+ * que sur la proposition dont il porte l'instant de dépôt — sinon il décrirait
+ * une proposition remplacée depuis.
+ */
+export function withProposalMaps<M extends Pick<BracketMatch, "id" | "team1Report" | "team2Report">>(
+  match: M,
+  proposals: ReadonlyArray<MatchProposalMaps>,
+): M {
+  const entry = proposals.find((p) => p.matchId === match.id);
+  if (!entry) return match;
+  const fill = (report: MatchScoreReport | null, side: ProposalMaps | null): MatchScoreReport | null =>
+    report && side && side.reportedAt === report.reportedAt ? { ...report, maps: side.maps } : report;
+  return { ...match, team1Report: fill(match.team1Report, entry.team1), team2Report: fill(match.team2Report, entry.team2) };
+}
+
+/**
+ * Le contexte du lecteur est-il en retard d'une proposition ? Il n'arrive
+ * qu'à la connexion au flux : une proposition déposée depuis se repère à son
+ * instant de dépôt (porté par l'instantané), et se relit par la lecture REST.
+ */
+export function proposalsNeedRefresh(
+  match: Pick<BracketMatch, "id" | "team1Report" | "team2Report">,
+  proposals: ReadonlyArray<MatchProposalMaps>,
+): boolean {
+  const entry = proposals.find((p) => p.matchId === match.id);
+  const stale = (report: MatchScoreReport | null, side: ProposalMaps | null | undefined) =>
+    report !== null && side?.reportedAt !== report.reportedAt;
+  return stale(match.team1Report, entry?.team1) || stale(match.team2Report, entry?.team2);
 }

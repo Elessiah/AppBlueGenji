@@ -315,6 +315,31 @@ async function reportsConcord(
   return otherMaps.length === 0 || sameMapLists(maps, otherMaps);
 }
 
+/** Ce que l'engagé confirme : le dépôt de la proposition adverse qu'il a lue. */
+export type ProposalConfirmation = { reportedAt: string };
+
+/**
+ * La proposition adverse est-elle toujours celle que l'engagé confirme ? Même
+ * instant de dépôt, et — quand elle porte un détail — les mêmes maps que
+ * celles renvoyées. Lève `PROPOSAL_STALE` sinon. La ligne du match est déjà
+ * verrouillée ; le détail adverse est relu sous verrou (la dernière version).
+ */
+async function assertProposalUnchanged(
+  connection: PoolConnection,
+  match: MatchRow,
+  isTeam1Reporter: boolean,
+  maps: ReadonlyArray<MatchMapInput>,
+  confirm: ProposalConfirmation,
+): Promise<void> {
+  const reportedAt = isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at;
+  const score = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
+  if (score === null || score === undefined || toIso(reportedAt ?? null) !== confirm.reportedAt) {
+    throw new Error("PROPOSAL_STALE");
+  }
+  const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
+  if (theirMaps.length > 0 && !sameMapLists(maps, theirMaps)) throw new Error("PROPOSAL_STALE");
+}
+
 /**
  * Score dérivé des maps, vu de l'engagée qui reporte (« mon score », « score
  * adverse » — le contrat des colonnes `teamN_report_*`). Lève le refus de la
@@ -337,6 +362,7 @@ export async function reportMatchScore(
   matchId: number,
   userId: number,
   maps: ReadonlyArray<MatchMapInput>,
+  confirm?: ProposalConfirmation,
 ): Promise<void> {
   const reporterTeamId = await resolveReportingTeamId(connection, tournamentId, userId);
 
@@ -423,6 +449,11 @@ export async function reportMatchScore(
     checkMapList(matchFormat, game, maps, { decisive: true }),
     isTeam1Reporter,
   );
+  // « Confirmer » : la proposition adverse doit être **celle que l'engagé a
+  // vue** — même dépôt, même détail. Elle a pu changer ou partir entre
+  // l'ouverture de la modale et le clic : on refuse plutôt que de clore sur
+  // autre chose que ce qui a été lu (`docs/features/MAP_SCORES.md`).
+  if (confirm) await assertProposalUnchanged(connection, match, isTeam1Reporter, maps, confirm);
 
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).

@@ -1,0 +1,31 @@
+"use client";
+
+import { useEffect, useMemo, useRef } from "react";
+import { proposalsNeedRefresh, withProposalMaps } from "@/lib/shared/player-score-report";
+import type { BracketMatch, MatchProposalMaps } from "@/lib/shared/types";
+
+/**
+ * Le match, propositions complétées de leur détail map par map
+ * (`docs/features/MAP_SCORES.md`) — détail lu dans le contexte du lecteur, que
+ * l'instantané diffusé ne porte pas.
+ *
+ * Ce contexte n'arrive qu'à la connexion au flux (ou par la lecture REST) :
+ * une proposition déposée depuis se repère à son instant de dépôt, porté par
+ * l'instantané, et déclenche **une** relecture par proposition (`onRefresh`).
+ */
+export function useProposalMaps(
+  liveMatch: BracketMatch,
+  proposals: ReadonlyArray<MatchProposalMaps>,
+  onRefresh: () => void,
+): BracketMatch {
+  const match = useMemo(() => withProposalMaps(liveMatch, proposals), [liveMatch, proposals]);
+  const needsRefresh = proposalsNeedRefresh(liveMatch, proposals);
+  const refreshAsked = useRef<string | null>(null);
+  const reportsKey = `${liveMatch.team1Report?.reportedAt ?? ""}|${liveMatch.team2Report?.reportedAt ?? ""}`;
+  useEffect(() => {
+    if (!needsRefresh || refreshAsked.current === reportsKey) return;
+    refreshAsked.current = reportsKey;
+    onRefresh();
+  }, [needsRefresh, reportsKey, onRefresh]);
+  return match;
+}

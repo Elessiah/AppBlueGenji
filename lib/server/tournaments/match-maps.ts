@@ -1,5 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { MatchMapInput, MatchMapResult } from "@/lib/shared/match-maps";
+import { mapsMatchStoredScore, type MatchMapInput, type MatchMapResult } from "@/lib/shared/match-maps";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "@/lib/shared/types";
 
 /**
  * Stockage du détail map par map (`bg_match_maps`, `docs/features/MAP_SCORES.md`).
@@ -252,5 +254,45 @@ function toResult(row: MapRow): MatchMapResult {
     replayCode: String(row.replay_code),
     team1Score: Number(row.team1_score),
     team2Score: Number(row.team2_score),
+  };
+}
+
+/**
+ * Propositions map par map **lisibles par un lecteur** (`TournamentViewerContext.matchProposals`) :
+ * celles des matchs ouverts où un report attend, restreintes aux matchs de ses
+ * engagés (`teamIds`) sauf pour l'arbitrage (`all`). Une requête au plus, et
+ * aucune quand rien n'attend — le cas de presque tous les lecteurs.
+ */
+export async function loadViewerProposals(
+  connection: PoolConnection,
+  matches: ReadonlyArray<BracketMatch>,
+  scope: { all: boolean; teamIds: ReadonlyArray<number> },
+): Promise<MatchProposalMaps[]> {
+  const eligible = matches.filter(
+    (match) =>
+      !isMatchPlayed(match) &&
+      (match.team1Report !== null || match.team2Report !== null) &&
+      (scope.all ||
+        (match.team1Id !== null && scope.teamIds.includes(match.team1Id)) ||
+        (match.team2Id !== null && scope.teamIds.includes(match.team2Id))),
+  );
+  if (eligible.length === 0) return [];
+  const byMatch = await loadMapsByMatch(connection, eligible.map((match) => match.id));
+  return eligible.map((match) => {
+    const sets = byMatch.get(match.id);
+    return {
+      matchId: match.id,
+      team1: proposalOf(match.team1Report, sets?.team1 ?? []),
+      team2: proposalOf(match.team2Report, sets?.team2 ?? []),
+    };
+  });
+}
+
+/** Le détail d'une proposition, s'il explique son score (sinon : aucun). */
+function proposalOf(report: MatchScoreReport | null, maps: MatchMapResult[]): ProposalMaps | null {
+  if (!report) return null;
+  return {
+    reportedAt: report.reportedAt,
+    maps: mapsMatchStoredScore(maps, report.team1Score, report.team2Score) ? maps : [],
   };
 }

@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
-import type { BracketMatch, MatchScoreReport } from "@/lib/shared/types";
+import type { BracketMatch, MatchProposalMaps, MatchScoreReport } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -28,6 +28,7 @@ import {
   playerReportView,
   toReporterScores,
 } from "@/lib/shared/player-score-report";
+import { useProposalMaps } from "../_hooks/useProposalMaps";
 import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
@@ -49,8 +50,16 @@ interface PlayerScoreDialogProps {
   canReportScore: boolean;
   /** Qualité pour déclarer forfait au nom de l'engagé (`OWNER` / `MANAGER`). */
   canForfeit: boolean;
+  /**
+   * Détail map par map des propositions en attente, lu dans le contexte du
+   * lecteur (`TournamentViewerContext.matchProposals`) — l'instantané diffusé
+   * ne le porte pas.
+   */
+  proposals: MatchProposalMaps[];
   onClose: () => void;
   onSubmitted: () => void;
+  /** Relit le contexte du lecteur (lecture REST) : une proposition a changé. */
+  onRefresh: () => void;
 }
 
 /** Empreinte des propositions en attente : ce que le flux peut changer sous la saisie. */
@@ -104,13 +113,18 @@ function deadlineText(iso: string | null): string | null {
  */
 export function PlayerScoreDialog({
   tournamentId,
-  match,
+  match: liveMatch,
   myTeamId,
   canReportScore,
   canForfeit,
+  proposals,
   onClose,
   onSubmitted,
+  onRefresh,
 }: Readonly<PlayerScoreDialogProps>) {
+  // Les propositions complétées de leur détail : la modale s'ouvre sur les maps
+  // de l'adversaire (codes et scores), à confirmer d'un clic.
+  const match = useProposalMaps(liveMatch, proposals, onRefresh);
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
@@ -159,6 +173,9 @@ export function PlayerScoreDialog({
   const relation = enteredScoreRelation(entered, view);
   const unchangedMine = relation.unchangedMine && sameMapLists(maps, view?.mine?.maps ?? []);
   const { confirmsTheirs } = relation;
+  // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
+  // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
+  const confirmsAsIs = confirmsTheirs && sameMapLists(maps, view?.theirs?.maps ?? []);
 
   const forfeitMaps = forfeitMapCount(matchFormat);
   const deadline = deadlineText(match.scoreDeadlineAt);
@@ -193,7 +210,11 @@ export function PlayerScoreDialog({
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ maps }),
+          // « Confirmer » renvoie le dépôt adverse lu ici : le serveur refuse
+          // (`PROPOSAL_STALE`) s'il a changé ou expiré depuis.
+          body: JSON.stringify(
+            confirmsAsIs && view?.theirs ? { maps, confirm: { reportedAt: view.theirs.reportedAt } } : { maps },
+          ),
         },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
@@ -209,6 +230,8 @@ export function PlayerScoreDialog({
       const code = (error as Error).message;
       flagRefusal(code);
       showError(mapError(code));
+      // Proposition changée ou expirée : la modale se recharge sur la nouvelle.
+      if (code === "PROPOSAL_STALE") onRefresh();
     } finally {
       setSubmitting(false);
     }
@@ -259,7 +282,7 @@ export function PlayerScoreDialog({
     }
   })();
 
-  const submitLabel = confirmsTheirs ? "Confirmer le score" : "Envoyer le score";
+  const submitLabel = confirmsAsIs ? "Confirmer" : "Envoyer le score";
   let blocker: string | null = null;
   if (unchangedMine) blocker = `Score déjà envoyé : en attente de ${opponentName}.`;
   else if (check.error) blocker = mapListViolationMessage(check.error, matchFormat, game);
