@@ -286,6 +286,10 @@ anglaise** :
   écrit par une migration de données (ou un script d'exploitation rejoué une fois), **avant**
   d'ajouter la route à la liste blanche — une page anglaise n'ouvre qu'une fois tout son contenu
   traduit.
+- **Clés ajoutées avant le lot 2** (français seul, à bilingualiser et rattraper au lot 2 avec
+  les autres `copy_*`, l'éditeur étant commun) : `ranking.hero.title` et `ranking.hero.lede`
+  (titre et sous-titre de `/classement`, 2026-10-06 — `RANKING_PAGE.md`). Leur anglais doit
+  exister avant que le lot 4 ouvre `/en/classement`.
 
 ### Glossaire (figé au lot 0 dans `docs/features/I18N.md`, D7 et D8 appliqués)
 

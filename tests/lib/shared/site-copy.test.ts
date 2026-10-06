@@ -74,3 +74,26 @@ describe("validateSiteCopy", () => {
     expect(validateSiteCopy(field.key, "x".repeat(field.maxLength)).ok).toBe(true);
   });
 });
+
+describe("en-tête de /classement", () => {
+  it("déclare le titre et le sous-titre, défauts repris du texte d'origine", () => {
+    const defaults = defaultSiteCopy();
+    expect(defaults["ranking.hero.title"]).toBe("Grimpe jusqu'au\nsommet.");
+    expect(defaults["ranking.hero.lede"]).toMatch(/^Chaque match compte\./);
+    for (const key of ["ranking.hero.title", "ranking.hero.lede"]) {
+      expect(isSiteCopyKey(key)).toBe(true);
+      expect(siteCopyField(key)).toMatchObject({ page: "Classement", multiline: true });
+    }
+    expect(siteCopySettingKey("ranking.hero.title")).toBe("copy_ranking.hero.title");
+  });
+
+  it("applique la même validation que les autres textes", () => {
+    const title = siteCopyField("ranking.hero.title")!;
+    expect(validateSiteCopy(title.key, "  Vise\r\nle haut.  ")).toEqual({ ok: true, value: "Vise\nle haut." });
+    expect(validateSiteCopy(title.key, "   ")).toEqual({ ok: false, error: "COPY_EMPTY" });
+    expect(validateSiteCopy(title.key, "x".repeat(title.maxLength)).ok).toBe(true);
+    expect(validateSiteCopy(title.key, "x".repeat(title.maxLength + 1))).toEqual({ ok: false, error: "COPY_TOO_LONG" });
+    const lede = siteCopyField("ranking.hero.lede")!;
+    expect(validateSiteCopy(lede.key, "x".repeat(lede.maxLength + 1))).toEqual({ ok: false, error: "COPY_TOO_LONG" });
+  });
+});

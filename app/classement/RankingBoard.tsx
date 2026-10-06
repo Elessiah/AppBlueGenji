@@ -46,6 +46,13 @@ const FORM_CLASSES: Record<FormResult, string | undefined> = {
 
 const PLACE_LABELS =["1re place", "2e place", "3e place"] as const;
 
+/**
+ * Effet du nom sur le podium, un par marche et de plus en plus sobre : 1re
+ * irisée et animée, 2e givre chromé, 3e liseré néon (RANKING_PAGE.md). Le nom
+ * reste du vrai texte dans son `TeamLink` : l'effet n'est que de la peinture.
+ */
+const PODIUM_NAME_TIERS = [styles.nameTier1, styles.nameTier2, styles.nameTier3] as const;
+
 /** Une défaite se lit dans sa couleur ; zéro défaite reste neutre (`DESIGN_SYSTEM.md`). */
 function lossClass(losses: number): string {
   return losses > 0 ? "result-loss" : styles.neutral;
@@ -120,7 +127,7 @@ function Podium({
               </span>
               <TeamSigil label={row.teamName.charAt(0)} size={40} logoUrl={row.logoUrl} />
             </div>
-            <h3 className={styles.podiumName}>
+            <h3 className={`${styles.podiumName} ${PODIUM_NAME_TIERS[index]}`}>
               <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
                 {row.teamName}
               </TeamLink>

@@ -1,5 +1,6 @@
 /**
- * Textes éditables du site vitrine (accueil + page association).
+ * Textes éditables du site vitrine (accueil, page association, en-tête du
+ * classement).
  *
  * Titres, slogans et descriptions sont d'ordinaire figés dans le JSX. Ce
  * registre les sort du code : chaque entrée déclare une clé de stockage, un
@@ -24,7 +25,9 @@ export type SiteCopyKey =
   | "association.hero.eyebrow"
   | "association.hero.title"
   | "association.manifesto.lede"
-  | "association.membership.lede";
+  | "association.membership.lede"
+  | "ranking.hero.title"
+  | "ranking.hero.lede";
 
 /** Tous les textes de la vitrine, indexés par clé. */
 export type SiteCopy = Record<SiteCopyKey, string>;
@@ -32,7 +35,7 @@ export type SiteCopy = Record<SiteCopyKey, string>;
 export type SiteCopyField = {
   key: SiteCopyKey;
   /** Page concernée, pour regrouper dans l'administration. */
-  page: "Accueil" | "Association";
+  page: "Accueil" | "Association" | "Classement";
   /** Libellé affiché à l'éditeur. */
   label: string;
   defaultValue: string;
@@ -158,6 +161,23 @@ export const SITE_COPY_FIELDS: readonly SiteCopyField[] = [
     label: "Adhérer — accroche",
     defaultValue:
       "L'adhésion fait de vous un membre de l'association. Elle se demande par le bulletin d'adhésion, à partir de 16 ans, pour un an, et reste soumise à l'agrément du bureau.",
+    multiline: true,
+    maxLength: 400,
+  },
+  {
+    key: "ranking.hero.title",
+    page: "Classement",
+    label: "En-tête — titre",
+    defaultValue: "Grimpe jusqu'au\nsommet.",
+    multiline: true,
+    maxLength: 160,
+  },
+  {
+    key: "ranking.hero.lede",
+    page: "Classement",
+    label: "En-tête — sous-titre",
+    defaultValue:
+      "Chaque match compte. Battre plus fort que soi rapporte gros, aller loin en tournoi aussi — la cote de chaque équipe raconte sa saison.",
     multiline: true,
     maxLength: 400,
   },

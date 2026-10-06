@@ -67,7 +67,18 @@ départages ci-dessus tranchent, comme sur la page.
 
 ## Contenu
 
-- **Héros** : « Grimpe jusqu'au sommet. », halo froid animé.
+- **Héros** : titre « Grimpe jusqu'au sommet. » et sous-titre, halo froid
+  animé. Titre et sous-titre sont des **textes éditables** (depuis le
+  2026-10-06) : clés `ranking.hero.title` / `ranking.hero.lede` du registre
+  `site-copy.ts`, modifiables en place par la permission `showcase` avec
+  `<EditableCopy>` — même mécanisme, mêmes limites et mêmes codes d'erreur que
+  l'accueil (`EDITABLE_SITE_COPY.md`). Un retour à la ligne du titre devient
+  `<br />`, la dernière ligne en dégradé ; le `<h1 id="classement-title">` et
+  le `aria-labelledby` de la section restent. Les **métadonnées restent
+  figées** (« Classement des équipes »), comme sur l'accueil et la page
+  association : le titre éditable est une accroche, pas le nom de la page.
+  Français seulement pour l'instant ; le lot 2 de l'i18n rend ces deux clés
+  bilingues (`I18N_MIGRATION_PLAN.md`).
 - **Pastilles de jeu** — Général / Overwatch / Marvel Rivals — en **liens**
   (`?jeu=ow|mr`, `aria-current="page"`), pas en état client : la page est
   rendue côté serveur, partageable et lisible sans JavaScript. Toute autre
@@ -133,6 +144,29 @@ Palette froide seulement (`DESIGN_SYSTEM.md`) :
 | 2e | `--cyan-400` |
 | 3e | `--violet-300` / `--violet-400` |
 
+### Noms du podium (depuis le 2026-10-06)
+
+Le nom de chaque équipe du podium porte un effet propre à sa marche, du plus
+riche au plus sobre (`PODIUM_NAME_TIERS` → `.nameTier1/2/3` sur le `<h3>`) :
+
+| Place | Effet du nom |
+|---|---|
+| 1re | dégradé **irisé** cyan → glacier → violet → rose traversé d'un reflet clair (`--ink`), qui ondule (7 s, `background-position`) ; lueur violette fixe et légère derrière le nom (`::before` en dégradé radial, pas de `filter` : un flou sur le nom animé serait recalculé à chaque image ; un halo serré ferait tomber le contraste au bord des lettres) ; filet irisé de 64 px sous le nom |
+| 2e | **givre chromé** (`--ink-soft` → `--blue-100` → `--ink` → `--blue-300`), reflet plus lent (11 s), halo cyan léger, filet givré de 36 px |
+| 3e | **liseré néon** : `--violet-300` plein, halo violet large et léger (`drop-shadow` 10 px, 0,3 — pas de `text-shadow` serré) ; ni mouvement ni filet |
+
+- Aucun or ni bronze : l'ambre reste réservé aux avertissements
+  (`DESIGN_SYSTEM.md`) ; le prestige passe par l'irisé et le givre.
+- Chaque arrêt de dégradé est un jeton de texte qui tient **4,5:1** sur le fond
+  le plus clair du site (vérifié par le test).
+- Le nom reste du **vrai texte** dans son `TeamLink` (dégradé par
+  `background-clip: text`), nom accessible inchangé ; au survol ou au focus il
+  reprend une couleur pleine (`--blue-100`) et son soulignement.
+- À l'arrêt (mouvement réduit, menu d'accessibilité, régime économe), chaque
+  marche garde sa peinture : la hiérarchie se lit sans animation.
+- Le podium ne montre **aucun nom de joueur** : rien à décorer de ce côté.
+  Hors podium (tableau, autres pages), aucun effet.
+
 Les trois premières lignes du tableau reprennent la couleur de leur marche en
 liseré. Défaites : `--result-loss-ink` (`.result-loss`) **seulement si le
 compte est non nul** — zéro défaite reste neutre (`--ink-dim`) ; même règle
@@ -147,8 +181,10 @@ marche.
 
 ## Animations
 
-Trois boucles décoratives (halo du héros, halo de la 1re, couronne) :
-`transform`/`opacity` seulement, toutes en
+Cinq boucles décoratives (halo du héros, halo de la 1re, couronne, reflet des
+noms de la 1re et de la 2e) : `transform`/`opacity` seulement — sauf le reflet
+des noms, qui ne déplace que `background-position` (aucune mise en page) —,
+toutes en
 `animation-play-state: var(--deco-anim-state)` — en pause en mouvement réduit,
 en régime économe et avant l'hydratation si la préférence système le demande
 (`CLIENT_POWER_MODES.md`). Rien n'apparaît par animation : la page est
@@ -171,6 +207,7 @@ complète sans JavaScript.
 | Rôle | Fichier |
 |---|---|
 | Page (serveur, métadonnées) | `app/classement/page.tsx` |
+| Titre et sous-titre éditables | `lib/shared/site-copy.ts` (`ranking.hero.*`) |
 | Podium + tableau | `app/classement/RankingBoard.tsx` |
 | « Afficher plus » (client) | `app/classement/RankingMore.tsx` |
 | Styles | `app/classement/page.module.css` |
@@ -192,4 +229,8 @@ complète sans JavaScript.
 - `tests/app/ranking-board.test.tsx` — podium, couleurs de défaite, forme,
   colonne des nuls, filtres, panne, animations en pause, plancher 11 px ;
   lien « Afficher plus » sans JavaScript, région d'annonce, rangs absolus et
-  ancres focalisables d'une page suivante.
+  ancres focalisables d'une page suivante ; effet de nom par marche (classe,
+  absence hors podium, contraste des arrêts, hiérarchie du mouvement).
+- `tests/app/classement-page-copy.test.tsx` — en-tête éditable : défauts,
+  textes édités (échappés), crayons réservés à `showcase`, `<h1>` unique,
+  métadonnées figées.
