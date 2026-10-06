@@ -145,11 +145,11 @@ function refusalWorthShowing(check: MapListCheck, maps: ReadonlyArray<MatchMapIn
 function theirMapsWorthShowing(
   phase: string | undefined,
   theirMaps: ReadonlyArray<MatchMapInput>,
-  missedProposal: boolean,
+  form: { missedProposal: boolean; confirmsAsIs: boolean },
 ): boolean {
   if (theirMaps.length === 0) return false;
   if (phase === "CONFLICT") return true;
-  return phase === "THEIRS_PENDING" && missedProposal;
+  return phase === "THEIRS_PENDING" && form.missedProposal && !form.confirmsAsIs;
 }
 
 /** Détail adverse en lecture — seulement pour qui peut le lire (`canReportScore`). */
@@ -263,7 +263,8 @@ export function PlayerScoreDialog({
   // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
   // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
   const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? [], detailLoading);
-  const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], missedProposal);
+  // Le bloc tombe dès que le formulaire porte les maps adverses (recopiées).
+  const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], { missedProposal, confirmsAsIs });
 
   const forfeitMaps = forfeitMapCount(matchFormat);
   const deadline = deadlineText(match.scoreDeadlineAt);

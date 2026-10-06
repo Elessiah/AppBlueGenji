@@ -133,6 +133,26 @@ function derivedScoreHintId(mapCount: number, mapsSetAside: boolean): string | u
 const AWAITING_DETAIL_MESSAGE =
   "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.";
 
+/**
+ * Infobulle d'un bouton, dans l'ordre de la phrase sous les boutons : détail
+ * en lecture, map refusée (sauf sur une ligne vierge ajoutée — même silence),
+ * puis blocage du score.
+ */
+function buttonTitleFor(input: {
+  awaitingDetail: boolean;
+  onBlankRow: boolean;
+  mapRefusal: MapListViolation | null;
+  blocker: ScoreFormBlocker | null | undefined;
+  idle: string;
+  format: MatchFormat | null;
+  game: TournamentGame | null | undefined;
+}): string {
+  if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;
+  if (input.mapRefusal && input.onBlankRow) return input.idle;
+  if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);
+  return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : input.idle;
+}
+
 /** La raison affichée sous les boutons, une seule, dans l'ordre de l'infobulle. */
 function visibleBlocker(input: {
   awaitingDetail: boolean;
@@ -190,11 +210,16 @@ export function AdminScoreDialog({
     mapRefusal: MapListViolation | null,
     blocker: ScoreFormBlocker | null | undefined,
     idle: string,
-  ): string => {
-    if (awaitingDetail) return AWAITING_DETAIL_MESSAGE;
-    if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);
-    return blocker ? scoreBlockerMessage(blocker, matchFormat) : idle;
-  };
+  ): string =>
+    buttonTitleFor({
+      awaitingDetail,
+      onBlankRow: form.mapsRefused.onBlankRow,
+      mapRefusal,
+      blocker,
+      idle,
+      format: matchFormat,
+      game: form.game,
+    });
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });
