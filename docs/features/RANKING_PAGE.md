@@ -144,28 +144,22 @@ Palette froide seulement (`DESIGN_SYSTEM.md`) :
 | 2e | `--cyan-400` |
 | 3e | `--violet-300` / `--violet-400` |
 
-### Noms du podium (depuis le 2026-10-06)
+### Noms du podium (depuis le 2026-10-06, refait le même jour)
 
-Le nom de chaque équipe du podium porte un effet propre à sa marche, du plus
-riche au plus sobre (`PODIUM_NAME_TIERS` → `.nameTier1/2/3` sur le `<h3>`) :
+Le nom de chaque équipe du podium porte sa **marche**, posée sur le `TeamLink`
+par `podiumTier` (classes globales `.podium-tier-N`, **`PODIUM_TIERS.md`**) :
+1re irisée cyan → violet → rose, balayée d'un reflet, aura et couronne ; 2e
+chrome glacier ; 3e néon violet → rose. La première version (`.nameTier1/2/3`
+du module de la page) était trop discrète — la 2e se lisait blanche.
 
-| Place | Effet du nom |
-|---|---|
-| 1re | dégradé **irisé** cyan → glacier → violet → rose traversé d'un reflet clair (`--ink`), qui ondule (7 s, `background-position`) ; lueur violette fixe et légère derrière le nom (`::before` en dégradé radial, pas de `filter` : un flou sur le nom animé serait recalculé à chaque image ; un halo serré ferait tomber le contraste au bord des lettres) ; filet irisé de 64 px sous le nom |
-| 2e | **givre chromé** (`--ink-soft` → `--blue-100` → `--ink` → `--blue-300`), reflet plus lent (11 s), halo cyan léger, filet givré de 36 px |
-| 3e | **liseré néon** : `--violet-300` plein, halo violet large et léger (`drop-shadow` 10 px, 0,3 — pas de `text-shadow` serré) ; ni mouvement ni filet |
-
-- Aucun or ni bronze : l'ambre reste réservé aux avertissements
-  (`DESIGN_SYSTEM.md`) ; le prestige passe par l'irisé et le givre.
-- Chaque arrêt de dégradé est un jeton de texte qui tient **4,5:1** sur le fond
-  le plus clair du site (vérifié par le test).
-- Le nom reste du **vrai texte** dans son `TeamLink` (dégradé par
-  `background-clip: text`), nom accessible inchangé ; au survol ou au focus il
-  reprend une couleur pleine (`--blue-100`) et son soulignement.
-- À l'arrêt (mouvement réduit, menu d'accessibilité, régime économe), chaque
-  marche garde sa peinture : la hiérarchie se lit sans animation.
-- Le podium ne montre **aucun nom de joueur** : rien à décorer de ce côté.
-  Hors podium (tableau, autres pages), aucun effet.
+- **Décision de l'utilisateur (2026-10-06)** : ni or ni bronze ; le style
+  brillant et animé en teintes froides est gardé, rendu nettement visible.
+- La marche est celle **de l'onglet affiché** : un onglet par jeu a son propre
+  podium, que le reste du site ne connaît pas (le site suit le podium
+  « Général »). Le tableau qui suit le podium n'en porte aucune ; sans podium
+  (moins de trois équipes), ses rangs 1 à 3 portent la leur.
+- La même marche suit l'équipe **partout** ailleurs (tournois, annuaire,
+  fiche…), et ses membres en portent une version adoucie — `PODIUM_TIERS.md`.
 
 Les trois premières lignes du tableau reprennent la couleur de leur marche en
 liseré. Défaites : `--result-loss-ink` (`.result-loss`) **seulement si le
@@ -229,8 +223,9 @@ complète sans JavaScript.
 - `tests/app/ranking-board.test.tsx` — podium, couleurs de défaite, forme,
   colonne des nuls, filtres, panne, animations en pause, plancher 11 px ;
   lien « Afficher plus » sans JavaScript, région d'annonce, rangs absolus et
-  ancres focalisables d'une page suivante ; effet de nom par marche (classe,
-  absence hors podium, contraste des arrêts, hiérarchie du mouvement).
+  ancres focalisables d'une page suivante ; marche de l'onglet sur le nom du
+  podium, absente du tableau qui le suit. L'apparence des marches est testée
+  par `tests/app/podium-tiers-style.test.ts` (`PODIUM_TIERS.md`).
 - `tests/app/classement-page-copy.test.tsx` — en-tête éditable : défauts,
   textes édités (échappés), crayons réservés à `showcase`, `<h1>` unique,
   métadonnées figées.
