@@ -156,7 +156,8 @@ describe("détail map par map — retours de la revue UI/UX", () => {
     expect(hook).toContain("mapsRefused: mapRefusals(matchFormat, game, mapsSent ? sentMaps : [], decision),");
     expect(hook).toContain("const sendMaps = mapsSent;");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toContain("if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);");
+    expect(dialog).toContain("if (input.mapRefusal && input.onBlankRow) return input.idle;");
+    expect(dialog).toContain("if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);");
     expect(dialog).toContain("title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker,");
     expect(dialog).toContain("title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker,");
   });
@@ -190,13 +191,14 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
       "if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;",
       "if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);",
       "return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : null;",
-    ].map((line) => dialog.indexOf(line));
+    ].map((line) => dialog.indexOf(line, dialog.indexOf("function visibleBlocker(")));
     expect(order.every((i) => i > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(dialog).toContain("mapRefusal: form.maps.some(isMapTouched) ? mapRefusal : null,");
     // Refus sur une ligne vierge : aucune phrase, ni le refus de map, ni le 0 – 0 dérivé.
     expect(dialog).toContain("blankMaps: mapRefusal !== null && form.mapsRefused.onBlankRow,");
-    expect(dialog.indexOf("if (input.blankMaps) return null;")).toBeLessThan(dialog.indexOf("if (input.mapRefusal) return"));
+    const visible = dialog.slice(dialog.indexOf("function visibleBlocker("));
+    expect(visible.indexOf("if (input.blankMaps) return null;")).toBeLessThan(visible.indexOf("if (input.mapRefusal) return"));
   });
 
   it("une erreur sous un champ ne décale pas la ligne ; le bouton de détail est en retrait", () => {
@@ -299,7 +301,7 @@ describe("détail map par map — saisie au clavier et au toucher", () => {
 
   it("le détail adverse reste visible quand le formulaire ne le reprend pas (saisie commencée)", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain('return phase === "THEIRS_PENDING" && missedProposal;');
+    expect(dialog).toContain('return phase === "THEIRS_PENDING" && form.missedProposal && !form.confirmsAsIs;');
     expect(dialog).toContain("setMissedProposal(typing && !sameMapLists(current.current, next));");
     // L'effet ne fait plus d'effet de bord dans un `setMaps(updater)`.
     expect(dialog).not.toContain("setMaps((current) =>");
