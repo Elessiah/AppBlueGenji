@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
 import {
   decideScoreForm,
@@ -18,8 +18,10 @@ import {
   deriveMatchScore,
   mapListViolationMessage,
   type MapField,
+  type MapListViolation,
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
+import type { MatchFormat } from "@/lib/shared/match-format";
 // « Tranché » se lit sur le statut, pas sur la présence d'un vainqueur : un
 // match nul n'en a pas et est pourtant terminé. Sur `winnerTeamId`,
 // « Enregistrer » restait actif sur une rencontre finie, et la route
@@ -158,6 +160,9 @@ export function useScoreForm(
     scoreEntryClosed: options.scoreEntryClosed === true,
   });
 
+  // Un forfait écarte les maps : elles ne partent pas, et leurs refus se taisent.
+  const mapsSent = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;
+
   const submit = async (action: "save" | "resolve") => {
     if (!match) return false;
 
@@ -166,7 +171,7 @@ export function useScoreForm(
     // les limites. Un forfait les écarte. **Avant** le contrôle du score : une
     // map au score vide ou au code manquant doit être désignée à son champ,
     // pas noyée dans « score incomplet » sur le score qui en dérive.
-    const sendMaps = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;
+    const sendMaps = mapsSent;
     const decisive = action === "resolve";
     if (sendMaps && refuseMaps(decisive)) return false;
     const blocker = action === "save" ? decision.saveBlocker : decision.resolveBlocker;
@@ -224,11 +229,9 @@ export function useScoreForm(
      * actionnable pour que l'envoi **désigne** le champ fautif, au lieu d'un
      * bouton grisé sur « score incomplet » (`refuseMaps`). Porte le motif,
      * que l'infobulle du bouton affiche à la place du blocage de score.
+     * Rien sous un forfait : la liste est masquée et ses maps ne partent pas.
      */
-    mapsRefused: {
-      save: maps.length > 0 ? checkMapList(matchFormat, game, maps, { decisive: false }).error : null,
-      resolve: maps.length > 0 ? checkMapList(matchFormat, game, maps, { decisive: true }).error : null,
-    },
+    mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : []),
     game,
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,
@@ -259,6 +262,19 @@ export function useScoreForm(
  * Corps d'une saisie d'arbitrage : double forfait, forfait, maps, ou score à la
  * main — dans cet ordre de priorité. `null` quand il n'y a rien à envoyer.
  */
+/** Refus des maps qui partiraient, pour l'enregistrement et pour la validation. */
+function mapRefusals(
+  format: MatchFormat | null,
+  game: TournamentGame | null | undefined,
+  maps: ReadonlyArray<MatchMapInput>,
+): { save: MapListViolation | null; resolve: MapListViolation | null } {
+  if (maps.length === 0) return { save: null, resolve: null };
+  return {
+    save: checkMapList(format, game, maps, { decisive: false }).error,
+    resolve: checkMapList(format, game, maps, { decisive: true }).error,
+  };
+}
+
 function adminScoreBody(
   state: ScoreFormState,
   maps: MatchMapInput[] | null,
