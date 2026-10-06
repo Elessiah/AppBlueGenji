@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "title": "Sign in",
+    "description": "Sign in to the BlueGenji Esport member area with your Google account or a Discord code."
+  },
+  "page": {
+    "backHome": "← Back to home",
+    "title": "Sign in",
+    "eyebrow": "BLUEGENJI · MEMBER ACCESS",
+    "codeSeparator": "OR A CODE BY DIRECT MESSAGE",
+    "handleLabel": "Discord tag or ID",
+    "handlePlaceholder": "your_username or 123456789012345678",
+    "handleHelp": "The bot has to share a server with you to message you privately, whether you enter your tag or your ID: the ID only saves the bot from looking up your tag. Not on one of its servers yet? <join>Join us</join> — or just use the Discord button above, which works without a shared server.",
+    "sending": "Sending...",
+    "requestCode": "Get a code →",
+    "codeSent": "Code sent by Discord DM (expires at {time}).",
+    "accountLabel": "Discord account",
+    "tagNotice": "Signing in with this code <strong>saves this tag</strong> without certifying it: it stays hidden from everyone, admins included. If you certify it later in “My profile”, {audience}",
+    "codeLabel": "Code received by DM (6 digits)",
+    "pseudoLabel": "Site username",
+    "pseudoOptional": "(optional, first sign-in)",
+    "pseudoPlaceholder": "Your username",
+    "pseudoHelp": "Only used when your account is created: if you already have one, it keeps its username.",
+    "verifying": "Checking...",
+    "submit": "Sign in",
+    "changeAccount": "← USE ANOTHER ACCOUNT"
+  },
+  "oauth": {
+    "continueWith": "Continue with {provider}",
+    "discordNote": "Saves your Discord username without certifying it: it stays hidden from everyone, admins included. If you certify it later with one click in “My profile”, {audience}",
+    "blizzardNote": "Fills in your BattleTag automatically.",
+    "tagAudience": "admins can see it at any time, referees while you are registered for a tournament that is not finished (from the moment registration opens), and the players and caster of your match for the duration of the match, once it is launched; other players only if you make it visible in your privacy settings. Never anyone else."
+  },
+  "environment": {
+    "notice": {
+      "IOS_INSTALLED_APP": "You are using the site from its home screen icon: iOS often blocks signing in with Google, Discord or Blizzard there. If it fails, open the site in Safari, or use the Discord code by direct message below.",
+      "IN_APP_BROWSER": "You are browsing inside an app's built-in browser, which often blocks signing in with Google, Discord or Blizzard. If it fails, open the site in your usual browser, or use the Discord code by direct message below."
+    },
+    "advice": {
+      "IOS_INSTALLED_APP": "From the home screen icon, iOS isolates the sign-in: open the site in Safari to sign in, or use the Discord code by direct message.",
+      "IN_APP_BROWSER": "This app's built-in browser blocks the sign-in: open the site in your usual browser (Safari, Chrome, Firefox…), or use the Discord code by direct message."
+    }
+  },
+  "errors": {
+    "fallback": "An internal error occurred.",
+    "BOT_INTERNAL_UNREACHABLE": "Discord sign-in unavailable (the bot cannot be reached). You can use Google instead.",
+    "BOT_RESOLVE_TIMEOUT": "The bot could not find your tag in time. If you are on the BlueGenji server, use your Discord ID instead; otherwise, use the Discord button.",
+    "BOT_INTERNAL_UNAUTHORIZED": "Discord sign-in unavailable (invalid internal token). You can use Google instead.",
+    "DISCORD_DM_FAILED": "Could not send you the code by direct message: the bot has to share a server with you, and your DMs must be open there. Join the BlueGenji server, or use the Discord button.",
+    "DISCORD_USER_NOT_FOUND": "Tag not found: the bot has to share a server with you. Join the BlueGenji server, or use the Discord button.",
+    "FAILED_TO_SEND_CODE": "The code could not be sent. Try again in a moment.",
+    "INVALID_DISCORD_HANDLE": "Enter your Discord tag or your ID.",
+    "INVALID_DISCORD_ID": "Invalid Discord ID.",
+    "INVALID_CODE": "The code must be 6 digits.",
+    "CODE_INVALID_OR_EXPIRED": "Invalid or expired code. Ask for a new one.",
+    "TOO_MANY_CODE_REQUESTS": "Too many codes requested for this Discord account. Wait about fifteen minutes, or sign in with Google.",
+    "TOO_MANY_CODE_REQUESTS_TODAY": "Too many codes requested for this Discord account today. Sign in with the Discord button or Google, or try again tomorrow.",
+    "INVALID_CHALLENGE": "Code request not found. Ask for a new code.",
+    "CROSS_SITE_REQUEST": "Request refused. Reload the sign-in page, then try again.",
+    "UNSUPPORTED_CONTENT_TYPE": "Request refused. Reload the sign-in page, then try again.",
+    "TOO_MANY_REQUESTS": "Too many attempts. Wait about fifteen minutes, or sign in with Google.",
+    "DISCORD_AUTH_FAILED": "Discord sign-in failed. Try again in a moment.",
+    "TERMS_REQUIRED": "To create your account, accept the terms of use. Reload the page to see them."
+  },
+  "oauthErrors": {
+    "providerFallback": "OAuth",
+    "not_configured": "{provider} sign-in unavailable: configuration missing. Try another way to sign in.",
+    "unavailable": "{provider} sign-in temporarily unavailable. Try again in a moment.",
+    "params": "{provider} sign-in interrupted. Start the sign-in again from this page.",
+    "state": "Sign-in session expired or invalid. Start the sign-in again.",
+    "oauth": "{provider} sign-in failed. Try again in a moment.",
+    "session": "You need to be signed in to link an app. Sign in, then try again.",
+    "terms": "To create your account, accept the terms of use, then start the sign-in again."
+  },
+  "suspension": {
+    "title": "Account suspended",
+    "spanUntil": "This account is suspended until {end} (decision {reference}): you cannot sign in while the suspension lasts.",
+    "spanIndefinite": "This account is suspended indefinitely (decision {reference}): you cannot sign in while the suspension lasts.",
+    "end": "{day} at {time} (Paris time)",
+    "facts": "Facts found",
+    "ground": "Grounds",
+    "groundText": "Terms of use (in French), <terms>“{clause}”</terms>. Decision made by a member of the moderation team, with no automated processing.",
+    "appeal": "Appeal",
+    "appealText": "Use “Report a problem” at the bottom of any page of the site, category “Autre” (Other — no sign-in needed), quoting decision {reference} and leaving a way to reply to you: the association will review its decision. You can then take the decision to the competent court.",
+    "close": "Close",
+    "loginUntil": "This account is suspended until {end}. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Autre” (Other — no sign-in needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
+    "loginIndefinite": "This account is suspended indefinitely. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Autre” (Other — no sign-in needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
+    "clauses": {
+      "BEHAVIOR": "Behavior",
+      "CONTENT": "Content published by users",
+      "ACCOUNT": "Account"
+    }
+  },
+  "consent": {
+    "eyebrow": "DATA PROTECTION · GDPR",
+    "title": "Before you continue",
+    "intro": "To run your account, BlueGenji processes only the data strictly needed for the service you ask for:",
+    "pseudonyms": "Only <strong>pseudonyms</strong> (site, Discord and game usernames) and an avatar — no real name, phone number or address: an account created through Google now gets a neutral username, never your name, and a photo copied from Google or Discord stays hidden until you choose to show it. <strong>The ID</strong> of the provider you sign in with (Google, Discord or Blizzard) is also kept for authentication.",
+    "gameNames": "Your <strong>Overwatch</strong> and <strong>Marvel Rivals</strong> usernames are only used so other players can add you in game, never to compile statistics.",
+    "noResale": "<strong>No resale</strong> of data, no advertising trackers, no targeted ads.",
+    "discordTag": "Signing in with Discord saves your Discord username <strong>without certifying it</strong>: nobody sees it until you certify it yourself in your profile.",
+    "export": "You can export or delete your data from your profile at any time.",
+    "policy": "Full details in our <policy>privacy policy (in French)</policy>. If you go back, no account is created; only the site's audience measurement may have counted your visit.",
+    "terms": "I have read and accept the terms of use (<terms>read the terms, in French</terms>), and I declare that I am at least {age} years old.",
+    "accept": "Continue",
+    "refuse": "Go back"
+  }
+}

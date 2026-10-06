@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import styles from "./AuthGate.module.css";
@@ -36,6 +37,9 @@ export function AuthGate() {
   const query = searchParams.toString();
   const search = query ? `?${query}` : "";
   const destination = `${pathname}${search}`;
+  // `pathname` garde le préfixe de langue (`/en/…`) : la destination revient
+  // dans la langue lue, et `LocaleLink` mène à la page de connexion de cette
+  // même langue (`/en/connexion` depuis une page anglaise, lot 6).
   const loginHref = `/connexion?redirect=${encodeURIComponent(destination)}`;
 
   return (
@@ -49,7 +53,7 @@ export function AuthGate() {
         </p>
         <div className={styles.actions}>
           <CyberButton asChild>
-            <Link href={loginHref}>Se connecter</Link>
+            <LocaleLink href={loginHref}>Se connecter</LocaleLink>
           </CyberButton>
           <CyberButton variant="ghost" asChild>
             <Link href="/">Retour à l&apos;accueil</Link>

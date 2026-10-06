@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { getCurrentUser } from "@/lib/server/auth";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
 
 /**
@@ -16,17 +18,18 @@ import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
  * restent des liens du site, qu'un robot peut suivre. L'URL canonique n'est pas
  * décorative pour autant : `?redirect=` multiplie l'adresse autant qu'il y a de
  * destinations, et c'est elle qui les ramène à une seule.
+ *
+ * Dans la langue de la page (lot 6) : `/en/connexion` a sa canonique et ses
+ * `hreflang`, toujours `noindex` — et toujours hors du sitemap.
  */
-export const metadata: Metadata = {
-  ...pageMetadata({
-    title: "Connexion",
-    description:
-      "Connexion à l'espace membre BlueGenji Esport, par compte Google ou par code Discord.",
-    path: "/connexion",
-    shareCard: "login",
-  }),
-  robots: { index: false, follow: true },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { meta } = messagesFor(locale).login;
+  return {
+    ...pageMetadata({ title: meta.title, description: meta.description, path: "/connexion", locale, shareCard: "login" }),
+    robots: { index: false, follow: true },
+  };
+}
 
 /**
  * La page porte aussi le pied de page léger : le moyen de signaler un problème

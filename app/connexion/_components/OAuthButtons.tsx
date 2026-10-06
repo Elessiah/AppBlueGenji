@@ -15,9 +15,16 @@
  * passage, que le joueur n'a plus qu'à certifier d'un clic sur `/profil` s'il
  * veut être joignable. La phrase sous le bouton le dit avant le clic — qu'elle
  * **ne certifie pas**, et qui lirait le tag une fois certifié.
+ *
+ * **Langue** : textes du message `login.oauth` ; la langue de la page voyage
+ * jusqu'à la route de départ (`oauthStartPath(…, { locale })`), qui la scelle
+ * dans le cookie d'état — un refus revient sur `/en/connexion`, une réussite
+ * sur la destination en anglais. Les adresses de rappel enregistrées chez
+ * Google, Discord et Blizzard ne changent pas.
  */
 import { CyberButton } from "@/components/cyber/CyberButton";
-import { DISCORD_LOGIN_TAG_NOTICE } from "@/lib/shared/identity-sharing";
+import { useLoginText } from "@/components/i18n/login-text";
+import type { LoginKey } from "@/lib/shared/login-text";
 import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 import {
   OAUTH_PROVIDER_LABELS,
@@ -29,10 +36,13 @@ import {
 /** Ordre d'affichage propre à cet écran, du plus complet au plus spécialisé. */
 const LOGIN_ORDER: readonly OAuthProvider[] = ["DISCORD", "GOOGLE", "BLIZZARD"];
 
-/** Ce que chaque porte apporte en plus d'une session, dit en une ligne. */
-const PROVIDER_NOTES: Partial<Record<OAuthProvider, string>> = {
-  DISCORD: DISCORD_LOGIN_TAG_NOTICE,
-  BLIZZARD: "Renseigne ton BattleTag automatiquement.",
+/**
+ * Ce que chaque porte apporte en plus d'une session, dit en une ligne. La note
+ * Discord reprend `DISCORD_LOGIN_TAG_NOTICE` (égalité du français testée).
+ */
+const PROVIDER_NOTES: Partial<Record<OAuthProvider, LoginKey>> = {
+  DISCORD: "oauth.discordNote",
+  BLIZZARD: "oauth.blizzardNote",
 };
 
 /** Identifiant de l'avertissement de contexte, relié à chaque bouton. */
@@ -53,6 +63,7 @@ export function OAuthButtons({
    */
   environmentNotice?: string | null;
 }>): React.ReactElement {
+  const { t, locale } = useLoginText();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {environmentNotice ? (
@@ -73,7 +84,8 @@ export function OAuthButtons({
         </p>
       ) : null}
       {LOGIN_ORDER.map((provider, index) => {
-        const note = PROVIDER_NOTES[provider];
+        const noteKey = PROVIDER_NOTES[provider];
+        const note = noteKey ? t(noteKey, { audience: t("oauth.tagAudience") }) : null;
         const noteId = `oauth-note-${OAUTH_PROVIDER_SLUGS[provider]}`;
         const describedBy = [environmentNotice ? ENVIRONMENT_NOTICE_ID : null, note ? noteId : null]
           .filter(Boolean)
@@ -99,10 +111,10 @@ export function OAuthButtons({
                 `aria-describedby`, qui complète le nom au lieu de l'écraser.
               */}
               <a
-                href={oauthStartPath(provider, { redirect, termsAccepted })}
+                href={oauthStartPath(provider, { redirect, termsAccepted, locale })}
                 aria-describedby={describedBy || undefined}
               >
-                Continuer avec {OAUTH_PROVIDER_LABELS[provider]}
+                {t("oauth.continueWith", { provider: OAUTH_PROVIDER_LABELS[provider] })}
               </a>
             </CyberButton>
             {note ? (

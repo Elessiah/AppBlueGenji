@@ -19,6 +19,8 @@
  * lui passe ce qu'elle lit de `navigator` et de `matchMedia`.
  */
 
+import { FR_LOGIN_TEXT, type LoginText } from "./login-text";
+
 export type LoginEnvironment = "BROWSER" | "IOS_INSTALLED_APP" | "IN_APP_BROWSER";
 
 export interface LoginEnvironmentSignals {
@@ -58,17 +60,11 @@ export function detectLoginEnvironment(signals: LoginEnvironmentSignals): LoginE
 /**
  * Le conseil à joindre à un échec de connexion, ou `null` quand le contexte
  * n'y est pour rien. Il nomme toujours **deux** sorties : changer de navigateur,
- * ou le code Discord par message privé, qui ne quitte jamais la page.
+ * ou le code Discord par message privé, qui ne quitte jamais la page. Dans la
+ * langue de `text` (messages `login.environment`), le français par défaut.
  */
-export function loginEnvironmentAdvice(environment: LoginEnvironment): string | null {
-  switch (environment) {
-    case "IOS_INSTALLED_APP":
-      return "Depuis l'icône de l'écran d'accueil, iOS isole la connexion : ouvre le site dans Safari pour te connecter, ou utilise le code Discord par message privé.";
-    case "IN_APP_BROWSER":
-      return "Le navigateur intégré de cette application bloque la connexion : ouvre le site dans ton navigateur habituel (Safari, Chrome, Firefox…), ou utilise le code Discord par message privé.";
-    default:
-      return null;
-  }
+export function loginEnvironmentAdvice(environment: LoginEnvironment, text: LoginText = FR_LOGIN_TEXT): string | null {
+  return environment === "BROWSER" ? null : text.t(`environment.advice.${environment}`);
 }
 
 /**
@@ -81,15 +77,8 @@ export function loginEnvironmentAdvice(environment: LoginEnvironment): string | 
  * incapable de nommer la cause. Le seul moment où l'app sait qu'elle l'est,
  * c'est avant de partir.
  */
-export function loginEnvironmentNotice(environment: LoginEnvironment): string | null {
-  switch (environment) {
-    case "IOS_INSTALLED_APP":
-      return "Tu utilises le site depuis l'icône de l'écran d'accueil : iOS y bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans Safari, ou utilise le code Discord par message privé ci-dessous.";
-    case "IN_APP_BROWSER":
-      return "Tu navigues dans le navigateur intégré d'une application, qui bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans ton navigateur habituel, ou utilise le code Discord par message privé ci-dessous.";
-    default:
-      return null;
-  }
+export function loginEnvironmentNotice(environment: LoginEnvironment, text: LoginText = FR_LOGIN_TEXT): string | null {
+  return environment === "BROWSER" ? null : text.t(`environment.notice.${environment}`);
 }
 
 /** Lecture des signaux dans le navigateur. `null` côté serveur. */

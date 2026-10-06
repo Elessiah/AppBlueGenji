@@ -62,6 +62,9 @@ const I18N_MIGRATED_FILES = [
   // Classement (lot 4) — et le bloc de statistiques des fiches, prêt pour le lot 9.
   "app/classement/**",
   "components/stats/**",
+  // Connexion (lot 6) — page, boutons OAuth, exposé de suspension, modale d'entrée.
+  "app/connexion/**",
+  "components/cyber/RgpdConsentModal.tsx",
   "components/ui/confirm-action-dialog.tsx",
   "components/ui/toast.tsx",
 ];
