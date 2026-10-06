@@ -1,0 +1,686 @@
+{
+  "meta": {
+    "indexTitle": "Règles des tournois",
+    "indexDescription": "Les règles de chaque mode BlueGenji : élimination simple et double, BlueGenji Survie, Survie, ronde suisse et multi-phases — schémas et cas particuliers.",
+    "indexShareDescription": "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple et double, BlueGenji Survie, Survie, ronde suisse, multi-phases.",
+    "modeTitle": "Règles : {mode}",
+    "unknownModeDescription": "Les règles de chaque mode de tournoi BlueGenji."
+  },
+  "breadcrumb": {
+    "home": "Accueil",
+    "rules": "Règles des tournois"
+  },
+  "index": {
+    "eyebrow": "RÈGLES · MODES DE TOURNOI",
+    "heroTitle": "Comment se joue",
+    "heroTitleAccent": "un tournoi BlueGenji.",
+    "heroLead": "Chaque tournoi annonce son mode dès la page d'inscription. Le mode détermine le nombre de défaites que l'on peut encaisser, la façon dont les adversaires sont désignés et la manière dont le classement final est établi. Choisis un mode pour en lire les règles détaillées, schémas à l'appui.",
+    "availableEyebrow": "MODES DISPONIBLES",
+    "availableTitle": "Jouables dès maintenant",
+    "availableNote": "Ces formats peuvent être choisis à la création d'un tournoi.",
+    "upcomingEyebrow": "À VENIR",
+    "upcomingTitle": "Bientôt sur la plateforme",
+    "upcomingNote": "Les règles sont déjà consultables : le format ouvrira à la création prochainement.",
+    "commonEyebrow": "TOUS MODES CONFONDUS",
+    "commonTitle": "Règles communes",
+    "commonNote": "Report des scores et forfaits fonctionnent de la même façon partout.",
+    "statusAvailable": "Disponible",
+    "statusSoon": "Bientôt",
+    "readRules": "Lire les règles →"
+  },
+  "mode": {
+    "back": "← Règles des tournois",
+    "soonBanner": "<b>Bientôt disponible.</b> Ce mode n'est pas encore proposé à la création d'un tournoi. Ses règles sont publiées à l'avance pour que les équipes puissent s'y préparer.",
+    "tournamentEyebrow": "CE TOURNOI",
+    "tournamentTitle": "Réglages de « {name} »",
+    "tournamentIntro": "Les valeurs retenues à la création de ce tournoi. Elles priment sur les valeurs par défaut citées plus bas.",
+    "backToTournament": "← Retour au tournoi",
+    "essentialsEyebrow": "EN BREF",
+    "essentialsTitle": "L'essentiel",
+    "detailsEyebrow": "EN DÉTAIL",
+    "detailsTitle": "Règles du mode",
+    "commonEyebrow": "TOUS MODES",
+    "commonTitle": "Règles communes",
+    "commonIntro": "Identiques dans tous les modes : lancement et format des matchs, report des scores, forfaits. Ouvre une règle pour la lire.",
+    "othersEyebrow": "COMPARER",
+    "othersTitle": "Autres modes",
+    "soonTag": "bientôt"
+  },
+  "toc": {
+    "label": "Sommaire des règles",
+    "heading": "Sommaire",
+    "tournament": "Ce tournoi",
+    "essentials": "L'essentiel",
+    "details": "Règles du mode",
+    "common": "Règles communes",
+    "others": "Autres modes"
+  },
+  "diagram": {
+    "scrollLabel": "Schéma : {caption}",
+    "champion": "CHAMPIONNE",
+    "team": "Équipe {name}",
+    "single": {
+      "ariaLabel": "Bracket à élimination simple : quatre quarts de finale, deux demi-finales, une finale.",
+      "quarterFinals": "Quarts",
+      "semiFinals": "Demi-finales",
+      "final": "Finale",
+      "winner": "Vainqueur",
+      "finalist": "Finaliste",
+      "footnote": "Une défaite = sortie du tournoi.",
+      "legendProgress": "Progression du vainqueur",
+      "legendMatch": "Match du tour"
+    },
+    "double": {
+      "ariaLabel": "Double élimination : bracket haut, bracket bas et grande finale.",
+      "upperColumn": "Bracket haut · invaincues",
+      "upperRound1": "Tour 1",
+      "upperRound2": "Tour 2",
+      "upperFinal": "Finale haute",
+      "lowerColumn": "Bracket bas · une défaite",
+      "lowerRound1": "Tour 1 bas",
+      "lowerRound2": "Tour 2 bas",
+      "lowerFinal": "Finale basse",
+      "loser": "perdant",
+      "grandFinal": "Grande finale",
+      "singleMatch": "un seul match",
+      "footnote": "Deux défaites = sortie du tournoi. Pas de belle en grande finale.",
+      "legendUpper": "Bracket haut",
+      "legendLower": "Bracket bas"
+    },
+    "swiss": {
+      "ariaLabel": "Ronde suisse : après chaque ronde, les équipes sont regroupées par score.",
+      "round": "Ronde {number}",
+      "seeding": "Seeding",
+      "wins": "{count, plural, one {# victoire} other {# victoires}}",
+      "group": "{teams} équipes · {matches, plural, one {# match} other {# matchs}}",
+      "footnote": "Personne n'est éliminé : toutes les équipes jouent chaque ronde.",
+      "legendTop": "Groupe de tête",
+      "legendBottom": "Groupe de queue"
+    },
+    "survival": {
+      "ariaLabel": "Mode Survie : classement unique, appariement par paires adjacentes et coupe des deux dernières.",
+      "standings": "Classement de la manche",
+      "versus": "vs",
+      "pairing": "1 vs 2, 3 vs 4…",
+      "reseed": "puis reclassement",
+      "cutLine1": "coupe : les 2",
+      "cutLine2": "dernières sortent",
+      "nextRound": "Manche suivante",
+      "untilChampion": "… jusqu'à la championne.",
+      "oddTitle": "⚖ EFFECTIF IMPAIR",
+      "oddLine1": "Manche 1 : barrage entre les",
+      "oddLine2": "2 dernières, le perdant sort.",
+      "legendPairing": "Appariement",
+      "legendCut": "Zone de coupe",
+      "legendPlayIn": "Barrage"
+    },
+    "multi": {
+      "ariaLabel": "Tournoi multi-phases : chaque phase affine l'effectif. Phase 1 : Ronde suisse 128→64, Phase 2 : Survie 64→16, Phase 3 : Double élimination 16→1.",
+      "phase": "Phase {number}",
+      "finalPhase": "Phase finale",
+      "swiss": "RONDE SUISSE",
+      "survival": "SURVIE",
+      "double": "DOUBLE ÉLIM.",
+      "line1": "Chaque phase joue indépendamment et ne transmet",
+      "line2": "que ses qualifiées à la suivante. Formats combinables",
+      "line3": "pour affiner progressivement le podium.",
+      "legendFlow": "Flux des qualifiées",
+      "legendSize": "Effectif d'une phase"
+    },
+    "bgSurvie": {
+      "ariaLabel": "Mode BlueGenji Survie : capital d'endurance par équipe, élimination à zéro, puis play-offs à huit.",
+      "endurance": "Endurance",
+      "points": "{points} pts",
+      "perMap": "+1 par map gagnée · −1 par map perdue",
+      "atZero": "à 0 : éliminée sur-le-champ",
+      "pairing": "Appariement : 1 vs 2, 3 vs 4…",
+      "tieLine1": "égalité de points : ordre du",
+      "tieLine2": "classement précédent conservé",
+      "playoffs": "Play-offs à 8",
+      "seed": "Seed {number}",
+      "left": "gauche",
+      "right": "droite",
+      "semiFinals": "Demi-finales",
+      "thenFinal": "puis finale",
+      "thirdPlace": "🥉 PETITE FINALE",
+      "withFinal": "jouée avec la finale",
+      "legendEndurance": "Endurance restante",
+      "legendDepleted": "Capital épuisé",
+      "legendThirdPlace": "Petite finale"
+    }
+  },
+  "seedingRule": "Le seeding initial vient du classement du site : chaque équipe part de {basePoints} points, et chaque match en transfère du perdant au vainqueur — d'autant plus que le résultat était improbable. À sa clôture, un tournoi en redistribue à nouveau selon le classement final, d'autant plus que son plateau était relevé. Seed 1 = meilleure équipe.",
+  "common": [
+    {
+      "title": "Lancement d'un match",
+      "body": [
+        "Un match jouable ne commence pas d'emblée : à son heure de début (ou dès qu'il est jouable s'il n'a pas d'horaire), il entre en <b>lancement</b>. Une fenêtre s'ouvre alors pour les joueurs des deux équipes, avec l'équipe hôte et les contacts utiles."
+      ],
+      "bullets": [
+        "Chaque équipe confirme qu'elle est prête — capitaine, manager ou propriétaire ; en tournoi individuel, le joueur lui-même. Le caster inscrit confirme aussi.",
+        "Le match est lancé quand toutes les parties sont prêtes, quand un arbitre le force, ou d'office au bout de {launchDelay} minutes.",
+        "Aucun score ne peut être déclaré avant le lancement."
+      ]
+    },
+    {
+      "title": "Format des matchs",
+      "body": [
+        "Le format des matchs (BO — nombre de maps au maximum — ou FT — nombre de maps à gagner) est fixé à la création et vaut pour tout le tournoi. Sans réglage, le score est libre."
+      ],
+      "bullets": [
+        "Un score qui dépasse le format, ou qui ne désigne pas de vainqueur quand le format en exige un, est refusé à la saisie.",
+        "Le match nul n'existe que si le tournoi l'autorise ; il ne s'applique jamais à un arbre à élimination directe."
+      ]
+    },
+    {
+      "title": "Report des scores",
+      "body": [
+        "Le mécanisme est le même dans tous les modes : chaque équipe déclare le score de son match depuis la page du tournoi, par son capitaine, un de ses managers ou son propriétaire (le joueur lui-même en tournoi individuel)."
+      ],
+      "bullets": [
+        "Deux déclarations concordantes valident le match immédiatement.",
+        "Une seule déclaration ouvre un délai de confirmation de {reportTimeout} minutes, qui ne court qu'après une durée de série plausible depuis le lancement ({minutesPerMap} minutes par map que le format autorise) : sans contestation de l'adversaire, le score est retenu.",
+        "Deux déclarations contradictoires mettent le match en litige : un arbitre tranche et enregistre le score officiel.",
+        "Un arbitre ou un administrateur peut corriger un score tant que la manche suivante n'a reçu aucune saisie ; au-delà, le score est verrouillé, y compris pour lui."
+      ]
+    },
+    {
+      "title": "Forfait",
+      "body": [
+        "Un arbitre peut prononcer le forfait d'une équipe sur un match : la rencontre est résolue en faveur de l'adversaire. Pour elle, c'est une défaite comme une autre : en élimination simple elle sort, en double élimination elle descend au bracket bas, en BlueGenji Survie elle perd le score plein du format et reste en lice avec le capital qui lui reste."
+      ],
+      "bullets": [
+        "En Survie par coupes, en Ronde suisse et en BlueGenji Survie, une équipe peut aussi se retirer du reste du tournoi pendant qu'il est en cours (ou l'arbitre l'en retirer) : elle n'est plus appariée.",
+        "Son classement final tient compte du moment où elle est sortie."
+      ]
+    },
+    {
+      "title": "Double forfait",
+      "body": [
+        "Quand aucune des deux équipes ne se présente, l'arbitre prononce un <b>double forfait</b> : le match est clos sans vainqueur ni score, et les deux équipes le perdent."
+      ],
+      "bullets": [
+        "En élimination, les deux équipes sortent et personne ne monte : le match suivant devient une victoire d'office pour l'autre qualifiée.",
+        "En Ronde suisse et en Survie par coupes, chacune encaisse une défaite ; en qualification BlueGenji Survie, chacune perd le score plein du format.",
+        "En finale, un double forfait ne désigne pas de championne : les deux finalistes sont classées 2ᵉ ex æquo."
+      ]
+    }
+  ],
+  "modes": {
+    "SINGLE": {
+      "label": "Élimination simple",
+      "tagline": "Une défaite et c'est terminé. Le format le plus court et le plus lisible.",
+      "facts": [
+        {
+          "label": "Équipes",
+          "value": "2 à 256"
+        },
+        {
+          "label": "Défaites fatales",
+          "value": "1"
+        },
+        {
+          "label": "Durée",
+          "value": "La plus courte"
+        },
+        {
+          "label": "Option",
+          "value": "Petite finale"
+        }
+      ],
+      "principles": [
+        "Chaque match élimine une équipe : l'effectif est divisé par deux à chaque round.",
+        "Le bracket est dimensionné à la puissance de 2 supérieure au nombre d'inscrites ; les places manquantes deviennent des victoires d'office au premier round.",
+        "En option, les deux perdants des demi-finales s'affrontent pour la 3ᵉ place."
+      ],
+      "diagramCaption": "Bracket à 8 équipes : quarts, demi-finales, finale. Chaque flèche suit le vainqueur.",
+      "sections": [
+        {
+          "title": "Déroulé",
+          "body": [
+            "Au démarrage du tournoi, le bracket complet est généré d'un coup à partir des équipes inscrites. Les matchs d'un round s'ouvrent dès que leurs deux participantes sont connues."
+          ],
+          "bullets": [
+            "Un match perdu = élimination immédiate.",
+            "Le vainqueur avance automatiquement au match suivant, sans intervention d'un arbitre.",
+            "Le tournoi se termine quand la finale est validée."
+          ]
+        },
+        {
+          "title": "Nombre d'équipes non puissance de 2",
+          "body": [
+            "Un bracket ne peut se jouer qu'à 2, 4, 8, 16, 32… équipes. Quand le nombre d'inscrites tombe entre deux paliers, la taille retenue est la puissance de 2 supérieure et les places vides deviennent des victoires d'office (byes)."
+          ],
+          "bullets": [
+            "Une équipe qui reçoit un bye ne joue pas le premier round et rejoint directement le second.",
+            "Exemple : à 7 équipes, le bracket est à 8 — 3 matchs au premier round et 1 bye.",
+            "Exemple : à 5 équipes, le bracket est à 8 — 1 match au premier round et 3 byes."
+          ]
+        },
+        {
+          "title": "Petite finale",
+          "body": [
+            "Option choisie à la création du tournoi, disponible uniquement en élimination simple. Elle ajoute un match entre les deux perdants des demi-finales pour départager la 3ᵉ et la 4ᵉ place."
+          ]
+        },
+        {
+          "title": "Classement final",
+          "body": [
+            "Le classement découle du round atteint : la championne, la finaliste, puis les équipes sorties en demi-finales, en quarts, et ainsi de suite. Avec la petite finale, les 3ᵉ et 4ᵉ places sont départagées sur le terrain."
+          ]
+        }
+      ]
+    },
+    "DOUBLE": {
+      "label": "Double élimination",
+      "tagline": "Un droit à l'erreur : il faut perdre deux fois pour quitter le tournoi.",
+      "facts": [
+        {
+          "label": "Équipes",
+          "value": "2 à 256"
+        },
+        {
+          "label": "Défaites fatales",
+          "value": "2"
+        },
+        {
+          "label": "Durée",
+          "value": "≈ 2× simple élim."
+        },
+        {
+          "label": "Grande finale",
+          "value": "Un seul match"
+        }
+      ],
+      "principles": [
+        "Deux tableaux coexistent : le bracket haut (invaincues) et le bracket bas (une défaite au compteur).",
+        "Perdre dans le bracket haut fait basculer dans le bracket bas ; perdre dans le bracket bas élimine.",
+        "Les deux survivantes se rencontrent en grande finale."
+      ],
+      "diagramCaption": "Bracket haut en bleu, bracket bas en violet : chaque défaite en haut redescend d'un cran.",
+      "sections": [
+        {
+          "title": "Bracket haut et bracket bas",
+          "body": [
+            "Toutes les équipes démarrent dans le bracket haut. La première défaite n'élimine pas : elle fait descendre dans le bracket bas, où le tournoi continue face aux autres équipes déjà tombées."
+          ],
+          "bullets": [
+            "Bracket haut : une défaite = descente dans le bracket bas.",
+            "Bracket bas : une défaite = élimination définitive.",
+            "Le bracket bas alterne les rounds d'intégration (accueil des équipes qui viennent de tomber) et les rounds d'élimination."
+          ]
+        },
+        {
+          "title": "Grande finale",
+          "body": [
+            "La gagnante du bracket haut affronte la survivante du bracket bas. La grande finale se joue en <b>un seul match</b> : il n'y a pas de belle à rejouer si la finaliste issue du bracket bas l'emporte — elle est alors championne."
+          ]
+        },
+        {
+          "title": "Nombre d'équipes non puissance de 2",
+          "body": [
+            "Comme en élimination simple, le bracket est dimensionné à la puissance de 2 supérieure et les places vides deviennent des victoires d'office au premier round du bracket haut."
+          ]
+        },
+        {
+          "title": "Classement final",
+          "body": [
+            "La championne et la finaliste sortent de la grande finale ; les autres sont classées selon le round du bracket bas où elles ont été éliminées — plus une équipe tient, mieux elle est classée."
+          ]
+        }
+      ]
+    },
+    "BG_SURVIE": {
+      "label": "BlueGenji Survie",
+      "tagline": "Un capital d'endurance qui fond à chaque map perdue, puis un arbre à huit. Personne n'est coupé : on sort quand son capital est vide.",
+      "facts": [
+        {
+          "label": "Capital",
+          "value": "9 points par défaut"
+        },
+        {
+          "label": "Barème",
+          "value": "+1 / −1 par map"
+        },
+        {
+          "label": "Élimination",
+          "value": "À 0 point"
+        },
+        {
+          "label": "Play-offs",
+          "value": "8 équipes"
+        }
+      ],
+      "principles": [
+        "Chaque équipe démarre avec un capital d'endurance : une map gagnée le fait monter, une map perdue le fait descendre.",
+        "Tomber à zéro élimine immédiatement — personne n'est éliminé par une coupe, seulement par ses propres résultats. C'est ce qui la distingue de la <b>Survie par coupes</b>, où les deux dernières sortent à intervalle régulier.",
+        "Quand il ne reste que huit équipes — ou au bout du nombre de manches annoncé, si le tournoi en fixe un —, la phase qualificative s'arrête et laisse place à un arbre à élimination directe."
+      ],
+      "diagramCaption": "L'endurance monte et descend à chaque map ; à zéro l'équipe sort. Les huit dernières se rencontrent selon un tableau fixe.",
+      "sections": [
+        {
+          "title": "Classement de départ",
+          "body": [
+            "{seedingRule}",
+            "L'arbitre peut <b>réordonner</b> ce classement tant qu'aucun score n'a été saisi : son ordre prime alors. C'est ce classement qui décide des premiers appariements."
+          ]
+        },
+        {
+          "title": "Phase qualificative — l'endurance",
+          "body": [
+            "Chaque équipe reçoit le même capital de départ (9 points par défaut, réglable à la création). Une victoire de map rapporte un point, une défaite en retire un : un match gagné 3-0 déplace donc trois points, un 3-2 un seul."
+          ],
+          "bullets": [
+            "Une équipe dont le capital atteint zéro est éliminée sur-le-champ.",
+            "Un forfait compte comme le score maximal du format du tournoi : en FT3, l'équipe forfait encaisse un 3-0 et perd trois points d'endurance.",
+            "Le classement est relu avant chaque manche : endurance décroissante, puis — à égalité — l'ordre du classement précédent.",
+            "Les équipes s'affrontent par couples adjacents : 1ʳᵉ contre 2ᵉ, 3ᵉ contre 4ᵉ, et ainsi de suite.",
+            "La mieux classée du couple prend le side gauche, l'autre le side droite.",
+            "Sur un effectif impair, la dernière du classement ne joue pas cette manche : son capital reste intact, sans victoire d'office."
+          ]
+        },
+        {
+          "title": "Le match nul en qualification",
+          "body": [
+            "Overwatch et Marvel Rivals connaissent la <b>map nulle</b>. Le tournoi peut donc ouvrir l'égalité sur sa phase qualificative : un BO5 s'y joue <b>sans tiebreaker</b>, et s'arrête quand les maps sont épuisées — même si personne n'a atteint les trois manches.",
+            "Le capital n'a besoin d'aucune règle de plus : il se compte <b>map par map</b>. Un 2-2 rapporte deux points à chacune et leur en retire deux — donc rien, au barème par défaut. Un 2-1 suit le même calcul, un point net pour la gagnante."
+          ],
+          "bullets": [
+            "N'importe quel score tenant dans le plafond de maps clôt la rencontre : 2-2, 2-1, et jusqu'à 0-0 si aucune map n'a été départagée.",
+            "Une map nulle ne figure dans aucun des deux scores — elle allonge la rencontre sans entamer le plafond.",
+            "Un match nul ne compte ni victoire ni défaite : il apparaît à part au classement, et rompt les séries des fiches d'équipe.",
+            "<b>L'arbre final n'accepte jamais d'égalité</b>, quel que soit le réglage : il lui faut savoir qui joue le tour suivant. Le tournoi peut lui donner son propre format — un vrai FT3, là où la qualification tolère le nul."
+          ]
+        },
+        {
+          "title": "Fin de la phase qualificative",
+          "body": [
+            "La phase s'arrête à la fin de la manche où il ne reste plus que huit équipes (ou moins) : une manche entamée est toujours jouée jusqu'au bout. Sans autre réglage, aucune durée maximale n'est imposée : c'est l'endurance seule qui fait le tri.",
+            "Le tournoi peut cependant annoncer un <b>nombre maximal de manches</b>. La phase s'arrête alors à la manche dite, et les huit premières du classement sont qualifiées — même si elles étaient encore trente en lice. Les autres sortent avec le capital qu'il leur restait : elles ne sont pas « éliminées », elles sont <b>hors course</b>."
+          ],
+          "bullets": [
+            "Sous ce plafond, une équipe qui ne peut plus mathématiquement rejoindre les huit premières dans les manches restantes est écartée sans attendre la fin.",
+            "Le calcul est prudent : il faut que huit équipes la devancent quoi qu'il arrive, en supposant qu'elle gagne tout ce qui reste et qu'elles perdent tout ce qui reste.",
+            "Il suppose donc un format de match connu (BO/FT), qui borne le nombre de maps d'une manche. En saisie libre, aucune équipe n'est jamais écartée d'avance.",
+            "Si cette sortie devait laisser un nombre impair d'équipes en course, elle est reportée d'une manche : un effectif impair condamne une équipe au repos, et on ne pénalise pas une équipe en course pour sortir des équipes déjà condamnées."
+          ]
+        },
+        {
+          "title": "Phase éliminatoire",
+          "body": [
+            "Les huit qualifiées jouent un arbre à élimination directe. Les affrontements ne suivent pas le seeding classique mais un tableau fixe, dans cet ordre d'affichage :"
+          ],
+          "bullets": [
+            "Match 1 : 8ᵉ contre 4ᵉ",
+            "Match 2 : 6ᵉ contre 2ᵉ",
+            "Match 3 : 1ʳᵉ contre 5ᵉ",
+            "Match 4 : 3ᵉ contre 7ᵉ",
+            "L'équipe affichée au-dessus prend le side gauche, celle du dessous le side droite.",
+            "Une petite finale départage la 3ᵉ place, jouée en parallèle de la finale.",
+            "Le vainqueur du match 1 affronte celui du match 2 en demi-finale, le vainqueur du match 3 celui du match 4.",
+            "L'arbre ne connaît pas le match nul : il se joue au format propre aux play-offs s'il en a un, sinon au format du tournoi, égalité fermée."
+          ]
+        },
+        {
+          "title": "Pénalités d'endurance",
+          "body": [
+            "L'arbitrage peut retirer des points de capital sans passer par un score de match : retard, joueur non éligible, conduite antisportive. Chaque sanction porte un motif, public, et figure au journal des sanctions sous le classement."
+          ],
+          "bullets": [
+            "La pénalité s'applique à la manche en cours, après ses matchs : si elle vide le capital, l'équipe est éliminée comme par une défaite.",
+            "Elle peut être levée tant qu'aucune manche suivante n'a reçu de score ; le classement est alors recalculé comme si elle n'avait jamais existé.",
+            "Aucune pénalité ne se pose ni ne se lève une fois l'arbre des play-offs lancé.",
+            "Au classement, « −N » à côté du capital indique ce que les pénalités ont réellement retiré."
+          ]
+        },
+        {
+          "title": "Forfait : deux gestes à ne pas confondre",
+          "body": [
+            "Un forfait ne fait jamais match blanc : il compte pour le score maximal du format du tournoi. En FT3, l'équipe absente encaisse un 3-0 — trois points d'endurance en moins pour elle, trois de plus pour son adversaire — et la rencontre entre au palmarès des deux équipes comme une victoire et une défaite pleines."
+          ],
+          "bullets": [
+            "Forfait sur une manche : l'équipe ne se présente pas à une rencontre. L'arbitre le déclare sur le match ; l'équipe reste engagée et joue la manche suivante avec le capital qui lui reste.",
+            "Forfait sur le reste du tournoi : l'équipe se retire, ou l'arbitre l'en retire. Son capital tombe à zéro, elle ne sera plus appariée, et le classement est aussitôt recalculé — la manche suivante est réappariée en conséquence.",
+            "Dans le tableau manche par manche, une équipe retirée n'affiche plus de capital : ses manches restantes portent « FF » en rouge, à la manière de la feuille de calcul d'arbitrage.",
+            "Le retrait définitif n'est possible que pendant la phase qualificative. Une fois l'arbre des play-offs lancé, un forfait se tranche sur le match, qui fait avancer le tableau."
+          ]
+        }
+      ]
+    },
+    "SURVIVAL": {
+      "label": "Survie par coupes",
+      "tagline": "Un seul groupe, des coupes à cadence fixe, une seule survivante. Ce sont les coupes qui éliminent, pas un capital de points.",
+      "facts": [
+        {
+          "label": "Structure",
+          "value": "Groupe unique"
+        },
+        {
+          "label": "Coupe",
+          "value": "2 dernières"
+        },
+        {
+          "label": "Seed initial",
+          "value": "Classement du site"
+        },
+        {
+          "label": "Effectif impair",
+          "value": "Barrage"
+        }
+      ],
+      "principles": [
+        "Pas d'arbre : toutes les équipes restent dans un même groupe, classé et reclassé à chaque round.",
+        "À chaque round, les équipes sont appariées par paires adjacentes au classement : 1 vs 2, 3 vs 4, 5 vs 6…",
+        "À intervalle régulier, les deux dernières du classement sont éliminées, jusqu'à la championne. À ne pas confondre avec <b>BlueGenji Survie</b>, où chaque équipe sort quand son capital d'endurance est vide, sans coupe."
+      ],
+      "diagramCaption": "Le classement est rejoué à chaque round ; la zone rose est la zone de coupe.",
+      "sections": [
+        {
+          "title": "Classement de départ",
+          "body": [
+            "{seedingRule}"
+          ]
+        },
+        {
+          "title": "Appariement et reclassement",
+          "body": [
+            "Chaque round oppose les équipes deux à deux dans l'ordre du classement courant : la 1ʳᵉ affronte la 2ᵉ, la 3ᵉ affronte la 4ᵉ, et ainsi de suite. Les meilleures se rencontrent donc entre elles, les plus fragiles aussi."
+          ],
+          "bullets": [
+            "Après chaque round, le classement est recalculé : victoires (décroissant), puis défaites (croissant), puis seed initial.",
+            "Une équipe qui gagne remonte et affrontera plus fort ; une équipe qui perd descend vers la zone de coupe."
+          ]
+        },
+        {
+          "title": "Coupes",
+          "body": [
+            "La cadence est fixée à la création du tournoi, en deux réglages : le nombre de manches avant la <b>première</b> coupe, puis l'intervalle entre les coupes suivantes. On peut ainsi laisser le classement se former avant d'éliminer, puis accélérer. À chaque coupe, les <b>deux dernières équipes</b> du classement sortent."
+          ],
+          "bullets": [
+            "La zone de coupe est signalée en direct dans le classement : on sait toujours qui est au bord du tableau.",
+            "Quand il ne resterait plus personne, la coupe n'élimine qu'une équipe : il y a toujours une championne unique."
+          ]
+        },
+        {
+          "title": "Nombre d'équipes impair : le barrage",
+          "body": [
+            "Un effectif impair obligerait à distribuer une victoire d'office à chaque round — et comme une coupe retire deux équipes, l'effectif resterait impair jusqu'au bout. Le mode corrige donc la parité dès l'ouverture."
+          ],
+          "bullets": [
+            "Inscriptions impaires : le round 1 est un barrage entre les deux dernières du classement, le perdant est éliminé. Les autres équipes entrent en lice au round suivant.",
+            "Le barrage ne compte pas dans la cadence des coupes : elle démarre au premier round complet.",
+            "Si un forfait recasse la parité en cours de tournoi, la coupe suivante n'élimine qu'une équipe au lieu de deux pour revenir à un effectif pair.",
+            "Conséquence : hors forfait, aucune victoire d'office n'est distribuée, quel que soit le nombre d'inscrites."
+          ]
+        },
+        {
+          "title": "Classement final",
+          "body": [
+            "La championne obtient le rang 1. Les autres sont classées par round d'élimination décroissant — sortir tard vaut mieux que sortir tôt — puis par victoires, défaites et seed initial."
+          ]
+        }
+      ]
+    },
+    "SWISS": {
+      "label": "Ronde suisse",
+      "tagline": "Un nombre de rondes fixe, aucune élimination, un classement fiable en peu de matchs.",
+      "facts": [
+        {
+          "label": "Équipes",
+          "value": "2 à 256"
+        },
+        {
+          "label": "Élimination",
+          "value": "Aucune"
+        },
+        {
+          "label": "Rondes",
+          "value": "⌈log₂(N)⌉ + 1"
+        },
+        {
+          "label": "Départages",
+          "value": "Buchholz & co."
+        }
+      ],
+      "principles": [
+        "Toutes les équipes jouent le même nombre de rondes, fixé à l'avance : personne n'est éliminé en cours de route.",
+        "À chaque ronde, on affronte une équipe ayant le même nombre de points que soi.",
+        "Le classement final se lit aux points, départagés par la difficulté du parcours."
+      ],
+      "diagramCaption": "Après chaque ronde, les équipes se regroupent par score et s'affrontent à l'intérieur de leur groupe.",
+      "sections": [
+        {
+          "title": "Principe",
+          "body": [
+            "Le système suisse produit un classement fiable avec beaucoup moins de matchs qu'un championnat complet : au lieu d'affronter tout le monde, chaque équipe affronte à chaque ronde une adversaire de niveau équivalent au tournoi."
+          ],
+          "bullets": [
+            "Le nombre de rondes est fixé à la création (recommandation : ⌈log₂(nombre d'équipes)⌉ + 1, proposée par défaut).",
+            "Aucune élimination : une équipe qui perd ses premiers matchs joue quand même jusqu'au bout.",
+            "Le barème est réglable à la création : 3 points la victoire, 1 le nul, 0 la défaite par défaut."
+          ]
+        },
+        {
+          "title": "Première ronde",
+          "body": [
+            "{seedingRule}"
+          ],
+          "bullets": [
+            "La moitié haute du seeding affronte la moitié basse : la 1ʳᵉ rencontre la (N/2 + 1)ᵉ, et ainsi de suite.",
+            "Les têtes de série ne s'éliminent donc pas entre elles dès l'ouverture."
+          ]
+        },
+        {
+          "title": "Appariements des rondes suivantes",
+          "body": [
+            "Les équipes sont regroupées par nombre de points et appariées à l'intérieur de leur groupe. Le tirage explore les combinaisons possibles pour éviter les rematchs, quitte à piocher dans le groupe voisin quand un groupe est bloqué."
+          ],
+          "bullets": [
+            "Les invaincues jouent contre les invaincues, celles à une défaite entre elles, etc.",
+            "Deux équipes ne se rencontrent jamais deux fois tant qu'une autre combinaison existe.",
+            "Si l'effectif est impair, une équipe reçoit une victoire d'office, qui vaut exactement une victoire — attribuée à la plus basse du classement n'en ayant pas encore reçu.",
+            "Une correction de score en amont réapparie automatiquement la ronde suivante, tant qu'aucun score n'y a été saisi."
+          ]
+        },
+        {
+          "title": "Classement et départages",
+          "body": [
+            "Le classement se fait aux points, recalculé après chaque match. À égalité, les départages mesurent la difficulté du parcours plutôt que le hasard des appariements ; ils s'appliquent dans cet ordre :"
+          ],
+          "bullets": [
+            "Buchholz : somme des points des adversaires rencontrés.",
+            "Sonneborn-Berger : somme des points des adversaires battus (moitié pour un nul).",
+            "Pourcentage de victoires des adversaires rencontrés.",
+            "Confrontation directe entre les équipes à départager.",
+            "En dernier ressort, le seed initial — jamais un tirage au sort."
+          ]
+        },
+        {
+          "title": "Abandon",
+          "body": [
+            "Comme en Survie par coupes, une équipe peut quitter le tournoi en cours de route. Elle conserve les points déjà acquis mais n'est plus appariée, et passe derrière toutes les équipes encore en lice au classement final."
+          ]
+        },
+        {
+          "title": "Classement final",
+          "body": [
+            "Le tournoi se termine à l'issue de la dernière ronde prévue : la tête du classement est championne. Il n'y a pas de finale — le classement fait foi."
+          ]
+        }
+      ]
+    },
+    "MULTI": {
+      "label": "Tournoi multi-phases",
+      "tagline": "Plusieurs phases enchaînées, chacune éliminant les plus faibles, jusqu'à la championne.",
+      "facts": [
+        {
+          "label": "Phases",
+          "value": "2 à 8"
+        },
+        {
+          "label": "Qualification",
+          "value": "Nombre ou %"
+        },
+        {
+          "label": "Formats",
+          "value": "Combinables"
+        },
+        {
+          "label": "Finalité",
+          "value": "Une championne"
+        }
+      ],
+      "principles": [
+        "Chaque phase se joue dans son propre format et ne transmet que ses qualifiées à la suivante.",
+        "La qualification peut être fixe (un nombre d'équipes) ou adaptative (un pourcentage de l'effectif réel).",
+        "La dernière phase désigne la championne ; les autres équipes sont classées par la phase la plus avancée qu'elles ont atteinte, puis par leur rang dans cette phase."
+      ],
+      "diagramCaption": "Exemple : ronde suisse (128 → 64), survie (64 → 16), double élimination (16 → 1). Chaque phase affine le podium.",
+      "sections": [
+        {
+          "title": "Enchaînement des phases",
+          "body": [
+            "Le tournoi se divise en une succession de phases numérotées. Chaque phase joue indépendamment dans son format (simple élimination, double élimination, suisse, survie) et établit son propre classement."
+          ],
+          "bullets": [
+            "Seules les qualifiées de la phase N accèdent à la phase N+1.",
+            "Les équipes non qualifiées quittent le tournoi, leur rang final fixé par la dernière phase qu'elles ont atteinte.",
+            "La dernière phase désigne la championne et tout le podium final."
+          ]
+        },
+        {
+          "title": "Qualification : nombre fixe ou pourcentage",
+          "body": [
+            "Chaque phase définit le nombre d'équipes qui avancent vers la suivante. Deux réglages sont possibles :"
+          ],
+          "bullets": [
+            "<b>Nombre fixe</b> (ex. 64 équipes) : la phase cherche à éliminer jusqu'à ce qu'il en reste 64. Si l'effectif réel est déjà ≤ 64, la phase saute et tout le groupe avance. Un effectif fixe sur une élimination simple est arrondi à la puissance de 2 inférieure ou égale.",
+            "<b>Pourcentage</b> (ex. 50%) : la phase adapte dynamiquement — si 128 équipes entrent, 64 sortent ; si 100 entrent, 50 sortent."
+          ]
+        },
+        {
+          "title": "Combinaisons possibles",
+          "body": [
+            "La ronde suisse et la survie coupent naturellement l'effectif et peuvent commencer une cascade. La double élimination est autorisée uniquement en phase finale (elle demande trop de matchs pour être utilisée en amont)."
+          ],
+          "bullets": [
+            "Exemple viable : ronde suisse → survie → simple élimination.",
+            "Exemple viable : simple élimination → double élimination (dernière phase).",
+            "Non viable : ronde suisse → double élimination (sauf si c'est la dernière phase)."
+          ]
+        },
+        {
+          "title": "Classement final",
+          "body": [
+            "Le classement se construit du haut vers le bas : d'abord par la phase atteinte (plus tard = mieux), puis par le rang dans cette phase."
+          ],
+          "bullets": [
+            "La gagnante de la dernière phase = classement 1ʳ.",
+            "Une équipe éliminée en phase 3 rank 2 devance une équipe éliminée en phase 2 rank 1.",
+            "À égalité de phase et rang, les départages se font sur les victoires et défaites au sein de la phase."
+          ]
+        }
+      ]
+    }
+  }
+}

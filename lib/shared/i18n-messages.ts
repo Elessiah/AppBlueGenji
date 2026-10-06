@@ -12,14 +12,17 @@
  */
 import type frCommon from "@/messages/fr/common.json";
 import type frShell from "@/messages/fr/shell.json";
+import type frRules from "@/messages/fr/rules.json";
 
-export const MESSAGE_NAMESPACES = ["common", "shell"] as const;
+export const MESSAGE_NAMESPACES = ["common", "shell", "rules"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
   common: typeof frCommon;
   /** Coquille partagée (en-têtes, pieds de page, menus, notifications, pages d'erreur) — `components/i18n/shell-text.tsx`. */
   shell: typeof frShell;
+  /** Pages `/regles` et `/regles/[slug]` : registre des modes, schémas, sommaire — `lib/shared/tournament-rules.ts`. */
+  rules: typeof frRules;
 };
 
 /**
