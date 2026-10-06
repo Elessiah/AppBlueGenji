@@ -608,7 +608,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Chaque map d'un match porte son score et son code de replay ; le score du match en découle.",
       "Un code de replay permet de revoir la partie en jeu, et d'y lire les identifiants de jeu des joueurs présents.",
-      "Les codes sont visibles des membres connectés sur la fiche du tournoi, et gardés avec le résultat qu'ils documentent.",
+      "Les codes du résultat retenu sont visibles des membres connectés sur la fiche du tournoi ; ceux d'une proposition en attente, des seules deux équipes du match et de l'arbitrage. Ils sont gardés avec le résultat qu'ils documentent.",
       "Le site retient quel compte a saisi le détail ; ce lien est effacé à la suppression du compte.",
     ],
     links: [{ href: "/rgpd", label: "Lire la politique de confidentialité" }],
