@@ -30,6 +30,16 @@ describe("middleware — route non traduite sous /en", () => {
     expect(response.headers.get("location")).toBe(`${PUBLIC}/route-jamais-traduite`);
   });
 
+  it("sans APP_URL (développement, E2E), renvoie sur l'origine de la requête", () => {
+    delete process.env.APP_URL;
+    try {
+      const response = middleware(new NextRequest("http://localhost:3100/en/route-jamais-traduite"));
+      expect(response.headers.get("location")).toBe("http://localhost:3100/route-jamais-traduite");
+    } finally {
+      process.env.APP_URL = PUBLIC;
+    }
+  });
+
   it.each(["/en//evil.example/x", "/en/%5Cevil.example", "/fr//evil.example"])(
     "ne sort jamais du site (%s)",
     (path) => {
