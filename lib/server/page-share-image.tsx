@@ -17,7 +17,9 @@ import { ShareTeamMark } from "@/components/og/share-team-mark";
 import { messagesFor } from "./i18n-messages";
 import { shareCardLogo } from "./share-card-logo";
 import { loadSharePodium } from "./share-podium";
-import { loadShareTeam, TEAM_SHARE_LOGO_SIZE } from "./share-team";
+import { cachedShareImage } from "./share-image-cache";
+import { findShareTeam, loadShareTeam, TEAM_SHARE_LOGO_SIZE } from "./share-team";
+import { RANKING_TTL_MS } from "./ranking-cache";
 import type { Locale } from "@/lib/shared/locales";
 import {
   parseTeamShareCardKey,
@@ -40,8 +42,46 @@ export const PODIUM_CARD_CACHE_CONTROL = "public, max-age=300";
 /** Clé de la carte qui porte le podium. */
 const PODIUM_CARD_KEY = "ranking";
 
-/** Rend la carte `key` dans `locale` ; `null` pour une clé inconnue. */
-export async function renderPageShareImage(key: string, locale: Locale): Promise<ImageResponse | null> {
+/** Carte générique d'une fiche d'équipe : le repli de toute clé `team-<id>`. */
+const GENERIC_TEAM_CARD_KEY = "team";
+
+/** Fenêtre d'une carte fixe en mémoire : son texte ne change qu'au déploiement. */
+const STATIC_CARD_TTL_MS = 60 * 60_000;
+
+/**
+ * Sert la carte `key` dans `locale` (route `/og/<langue>/<clé>.png`) : le PNG
+ * gardé en mémoire s'il est frais (`cachedShareImage`), sinon rendu une fois.
+ * `null` pour une clé inconnue.
+ *
+ * - Podium et équipe nominative suivent le classement (`RANKING_TTL_MS`).
+ * - Une clé `team-<id>` hors du classement public partage la carte générique
+ *   `team` (une seule entrée, quel que soit l'identifiant), servie en cache
+ *   court : l'équipe peut y entrer.
+ */
+export async function renderPageShareImage(key: string, locale: Locale): Promise<Response | null> {
+  const teamId = parseTeamShareCardKey(key);
+  let cacheKey = key;
+  let ttlMs = STATIC_CARD_TTL_MS;
+  let cacheControl: string | null = null;
+  if (key === PODIUM_CARD_KEY) {
+    ttlMs = RANKING_TTL_MS;
+  } else if (teamId !== null) {
+    if (await findShareTeam(teamId)) {
+      ttlMs = RANKING_TTL_MS;
+    } else {
+      cacheKey = GENERIC_TEAM_CARD_KEY;
+      cacheControl = PODIUM_CARD_CACHE_CONTROL;
+    }
+  }
+  const image = await cachedShareImage(`${locale}:${cacheKey}`, ttlMs, () => buildPageShareImage(cacheKey, locale));
+  if (!image) return null;
+  return new Response(image.body, {
+    headers: { "content-type": "image/png", "cache-control": cacheControl ?? image.cacheControl },
+  });
+}
+
+/** Rend la carte `key` dans `locale`, sans cache ; `null` pour une clé inconnue. */
+export async function buildPageShareImage(key: string, locale: Locale): Promise<ImageResponse | null> {
   const messages = messagesFor(locale);
   const modeTexts = new Map(localizedRuleModes(messages.rules).map((mode) => [mode.slug, mode]));
   const card = resolvePageShareCard(key, messages.share, modeTexts);

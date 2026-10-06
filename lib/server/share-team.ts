@@ -26,7 +26,7 @@ import { RANKING_MAX_SHOWN } from "@/lib/shared/ranking-page";
 /** Côté du logo converti : la taille du motif de la carte (208 px). */
 export const TEAM_SHARE_LOGO_SIZE = 208;
 
-type ShareTeamRow = TeamShareInput & { logoUrl: string | null };
+export type ShareTeamRow = TeamShareInput & { logoUrl: string | null };
 
 type GhostRow = RowDataPacket & { id: number };
 
@@ -52,21 +52,29 @@ async function computeShareTeams(): Promise<ReadonlyMap<number, ShareTeamRow>> {
 }
 
 /**
+ * La ligne publique de l'équipe `teamId` (sans logo converti) ; `null` si elle
+ * n'est pas au classement public (inconnue, solo, fantôme, dissoute) ou si la
+ * base ne répond pas. Une lecture du cache partagé : de quoi décider, avant
+ * tout rendu, si la carte sera nominative.
+ */
+export async function findShareTeam(teamId: number): Promise<ShareTeamRow | null> {
+  try {
+    return (await cachedRanking("share-teams", computeShareTeams)).get(teamId) ?? null;
+  } catch (error) {
+    console.error("[share-team] lecture impossible", error);
+    return null;
+  }
+}
+
+/**
  * L'équipe `teamId` telle que sa carte la montre, logo compris (fichier du
- * site seulement, `teamLogoDataUrl`) ; `null` si elle n'est pas au classement
- * public (inconnue, solo, fantôme, dissoute) ou si la base ne répond pas — la
+ * site seulement, `teamLogoDataUrl`) ; `null` comme {@link findShareTeam} — la
  * carte retombe alors sur la carte générique de la fiche.
  */
 export async function loadShareTeam(
   teamId: number,
 ): Promise<(TeamShareInput & { logoSrc: string | null }) | null> {
-  let row: ShareTeamRow | undefined;
-  try {
-    row = (await cachedRanking("share-teams", computeShareTeams)).get(teamId);
-  } catch (error) {
-    console.error("[share-team] lecture impossible", error);
-    return null;
-  }
+  const row = await findShareTeam(teamId);
   if (!row) return null;
   const { logoUrl, ...team } = row;
   return { ...team, logoSrc: await teamLogoDataUrl(logoUrl, TEAM_SHARE_LOGO_SIZE) };
