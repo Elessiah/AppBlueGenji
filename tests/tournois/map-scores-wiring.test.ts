@@ -80,6 +80,14 @@ describe("détail map par map — focus et interblocages", () => {
   });
 });
 
+describe("détail map par map — champs vides", () => {
+  it("quitter un score vide sans saisie ne lève pas son refus, et pas de 0 – 0 sans map", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list).toContain("if (Object.is(maps[index]?.[field], patch[field])) return;");
+    expect(list).toMatch(/\{maps\.length > 0 && \(\s*<output className=\{styles\.summary\}>/);
+  });
+});
+
 describe("détail map par map — noms accessibles", () => {
   it("chaque champ nomme sa map, et la phrase d'erreur reste hors du label", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");

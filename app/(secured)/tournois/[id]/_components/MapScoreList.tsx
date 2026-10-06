@@ -87,6 +87,9 @@ export function MapScoreList({
   }
 
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
+    // Rien de changé (un champ de score vide quitté sans saisie rend `NaN`, et
+    // `NaN !== NaN`) : ni mise à jour, ni levée du refus rattaché au champ.
+    if (Object.is(maps[index]?.[field], patch[field])) return;
     fieldErrors.clear(mapFieldKey(index, field));
     onChange(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
   };
@@ -221,13 +224,16 @@ export function MapScoreList({
         <Plus size={16} aria-hidden="true" /> Ajouter une map
       </button>
 
-      {/* Région d'état : le score dérivé change à chaque frappe. */}
-      <output className={styles.summary}>
-        <span className={styles.summaryLabel}>Score du match</span>
-        <span className={styles.summaryScore}>
-          {team1Name} {score.team1} – {score.team2} {team2Name}
-        </span>
-      </output>
+      {/* Région d'état : le score dérivé change à chaque frappe. Rien sans map —
+          un « 0 – 0 » contredirait le score posé à la main au-dessus. */}
+      {maps.length > 0 && (
+        <output className={styles.summary}>
+          <span className={styles.summaryLabel}>Score du match</span>
+          <span className={styles.summaryScore}>
+            {team1Name} {score.team1} – {score.team2} {team2Name}
+          </span>
+        </output>
+      )}
     </fieldset>
   );
 }
