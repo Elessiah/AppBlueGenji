@@ -117,3 +117,5 @@ Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à c
 ## Saisie map par map
 
 Depuis octobre 2026, le score se saisit **map par map** (code de replay + score de chaque map) et le score du match en est dérivé, puis passe par le même cycle proposer / confirmer / contester : voir [MAP_SCORES.md](./MAP_SCORES.md).
+
+- **Confirmer d'un clic** (MAP_SCORES.md) : la modale s'ouvre sur les maps de la proposition adverse (codes et scores) ; « Confirmer » la valide telle quelle par le même chemin serveur, `409 PROPOSAL_STALE` si elle a changé ou expiré entre-temps. Le détail d'une proposition ne voyage que dans le contexte des deux engagés qui mènent le match et de l'arbitrage (`TournamentViewerContext.matchProposals`).

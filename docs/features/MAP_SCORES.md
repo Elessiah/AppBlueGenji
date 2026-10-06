@@ -151,14 +151,49 @@ compare que sur le score. La modale de l'adversaire s'ouvre sur la proposition
 « déjà envoyé »). **Décision requise** : faut-il plutôt clore sur le seul score
 et retenir le détail de l'une des deux ?
 
+### « Confirmer » la proposition adverse (demande du 2026-10-06)
+
+La seconde équipe ne ressaisit rien :
+
+- **Pré-remplissage.** La modale s'ouvre sur la proposition adverse : chaque
+  ligne reprend son code de replay et son score de map
+  (`playerReportInitialMaps` sur le match complété par `withProposalMaps`).
+- **« Confirmer »** (action principale, `confirmsAsIs`) : visible tant que les
+  lignes sont celles de l'adversaire, à l'identique. Le corps porte
+  `confirm: { reportedAt }` — l'instant de dépôt lu dans la modale — et passe
+  par **le même chemin** que tout report (`reportMatchScore`, mêmes contrôles,
+  même concordance, même `finalizeMatch`) : vainqueur, perdant et nul ne
+  changent en rien.
+- **Retouche = contre-proposition.** Dès qu'un champ change, le bouton redevient
+  « Envoyer le score » et l'envoi suit le désaccord ordinaire (arbitrage alerté).
+- **Péremption.** Le serveur relit le report adverse sous le verrou du match :
+  autre instant de dépôt, report retiré ou expiré, ou maps qui ne sont plus
+  celles envoyées → `409 PROPOSAL_STALE`, rien d'écrit. La modale relit alors le
+  contexte du lecteur et se réaligne sur la version à jour.
+
+**Qui voit le détail d'une proposition.** Jamais l'instantané diffusé : les
+propositions y gardent `maps: []`. Le détail voyage dans
+`TournamentViewerContext.matchProposals`, calculé par `loadViewerProposals`
+dans `getTournamentViewerContext` — porte commune du **flux SSE** et de la
+**lecture REST de secours** —, pour les seuls matchs de l'engagé du lecteur
+**s'il mène le match** (`canCreateReportsForTeamIds` : capitaine, manager,
+propriétaire, ou le joueur en individuel), et pour l'arbitrage (permission
+`tournaments`, qui en a besoin pour trancher un désaccord). Une requête au plus,
+aucune quand rien n'attend. Le contexte du lecteur n'arrivant qu'à la connexion
+au flux, une proposition déposée depuis se repère à son `reportedAt` (porté par
+l'instantané) et déclenche une relecture REST (`useProposalMaps`,
+`proposalsNeedRefresh`).
+
 Un forfait n'affiche jamais de détail, quel que soit le chemin qui l'a posé
 (arbitrage, abandon en Survie / Ronde suisse / BG Survie) : `attachMatchMaps`
 le tait.
 
 ### Affichage
 
-- `attachMatchMaps` pose le détail sur l'instantané commun : **une seule porte
-  de données**, servie à l'identique par le flux SSE et par le REST de secours.
+- `attachMatchMaps` pose le détail **retenu** sur l'instantané commun : **une
+  seule porte de données**, servie à l'identique par le flux SSE et par le REST
+  de secours (le détail des propositions, lui, passe par le contexte du
+  lecteur — voir ci-dessus).
   Un détail ne s'affiche que s'il **explique** le score qu'il accompagne
   (`mapsMatchStoredScore`) : un score corrigé à la main ne porte pas un détail
   qui le contredit.
