@@ -154,8 +154,15 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 
   it("une proposition adverse sans détail dit quoi saisir au lieu de « Confirme-le »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain("if ((view.theirs?.maps ?? []).length === 0) {");
+    expect(dialog).toContain("if ((theirs.maps ?? []).length > 0) {");
     expect(dialog).toContain("sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay");
+  });
+
+  it("un détail adverse encore en lecture est annoncé comme tel, sans inviter à ressaisir", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toContain("return canRead && proposalsNeedRefresh(match, proposals);");
+    expect(dialog).toContain("if (detailLoading) return `${proposed}. Lecture du détail de ses maps…");
+    expect(dialog.indexOf("if ((theirs.maps ?? []).length > 0)")).toBeLessThan(dialog.indexOf("if (detailLoading) return"));
   });
 });
 
@@ -165,6 +172,19 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
     expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, proposals\) &&\s*form\.maps\.length === 0/);
     expect(dialog).toContain("|| form.submitting || awaitingDetail}");
     expect(dialog).toContain("!form.submitting && !awaitingDetail) void run(\"resolve\");");
-    expect(dialog).toContain("{awaitingDetail && (");
+    expect(dialog).toContain("if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;");
+  });
+
+  it("la phrase visible suit l'ordre de l'infobulle : détail, map refusée renseignée, puis score", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    const order = [
+      "if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;",
+      "if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);",
+      "return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : null;",
+    ].map((line) => dialog.indexOf(line));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(dialog).toContain("mapRefusal: form.maps.some(isMapTouched) ? (form.mapsRefused.resolve ?? form.mapsRefused.save) : null,");
+    expect(dialog).toContain("{blockerText && <output");
   });
 });
