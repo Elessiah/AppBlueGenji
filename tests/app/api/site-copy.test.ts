@@ -136,3 +136,46 @@ describe("DELETE /api/site-copy", () => {
     expect(resetSiteCopy).not.toHaveBeenCalled();
   });
 });
+
+describe("/api/site-copy — en-tête de /classement", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("refuse l'édition du titre à un membre sans showcase (403, code seul)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(visitor);
+
+    const res = await PATCH(patchReq({ key: "ranking.hero.title", value: "x" }));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "FORBIDDEN" });
+    expect(setSiteCopy).not.toHaveBeenCalled();
+  });
+
+  it("refuse la remise à l'origine du sous-titre à un membre sans showcase", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(visitor);
+
+    expect((await DELETE(deleteReq("ranking.hero.lede"))).status).toBe(403);
+    expect(resetSiteCopy).not.toHaveBeenCalled();
+  });
+
+  it("laisse un Community Manager éditer le sous-titre", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
+    jest.mocked(setSiteCopy).mockResolvedValue({ ...copy, "ranking.hero.lede": "Nouveau" });
+
+    const res = await PATCH(patchReq({ key: "ranking.hero.lede", value: "Nouveau" }));
+
+    expect(res.status).toBe(200);
+    expect(setSiteCopy).toHaveBeenCalledWith("ranking.hero.lede", "Nouveau");
+  });
+
+  it("renvoie le code du service quand le titre est trop long", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
+    jest.mocked(setSiteCopy).mockRejectedValue(new Error("COPY_TOO_LONG"));
+
+    const res = await PATCH(patchReq({ key: "ranking.hero.title", value: "x".repeat(500) }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "COPY_TOO_LONG" });
+  });
+});
