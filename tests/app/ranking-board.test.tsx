@@ -230,7 +230,9 @@ describe("noms du podium — un effet par marche", () => {
   });
 
   it("n'entoure les noms que d'un halo large et léger, qui n'éclaircit pas le bord des lettres", () => {
-    const nameRules = [1, 2].map((tier) => new RegExp(String.raw`\.nameTier${tier} \{([^}]*)\}`).exec(css)![1]).join(" ");
+    const nameRules = [1, 2, 3].map((tier) => new RegExp(String.raw`\.nameTier${tier} \{([^}]*)\}`).exec(css)![1]).join(" ");
+    // Aucun `text-shadow` serré sur un nom du podium.
+    expect(css).not.toMatch(/\.nameTier\d[^{]*\{[^}]*text-shadow/);
     const shadows = [...nameRules.matchAll(/drop-shadow\(0 0 (\d+)px rgba\(var\(--[a-z0-9-]+-rgb\), ([\d.]+)\)\)/g)];
     expect(shadows.length).toBeGreaterThan(0);
     for (const [, blur, alpha] of shadows) {
