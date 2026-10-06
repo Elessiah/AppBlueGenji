@@ -56,10 +56,12 @@ réservées aux comptes. Rien de nouveau n'est collecté ni exposé : aucune ent
 Tout nom rendu par `TeamLink`, `EntrantLink`, `EntrantName` (marche pleine) ou
 `PlayerLink` (marche adoucie) — `/classement`, tournois (inscrites, arbres,
 cartes de match, classements de phase), fiche joueur, profil, statistiques,
-accueil (leaderboard, direct). Noms **non cliquables** :
+accueil (leaderboard ; la carte « direct » rend un `EntityLink` nu, sans
+marche). Noms **non cliquables** :
 
 - `TeamPodiumName` : titre de la fiche d'équipe (`TeamHeader`), nom des cartes
-  de l'annuaire `/equipes` (`TeamCard`) ;
+  de l'annuaire `/equipes` (`TeamCard`) et de son bandeau de tête
+  (`HighlightStrip`) ;
 - `PlayerPodiumName` : pseudo des cartes `/joueurs` (`PlayerCard`) et titre de
   la fiche joueur.
 
@@ -70,9 +72,13 @@ Exceptions :
   d'arbitrage (`EntrantContactsPanel`) et l'aperçu de l'étape suivante de
   l'Endurance (`EnduranceNextRoundPanel`, enveloppé dans `EnduranceView`) —
   des outils, pas une vitrine.
-- **Perdant d'un match** (`MatchRow`, ligne `.decided`) : la marche garde son
-  repère (couronne, losange) mais quitte dégradé, lueur, mouvement et graisse —
-  sinon le nom du perdant brillerait plus fort que celui du vainqueur.
+- **Ligne en retrait** (`data-podium-muted` : perdant d'un match dans
+  `MatchRow`, équipe éliminée ou forfait dans les classements Survie, Suisse et
+  Endurance) : la marche garde son repère (couronne, losange) mais quitte
+  dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
+  fort que les autres.
+- **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
+  ferait tomber violets et rose sous 4,5:1 sous la lueur.
 - **Lien-avatar sans texte** (roster des cartes `/equipes`) : `podiumTier={null}`
   — la peinture sur le texte effacerait l'initiale de repli ; le nom de
   l'équipe, au-dessus, porte déjà la marche.
