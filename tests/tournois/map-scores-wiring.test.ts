@@ -145,7 +145,14 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 
   it("l'infobulle d'un bouton actionnable sur une map refusée dit ce refus, pas « score incomplet »", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(hook).toContain("resolve: maps.length > 0 ? checkMapList(matchFormat, game, maps, { decisive: true }).error : null,");
+    expect(hook).toContain("resolve: checkMapList(format, game, maps, { decisive: true }).error,");
+  });
+
+  it("un forfait tait les refus de map : la liste est masquée et ses maps ne partent pas", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook).toContain("const mapsSent = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;");
+    expect(hook).toContain("mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : []),");
+    expect(hook).toContain("const sendMaps = mapsSent;");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toContain("if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);");
     expect(dialog).toContain("title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker,");
