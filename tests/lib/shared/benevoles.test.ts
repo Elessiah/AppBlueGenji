@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   nextCategoryEnglish,
   borrowedCategoryEnglish,
+  knownCategoryEnglish,
   BENEVOLE_CATEGORY_MAX,
   BENEVOLE_FIELD_ERRORS,
   benevoleInitials,
@@ -368,20 +369,29 @@ describe("formatJoinedAt — langue", () => {
 describe("nextCategoryEnglish", () => {
   const known: Record<string, string> = { Arbitre: "Referee", Caster: "Caster", Developpeur: "Developer" };
   const englishOf = (category: string) => known[category.trim()] ?? null;
+  const knownEn = new Set(Object.values(known));
+  const next = (form: { category: string; categoryEn: string }, category: string) =>
+    nextCategoryEnglish(form, category, englishOf, knownEn);
 
   it("reprend l'anglais connu de la nouvelle catégorie", () => {
-    expect(nextCategoryEnglish({ category: "", categoryEn: "" }, "Arbitre", englishOf)).toBe("Referee");
-    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, "Caster", englishOf)).toBe("Caster");
+    expect(next({ category: "", categoryEn: "" }, "Arbitre")).toBe("Referee");
+    expect(next({ category: "Arbitre", categoryEn: "Referee" }, "Caster")).toBe("Caster");
   });
 
   it("vers une catégorie inconnue, l'anglais reste (une faute corrigée ne le vide pas)", () => {
-    expect(nextCategoryEnglish({ category: "Developpeur", categoryEn: "Developer" }, "Dveloppeur", englishOf)).toBe("Developer");
-    expect(nextCategoryEnglish({ category: "Dveloppeur", categoryEn: "Developer" }, "Développeur", englishOf)).toBe("Developer");
+    expect(next({ category: "Developpeur", categoryEn: "Developer" }, "Dveloppeur")).toBe("Developer");
+    expect(next({ category: "Dveloppeur", categoryEn: "Developer" }, "Développeur")).toBe("Developer");
+  });
+
+  it("un anglais repris, gardé le temps de taper une catégorie inconnue, cède à celui de la catégorie connue atteinte", () => {
+    // « Arbitre » → vidé → « C » → « Caster » (connue) : « Referee » ne colle pas.
+    expect(next({ category: "Arbitre", categoryEn: "Referee" }, "C")).toBe("Referee");
+    expect(next({ category: "C", categoryEn: "Referee" }, "Caster")).toBe("Caster");
   });
 
   it("une saisie anglaise faite à la main n'est jamais écrasée", () => {
-    expect(nextCategoryEnglish({ category: "Graphiste", categoryEn: "Designer" }, "Arbitre", englishOf)).toBe("Designer");
-    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Umpire" }, "Graphist", englishOf)).toBe("Umpire");
+    expect(next({ category: "Graphiste", categoryEn: "Designer" }, "Arbitre")).toBe("Designer");
+    expect(next({ category: "Arbitre", categoryEn: "Umpire" }, "Graphist")).toBe("Umpire");
   });
 });
 
@@ -401,5 +411,11 @@ describe("borrowedCategoryEnglish", () => {
     expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "Caster" }, benevoles)).toBeNull();
     expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "" }, benevoles)).toBeNull();
     expect(borrowedCategoryEnglish({ category: "", categoryEn: "Referee" }, benevoles)).toBeNull();
+  });
+});
+
+describe("knownCategoryEnglish", () => {
+  it("rassemble les anglais saisis, sans les vides", () => {
+    expect(knownCategoryEnglish([{ categoryEn: " Referee " }, { categoryEn: null }, { categoryEn: "" }])).toEqual(new Set(["Referee"]));
   });
 });
