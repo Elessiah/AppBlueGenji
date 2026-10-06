@@ -116,7 +116,58 @@ navigateur. D'où trois contraintes qui ne sont pas des maladresses :
   style du site n'est pas chargée pendant le rendu ;
 - la taille du titre est choisie d'après sa longueur, Satori ne sachant pas
   rétrécir un texte pour qu'il tienne — un nom de tournoi va de « OW Cup » à
-  soixante caractères.
+  soixante caractères ;
+- la police est celle que `next/og` embarque : celles du dépôt sont en WOFF2,
+  que Satori ne lit pas, et en télécharger une serait une requête réseau par
+  rendu.
+
+### Palette « néons froids » (décision du 2026-10-06)
+
+La carte était un aplat noir à deux halos bleu nuit : « tout noir, c'est très
+triste » au milieu d'un salon Discord. Elle reprend désormais la palette de la
+refonte (`DESIGN_SYSTEM.md`), chaque valeur recopiée d'un jeton de
+`app/globals.css` et citée dans `SHARE_CARD_COLORS` :
+
+- **filet de marque** de 10 px en tête et trait sous le titre au dégradé
+  `--grad-brand` (`--cyan-400` → `--blue-500` → `--violet-400`) ;
+- **trois halos** (cyan en haut à droite, violet en bas à gauche, rose en bas à
+  droite), chacun un `<div>` positionné portant un seul `radial-gradient` —
+  Satori place mal les centres d'un `background-image` à plusieurs dégradés
+  (vérifié au rendu : les halos glissaient au milieu des bords) ;
+- **pastilles** : le jeu en cyan, l'état au ton de sa variante `.pill-*`, les
+  mêmes que l'en-tête de la fiche (`STATE_META`) — violet « Prochainement »,
+  rose « Inscriptions ouvertes », glacier « Tournoi en cours », turquoise
+  « Tournoi terminé ». Ni rouge (une vraie diffusion seulement) ni ambre (un
+  avertissement seulement). `SHARE_STATE_TONES` porte la correspondance, un test
+  la tient alignée sur `STATE_META` ;
+- **faits** : chaque intitulé dans son néon (cyan, violet, turquoise) avec un
+  liseré à gauche, la valeur en `--ink` ;
+- **logo** BlueGenji en pied, lu sur le disque (`lib/server/share-card-logo.ts` :
+  `public/icons/icon-192.png` en URL `data:`, mémorisé par processus). Satori ne
+  décode pas le WebP de la vitrine ; un fichier absent rend `null` et la carte
+  garde le seul nom « BLUEGENJI » plutôt que d'échouer.
+
+**Contraste.** Les cœurs des halos sont posés hors de la zone de texte, et
+`tests/components/og/share-card.test.tsx` recompose le fond tous les 8 px dans
+`SHARE_CARD_TEXT_BOX` : chaque couleur de texte (titre, sous-titre, intitulés,
+pastilles sur leur propre voile) y tient 4,5:1 au point le moins favorable.
+Monter l'opacité d'un halo ou du voile des pastilles fait échouer ce test — le
+halo cyan a dû redescendre à 0,4 pour que le rose des « Inscriptions ouvertes »
+tienne dans le coin haut-droit.
+
+**Noms saisis.** `tournamentShareCard` repasse le nom et la description par
+`visibleText` (`UNTRUSTED_NAMES.md`) avant de les borner : titre coupé sur un
+mot à 90 caractères (trois lignes à la plus petite taille), avec une ellipse ;
+un nom sans caractère visible devient « Tournoi ».
+
+**Barre colorée de l'encart Discord — non changée, décision requise.** Discord
+colore le liseré gauche d'un encart d'après `<meta name="theme-color">`, réglé à
+`APP_BACKGROUND_COLOR` (`#05060a`) dans `app/layout.tsx` et le manifeste. Le
+passer au glacier `#5ac8ff` colorerait aussi la barre d'adresse des navigateurs
+mobiles et la barre d'état de l'application installée — une bande bleu vif
+au-dessus d'un site noir. Un `theme-color` propre à la fiche d'un tournoi
+(`generateViewport`) aurait le même effet sur cette seule page. Laissé tel quel
+en attendant l'arbitrage.
 
 Deux routes la servent :
 
