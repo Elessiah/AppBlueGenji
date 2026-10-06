@@ -145,7 +145,8 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 
   it("l'infobulle d'un bouton actionnable sur une map refusée dit ce refus, pas « score incomplet »", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(hook).toContain("resolve: checkMapList(format, game, maps, { decisive: true }).error,");
+    expect(hook).toContain("const resolve = checkMapList(format, game, maps, { decisive: true });");
+    expect(hook).toContain("resolve: resolve.error,");
   });
 
   it("un forfait ou une saisie fermée taisent les refus de map : la liste est masquée et ses maps ne partent pas", () => {
@@ -191,9 +192,9 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
     ].map((line) => dialog.indexOf(line));
     expect(order.every((i) => i > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(dialog).toContain("mapRefusal: mapsTouched ? (form.mapsRefused.resolve ?? form.mapsRefused.save) : null,");
-    // Ligne vierge : aucune phrase, ni le refus de map, ni le 0 – 0 dérivé.
-    expect(dialog).toContain("blankMaps: form.maps.length > 0 && !mapsTouched && form.mapsRefused.resolve !== null,");
+    expect(dialog).toContain("mapRefusal: form.maps.some(isMapTouched) ? mapRefusal : null,");
+    // Refus sur une ligne vierge : aucune phrase, ni le refus de map, ni le 0 – 0 dérivé.
+    expect(dialog).toContain("blankMaps: mapRefusal !== null && form.mapsRefused.onBlankRow,");
     expect(dialog.indexOf("if (input.blankMaps) return null;")).toBeLessThan(dialog.indexOf("if (input.mapRefusal) return"));
   });
 
@@ -257,5 +258,21 @@ describe("détail map par map — lecteur sans droit de report", () => {
     expect(fn.indexOf("if (!reader.canReport) return")).toBeGreaterThan(0);
     expect(fn.indexOf("if (!reader.canReport) return")).toBeLessThan(fn.indexOf("sans le détail des maps"));
     expect(dialog).toContain("theirsPendingStatus({ opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading })");
+  });
+});
+
+describe("détail map par map — ligne vierge ajoutée et refus corrigé ailleurs", () => {
+  it("un refus qui désigne la ligne vierge qu'on vient d'ajouter se tait, dans les deux modales", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook).toContain("onBlankRow: !refusalOnTouchedRow(resolve.error ? resolve : save, maps),");
+    const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(player).toContain("return maps.some(isMapTouched) && refusalOnTouchedRow(check, maps);");
+    expect(player).toContain("const touched = refusalWorthShowing(check, maps);");
+  });
+
+  it("toute saisie dans la liste lève les refus, corrigés souvent sur un autre champ", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    const update = list.slice(list.indexOf("const update = (index: number"));
+    expect(update.slice(0, update.indexOf("};"))).toContain("fieldErrors.clear();");
   });
 });

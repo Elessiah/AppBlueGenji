@@ -11,6 +11,7 @@ import {
   mapListLimit,
   mapListViolationMessage,
   MAP_LIST_ERROR_CODES,
+  refusalOnTouchedRow,
   mapWinnerSide,
   mapsMatchStoredScore,
   normalizeReplayCode,
@@ -261,5 +262,27 @@ describe("checkMapList — la map nulle consomme une map du BO (décision du 202
 
   it("est un refus de règle des routes (400)", () => {
     expect(MAP_LIST_ERROR_CODES.has("MAP_LIST_INCOMPLETE")).toBe(true);
+  });
+});
+
+describe("refusalOnTouchedRow — une ligne vierge n'appelle pas de reproche", () => {
+  const filled = { replayCode: "ABC123", team1Score: 2, team2Score: 0 };
+
+  it("tait le refus qui désigne la ligne vierge ajoutée après une map renseignée", () => {
+    const maps = [filled, emptyMap()];
+    const check = checkMapList({ type: "BO", value: 3 }, "OW", maps, { decisive: true });
+    expect(check.field?.index).toBe(1);
+    expect(refusalOnTouchedRow(check, maps)).toBe(false);
+  });
+
+  it("garde le refus d'une ligne renseignée, et celui qui ne désigne aucune ligne", () => {
+    const maps = [{ ...filled, replayCode: "" }];
+    expect(refusalOnTouchedRow(checkMapList(null, "OW", maps, { decisive: true }), maps)).toBe(true);
+    expect(refusalOnTouchedRow({ field: null }, maps)).toBe(true);
+    expect(refusalOnTouchedRow({ field: { index: 0, field: "replayCode" } }, [])).toBe(true);
+  });
+
+  it("borne un index hors liste (plafond dépassé) à la dernière ligne", () => {
+    expect(refusalOnTouchedRow({ field: { index: 9, field: "replayCode" } }, [filled])).toBe(true);
   });
 });
