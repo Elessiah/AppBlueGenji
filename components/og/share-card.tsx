@@ -178,6 +178,17 @@ export function titleFontSize(title: string): number {
   return 44;
 }
 
+/**
+ * Lignes accordées à l'accroche selon la longueur du titre.
+ *
+ * La colonne de texte n'a que 528 px de haut : un titre sur deux ou trois
+ * lignes plus une accroche sur deux pousserait celle-ci dans les faits du pied.
+ * Seul un titre qui tient sur une ligne laisse la place d'une seconde.
+ */
+export function subtitleLineClamp(title: string): number {
+  return title.length <= 16 ? 2 : 1;
+}
+
 function Badge({ label, color }: Readonly<{ label: string; color: string }>): ReactElement {
   return (
     <div
@@ -250,7 +261,9 @@ export function ShareCard({
           padding: `${SHARE_CARD_PADDING.top}px ${SHARE_CARD_PADDING.right}px ${SHARE_CARD_PADDING.bottom}px ${SHARE_CARD_PADDING.left}px`,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        {/* Le bloc du haut cède avant le pied : s'il manque de place, il est
+            rogné au lieu de chevaucher les faits. */}
+        <div style={{ display: "flex", flexDirection: "column", flexShrink: 1, minHeight: 0, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <Badge label={eyebrow} color={SHARE_CARD_COLORS.cyan} />
             {state ? <Badge label={state.label} color={SHARE_CARD_TONE_COLORS[state.tone]} /> : null}
@@ -268,6 +281,8 @@ export function ShareCard({
               display: "-webkit-box",
               WebkitBoxOrient: "vertical",
               WebkitLineClamp: 3,
+              // Satori n'applique la limite de lignes qu'avec l'ellipse.
+              textOverflow: "ellipsis",
               overflow: "hidden",
             }}
           >
@@ -294,7 +309,8 @@ export function ShareCard({
                 color: SHARE_CARD_COLORS.inkMute,
                 display: "-webkit-box",
                 WebkitBoxOrient: "vertical",
-                WebkitLineClamp: 2,
+                WebkitLineClamp: subtitleLineClamp(title),
+                textOverflow: "ellipsis",
                 overflow: "hidden",
               }}
             >
@@ -303,7 +319,7 @@ export function ShareCard({
           ) : null}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
           {facts.length > 0 ? (
             <div style={{ display: "flex", marginBottom: 28 }}>
               {facts.map((fact, index) => {
@@ -322,8 +338,9 @@ export function ShareCard({
                   >
                     <div
                       style={{
-                        fontSize: 20,
-                        letterSpacing: 3,
+                        // 24 px : la vignette Discord réduit la carte de moitié.
+                        fontSize: 24,
+                        letterSpacing: 2,
                         textTransform: "uppercase",
                         color,
                       }}
