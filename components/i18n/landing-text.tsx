@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
-import { landingText, type LandingMessages, type LandingText } from "@/lib/shared/landing-text";
+import { FR_LANDING_MESSAGES, landingText, type LandingClientMessages, type LandingText } from "@/lib/shared/landing-text";
 
 /**
  * Textes de l'accueil côté client (`lib/shared/landing-text.ts`).
@@ -18,8 +18,13 @@ export function LandingTextProvider({
   locale,
   messages,
   children,
-}: Readonly<{ locale: Locale; messages?: LandingMessages; children: ReactNode }>) {
-  const value = useMemo(() => landingText(locale, messages), [locale, messages]);
+}: Readonly<{ locale: Locale; messages?: LandingClientMessages; children: ReactNode }>) {
+  // Seuls les espaces clients voyagent (`landingClientMessages`) ; les autres,
+  // qu'aucun composant client ne lit, gardent ceux du paquet.
+  const value = useMemo(
+    () => landingText(locale, messages ? { ...FR_LANDING_MESSAGES, ...messages } : undefined),
+    [locale, messages],
+  );
   return <LandingTextContext.Provider value={value}>{children}</LandingTextContext.Provider>;
 }
 

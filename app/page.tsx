@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Ticker } from "@/components/cyber";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { LandingTextProvider } from "@/components/i18n/landing-text";
+import { landingClientMessages } from "@/lib/shared/landing-text";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { SiteCopyEditorProvider } from "@/components/cyber/landing/EditableCopy";
 import { Hero } from "@/components/cyber/landing/Hero";
@@ -110,8 +111,9 @@ export default async function HomePage() {
         à la même structure plutôt que d'en déclarer une seconde.
       */}
       <JsonLd data={[organizationJsonLd(base, description), webSiteJsonLd(base, description, locale)]} />
-      {/* Français inclus dans le paquet : seul l'anglais voyage jusqu'au navigateur. */}
-      <LandingTextProvider locale={locale} messages={locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).landing}>
+      {/* Français inclus dans le paquet : seul l'anglais voyage jusqu'au navigateur,
+          réduit aux espaces que lisent les composants clients. */}
+      <LandingTextProvider locale={locale} messages={locale === DEFAULT_LOCALE ? undefined : landingClientMessages(messagesFor(locale).landing)}>
         {/* L'éditeur bilingue ne reçoit ses textes que pour le staff `showcase`. */}
         <SiteCopyEditorProvider entries={isAdmin ? copyBundle.editor : null}>
           <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} />

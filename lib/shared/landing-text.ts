@@ -28,4 +28,30 @@ export function landingText(locale: Locale, messages: LandingMessages = FR_LANDI
 }
 
 /** Étiquette BCP 47 des formats de date et de nombre de l'accueil. */
+/**
+ * Espaces que lisent les composants **clients** de l'accueil (`useLandingText`).
+ * Seuls eux voyagent jusqu'au navigateur sous `/en` : `meta`, `board`,
+ * `calendar`, `leaderCal`, `about` et `join` ne servent qu'au rendu serveur
+ * (`landingServerText`). Un composant client qui lirait un autre espace doit
+ * l'ajouter ici (`tests/lib/shared/landing-client-messages.test.ts`).
+ */
+export const LANDING_CLIENT_NAMESPACES = [
+  "common",
+  "hero",
+  "countdown",
+  "discord",
+  "live",
+  "ticker",
+  "leaderboard",
+  "sponsors",
+] as const satisfies ReadonlyArray<keyof LandingMessages>;
+
+export type LandingClientNamespace = (typeof LANDING_CLIENT_NAMESPACES)[number];
+export type LandingClientMessages = Pick<LandingMessages, LandingClientNamespace>;
+
+/** La part des messages d'une langue que lisent les composants clients. */
+export function landingClientMessages(messages: LandingMessages): LandingClientMessages {
+  return Object.fromEntries(LANDING_CLIENT_NAMESPACES.map((ns) => [ns, messages[ns]])) as LandingClientMessages;
+}
+
 export const LANDING_INTL_LOCALE: Readonly<Record<Locale, string>> = { fr: "fr-FR", en: "en-US" };

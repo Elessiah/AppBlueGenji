@@ -12,13 +12,32 @@ type CalendarCardProps = {
   locale?: Locale;
 };
 
-function monthLabel(date: Date, tag: string): string {
-  return date.toLocaleDateString(tag, { month: "short", timeZone: BOARD_TIME_ZONE }).replace(".", "").toUpperCase();
+// Formateurs construits une fois par langue (une construction coûte bien plus
+// qu'un formatage), comme ceux du plateau (`landing-board.ts`).
+type CalendarFormats = { month: Intl.DateTimeFormat; day: Intl.DateTimeFormat; full: Intl.DateTimeFormat; time: Intl.DateTimeFormat };
+
+function buildFormats(tag: string): CalendarFormats {
+  return {
+    month: new Intl.DateTimeFormat(tag, { month: "short", timeZone: BOARD_TIME_ZONE }),
+    day: new Intl.DateTimeFormat(tag, { day: "2-digit", timeZone: BOARD_TIME_ZONE }),
+    full: new Intl.DateTimeFormat(tag, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: BOARD_TIME_ZONE,
+      timeZoneName: "short",
+    }),
+    time: new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: BOARD_TIME_ZONE }),
+  };
 }
 
-function dayLabel(date: Date, tag: string): string {
-  return date.toLocaleDateString(tag, { day: "2-digit", timeZone: BOARD_TIME_ZONE });
-}
+const CALENDAR_FORMATS: Readonly<Record<Locale, CalendarFormats>> = {
+  fr: buildFormats(LANDING_INTL_LOCALE.fr),
+  en: buildFormats(LANDING_INTL_LOCALE.en),
+};
 
 // `getLandingCalendar` n'envoie plus jamais `RUNNING` ni `FINISHED` — le
 // calendrier ne montre que ce qui arrive — mais le type accepte encore les
@@ -33,7 +52,7 @@ function tagKey(state: LandingCalendarEvent["state"]): "running" | "registration
 
 export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<CalendarCardProps>) {
   const { t } = landingServerText(locale);
-  const tag = LANDING_INTL_LOCALE[locale];
+  const formats = CALENDAR_FORMATS[locale];
   return (
     <div id="calendrier" className={styles.root}>
       <div className={styles.head}>
@@ -53,8 +72,8 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<Calen
           return (
             <div key={event.tournamentId} className={styles.row}>
               <div className={styles.date}>
-                <div className="num">{dayLabel(date, tag)}</div>
-                <div className="mono">{monthLabel(date, tag)}</div>
+                <div className="num">{formats.day.format(date)}</div>
+                <div className="mono">{formats.month.format(date).replace(".", "").toUpperCase()}</div>
               </div>
               <div className={styles.bar} />
               <div className={styles.body}>
@@ -66,13 +85,13 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<Calen
                     `::after` : la ligne entière mène à la fiche, et le nom
                     accessible du lien reste celui du tournoi — pas la date,
                     le jeu et l'état concaténés. */}
-                <div className={styles.title} title={date.toLocaleString(tag, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: BOARD_TIME_ZONE, timeZoneName: "short" })}>
+                <div className={styles.title} title={formats.full.format(date)}>
                   <a className={styles.link} href={tournamentMatchHref(event.tournamentId)}>
                     {event.name}
                   </a>
                 </div>
               </div>
-              <div className={`num mono ${styles.time}`}>{date.toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: BOARD_TIME_ZONE })}</div>
+              <div className={`num mono ${styles.time}`}>{formats.time.format(date)}</div>
             </div>
           );
         })}

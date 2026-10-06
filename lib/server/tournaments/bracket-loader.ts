@@ -36,18 +36,32 @@ export async function loadMiniBracket(
   // Un incident de lecture n'est pas mis en cache : `cached` ne mémorise jamais
   // un rejet, et la visite suivante retentera plutôt que de servir une vignette
   // vide pendant quinze secondes.
+  // Les lignes brutes sont mises en cache une fois pour les deux langues ;
+  // seule la place vide se rédige à la sortie.
+  let rows: MiniBracketRow[];
   try {
-    const key = locale === DEFAULT_LOCALE ? `mini-bracket:${tournamentId}` : `mini-bracket:${tournamentId}:${locale}`;
-    return await cached(key, MINI_BRACKET_TTL_MS, () => loadMiniBracketRows(tournamentId, locale));
+    rows = await cached(`mini-bracket:${tournamentId}`, MINI_BRACKET_TTL_MS, () => loadMiniBracketRows(tournamentId));
   } catch {
     return [];
   }
+  const pending = (placeholder: string | null) =>
+    locale === DEFAULT_LOCALE
+      ? (localizeBracketPlaceholder(placeholder) ?? "À venir")
+      : landingServerText(locale).t("board.tbd");
+  return rows.map((row) => ({
+    a: row.team1_name ?? pending(row.team1_placeholder),
+    b: row.team2_name ?? pending(row.team2_placeholder),
+    sa: row.team1_score ?? "—",
+    sb: row.team2_score ?? "—",
+  }));
 }
 
-async function loadMiniBracketRows(
-  tournamentId: number,
-  locale: Locale,
-): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
+type MiniBracketRow = Pick<
+  MatchRow,
+  "team1_name" | "team2_name" | "team1_placeholder" | "team2_placeholder" | "team1_score" | "team2_score"
+>;
+
+async function loadMiniBracketRows(tournamentId: number): Promise<MiniBracketRow[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & MatchRow)[]>(
     `SELECT
@@ -67,14 +81,12 @@ async function loadMiniBracketRows(
     [tournamentId],
   );
 
-  const pending = (placeholder: string | null) =>
-    locale === DEFAULT_LOCALE
-      ? (localizeBracketPlaceholder(placeholder) ?? "À venir")
-      : landingServerText(locale).t("board.tbd");
   return rows.map((row) => ({
-    a: row.team1_name ?? pending(row.team1_placeholder),
-    b: row.team2_name ?? pending(row.team2_placeholder),
-    sa: row.team1_score ?? "—",
-    sb: row.team2_score ?? "—",
+    team1_name: row.team1_name,
+    team2_name: row.team2_name,
+    team1_placeholder: row.team1_placeholder,
+    team2_placeholder: row.team2_placeholder,
+    team1_score: row.team1_score,
+    team2_score: row.team2_score,
   }));
 }
