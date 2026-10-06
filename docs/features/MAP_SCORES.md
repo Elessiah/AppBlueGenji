@@ -184,7 +184,11 @@ La seconde équipe ne ressaisit rien :
   d'état dit de saisir les maps jouées et leurs codes pour confirmer, au lieu
   de « Confirme-le ». Tant que le détail est **en lecture** (proposition
   arrivée par le flux), la phrase le dit, pour que le joueur ne ressaisisse pas
-  ce qui va pré-remplir le formulaire.
+  ce qui va pré-remplir le formulaire. Saisir les maps au **même score** qu'une
+  proposition sans détail vaut confirmation (« Confirmer », contrôle de
+  péremption compris) : le serveur la compare au seul score.
+- **Code de replay** saisi brut (majuscules par la CSS, normalisé à la
+  validation et au serveur) : le curseur reste en place pendant une correction.
 
 **Lisibilité de la saisie.** Le compteur « Maps jouées (n/N) » annonce le format
 (BO3 → 3) ; les maps nulles rejouables au-delà sont dites dans l'aide et ne
