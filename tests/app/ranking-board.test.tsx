@@ -230,15 +230,18 @@ describe("noms du podium — un effet par marche", () => {
   });
 
   it("n'entoure les noms que d'un halo large et léger, qui n'éclaircit pas le bord des lettres", () => {
-    const nameRules = [1, 2, 3].map((tier) => new RegExp(String.raw`\.nameTier${tier} \{([^}]*)\}`).exec(css)![1]).join(" ");
     // Aucun `text-shadow` serré sur un nom du podium.
     expect(css).not.toMatch(/\.nameTier\d[^{]*\{[^}]*text-shadow/);
-    const shadows = [...nameRules.matchAll(/drop-shadow\(0 0 (\d+)px rgba\(var\(--[a-z0-9-]+-rgb\), ([\d.]+)\)\)/g)];
-    expect(shadows.length).toBeGreaterThan(0);
-    for (const [, blur, alpha] of shadows) {
-      expect(Number(blur)).toBeGreaterThanOrEqual(10);
-      expect(Number(alpha)).toBeLessThanOrEqual(0.3);
+    // Noms animés : lueur fixe en `::before`, jamais un `filter` recalculé à chaque image.
+    for (const tier of [1, 2]) {
+      expect(new RegExp(String.raw`\.nameTier${tier} \{([^}]*)\}`).exec(css)![1]).not.toMatch(/filter/);
+      const glow = new RegExp(String.raw`\.nameTier${tier}::before \{[^}]*rgba\(var\(--[a-z0-9-]+-rgb\), ([\d.]+)\)`).exec(css);
+      expect(Number(glow![1])).toBeLessThanOrEqual(0.2);
     }
+    // 3e, immobile : halo par `drop-shadow`, large et léger.
+    const tier3 = /\.nameTier3 \{[^}]*drop-shadow\(0 0 (\d+)px rgba\(var\(--[a-z0-9-]+-rgb\), ([\d.]+)\)\)/.exec(css)!;
+    expect(Number(tier3[1])).toBeGreaterThanOrEqual(10);
+    expect(Number(tier3[2])).toBeLessThanOrEqual(0.3);
   });
 
   it("garde un soulignement visible et un nom imprimable malgré le texte transparent", () => {
