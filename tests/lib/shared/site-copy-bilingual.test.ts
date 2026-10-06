@@ -182,3 +182,13 @@ describe("textes de l'accueil — retours de revue", () => {
     expect(en.calendar.heading).toBe("UPCOMING EVENTS · PARIS TIME");
   });
 });
+
+describe("validateBilingualSiteCopy — corps JSON qui ne sont pas des textes", () => {
+  it.each([[{}], [["a", "b"]], [true], [42]])("refuse un anglais %p comme vide", (valueEn) => {
+    expect(validateBilingualSiteCopy("home.hero.title", "Titre", valueEn)).toEqual({ ok: false, error: "COPY_EN_EMPTY" });
+  });
+
+  it.each([[{}], [["a"]], [false]])("refuse un français %p comme vide", (value) => {
+    expect(validateBilingualSiteCopy("home.hero.title", value, "Title")).toEqual({ ok: false, error: "COPY_EMPTY" });
+  });
+});
