@@ -18,6 +18,7 @@ jest.mock("next-intl/server", () => {
   return {
     getTranslations: async (namespace?: "common.languageSwitcher" | "shell.header" | "shell.footer") =>
       createTranslator({ locale: "en", messages: messagesFor("en"), timeZone: "Europe/Paris", namespace }),
+    getLocale: async () => "en",
   };
 });
 // En-tête et pied de page (asynchrones) sont rendus à part plus bas.
@@ -201,8 +202,8 @@ describe("coquille en anglais — composants serveur", () => {
       "Manifesto",
       "Volunteers",
       "Partners",
-      "Bylaws",
-      "Internal rules",
+      "Bylaws (in French)",
+      "Internal rules (in French)",
       "Accessibility settings",
       "Accessibility: non-compliant",
       "Report a problem",
@@ -210,6 +211,8 @@ describe("coquille en anglais — composants serveur", () => {
     ]) {
       expect(html).toContain(label);
     }
+    // Documents uniquement en français : signalés au lecteur d'écran.
+    expect(html).toContain('href="/statuts.pdf" hrefLang="fr"');
     expect(html).not.toMatch(FRENCH_LEFTOVERS);
   });
 });
