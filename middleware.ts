@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
+import { siteMetadataBase } from "@/lib/server/site-url";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
@@ -127,16 +128,15 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   if (prefixed === null) return null;
   if (isApiPath(path)) return new NextResponse(null, { status: 404 });
   if (prefixed === "en" && isMigratedRoute(path)) return null;
-  // `Location` relative : derrière le mandataire, `request.nextUrl` porte
-  // l'origine interne (`localhost:3000`), qu'une adresse absolue enverrait au
-  // visiteur. Les barres de tête sont réduites à une seule : `/en//hote.tld`
-  // donnerait sinon `//hote.tld`, adresse relative au protocole qui sort du
-  // site (redirection ouverte) — `\` compte aussi, les navigateurs le lisant `/`.
-  const location = `/${path.replace(/^[/\\]+/, "")}${request.nextUrl.search}`;
-  return new NextResponse(null, {
-    status: prefixed === "en" ? 307 : 308,
-    headers: { location },
-  });
+  // Adresse absolue sur la racine **publique** (`APP_URL`) : l'adaptateur de
+  // Next lit tout `Location` par `new URL` sans base (une adresse relative le
+  // fait échouer) et récrit sur l'origine de la requête celui qui la partage —
+  // derrière le mandataire, l'origine interne `localhost:3000`, livrée telle
+  // quelle au visiteur. Les barres de tête sont réduites à une seule :
+  // `/en//hote.tld` donnerait sinon `//hote.tld`, que `new URL` résout hors du
+  // site (redirection ouverte) — `\` compte aussi, lu `/` par les navigateurs.
+  const target = new URL(`/${path.replace(/^[/\\]+/, "")}${request.nextUrl.search}`, siteMetadataBase());
+  return NextResponse.redirect(target, prefixed === "en" ? 307 : 308);
 }
 
 /** Chargement d'un document, et non `fetch` du routeur (préchargement, navigation client). */
