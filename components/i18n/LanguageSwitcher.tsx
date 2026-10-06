@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LOCALE_NATIVE_NAME, isMigratedRoute, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 import { useAppLocale } from "./locale-context";
@@ -19,13 +18,16 @@ import styles from "./LanguageSwitcher.module.css";
  *   seul moyen de rendre de nouveau `<html lang>` et les messages du client.
  * - Son nom accessible commence par le texte visible (WCAG 2.5.3), écrit dans
  *   la langue visée (`lang`), et `hrefLang` l'annonce aux robots.
+ * - Sa précision (`label`) est traduite **côté serveur** par l'en-tête qui le
+ *   rend (`languageSwitcherLabel()`) : sur une page sans rien de traduit, aucun
+ *   code client de `next-intl` n'est chargé pour un lien qui ne s'affiche pas.
  */
-export function LanguageSwitcher({ className }: Readonly<{ className?: string }>) {
+export function LanguageSwitcher({ label, className }: Readonly<{ label: string; className?: string }>) {
   const path = splitLocalePrefix(usePathname() ?? "/").path;
   const locale = useAppLocale();
   if (!isMigratedRoute(path)) return null;
   const target: Locale = locale === "fr" ? "en" : "fr";
-  return <SwitcherLink href={localeHref(path, target)} target={target} className={className} />;
+  return <SwitcherLink href={localeHref(path, target)} target={target} label={label} className={className} />;
 }
 
 /** L'adresse de l'autre langue, avec la requête (`a=1`) et l'ancre (`#x`) de la page courante. */
@@ -36,12 +38,15 @@ export function switcherHref(path: string, query: string, hash = ""): string {
 }
 
 /**
- * Le lien lui-même, à part : `useTranslations` exige un fournisseur de
- * messages, qu'une page non traduite n'a pas à fournir pour un lien qu'elle ne
- * rend pas.
+ * Le lien lui-même, à part : `useSearchParams` ne s'appelle que sur une route
+ * traduite.
  */
-function SwitcherLink({ href, target, className }: Readonly<{ href: string; target: Locale; className?: string }>) {
-  const t = useTranslations("common.languageSwitcher");
+function SwitcherLink({
+  href,
+  target,
+  label,
+  className,
+}: Readonly<{ href: string; target: Locale; label: string; className?: string }>) {
   // La requête suit (un filtre, un onglet, le `?redirect=` de la connexion) :
   // changer de langue ne doit pas perdre l'état de la page.
   const query = useSearchParams()?.toString() ?? "";
@@ -61,7 +66,7 @@ function SwitcherLink({ href, target, className }: Readonly<{ href: string; targ
       onClick={withAnchor}
     >
       <span lang={target}>{LOCALE_NATIVE_NAME[target]}</span>
-      <span className="sr-only"> — {t("label")}</span>
+      <span className="sr-only"> — {label}</span>
     </a>
   );
 }

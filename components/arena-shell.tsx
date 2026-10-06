@@ -4,6 +4,7 @@ import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { countOpenReports } from "@/lib/server/content-reports";
 import { can } from "@/lib/shared/permissions";
 import { ArenaNav } from "@/components/arena-nav";
+import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
 
 /**
@@ -34,6 +35,7 @@ export async function ArenaShell({
         avatarUrl={user.avatarUrl}
         activeTeam={activeTeam}
         openReports={openReports}
+        languageSwitcherLabel={await languageSwitcherLabel()}
       />
       <main className={mainClassName} style={mainStyle}>{children}</main>
       <SiteFooterBar authenticated />

@@ -5,6 +5,7 @@ import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
 import { PublicNavMenu } from "./PublicNavMenu";
 import styles from "./PublicHeader.module.css";
 
@@ -30,6 +31,7 @@ export async function PublicHeader() {
   // la retire, elle ne fait pas tomber l'en-tête.
   const team = user ? await getUserActiveTeam(user.id).catch(() => null) : null;
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
+  const switcherLabel = await languageSwitcherLabel();
 
   return (
     <header className={styles.root} data-sticky-header>
@@ -58,7 +60,7 @@ export async function PublicHeader() {
 
         <div className={styles.actions}>
           {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
-          <LanguageSwitcher />
+          <LanguageSwitcher label={switcherLabel} />
           {user ? (
             <>
               <CyberButton variant="primary" asChild>

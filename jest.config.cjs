@@ -15,6 +15,8 @@ module.exports = {
     moduleNameMapper: {
         // Les composants importent leurs modules CSS ; Node ne sait pas les lire.
         '\\.(css|scss|sass)$': '<rootDir>/tests/__mocks__/style-mock.cjs',
+        // Le vrai `next-intl/server` n'existe que dans le rendu serveur de Next.
+        '^next-intl/server$': '<rootDir>/tests/__mocks__/next-intl-server.ts',
         '^@/(.*)$': '<rootDir>/$1',
     },
     setupFiles: ['<rootDir>/tests/setup-env.cjs'],

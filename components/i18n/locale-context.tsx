@@ -1,17 +1,16 @@
 "use client";
 
-import { NextIntlClientProvider } from "next-intl";
 import { createContext, useContext, type ReactNode } from "react";
-import { DEFAULT_LOCALE, SITE_TIME_ZONE, type Locale } from "@/lib/shared/locales";
-import type { MessageNamespace, Messages } from "@/lib/shared/i18n-messages";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 
 /**
  * Langue de la page côté client.
  *
- * Contexte propre, en plus de celui de `next-intl` : il vaut `fr` hors de tout
+ * Contexte propre, distinct de celui de `next-intl` : il vaut `fr` hors de tout
  * fournisseur, si bien qu'un lien (`LocaleLink`, `TeamLink`…) se rend sans
- * fournisseur — dans un test comme dans un composant pas encore migré. Un
- * `useLocale()` de `next-intl` y lèverait une erreur.
+ * fournisseur — dans un test comme dans un composant pas encore migré. Et il ne
+ * tire **aucun** code de `next-intl` : la mise en page racine le pose sur
+ * toutes les pages sans alourdir celles qui n'ont rien de traduit.
  */
 const LocaleContext = createContext<Locale>(DEFAULT_LOCALE);
 
@@ -19,21 +18,7 @@ export function useAppLocale(): Locale {
   return useContext(LocaleContext);
 }
 
-/**
- * Fournit la langue **et** les messages des espaces de noms choisis à un
- * sous-arbre client. Rendu par `IntlMessages` (serveur), qui choisit les
- * espaces — jamais le catalogue entier.
- */
-export function AppIntlProvider({
-  locale,
-  messages,
-  children,
-}: Readonly<{ locale: Locale; messages: Partial<Pick<Messages, MessageNamespace>>; children: ReactNode }>) {
-  return (
-    <LocaleContext.Provider value={locale}>
-      <NextIntlClientProvider locale={locale} messages={messages} timeZone={SITE_TIME_ZONE}>
-        {children}
-      </NextIntlClientProvider>
-    </LocaleContext.Provider>
-  );
+/** Pose la langue de la page pour tout le sous-arbre client. */
+export function AppLocaleProvider({ locale, children }: Readonly<{ locale: Locale; children: ReactNode }>) {
+  return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
 }

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { pickMessages, type MessageNamespace } from "@/lib/shared/i18n-messages";
-import { AppIntlProvider } from "./locale-context";
+import { AppIntlProvider } from "./intl-provider";
 
 /**
  * Remet aux composants **client** d'un segment les messages qu'ils lisent, et

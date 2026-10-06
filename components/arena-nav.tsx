@@ -17,6 +17,11 @@ type ArenaNavProps = {
    * lien n'est pas rendu). Le nombre est celui du chargement de la page.
    */
   openReports?: number | null;
+  /**
+   * Précision du sélecteur de langue, traduite côté serveur
+   * (`languageSwitcherLabel()`). Absente : pas de sélecteur.
+   */
+  languageSwitcherLabel?: string;
 };
 
 /**
@@ -33,7 +38,13 @@ export const ARENA_NAV_LINKS = [
 ] as const;
 const links = ARENA_NAV_LINKS;
 
-export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: Readonly<ArenaNavProps>) {
+export function ArenaNav({
+  pseudo,
+  avatarUrl,
+  activeTeam,
+  openReports = null,
+  languageSwitcherLabel,
+}: Readonly<ArenaNavProps>) {
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
 
@@ -103,7 +114,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
           {/* Profil, équipe et déconnexion, à portée de main sur toutes les
               largeurs — sous 720 px, c'est le seul chemin vers sa propre équipe. */}
           {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
-          <LanguageSwitcher />
+          {languageSwitcherLabel && <LanguageSwitcher label={languageSwitcherLabel} />}
           <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
       </div>

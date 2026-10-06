@@ -43,7 +43,7 @@ import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import { DEFAULT_SHARE_IMAGE, SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
 import { APP_BACKGROUND_COLOR } from "@/lib/shared/web-manifest";
 import { appleStartupImageLinks } from "@/lib/shared/apple-startup-images";
-import { IntlMessages } from "@/components/i18n/IntlMessages";
+import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { LOCALE_HEADER, localeFromHeader } from "@/lib/shared/locales";
 
 /**
@@ -224,14 +224,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.
   const a11ySettings = parseA11yCookie(cookieStore.get(A11Y_COOKIE)?.value);
   // Langue de la page, posée par le middleware d'après l'URL (`/en/…`) : elle
-  // fixe `<html lang>`, et `IntlMessages` remet aux composants client les
-  // seuls messages communs — chaque segment traduit y ajoute les siens.
+  // fixe `<html lang>` et la langue des liens côté client. **Aucun** message
+  // n'est remis ici : le code client de `next-intl` (~12 Ko compressés) ne se
+  // charge que sous un segment traduit, par son propre `IntlMessages`.
   const locale = localeFromHeader(requestHeaders.get(LOCALE_HEADER));
 
   return (
     <html lang={locale} data-a11y={a11yAttribute(a11ySettings)}>
       <body style={FONT_VARIABLES}>
-        <IntlMessages namespaces={["common"]}>
+        <AppLocaleProvider locale={locale}>
         <ToastProvider>
           {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
               réglages ne doit pas traverser toute la page pour les trouver. */}
@@ -275,7 +276,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}
           {children}
         </ToastProvider>
-        </IntlMessages>
+        </AppLocaleProvider>
       </body>
     </html>
   );
