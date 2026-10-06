@@ -288,10 +288,12 @@ aurait affiché la carte française. Ici, `pageMetadata({ shareCard, locale })`
 côté du middleware (son `matcher` écarte les images) : ni nonce ni CSP pour un
 robot. Clé ou langue inconnue, extension absente : 404.
 
-**Texte de remplacement** (`og:image:alt`) : le titre de l'encart, sauf quand la
-carte ne le montre pas — `shareImageAlt` le remplace alors : `/classement`
-(« Classement des équipes BlueGenji », juste pour le podium comme pour son repli)
-et une section de `/bot/docs` (la carte ne nomme que la documentation). Le repli
+**Texte de remplacement** (`og:image:alt`) : ce que la carte montre — son titre
+dans la langue de la page, suivi du nom du site (`shareCardAlt`), et non le
+titre de l'encart. `shareImageAlt` le remplace quand le contenu varie : `/classement`
+(« Classement des équipes BlueGenji », juste pour le podium comme pour son repli).
+Une section de `/bot/docs` garde ainsi « Documentation du bot », que sa carte
+montre, et non le nom de la section. Le repli
 d'une fiche de tournoi illisible pose l'encart du site **en entier** : sans quoi
 la carte générique de `/tournois` (mise en page parente) y descendrait.
 
