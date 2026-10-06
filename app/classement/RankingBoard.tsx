@@ -63,7 +63,14 @@ function trendText(row: LandingLeaderboardRow): { symbol: string; label: string;
 
 function FormStrip({ form }: Readonly<{ form: readonly FormResult[] }>) {
   const recent = form.slice(0, RANKING_FORM_LENGTH);
-  if (recent.length === 0) return <span className={styles.neutral}>—</span>;
+  if (recent.length === 0) {
+    return (
+      <span className={styles.neutral}>
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">Aucun résultat récent</span>
+      </span>
+    );
+  }
   const spoken = recent.map((result) => FORM_LETTERS[result]).join(", ");
   return (
     <span className={styles.form} role="img" aria-label={`Forme récente, du plus récent au plus ancien : ${spoken}`}>
