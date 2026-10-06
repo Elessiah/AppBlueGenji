@@ -84,7 +84,7 @@
     "tournaments": {
       "eyebrow": "Tournois",
       "title": "Tournois amateurs",
-      "subtitle": "Inscriptions, brackets mis à jour en temps réel et résultats des tournois Overwatch et Marvel Rivals."
+      "subtitle": "Inscriptions, brackets mis à jour en temps réel et résultats des tournois Overwatch et Marvel Rivals. Connexion requise."
     },
     "teams": {
       "eyebrow": "Équipes",
@@ -113,6 +113,7 @@
   "podium": {
     "eyebrow": "Classement",
     "title": "Le podium BlueGenji",
+    "alt": "Classement des équipes BlueGenji",
     "points": "pts",
     "places": ["1re", "2e", "3e"]
   }

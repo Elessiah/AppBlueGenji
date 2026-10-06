@@ -39,9 +39,9 @@ export async function generateMetadata(): Promise<Metadata> {
     shareDescription: meta.shareDescription,
     path: "/classement",
     shareCard: "ranking",
-    // La carte montre le podium (repli sur la carte du classement sans trois
-    // équipes classées, cas rare).
-    shareImageAlt: messages.share.podium.title,
+    // La carte montre le podium, ou la carte du classement sans trois équipes
+    // classées (ou base injoignable) : un texte juste pour les deux.
+    shareImageAlt: messages.share.podium.alt,
     locale,
   });
 }

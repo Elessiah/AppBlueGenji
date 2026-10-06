@@ -84,7 +84,7 @@
     "tournaments": {
       "eyebrow": "Tournaments",
       "title": "Amateur tournaments",
-      "subtitle": "Registration, real-time brackets and results of Overwatch and Marvel Rivals tournaments."
+      "subtitle": "Registration, real-time brackets and results of Overwatch and Marvel Rivals tournaments. Sign in required."
     },
     "teams": {
       "eyebrow": "Teams",
@@ -113,6 +113,7 @@
   "podium": {
     "eyebrow": "Ranking",
     "title": "The BlueGenji podium",
+    "alt": "BlueGenji team ranking",
     "points": "pts",
     "places": ["1st", "2nd", "3rd"]
   }

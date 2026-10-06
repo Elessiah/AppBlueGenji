@@ -37,7 +37,15 @@ type MetadataProps = {
  * souvent une seconde fois pour le flux SSE, le cache ne durant que 3 s.
  */
 export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
-  const fallback: Metadata = { title: "Tournoi", description: SITE_DESCRIPTION };
+  // L'encart du site, posé en entier : sans lui, la fiche hériterait de la
+  // carte générique de `/tournois` (mise en page parente), dont le texte ne
+  // correspond pas à l'image du site que `opengraph-image.tsx` dessine ici.
+  const fallback: Metadata = {
+    title: "Tournoi",
+    description: SITE_DESCRIPTION,
+    openGraph: { type: "website", siteName: SITE_NAME, locale: "fr_FR", title: SITE_NAME, description: SITE_DESCRIPTION },
+    twitter: { card: "summary_large_image", title: SITE_NAME, description: SITE_DESCRIPTION },
+  };
 
   const { id } = await params;
   const tournamentId = Number(id);
