@@ -103,13 +103,15 @@ export async function promoteReportedMaps(
   connection: PoolConnection,
   matchId: number,
   from: "TEAM1" | "TEAM2",
+  options: { locking?: boolean } = {},
 ): Promise<void> {
+  const lock = options.locking === false ? "" : " FOR UPDATE";
   // Rien à promouvoir, rien à effacer : une clôture concurrente du même report
   // expiré (l'entretien tourne à chaque écriture et à chaque chargement) a déjà
   // promu la proposition puis l'a effacée. Sans cette garde, la seconde
   // effaçait le détail retenu par la première sans rien remettre.
   const pending = await connection.execute<(RowDataPacket & { map_number: number })[]>(
-    `SELECT map_number FROM bg_match_maps WHERE match_id = ? AND source = ? FOR UPDATE`,
+    `SELECT map_number FROM bg_match_maps WHERE match_id = ? AND source = ?${lock}`,
     [matchId, from],
   );
   const rows = Array.isArray(pending) && Array.isArray(pending[0]) ? pending[0] : [];

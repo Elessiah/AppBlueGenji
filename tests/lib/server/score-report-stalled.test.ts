@@ -77,6 +77,34 @@ describe("resolveExpiredScoreReports", () => {
     expect(finalizeMatch).not.toHaveBeenCalled();
   });
 
+  it("clôt sur le report relu sous verrou, pas sur la copie lue avant (MAP_SCORES.md)", async () => {
+    const connection = fakeConnection({
+      rows: (q) => {
+        if (q.startsWith("SELECT status,")) {
+          // L'équipe 1 a corrigé 2-1 en 2-0 entre la sélection et le verrou.
+          return [{
+            status: "AWAITING_CONFIRMATION",
+            team1_report_score: 2,
+            team1_report_opponent_score: 0,
+            team2_report_score: null,
+            team2_report_opponent_score: null,
+          }];
+        }
+        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
+        return [];
+      },
+    });
+
+    await resolveExpiredScoreReports(connection, 12);
+
+    expect(finalizeMatch).toHaveBeenCalledWith(
+      connection,
+      12,
+      expect.objectContaining({ id: 31 }),
+      expect.objectContaining({ team1Score: 2, team2Score: 0 }),
+    );
+  });
+
   it("ne tranche pas d'office un report contesté entre-temps (MAP_SCORES.md)", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -143,7 +171,7 @@ describe("resolveExpiredScoreReports", () => {
       }),
     );
 
-    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, expect.any(Number), "TEAM1");
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, expect.any(Number), "TEAM1", { locking: false });
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
@@ -193,7 +221,7 @@ describe("resolveExpiredScoreReports", () => {
     );
 
     // Le détail map par map du report qui fait foi devient le résultat retenu.
-    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, 32, "TEAM2");
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, 32, "TEAM2", { locking: false });
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });

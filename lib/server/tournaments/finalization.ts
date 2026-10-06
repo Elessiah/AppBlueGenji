@@ -513,8 +513,11 @@ export async function resolveExpiredScoreReports(
       // écriture comme à chaque chargement. Deux clôtures concurrentes du même
       // report réécrivaient le même score sans dommage ; avec le détail map par
       // map, la seconde effaçait celui que la première venait de retenir.
-      if (!(await stillSingleReport(connection, Number(match.id), team1Reported))) continue;
-      const { team1Score, team2Score } = singleReportScores(match);
+      const fresh = await stillSingleReport(connection, match, team1Reported);
+      if (!fresh) continue;
+      // Scores relus sous verrou : une correction du report validée entre la
+      // sélection et le verrou fait foi, pas la copie lue sans verrou.
+      const { team1Score, team2Score } = singleReportScores(fresh);
 
       const format = await loadTournamentMatchFormat(
         connection,
@@ -527,7 +530,10 @@ export async function resolveExpiredScoreReports(
       // retenu (`docs/features/MAP_SCORES.md`), avant que la clôture n'efface
       // les propositions.
       const { promoteReportedMaps } = await import("./match-maps");
-      await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2");
+      // Sans lecture verrouillante : l'entretien tourne aussi pendant la
+      // construction de l'instantané, qui ne rejoue pas sa transaction ; le
+      // match vient d'être verrouillé et relu, sa proposition ne bouge plus.
+      await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2", { locking: false });
       await finalizeMatch(connection, tournamentId, match, {
         team1Score,
         team2Score,
@@ -566,9 +572,10 @@ export async function resolveExpiredScoreReports(
  */
 async function stillSingleReport(
   connection: PoolConnection,
-  matchId: number,
+  match: ExpiredMatchRow,
   team1Reported: boolean,
-): Promise<boolean> {
+): Promise<ExpiredMatchRow | null> {
+  const matchId = Number(match.id);
   const result = await connection.execute<(RowDataPacket & Partial<ExpiredMatchRow> & { status?: string })[]>(
     `SELECT status, team1_report_score, team1_report_opponent_score,
             team2_report_score, team2_report_opponent_score
@@ -576,10 +583,10 @@ async function stillSingleReport(
     [matchId],
   );
   const fresh = Array.isArray(result) && Array.isArray(result[0]) ? result[0][0] : undefined;
-  if (fresh?.status === undefined) return true;
-  if (fresh.status !== "AWAITING_CONFIRMATION") return false;
-  const row = fresh as ExpiredMatchRow;
-  return hasTeam1Report(row) === team1Reported && hasTeam2Report(row) === !team1Reported;
+  if (fresh?.status === undefined) return match;
+  if (fresh.status !== "AWAITING_CONFIRMATION") return null;
+  const row = { ...match, ...fresh } as ExpiredMatchRow;
+  return hasTeam1Report(row) === team1Reported && hasTeam2Report(row) === !team1Reported ? row : null;
 }
 
 /** L'engagé 1 a-t-il déposé son report (son score et celui de l'adversaire) ? */

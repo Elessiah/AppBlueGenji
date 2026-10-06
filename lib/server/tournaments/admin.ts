@@ -13,7 +13,7 @@ import {
 import { MatchRow } from "./_internal";
 import { forfeitMatchScores, loadTournamentMatchFormat, loadTournamentMatchRules, reopenTournament } from "./repository";
 import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
-import { replaceMatchMaps } from "./match-maps";
+import { clearMapSets, replaceMatchMaps } from "./match-maps";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
@@ -475,7 +475,7 @@ export async function adminSaveMatchScores(
     );
     // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit
     // plus, que le client ait envoyé des maps ou non.
-    await replaceMatchMaps(connection, matchId, "FINAL", [], null);
+    await clearMapSets(connection, [matchId], ["FINAL"]);
   } else if (mapEntry && mapEntry.maps.length > 0) {
     // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
     // exiger un match terminé (l'arbitrage note l'avancement).
@@ -603,7 +603,9 @@ export async function adminResolveMatch(
   // le score plein pourrait sinon coïncider avec un détail noté plus tôt.
   // Sans `mapEntry` sur un score (moteur), le détail existant reste tel quel.
   const forfeited = forfeitTeamId !== undefined || doubleForfeit;
-  if (forfeited) await replaceMatchMaps(connection, matchId, "FINAL", [], mapEntry?.userId ?? null);
+  // Lecture sans verrou (`clearMapSets`) : le forfait déclaré par une engagée
+  // passe ici sans rejeu sur interblocage.
+  if (forfeited) await clearMapSets(connection, [matchId], ["FINAL"]);
   else if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", mapEntry.maps, mapEntry.userId);
 
   await tryAutoResolveByes(connection, tournamentId);

@@ -55,6 +55,7 @@ function fakeConnection(matchFormat: { type: string; value: number }) {
 }
 
 const CLEAR_FINAL = "DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?";
+const CLEAR_FINAL_SET = "DELETE FROM bg_match_maps WHERE match_id IN (?) AND source IN (?)";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -79,7 +80,8 @@ describe("arbitrage — détail map par map", () => {
   it("un forfait enregistré efface le détail, même sans maps envoyées", async () => {
     const { conn, maps } = fakeConnection({ type: "BO", value: 1 });
     await adminSaveMatchScores(conn, 10, undefined, undefined, 200);
-    expect(maps).toEqual([{ sql: CLEAR_FINAL, params: [10, "FINAL"] }]);
+    expect(maps.at(-1)).toEqual({ sql: CLEAR_FINAL_SET, params: [10, "FINAL"] });
+    expect(maps[0].sql).not.toMatch(/FOR UPDATE/);
   });
 
   it("un score à la main avec une liste vide efface le détail ; sans liste, il n'y touche pas", async () => {
@@ -95,7 +97,7 @@ describe("arbitrage — détail map par map", () => {
   it("un forfait tranché efface le détail, même déclaré par une engagée (sans mapEntry)", async () => {
     const { conn, maps } = fakeConnection({ type: "BO", value: 1 });
     await adminResolveMatch(conn, 10, undefined, undefined, 200);
-    expect(maps.map((m) => m.sql)).toContain(CLEAR_FINAL);
+    expect(maps.map((m) => m.sql)).toContain(CLEAR_FINAL_SET);
   });
 
   it("« Valider le résultat » avec des maps tranche sur le score dérivé", async () => {
