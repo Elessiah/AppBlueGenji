@@ -195,13 +195,13 @@ describe("coquille en anglais — composants serveur", () => {
   it("pied de page de la vitrine", async () => {
     const html = english(await PublicFooter());
     for (const label of [
-      "Non-profit association (French law of 1901).",
+      "Nonprofit association (French law of 1901).",
       "COMPETITIONS",
       ">LEGAL<",
       "Manifesto",
       "Volunteers",
       "Partners",
-      "Articles of association",
+      "Bylaws",
       "Internal rules",
       "Accessibility settings",
       "Accessibility: non-compliant",

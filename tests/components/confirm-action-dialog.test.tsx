@@ -31,6 +31,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ConfirmActionDialog, runConfirmation } from "@/components/ui/confirm-action-dialog";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
 import { diffPlatformRoles, roleChangeNeedsConfirmation } from "@/lib/shared/permissions";
 import { readSource } from "../helpers/read-source";
 
@@ -105,6 +107,24 @@ describe("ConfirmActionDialog — balisage", () => {
     expect(html).toMatch(/<button type="submit" class="btn danger">Supprimer<\/button>/);
     expect(html).toContain("<p>Perdu.</p>");
     expect(html).not.toContain("<input");
+  });
+
+  it("contenu resté en français sur une page anglaise : modale entière en français, `lang=\"fr\"`", () => {
+    const dialog = (
+      <ConfirmActionDialog title="Supprimer ?" confirmLabel="Supprimer" pendingLabel="…" contentLang="fr" onClose={noop} onConfirm={resolved}>
+        <p>Perdu.</p>
+      </ConfirmActionDialog>
+    );
+    const english = render(
+      <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+        {dialog}
+      </ShellTextProvider>,
+    );
+    expect(english).toMatch(/role="alertdialog"[^>]*lang="fr"/);
+    expect(english).toContain(">Annuler</button>");
+    expect(english).not.toContain("Cancel");
+    // Page française : rien n'est ajouté.
+    expect(render(dialog)).not.toContain("lang=");
   });
 
   it("ton primary pour un engagement", () => {
