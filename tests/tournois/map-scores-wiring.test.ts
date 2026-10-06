@@ -153,7 +153,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   it("un forfait ou une saisie fermée taisent les refus de map : la liste est masquée et ses maps ne partent pas", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
     expect(hook).toMatch(/const mapsSent =\s*maps\.length > 0 &&\s*options\.scoreEntryClosed !== true &&\s*state\.forfeitTeamId === undefined &&\s*state\.doubleForfeit !== true;/);
-    expect(hook).toContain("mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : [], decision),");
+    expect(hook).toContain("mapsRefused: mapRefusals(matchFormat, game, mapsSent ? sentMaps : [], decision),");
     expect(hook).toContain("const sendMaps = mapsSent;");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toContain("if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);");
@@ -340,5 +340,28 @@ describe("détail map par map — blocages qui ne tiennent pas aux maps", () => 
       expect(hook).toContain(`"${blocker}",`);
     }
     expect(hook).toContain("save: isStructuralBlocker(decision.saveBlocker) ? null : save.error,");
+  });
+});
+
+describe("détail map par map — lignes progressives dans les modales", () => {
+  const list = () => readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+
+  it("toute modification passe par l'affichage progressif ; une ligne ajoutée s'annonce sans voler le focus", () => {
+    expect(list()).toContain("const change = (next: MatchMapInput[]) => onChange(progressiveMapRows(format, game, next, minRows));");
+    expect(list()).toContain('<p className="sr-only" aria-live="polite">');
+    expect(list()).toContain("if (maps.length > previousLength.current && !focusNewRow.current) {");
+    // « Ajouter une map » ne sert plus qu'à ouvrir la première ligne (arbitrage).
+    expect(list()).toContain("{maps.length === 0 && (");
+  });
+
+  it("l'engagé part d'une ligne ; l'arbitrage d'aucune ; ce qui part retire la ligne vierge", () => {
+    const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(player).toContain("progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), 1)");
+    expect(player).toContain("const maps = trimTrailingBlankMaps(rows);");
+    expect(player).toMatch(/maps=\{rows\}\s*onChange=\{setRows\}\s*minRows=\{1\}/);
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook).toContain("const openingRows = () => progressiveMapRows(matchFormat, game, initialAdminMaps(match), 0);");
+    expect(hook).toContain("const sentMaps = trimTrailingBlankMaps(maps);");
+    expect(hook).toContain("adminScoreBody(state, sendMaps ? sentMaps : null, decision.scores)");
   });
 });

@@ -12,6 +12,9 @@ import {
   mapListViolationMessage,
   MAP_LIST_ERROR_CODES,
   refusalOnTouchedRow,
+  progressiveMapRows,
+  trimTrailingBlankMaps,
+  isMapComplete,
   mapWinnerSide,
   mapsMatchStoredScore,
   normalizeReplayCode,
@@ -284,5 +287,95 @@ describe("refusalOnTouchedRow — une ligne vierge n'appelle pas de reproche", (
 
   it("borne un index hors liste (plafond dépassé) à la dernière ligne", () => {
     expect(refusalOnTouchedRow({ field: { index: 9, field: "replayCode" } }, [filled])).toBe(true);
+  });
+});
+
+describe("progressiveMapRows — lignes une à une au fil du format (demande du 2026-10-06)", () => {
+  const FT2: MatchFormat = { type: "FT", value: 2 };
+  const BO5_DRAWS: MatchFormat = { type: "BO", value: 5, drawsAllowed: true };
+  let n = 0;
+  const win = (side: 1 | 2) => {
+    n += 1;
+    return { replayCode: `CODE${String(n).padStart(2, "0")}`, team1Score: side === 1 ? 2 : 0, team2Score: side === 1 ? 0 : 2 };
+  };
+  const drawn = () => {
+    n += 1;
+    return { replayCode: `CODE${String(n).padStart(2, "0")}`, team1Score: 1, team2Score: 1 };
+  };
+  /** Rejoue une saisie ligne à ligne : chaque map remplit la dernière ligne affichée. */
+  const play = (format: MatchFormat, results: Array<() => ReturnType<typeof win>>) => {
+    let rows = progressiveMapRows(format, "OW", [], 1);
+    for (const next of results) {
+      expect(isMapTouched(rows[rows.length - 1])).toBe(false);
+      rows = progressiveMapRows(format, "OW", [...rows.slice(0, -1), next()], 1);
+    }
+    return rows;
+  };
+
+  it("commence par une seule ligne vierge (engagé), aucune pour l'arbitrage", () => {
+    expect(progressiveMapRows(FT2, "OW", [], 1)).toEqual([emptyMap()]);
+    expect(progressiveMapRows(FT2, "OW", [], 0)).toEqual([]);
+  });
+
+  it("FT2 2-0 : deux lignes, pas de troisième", () => {
+    const rows = play(FT2, [() => win(1), () => win(1)]);
+    expect(rows).toHaveLength(2);
+    expect(rows.every(isMapTouched)).toBe(true);
+  });
+
+  it("FT2 1-1 ouvre une troisième ligne ; 2-1 s'arrête à trois", () => {
+    const rows = play(FT2, [() => win(1), () => win(2), () => win(1)]);
+    expect(rows).toHaveLength(3);
+    expect(deriveMatchScore(rows)).toMatchObject({ team1: 2, team2: 1 });
+  });
+
+  it("BO5 3-0 : arrêt dès que l'équipe ne peut plus être rattrapée", () => {
+    expect(play({ type: "BO", value: 5 }, [() => win(1), () => win(1), () => win(1)])).toHaveLength(3);
+  });
+
+  it("BO5 à égalités ouvertes, 2-2 : la cinquième ligne apparaît, une map nulle la clôt", () => {
+    const four = play(BO5_DRAWS, [() => win(1), () => win(2), () => win(1), () => win(2)]);
+    expect(four).toHaveLength(5);
+    expect(isMapTouched(four[4])).toBe(false);
+    const five = progressiveMapRows(BO5_DRAWS, "OW", [...four.slice(0, -1), drawn()], 1);
+    expect(five).toHaveLength(5);
+    expect(checkMapList(BO5_DRAWS, "OW", five, { decisive: true }).error).toBeNull();
+  });
+
+  it("une ligne incomplète n'ouvre pas la suivante", () => {
+    const partial = { replayCode: "ABC123", team1Score: 2, team2Score: Number.NaN };
+    expect(progressiveMapRows(FT2, "OW", [partial], 1)).toEqual([partial]);
+    expect(isMapComplete(partial, "OW")).toBe(false);
+    expect(isMapComplete({ ...partial, replayCode: "AB", team2Score: 0 }, "OW")).toBe(false);
+  });
+
+  it("une retouche qui tranche plus tôt retire les lignes vierges, garde les renseignées", () => {
+    const [a, b] = [win(1), win(2)];
+    // 1-1 en FT2 : la troisième ligne est vierge.
+    const open = progressiveMapRows(FT2, "OW", [a, b], 1);
+    expect(open).toHaveLength(3);
+    // La map 2 corrigée en victoire de l'équipe 1 : 2-0, la ligne vierge s'en va.
+    const fixed = progressiveMapRows(FT2, "OW", [a, { ...b, team1Score: 2, team2Score: 0 }, open[2]], 1);
+    expect(fixed).toHaveLength(2);
+    // Une troisième ligne renseignée reste, et la validation la désigne.
+    const c = win(2);
+    const kept = progressiveMapRows(FT2, "OW", [a, { ...b, team1Score: 2, team2Score: 0 }, c], 1);
+    expect(kept).toHaveLength(3);
+    expect(checkMapList(FT2, "OW", kept, { decisive: true })).toMatchObject({
+      error: "MAP_AFTER_DECISION",
+      field: { index: 2 },
+    });
+  });
+
+  it("une proposition adverse pré-remplie s'affiche telle quelle, sans ligne de plus", () => {
+    const theirs = [win(1), win(2), win(1)];
+    expect(progressiveMapRows(FT2, "OW", theirs, 1)).toEqual(theirs);
+  });
+
+  it("ce qui part retire la ligne vierge de fin, mais jamais la seule ligne", () => {
+    const a = win(1);
+    expect(trimTrailingBlankMaps([a, emptyMap()])).toEqual([a]);
+    expect(trimTrailingBlankMaps([emptyMap()])).toEqual([emptyMap()]);
+    expect(trimTrailingBlankMaps([])).toEqual([]);
   });
 });

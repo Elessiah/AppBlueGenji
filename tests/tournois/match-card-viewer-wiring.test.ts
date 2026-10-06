@@ -68,7 +68,7 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
 
   it("la modale saisit map par map, colonnes ordonnées comme la carte (MAP_SCORES.md)", () => {
     // Une ligne par map : équipe 1 puis équipe 2, dans l'orientation du plateau.
-    expect(PLAYER_DIALOG).toMatch(/<MapScoreList[\s\S]{0,200}team1Name=\{team1\}[\s\S]{0,40}team2Name=\{team2\}/);
+    expect(PLAYER_DIALOG).toMatch(/<MapScoreList[\s\S]{0,300}team1Name=\{team1\}[\s\S]{0,40}team2Name=\{team2\}/);
     // Le message d'envoi parle depuis l'engagé : la conversion passe par le
     // module pur, jamais par une inversion recopiée.
     expect(PLAYER_DIALOG).toContain("toReporterScores(myTeamIsTeam1,");
