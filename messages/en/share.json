@@ -109,7 +109,7 @@
   },
   "teamProfile": {
     "eyebrow": "Team",
-    "subtitle": "A team of the BlueGenji amateur scene.",
+    "subtitle": "A team on the BlueGenji amateur scene.",
     "rating": "Rating",
     "record": "Record",
     "recordValue": "{wins} W · {losses} L",
