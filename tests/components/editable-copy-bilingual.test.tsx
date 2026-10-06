@@ -4,6 +4,8 @@
  * marque « EN » des textes à rattraper (`docs/features/EDITABLE_SITE_COPY.md`).
  */
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 jest.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 jest.mock("@/components/ui/toast", () => ({
@@ -68,7 +70,7 @@ beforeEach(() => {
 describe("EditableCopy — éditeur bilingue", () => {
   it("montre le français et l'anglais côte à côte, chacun dans sa langue", () => {
     const markup = render({ fr: "Organiser", en: "Organize", enMissing: false }, { open: true });
-    expect(markup).toContain('<label class="langLabel" for="copy-home.hero.title">Français</label>');
+    expect(markup).toContain('<label class="langLabel" for="copy-home.hero.title">Français (obligatoire)</label>');
     expect(markup).toContain('<label class="langLabel" for="copy-home.hero.title-en">Anglais (obligatoire)</label>');
     expect(markup).toMatch(/<textarea[^>]*id="copy-home.hero.title"[^>]*lang="fr"[^>]*required=""/);
     expect(markup).toMatch(/<textarea[^>]*id="copy-home.hero.title-en"[^>]*lang="en"/);
@@ -138,5 +140,25 @@ describe("submitSiteCopy", () => {
     const outcome = await submitSiteCopy(fetcher, "home.hero.title", "Titre", "Title");
     expect(outcome).toEqual({ ok: false, code: "", fallback: "Erreur réseau, réessaye." });
     expect(fieldForError("", SITE_COPY_FIELD_ERRORS)).toBeNull();
+  });
+});
+
+describe("EditableCopy — remise à l'origine", () => {
+  const source = readFileSync(join(__dirname, "..", "..", "components", "cyber", "landing", "EditableCopy.tsx"), "utf8");
+
+  it("ne supprime rien d'un clic : le bouton ouvre une confirmation", () => {
+    expect(source).toContain("onClick={() => setConfirmReset(true)}");
+    expect(source).not.toContain("onClick={reset}");
+  });
+
+  it("dit que le français et l'anglais repartent ensemble, en français sous /en", () => {
+    const dialog = source.slice(source.indexOf("<ConfirmActionDialog"));
+    expect(dialog).toContain("onConfirm={reset}");
+    expect(dialog).toContain("contentLang={staffLang}");
+    expect(dialog).toContain("Le français <strong>et</strong> l&apos;anglais");
+  });
+
+  it("ne s'ouvre pas avec l'éditeur", () => {
+    expect(render({ fr: "A", en: "B", enMissing: false }, { open: true })).not.toContain("Rétablir le texte d&#x27;origine");
   });
 });
