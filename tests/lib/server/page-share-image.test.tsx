@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/page-share-image";
 import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { loadSharePodium } from "@/lib/server/share-podium";
+import { loadShareTeam } from "@/lib/server/share-team";
 import { GET } from "@/app/og/[locale]/[card]/route";
 
 /**
@@ -34,6 +35,7 @@ jest.mock("next/og", () => ({
 }));
 jest.mock("@/lib/server/share-podium");
 jest.mock("@/lib/server/share-card-logo");
+jest.mock("@/lib/server/share-team", () => ({ TEAM_SHARE_LOGO_SIZE: 208, loadShareTeam: jest.fn() }));
 
 const PODIUM = [
   { teamName: "Alpha", points: 1240, logoSrc: null },
@@ -49,6 +51,50 @@ async function render(key: string, locale: "fr" | "en" = "fr") {
 beforeEach(() => {
   jest.mocked(loadSharePodium).mockReset().mockResolvedValue(PODIUM);
   jest.mocked(shareCardLogo).mockReset().mockResolvedValue(null);
+  jest.mocked(loadShareTeam).mockReset().mockResolvedValue(null);
+});
+
+describe("carte nominative d'une équipe", () => {
+  const TEAM = { teamName: "Dragon Squad", wins: 12, losses: 3, draws: 0, points: 1240, logoSrc: null };
+
+  it("rend nom, cote et bilan, en cache court, sans lire le podium", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue(TEAM);
+    const result = await render("team-42");
+    expect(loadShareTeam).toHaveBeenCalledWith(42);
+    expect(loadSharePodium).not.toHaveBeenCalled();
+    expect(result!.image.options.headers["cache-control"]).toBe(PODIUM_CARD_CACHE_CONTROL);
+    for (const text of ["Dragon Squad", "1240 pts", "12 V · 3 D", "Cote", "Bilan", "Équipe"]) expect(result!.html).toContain(text);
+    // Sans logo, l'initiale ; jamais le bouclier générique.
+    expect(result!.html).toContain(">D<");
+  });
+
+  it("pose le logo du site à la place du motif", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM, logoSrc: "data:image/png;base64,AAAA" });
+    const result = await render("team-42");
+    expect(result!.html).toContain('src="data:image/png;base64,AAAA"');
+    expect(result!.html).toContain('width="208"');
+  });
+
+  it("écrit la carte en anglais sous /og/en", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue(TEAM);
+    const result = await render("team-42", "en");
+    for (const text of ["Team", "Rating", "Record", "12 W · 3 L", "Nonprofit association"]) expect(result!.html).toContain(text);
+  });
+
+  it("retombe sur la carte générique (équipe absente, fantôme, solo, base injoignable), en cache court", async () => {
+    const result = await render("team-42");
+    expect(result!.html).toContain("Fiche d&#x27;équipe");
+    expect(result!.html).not.toContain("Dragon Squad");
+    expect(result!.image.options.headers["cache-control"]).toBe(PODIUM_CARD_CACHE_CONTROL);
+  });
+
+  it("ne lit rien pour une clé d'équipe malformée (404 par la route)", async () => {
+    const response = await GET(new Request("http://localhost/og/fr/team-007.png"), {
+      params: Promise.resolve({ locale: "fr", card: "team-007.png" }),
+    });
+    expect(response.status).toBe(404);
+    expect(loadShareTeam).not.toHaveBeenCalled();
+  });
 });
 
 describe("renderPageShareImage", () => {

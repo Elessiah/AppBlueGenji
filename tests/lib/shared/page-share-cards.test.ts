@@ -18,6 +18,10 @@ import {
   podiumShareEntries,
   resolvePageShareCard,
   ruleModeShareCardKey,
+  TEAM_SHARE_NAME_MAX_LENGTH,
+  parseTeamShareCardKey,
+  teamShareCard,
+  teamShareCardKey,
   type ShareMessages,
 } from "@/lib/shared/page-share-cards";
 import { SITE_SHARE_CARD } from "@/lib/shared/share-metadata";
@@ -207,5 +211,73 @@ describe("podium", () => {
     expect(entries[0].name).toBe("Alpha");
     expect(entries[1].name).toBe("?");
     expect(entries[2].initial).toBe("É");
+  });
+});
+
+describe("carte nominative d'une équipe", () => {
+  const team = { teamName: "Dragon Squad", wins: 12, losses: 3, draws: 0, points: 1240.4 };
+
+  it("nomme la clé team-<id> et la relit", () => {
+    expect(teamShareCardKey(42)).toBe("team-42");
+    expect(parseTeamShareCardKey("team-42")).toBe(42);
+    expect(pageShareImagePath(teamShareCardKey(42))).toBe("/og/fr/team-42.png");
+  });
+
+  it.each(["team-0", "team-007", "team--1", "team-1.5", "team-12345678901", "team-", "team-abc", "team-42/../x", " team-4"])(
+    "refuse la clé %s",
+    (key) => {
+      expect(parseTeamShareCardKey(key)).toBeNull();
+      expect(parseShareImageSegments("fr", `${key}.png`)).toBeNull();
+    },
+  );
+
+  it("sert la clé d'équipe dans les deux langues, extension exigée", () => {
+    expect(parseShareImageSegments("en", "team-42.png")).toEqual({ locale: "en", key: "team-42" });
+    expect(parseShareImageSegments("fr", "team-42")).toBeNull();
+    expect(parseShareImageSegments("de", "team-42.png")).toBeNull();
+  });
+
+  it("retombe sur la carte générique de la fiche, qui ne dit pas si l'équipe existe", () => {
+    const fallback = resolvePageShareCard("team-42", frShare, modeTexts(frRules))!;
+    expect(fallback.title).toBe(frShare.pages.team.title);
+    expect(fallback.motif).toBe(PAGE_SHARE_CARD_STYLES.team.motif);
+  });
+
+  it("écrit nom, cote et bilan comme le classement, en français", () => {
+    const card = teamShareCard(team, frShare);
+    expect(card).toMatchObject({ eyebrow: "Équipe", title: "Dragon Squad", initial: "D", footer: "Association loi 1901" });
+    expect(card.facts).toEqual([
+      { label: "Cote", value: "1240 pts" },
+      { label: "Bilan", value: "12 V · 3 D" },
+    ]);
+  });
+
+  it("écrit la carte en anglais, nuls compris quand il y en a", () => {
+    const card = teamShareCard({ ...team, draws: 2 }, enShare);
+    expect(card).toMatchObject({ eyebrow: "Team", footer: "Nonprofit association" });
+    expect(card.facts).toEqual([
+      { label: "Rating", value: "1240 pts" },
+      { label: "Record", value: "12 W · 3 L · 2 D" },
+    ]);
+  });
+
+  it("nettoie un nom saisi (visibleText), le borne sur un mot, et remplace un nom invisible", () => {
+    expect(teamShareCard({ ...team, teamName: "Dra​gon‮" }, frShare).title).toBe("Dragon");
+    expect(teamShareCard({ ...team, teamName: "​" }, frShare)).toMatchObject({ title: "?", initial: "?" });
+    const long = teamShareCard({ ...team, teamName: "Les Invincibles Chevaliers De La Table Ronde Du Grand Ouest" }, frShare);
+    expect(Array.from(long.title).length).toBeLessThanOrEqual(TEAM_SHARE_NAME_MAX_LENGTH);
+    expect(long.title.endsWith("…")).toBe(true);
+  });
+
+  it("ne parle d'aucun joueur", () => {
+    for (const messages of [frShare, enShare]) {
+      expect(JSON.stringify(messages.teamProfile)).not.toMatch(/joueur|player|pseudo|avatar/iu);
+    }
+  });
+
+  it("existe en français et en anglais, mêmes clés", () => {
+    expect(Object.keys(enShare.teamProfile).sort((a, b) => a.localeCompare(b))).toEqual(
+      Object.keys(frShare.teamProfile).sort((a, b) => a.localeCompare(b)),
+    );
   });
 });

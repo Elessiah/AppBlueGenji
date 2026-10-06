@@ -47,6 +47,13 @@ describe("teamLogoDataUrl", () => {
     expect(String(path).replaceAll("\\", "/")).toMatch(/public\/uploads\/teams\/7-abc\.webp$/);
   });
 
+  it("convertit à la taille demandée (carte d'une équipe)", async () => {
+    jest.mocked(readFile).mockResolvedValue(webp);
+    const url = await teamLogoDataUrl("/api/uploads/teams/7-abc.webp", 208);
+    const meta = await sharp(Buffer.from(url!.split(",")[1], "base64")).metadata();
+    expect([meta.width, meta.height]).toEqual([208, 208]);
+  });
+
   it.each([
     ["absent", null],
     ["hors du site", "https://example.com/logo.png"],

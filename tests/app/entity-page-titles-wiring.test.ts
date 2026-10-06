@@ -68,6 +68,18 @@ describe("fiche d'équipe", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("désigne l'image nominative de l'équipe sans aucune lecture pour elle", async () => {
+    mockedUser.mockResolvedValue(null);
+    const metadata = await teamMetadata(params("12"));
+    expect(metadata.twitter).toMatchObject({ images: ["/og/fr/team-12.png"] });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("garde l'image générique pour un identifiant invalide", async () => {
+    const metadata = await teamMetadata(params("12abc"));
+    expect(metadata.twitter).toMatchObject({ images: ["/og/fr/team.png"] });
+  });
+
   it("retombe sur le titre générique pour un identifiant invalide, sans rien lire", async () => {
     expect(await teamMetadata(params("12abc"))).toMatchObject({ title: "Équipe" });
     expect(mockedUser).not.toHaveBeenCalled();

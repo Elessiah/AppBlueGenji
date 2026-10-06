@@ -91,3 +91,26 @@ describe("og:image:alt des cartes qui ne montrent pas le titre de l'encart", () 
     );
   });
 });
+
+describe("fiche d'équipe : image nominative, texte générique", () => {
+  it("la mise en page désigne la carte team-<id> sans lire la base pour elle", () => {
+    const source = readSource("app/(secured)/equipes/[id]/layout.tsx");
+    expect(source).toContain('memberAreaShareMetadata("team", teamShareCardKey(teamId))');
+    expect(source).not.toContain("loadShareTeam");
+  });
+
+  it("l'encart garde le texte générique, seule l'image change", () => {
+    const metadata = memberAreaShareMetadata("team", "team-42");
+    const openGraph = metadata.openGraph as { title?: unknown; images?: unknown };
+    expect(openGraph.title).toBe(`Fiche d'équipe · ${SITE_NAME}`);
+    expect(openGraph.images).toEqual([
+      { url: "/og/fr/team-42.png", width: 1200, height: 630, alt: `Fiche d'équipe · ${SITE_NAME}` },
+    ]);
+    expect(metadata.twitter).toMatchObject({ images: ["/og/fr/team-42.png"] });
+  });
+
+  it("la fiche d'un joueur reste générique", () => {
+    expect(readSource("app/(secured)/joueurs/[id]/layout.tsx")).toContain('memberAreaShareMetadata("player")');
+    expect(readSource("app/(secured)/joueurs/[id]/layout.tsx")).not.toContain("ShareCardKey(");
+  });
+});
