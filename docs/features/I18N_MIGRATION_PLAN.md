@@ -308,6 +308,22 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **Reporté** : la carte « Connexion requise » (`AuthGate`) reste française — elle ne se rend que sur
   des pages pas encore traduites (lots 8–9) ; seul son lien suit déjà la langue.
 
+### Ce que le lot 5a a établi (2026-10-06) — écarts au plan
+
+- **Lot 5 coupé en deux** : 5a (`/bot`, `/bot/docs`) puis 5b (association, bénévoles, recrutement,
+  partenaires, mise en avant du recrutement, éditeurs bilingues et schéma). Écart au découpage
+  proposé (« pages » / « éditeurs ») : le contenu de `/association`, `/benevoles` et
+  `/recrutement` est presque entièrement saisi par le staff ; ouvrir ces pages avant leurs
+  éditeurs aurait publié — et mis au sitemap — des pages anglaises vides, tout leur contenu restant
+  masqué faute d'anglais. Chaque PR ouvre donc des pages complètes.
+- **`/bot` ouvert sous `/en`**, espace `bot` (~190 messages), toujours sans `next-intl` côté client
+  (`BotTextProvider`, trois espaces sérialisés sous `/en`). Détail : `I18N.md` § Bot.
+- **Documentation** : `help.md` / `helpfr.md` branchés par langue **sans toucher au dépôt du bot** ;
+  l'entrée `user-guide-en` devient une redirection 308 vers `/en/bot/docs/guide`. Pages du staff
+  françaises seulement, annoncées `lang="fr"` sous `/en` (D4).
+- **Données du bot restées françaises** : résumés du flux temps réel (`lang="fr"` sous `/en`) — les
+  traduire demanderait au bot d'émettre des événements structurés (hors périmètre).
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -340,7 +356,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 2 ✅ | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
 | 3 ✅ | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
 | 4 ✅ | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
-| 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
+| 5 (5a ✅) | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
 | 6 ✅ | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
 | 7a | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
 | 7b | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
