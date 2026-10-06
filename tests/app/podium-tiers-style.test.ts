@@ -38,14 +38,16 @@ function blend(background: string, rgb: [number, number, number], alpha: number)
  * pour la moitié, et on cumule toutes les lueurs : le cas le plus défavorable.
  */
 /**
- * Fond le plus clair où une marche garde sa lueur : la ligne de l'engagé du
- * lecteur, teintée de 6 % de cyan (`isMine`, `.historyRowMine`). Les lignes plus
- * teintées l'éteignent (vainqueur d'un match, `data-podium-muted`).
+ * Fond le plus clair où une marche garde sa lueur : le bandeau du champion d'un
+ * arbre (`RoundColumns`, 8 % de vert), devant la ligne de l'engagé du lecteur
+ * (6 % de cyan, `isMine`). Les lignes plus teintées l'éteignent (vainqueur d'un
+ * match, `data-podium-muted`).
  */
+const CHAMPION_BANNER = blend(SURFACE, [79, 224, 162], 0.08);
 const MINE_ROW = blend(SURFACE, [89, 212, 255], 0.06);
 
-function litSurface(body: string): string {
-  let background = MINE_ROW;
+function litSurface(body: string, surface = CHAMPION_BANNER): string {
+  let background = surface;
   for (const [, name, alpha] of body.matchAll(/drop-shadow\([^)]*rgba\(var\((--[a-z0-9-]+-rgb)\), ([\d.]+)\)\)/g)) {
     background = blend(background, rgbOf(name), Number(alpha) / 2);
   }
@@ -192,5 +194,32 @@ describe("marches du podium — historique et graisse des classements de phase",
     const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
     expect(source).toMatch(/standingNameWeight\(isMine, teamPodiumTier\(podiumTiers, team\.teamId\) !== null, team\.status (===|!==) "(FORFEIT|ACTIVE)"\)/);
     expect(source).not.toContain("fontWeight: isMine ? 700 : 500");
+  });
+});
+
+describe("marches du podium — fonds teintés où la lueur reste", () => {
+  it("prend pour référence le plus clair d'entre eux", () => {
+    expect(contrastRatio(CHAMPION_BANNER, "#000000")).toBeGreaterThan(contrastRatio(MINE_ROW, "#000000"));
+    expect(readSource("app/(secured)/tournois/[id]/_components/RoundColumns.tsx")).toContain("rgba(79,224,162,0.08)");
+  });
+
+  it.each(TEXT_RULES)("%s tient 4,5:1 sur la ligne de l'engagé du lecteur", (selector) => {
+    const body = rule(selector);
+    const background = litSurface(body, MINE_ROW);
+    for (const [, name] of /background-image:([^;]*);/.exec(body)![1].matchAll(/var\((--[a-z0-9-]+)\)/g)) {
+      expect(contrastRatio(hexOf(name)!, background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe("marches du podium — outils du staff et comptes supprimés", () => {
+  it("éteint les marches du tableau des inscriptions en mode staff seulement", () => {
+    const panel = readSource("app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx");
+    expect(panel).toMatch(/<PodiumTiersOffWhen off=\{showActions\}>\s*<div className=\{styles\.table\}>/);
+  });
+
+  it("garde sans marche l'historique d'équipes d'un compte supprimé", () => {
+    const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
+    expect(profile).toMatch(/<TeamLink teamId=\{entry\.teamId\} podiumTier=\{deleted \? null : undefined\}>/);
   });
 });

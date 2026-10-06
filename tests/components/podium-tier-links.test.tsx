@@ -7,7 +7,13 @@ jest.mock("next/navigation", () => ({
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
-import { PlayerPodiumName, PodiumTiersOff, PodiumTiersProvider, TeamPodiumName } from "@/components/podium-tiers";
+import {
+  PlayerPodiumName,
+  PodiumTiersOff,
+  PodiumTiersOffWhen,
+  PodiumTiersProvider,
+  TeamPodiumName,
+} from "@/components/podium-tiers";
 import { EntrantLink, EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { buildPodiumTiers } from "@/lib/shared/podium-tiers";
 import { readSource } from "../helpers/read-source";
@@ -113,6 +119,12 @@ describe("noms non cliquables et écrans d'administration", () => {
       </PodiumTiersOff>,
     );
     expect(markup).not.toContain("podium");
+  });
+
+  it("n'éteint sous `PodiumTiersOffWhen` que si la condition le demande", () => {
+    const link = <TeamLink teamId={10}>Alpha</TeamLink>;
+    expect(render(<PodiumTiersOffWhen off>{link}</PodiumTiersOffWhen>)).not.toContain("podium");
+    expect(render(<PodiumTiersOffWhen off={false}>{link}</PodiumTiersOffWhen>)).toContain("podium-tier-1");
   });
 
   it("pose `PodiumTiersOff` sur le panneau des signalements et les contacts d'arbitrage", () => {
