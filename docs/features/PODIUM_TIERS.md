@@ -70,7 +70,9 @@ Exceptions :
 - **Écrans d'administration sobres** : `PodiumTiersOff` sur le panneau des
   signalements (`app/(secured)/admin/signalements/layout.tsx`) et les contacts
   d'arbitrage (`EntrantContactsPanel`) et l'aperçu de l'étape suivante de
-  l'Endurance (`EnduranceNextRoundPanel`, enveloppé dans `EnduranceView`) —
+  l'Endurance (`EnduranceNextRoundPanel`, enveloppé dans `EnduranceView`), et
+  l'aperçu des têtes de série du staff avant lancement (`BracketPreview`,
+  enveloppé dans la page du tournoi) —
   des outils, pas une vitrine.
 - **Ligne en retrait** (`data-podium-muted` : perdant d'un match dans
   `MatchRow`, équipe éliminée ou forfait dans les classements Survie, Suisse et
@@ -80,8 +82,9 @@ Exceptions :
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
 - **Graisse en ligne** des classements Suisse et Survie : `standingNameWeight`
-  (700 pour l'engagé du lecteur, 500 ailleurs) ne l'impose pas à une marche,
-  qui porte la sienne.
+  (700 pour l'engagé du lecteur, 500 ailleurs) ne l'impose pas à une marche
+  affichée, qui porte la sienne ; une marche éteinte (ligne en retrait)
+  reprend les 500 de ses voisins.
 - **Lien-avatar sans texte** (roster des cartes `/equipes`) : `podiumTier={null}`
   — la peinture sur le texte effacerait l'initiale de repli ; le nom de
   l'équipe, au-dessus, porte déjà la marche.
