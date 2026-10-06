@@ -168,8 +168,8 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   it("un détail adverse encore en lecture est annoncé comme tel, sans inviter à ressaisir", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain("return canRead && proposalsNeedRefresh(match, proposals);");
-    expect(dialog).toContain("if (detailLoading) return `${proposed}. Lecture du détail de ses maps…");
-    expect(dialog.indexOf("if ((theirs.maps ?? []).length > 0)")).toBeLessThan(dialog.indexOf("if (detailLoading) return"));
+    expect(dialog).toContain("if (reader.detailLoading) return `${proposed}. Lecture du détail de ses maps…");
+    expect(dialog.indexOf("if ((theirs.maps ?? []).length > 0)")).toBeLessThan(dialog.indexOf("if (reader.detailLoading) return"));
   });
 });
 
@@ -247,5 +247,15 @@ describe("détail map par map — correction d'un résultat validé", () => {
     const run = dialog.slice(dialog.indexOf('const run = async (action: "save" | "resolve") => {'));
     expect(run.indexOf("if (form.refuseMapsBefore(action)) return;")).toBeGreaterThan(0);
     expect(run.indexOf("if (form.refuseMapsBefore(action)) return;")).toBeLessThan(run.indexOf("setConfirmingCorrection(action);"));
+  });
+});
+
+describe("détail map par map — lecteur sans droit de report", () => {
+  it("sans droit de report, la phrase n'invente pas une absence de détail et n'invite pas à saisir", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    const fn = dialog.slice(dialog.indexOf("function theirsPendingStatus("));
+    expect(fn.indexOf("if (!reader.canReport) return")).toBeGreaterThan(0);
+    expect(fn.indexOf("if (!reader.canReport) return")).toBeLessThan(fn.indexOf("sans le détail des maps"));
+    expect(dialog).toContain("theirsPendingStatus({ opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading })");
   });
 });
