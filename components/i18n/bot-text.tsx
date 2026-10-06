@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { botClientText, type BotClientMessages, type BotClientText } from "@/lib/shared/bot-text";
+import { botClientText, type BotClientMessages, type BotClientText } from "@/lib/shared/bot-client-text";
 import type { Locale } from "@/lib/shared/locales";
 
 /**

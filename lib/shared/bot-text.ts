@@ -5,7 +5,7 @@
  * Même mécanique que la connexion (`login-text.ts`) : **pas** de `next-intl`
  * dans le navigateur. Les composants serveur reçoivent `botText(locale,
  * messagesFor(locale).bot)` ; les deux composants client (bande d'état, flux
- * temps réel) ne lisent que {@link BOT_CLIENT_NAMESPACES}, dont le français est
+ * temps réel) ne lisent que `bot-client-text.ts` (trois espaces), dont le français est
  * inclus dans le paquet (il remplace les chaînes écrites en dur) et l'anglais
  * passé par la page sous `/en` seulement.
  *
@@ -30,19 +30,11 @@ export function botText(locale: Locale = DEFAULT_LOCALE, messages: BotMessages =
 /** Français, construit une fois : rendu par défaut des composants sans `text`. */
 export const FR_BOT_TEXT: BotText = botText(DEFAULT_LOCALE);
 
-/** Les seuls espaces que lisent les composants client de `/bot`. */
-export const BOT_CLIENT_NAMESPACES = ["strip", "status", "feed"] as const;
-export type BotClientNamespace = (typeof BOT_CLIENT_NAMESPACES)[number];
-export type BotClientMessages = Pick<BotMessages, BotClientNamespace>;
-export type BotClientText = ScopedText<Leaves<BotClientMessages>>;
-
-/** Ce qui voyage vers le navigateur sous `/en` : trois espaces, pas le registre des permissions. */
-export function botClientMessages(messages: BotMessages): BotClientMessages {
-  const picked = {} as Record<BotClientNamespace, unknown>;
-  for (const namespace of BOT_CLIENT_NAMESPACES) picked[namespace] = messages[namespace];
-  return picked as BotClientMessages;
-}
-
-export function botClientText(locale: Locale = DEFAULT_LOCALE, messages: BotClientMessages = FR_BOT_MESSAGES): BotClientText {
-  return scopedText(locale, messages);
-}
+export {
+  BOT_CLIENT_NAMESPACES,
+  botClientMessages,
+  botClientText,
+  type BotClientMessages,
+  type BotClientNamespace,
+  type BotClientText,
+} from "@/lib/shared/bot-client-text";

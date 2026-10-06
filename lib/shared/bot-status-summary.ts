@@ -1,6 +1,6 @@
 import type { BotStatus } from "@/lib/shared/types";
 import { botPayloadNumber } from "@/lib/shared/bot-payload";
-import { botClientText, type BotClientText } from "@/lib/shared/bot-text";
+import { botClientText, type BotClientText } from "@/lib/shared/bot-client-text";
 
 /** Français par défaut : un appel sans texte rend la page française d'avant le lot 5a. */
 const FR_TEXT: BotClientText = botClientText();
