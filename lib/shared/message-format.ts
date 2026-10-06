@@ -172,6 +172,19 @@ export function parseMessage(source: string): MessageNode[] {
 /** Rendu d'une balise riche : reçoit ses enfants déjà formatés. */
 export type TagRenderer<T> = (children: Array<string | T>) => T;
 
+const pluralRules = new Map<string, Intl.PluralRules>();
+const numberFormats = new Map<string, Intl.NumberFormat>();
+
+/** Une instance par langue : coûteuses à construire, lues à chaque rendu. */
+function cached<T>(cache: Map<string, T>, locale: string, create: (locale: string) => T): T {
+  let value = cache.get(locale);
+  if (!value) {
+    value = create(locale);
+    cache.set(locale, value);
+  }
+  return value;
+}
+
 function pluralBranch(
   node: Extract<MessageNode, { kind: "plural" }>,
   count: number,
@@ -179,7 +192,7 @@ function pluralBranch(
 ): MessageNode[] {
   const exact = node.options[`=${count}`];
   if (exact) return exact;
-  return node.options[new Intl.PluralRules(locale).select(count)] ?? node.options.other;
+  return node.options[cached(pluralRules, locale, (l) => new Intl.PluralRules(l)).select(count)] ?? node.options.other;
 }
 
 function formatNodes<T>(
@@ -204,7 +217,7 @@ function formatNodes<T>(
         push(String(values[node.name] ?? ""));
         break;
       case "pound":
-        push(new Intl.NumberFormat(locale).format(count ?? 0));
+        push(cached(numberFormats, locale, (l) => new Intl.NumberFormat(l)).format(count ?? 0));
         break;
       case "plural": {
         const n = Number(values[node.name] ?? 0);
