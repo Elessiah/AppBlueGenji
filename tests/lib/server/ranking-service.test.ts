@@ -112,6 +112,37 @@ describe("loadRankingState — collecte", () => {
     expect(states.get(7)).toMatchObject({ wins: 0, losses: 1 });
   });
 
+  it("lit le score en maps, vu du vainqueur, et majore un balayage", async () => {
+    const execute = await mockDb(
+      fakeDb([{ ...matchRow(1, 7, 9, 9), team1_score: 0, team2_score: 3, forfeit_team_id: null }], []),
+    );
+
+    const states = await loadRankingState();
+
+    const [sql] = execute.mock.calls[0] as [string];
+    expect(sql).toContain("m.team1_score");
+    expect(sql).toContain("m.forfeit_team_id");
+    expect(states.get(9)?.points).toBe(RANKING_BASE_POINTS + ratingTransfer(500, 500, { winnerMaps: 3, loserMaps: 0 }));
+    expect(states.get(9)?.points).toBe(524);
+  });
+
+  it("ignore le score d'un forfait et d'un match sans score (transfert d'avant)", async () => {
+    await mockDb(
+      fakeDb(
+        [
+          { ...matchRow(1, 1, 2, 1), team1_score: 3, team2_score: 0, forfeit_team_id: 2 },
+          { ...matchRow(2, 3, 4, 3), team1_score: null, team2_score: null, forfeit_team_id: null },
+        ],
+        [],
+      ),
+    );
+
+    const states = await loadRankingState();
+
+    expect(states.get(1)?.points).toBe(RANKING_BASE_POINTS + 16);
+    expect(states.get(3)?.points).toBe(RANKING_BASE_POINTS + 16);
+  });
+
   it("rend exactement ce que rend le rejeu pur", async () => {
     const rows = [matchRow(1, 1, 2, 1), matchRow(2, 2, 3, 2), matchRow(3, 3, 1, 3)];
     await mockDb(fakeDb(rows, []));

@@ -50,6 +50,21 @@ describe("RankingBoard", () => {
     expect(markup).toContain("À 20 pts de la tête");
   });
 
+  it("ne répète pas le podium : le tableau commence à la 4e place et le dit", () => {
+    const markup = render();
+    expect(markup).toContain("Tableau du classement des équipes, à partir de la 4e place");
+    expect(markup).toContain('id="rang-4"');
+    expect(markup).not.toContain('id="rang-1"');
+    expect(markup.match(/href="\/equipes\/10"/g) ?? []).toHaveLength(1);
+  });
+
+  it("garde la forme et la tendance des trois premières sur le podium", () => {
+    const markup = render({ rows: [row(1), row(2, { trend: "up", trendValue: 2 }), row(3)] });
+    expect(markup).not.toContain('role="table"');
+    expect(markup).toContain("Forme récente, du plus récent au plus ancien : V, D, N");
+    expect(markup).toContain("Monte de 2 sur 7 jours");
+  });
+
   it("n'affiche pas de podium sous trois équipes", () => {
     const markup = render({ rows: [row(1), row(2)] });
     expect(markup).not.toContain('aria-label="Podium"');
