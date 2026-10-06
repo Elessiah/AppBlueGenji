@@ -255,7 +255,8 @@ le tait.
   puis blocage du score. Sous un forfait ou une saisie fermée, la liste masquée ne refuse plus rien
   (ses maps ne partent pas) ; une ligne vierge ajoutée n'affiche aucune phrase.
   Les champs d'une ligne s'alignent en haut : une erreur sous un champ n'allonge
-  que sa colonne.
+  que sa colonne. Sur un résultat déjà validé, une map refusée se désigne
+  **avant** la confirmation de correction, qui couvrirait sinon le champ.
 
 ## RGPD
 
