@@ -5,10 +5,10 @@ import { CyberButton, Pill, ScrollArea } from "@/components/cyber";
 import { ContactTags } from "@/components/recruitment/ContactTags";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { RecruitmentBody } from "@/components/recruitment/RecruitmentBody";
+import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
-  RECRUITMENT_DOMAIN_LABELS,
   RECRUITMENT_DOMAIN_PILL,
   RECRUITMENT_PRIORITY_EXPOSURE,
   type RecruitmentAd,
@@ -17,6 +17,7 @@ import {
 import styles from "./AdDetailModal.module.css";
 
 interface AdDetailModalProps {
+  /** Annonce **dans la langue de la page** (`localizeRecruitmentAd`). */
   ad: RecruitmentAd;
   onClose: () => void;
 }
@@ -31,6 +32,7 @@ interface AdDetailModalProps {
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
 export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
+  const { t } = useRecruitmentText();
   const dialogRef = useDialogBehavior({ open: true, onClose });
   const backdrop = useBackdropDismiss(onClose);
   const titleId = `annonce-titre-${ad.id}`;
@@ -52,16 +54,16 @@ export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
       >
         <header className={styles.head}>
           <div className={styles.tags}>
-            <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
+            <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{t(`domains.${ad.domain}`)}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
-            {!ad.active && <Pill variant="neutral">Inactif</Pill>}
+            {!ad.active && <Pill variant="neutral">{t("card.inactive")}</Pill>}
           </div>
           <button
             type="button"
             className={styles.close}
             onClick={onClose}
-            aria-label="Fermer l'annonce"
-            title="Fermer"
+            aria-label={t("detail.closeLabel")}
+            title={t("detail.closeTitle")}
           >
             ✕
           </button>
@@ -71,32 +73,32 @@ export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
           {ad.title}
         </h2>
         {ad.teamName && <p className={styles.team}>{ad.teamName}</p>}
-        {ad.roles && <p className={styles.roles}>Missions : {ad.roles}</p>}
+        {ad.roles && <p className={styles.roles}>{t("card.roles", { roles: ad.roles })}</p>}
 
         {hasBody ? (
           <ScrollArea
             orientation="y"
             className={styles.bodyScroll}
-            ariaLabel={`Description de l'annonce ${ad.title}`}
+            ariaLabel={t("detail.bodyLabel", { title: ad.title })}
           >
             <RecruitmentBody body={ad.body} />
           </ScrollArea>
         ) : (
           // Sans description, une zone défilante vide ne serait qu'un cadre de
           // 28 px sous un filet : on dit plutôt qu'il n'y a rien à lire.
-          <p className={styles.noBody}>Pas de description pour cette annonce.</p>
+          <p className={styles.noBody}>{t("detail.noBody")}</p>
         )}
 
         <ContactTags ad={ad} />
 
         <div className={styles.actions}>
           <CyberButton variant="ghost" onClick={onClose}>
-            Fermer
+            {t("detail.close")}
           </CyberButton>
           {ad.contactUrl && (
             <CyberButton variant="primary" asChild>
               <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
-                Postuler →
+                {t("card.apply")}
               </a>
             </CyberButton>
           )}

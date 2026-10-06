@@ -2,9 +2,12 @@
 
 import { CyberButton } from "@/components/cyber";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
+import { BilingualField } from "@/components/ui/bilingual-field";
+import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   type RecruitmentAd,
   type RecruitmentContactChannel,
+  type RecruitmentField,
   type RecruitmentDomain,
   type RecruitmentPriority,
   RECRUITMENT_BODY_MAX,
@@ -16,6 +19,8 @@ import {
   RECRUITMENT_PRIORITIES,
   RECRUITMENT_PRIORITY_DESCRIPTIONS,
   RECRUITMENT_PRIORITY_LABELS,
+  RECRUITMENT_ROLES_MAX,
+  RECRUITMENT_TITLE_MAX,
 } from "@/lib/shared/recruitment";
 import type { RecruitmentFormState } from "./recruitment-form";
 import styles from "./page.module.css";
@@ -33,6 +38,9 @@ export function RecruitmentAdEditor({
   prefilledDiscord,
   onClose,
   onSubmit,
+  errors,
+  enMissing,
+  staffLang,
 }: Readonly<{
   /** Annonce modifiée, `null` pour une création. */
   editing: RecruitmentAd | null;
@@ -43,29 +51,48 @@ export function RecruitmentAdEditor({
   prefilledDiscord: boolean;
   onClose: () => void;
   onSubmit: () => void;
+  /** Refus rattachés aux champs (titre, missions, description, et leur anglais). */
+  errors: FieldErrors<RecruitmentField>;
+  /** Annonce déjà en ligne sans anglais (rattrapage du lot 5b). */
+  enMissing: boolean;
+  /** `fr` sous `/en` : l'administration reste en français (D4). */
+  staffLang?: string;
 }>) {
+  const bilingual = (field: "title" | "roles" | "body") =>
+    ({
+      ids: { fr: `recruitment-${field}`, en: `recruitment-${field}-en` },
+      fields: { fr: field, en: `${field}En` as const },
+      errors,
+      values: { fr: form[field], en: form[`${field}En`] },
+      onChange: (lang: "fr" | "en", value: string) => onChange(lang === "fr" ? field : `${field}En`, value),
+      enMissing,
+      inputClassName: styles.modalInput,
+      labelClassName: styles.modalLabel,
+    }) as const;
   const submitLabel = editing ? "Enregistrer" : "Publier";
   return (
     <LandingDialog
       onClose={onClose}
       busy={busy}
       className={styles.modal}
+      lang={staffLang}
       label={editing ? "Modifier une annonce" : "Nouvelle annonce"}
     >
       <h3 className={styles.modalTitle}>
         {editing ? "Modifier l'annonce" : "Nouvelle annonce"}
       </h3>
 
-      <label className={styles.modalField}>
-        <span className={styles.modalLabel}>Titre *</span>
-        <input
-          className={styles.modalInput}
-          value={form.title}
-          maxLength={140}
-          placeholder="Recherche arbitre pour les tournois du dimanche"
-          onChange={(e) => onChange("title", e.target.value)}
+      <div className={styles.modalField}>
+        <BilingualField
+          label="Titre *"
+          maxLength={RECRUITMENT_TITLE_MAX}
+          placeholders={{
+            fr: "Recherche arbitre pour les tournois du dimanche",
+            en: "Looking for referees for the Sunday tournaments",
+          }}
+          {...bilingual("title")}
         />
-      </label>
+      </div>
 
       <div className={styles.modalRow}>
         <label className={styles.modalField}>
@@ -95,28 +122,29 @@ export function RecruitmentAdEditor({
         </label>
       </div>
 
-      <label className={styles.modalField}>
-        <span className={styles.modalLabel}>Missions / profil recherché (optionnel)</span>
-        <input
-          className={styles.modalInput}
-          value={form.roles}
-          maxLength={200}
-          placeholder="Arbitrer les matchs, gérer les litiges…"
-          onChange={(e) => onChange("roles", e.target.value)}
+      <div className={styles.modalField}>
+        <BilingualField
+          label="Missions / profil recherché (optionnel)"
+          required={false}
+          maxLength={RECRUITMENT_ROLES_MAX}
+          placeholders={{ fr: "Arbitrer les matchs, gérer les litiges…", en: "Referee matches, handle disputes…" }}
+          {...bilingual("roles")}
         />
-      </label>
+      </div>
 
-      <label className={styles.modalField}>
-        <span className={styles.modalLabel}>Description (optionnel)</span>
-        <textarea
-          className={`${styles.modalInput} ${styles.modalTextarea}`}
-          value={form.body}
-          maxLength={RECRUITMENT_BODY_MAX}
+      <div className={styles.modalField}>
+        <BilingualField
+          label="Description (optionnel)"
+          required={false}
+          multiline
           rows={8}
-          placeholder={
-            "Disponibilités attendues, compétences, ambiance de l'équipe…\n\nEn quoi consiste le rôle :\n- une mission par ligne commençant par un tiret"
-          }
-          onChange={(e) => onChange("body", e.target.value)}
+          maxLength={RECRUITMENT_BODY_MAX}
+          placeholders={{
+            fr: "Disponibilités attendues, compétences, ambiance de l'équipe…\n\nEn quoi consiste le rôle :\n- une mission par ligne commençant par un tiret",
+            en: "Expected availability, skills, team atmosphere…\n\nWhat the role involves:\n- one task per line starting with a dash",
+          }}
+          {...bilingual("body")}
+          inputClassName={`${styles.modalInput} ${styles.modalTextarea}`}
         />
         <span className={styles.modalHint}>
           Une ligne courte finissant par « : » devient un intertitre, une ligne commençant
@@ -128,7 +156,7 @@ export function RecruitmentAdEditor({
         >
           {form.body.length} / {RECRUITMENT_BODY_MAX}
         </span>
-      </label>
+      </div>
 
       <label className={styles.modalField}>
         <span className={styles.modalLabel}>Lien de candidature (optionnel)</span>

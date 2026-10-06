@@ -2,22 +2,34 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { getCurrentUser } from "@/lib/server/auth";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
 import { can } from "@/lib/shared/permissions";
 import { listBenevoles } from "@/lib/server/benevoles-service";
 import { BenevolesSection } from "./BenevolesSection";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Bénévoles",
-  description: "Découvrez les bénévoles qui font vivre BlueGenji Esport au quotidien.",
-  shareDescription:
-    "Les passionné·es qui organisent, animent et développent la scène esport francophone.",
-  path: "/benevoles",
-  shareCard: "volunteers",
-});
+/**
+ * Page traduite (`/en/benevoles`, lot 5b — `docs/features/I18N.md`
+ * § Association, bénévoles, recrutement) : métadonnées, canonique et
+ * `hreflang` dans la langue, carte d'aperçu anglaise.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { meta } = messagesFor(locale).volunteers;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    shareDescription: meta.shareDescription,
+    path: "/benevoles",
+    shareCard: "volunteers",
+    locale,
+  });
+}
 
 export default async function BenevolesPage() {
-  const [user, benevoles] = await Promise.all([getCurrentUser(), listBenevoles()]);
+  const [user, benevoles, locale] = await Promise.all([getCurrentUser(), listBenevoles(), requestLocale()]);
+  const messages = messagesFor(locale).volunteers;
   // Gestion des bénévoles : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
 
@@ -25,17 +37,18 @@ export default async function BenevolesPage() {
     <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
-        <span className="eyebrow">L'ÉQUIPE · BÉNÉVOLES</span>
+        <span className="eyebrow">{messages.hero.eyebrow}</span>
         <h1 className={`display ${styles.heroTitle}`}>
-          Celles et ceux qui font<br />
-          <span className="text-gradient">vivre BlueGenji.</span>
+          {messages.hero.titleLead}
+          <br />
+          <span className="text-gradient">{messages.hero.titleAccent}</span>
         </h1>
-        <p className={styles.heroSub}>
-          Organisateurs, développeurs, casters, arbitres… chaque tournoi existe grâce à eux.
-        </p>
+        <p className={styles.heroSub}>{messages.hero.sub}</p>
       </section>
 
-      <BenevolesSection initialBenevoles={benevoles} isAdmin={isAdmin} />
+      {/* Les textes visiteurs de la section voyagent avec elle (cinq phrases) :
+          sous `/en`, sous leur forme anglaise. */}
+      <BenevolesSection initialBenevoles={benevoles} isAdmin={isAdmin} locale={locale} messages={messages.section} />
     </PublicPageShell>
   );
 }

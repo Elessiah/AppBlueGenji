@@ -1,4 +1,6 @@
 import { isStoredUploadIn, toDiskUploadPath } from "./uploads";
+import { INTL_LOCALE, type Locale } from "./locales";
+import { checkEnglish, englishCodes, hasEnglish, staffText } from "./staff-translation";
 
 export type Benevole = {
   id: number;
@@ -6,6 +8,13 @@ export type Benevole = {
   pseudo: string | null;
   lastName: string;
   category: string;
+  /**
+   * Catégorie en anglais (lot 5b) ; `null` tant qu'elle n'est pas saisie. Une
+   * catégorie se traduit **en bloc** : l'enregistrement d'un bénévole recopie
+   * son anglais sur toute sa catégorie (`benevoles-service.ts`). Sous `/en`, une
+   * catégorie sans anglais n'est pas rendue.
+   */
+  categoryEn: string | null;
   photoUrl: string | null;
   joinedAt: string; // YYYY-MM-DD
 };
@@ -15,6 +24,7 @@ export type BenevoleInput = {
   pseudo?: string | null;
   lastName: string;
   category: string;
+  categoryEn?: string | null;
   photoUrl?: string | null;
   joinedAt: string;
 };
@@ -24,6 +34,7 @@ export type BenevoleNormalized = {
   pseudo: string;
   lastName: string;
   category: string;
+  categoryEn: string;
   photoUrl: string;
   joinedAt: string;
 };
@@ -90,14 +101,17 @@ export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationR
 
   const error =
     benevoleNameError(firstName, lastName, pseudo) ??
-    benevoleCategoryError(category) ??
-    benevoleJoinedAtError(joinedAt) ??
-    benevoleExtrasError(pseudo, photoUrl);
+    benevoleCategoryError(category);
   if (error) return { ok: false, error };
+  // Anglais de la catégorie obligatoire (D9), vérifié juste après le français.
+  const categoryEn = checkEnglish(input.categoryEn, true, BENEVOLE_CATEGORY_MAX, englishCodes("CATEGORY"));
+  if (!categoryEn.ok) return categoryEn;
+  const later = benevoleJoinedAtError(joinedAt) ?? benevoleExtrasError(pseudo, photoUrl);
+  if (later) return { ok: false, error: later };
 
   return {
     ok: true,
-    value: { firstName, lastName, pseudo, category, photoUrl, joinedAt },
+    value: { firstName, lastName, pseudo, category, categoryEn: categoryEn.value ?? "", photoUrl, joinedAt },
   };
 }
 
@@ -139,6 +153,31 @@ export function groupByCategory(benevoles: Benevole[]): { category: string; memb
 }
 
 /**
+ * L'anglais d'une catégorie : celui du premier de ses bénévoles qui en a un
+ * (tous le partagent depuis le lot 5b ; une ligne plus ancienne peut ne pas
+ * l'avoir encore), `null` si aucun.
+ */
+export function categoryEnglish(members: readonly Pick<Benevole, "categoryEn">[]): string | null {
+  for (const member of members) if (hasEnglish(member.categoryEn)) return member.categoryEn.trim();
+  return null;
+}
+
+/**
+ * Les catégories dans la langue de la page : intitulé traduit, et sous `/en`,
+ * seulement celles qui ont leur anglais — jamais de français sur la page
+ * anglaise (`staff-translation.ts`).
+ */
+export function localizedCategories(
+  benevoles: Benevole[],
+  locale: Locale,
+): { category: string; label: string; members: Benevole[] }[] {
+  return groupByCategory(benevoles).flatMap(({ category, members }) => {
+    const label = staffText(category, categoryEnglish(members), locale);
+    return label === null ? [] : [{ category, label, members }];
+  });
+}
+
+/**
  * Formate le nom d'affichage : Prénom "Pseudo" NOM. Sans prénom/nom complet,
  * retombe sur le pseudo seul, puis sur le prénom ou le nom isolé le cas
  * échéant (donnée historique/partielle) plutôt que de renvoyer une chaîne vide.
@@ -160,8 +199,20 @@ export function benevoleInitials(b: Pick<Benevole, "firstName" | "pseudo" | "las
 }
 
 /** Formate une date ISO (YYYY-MM-DD) en date française (dd/mm/yyyy). */
-export function formatJoinedAt(iso: string): string {
+export function formatJoinedAt(iso: string, locale: Locale = "fr"): string {
   const [year, month, day] = iso.split("-");
   if (!year || !month || !day) return iso;
-  return `${day}/${month}/${year}`;
+  if (locale === "fr") return `${day}/${month}/${year}`;
+  // Sous `/en` : « Oct 6, 2026 » — une date en chiffres s'y lirait mois et jour inversés.
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
+
+/** Champ du formulaire que chaque refus de catégorie désigne (`useFieldErrors`). */
+export const BENEVOLE_FIELD_ERRORS = {
+  CATEGORY_REQUIRED: "category",
+  CATEGORY_TOO_LONG: "category",
+  CATEGORY_EN_REQUIRED: "categoryEn",
+  CATEGORY_EN_TOO_LONG: "categoryEn",
+} as const;

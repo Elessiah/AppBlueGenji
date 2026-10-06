@@ -1,32 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   type AboutPillar,
+  ABOUT_PILLAR_FIELD_ERRORS,
   ABOUT_PILLAR_TEXT_MAX,
   ABOUT_PILLAR_TITLE_MAX,
+  aboutPillarErrorMessage,
+  aboutPillarHasEnglish,
   FALLBACK_ABOUT_PILLARS,
+  localizedAboutPillars,
+  validateAboutPillarInput,
 } from "@/lib/shared/about-pillars";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutPillars.module.css";
 
 interface AboutPillarsProps {
   initialPillars: AboutPillar[];
   isAdmin: boolean;
+  /** Langue de la page : sous `/en`, seules les cartes traduites sont rendues. */
+  locale?: Locale;
 }
 
 interface FormState {
   title: string;
   text: string;
+  titleEn: string;
+  textEn: string;
 }
 
-const EMPTY_FORM: FormState = { title: "", text: "" };
+const EMPTY_FORM: FormState = { title: "", text: "", titleEn: "", textEn: "" };
 
-export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsProps>) {
-  const { showError, showSuccess } = useToast();
+/** `id` des champs du formulaire, cibles de `useFieldErrors`. */
+const PILLAR_FIELD_IDS = {
+  title: "about-pillar-title",
+  titleEn: "about-pillar-title-en",
+  text: "about-pillar-text",
+  textEn: "about-pillar-text-en",
+} as const;
+
+export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE }: Readonly<AboutPillarsProps>) {
+  // La gestion reste en français (D4) : sous `/en`, ses contrôles, sa fenêtre
+  // et ses notifications le disent (`lang="fr"`).
+  const staffLang = locale === DEFAULT_LOCALE ? undefined : "fr";
+  const toast = useToast();
+  const staffToast = staffLang ? { lang: staffLang } : undefined;
+  const showError = (message: string) => toast.showError(message, staffToast);
+  const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const fieldErrors = useFieldErrors(ABOUT_PILLAR_FIELD_ERRORS, PILLAR_FIELD_IDS);
   const [pillars, setPillars] = useState<AboutPillar[]>(initialPillars);
+  // Sous `/en`, une carte sans anglais n'est pas rendue.
+  const shown = useMemo(() => localizedAboutPillars(pillars, locale), [pillars, locale]);
   const [editing, setEditing] = useState<AboutPillar | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
@@ -36,14 +65,16 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
   const canManage = (p: AboutPillar) => isAdmin && p.id > 0;
 
   function openCreate() {
+    fieldErrors.clear();
     setEditing(null);
     setForm(EMPTY_FORM);
     setOpen(true);
   }
 
   function openEdit(pillar: AboutPillar) {
+    fieldErrors.clear();
     setEditing(pillar);
-    setForm({ title: pillar.title, text: pillar.text });
+    setForm({ title: pillar.title, text: pillar.text, titleEn: pillar.titleEn ?? "", textEn: pillar.textEn ?? "" });
     setOpen(true);
   }
 
@@ -54,18 +85,30 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
     setForm(EMPTY_FORM);
   }
 
+  // Un refus désigne son champ (titre, texte, et leur anglais) : rattaché à
+  // lui, focus ramené, et la même phrase en notification.
+  function refuse(code: string | undefined, fallback: string) {
+    const message = aboutPillarErrorMessage(code, fallback);
+    fieldErrors.report(code, message);
+    showError(message);
+  }
+
   async function submit() {
-    if (!form.title.trim()) {
-      showError("Le titre est requis.");
-      return;
-    }
-    if (!form.text.trim()) {
-      showError("Le texte est requis.");
+    const payload = {
+      title: form.title.trim(),
+      text: form.text.trim(),
+      titleEn: form.titleEn.trim(),
+      textEn: form.textEn.trim(),
+    };
+    // Même validation que le serveur, avant l'envoi : l'anglais (obligatoire,
+    // D9) est désigné sans aller-retour.
+    const check = validateAboutPillarInput(payload);
+    if (!check.ok) {
+      refuse(check.error, "Formulaire invalide.");
       return;
     }
 
     setBusy(true);
-    const payload = { title: form.title.trim(), text: form.text.trim() };
 
     try {
       const url = editing ? `/api/association/about-pillars/${editing.id}` : "/api/association/about-pillars";
@@ -76,7 +119,7 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
       });
       const data = (await res.json()) as { pillar?: AboutPillar; error?: string };
       if (!res.ok || !data.pillar) {
-        showError(data.error ? `Échec : ${data.error}` : "Échec de l'enregistrement.");
+        refuse(data.error, "Échec de l'enregistrement.");
         return;
       }
 
@@ -160,15 +203,15 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
 
   return (
     <>
-      {pillars.map((p, index) => (
+      {shown.map(({ pillar: p, title, text, index }, position) => (
         <article key={p.id} className={styles.pillar}>
-          <span className="mono">{String(index + 1).padStart(2, "0")}</span>
+          <span className="mono">{String(position + 1).padStart(2, "0")}</span>
           <div>
-            <h3>{p.title}</h3>
-            <p>{p.text}</p>
+            <h3>{title}</h3>
+            <p>{text}</p>
           </div>
           {canManage(p) && (
-            <div className={styles.pillarActions}>
+            <div className={styles.pillarActions} lang={staffLang}>
               <button
                 type="button"
                 className={`${styles.action} ${styles.moveAction}`}
@@ -194,9 +237,10 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
                 className={styles.action}
                 onClick={() => openEdit(p)}
                 disabled={busy}
-                aria-label={`Modifier la carte ${p.title}`}
+                aria-label={withEnglishMissing(`Modifier la carte ${p.title}`, !aboutPillarHasEnglish(p))}
               >
                 Modifier
+                {!aboutPillarHasEnglish(p) && <EnglishMissingMark />}
               </button>
               <button
                 type="button"
@@ -213,40 +257,56 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
       ))}
 
       {isAdmin && (
-        <button type="button" className={styles.addBtn} onClick={openCreate} disabled={busy}>
+        <button type="button" className={styles.addBtn} onClick={openCreate} disabled={busy} lang={staffLang}>
           + Ajouter une carte
         </button>
       )}
 
       {open && (
-        <LandingDialog onClose={close} busy={busy} className={styles.modal} labelledBy="about-pillar-modal-title">
+        <LandingDialog
+          onClose={close}
+          busy={busy}
+          className={styles.modal}
+          labelledBy="about-pillar-modal-title"
+          lang={staffLang}
+        >
           <h3 id="about-pillar-modal-title" className={styles.modalTitle}>
             {editing ? "Modifier la carte" : "Ajouter une carte"}
           </h3>
 
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Titre</span>
-            <input
-              className={styles.modalInput}
-              value={form.title}
+          <div className={styles.modalField}>
+            <BilingualField
+              label="Titre"
+              ids={{ fr: PILLAR_FIELD_IDS.title, en: PILLAR_FIELD_IDS.titleEn }}
+              fields={{ fr: "title", en: "titleEn" }}
+              errors={fieldErrors}
+              values={{ fr: form.title, en: form.titleEn }}
+              onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, title: value } : { ...f, titleEn: value }))}
               maxLength={ABOUT_PILLAR_TITLE_MAX}
-              placeholder="Accessible"
-              enterKeyHint="next"
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholders={{ fr: "Accessible", en: "Accessible" }}
+              enMissing={editing !== null && !aboutPillarHasEnglish(editing)}
+              inputClassName={styles.modalInput}
+              labelClassName={styles.modalLabel}
             />
-          </label>
+          </div>
 
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Texte</span>
-            <textarea
-              className={styles.modalInput}
-              value={form.text}
+          <div className={styles.modalField}>
+            <BilingualField
+              label="Texte"
+              ids={{ fr: PILLAR_FIELD_IDS.text, en: PILLAR_FIELD_IDS.textEn }}
+              fields={{ fr: "text", en: "textEn" }}
+              errors={fieldErrors}
+              values={{ fr: form.text, en: form.textEn }}
+              onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, text: value } : { ...f, textEn: value }))}
               maxLength={ABOUT_PILLAR_TEXT_MAX}
-              placeholder="Inscription gratuite, matchmaking par niveau…"
+              multiline
               rows={3}
-              onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
+              placeholders={{ fr: "Inscription gratuite, matchmaking par niveau…", en: "Free registration, skill-based matchmaking…" }}
+              enMissing={editing !== null && !aboutPillarHasEnglish(editing)}
+              inputClassName={styles.modalInput}
+              labelClassName={styles.modalLabel}
             />
-          </label>
+          </div>
 
           <div className={styles.modalActions}>
             <button type="button" className={styles.action} onClick={close} disabled={busy}>
@@ -269,6 +329,7 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
           title={`Supprimer la carte « ${pendingRemoval.title} » ?`}
           confirmLabel="Supprimer la carte"
           pendingLabel="Suppression…"
+          contentLang={staffLang}
           onClose={() => setPendingRemoval(null)}
           onConfirm={() => remove(pendingRemoval)}
         >

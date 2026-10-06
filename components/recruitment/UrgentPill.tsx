@@ -1,4 +1,7 @@
+"use client";
+
 import { Pill } from "@/components/cyber";
+import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 
 /**
  * Pastille clignotante « Urgente » d'une annonce **prioritaire**.
@@ -10,9 +13,10 @@ import { Pill } from "@/components/cyber";
  * Ambre d'avertissement (`pill-warning`) : le rouge est réservé au direct.
  */
 export function UrgentPill({ className = "" }: Readonly<{ className?: string }>) {
+  const { t } = useRecruitmentText();
   return (
     <Pill variant="warning" className={`pill-urgent ${className}`.trim()}>
-      Urgente
+      {t("card.urgent")}
     </Pill>
   );
 }

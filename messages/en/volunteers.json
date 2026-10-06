@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "title": "Volunteers",
+    "description": "Meet the volunteers who keep BlueGenji Esport running day to day.",
+    "shareDescription": "The passionate people who organize, host and grow the French-speaking esports scene."
+  },
+  "hero": {
+    "eyebrow": "THE TEAM · VOLUNTEERS",
+    "titleLead": "The people who keep",
+    "titleAccent": "BlueGenji alive.",
+    "sub": "Organizers, developers, casters, referees… every tournament exists thanks to them."
+  },
+  "section": {
+    "eyebrow": "SECTION 01",
+    "title": "Volunteers",
+    "meta": "{count, plural, one {# VOLUNTEER} other {# VOLUNTEERS}} · {categories, plural, one {# CATEGORY} other {# CATEGORIES}}",
+    "empty": "No volunteers yet.",
+    "since": "Since {date}"
+  }
+}

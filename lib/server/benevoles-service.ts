@@ -16,6 +16,7 @@ interface BenevoleRow extends RowDataPacket {
   pseudo: string | null;
   last_name: string;
   category: string;
+  category_en: string | null;
   photo_url: string | null;
   joined_at: string;
 }
@@ -27,6 +28,7 @@ function fromRow(row: BenevoleRow): Benevole {
     pseudo: row.pseudo || null,
     lastName: row.last_name,
     category: row.category,
+    categoryEn: row.category_en,
     photoUrl: localUploadUrl(row.photo_url),
     joinedAt: typeof row.joined_at === "string"
       ? row.joined_at.slice(0, 10)
@@ -37,7 +39,7 @@ function fromRow(row: BenevoleRow): Benevole {
 async function loadBenevoles(): Promise<Benevole[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<BenevoleRow[]>(
-    `SELECT id, first_name, pseudo, last_name, category, photo_url, joined_at
+    `SELECT id, first_name, pseudo, last_name, category, category_en, photo_url, joined_at
      FROM bg_benevoles
      ORDER BY category_order ASC, category ASC, display_order ASC, id ASC`,
   );
@@ -81,6 +83,17 @@ async function resolveCategoryOrder(category: string): Promise<number> {
   return Number(max[0].next);
 }
 
+/**
+ * Une catégorie se traduit **en bloc** : l'anglais saisi pour un bénévole
+ * devient celui de toute sa catégorie (lot 5b). Sans cela, la page anglaise
+ * tiendrait un intitulé par bénévole, et une catégorie reprise en anglais
+ * pour l'un resterait à saisir pour chacun des autres.
+ */
+async function shareCategoryEnglish(category: string, categoryEn: string): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(`UPDATE bg_benevoles SET category_en = ? WHERE category = ?`, [categoryEn, category]);
+}
+
 /** Renvoie l'URL de la photo d'un bénévole (ou `null`), pour le nettoyage de fichier. */
 export async function getBenevolePhotoUrl(id: number): Promise<string | null> {
   const db = await getDatabase();
@@ -95,16 +108,17 @@ export async function getBenevolePhotoUrl(id: number): Promise<string | null> {
 export async function createBenevole(input: BenevoleInput): Promise<Benevole> {
   const validation = validateBenevoleInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { firstName, lastName, pseudo, category, photoUrl, joinedAt } = validation.value;
+  const { firstName, lastName, pseudo, category, categoryEn, photoUrl, joinedAt } = validation.value;
 
   const db = await getDatabase();
   const categoryOrder = await resolveCategoryOrder(category);
   const [res] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_benevoles (first_name, pseudo, last_name, category, photo_url, joined_at, category_order, display_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?,
+    `INSERT INTO bg_benevoles (first_name, pseudo, last_name, category, category_en, photo_url, joined_at, category_order, display_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(b2.display_order), 0) + 10 FROM bg_benevoles AS b2 WHERE b2.category = ?))`,
-    [firstName, pseudo || null, lastName, category, photoUrl || null, joinedAt, categoryOrder, category],
+    [firstName, pseudo || null, lastName, category, categoryEn, photoUrl || null, joinedAt, categoryOrder, category],
   );
+  await shareCategoryEnglish(category, categoryEn);
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
@@ -114,6 +128,7 @@ export async function createBenevole(input: BenevoleInput): Promise<Benevole> {
     pseudo: pseudo || null,
     lastName,
     category,
+    categoryEn,
     photoUrl: photoUrl || null,
     joinedAt,
   };
@@ -123,7 +138,7 @@ export async function createBenevole(input: BenevoleInput): Promise<Benevole> {
 export async function updateBenevole(id: number, input: BenevoleInput): Promise<Benevole> {
   const validation = validateBenevoleInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { firstName, lastName, pseudo, category, photoUrl, joinedAt } = validation.value;
+  const { firstName, lastName, pseudo, category, categoryEn, photoUrl, joinedAt } = validation.value;
 
   const db = await getDatabase();
   // Aligne l'ordre de catégorie sur la (nouvelle) catégorie : conserve sa place
@@ -131,11 +146,12 @@ export async function updateBenevole(id: number, input: BenevoleInput): Promise<
   const categoryOrder = await resolveCategoryOrder(category);
   const [res] = await db.execute<ResultSetHeader>(
     `UPDATE bg_benevoles
-     SET first_name = ?, pseudo = ?, last_name = ?, category = ?, photo_url = ?, joined_at = ?, category_order = ?
+     SET first_name = ?, pseudo = ?, last_name = ?, category = ?, category_en = ?, photo_url = ?, joined_at = ?, category_order = ?
      WHERE id = ?`,
-    [firstName, pseudo || null, lastName, category, photoUrl || null, joinedAt, categoryOrder, id],
+    [firstName, pseudo || null, lastName, category, categoryEn, photoUrl || null, joinedAt, categoryOrder, id],
   );
   if (res.affectedRows === 0) throw new Error("BENEVOLE_NOT_FOUND");
+  await shareCategoryEnglish(category, categoryEn);
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
@@ -145,6 +161,7 @@ export async function updateBenevole(id: number, input: BenevoleInput): Promise<
     pseudo: pseudo || null,
     lastName,
     category,
+    categoryEn,
     photoUrl: photoUrl || null,
     joinedAt,
   };

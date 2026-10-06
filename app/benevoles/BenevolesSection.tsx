@@ -4,18 +4,27 @@ import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
+import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
 import {
   type Benevole,
+  BENEVOLE_CATEGORY_MAX,
+  BENEVOLE_FIELD_ERRORS,
   benevoleInitials,
+  categoryEnglish,
   formatDisplayName,
   formatJoinedAt,
-  groupByCategory,
+  localizedCategories,
   validateBenevoleInput,
 } from "@/lib/shared/benevoles";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
+import { scopedText } from "@/lib/shared/scoped-text";
+import { englishErrorMessage, hasEnglish } from "@/lib/shared/staff-translation";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
+import type frVolunteers from "@/messages/fr/volunteers.json";
 import styles from "./page.module.css";
 
 const ACCEPTED_PHOTO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -24,13 +33,20 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 interface BenevoleSectionProps {
   initialBenevoles: Benevole[];
   isAdmin: boolean;
+  /** Langue de la page, et les textes visiteurs de la section dans cette langue (`volunteers.section`). */
+  locale?: Locale;
+  messages: (typeof frVolunteers)["section"];
 }
+
+/** `id` des deux champs de la catégorie, cibles de `useFieldErrors`. */
+const CATEGORY_FIELD_IDS = { category: "benevole-category", categoryEn: "benevole-category-en" } as const;
 
 interface FormState {
   firstName: string;
   pseudo: string;
   lastName: string;
   category: string;
+  categoryEn: string;
   photoUrl: string;
   joinedAt: string;
 }
@@ -40,6 +56,7 @@ const EMPTY_FORM: FormState = {
   pseudo: "",
   lastName: "",
   category: "",
+  categoryEn: "",
   photoUrl: "",
   joinedAt: "",
 };
@@ -67,11 +84,31 @@ const VALIDATION_ERROR_MESSAGES: Record<string, string> = {
   INVALID_PHOTO_URL: "Cette photo est une image d'une autre partie du site : importe-la.",
 };
 
-export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<BenevoleSectionProps>) {
-  const { showError, showSuccess } = useToast();
+/** Phrase d'un refus de validation (staff, en français — D4). */
+function validationMessage(code: string): string {
+  return VALIDATION_ERROR_MESSAGES[code] ?? englishErrorMessage(code) ?? "Formulaire invalide.";
+}
+
+export function BenevolesSection({
+  initialBenevoles,
+  isAdmin,
+  locale = DEFAULT_LOCALE,
+  messages,
+}: Readonly<BenevoleSectionProps>) {
+  const { t } = scopedText(locale, messages);
+  // La gestion reste en français (D4) : sous `/en`, ses contrôles, sa fenêtre
+  // et ses notifications le disent (`lang="fr"`).
+  const staffLang = locale === DEFAULT_LOCALE ? undefined : "fr";
+  const toast = useToast();
+  const staffToast = staffLang ? { lang: staffLang } : undefined;
+  const showError = (message: string) => toast.showError(message, staffToast);
+  const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const fieldErrors = useFieldErrors(BENEVOLE_FIELD_ERRORS, CATEGORY_FIELD_IDS);
   const { cropImage, cropDialog } = useImageCropper();
   const [benevoles, setBenevoles] = useState<Benevole[]>(initialBenevoles);
-  const groups = useMemo(() => groupByCategory(benevoles), [benevoles]);
+  // Catégories dans la langue de la page : sous `/en`, celles qui n'ont pas
+  // encore d'anglais ne sont pas rendues (`localizedCategories`).
+  const groups = useMemo(() => localizedCategories(benevoles, locale), [benevoles, locale]);
   const [editing, setEditing] = useState<Benevole | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
@@ -80,18 +117,22 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
   const photoFileRef = useRef<HTMLInputElement>(null);
 
   function openCreate() {
+    fieldErrors.clear();
     setEditing(null);
     setForm({ ...EMPTY_FORM, joinedAt: new Date().toISOString().slice(0, 10) });
     setOpen(true);
   }
 
   function openEdit(b: Benevole) {
+    fieldErrors.clear();
     setEditing(b);
     setForm({
       firstName: b.firstName,
       pseudo: b.pseudo ?? "",
       lastName: b.lastName,
       category: b.category,
+      // L'anglais de la catégorie, saisi pour un autre de ses bénévoles le cas échéant.
+      categoryEn: categoryEnglishOf(b.category) ?? "",
       photoUrl: b.photoUrl ?? "",
       joinedAt: b.joinedAt,
     });
@@ -109,20 +150,46 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  /** L'anglais déjà connu d'une catégorie (une catégorie se traduit en bloc). */
+  function categoryEnglishOf(category: string): string | null {
+    return categoryEnglish(benevoles.filter((b) => b.category === category.trim()));
+  }
+
+  // Changer de catégorie reprend son anglais s'il est connu, sans écraser une
+  // saisie en cours.
+  function setCategory(lang: "fr" | "en", value: string) {
+    if (lang === "en") {
+      set("categoryEn", value);
+      return;
+    }
+    setForm((f) => {
+      const known = categoryEnglishOf(value);
+      const previous = categoryEnglishOf(f.category);
+      const keepEn = f.categoryEn.trim() !== "" && f.categoryEn !== previous;
+      return { ...f, category: value, categoryEn: keepEn || known === null ? f.categoryEn : known };
+    });
+  }
+
+  function refuse(code: string | undefined, message: string) {
+    fieldErrors.report(code, message);
+    showError(message);
+  }
+
   async function submit() {
     const validation = validateBenevoleInput({
       firstName: form.firstName,
       pseudo: form.pseudo,
       lastName: form.lastName,
       category: form.category,
+      categoryEn: form.categoryEn,
       photoUrl: form.photoUrl,
       joinedAt: form.joinedAt,
     });
     if (!validation.ok) {
-      showError(VALIDATION_ERROR_MESSAGES[validation.error] ?? "Formulaire invalide.");
+      refuse(validation.error, validationMessage(validation.error));
       return;
     }
-    const { firstName, pseudo, lastName, category, photoUrl, joinedAt } = validation.value;
+    const { firstName, pseudo, lastName, category, categoryEn, photoUrl, joinedAt } = validation.value;
 
     setBusy(true);
     const payload = {
@@ -130,6 +197,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
       pseudo: pseudo || null,
       lastName,
       category,
+      categoryEn,
       photoUrl: photoUrl || null,
       joinedAt,
     };
@@ -143,15 +211,22 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
       });
       const data = (await res.json()) as { benevole?: Benevole; error?: string };
       if (!res.ok || !data.benevole) {
-        showError(data.error ? `Échec : ${data.error}` : "Échec de l'enregistrement.");
+        if (data.error) {
+          const code = data.error;
+          refuse(code, VALIDATION_ERROR_MESSAGES[code] ?? englishErrorMessage(code) ?? `Échec : ${code}`);
+        }
+        else showError("Échec de l'enregistrement.");
         return;
       }
 
+      // Le serveur recopie l'anglais sur toute la catégorie : la liste aussi.
+      const saved = data.benevole;
+      const shareEnglish = (b: Benevole) => (b.category === saved.category ? { ...b, categoryEn: saved.categoryEn } : b);
       if (editing) {
-        setBenevoles((prev) => prev.map((b) => (b.id === data.benevole!.id ? data.benevole! : b)));
+        setBenevoles((prev) => prev.map((b) => (b.id === saved.id ? saved : shareEnglish(b))));
         showSuccess("Bénévole mis à jour.");
       } else {
-        setBenevoles((prev) => [...prev, data.benevole!]);
+        setBenevoles((prev) => [...prev.map(shareEnglish), saved]);
         showSuccess("Bénévole ajouté.");
       }
       close();
@@ -257,7 +332,8 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
     }
   }
 
-  const totalCount = benevoles.length;
+  // Ce que la page montre : sous `/en`, les bénévoles des catégories traduites.
+  const totalCount = groups.reduce((count, group) => count + group.members.length, 0);
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
   const photoLabel = form.photoUrl ? "Changer la photo" : "Importer une image";
 
@@ -267,15 +343,15 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
       <section className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">SECTION 01</span>
-            <h2 className={styles.sectionTitle}>Bénévoles</h2>
+            <span className="eyebrow">{t("eyebrow")}</span>
+            <h2 className={styles.sectionTitle}>{t("title")}</h2>
           </div>
           <div className={styles.headActions}>
             <span className={styles.meta}>
-              {totalCount} BÉNÉVOLE{totalCount > 1 ? "S" : ""} · {groups.length} CATÉGORIE{groups.length > 1 ? "S" : ""}
+              {t("meta", { count: totalCount, categories: groups.length })}
             </span>
             {isAdmin && (
-              <CyberButton variant="primary" onClick={openCreate}>
+              <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 + Ajouter
               </CyberButton>
             )}
@@ -284,21 +360,28 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
 
         {groups.length === 0 ? (
           <div className={styles.empty}>
-            <p>Aucun bénévole pour le moment.</p>
+            <p>{t("empty")}</p>
             {isAdmin && (
-              <CyberButton variant="primary" onClick={openCreate}>
+              <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 Ajouter le premier bénévole
               </CyberButton>
             )}
           </div>
         ) : (
           <div className={styles.categories}>
-            {groups.map(({ category, members }, index) => (
+            {groups.map(({ category, label, members }, index) => (
               <div key={category} className={styles.categoryBlock}>
                 <div className={styles.categoryHeader}>
-                  <span className={styles.categoryTitle}>{category}</span>
+                  <span className={styles.categoryTitle}>
+                    {label}
+                    {/* Catégorie sans anglais : absente de la page anglaise
+                        jusqu'à ce qu'un de ses bénévoles soit traduit. */}
+                    {isAdmin && categoryEnglish(members) === null && <EnglishMissingMark />}
+                  </span>
                   <span className={styles.categoryCount}>{members.length}</span>
-                  {isAdmin && groups.length > 1 && (
+                  {/* L'ordre des catégories se règle sur la page française,
+                      où elles sont toutes présentes. */}
+                  {isAdmin && locale === DEFAULT_LOCALE && groups.length > 1 && (
                     <div className={styles.categoryActions} data-tap-zone>
                       <button
                         type="button"
@@ -344,19 +427,20 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
                       <div className={styles.cardBody}>
                         <p className={styles.displayName}>{formatDisplayName(b)}</p>
                         <p className={styles.joinedAt}>
-                          Depuis le {formatJoinedAt(b.joinedAt)}
+                          {t("since", { date: formatJoinedAt(b.joinedAt, locale) })}
                         </p>
                       </div>
                       {isAdmin && (
-                        <div className={styles.cardActions}>
+                        <div className={styles.cardActions} lang={staffLang}>
                           <button
                             type="button"
                             className={styles.action}
                             onClick={() => openEdit(b)}
                             disabled={busy}
-                            aria-label={`Modifier ${formatDisplayName(b)}`}
+                            aria-label={withEnglishMissing(`Modifier ${formatDisplayName(b)}`, !hasEnglish(b.categoryEn))}
                           >
                             Modifier
+                            {!hasEnglish(b.categoryEn) && <EnglishMissingMark />}
                           </button>
                           <button
                             type="button"
@@ -384,6 +468,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
           busy={busy}
           ariaBusy={busy || photoBusy}
           className={styles.modal}
+          lang={staffLang}
           label={editing ? "Modifier un bénévole" : "Ajouter un bénévole"}
         >
           <h3 className={styles.modalTitle}>
@@ -449,22 +534,30 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
             </label>
           </div>
 
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Catégorie *</span>
-            <input
-              className={styles.modalInput}
-              value={form.category}
-              maxLength={120}
-              placeholder="Développeur, Arbitre, Caster…"
-              onChange={(e) => set("category", e.target.value)}
-              list="category-suggestions"
+          <div className={styles.modalField}>
+            <BilingualField
+              label="Catégorie *"
+              ids={{ fr: CATEGORY_FIELD_IDS.category, en: CATEGORY_FIELD_IDS.categoryEn }}
+              fields={{ fr: "category", en: "categoryEn" }}
+              errors={fieldErrors}
+              values={{ fr: form.category, en: form.categoryEn }}
+              onChange={setCategory}
+              maxLength={BENEVOLE_CATEGORY_MAX}
+              placeholders={{ fr: "Développeur, Arbitre, Caster…", en: "Developer, Referee, Caster…" }}
+              enMissing={editing !== null && !hasEnglish(editing.categoryEn) && categoryEnglishOf(editing.category) === null}
+              inputClassName={styles.modalInput}
+              labelClassName={styles.modalLabel}
+              listFr="category-suggestions"
             />
             <datalist id="category-suggestions">
               {[...new Set(benevoles.map((b) => b.category))].map((cat) => (
                 <option key={cat} value={cat} />
               ))}
             </datalist>
-          </label>
+            <span className={styles.photoHint}>
+              Une catégorie se traduit une fois pour toutes : l&apos;anglais vaut pour tous ses bénévoles.
+            </span>
+          </div>
 
           <label className={styles.modalField}>
             <span className={styles.modalLabel}>Date d'arrivée *</span>
@@ -532,6 +625,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
           title={`Retirer ${formatDisplayName(pendingRemoval)} des bénévoles ?`}
           confirmLabel="Retirer"
           pendingLabel="Retrait…"
+          contentLang={staffLang}
           onClose={() => setPendingRemoval(null)}
           onConfirm={() => remove(pendingRemoval)}
         >

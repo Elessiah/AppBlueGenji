@@ -179,6 +179,18 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
        AFTER registration_min_players`,
     // Détail map par map (`docs/features/MAP_SCORES.md`) : table neuve, son
     // `CREATE TABLE IF NOT EXISTS` est sa migration — rien à rejouer ici.
+    // i18n lot 5b — l'anglais des contenus saisis par le staff sur les pages de
+    // l'association (`lib/shared/staff-translation.ts`). `NULL` = pas encore
+    // traduit : la ligne n'est pas rendue sous `/en` jusqu'au rattrapage.
+    `ALTER TABLE bg_bureau_members ADD COLUMN role_en VARCHAR(120) NULL AFTER role`,
+    `ALTER TABLE bg_about_stats ADD COLUMN label_en VARCHAR(60) NULL AFTER label`,
+    `ALTER TABLE bg_about_pillars ADD COLUMN title_en VARCHAR(60) NULL AFTER text`,
+    `ALTER TABLE bg_about_pillars ADD COLUMN text_en VARCHAR(240) NULL AFTER title_en`,
+    `ALTER TABLE bg_sponsors ADD COLUMN description_en TEXT NULL AFTER description`,
+    `ALTER TABLE bg_benevoles ADD COLUMN category_en VARCHAR(120) NULL AFTER category`,
+    `ALTER TABLE bg_recruitment_ads ADD COLUMN title_en VARCHAR(140) NULL AFTER title`,
+    `ALTER TABLE bg_recruitment_ads ADD COLUMN roles_en VARCHAR(200) NULL AFTER roles`,
+    `ALTER TABLE bg_recruitment_ads ADD COLUMN body_en TEXT NULL AFTER body`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

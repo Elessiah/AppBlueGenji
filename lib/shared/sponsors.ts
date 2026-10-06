@@ -1,4 +1,6 @@
 import { isStoredUploadIn, toDiskUploadPath } from "./uploads";
+import type { Locale } from "./locales";
+import { checkEnglish, englishCodes, hasEnglish, optionalStaffText } from "./staff-translation";
 
 export const SPONSOR_TIERS = ["GOLD", "SILVER", "BRONZE", "PARTNER"] as const;
 export type SponsorTier = (typeof SPONSOR_TIERS)[number];
@@ -17,6 +19,12 @@ export type Sponsor = {
   bannerUrl: string | null;
   websiteUrl: string | null;
   description: string | null;
+  /**
+   * Description en anglais (lot 5b) ; `null` sans description ou tant qu'elle
+   * n'est pas traduite — sous `/en`, le partenaire reste affiché, **sans** sa
+   * description.
+   */
+  descriptionEn: string | null;
 };
 
 export type SponsorInput = {
@@ -26,6 +34,7 @@ export type SponsorInput = {
   bannerUrl?: string | null;
   websiteUrl?: string | null;
   description?: string | null;
+  descriptionEn?: string | null;
   active?: boolean;
 };
 
@@ -42,12 +51,12 @@ export const SPONSOR_TIER_LABELS: Record<SponsorTier, string> = {
  * non modifiables côté interface. Partagé client/serveur.
  */
 export const FALLBACK_SPONSORS: Sponsor[] = [
-  { id: -1, name: "LOGITECH G", slug: "logitech-g", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.logitechg.com", description: null },
-  { id: -2, name: "CORSAIR", slug: "corsair", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.corsair.com", description: null },
-  { id: -3, name: "HYPERX", slug: "hyperx", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.hyperxgaming.com", description: null },
-  { id: -4, name: "STEELSERIES", slug: "steelseries", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.steelseries.com", description: null },
-  { id: -5, name: "RAZER", slug: "razer", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.razer.com", description: null },
-  { id: -6, name: "ASUS ROG", slug: "asus-rog", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://rog.asus.com", description: null },
+  { id: -1, name: "LOGITECH G", slug: "logitech-g", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.logitechg.com", description: null, descriptionEn: null },
+  { id: -2, name: "CORSAIR", slug: "corsair", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.corsair.com", description: null, descriptionEn: null },
+  { id: -3, name: "HYPERX", slug: "hyperx", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.hyperxgaming.com", description: null, descriptionEn: null },
+  { id: -4, name: "STEELSERIES", slug: "steelseries", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.steelseries.com", description: null, descriptionEn: null },
+  { id: -5, name: "RAZER", slug: "razer", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.razer.com", description: null, descriptionEn: null },
+  { id: -6, name: "ASUS ROG", slug: "asus-rog", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://rog.asus.com", description: null, descriptionEn: null },
 ];
 
 export const SPONSOR_NAME_MAX = 120;
@@ -122,6 +131,7 @@ export type SponsorValidationResult =
         bannerUrl: string | null;
         websiteUrl: string | null;
         description: string | null;
+        descriptionEn: string | null;
         active: boolean;
       };
     }
@@ -158,7 +168,34 @@ export function validateSponsorInput(input: SponsorInput): SponsorValidationResu
   const rawDescription = typeof input.description === "string" ? input.description.trim() : "";
   if (rawDescription.length > SPONSOR_DESCRIPTION_MAX) return { ok: false, error: "DESCRIPTION_TOO_LONG" };
   const description = rawDescription || null;
+  // Anglais obligatoire dès qu'une description est saisie (D9).
+  const descriptionEn = checkEnglish(input.descriptionEn, description !== null, SPONSOR_DESCRIPTION_MAX, englishCodes("DESCRIPTION"));
+  if (!descriptionEn.ok) return descriptionEn;
   const active = input.active === undefined ? true : Boolean(input.active);
 
-  return { ok: true, value: { name, tier, logoUrl, bannerUrl, websiteUrl, description, active } };
+  return {
+    ok: true,
+    value: { name, tier, logoUrl, bannerUrl, websiteUrl, description, descriptionEn: descriptionEn.value, active },
+  };
 }
+
+/**
+ * La description d'un partenaire dans la langue de la page, ou `null` : sans
+ * description, ou sous `/en` sans anglais — le partenaire reste affiché, sans
+ * elle (`staff-translation.ts`).
+ */
+export function sponsorDescription(sponsor: Pick<Sponsor, "description" | "descriptionEn">, locale: Locale): string | null {
+  return optionalStaffText(sponsor.description, sponsor.descriptionEn, locale) || null;
+}
+
+/** Une description saisie attend-elle son anglais (rattrapage du lot 5b) ? */
+export function sponsorEnglishMissing(sponsor: Pick<Sponsor, "description" | "descriptionEn">): boolean {
+  return Boolean(sponsor.description?.trim()) && !hasEnglish(sponsor.descriptionEn);
+}
+
+/** Champ du formulaire que chaque refus désigne (`useFieldErrors`). */
+export const SPONSOR_FIELD_ERRORS = {
+  DESCRIPTION_TOO_LONG: "description",
+  DESCRIPTION_EN_REQUIRED: "descriptionEn",
+  DESCRIPTION_EN_TOO_LONG: "descriptionEn",
+} as const;

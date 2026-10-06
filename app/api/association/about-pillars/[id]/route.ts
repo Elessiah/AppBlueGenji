@@ -10,6 +10,8 @@ export const { PUT, DELETE } = itemRoutes({
     pillar: await updateAboutPillar(id, {
       title: typeof body.title === "string" ? body.title : "",
       text: typeof body.text === "string" ? body.text : "",
+      titleEn: typeof body.titleEn === "string" ? body.titleEn : null,
+      textEn: typeof body.textEn === "string" ? body.textEn : null,
     }),
   }),
   remove: deleteAboutPillar,

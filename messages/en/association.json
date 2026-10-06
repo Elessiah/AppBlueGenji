@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "title": "The Esports Association",
+    "description": "A French nonprofit, BlueGenji runs esports tournaments online and at LAN events, brings teams together and showcases the French amateur scene.",
+    "shareDescription": "A competitive, inclusive nonprofit for the French-speaking esports scene."
+  },
+  "organizationDescription": "A French nonprofit (law of 1901), BlueGenji Esport runs esports events and tournaments online and at LAN events, brings participating teams together, and trains the people of the French-speaking amateur scene to showcase them.",
+  "hero": {
+    "foundedIn": "FOUNDED IN",
+    "seat": "REGISTERED OFFICE",
+    "seatValue": "Janvilliers",
+    "status": "STATUS",
+    "statusValue": "French nonprofit (law of 1901)"
+  },
+  "manifesto": {
+    "eyebrow": "SECTION 04",
+    "title": "Manifesto",
+    "meta": "WHAT DEFINES US",
+    "purpose": {
+      "title": "Purpose",
+      "text": "Bringing the amateur esports scene to life by creating competitive events open to everyone. Where others organize for an elite, we build regular meetups where anyone can play, improve and test themselves against others."
+    },
+    "values": {
+      "title": "Values",
+      "text": "Inclusiveness and open-mindedness. We judge players on nothing but their respect and their skill — background, level or profile never close a door."
+    },
+    "vision": {
+      "title": "Vision",
+      "text": "A reliable, ethical and lasting scene where everyone has a place, at any level: to have fun in a more serious setting, or to try climbing toward the pro scene."
+    },
+    "commitment": {
+      "title": "Commitment",
+      "text": "Serious supervision, a busy calendar and a genuine will to build an environment that's both healthy and competitive. We take that commitment seriously at every tournament."
+    }
+  },
+  "bureau": {
+    "eyebrow": "SECTION 05",
+    "title": "Board",
+    "meta": "{count, plural, one {# MEMBER} other {# MEMBERS}} · VOLUNTEERS"
+  },
+  "membership": {
+    "eyebrow": "SECTION 06",
+    "title": "Join",
+    "meta": "FORM · BOARD APPROVAL",
+    "bodyMember": "Your player account already lets you sign up for tournaments; it doesn't make you a member of the association. To join, fill in the membership form and send it to the board (contact details are on the Legal notice page), which decides on the application.",
+    "bodyGuest": "A free player account is all you need to take part in tournaments; it doesn't make you a member of the association. To join, fill in the membership form and send it to the board (contact details are on the Legal notice page), which decides on the application.",
+    "ageValue": "16",
+    "ageLabel": "Minimum age",
+    "durationValue": "1 year",
+    "durationLabel": "Membership length",
+    "approvalValue": "Board",
+    "approvalLabel": "Approval",
+    "download": "Download the form (in French) →",
+    "tournaments": "See the tournaments",
+    "createAccount": "Create a player account",
+    "discord": "Join the Discord"
+  },
+  "documents": {
+    "eyebrow": "SECTION 07",
+    "title": "Documents",
+    "meta": "DOWNLOADS · IN FRENCH",
+    "statutes": "Articles of association",
+    "rules": "Internal rules",
+    "form": "Membership form",
+    "pdf": "PDF →",
+    "doc": "DOC →",
+    "docx": "DOCX →"
+  }
+}

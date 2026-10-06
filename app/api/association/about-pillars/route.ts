@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let body: { title?: unknown; text?: unknown };
+  let body: { title?: unknown; text?: unknown; titleEn?: unknown; textEn?: unknown };
   try {
     body = (await readJsonBody(req)) as typeof body;
   } catch {
@@ -25,6 +25,8 @@ export async function POST(req: Request) {
     const pillar = await createAboutPillar({
       title: typeof body.title === "string" ? body.title : "",
       text: typeof body.text === "string" ? body.text : "",
+      titleEn: typeof body.titleEn === "string" ? body.titleEn : null,
+      textEn: typeof body.textEn === "string" ? body.textEn : null,
     });
     return ok({ pillar }, 201);
   } catch (e) {

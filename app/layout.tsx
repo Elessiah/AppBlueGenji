@@ -4,6 +4,8 @@ import "./globals.css";
 import { FONT_VARIABLES } from "./site-fonts";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
+import { RecruitmentTextProvider } from "@/components/i18n/recruitment-text";
+import { recruitmentClientMessages } from "@/lib/shared/recruitment-text";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { SiteNavigationTracker } from "@/components/site-navigation-tracker";
@@ -182,7 +184,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // l'ont été ; la banderole se tait tant qu'aucune annonce qu'elle porte n'est
   // neuve pour ce visiteur.
   const cookieStore = await cookies();
-  const spotlight = await getRecruitmentSpotlight();
+  // Sous `/en`, seulement les annonces traduites, dans leur anglais (lot 5b) :
+  // la banderole et la modale se taisent plutôt que de parler français.
+  const pageLocale = localeFromHeader(requestHeaders.get(LOCALE_HEADER));
+  const spotlight = await getRecruitmentSpotlight(pageLocale);
   const requestedPath = requestHeaders.get(PATHNAME_HEADER);
   const onRecruitmentPage = requestedPath === RECRUITMENT_PAGE;
   const modalSeen = recruitmentSeenAmong(
@@ -240,8 +245,14 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // charge que sous un segment traduit, par son propre `IntlMessages`. Seuls
   // les textes de la coquille (menus, notifications…) suivent, formatés sans
   // `next-intl` — et seulement hors français, déjà inclus dans le paquet.
-  const locale = localeFromHeader(requestHeaders.get(LOCALE_HEADER));
+  const locale = pageLocale;
   const shellMessages = locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).shell;
+  // Textes de la mise en avant du recrutement : l'anglais ne voyage que sous
+  // `/en`, et seulement s'il y a une annonce à montrer.
+  const recruitmentMessages =
+    locale === DEFAULT_LOCALE || (spotlight.banner.length === 0 && spotlight.modal.length === 0)
+      ? undefined
+      : recruitmentClientMessages(messagesFor(locale).recruitment);
 
   return (
     <html lang={locale} data-a11y={a11yAttribute(a11ySettings)}>
@@ -267,6 +278,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               la connexion (sa modale de consentement passe d'abord), la mise
               en avant du recrutement se tait (la banderole, elle, reste).
               Voir `lib/shared/global-modals.ts`. */}
+          <RecruitmentTextProvider locale={locale} messages={recruitmentMessages}>
           <RecruitmentHighlight
             modalAds={spotlight.modal}
             modalSilenced={recruitmentModalSilenced({
@@ -279,6 +291,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             bannerDismissed={bannerDismissed}
             onAdPage={onRecruitmentPage}
           />
+          </RecruitmentTextProvider>
           <PrivacyChangesModal changes={privacyChanges} />
           {user && (
             <TermsAcceptanceModal

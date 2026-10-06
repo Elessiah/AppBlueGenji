@@ -16,6 +16,7 @@ interface BureauRow extends RowDataPacket {
   id: number;
   name: string;
   role: string;
+  role_en: string | null;
   initials: string;
   color: string;
 }
@@ -25,6 +26,7 @@ function fromRow(row: BureauRow): BureauMember {
     id: Number(row.id),
     name: row.name,
     role: row.role,
+    roleEn: row.role_en,
     initials: row.initials,
     color: row.color,
   };
@@ -33,7 +35,7 @@ function fromRow(row: BureauRow): BureauMember {
 async function loadBureauMembers(): Promise<BureauMember[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<BureauRow[]>(
-    `SELECT id, name, role, initials, color
+    `SELECT id, name, role, role_en, initials, color
      FROM bg_bureau_members
      ORDER BY display_order ASC, id ASC`,
   );
@@ -64,38 +66,38 @@ export async function listBureauMembers(): Promise<BureauMember[]> {
 export async function createBureauMember(input: BureauMemberInput): Promise<BureauMember> {
   const validation = validateBureauInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { name, role, initials, color } = validation.value;
+  const { name, role, roleEn, initials, color } = validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_bureau_members (name, role, initials, color, display_order)
-     VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_bureau_members AS m))`,
-    [name, role, initials, color],
+    `INSERT INTO bg_bureau_members (name, role, role_en, initials, color, display_order)
+     VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_bureau_members AS m))`,
+    [name, role, roleEn, initials, color],
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id: Number(res.insertId), name, role, initials, color };
+  return { id: Number(res.insertId), name, role, roleEn, initials, color };
 }
 
 /** Met à jour un membre existant et renvoie sa version mise à jour. */
 export async function updateBureauMember(id: number, input: BureauMemberInput): Promise<BureauMember> {
   const validation = validateBureauInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { name, role, initials, color } = validation.value;
+  const { name, role, roleEn, initials, color } = validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
     `UPDATE bg_bureau_members
-     SET name = ?, role = ?, initials = ?, color = ?
+     SET name = ?, role = ?, role_en = ?, initials = ?, color = ?
      WHERE id = ?`,
-    [name, role, initials, color, id],
+    [name, role, roleEn, initials, color, id],
   );
   if (res.affectedRows === 0) throw new Error("BUREAU_MEMBER_NOT_FOUND");
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id, name, role, initials, color };
+  return { id, name, role, roleEn, initials, color };
 }
 
 /**

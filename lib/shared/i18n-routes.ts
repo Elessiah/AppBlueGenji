@@ -14,7 +14,8 @@
  * Un motif est un chemin sans préfixe de langue ; un segment `[x]` vaut un
  * segment quelconque (`/regles/[slug]`). Le lot 0 l'a laissée vide ; chaque lot
  * de pages y ajoute ses routes (lot 2 : l'accueil ; lot 3 : les règles ; lot 4 :
- * le classement ; lot 6 : la connexion ; lot 5a : le bot et sa documentation).
+ * le classement ; lot 6 : la connexion ; lot 5a : le bot et sa documentation ;
+ * lot 5b : l'association, les bénévoles, le recrutement).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
@@ -37,4 +38,12 @@ export const MIGRATED_ROUTES: readonly string[] = [
   "/bot",
   "/bot/docs",
   "/bot/docs/[slug]",
+  // Lot 5b — reste de la vitrine. Le contenu saisi par le staff n'y est rendu
+  // qu'avec son anglais (`lib/shared/staff-translation.ts`) : jamais de
+  // français sur ces pages anglaises.
+  "/association",
+  "/benevoles",
+  "/recrutement",
+  // Redirection vers la section « Partenaires » de l'accueil, dans sa langue.
+  "/partenaires",
 ];
