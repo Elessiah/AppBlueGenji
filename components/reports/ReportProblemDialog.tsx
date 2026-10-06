@@ -1,7 +1,7 @@
 "use client";
 
 import { type Dispatch, FormEvent, type SetStateAction, useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
@@ -487,9 +487,9 @@ function TargetsField({
   }
   return (
     <p className={styles.anonNote}>
-      <Link href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
+      <LocaleLink href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
         Connecte-toi
-      </Link>{" "}
+      </LocaleLink>{" "}
       pour
       désigner directement les joueurs, équipes ou tournois concernés. Sans compte, indique leur nom
       ou l&apos;adresse de la page dans ta description.
@@ -525,9 +525,9 @@ function ContestField({
   if (!authenticated) {
     return (
       <p className={styles.anonNote}>
-        <Link href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
+        <LocaleLink href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
           Connecte-toi
-        </Link>{" "}
+        </LocaleLink>{" "}
         pour contester un signalement : seuls les joueurs visés, les membres des équipes visées
         et l&apos;auteur d&apos;un signalement de droit d&apos;auteur ou de modération, une fois le
         dossier archivé, peuvent le faire.
@@ -691,13 +691,13 @@ function ReportPrivacyNotice({ category }: Readonly<{ category: ReportCategory }
         {(category === "COPYRIGHT" || category === "MODERATION") && <li>{NOTIFIER_FOLLOW_UP}</li>}
         <li>
           {reportRightsNotice(category)}{" "}
-          <Link href="/rgpd" target="_blank" rel="noreferrer">
+          <LocaleLink href="/rgpd" target="_blank" rel="noreferrer">
             Politique de confidentialité
-          </Link>{" "}
+          </LocaleLink>{" "}
           ·{" "}
-          <Link href={`${TERMS_PATH}#signalement`} target="_blank" rel="noreferrer">
+          <LocaleLink href={`${TERMS_PATH}#signalement`} target="_blank" rel="noreferrer">
             Conditions d&apos;utilisation
-          </Link>
+          </LocaleLink>
         </li>
       </ul>
     </div>

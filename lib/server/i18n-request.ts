@@ -7,7 +7,7 @@ import { requestLocale } from "./request-locale";
  * Configuration de `next-intl` par requête, **sans son routage**
  * (`docs/features/I18N.md`) : la langue vient de l'en-tête que pose le
  * middleware d'après l'URL, jamais d'un segment `[locale]` ni d'un cookie.
- * Désignée à `createNextIntlPlugin` dans `next.config.ts`.
+ * Désignée par les alias `next-intl/config` de `next.config.ts` (sans le greffon).
  *
  * Le fuseau est fixé pour toutes les langues : une date de match se lit à
  * l'heure de Paris, en anglais comme en français.

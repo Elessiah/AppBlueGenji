@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import type { TournamentFormat } from "@/lib/shared/types";
 import { rulesHrefForFormat, ruleModeForFormat } from "@/lib/shared/tournament-rules";
 import { rulesHrefWithTournament } from "@/lib/shared/tournament-settings";
@@ -25,8 +25,8 @@ export function RulesHelpFab({
   const label = contextLabel ? `${baseLabel} — ${contextLabel}` : baseLabel;
 
   return (
-    <Link href={href} className="cta-float-help" aria-label={label} title={label}>
+    <LocaleLink href={href} className="cta-float-help" aria-label={label} title={label}>
       <span aria-hidden="true">?</span>
-    </Link>
+    </LocaleLink>
   );
 }

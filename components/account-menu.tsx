@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { useRouter } from "next/navigation";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { UserAvatar } from "./user-avatar";
 import { useToast } from "./ui/toast";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
@@ -33,7 +32,7 @@ export const LOGOUT_FAILED_MESSAGE = "La déconnexion a échoué. Réessaie dans
  * tabulation en sort — mêmes règles que le menu de la vitrine.
  */
 export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<AccountMenuProps>) {
-  const router = useRouter();
+  const router = useLocaleRouter();
   const { showError } = useToast();
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);

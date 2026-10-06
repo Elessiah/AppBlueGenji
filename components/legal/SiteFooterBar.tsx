@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { SOURCE_CODE_LINK_LABEL, SOURCE_CODE_URL } from "@/lib/shared/source-code";
@@ -21,13 +21,13 @@ export function SiteFooterBar({ authenticated }: Readonly<{ authenticated: boole
         <ReportProblemButton authenticated={authenticated} className={styles.report} icon />
         <ul className={styles.links}>
           <li>
-            <Link className="tap-target" href={TERMS_PATH}>Conditions d&apos;utilisation</Link>
+            <LocaleLink className="tap-target" href={TERMS_PATH}>Conditions d&apos;utilisation</LocaleLink>
           </li>
           <li>
-            <Link className="tap-target" href="/mentions-legales">Mentions légales</Link>
+            <LocaleLink className="tap-target" href="/mentions-legales">Mentions légales</LocaleLink>
           </li>
           <li>
-            <Link className="tap-target" href="/rgpd">Confidentialité</Link>
+            <LocaleLink className="tap-target" href="/rgpd">Confidentialité</LocaleLink>
           </li>
           <li>
             {/* AGPL, art. 13 : le code source s'offre à chaque utilisateur du service. */}
