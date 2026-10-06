@@ -168,7 +168,11 @@ export function MapScoreList({
                     autoComplete="off"
                     autoCapitalize="characters"
                     spellCheck={false}
-                    onChange={(event) => update(index, { replayCode: event.target.value.toUpperCase() }, "replayCode")}
+                    // Saisie brute : majuscules par la CSS, normalisation à la
+                    // validation et au serveur (`normalizeReplayCode`). Réécrire
+                    // la valeur à chaque frappe renverrait le curseur en fin de
+                    // champ au milieu d'une correction.
+                    onChange={(event) => update(index, { replayCode: event.target.value }, "replayCode")}
                     {...fieldErrors.aria(codeKey, hintId)}
                   />
                   <FieldErrorText fieldId={codeId} message={fieldErrors.message(codeKey)} />

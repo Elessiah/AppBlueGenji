@@ -204,7 +204,11 @@ export function PlayerScoreDialog({
   const { confirmsTheirs } = relation;
   // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
   // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
-  const confirmsAsIs = confirmsTheirs && sameMapLists(maps, view?.theirs?.maps ?? []);
+  // Proposition adverse sans détail (antérieure aux maps) : le serveur la
+  // compare au seul score (`reportsConcord`) — la saisir au même score la
+  // confirme, avec le contrôle de péremption.
+  const theirMaps = view?.theirs?.maps ?? [];
+  const confirmsAsIs = confirmsTheirs && (theirMaps.length === 0 || sameMapLists(maps, theirMaps));
 
   const forfeitMaps = forfeitMapCount(matchFormat);
   const deadline = deadlineText(match.scoreDeadlineAt);
