@@ -52,12 +52,19 @@ import {
   type OAuthLinkOutcome,
 } from "@/lib/server/account-identities";
 import {
+  OAUTH_LOCALE_PARAM,
   OAUTH_PROVIDER_SLUGS,
   type OAuthIntent,
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
 import { isLinkRefusal } from "@/lib/shared/account-connections";
-import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
+import {
+  DEFAULT_REDIRECT,
+  loginDestination,
+  sealedReturnLocale,
+  sealedReturnPath,
+} from "@/lib/shared/safe-redirect";
+import { DEFAULT_LOCALE, isLocale, localeHref, type Locale } from "@/lib/shared/locales";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 
 /** Où retombe un rattachement, réussi ou non. */
@@ -128,8 +135,13 @@ function isMissingConfiguration(error: unknown): boolean {
   return (error as Error)?.message?.startsWith("Missing ") === true;
 }
 
-function loginFailure(base: string, provider: OAuthProvider, kind: string): NextResponse {
-  const url = new URL("/connexion", base);
+/**
+ * Retour sur la page de connexion, **dans la langue du départ** : `/en/connexion`
+ * pour qui est parti de la page anglaise (lot 6). Sans cookie d'état lisible
+ * (expiré, navigateur qui l'isole), la langue n'est plus connue : le français.
+ */
+function loginFailure(base: string, provider: OAuthProvider, kind: string, locale: Locale = DEFAULT_LOCALE): NextResponse {
+  const url = new URL(localeHref("/connexion", locale), base);
   url.searchParams.set("error", kind);
   url.searchParams.set("provider", OAUTH_PROVIDER_SLUGS[provider]);
   return NextResponse.redirect(url);
@@ -152,14 +164,18 @@ function linkFailure(base: string, provider: OAuthProvider, code: string): NextR
  */
 export async function startOAuth(req: NextRequest, provider: OAuthProvider): Promise<NextResponse> {
   const base = getAppBaseUrl(req.url);
+  const requestedLocale = req.nextUrl.searchParams.get(OAUTH_LOCALE_PARAM);
+  const locale: Locale = isLocale(requestedLocale) ? requestedLocale : DEFAULT_LOCALE;
   // Filtrée dès l'aller : rien d'étranger au site n'entre dans le cookie d'état.
-  const redirectTo = safeRedirectPath(req.nextUrl.searchParams.get("redirect"));
+  // Scellée **dans la langue du départ** (`/en/…`, lot 6) : le cookie ne porte
+  // pas de champ de plus, la langue se relit dans la destination au retour.
+  const redirectTo = sealedReturnPath(req.nextUrl.searchParams.get("redirect"), locale);
   const intent: OAuthIntent = req.nextUrl.searchParams.get("intent") === "link" ? "LINK" : "LOGIN";
   const termsAccepted = req.nextUrl.searchParams.get("terms") === "1";
 
   if (intent === "LINK") {
     const user = await getCurrentUser();
-    if (!user) return loginFailure(base, provider, "session");
+    if (!user) return loginFailure(base, provider, "session", locale);
   }
 
   const state = crypto.randomBytes(24).toString("hex");
@@ -178,7 +194,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
     if (intent === "LINK") {
       return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED");
     }
-    return loginFailure(base, provider, missing ? "not_configured" : "unavailable");
+    return loginFailure(base, provider, missing ? "not_configured" : "unavailable", locale);
   }
 }
 
@@ -211,22 +227,25 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
   // cette porte-ci : sinon rien ne dit qu'il s'agissait d'un rattachement, et la
   // page de connexion reste la seule destination honnête.
   const linking = saved?.intent === "LINK" && saved.provider === provider;
+  // Langue du départ, relue dans la destination scellée (jamais dans l'URL du
+  // rappel, fixée chez le fournisseur) ; sans cookie, le français.
+  const locale = sealedReturnLocale(saved?.redirectTo);
   if (!code || !state) {
-    return linking ? linkFailure(base, provider, "LINK_CANCELLED") : loginFailure(base, provider, "params");
+    return linking ? linkFailure(base, provider, "LINK_CANCELLED") : loginFailure(base, provider, "params", locale);
   }
   if (saved?.state !== state || saved.provider !== provider) {
-    return linking ? linkFailure(base, provider, "LINK_STATE_MISMATCH") : loginFailure(base, provider, "state");
+    return linking ? linkFailure(base, provider, "LINK_STATE_MISMATCH") : loginFailure(base, provider, "state", locale);
   }
 
   let identity: OAuthIdentity;
   try {
     identity = await OAUTH_CLIENTS[provider].fetchIdentity(code);
   } catch (error) {
-    return identityFailure(base, provider, saved.intent, error);
+    return identityFailure(base, provider, saved.intent, error, locale);
   }
 
   if (saved.intent === "LINK") return completeLink(base, provider, identity);
-  return completeLogin(base, provider, identity, saved);
+  return completeLogin(base, provider, identity, saved, locale);
 }
 
 /** Lecture de l'identité refusée par le fournisseur (ou configuration absente). */
@@ -235,12 +254,13 @@ function identityFailure(
   provider: OAuthProvider,
   intent: OAuthIntent,
   error: unknown,
+  locale: Locale,
 ): NextResponse {
   const missing = isMissingConfiguration(error);
   if (intent === "LINK") {
     return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED");
   }
-  return loginFailure(base, provider, missing ? "not_configured" : "oauth");
+  return loginFailure(base, provider, missing ? "not_configured" : "oauth", locale);
 }
 
 /** Retour d'un rattachement : session relue, identité posée, retour sur `/profil`. */
@@ -284,6 +304,7 @@ async function completeLogin(
   provider: OAuthProvider,
   identity: OAuthIdentity,
   saved: OAuthStatePayload,
+  locale: Locale,
 ): Promise<NextResponse> {
   try {
     // L'acceptation voyage dans le cookie d'état, scellée à l'aller comme
@@ -294,7 +315,7 @@ async function completeLogin(
   } catch (error) {
     // Un compte neuf sans les conditions acceptées : la page de connexion le
     // dit, plutôt qu'un « échec de connexion » qui ferait réessayer pour rien.
-    if ((error as Error).message === TERMS_REQUIRED) return loginFailure(base, provider, "terms");
+    if ((error as Error).message === TERMS_REQUIRED) return loginFailure(base, provider, "terms", locale);
     // Compte suspendu : l'exposé de la décision voyage dans un cookie
     // `httpOnly` de courte durée, jamais dans l'URL — il porte un motif, que
     // l'historique du navigateur et les journaux des relais n'ont pas à garder.
@@ -303,7 +324,7 @@ async function completeLogin(
     // Seul le middleware le lit, et seulement sur la page de connexion, qu'il
     // compare sans préfixe de langue (`middleware.ts`).
     if (error instanceof AccountSuspendedError) {
-      const response = loginFailure(base, provider, "suspended");
+      const response = loginFailure(base, provider, "suspended", locale);
       response.cookies.set(SUSPENSION_NOTICE_COOKIE, encodeSuspensionNotice(error.notice), {
         httpOnly: true,
         sameSite: "lax",
@@ -313,8 +334,9 @@ async function completeLogin(
       });
       return response;
     }
-    return loginFailure(base, provider, "oauth");
+    return loginFailure(base, provider, "oauth", locale);
   }
 
-  return NextResponse.redirect(new URL(safeRedirectPath(saved.redirectTo ?? DEFAULT_REDIRECT), base));
+  // Refiltrée (le cookie ne fait pas foi), puis rendue dans la langue du départ.
+  return NextResponse.redirect(new URL(loginDestination(saved.redirectTo || DEFAULT_REDIRECT, locale), base));
 }

@@ -164,7 +164,7 @@ describe("cartes de l'espace membre", () => {
 
   it("dit qu'il faut se connecter pour voir une fiche", () => {
     expect(frShare.pages.team.subtitle).toContain("Connexion requise");
-    expect(enShare.pages.player.subtitle).toContain("Sign in");
+    expect(enShare.pages.player.subtitle).toContain("Log in");
   });
 });
 

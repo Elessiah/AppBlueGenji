@@ -2,15 +2,14 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useLoginText } from "@/components/i18n/login-text";
+import { richNodes } from "@/components/i18n/shell-text";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import {
-  SUSPENSION_GROUND_DEFINITIONS,
-  suspensionContestText,
-  suspensionSpan,
-  type SuspensionNotice,
-} from "@/lib/shared/account-suspension";
+import { SUSPENSION_GROUND_DEFINITIONS, type SuspensionNotice } from "@/lib/shared/account-suspension";
+import { suspensionSpanText } from "@/lib/shared/login-text";
+import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 
 /**
@@ -19,12 +18,20 @@ import { TERMS_PATH } from "@/lib/shared/terms-of-use";
  * retenus, la clause invoquée, et le moyen de la contester. C'est le seul canal
  * qui joigne un compte sans Discord rattaché — d'où une modale qu'on lit à son
  * rythme, plutôt qu'une notification qui s'efface.
+ *
+ * Textes du message `login.suspension` (lot 6), rendus aussi sous
+ * `/en/connexion`. Les faits retenus sont **saisis** par la modération, en
+ * français : sous `/en`, ils portent `lang="fr"` (WCAG 3.1.2), comme le lien
+ * vers les conditions d'utilisation, pas encore traduites (lot 7b).
  */
 export function SuspensionNoticeDialog({ notice, onClose }: Readonly<{ notice: SuspensionNotice; onClose: () => void }>) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose });
   const backdrop = useBackdropDismiss(onClose);
+  const text = useLoginText();
+  const { t } = text;
+  const frenchContentLang = text.locale === DEFAULT_LOCALE ? undefined : DEFAULT_LOCALE;
 
   if (!mounted) return null;
   const ground = SUSPENSION_GROUND_DEFINITIONS[notice.ground];
@@ -60,31 +67,44 @@ export function SuspensionNoticeDialog({ notice, onClose }: Readonly<{ notice: S
         }}
       >
         <h2 id="suspension-notice-title" className="display" style={{ fontSize: 18, margin: "0 0 10px" }}>
-          Compte suspendu
+          {t("suspension.title")}
         </h2>
         <p id="suspension-notice-span" style={{ color: "var(--ink)", fontSize: 14, lineHeight: 1.7, margin: "0 0 12px" }}>
-          Ce compte est suspendu {suspensionSpan(notice.endsAt)} (décision {notice.reference}) : aucune connexion
-          n&apos;est possible tant que la suspension court.
+          {suspensionSpanText(text, notice.endsAt, notice.reference)}
         </p>
         <dl style={{ fontSize: 13.5, lineHeight: 1.7, color: "var(--ink-mute)", margin: "0 0 12px" }}>
-          <dt style={{ color: "var(--ink)", fontWeight: 600 }}>Faits retenus</dt>
-          <dd style={{ margin: "0 0 8px" }}>{notice.reason}</dd>
-          <dt style={{ color: "var(--ink)", fontWeight: 600 }}>Fondement</dt>
-          <dd style={{ margin: "0 0 8px" }}>
-            Conditions d&apos;utilisation,{" "}
-            <Link href={`${TERMS_PATH}#${ground.anchor}`}>« {ground.clause} »</Link>. Décision prise par un membre
-            de la modération, sans traitement automatisé.
+          <dt style={{ color: "var(--ink)", fontWeight: 600 }}>{t("suspension.facts")}</dt>
+          <dd style={{ margin: "0 0 8px" }} lang={frenchContentLang}>
+            {notice.reason}
           </dd>
-          <dt style={{ color: "var(--ink)", fontWeight: 600 }}>Recours</dt>
+          <dt style={{ color: "var(--ink)", fontWeight: 600 }}>{t("suspension.ground")}</dt>
+          <dd style={{ margin: "0 0 8px" }}>
+            {richNodes(
+              text.rich("suspension.groundText", { clause: t(`suspension.clauses.${notice.ground}`) }, {
+                terms: (children) => (
+                  <LocaleLink href={`${TERMS_PATH}#${ground.anchor}`} hrefLang={frenchContentLang}>
+                    {richNodes(children)}
+                  </LocaleLink>
+                ),
+              }),
+            )}
+          </dd>
+          <dt style={{ color: "var(--ink)", fontWeight: 600 }}>{t("suspension.appeal")}</dt>
           <dd style={{ margin: 0 }}>
-            {suspensionContestText(notice.reference)}. Tu peux ensuite porter la décision devant le juge compétent.
+            {/* « Autre » : libellé du formulaire de signalement, encore en français (lot 9). */}
+            {richNodes(
+              text.rich("suspension.appealText", { reference: notice.reference }, {
+                fr: (children) =>
+                  frenchContentLang ? <span lang={frenchContentLang}>{richNodes(children)}</span> : richNodes(children),
+              }),
+            )}
           </dd>
         </dl>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           {/* Focus sur la sortie : l'exposé se lit par la description du dialogue,
               et le premier arrêt ne doit pas être le lien vers les conditions. */}
           <button type="button" className="btn ghost" onClick={onClose} data-autofocus>
-            Fermer
+            {t("suspension.close")}
           </button>
         </div>
       </div>

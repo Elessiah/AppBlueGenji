@@ -17,6 +17,8 @@
  *   par un lien du site dans un nouvel onglet, ou rechargement de la page).
  */
 
+import { splitLocalePrefix } from "./locales";
+
 /** Pages d'où l'on ne revient pas : y retourner rejouerait la connexion. */
 const NOT_A_RETURN_TARGET = ["/connexion"];
 
@@ -81,7 +83,9 @@ export function canReturnInSite(input: SiteBackInput): boolean {
   if (input.historyLength < 2) return false;
   const target = input.previousPath ?? sitePathFromReferrer(input.referrer, input.origin);
   if (target === null || target === input.currentPath) return false;
-  return !NOT_A_RETURN_TARGET.some((prefix) => target === prefix || target.startsWith(`${prefix}/`));
+  // Comparé sans préfixe de langue : `/en/connexion` est la même page (lot 6).
+  const { path } = splitLocalePrefix(target);
+  return !NOT_A_RETURN_TARGET.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
 /**

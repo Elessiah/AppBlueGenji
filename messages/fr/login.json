@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "title": "Connexion",
+    "description": "Connexion à l'espace membre BlueGenji Esport, par compte Google ou par code Discord."
+  },
+  "page": {
+    "backHome": "← Retour à l'accueil",
+    "title": "Connexion",
+    "eyebrow": "BLUEGENJI · ACCÈS MEMBRE",
+    "codeSeparator": "OU CODE PAR MESSAGE PRIVÉ",
+    "handleLabel": "Tag Discord ou ID",
+    "handlePlaceholder": "ton_pseudo ou 123456789012345678",
+    "handleHelp": "Le bot doit partager un serveur avec toi pour t'écrire en privé, que tu saisisses ton tag ou ton ID : l'ID évite seulement la recherche de ton tag. Pas encore sur un de ses serveurs ? <join>Rejoins-nous</join> — ou passe simplement par le bouton Discord ci-dessus, qui marche sans serveur commun.",
+    "sending": "Envoi...",
+    "requestCode": "Recevoir un code →",
+    "codeSent": "Code envoyé en DM Discord (expiration : {time}).",
+    "accountLabel": "Compte Discord",
+    "tagNotice": "Te connecter par ce code <strong>enregistre ce tag</strong>, sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite dans « Mon profil », {audience}",
+    "codeLabel": "Code reçu en DM (6 chiffres)",
+    "pseudoLabel": "Pseudo site",
+    "pseudoOptional": "(facultatif, première connexion)",
+    "pseudoPlaceholder": "Ton pseudo",
+    "pseudoHelp": "Seulement à la création de ton compte : si tu en as déjà un, il garde son pseudo.",
+    "verifying": "Vérification...",
+    "submit": "Se connecter",
+    "changeAccount": "← CHANGER DE COMPTE"
+  },
+  "oauth": {
+    "continueWith": "Continuer avec {provider}",
+    "discordNote": "Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite d'un clic dans « Mon profil », {audience}",
+    "blizzardNote": "Renseigne ton BattleTag automatiquement.",
+    "tagAudience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les joueurs et le caster de ton match le temps de la rencontre, à partir de son lancement ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre."
+  },
+  "environment": {
+    "notice": {
+      "IOS_INSTALLED_APP": "Tu utilises le site depuis l'icône de l'écran d'accueil : iOS y bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans Safari, ou utilise le code Discord par message privé ci-dessous.",
+      "IN_APP_BROWSER": "Tu navigues dans le navigateur intégré d'une application, qui bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans ton navigateur habituel, ou utilise le code Discord par message privé ci-dessous."
+    },
+    "advice": {
+      "IOS_INSTALLED_APP": "Depuis l'icône de l'écran d'accueil, iOS isole la connexion : ouvre le site dans Safari pour te connecter, ou utilise le code Discord par message privé.",
+      "IN_APP_BROWSER": "Le navigateur intégré de cette application bloque la connexion : ouvre le site dans ton navigateur habituel (Safari, Chrome, Firefox…), ou utilise le code Discord par message privé."
+    }
+  },
+  "errors": {
+    "fallback": "Une erreur interne est survenue.",
+    "BOT_INTERNAL_UNREACHABLE": "Connexion Discord indisponible (bot non joignable). Tu peux passer par Google.",
+    "BOT_RESOLVE_TIMEOUT": "La recherche de ton tag par le bot n'a pas abouti à temps. Si tu es sur le serveur BlueGenji, utilise plutôt ton ID Discord ; sinon, passe par le bouton Discord.",
+    "BOT_INTERNAL_UNAUTHORIZED": "Connexion Discord indisponible (token interne invalide). Tu peux passer par Google.",
+    "DISCORD_DM_FAILED": "Impossible de t'envoyer le code en message privé : le bot doit partager un serveur avec toi, et tes DM doivent y être ouverts. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
+    "DISCORD_USER_NOT_FOUND": "Tag introuvable : le bot doit partager un serveur avec toi. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
+    "FAILED_TO_SEND_CODE": "Le code n'a pas pu être envoyé. Réessaie dans un instant.",
+    "INVALID_DISCORD_HANDLE": "Renseigne ton tag Discord ou ton ID.",
+    "INVALID_DISCORD_ID": "Identifiant Discord invalide.",
+    "INVALID_CODE": "Le code doit contenir 6 chiffres.",
+    "CODE_INVALID_OR_EXPIRED": "Code invalide ou expiré. Demande un nouveau code.",
+    "TOO_MANY_CODE_REQUESTS": "Trop de codes demandés pour ce compte Discord. Attends une quinzaine de minutes, ou connecte-toi avec Google.",
+    "TOO_MANY_CODE_REQUESTS_TODAY": "Trop de codes demandés pour ce compte Discord aujourd'hui. Connecte-toi avec le bouton Discord ou Google, ou réessaie demain.",
+    "INVALID_CHALLENGE": "Demande de code introuvable. Redemande un code.",
+    "CROSS_SITE_REQUEST": "Requête refusée. Recharge la page de connexion, puis réessaie.",
+    "UNSUPPORTED_CONTENT_TYPE": "Requête refusée. Recharge la page de connexion, puis réessaie.",
+    "TOO_MANY_REQUESTS": "Trop de tentatives. Attends une quinzaine de minutes, ou connecte-toi avec Google.",
+    "DISCORD_AUTH_FAILED": "La connexion Discord a échoué. Réessaie dans un instant.",
+    "TERMS_REQUIRED": "Pour créer ton compte, accepte les conditions d'utilisation. Recharge la page pour les afficher."
+  },
+  "oauthErrors": {
+    "providerFallback": "OAuth",
+    "not_configured": "Connexion {provider} indisponible : configuration manquante. Essaie un autre moyen de connexion.",
+    "unavailable": "Connexion {provider} temporairement indisponible. Réessaie dans un instant.",
+    "params": "Connexion {provider} interrompue. Relance la connexion depuis cette page.",
+    "state": "Session de connexion expirée ou invalide. Relance la connexion.",
+    "oauth": "Échec de la connexion {provider}. Réessaie dans un instant.",
+    "session": "Tu dois être connecté pour rattacher une application. Connecte-toi, puis réessaie.",
+    "terms": "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion."
+  },
+  "suspension": {
+    "title": "Compte suspendu",
+    "spanUntil": "Ce compte est suspendu jusqu'au {end} (décision {reference}) : aucune connexion n'est possible tant que la suspension court.",
+    "spanIndefinite": "Ce compte est suspendu pour une durée indéterminée (décision {reference}) : aucune connexion n'est possible tant que la suspension court.",
+    "end": "{day} à {time} (heure de Paris)",
+    "facts": "Faits retenus",
+    "ground": "Fondement",
+    "groundText": "Conditions d'utilisation, <terms>« {clause} »</terms>. Décision prise par un membre de la modération, sans traitement automatisé.",
+    "appeal": "Recours",
+    "appealText": "« Signaler un problème », en bas de chaque page du site, catégorie « <fr>Autre</fr> » (sans connexion), en citant la décision {reference} et en laissant un moyen de te répondre : l'association réexamine sa décision. Tu peux ensuite porter la décision devant le juge compétent.",
+    "close": "Fermer",
+    "loginUntil": "Ce compte est suspendu jusqu'au {end}. Le motif t'a été envoyé en message privé Discord si ton compte y est rattaché. Pour contester : « Signaler un problème », en bas de chaque page du site, catégorie « Autre » (sans connexion), en citant la décision reçue et en laissant un moyen de te répondre : l'association réexamine sa décision — puis, le cas échéant, le juge compétent.",
+    "loginIndefinite": "Ce compte est suspendu pour une durée indéterminée. Le motif t'a été envoyé en message privé Discord si ton compte y est rattaché. Pour contester : « Signaler un problème », en bas de chaque page du site, catégorie « Autre » (sans connexion), en citant la décision reçue et en laissant un moyen de te répondre : l'association réexamine sa décision — puis, le cas échéant, le juge compétent.",
+    "clauses": {
+      "BEHAVIOR": "Comportement",
+      "CONTENT": "Contenus publiés par les utilisateurs",
+      "ACCOUNT": "Compte"
+    }
+  },
+  "consent": {
+    "eyebrow": "PROTECTION DES DONNÉES · RGPD",
+    "title": "Avant de continuer",
+    "intro": "Pour faire fonctionner ton compte, BlueGenji traite les données strictement nécessaires au service que tu demandes :",
+    "pseudonyms": "Uniquement des <strong>pseudonymes</strong> (pseudo site, Discord, jeux) et un avatar — aucun nom réel, téléphone ni adresse : un compte créé par Google reçoit désormais un pseudo neutre, jamais ton nom, et la photo copiée depuis Google ou Discord reste masquée tant que tu ne l'affiches pas. <strong>L'identifiant</strong> du fournisseur par lequel tu te connectes (Google, Discord ou Blizzard) est aussi conservé pour l'authentification.",
+    "gameNames": "Tes pseudos <strong>Overwatch</strong> et <strong>Marvel Rivals</strong> servent seulement à permettre aux autres joueurs de t'ajouter en jeu, jamais à établir des statistiques.",
+    "noResale": "<strong>Aucune revente</strong> de données, aucun traceur publicitaire, aucune publicité ciblée.",
+    "discordTag": "Te connecter par Discord enregistre ton pseudo Discord <strong>sans le certifier</strong> : personne ne le voit tant que tu ne le certifies pas toi-même dans ton profil.",
+    "export": "Tu peux à tout moment exporter ou supprimer tes données depuis ton profil.",
+    "policy": "Détail complet dans notre <policy>politique de confidentialité</policy>. Si tu reviens en arrière, aucun compte n'est créé ; seule la mesure d'audience du site a pu compter ta visite.",
+    "terms": "J'ai lu et j'accepte les conditions d'utilisation (<terms>lire les conditions</terms>), et je déclare avoir au moins {age} ans.",
+    "accept": "Continuer",
+    "refuse": "Revenir en arrière"
+  }
+}

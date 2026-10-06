@@ -21,6 +21,7 @@
  * ne fait pas foi).
  */
 
+import { DEFAULT_LOCALE, localeHref, splitLocalePrefix, type Locale } from "./locales";
 import { trimTrailingSlashes } from "./trim-trailing";
 
 /** Destination de repli : l'accueil de l'espace compétitif. */
@@ -62,8 +63,64 @@ export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDI
   if (!candidate.startsWith("/")) return fallback;
   // `//` comme `/\` : le navigateur y lit une autorité, pas un chemin.
   if (candidate.startsWith("//") || candidate.startsWith("/\\")) return fallback;
+  if (UNSAFE_PATH_SEPARATOR.test(pathPart(candidate))) return fallback;
 
   return candidate;
+}
+
+/**
+ * Séparateurs qu'un chemin du site ne porte **jamais**, où qu'ils soient dans
+ * le chemin (requête et ancre exclues) : `//`, la contre-barre, et leurs formes
+ * encodées (`%2F`, `%5C`).
+ *
+ * Depuis la page anglaise (lot 6), une destination porte un préfixe de langue,
+ * que `localeHref` retire puis repose : `/en//exemple.invalid` y redevenait
+ * `//exemple.invalid` sans ce refus. `localeHref` se garde lui-même de ce cas,
+ * mais la règle tient ici, à la seule porte d'entrée : rien d'ambigu n'entre
+ * dans le cookie d'état ni n'atteint `router.push`. Une contre-barre, qu'un
+ * navigateur lit comme une barre, ou une barre encodée, qu'un relais peut
+ * décoder, ne servent qu'à reconstituer ces formes.
+ */
+const UNSAFE_PATH_SEPARATOR = /\/\/|\\|%2f|%5c/i;
+
+/** Le chemin seul d'une adresse du site, sans requête ni ancre. */
+function pathPart(href: string): string {
+  const cut = href.search(/[?#]/);
+  return cut === -1 ? href : href.slice(0, cut);
+}
+
+/**
+ * Destination d'après connexion, **dans la langue de la page de connexion** :
+ * `/en/connexion?redirect=/regles` ramène sur `/en/regles`, `/connexion?redirect=/en/regles`
+ * sur `/regles` — la page qu'on vient de lire dit la langue, comme le reste du
+ * site (`localeHref`, qui laisse française une route pas encore traduite).
+ * Filtrée d'abord par `safeRedirectPath`.
+ */
+export function loginDestination(value: unknown, locale: Locale): string {
+  return localeHref(safeRedirectPath(value), locale);
+}
+
+/**
+ * Destination **scellée** dans le cookie d'état OAuth (`bg_oauth`), avec la
+ * langue de la page de départ : l'adresse de la page dans cette langue, préfixe
+ * compris **même pour une route pas encore traduite** (`/en/tournois`, qui
+ * répondrait 307 vers `/tournois`). Le cookie ne porte ainsi rien de plus que
+ * « la page où vous ramener » (`/rgpd`) ; la langue s'y relit au retour
+ * ({@link sealedReturnLocale}) pour revenir sur `/en/connexion` après un refus.
+ */
+export function sealedReturnPath(value: unknown, locale: Locale): string {
+  const safe = safeRedirectPath(value);
+  const path = pathPart(safe);
+  const suffix = safe.slice(path.length);
+  const bare = splitLocalePrefix(path).path;
+  if (locale === DEFAULT_LOCALE) return `${bare}${suffix}`;
+  return `/${locale}${bare === "/" ? "" : bare}${suffix}`;
+}
+
+/** Langue scellée par {@link sealedReturnPath} ; le français pour tout le reste (cookie antérieur, valeur absente). */
+export function sealedReturnLocale(value: unknown): Locale {
+  if (typeof value !== "string") return DEFAULT_LOCALE;
+  return splitLocalePrefix(pathPart(safeRedirectPath(value))).locale;
 }
 
 /** Chemin de la page de connexion, exclu des destinations d'un visiteur déjà connecté. */
@@ -86,6 +143,7 @@ export function signedInLoginRedirect(value: unknown): string {
     // Encodage illisible : dans le doute, la destination par défaut.
     return DEFAULT_REDIRECT;
   }
-  path = trimTrailingSlashes(path);
+  // `/en/connexion` est la même page (lot 6) : comparée sans préfixe de langue.
+  path = splitLocalePrefix(trimTrailingSlashes(path)).path;
   return path === LOGIN_PATH || path.startsWith(`${LOGIN_PATH}/`) ? DEFAULT_REDIRECT : target;
 }

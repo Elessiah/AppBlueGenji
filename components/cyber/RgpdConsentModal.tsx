@@ -1,10 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useLoginText } from "@/components/i18n/login-text";
+import { richNodes } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber/CyberButton";
-import { TERMS_AGE_DECLARATION, TERMS_CHECKBOX_LABEL, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { DEFAULT_LOCALE } from "@/lib/shared/locales";
+import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+
+/** Ce que la modale annonce, dans l'ordre (messages `login.consent`). */
+const CONSENT_ITEMS = [
+  "consent.pseudonyms",
+  "consent.gameNames",
+  "consent.noResale",
+  "consent.discordTag",
+  "consent.export",
+] as const;
 
 interface RgpdConsentModalProps {
   onAccept: () => void;
@@ -25,6 +37,12 @@ interface RgpdConsentModalProps {
  *
  * Revenir en arrière (`onRefuse`) ne déclenche aucune requête
  * d'authentification : rien n'est enregistré.
+ *
+ * Textes du message `login.consent` (lot 6) : la modale s'ouvre aussi sous
+ * `/en/connexion`. La case reprend `TERMS_CHECKBOX_LABEL` et
+ * `TERMS_AGE_DECLARATION` (égalité du français testée) ; la politique et les
+ * conditions liées restent françaises jusqu'au lot 7b — l'anglais le dit, et
+ * leurs liens portent `hrefLang="fr"`.
  */
 export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentModalProps>) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
@@ -40,6 +58,10 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
   // le rendu serveur, au niveau de `<main>`, qui ne crée aucun contexte
   // d'empilement.
   const dialogRef = useDialogBehavior({ open: true, onClose: onRefuse, locked: true });
+  const text = useLoginText();
+  const { t } = text;
+  const frenchDocumentLang = text.locale === DEFAULT_LOCALE ? undefined : DEFAULT_LOCALE;
+  const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
 
   return (
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
@@ -71,18 +93,17 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
           padding: 32,
         }}
       >
-        <span className="eyebrow">PROTECTION DES DONNÉES · RGPD</span>
+        <span className="eyebrow">{t("consent.eyebrow")}</span>
         <h2
           id="rgpd-consent-title"
           className="display"
           style={{ fontSize: 24, margin: "12px 0 16px" }}
         >
-          Avant de continuer
+          {t("consent.title")}
         </h2>
 
         <p style={{ color: "var(--ink-mute)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
-          Pour faire fonctionner ton compte, BlueGenji traite les données strictement
-          nécessaires au service que tu demandes :
+          {t("consent.intro")}
         </p>
 
         <ul
@@ -97,44 +118,27 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
             gap: 6,
           }}
         >
-          <li>
-            Uniquement des <strong>pseudonymes</strong> (pseudo site, Discord, jeux) et un
-            avatar — aucun nom réel, téléphone ni adresse : un compte créé par Google reçoit
-            désormais un pseudo neutre, jamais ton nom, et la photo copiée depuis Google ou Discord reste
-            masquée tant que tu ne l&apos;affiches pas. L&apos;<strong>identifiant</strong> du
-            fournisseur par lequel tu te connectes (Google, Discord ou Blizzard) est aussi
-            conservé pour l&apos;authentification.
-          </li>
-          <li>
-            Tes pseudos <strong>Overwatch</strong> et <strong>Marvel Rivals</strong> servent
-            seulement à permettre aux autres joueurs de t&apos;ajouter en jeu, jamais à
-            établir des statistiques.
-          </li>
-          <li>
-            <strong>Aucune revente</strong> de données, aucun traceur publicitaire, aucune
-            publicité ciblée.
-          </li>
-          <li>
-            Te connecter par Discord enregistre ton pseudo Discord <strong>sans le
-            certifier</strong> : personne ne le voit tant que tu ne le certifies pas toi-même
-            dans ton profil.
-          </li>
-          <li>
-            Tu peux à tout moment exporter ou supprimer tes données depuis ton profil.
-          </li>
+          {CONSENT_ITEMS.map((key) => (
+            <li key={key}>{richNodes(text.rich(key, {}, { strong }))}</li>
+          ))}
         </ul>
 
         <p style={{ color: "var(--ink-dim)", fontSize: 12.5, lineHeight: 1.6, margin: "0 0 24px" }}>
-          Détail complet dans notre{" "}
-          <LocaleLink
-            href="/rgpd"
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-          >
-            politique de confidentialité
-          </LocaleLink>
-          . Si tu reviens en arrière, aucun compte n&apos;est créé ; seule la mesure d&apos;audience du site a pu compter ta visite.
+          {richNodes(
+            text.rich("consent.policy", {}, {
+              policy: (children) => (
+                <LocaleLink
+                  href="/rgpd"
+                  target="_blank"
+                  rel="noreferrer"
+                  hrefLang={frenchDocumentLang}
+                  style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+                >
+                  {richNodes(children)}
+                </LocaleLink>
+              ),
+            }),
+          )}
         </p>
 
         <label
@@ -156,16 +160,21 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
             style={{ marginTop: 3 }}
           />
           <span>
-            {TERMS_CHECKBOX_LABEL} (
-            <LocaleLink
-              href={TERMS_PATH}
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-            >
-              lire les conditions
-            </LocaleLink>
-            ), et {TERMS_AGE_DECLARATION}.
+            {richNodes(
+              text.rich("consent.terms", { age: SITE_MINIMUM_AGE }, {
+                terms: (children) => (
+                  <LocaleLink
+                    href={TERMS_PATH}
+                    target="_blank"
+                    rel="noreferrer"
+                    hrefLang={frenchDocumentLang}
+                    style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+                  >
+                    {richNodes(children)}
+                  </LocaleLink>
+                ),
+              }),
+            )}
           </span>
         </label>
 
@@ -177,7 +186,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
             disabled={!termsChecked}
             style={{ flex: 1, minWidth: 160 }}
           >
-            Continuer
+            {t("consent.accept")}
           </CyberButton>
           <CyberButton
             variant="ghost"
@@ -185,7 +194,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
             onClick={onRefuse}
             style={{ flex: 1, minWidth: 120 }}
           >
-            Revenir en arrière
+            {t("consent.refuse")}
           </CyberButton>
         </div>
       </div>

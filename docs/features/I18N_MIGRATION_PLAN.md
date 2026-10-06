@@ -288,6 +288,26 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   diffèrent les séparateurs `<!-- -->` du rendu serveur (un nœud texte au lieu de deux) et le
   JSON-LD ajouté.
 
+### Ce que le lot 6 a établi (2026-10-06) — écarts au plan
+
+- **`/connexion` ouvert sous `/en`**, toujours `noindex` et hors sitemap ; espace `login` (~85
+  messages : page, boutons OAuth, refus, exposé de suspension, modale d'entrée). Détail : `I18N.md`
+  § Connexion. Toujours pas de `next-intl` côté client (`LoginTextProvider`, anglais sérialisé sous
+  `/en` seulement).
+- **Langue à travers OAuth sans toucher aux fournisseurs** : `lang=en` sur la route de départ, langue
+  scellée **dans la destination** du cookie d'état (`/en/…`) plutôt que dans un champ nouveau — le
+  cookie `bg_oauth` garde son contenu déclaré sur `/rgpd`, aucune entrée `PRIVACY_CHANGES`. Adresses
+  de rappel inchangées : aucune action en production chez Google, Discord ou Blizzard.
+- **Garde des redirections durcie** : `//`, contre-barre et `%2F` / `%5C` refusés **n'importe où**
+  dans le chemin (le préfixe de langue, retiré puis reposé, ne doit rien démasquer).
+- **« Google One Tap »** du plan : retiré du site avant ce lot, aucun texte à traduire.
+- **Modale d'entrée traduite** alors que les documents qu'elle cite (politique, conditions) restent
+  français jusqu'au lot 7b : l'anglais le dit et leurs liens portent `hrefLang="fr"`.
+- **Écart de rendu français** : gras de « L'identifiant » (ICU, `'<`) et heure d'expiration du code
+  (24 h, langue de la page). Le reste est identique, testé.
+- **Reporté** : la carte « Connexion requise » (`AuthGate`) reste française — elle ne se rend que sur
+  des pages pas encore traduites (lots 8–9) ; seul son lien suit déjà la langue.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -321,7 +341,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 3 ✅ | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
 | 4 ✅ | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
 | 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
-| 6 | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
+| 6 ✅ | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
 | 7a | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
 | 7b | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |

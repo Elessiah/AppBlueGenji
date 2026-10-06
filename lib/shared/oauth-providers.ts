@@ -23,6 +23,11 @@
  * - **Blizzard** — `openid`. L'identifiant et le BattleTag.
  */
 
+import { DEFAULT_LOCALE, type Locale } from "./locales";
+
+/** Paramètre de départ qui porte la langue de la page de connexion (`oauthStartPath`). */
+export const OAUTH_LOCALE_PARAM = "lang";
+
 /** Une porte d'entrée du site. */
 export type OAuthProvider = "GOOGLE" | "DISCORD" | "BLIZZARD";
 
@@ -99,10 +104,15 @@ export function oauthProviderFromSlug(slug: string | null | undefined): OAuthPro
  */
 export function oauthStartPath(
   provider: OAuthProvider,
-  options: { redirect?: string; intent?: OAuthIntent; termsAccepted?: boolean } = {},
+  options: { redirect?: string; intent?: OAuthIntent; termsAccepted?: boolean; locale?: Locale } = {},
 ): string {
   const params = new URLSearchParams();
   if (options.redirect) params.set("redirect", options.redirect);
+  // Langue de la page de départ, scellée dans le cookie d'état avec la destination
+  // (`sealedReturnPath`) : un refus revient sur `/en/connexion` pour qui en est parti. Le rappel, lui,
+  // reste `/api/auth/<slug>/callback`, l'adresse enregistrée chez le
+  // fournisseur — aucune langue n'y voyage. Le français, par défaut, ne s'écrit pas.
+  if (options.locale && options.locale !== DEFAULT_LOCALE) params.set(OAUTH_LOCALE_PARAM, options.locale);
   if (options.intent === "LINK") params.set("intent", "link");
   // Les conditions d'utilisation, cochées à l'entrée de `/connexion` : sans
   // elles, la porte refuse de **créer** un compte (`TERMS_REQUIRED`).

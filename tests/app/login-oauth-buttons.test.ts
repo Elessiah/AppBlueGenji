@@ -29,14 +29,15 @@ describe("boutons OAuth de la page de connexion", () => {
   });
 
   it("pose des ancres ordinaires vers la route de départ", () => {
-    expect(buttons).toMatch(/<a\s+href=\{oauthStartPath\(provider, \{ redirect, termsAccepted \}\)\}/);
+    // La langue de la page voyage aussi (lot 6) : un refus revient sur `/en/connexion`.
+    expect(buttons).toMatch(/<a\s+href=\{oauthStartPath\(provider, \{ redirect, termsAccepted, locale \}\)\}/);
   });
 
   it("garde la page de connexion capable d'annoncer le refus qu'elle reçoit", () => {
     // L'autre moitié du même mécanisme : la navigation complète ne sert à rien
     // si la page ne lit plus l'URL au montage.
     const page = source(join("app", "connexion", "_components", "LoginForm.tsx"));
-    expect(page).toMatch(/oauthErrorMessage\(params\.get\("error"\), params\.get\("provider"\), environment\)/);
+    expect(page).toMatch(/oauthErrorMessage\(params\.get\("error"\), params\.get\("provider"\), environment, text\)/);
   });
 });
 
@@ -67,9 +68,10 @@ describe("lisibilité de la page de connexion", () => {
 
   it("offre un retour à l'accueil lisible, en tête de carte", () => {
     expect(form).not.toMatch(/RETOUR ACCUEIL/);
-    const back = form.indexOf("← Retour à l&apos;accueil");
+    // Textes dans les messages depuis le lot 6 : l'ordre se lit sur les clés.
+    const back = form.indexOf('t("page.backHome")');
     expect(back).toBeGreaterThan(-1);
-    expect(back).toBeLessThan(form.indexOf("BLUEGENJI · ACCÈS MEMBRE"));
+    expect(back).toBeLessThan(form.indexOf('t("page.eyebrow")'));
     expect(form).toMatch(/minHeight: 44,\s*fontSize: 14/);
   });
 });

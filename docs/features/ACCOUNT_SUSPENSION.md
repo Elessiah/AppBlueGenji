@@ -58,7 +58,8 @@ invoquée avec son lien, puis les recours : **réexamen par l'association**, pui
   lecture à la page de connexion, comparée sans préfixe de langue,
   `I18N.md`). **Jamais dans l'URL** : l'exposé porte un motif, que
   l'historique et les journaux des relais n'ont pas à garder. La page le rend
-  dans `SuspensionNoticeDialog`. Le middleware le remet à la page par un
+  dans `SuspensionNoticeDialog` — en anglais sous `/en/connexion` depuis le lot 6, faits retenus
+  annoncés `lang="fr"` (`I18N.md` § Connexion). Le middleware le remet à la page par un
   en-tête de requête (`x-bg-suspension-notice`, toujours retiré s'il vient du
   client) et efface le cookie dans la réponse de cette même page — pas par le
   cookie : Next fusionne dans la requête vue par la page (`cookies()` comme

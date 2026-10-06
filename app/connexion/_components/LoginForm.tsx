@@ -1,13 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useLoginText } from "@/components/i18n/login-text";
+import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
 import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
-import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
+import { DEFAULT_REDIRECT, loginDestination } from "@/lib/shared/safe-redirect";
+import { codeExpiryTime, suspendedLoginText } from "@/lib/shared/login-text";
 import { loginErrorMessage, oauthErrorMessage } from "../_lib/login-errors";
 import {
   detectLoginEnvironment,
@@ -17,16 +19,10 @@ import {
 } from "@/lib/shared/login-environment";
 import { OAuthButtons } from "./OAuthButtons";
 import { SuspensionNoticeDialog } from "./SuspensionNoticeDialog";
-import {
-  ACCOUNT_SUSPENDED,
-  parseSuspensionNotice,
-  suspendedLoginMessage,
-  type SuspensionNotice,
-} from "@/lib/shared/account-suspension";
+import { ACCOUNT_SUSPENDED, parseSuspensionNotice, type SuspensionNotice } from "@/lib/shared/account-suspension";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
-import { DISCORD_TAG_AUDIENCE } from "@/lib/shared/identity-sharing";
 import { CodedError, LOGIN_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -68,12 +64,17 @@ const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-c
  * cookie que pose un retour OAuth refusé (`lib/server/oauth-flow.ts`).
  */
 export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNotice?: SuspensionNotice | null }> = {}) {
-  const router = useRouter();
+  // Navigation dans la langue de la page : une destination restée française
+  // (route pas encore traduite) se rejoint par un chargement complet.
+  const router = useLocaleRouter();
+  const text = useLoginText();
+  const { t } = text;
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(LOGIN_FIELD_ERRORS, LOGIN_FIELD_IDS);
   // Destination d'après connexion. Toujours **filtrée** : la valeur vient de
   // l'URL, et une redirection ouverte est l'appât classique du hameçonnage
-  // (`lib/shared/safe-redirect.ts`).
+  // (`lib/shared/safe-redirect.ts`). Rendue dans la langue de la page : partie
+  // de `/en/connexion`, elle ramène sur `/en/…` (lot 6).
   const [redirect, setRedirect] = useState(DEFAULT_REDIRECT);
   // Lu au montage : le rendu serveur ne connaît ni l'agent ni le mode d'affichage.
   const [environment, setEnvironment] = useState<LoginEnvironment>("BROWSER");
@@ -133,10 +134,16 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     router.push("/");
   };
 
+  // L'adresse ne se lit qu'**une fois** par montage : `suspensionNotice` passe
+  // à `null` au `router.refresh()` qui suit une connexion réussie (le
+  // middleware ne le remet qu'à une requête de document), et relancer l'effet
+  // réafficherait le refus de `?error=` au moment même où l'on part.
+  const urlRead = useRef(false);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || urlRead.current) return;
+    urlRead.current = true;
     const params = new URLSearchParams(window.location.search);
-    setRedirect(safeRedirectPath(params.get("redirect")));
+    setRedirect(loginDestination(params.get("redirect"), text.locale));
     // Le refus vient du module partagé, qui compose la phrase depuis le motif
     // (`?error=`) et le fournisseur (`?provider=`). Les cinq codes écrits ici en
     // dur ne parlaient que de Google : la troisième porte en aurait fait quinze.
@@ -152,9 +159,9 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       setSuspension(suspensionNotice);
       return;
     }
-    const message = oauthErrorMessage(params.get("error"), params.get("provider"), environment);
+    const message = oauthErrorMessage(params.get("error"), params.get("provider"), environment, text);
     if (message) showError(message);
-  }, [showError, suspensionNotice]);
+  }, [showError, suspensionNotice, text]);
 
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
@@ -173,11 +180,11 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       };
       if (!response.ok) {
         const code = payload.error || "FAILED";
-        throw new CodedError(code, loginErrorMessage(code));
+        throw new CodedError(code, loginErrorMessage(code, text));
       }
       setChallenge(typeof payload.challenge === "string" ? payload.challenge : null);
       setRequested(true);
-      showSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
+      showSuccess(t("page.codeSent", { time: codeExpiryTime(text.locale, payload.expiresAt) }));
     } catch (e) {
       fieldErrors.report(errorCode(e), (e as Error).message);
       showError((e as Error).message);
@@ -209,7 +216,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           setSuspension(notice);
           return;
         }
-        throw new CodedError(code, code === ACCOUNT_SUSPENDED ? suspendedLoginMessage(null) : loginErrorMessage(code));
+        throw new CodedError(code, code === ACCOUNT_SUSPENDED ? suspendedLoginText(text, null) : loginErrorMessage(code, text));
       }
       router.push(redirect);
       router.refresh();
@@ -238,7 +245,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           Il était en bas de carte, en mono 11 px — sous le pli sur mobile, et
           une cible minuscule. En tête, en texte courant, 44 px de haut.
         */}
-        <Link
+        <LocaleLink
           href="/"
           style={{
             display: "inline-flex",
@@ -248,14 +255,14 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             color: "var(--ink-mute)",
           }}
         >
-          ← Retour à l&apos;accueil
-        </Link>
+          {t("page.backHome")}
+        </LocaleLink>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <h1 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 8 }}>
-            <span className="text-gradient">Connexion</span>
+            <span className="text-gradient">{t("page.title")}</span>
           </h1>
           <p className="mono" style={{ color: "var(--blue-300)", letterSpacing: "0.18em", fontSize: 11, margin: 0 }}>
-            BLUEGENJI · ACCÈS MEMBRE
+            {t("page.eyebrow")}
           </p>
         </div>
 
@@ -264,7 +271,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             <OAuthButtons
               redirect={redirect}
               termsAccepted={termsAccepted}
-              environmentNotice={loginEnvironmentNotice(environment)}
+              environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
             {/*
@@ -277,14 +284,14 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
               <span className="mono" style={{ fontSize: 11, letterSpacing: "0.14em", whiteSpace: "nowrap" }}>
-                OU CODE PAR MESSAGE PRIVÉ
+                {t("page.codeSeparator")}
               </span>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
             </div>
 
             <form onSubmit={requestCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div className="field">
-                <label htmlFor={LOGIN_FIELD_IDS.handle}>Tag Discord ou ID</label>
+                <label htmlFor={LOGIN_FIELD_IDS.handle}>{t("page.handleLabel")}</label>
                 <input
                   id={LOGIN_FIELD_IDS.handle}
                   type="text"
@@ -294,25 +301,26 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                     setHandle(e.target.value);
                     fieldErrors.clear("handle");
                   }}
-                  placeholder="ton_pseudo ou 123456789012345678"
+                  placeholder={t("page.handlePlaceholder")}
                   required
                   {...fieldErrors.aria("handle", "login-discord-handle-help")}
                 />
                 <FieldErrorText fieldId={LOGIN_FIELD_IDS.handle} message={fieldErrors.message("handle")} />
                 <span id="login-discord-handle-help" style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
-                  Le bot doit partager un serveur avec toi pour t&apos;écrire en privé, que tu
-                  saisisses ton tag ou ton ID : l&apos;ID évite seulement la recherche de ton tag.
-                  Pas encore sur un de ses serveurs ?{" "}
-                  <Link
-                    href={DISCORD_INVITE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-                  >
-                    Rejoins-nous
-                  </Link>{" "}
-                  — ou passe simplement par le bouton Discord ci-dessus, qui marche sans serveur
-                  commun.
+                  {richNodes(
+                    text.rich("page.handleHelp", {}, {
+                      join: (children) => (
+                        <a
+                          href={DISCORD_INVITE_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+                        >
+                          {richNodes(children)}
+                        </a>
+                      ),
+                    }),
+                  )}
                 </span>
               </div>
               <CyberButton
@@ -321,7 +329,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                 disabled={loading}
                 style={{ width: "100%" }}
               >
-                {loading ? "Envoi..." : "Recevoir un code →"}
+                {loading ? t("page.sending") : t("page.requestCode")}
               </CyberButton>
             </form>
           </>
@@ -330,20 +338,20 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             <OAuthButtons
               redirect={redirect}
               termsAccepted={termsAccepted}
-              environmentNotice={loginEnvironmentNotice(environment)}
+              environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
               <span className="mono" style={{ fontSize: 11, letterSpacing: "0.14em", whiteSpace: "nowrap" }}>
-                OU CODE PAR MESSAGE PRIVÉ
+                {t("page.codeSeparator")}
               </span>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
             </div>
 
             <form onSubmit={verifyCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div className="field">
-                <label htmlFor={LOGIN_FIELD_IDS.handle}>Compte Discord</label>
+                <label htmlFor={LOGIN_FIELD_IDS.handle}>{t("page.accountLabel")}</label>
                 <input
                   id={LOGIN_FIELD_IDS.handle}
                   type="text"
@@ -365,14 +373,16 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                 */}
                 {isCertifiableDiscordHandle(handle) && (
                   <span style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
-                    Te connecter par ce code <strong>enregistre ce tag</strong>, sans le certifier :
-                    il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite
-                    dans « Mon profil », {DISCORD_TAG_AUDIENCE}
+                    {richNodes(
+                      text.rich("page.tagNotice", { audience: t("oauth.tagAudience") }, {
+                        strong: (children) => <strong>{richNodes(children)}</strong>,
+                      }),
+                    )}
                   </span>
                 )}
               </div>
               <div className="field">
-                <label htmlFor={LOGIN_FIELD_IDS.code}>Code reçu en DM (6 chiffres)</label>
+                <label htmlFor={LOGIN_FIELD_IDS.code}>{t("page.codeLabel")}</label>
                 <input
                   id={LOGIN_FIELD_IDS.code}
                   type="text"
@@ -400,7 +410,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
               */}
               <div className="field">
                 <label htmlFor="login-site-pseudo">
-                  Pseudo site <span style={{ color: "var(--ink-mute)", fontWeight: 400 }}>(facultatif, première connexion)</span>
+                  {t("page.pseudoLabel")} <span style={{ color: "var(--ink-mute)", fontWeight: 400 }}>{t("page.pseudoOptional")}</span>
                 </label>
                 <input
                   id="login-site-pseudo"
@@ -408,11 +418,11 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                   name="pseudo"
                   value={pseudo}
                   onChange={(e) => setPseudo(e.target.value)}
-                  placeholder="Ton pseudo"
+                  placeholder={t("page.pseudoPlaceholder")}
                   aria-describedby="login-site-pseudo-help"
                 />
                 <span id="login-site-pseudo-help" style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
-                  Seulement à la création de ton compte : si tu en as déjà un, il garde son pseudo.
+                  {t("page.pseudoHelp")}
                 </span>
               </div>
               <CyberButton
@@ -421,7 +431,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                 disabled={loading}
                 style={{ width: "100%" }}
               >
-                {loading ? "Vérification..." : "Se connecter"}
+                {loading ? t("page.verifying") : t("page.submit")}
               </CyberButton>
             </form>
 
@@ -444,7 +454,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                   cursor: "pointer",
                 }}
               >
-                ← CHANGER DE COMPTE
+                {t("page.changeAccount")}
               </button>
             </div>
           </>
