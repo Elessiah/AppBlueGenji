@@ -70,7 +70,7 @@ enregistrement intermédiaire de l'arbitrage reste libre).
 
 Une ligne après la fin acquise (un camp a atteint l'objectif, ou toutes les maps
 d'un BO sans tiebreaker sont jouées) est refusée (`MAP_AFTER_DECISION`) : elle
-n'a pas eu lieu. Le bouton « Ajouter une map » se désactive au même moment.
+n'a pas eu lieu. L'affichage progressif n'ouvre plus de ligne à ce moment-là.
 
 ### Codes de replay
 
@@ -125,7 +125,7 @@ bg_match_maps (
   s'interbloquer, et `reportMatchScorePublic` rejoue alors la transaction
   annulée (3 essais), comme les deux écritures d'arbitrage et le forfait déclaré
   par une engagée (`retryOnDeadlock`). Retirer une map rend le focus à la ligne
-  suivante (ou à « Ajouter une map »).
+  suivante (ou à « Ajouter une map » quand il n'en reste aucune, arbitrage).
   Les chemins qui ne rejouent pas leur transaction (clôture d'un match,
   abandons, retour en arrière, entretien des reports expirés) lisent **sans
   verrou** avant d'effacer (`clearMapSets`) ; l'entretien verrouille et relit
@@ -247,8 +247,24 @@ le tait.
 
 - **Engagé** (`PlayerScoreDialog`) : la liste remplace les deux steppers ; une
   ligne par map (« Map N », code, score de chaque équipe en `<NumberInput>`,
-  retrait), « Ajouter une map » jusqu'au plafond, score du match dérivé en
-  direct.
+  retrait), score du match dérivé en direct.
+- **Lignes progressives** (demande du 2026-10-06, `progressiveMapRows`) : la
+  modale s'ouvre sur **une** ligne vierge. Quand la dernière ligne est complète
+  (code valable et deux scores valables), la suivante n'apparaît que si le match
+  n'est pas acquis selon le format — même dérivation que le serveur (map gagnée
+  = 1 point, map nulle = rien, objectif FT/BO, égalités ouvertes) — et sous le
+  plafond `mapListLimit` (maps nulles rejouées comprises). FT2 : 2-0 → deux
+  lignes ; 1-1 → une troisième. BO5 : arrêt à 3-0 ; à égalités ouvertes, 2-2
+  ouvre la cinquième (la map nulle consomme une map du BO). Une retouche qui
+  tranche plus tôt retire les lignes **vierges** de fin ; une ligne renseignée
+  reste et la validation la refuse sur son champ (`MAP_AFTER_DECISION`) — rien
+  ne se perd en silence. Ce qui se valide et part en retire la ligne vierge de
+  fin (`trimTrailingBlankMaps`, jamais la seule ligne). Une ligne ajoutée
+  s'annonce poliment (`aria-live`) sans déplacer le focus. En confirmation,
+  la modale montre exactement les lignes adverses, puis le même comportement si
+  l'engagé les retouche. L'arbitrage partage la liste (`MapScoreList`) : sans
+  ligne d'emblée (`minRows = 0`, score à la main), « Ajouter une map » ouvre la
+  première, les suivantes viennent de la même façon.
 - **Arbitrage** (`AdminScoreDialog`) : la même liste sous les steppers. Dès
   qu'une map est saisie, les steppers suivent le score dérivé (désactivés, une
   phrase reliée par `aria-describedby` dit de retirer les maps pour saisir à la
