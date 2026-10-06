@@ -73,8 +73,10 @@
   line-height: 1;
   /* Largeur plancher, jamais fixe : « 01 » en police d'affichage dépasse
      44 px, et le dégradé `background-clip: text` du premier rang ne peint
-     que la boîte — le chiffre qui déborde y devient transparent. */
-  min-width: 44px;
+     que la boîte — le chiffre qui déborde y devient transparent. Le
+     plancher (60 px, la largeur de « 02 » / « 03 ») garde les noms alignés
+     quand les cartes s'empilent. */
+  min-width: 60px;
   white-space: nowrap;
   text-align: center;
   font-variant-numeric: tabular-nums;
