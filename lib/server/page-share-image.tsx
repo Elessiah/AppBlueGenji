@@ -17,7 +17,7 @@ import { ShareTeamMark } from "@/components/og/share-team-mark";
 import { messagesFor } from "./i18n-messages";
 import { shareCardLogo } from "./share-card-logo";
 import { loadSharePodium } from "./share-podium";
-import { cachedShareImage } from "./share-image-cache";
+import { cachedShareImage, type ShareImagePool } from "./share-image-cache";
 import { findShareTeam, loadShareTeam, TEAM_SHARE_LOGO_SIZE } from "./share-team";
 import { RANKING_TTL_MS } from "./ranking-cache";
 import type { Locale } from "@/lib/shared/locales";
@@ -63,17 +63,19 @@ export async function renderPageShareImage(key: string, locale: Locale): Promise
   let cacheKey = key;
   let ttlMs = STATIC_CARD_TTL_MS;
   let cacheControl: string | null = null;
+  let pool: ShareImagePool = "fixed";
   if (key === PODIUM_CARD_KEY) {
     ttlMs = RANKING_TTL_MS;
   } else if (teamId !== null) {
     if (await findShareTeam(teamId)) {
       ttlMs = RANKING_TTL_MS;
+      pool = "team";
     } else {
       cacheKey = GENERIC_TEAM_CARD_KEY;
       cacheControl = PODIUM_CARD_CACHE_CONTROL;
     }
   }
-  const image = await cachedShareImage(`${locale}:${cacheKey}`, ttlMs, () => buildPageShareImage(cacheKey, locale));
+  const image = await cachedShareImage(`${locale}:${cacheKey}`, ttlMs, () => buildPageShareImage(cacheKey, locale), pool);
   if (!image) return null;
   return new Response(image.body, {
     headers: { "content-type": "image/png", "cache-control": cacheControl ?? image.cacheControl },
