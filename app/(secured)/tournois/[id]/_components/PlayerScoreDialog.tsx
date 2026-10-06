@@ -16,6 +16,8 @@ import {
   checkMapList,
   mapFieldKey,
   isMapTouched,
+  refusalOnTouchedRow,
+  type MapListCheck,
   mapListViolationMessage,
   sameMapLists,
   type MatchMapInput,
@@ -126,6 +128,11 @@ function confirmsProposalMaps(
 ): boolean {
   if (theirMaps.length === 0) return !detailLoading;
   return sameMapLists(maps, theirMaps);
+}
+
+/** Une map est renseignée, et le refus ne désigne pas une ligne vierge. */
+function refusalWorthShowing(check: MapListCheck, maps: ReadonlyArray<MatchMapInput>): boolean {
+  return maps.some(isMapTouched) && refusalOnTouchedRow(check, maps);
 }
 
 /** Détail adverse en lecture — seulement pour qui peut le lire (`canReportScore`). */
@@ -341,7 +348,7 @@ export function PlayerScoreDialog({
   // Une saisie vide n'est pas un refus : la raison ne s'affiche qu'une fois
   // une map **renseignée** — une ligne vierge qu'on vient d'ajouter n'appelle
   // pas encore de reproche.
-  const touched = maps.some(isMapTouched);
+  const touched = refusalWorthShowing(check, maps);
   const showBlocker = blocker !== null && (unchangedMine || touched);
 
   return createPortal(

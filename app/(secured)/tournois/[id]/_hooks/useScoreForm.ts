@@ -16,6 +16,7 @@ import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context"
 import {
   checkMapList,
   deriveMatchScore,
+  refusalOnTouchedRow,
   mapListViolationMessage,
   type MapField,
   type MapListViolation,
@@ -277,11 +278,15 @@ function mapRefusals(
   format: MatchFormat | null,
   game: TournamentGame | null | undefined,
   maps: ReadonlyArray<MatchMapInput>,
-): { save: MapListViolation | null; resolve: MapListViolation | null } {
-  if (maps.length === 0) return { save: null, resolve: null };
+): { save: MapListViolation | null; resolve: MapListViolation | null; onBlankRow: boolean } {
+  if (maps.length === 0) return { save: null, resolve: null, onBlankRow: false };
+  const save = checkMapList(format, game, maps, { decisive: false });
+  const resolve = checkMapList(format, game, maps, { decisive: true });
   return {
-    save: checkMapList(format, game, maps, { decisive: false }).error,
-    resolve: checkMapList(format, game, maps, { decisive: true }).error,
+    save: save.error,
+    resolve: resolve.error,
+    // Le refus affiché désigne une ligne vierge, qu'on vient d'ajouter : il se tait.
+    onBlankRow: !refusalOnTouchedRow(resolve.error ? resolve : save, maps),
   };
 }
 

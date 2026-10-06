@@ -93,9 +93,11 @@ export function MapScoreList({
 
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
     // Rien de changé (un champ de score vide quitté sans saisie rend `NaN`, et
-    // `NaN !== NaN`) : ni mise à jour, ni levée du refus rattaché au champ.
+    // `NaN !== NaN`) : ni mise à jour, ni levée des refus.
     if (Object.is(maps[index]?.[field], patch[field])) return;
-    fieldErrors.clear(mapFieldKey(index, field));
+    // Tout refus se lève : un code en double, une map de trop ou un match
+    // inachevé se corrigent souvent sur un **autre** champ que celui désigné.
+    fieldErrors.clear();
     onChange(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
   };
   // Le bouton « Retirer » activé disparaît avec sa ligne : le focus va au

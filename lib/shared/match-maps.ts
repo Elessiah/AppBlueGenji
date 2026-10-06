@@ -333,6 +333,16 @@ export function isMapTouched(map: MatchMapInput): boolean {
 }
 
 /**
+ * Le refus désigne-t-il une ligne **renseignée** ? Une ligne vierge qu'on vient
+ * d'ajouter n'appelle pas encore de reproche (pas de phrase, pas d'annonce).
+ * Un refus sans ligne (liste vide) est tenu pour renseigné.
+ */
+export function refusalOnTouchedRow(check: Pick<MapListCheck, "field">, maps: ReadonlyArray<MatchMapInput>): boolean {
+  if (!check.field || maps.length === 0) return true;
+  return isMapTouched(maps[Math.min(check.field.index, maps.length - 1)]);
+}
+
+/**
  * Peut-on ajouter une map ? Pas au-delà du plafond, ni une fois la rencontre
  * acquise (vainqueur désigné, ou nul acquis) — la ligne serait refusée.
  */
