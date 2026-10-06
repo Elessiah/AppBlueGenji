@@ -85,6 +85,19 @@
   font-weight: 600;
 }
 
+/* Perdant du podium (`PODIUM_TIERS.md`) : il garde son repère (couronne,
+   losange) mais quitte dégradé, lueur, mouvement et graisse — sinon son nom
+   brillerait plus fort que celui du vainqueur. */
+.decided :global(.podium-tier),
+.decided :global(.podium-member) {
+  background-image: none;
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
+  filter: none;
+  animation: none;
+  font-weight: inherit;
+}
+
 .name {
   flex: 1;
   min-width: 0;

@@ -217,11 +217,11 @@ function RankingTable({ rows, forms, showDraws, afterPodium }: Readonly<RankingT
             <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
             <span className={styles.team} role="cell">
               <TeamSigil label={row.teamName.charAt(0)} size={32} logoUrl={row.logoUrl} />
-              {/* Rang de l'onglet affiché, pas du podium « Général » : sur un
-                  onglet par jeu, la marche du site contredirait la ligne. */}
+              {/* Aucune marche au tableau : il suit le podium (rangs 4 et plus)
+                  ou, sous trois équipes, il n'y a pas de podium du tout. */}
               <TeamLink
                 teamId={row.teamId}
-                podiumTier={row.rank <= 3 ? (row.rank as 1 | 2 | 3) : null}
+                podiumTier={null}
                 title={`Voir la fiche de ${row.teamName}`}>
                 {row.teamName}
               </TeamLink>
