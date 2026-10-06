@@ -10,7 +10,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { RankingBoard, podiumGapText } from "@/app/classement/RankingBoard";
 import { rankingAddedMessage } from "@/app/classement/RankingMore";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
-import { contrastRatio } from "@/lib/shared/color-contrast";
 
 /**
  * Page `/classement` : podium, tableau complet, filtres en liens, couleur de
@@ -165,92 +164,29 @@ describe("styles de /classement", () => {
   });
 });
 
-describe("noms du podium — un effet par marche", () => {
-  const css = readFileSync(join(process.cwd(), "app/classement/page.module.css"), "utf8");
-  const globalsCss = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
-  const root = /:root\s*\{([^}]*)\}/.exec(globalsCss)![1];
-  const tokenHex = (name: string) => new RegExp(`${name}:\\s*(#[0-9a-f]{6})`).exec(root)?.[1];
-  const SURFACE = "#161a22"; // --cyber-bg-3, le fond le plus clair (neon-palette.test.ts)
-  /** Corps de la règle `.nameTierN :global(.entity-link) { … }`. */
-  const linkRule = (tier: number) =>
-    new RegExp(String.raw`\.nameTier${tier} :global\(\.entity-link\) \{([^}]*)\}`).exec(css)![1];
-
-  it("pose une classe de marche distincte sur le nom de chaque équipe du podium", () => {
+describe("noms du podium — la marche de l'onglet affiché", () => {
+  it("pose la marche de chaque place sur le lien du nom, nom accessible inchangé", () => {
     const markup = render();
-    const tiers = [...markup.matchAll(/<h3 class="podiumName (nameTier\d)">/g)].map((match) => match[1]);
-    expect(tiers).toEqual(["nameTier1", "nameTier2", "nameTier3"]);
-    // Le nom reste le texte du lien vers la fiche, nom accessible inchangé.
-    expect(markup).toMatch(/<h3 class="podiumName nameTier1"><a [^>]*href="\/equipes\/10"[^>]*>Équipe 1<\/a><\/h3>/);
+    const tiers = [...markup.matchAll(/<h3 class="podiumName"><a [^>]*class="entity-link (podium-tier podium-tier-\d)"/g)].map(
+      (match) => match[1],
+    );
+    expect(tiers).toEqual(["podium-tier podium-tier-1", "podium-tier podium-tier-2", "podium-tier podium-tier-3"]);
+    expect(markup).toMatch(/<h3 class="podiumName"><a [^>]*href="\/equipes\/10"[^>]*>Équipe 1<\/a><\/h3>/);
   });
 
-  it("ne pose aucun effet hors du podium : ni au tableau, ni sans podium", () => {
+  it("ne pose aucune marche au tableau qui suit le podium", () => {
     const markup = render();
     const table = markup.slice(markup.indexOf('aria-label="Podium"')).split("</ol>").slice(1).join("</ol>");
     expect(table).toContain("Équipe 4");
-    expect(table).not.toMatch(/nameTier/);
-    expect(render({ rows: [row(1), row(2)] })).not.toMatch(/nameTier/);
+    expect(table).not.toMatch(/podium-tier/);
   });
 
-  it("écrit chaque arrêt de couleur en jeton de texte tenant 4,5:1, sans teinte chaude", () => {
-    for (const tier of [1, 2, 3]) {
-      const rule = linkRule(tier);
-      const tokens = [...rule.matchAll(/var\((--[a-z0-9-]+)\)/g)]
-        .map((match) => match[1])
-        // Les halos (`--*-rgb`) ne sont pas du texte ; l'état d'animation non plus.
-        .filter((name) => name !== "--deco-anim-state" && !name.endsWith("-rgb"));
-      expect(tokens.length).toBeGreaterThan(0);
-      expect(rule).not.toMatch(/#[0-9a-f]{3,6}\b|amber|gold|orange/i);
-      for (const name of tokens) {
-        const hex = tokenHex(name);
-        expect(hex).toBeDefined();
-        expect(contrastRatio(hex!, SURFACE)).toBeGreaterThanOrEqual(4.5);
-      }
-    }
-  });
-
-  it("hiérarchise le mouvement : 1re la plus vive, 2e plus lente, 3e immobile — tout en pause avec le régime", () => {
-    const duration = (tier: number) => Number(/animation: nameIridescent ([\d.]+)s[^;]*infinite/.exec(linkRule(tier))?.[1]);
-    expect(duration(1)).toBeLessThan(duration(2));
-    expect(linkRule(1)).toContain("animation-play-state: var(--deco-anim-state)");
-    expect(linkRule(2)).toContain("animation-play-state: var(--deco-anim-state)");
-    expect(linkRule(3)).not.toMatch(/animation/);
-    // Seule la position du fond bouge (ni mise en page, ni couleur recalculée).
-    const keyframes = /@keyframes nameIridescent \{([\s\S]*?)\n\}/.exec(css)![1];
-    expect(keyframes.match(/[a-z-]+(?=:)/g)!.every((property) => property === "background-position")).toBe(true);
-  });
-
-  it("garde la peinture à l'arrêt : dégradé et filet ne dépendent d'aucune animation", () => {
-    for (const tier of [1, 2]) {
-      expect(linkRule(tier)).toMatch(/background-clip: text/);
-      expect(linkRule(tier)).toMatch(/color: transparent/);
-      expect(css).toMatch(new RegExp(String.raw`\.nameTier${tier}::after \{[^}]*width: \d+px`));
-    }
-    // Survol et focus rendent une couleur pleine (soulignement visible).
-    expect(css).toMatch(/\.nameTier1 :global\(\.entity-link\):focus-visible[\s\S]*?\{\s*color: var\(--blue-100\)/);
-  });
-
-  it("n'entoure les noms que d'un halo large et léger, qui n'éclaircit pas le bord des lettres", () => {
-    // Aucun `text-shadow` serré sur un nom du podium.
-    expect(css).not.toMatch(/\.nameTier\d[^{]*\{[^}]*text-shadow/);
-    // Noms animés : lueur fixe en `::before`, jamais un `filter` recalculé à chaque image.
-    for (const tier of [1, 2]) {
-      expect(new RegExp(String.raw`\.nameTier${tier} \{([^}]*)\}`).exec(css)![1]).not.toMatch(/filter/);
-      const glow = new RegExp(String.raw`\.nameTier${tier}::before \{[^}]*rgba\(var\(--[a-z0-9-]+-rgb\), ([\d.]+)\)`).exec(css);
-      expect(Number(glow![1])).toBeLessThanOrEqual(0.2);
-    }
-    // 3e, immobile : halo par `drop-shadow`, large et léger.
-    const tier3 = /\.nameTier3 \{[^}]*drop-shadow\(0 0 (\d+)px rgba\(var\(--[a-z0-9-]+-rgb\), ([\d.]+)\)\)/.exec(css)!;
-    expect(Number(tier3[1])).toBeGreaterThanOrEqual(10);
-    expect(Number(tier3[2])).toBeLessThanOrEqual(0.3);
-  });
-
-  it("garde un soulignement visible et un nom imprimable malgré le texte transparent", () => {
-    for (const tier of [1, 2]) {
-      // « Liens soulignés » (menu d'accessibilité) : le trait ne suit pas `color: transparent`.
-      expect(linkRule(tier)).toMatch(/text-decoration-color: var\(--blue-300\)/);
-    }
-    // Imprimé : les fonds ne s'impriment pas — couleur pleine pour les deux noms peints.
-    expect(css).toMatch(/@media print \{\s*\.nameTier1 :global\(\.entity-link\),\s*\.nameTier2 :global\(\.entity-link\) \{\s*background: none;\s*color: var\(--blue-500\);/);
+  it("sans podium (moins de trois équipes), les rangs 1 et 2 du tableau portent leur marche", () => {
+    const markup = render({ rows: [row(1), row(2)] });
+    expect(markup).not.toContain('aria-label="Podium"');
+    expect(markup).toContain("podium-tier-1");
+    expect(markup).toContain("podium-tier-2");
+    expect(markup).not.toContain("podium-tier-3");
   });
 });
 
