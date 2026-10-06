@@ -76,6 +76,13 @@ describe("localeHref — adresse d'un lien dans une langue", () => {
     expect(localeHref("/api/uploads/a.png", "en")).toBe("/api/uploads/a.png");
   });
 
+  it("ne démasque jamais un autre hôte en retirant le préfixe (redirection ouverte)", () => {
+    for (const href of ["/en//evil.test", "/fr//evil.test/x", "/en/\\evil.test", "/en//evil.test?x=1"]) {
+      expect(localeHref(href, "fr")).toBe(href);
+      expect(localeHref(href, "en")).toBe(href);
+    }
+  });
+
   it("rend telle quelle une adresse qui n'est pas un chemin du site", () => {
     for (const href of ["https://discord.gg/x", "//evil.test/x", "/\\evil.test", "mailto:a@b.c", "#top", "regles"]) {
       expect(localeHref(href, "en")).toBe(href);
