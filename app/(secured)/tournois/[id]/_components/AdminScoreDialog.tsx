@@ -270,6 +270,9 @@ export function AdminScoreDialog({
   };
 
   const run = async (action: "save" | "resolve") => {
+    // Une map refusée se désigne avant la confirmation de correction : la
+    // modale de confirmation piégerait sinon le focus loin du champ fautif.
+    if (form.refuseMapsBefore(action)) return;
     if (scoreCorrectionNeedsConfirmation(match)) {
       setConfirmingCorrection(action);
       return;

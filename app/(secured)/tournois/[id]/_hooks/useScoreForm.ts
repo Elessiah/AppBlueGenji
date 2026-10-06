@@ -260,6 +260,11 @@ export function useScoreForm(
         forfeitTeamId: on ? undefined : s.forfeitTeamId,
       })),
     submit,
+    /**
+     * Refuse d'avance des maps qui ne partiraient pas (champ désigné, toast) :
+     * à appeler **avant** une confirmation, qui sinon couvrirait le champ fautif.
+     */
+    refuseMapsBefore: (action: "save" | "resolve") => mapsSent && refuseMaps(action === "resolve"),
   };
 }
 
