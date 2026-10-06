@@ -95,7 +95,7 @@ describe("détail map par map — arbitrage et relecture", () => {
       hook.indexOf("const blocker = action === \"save\" ? decision.saveBlocker : decision.resolveBlocker;"),
     );
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toContain("disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting}");
+    expect(dialog).toContain("disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting || awaitingDetail}");
   });
 
   it("la relecture du détail adverse se retente tant qu'il manque, au plus trois fois", () => {
@@ -156,5 +156,15 @@ describe("détail map par map — retours de la revue UI/UX", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain("if ((view.theirs?.maps ?? []).length === 0) {");
     expect(dialog).toContain("sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay");
+  });
+});
+
+describe("détail map par map — arbitrage pendant la lecture du détail proposé", () => {
+  it("les boutons de score attendent le détail de la proposition, pour ne pas en effacer les codes", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, proposals\) &&\s*form\.maps\.length === 0/);
+    expect(dialog).toContain("|| form.submitting || awaitingDetail}");
+    expect(dialog).toContain("!form.submitting && !awaitingDetail) void run(\"resolve\");");
+    expect(dialog).toContain("{awaitingDetail && (");
   });
 });

@@ -10,6 +10,7 @@ import {
   isValidReplayCode,
   mapListLimit,
   mapListViolationMessage,
+  MAP_LIST_ERROR_CODES,
   mapWinnerSide,
   mapsMatchStoredScore,
   normalizeReplayCode,
@@ -199,6 +200,7 @@ describe("saisie et affichage", () => {
       "MAP_REPLAY_CODE_DUPLICATE",
       "MAP_SCORE_INVALID",
       "MAP_AFTER_DECISION",
+      "MAP_LIST_INCOMPLETE",
       "DRAW_NOT_ALLOWED",
       "SCORE_EXCEEDS_MATCH_FORMAT",
       "SCORE_BELOW_MATCH_FORMAT",
@@ -226,5 +228,38 @@ describe("ligne vierge : jamais un 0 – 0 inventé", () => {
       error: "MAP_SCORE_INVALID",
       field: { index: 1, field: "team1Score" },
     });
+  });
+});
+
+describe("checkMapList — la map nulle consomme une map du BO (décision du 2026-10-06)", () => {
+  const BO5_DRAWS: MatchFormat = { type: "BO", value: 5, drawsAllowed: true };
+  const decisive = { decisive: true };
+
+  it("accepte un 2-2 en BO5 justifié par une cinquième map nulle", () => {
+    const check = checkMapList(BO5_DRAWS, null, mapsFor(2, 2, 1), decisive);
+    expect(check.error).toBeNull();
+    expect(check.score).toMatchObject({ team1: 2, team2: 2, drawnMaps: 1 });
+  });
+
+  it("refuse un 2-2 en BO5 sur quatre maps, en désignant la dernière", () => {
+    expect(checkMapList(BO5_DRAWS, null, mapsFor(2, 2), decisive)).toMatchObject({
+      error: "MAP_LIST_INCOMPLETE",
+      field: { index: 3, field: "team1Score" },
+    });
+    expect(mapListViolationMessage("MAP_LIST_INCOMPLETE", BO5_DRAWS)).toContain("les 5 maps");
+  });
+
+  it("n'exige rien d'un match gagné, ni d'un enregistrement intermédiaire", () => {
+    expect(checkMapList(BO5_DRAWS, null, mapsFor(3, 1), decisive).error).toBeNull();
+    expect(checkMapList(BO5_DRAWS, null, mapsFor(2, 2), { decisive: false }).error).toBeNull();
+  });
+
+  it("vaut aussi sous un plafond abaissé : 2-2 en FT3 plafonné à 4", () => {
+    expect(checkMapList(FT3_DRAWS_CAP4, null, mapsFor(2, 2), decisive).error).toBeNull();
+    expect(checkMapList(FT3_DRAWS_CAP4, null, mapsFor(1, 2), decisive).error).toBe("MAP_LIST_INCOMPLETE");
+  });
+
+  it("est un refus de règle des routes (400)", () => {
+    expect(MAP_LIST_ERROR_CODES.has("MAP_LIST_INCOMPLETE")).toBe(true);
   });
 });

@@ -108,6 +108,7 @@ describe("POST .../report — détail map par map (MAP_SCORES.md)", () => {
       "MAP_REPLAY_CODE_DUPLICATE",
       "MAP_SCORE_INVALID",
       "MAP_AFTER_DECISION",
+      "MAP_LIST_INCOMPLETE",
     ]) {
       jest.mocked(reportMatchScore).mockRejectedValueOnce(new Error(code));
       const res = await POST(req(), params);
