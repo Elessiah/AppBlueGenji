@@ -1,7 +1,7 @@
 # Textes éditables de la vitrine
 
-Titres, slogans et descriptions de l'accueil et de la page association sont
-modifiables en place par le staff `showcase` (ADMIN + Community Manager), sans
+Titres, slogans et descriptions de l'accueil, de la page association et de
+l'en-tête du classement sont modifiables en place par le staff `showcase` (ADMIN + Community Manager), sans
 passer par le code.
 
 ## Registre
@@ -52,6 +52,19 @@ connecté, sans quoi il ne pourrait jamais modifier la version visiteur).
 
 **Association** — surtitre et titre du hero, accroche du manifeste, accroche
 de la section « Adhérer ».
+
+**Classement** (`/classement`, depuis le 2026-10-06) — titre
+(`ranking.hero.title`, multiligne, 160 car.) et sous-titre
+(`ranking.hero.lede`, 400 car.) de l'en-tête. Les métadonnées de la page
+restent figées, comme pour l'accueil et l'association (`RANKING_PAGE.md`).
+
+Les textes éditables ne sont pas des données personnelles : rien à déclarer
+au registre des traitements ni à `PRIVACY_CHANGES`.
+
+**Langues** : français seulement à ce jour. Le lot 2 de l'i18n rend **toutes**
+les clés du registre bilingues (`copy_<clé>__en`, anglais obligatoire, D9) et
+rattrape l'anglais de celles déjà saisies — classement compris
+(`I18N_MIGRATION_PLAN.md`).
 
 Les titres multilignes se saisissent avec de vrais retours à la ligne ; le rendu
 les convertit en `<br />`, la dernière ligne portant l'accent de couleur.
