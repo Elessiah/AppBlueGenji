@@ -76,7 +76,7 @@
     "rank": "#",
     "server": "SERVER",
     "members": "MEMBERS",
-    "relays": "7-DAY RELAYS",
+    "relays": "RELAYS 7D",
     "relayQualifier": "RELAY ",
     "relayState": "STATUS",
     "trend": "TREND"
@@ -202,7 +202,7 @@
     "source": "SOURCE · BLUEGENJIBOT/{file}",
     "navTitle": "Contents",
     "pages": "{count, plural, one {# PAGE} other {# PAGES}}",
-    "live": "MARKDOWN · LIVE",
+    "live": "MARKDOWN · SYNCED",
     "missing": "This documentation page is temporarily unavailable: the file <code>{file}</code> couldn't be read from the bot project.",
     "synced": "DOCS SYNCED FROM THE BOT REPOSITORY",
     "updated": "UPDATED · {date}",

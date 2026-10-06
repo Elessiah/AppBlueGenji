@@ -202,7 +202,7 @@
     "source": "SOURCE · BLUEGENJIBOT/{file}",
     "navTitle": "Sommaire",
     "pages": "{count, plural, one {# PAGE} other {# PAGES}}",
-    "live": "MARKDOWN · LIVE",
+    "live": "MARKDOWN · SYNCHRONISÉ",
     "missing": "Cette page de documentation est momentanément indisponible : le fichier <code>{file}</code> n'a pas pu être lu depuis le projet du bot.",
     "synced": "DOC SYNCHRONISÉE DEPUIS LE DÉPÔT DU BOT",
     "updated": "MAJ · {date}",
