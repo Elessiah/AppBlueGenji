@@ -10,6 +10,7 @@ import {
   rankingFilterHref,
   rankingMoreHref,
   rankingRowId,
+  splitRankingPodium,
 } from "@/lib/shared/ranking-page";
 
 describe("filtre de jeu de /classement", () => {
@@ -83,6 +84,22 @@ describe("affichage progressif (?n=)", () => {
     expect(rankingMoreHref("mr", 100)).toBe("/classement?jeu=mr&n=150#rang-101");
     expect(rankingFilterHref("ow", 50)).toBe("/classement?jeu=ow");
     expect(rankingRowId(51)).toBe("rang-51");
+  });
+
+  it("partage podium et tableau : le tableau commence à la 4e place", () => {
+    const ranks = Array.from({ length: RANKING_PAGE_SIZE }, (_, index) => index + 1);
+    const { podium, table } = splitRankingPodium(ranks);
+    expect(podium).toEqual([1, 2, 3]);
+    expect(table[0]).toBe(4);
+    expect(table.at(-1)).toBe(RANKING_PAGE_SIZE);
+    expect(podium.length + table.length).toBe(RANKING_PAGE_SIZE);
+    expect(table).not.toContain(1);
+  });
+
+  it("sans podium (moins de trois équipes), tout reste au tableau", () => {
+    expect(splitRankingPodium([1, 2])).toEqual({ podium: [], table: [1, 2] });
+    expect(splitRankingPodium([])).toEqual({ podium: [], table: [] });
+    expect(splitRankingPodium([1, 2, 3])).toEqual({ podium: [1, 2, 3], table: [] });
   });
 
   it("n'offre plus de page suivante une fois le plafond atteint", () => {

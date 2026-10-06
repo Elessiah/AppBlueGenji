@@ -42,6 +42,7 @@ import {
   PLAYED_MATCH_SQL,
   RANKING_BASE_POINTS,
   replayRanking,
+  type MatchMargin,
   type RankedMatch,
   type RankedPlacement,
   type RankedTeamState,
@@ -131,6 +132,9 @@ type RankedMatchRow = RowDataPacket & {
   team2_id: number;
   /** `null` = match nul : `PLAYED_MATCH_SQL` n'en laisse pas passer d'autre. */
   winner_team_id: number | null;
+  team1_score: number | null;
+  team2_score: number | null;
+  forfeit_team_id: number | null;
   played_at: Date | string | null;
 };
 
@@ -162,6 +166,21 @@ function isoOrEpoch(value: Date | string | null): string {
 }
 
 /**
+ * Score en maps d'un match gagné, vu du vainqueur — ou rien quand il ne doit pas
+ * peser : un forfait (le score posé n'a pas été joué) ou un match sans score.
+ * Le rejeu retombe alors sur le transfert sans majoration.
+ */
+function matchMarginOf(row: RankedMatchRow, winnerIsTeam1: boolean): MatchMargin | undefined {
+  if (row.forfeit_team_id !== null && row.forfeit_team_id !== undefined) return undefined;
+  if (row.team1_score === null || row.team2_score === null) return undefined;
+  const team1 = Number(row.team1_score);
+  const team2 = Number(row.team2_score);
+  return winnerIsTeam1
+    ? { winnerMaps: team1, loserMaps: team2 }
+    : { winnerMaps: team2, loserMaps: team1 };
+}
+
+/**
  * Rencontres comptées du site, prêtes pour le rejeu.
  *
  * La chronologie est celle des fiches et des barres de forme
@@ -187,6 +206,9 @@ async function loadRankedMatches(
       m.team1_id,
       m.team2_id,
       m.winner_team_id,
+      m.team1_score,
+      m.team2_score,
+      m.forfeit_team_id,
       COALESCE(m.updated_at, t.finished_at, t.start_at) AS played_at
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -212,10 +234,12 @@ async function loadRankedMatches(
     }
 
     const winner = Number(row.winner_team_id);
+    const score = matchMarginOf(row, winner === team1);
     return {
       matchId: Number(row.id),
       winnerTeamId: winner,
       loserTeamId: winner === team1 ? team2 : team1,
+      ...(score ? { score } : {}),
       playedAt: isoOrEpoch(row.played_at),
     };
   });

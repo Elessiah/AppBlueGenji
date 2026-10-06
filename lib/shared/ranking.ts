@@ -125,8 +125,63 @@ export function expectedScore(rating: number, opponentRating: number): number {
  * deux nombres différents dès que la valeur exacte tombe sur une demie, et le
  * total du site dériverait match après match.
  */
-export function ratingTransfer(winnerRating: number, loserRating: number): number {
-  return Math.round(RANKING_K_FACTOR * (1 - expectedScore(winnerRating, loserRating)));
+export function ratingTransfer(
+  winnerRating: number,
+  loserRating: number,
+  score?: MatchMargin,
+): number {
+  const multiplier = marginMultiplier(score, winnerRating - loserRating);
+  return Math.round(RANKING_K_FACTOR * (1 - expectedScore(winnerRating, loserRating)) * multiplier);
+}
+
+/** Score d'un match gagné, en maps : celles du vainqueur, celles du perdant. */
+export type MatchMargin = { winnerMaps: number; loserMaps: number };
+
+/**
+ * Majoration maximale d'un transfert pour une victoire **sans concéder de map**
+ * (3-0, 2-0) : ×1,5. La victoire la plus serrée possible (3-2, 2-1) reste à ×1.
+ *
+ * Une demi-fois de plus, pas le double : l'écart de score dit quelque chose du
+ * niveau, mais une seule rencontre ne doit pas valoir deux matchs.
+ */
+export const RANKING_MARGIN_MAX_BONUS = 0.5;
+
+/**
+ * Amortisseur de l'autocorrélation (méthode de FiveThirtyEight) : la favorite
+ * balaie plus souvent ses adversaires **parce qu'elle** est favorite, et
+ * majorer chacun de ses balayages gonflerait sa cote match après match. Le bonus
+ * est multiplié par `2,2 / (2,2 + écart × 0,001)` quand c'est la mieux cotée qui
+ * gagne — ×0,85 à 400 points d'avance. Un outsider qui balaie garde son bonus
+ * entier : il n'est jamais majoré au-delà de {@link RANKING_MARGIN_MAX_BONUS}.
+ */
+const AUTOCORRELATION_BASE = 2.2;
+const AUTOCORRELATION_SLOPE = 0.001;
+
+/**
+ * Multiplicateur du transfert selon le **score du match** — entre 1 et
+ * 1 + {@link RANKING_MARGIN_MAX_BONUS}.
+ *
+ * L'écart se rapporte au format, par le nombre de maps du vainqueur (`w`) :
+ * `marge = (w − perdant − 1) / (w − 1)`, qui vaut 0 sur la victoire la plus
+ * serrée possible et 1 sur un balayage, quel que soit le FT/BO. En FT3 : 3-2 →
+ * ×1, 3-1 → ×1,25, 3-0 → ×1,5 ; en FT2 : 2-1 → ×1, 2-0 → ×1,5.
+ *
+ * Vaut **1** — le transfert d'avant — chaque fois que le score ne dit rien :
+ * pas de score (forfait, match ancien), FT1 (une seule map, aucun écart
+ * possible), score incohérent (le vainqueur n'a pas plus de maps que le
+ * perdant).
+ *
+ * `ratingGap` = cote du vainqueur − cote du perdant, pour l'amortisseur.
+ */
+export function marginMultiplier(score: MatchMargin | undefined, ratingGap = 0): number {
+  if (!score) return 1;
+  const { winnerMaps, loserMaps } = score;
+  if (!Number.isInteger(winnerMaps) || !Number.isInteger(loserMaps)) return 1;
+  if (winnerMaps <= 1 || loserMaps < 0 || loserMaps >= winnerMaps) return 1;
+  const margin = (winnerMaps - loserMaps - 1) / (winnerMaps - 1);
+  const damping =
+    AUTOCORRELATION_BASE / (AUTOCORRELATION_BASE + Math.max(0, ratingGap) * AUTOCORRELATION_SLOPE);
+  return 1 + RANKING_MARGIN_MAX_BONUS * margin * damping;
 }
 
 /**
@@ -168,6 +223,12 @@ export type RankedMatch = {
    * deux, et le rejeu n'aurait plus personne à créditer.
    */
   drawn?: boolean;
+  /**
+   * Score du match en maps, quand il en dit quelque chose : majore le transfert
+   * d'une victoire nette ({@link marginMultiplier}). Absent sur un forfait ou un
+   * match ancien sans score — transfert inchangé. Ignoré sur un nul.
+   */
+  score?: MatchMargin;
   /** Date ISO du résultat. Une date illisible range le match en tête. */
   playedAt: string;
 };
@@ -384,7 +445,7 @@ export function replayRanking(
       continue;
     }
 
-    const transfer = ratingTransfer(winner.points, loser.points);
+    const transfer = ratingTransfer(winner.points, loser.points, match.score);
 
     winner.points += transfer;
     loser.points = Math.max(RANKING_FLOOR_POINTS, loser.points - transfer);

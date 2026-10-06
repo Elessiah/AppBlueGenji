@@ -50,6 +50,38 @@ describe("RankingBoard", () => {
     expect(markup).toContain("À 20 pts de la tête");
   });
 
+  it("ne répète pas le podium : le tableau commence à la 4e place et le dit", () => {
+    const markup = render();
+    expect(markup).toContain("Tableau du classement des équipes, à partir de la 4e place");
+    expect(markup).toContain('id="rang-4"');
+    expect(markup).not.toContain('id="rang-1"');
+    expect(markup.match(/href="\/equipes\/10"/g) ?? []).toHaveLength(1);
+  });
+
+  it("garde la forme et la tendance des trois premières sur le podium", () => {
+    const markup = render({ rows: [row(1), row(2, { trend: "up", trendValue: 2 }), row(3)] });
+    expect(markup).not.toContain('role="table"');
+    expect(markup).toContain("Forme récente, du plus récent au plus ancien : V, D, N");
+    expect(markup).toContain("Monte de 2 sur 7 jours");
+  });
+
+  it("libelle visiblement la forme et la tendance du podium, sans les doubler à l'oral", () => {
+    const markup = render({ rows: [row(1), row(2), row(3)] });
+    expect(markup.match(/aria-hidden="true">Forme<\/span>/g) ?? []).toHaveLength(3);
+    expect(markup.match(/aria-hidden="true">7 j<\/span>/g) ?? []).toHaveLength(3);
+  });
+
+  it("dit à l'oral qu'une équipe sans résultat récent n'a pas de forme", () => {
+    const markup = render({ rows: [row(1), row(2), row(3)], forms: new Map() });
+    expect(markup).toContain("Aucun résultat récent");
+  });
+
+  it("ne libelle pas la forme du podium quand elle n'est pas affichée", () => {
+    const markup = render({ rows: [row(1), row(2), row(3)], forms: null });
+    expect(markup).not.toContain('aria-hidden="true">Forme</span>');
+    expect(markup.match(/aria-hidden="true">7 j<\/span>/g) ?? []).toHaveLength(3);
+  });
+
   it("n'affiche pas de podium sous trois équipes", () => {
     const markup = render({ rows: [row(1), row(2)] });
     expect(markup).not.toContain('aria-label="Podium"');

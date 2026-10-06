@@ -104,3 +104,24 @@ export const FORM_LETTERS: Record<"w" | "l" | "d", string> = { w: "V", l: "D", d
 
 /** Nombre de résultats de forme montrés par ligne. */
 export const RANKING_FORM_LENGTH = 5;
+
+/** Places tenues par le podium — dès qu'il y a de quoi le remplir. */
+export const RANKING_PODIUM_SIZE = 3;
+
+/**
+ * Partage les lignes affichées entre le podium et le tableau : avec au moins
+ * trois équipes, les trois premières montent sur le podium et le tableau
+ * **commence à la 4e place** — sans répéter le podium. En dessous, pas de
+ * podium et tout reste au tableau.
+ *
+ * `?n=` compte toujours des **rangs** (podium compris) : la première page montre
+ * les rangs 1 à 50 (podium + tableau 4 à 50), « Afficher plus » ajoute 51 à
+ * 100, et les ancres `rang-<n>` restent celles des rangs absolus.
+ */
+export function splitRankingPodium<Row>(rows: readonly Row[]): {
+  podium: readonly Row[];
+  table: readonly Row[];
+} {
+  if (rows.length < RANKING_PODIUM_SIZE) return { podium: [], table: rows };
+  return { podium: rows.slice(0, RANKING_PODIUM_SIZE), table: rows.slice(RANKING_PODIUM_SIZE) };
+}

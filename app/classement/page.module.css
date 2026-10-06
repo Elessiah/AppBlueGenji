@@ -262,6 +262,31 @@
   font-size: 13px;
 }
 
+.podiumMeta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Libellés visibles : sans la tête du tableau, « ▲ 12 » ne dirait pas qu'il
+   s'agit de points gagnés sur 7 jours. Même style que les libellés mobiles. */
+.podiumMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.podiumMetaLabel {
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .podiumGap {
   margin: 0;
   font-size: 12px;
@@ -429,12 +454,13 @@
   letter-spacing: -0.01em;
 }
 
+/* Quatre cartes : deux par deux, sans orpheline sur une seconde ligne. */
 .howList {
   margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 

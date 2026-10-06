@@ -5,7 +5,7 @@ import { loadLeaderboardRows } from "@/lib/server/landing-service";
 import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import { RANKING_BASE_POINTS, RANKING_FLOOR_POINTS } from "@/lib/shared/ranking";
+import { RANKING_BASE_POINTS, RANKING_FLOOR_POINTS, RANKING_MARGIN_MAX_BONUS } from "@/lib/shared/ranking";
 import { parseRankingFilter, parseRankingShown, rankingFilterGame } from "@/lib/shared/ranking-page";
 import { RankingBoard } from "./RankingBoard";
 import styles from "./page.module.css";
@@ -17,6 +17,9 @@ export const metadata: Metadata = pageMetadata({
   shareDescription: "Qui est au sommet ? Le classement des équipes de la scène BlueGenji.",
   path: "/classement",
 });
+
+/** « 1,5 » : majoration maximale d'un balayage, dérivée de la constante. */
+const MARGIN_MAX_TEXT = (1 + RANKING_MARGIN_MAX_BONUS).toLocaleString("fr-FR");
 
 // Le classement bouge à chaque score : la page se rend à la demande, la
 // mutualisation se fait en amont (`ranking-cache`, `stats-cache`).
@@ -79,6 +82,12 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
           <li>
             <strong>Chaque match</strong> transfère des points du perdant au vainqueur — beaucoup pour
             une victoire improbable, presque rien pour une victoire attendue.
+          </li>
+          <li>
+            <strong>Le score</strong> pèse aussi : une victoire sans perdre de map (3-0, 2-0) transfère
+            jusqu'à {MARGIN_MAX_TEXT} fois les points d'une victoire arrachée (3-2, 2-1) — autant de
+            gagné pour le vainqueur, autant de perdu pour le perdant. Un match en une seule map et un
+            forfait comptent comme une victoire simple.
           </li>
           <li>
             <strong>Le rang final</strong> d'un tournoi redistribue aussi des points, d'autant plus que
