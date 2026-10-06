@@ -450,6 +450,8 @@ export function AdminScoreDialog({
               game={form.game}
               team1Name={team1}
               team2Name={team2}
+              team1Id={match.team1Id}
+              team2Id={match.team2Id}
               disabled={form.submitting}
               fieldErrors={mapFieldErrors}
             />

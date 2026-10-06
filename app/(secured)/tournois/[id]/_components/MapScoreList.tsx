@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -19,7 +19,12 @@ import {
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
 import type { TournamentGame } from "@/lib/shared/types";
+import { EntrantLogo } from "./EntrantName";
 import styles from "./MapScoreList.module.css";
+
+function keepEnterInList(event: KeyboardEvent<HTMLFieldSetElement>) {
+  if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
+}
 
 interface MapScoreListProps {
   /** Préfixe des `id` de champs — deux modales ne partagent jamais les leurs. */
@@ -30,6 +35,9 @@ interface MapScoreListProps {
   game: TournamentGame | null;
   team1Name: string;
   team2Name: string;
+  /** Engagés de chaque colonne — leur emblème distingue deux noms proches. */
+  team1Id?: number | null;
+  team2Id?: number | null;
   disabled: boolean;
   fieldErrors: FieldErrors<string>;
 }
@@ -65,6 +73,8 @@ export function MapScoreList({
   game,
   team1Name,
   team2Name,
+  team1Id = null,
+  team2Id = null,
   disabled,
   fieldErrors,
 }: Readonly<MapScoreListProps>) {
@@ -133,7 +143,9 @@ export function MapScoreList({
   };
 
   return (
-    <fieldset className={styles.list} disabled={disabled}>
+    // `Entrée` dans un champ de map ne soumet pas le formulaire : corriger un
+    // code puis valider d'un même geste trancherait le match sans relecture.
+    <fieldset className={styles.list} disabled={disabled} onKeyDown={keepEnterInList}>
       <legend className={styles.legend}>
         Maps jouées <span className={styles.limit}>({maps.length}/{Math.max(shownLimit, maps.length)})</span>
       </legend>
@@ -181,13 +193,17 @@ export function MapScoreList({
                 </div>
                 <div className={styles.score}>
                   <label className={styles.fieldLabel} htmlFor={t1Id} title={team1Name}>
-                    <span className="sr-only">Map {index + 1}, score de </span>{team1Name}
+                    {team1Id !== null && <EntrantLogo teamId={team1Id} name={team1Name} size={16} />}
+                    <span className={styles.fieldLabelText}>
+                      <span className="sr-only">Map {index + 1}, score de </span>{team1Name}
+                    </span>
                   </label>
                   <NumberInput
                     id={t1Id}
                     className={styles.scoreInput}
                     min={0}
                     max={MAP_SCORE_MAX}
+                    inputMode="numeric"
                     value={map.team1Score}
                     onValueChange={(value) => update(index, { team1Score: value }, "team1Score")}
                     // Un champ vidé pour être ressaisi n'émet pas de valeur :
@@ -199,13 +215,17 @@ export function MapScoreList({
                 </div>
                 <div className={styles.score}>
                   <label className={styles.fieldLabel} htmlFor={t2Id} title={team2Name}>
-                    <span className="sr-only">Map {index + 1}, score de </span>{team2Name}
+                    {team2Id !== null && <EntrantLogo teamId={team2Id} name={team2Name} size={16} />}
+                    <span className={styles.fieldLabelText}>
+                      <span className="sr-only">Map {index + 1}, score de </span>{team2Name}
+                    </span>
                   </label>
                   <NumberInput
                     id={t2Id}
                     className={styles.scoreInput}
                     min={0}
                     max={MAP_SCORE_MAX}
+                    inputMode="numeric"
                     value={map.team2Score}
                     onValueChange={(value) => update(index, { team2Score: value }, "team2Score")}
                     // Un champ vidé pour être ressaisi n'émet pas de valeur :

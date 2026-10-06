@@ -74,6 +74,10 @@
 }
 
 .fieldLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
   font-size: 11px;
   line-height: 16px;
   font-weight: 600;
@@ -81,6 +85,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Nom d'équipe après l'emblème : c'est lui qui s'abrège, pas l'emblème. */
+.fieldLabelText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .codeInput,
@@ -96,6 +107,15 @@
   font-family: var(--font-mono);
   font-size: 15px;
   font-weight: 700;
+}
+
+.codeInput:disabled,
+.scoreInput:disabled {
+  /* Désactivé par les couleurs (jamais `opacity`) : envoi en cours. */
+  border-color: rgba(90, 200, 255, 0.12);
+  background: transparent;
+  color: var(--ink-dim, #859dbb);
+  cursor: not-allowed;
 }
 
 .codeInput {

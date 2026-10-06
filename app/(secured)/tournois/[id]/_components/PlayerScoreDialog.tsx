@@ -135,6 +135,20 @@ function refusalWorthShowing(check: MapListCheck, maps: ReadonlyArray<MatchMapIn
   return maps.some(isMapTouched) && refusalOnTouchedRow(check, maps);
 }
 
+/**
+ * Le détail adverse s'affiche à part en désaccord, et quand le formulaire ne
+ * le reprend pas tel quel (proposition arrivée pendant une saisie).
+ */
+function theirMapsWorthShowing(
+  phase: string | undefined,
+  theirMaps: ReadonlyArray<MatchMapInput>,
+  maps: ReadonlyArray<MatchMapInput>,
+): boolean {
+  if (theirMaps.length === 0) return false;
+  if (phase === "CONFLICT") return true;
+  return phase === "THEIRS_PENDING" && !sameMapLists(maps, theirMaps);
+}
+
 /** Détail adverse en lecture — seulement pour qui peut le lire (`canReportScore`). */
 function proposalDetailLoading(
   canRead: boolean,
@@ -235,6 +249,7 @@ export function PlayerScoreDialog({
   // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
   // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
   const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? [], detailLoading);
+  const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], maps);
 
   const forfeitMaps = forfeitMapCount(matchFormat);
   const deadline = deadlineText(match.scoreDeadlineAt);
@@ -384,9 +399,11 @@ export function PlayerScoreDialog({
             </output>
           )}
 
-          {/* Désaccord : le détail adverse, codes de replay compris — sans lui,
-              une faute de frappe dans un code ne se retrouverait pas. */}
-          {view?.phase === "CONFLICT" && view.theirs && view.theirs.maps.length > 0 && (
+          {/* Désaccord, ou proposition adverse que le formulaire ne reprend pas
+              (saisie déjà commencée à son arrivée) : le détail adverse, codes de
+              replay compris — sans lui, une faute de frappe ne se retrouverait
+              pas, et « Confirme-le » n'aurait rien à montrer. */}
+          {showTheirMaps && view?.theirs && (
             <div className={mapStyles.proposals}>
               <p className={mapStyles.proposalTitle}>Proposition de {opponentName}</p>
               <MapResultList
@@ -408,6 +425,8 @@ export function PlayerScoreDialog({
                 game={game}
                 team1Name={team1}
                 team2Name={team2}
+                team1Id={match.team1Id}
+                team2Id={match.team2Id}
                 disabled={submitting}
                 fieldErrors={fieldErrors}
               />
