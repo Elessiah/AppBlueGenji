@@ -127,9 +127,13 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   if (prefixed === null) return null;
   if (isApiPath(path)) return new NextResponse(null, { status: 404 });
   if (prefixed === "en" && isMigratedRoute(path)) return null;
-  const target = request.nextUrl.clone();
-  target.pathname = path;
-  return NextResponse.redirect(target, prefixed === "en" ? 307 : 308);
+  // `Location` relative : derrière le mandataire, `request.nextUrl` porte
+  // l'origine interne (`localhost:3000`), qu'une adresse absolue enverrait au
+  // visiteur.
+  return new NextResponse(null, {
+    status: prefixed === "en" ? 307 : 308,
+    headers: { location: `${path}${request.nextUrl.search}` },
+  });
 }
 
 /** Chargement d'un document, et non `fetch` du routeur (préchargement, navigation client). */
