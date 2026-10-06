@@ -40,7 +40,7 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<Calen
         <h3 className="mono" style={{ fontSize: 11, letterSpacing: "0.2em", color: "var(--ink-mute)", margin: 0, fontWeight: 400 }}>
           {t("calendar.heading")}
         </h3>
-        <a className="mono" href="/api/landing/calendar?format=ics" download="bluegenji.ics">
+        <a className="mono" href={locale === "en" ? "/api/landing/calendar?format=ics&lang=en" : "/api/landing/calendar?format=ics"} download="bluegenji.ics">
           {t("calendar.ics")}
         </a>
       </div>

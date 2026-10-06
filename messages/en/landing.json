@@ -68,6 +68,7 @@
     "phase": {
       "waiting": "WAITING",
       "final": "FINAL STAGE",
+      "knockout": "KNOCKOUT STAGE",
       "round": "ROUND {n}"
     },
     "round": {
@@ -84,13 +85,13 @@
     "resumeShort": "Resume",
     "pauseShort": "Pause",
     "result": "RESULT · {tournament} · {team1} {score1} — {team2} {score2}",
-    "registration": "REGISTRATION · {name} · {registered}/{max} teams",
+    "registration": "REGISTRATION OPEN · {name} · {registered}/{max} teams",
     "winner": "WINNER · {name} · {winner}",
     "unknownChampion": "Unknown champion",
     "teamFallback": "Team #{id}",
     "news": "NEWS · {title}",
     "defaultResult": "RESULT · Waiting for new matches",
-    "defaultRegistration": "REGISTRATION · More brackets coming soon",
+    "defaultRegistration": "REGISTRATION OPEN · More brackets coming soon",
     "defaultCommunity": "COMMUNITY · Join the BlueGenji Discord"
   },
   "board": {

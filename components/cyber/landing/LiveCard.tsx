@@ -27,12 +27,13 @@ function roundText({ t, locale }: LandingText, match: LandingLiveMatch): string 
 
 /**
  * Phase affichée sous la pastille. En français, `inferPhaseLabel` (inchangé :
- * la finale, la demi-finale et les quarts se lisent « PHASE FINALE ») ; en
- * anglais, la même règle d'après `round`.
+ * la finale et la demi-finale se lisent « PHASE FINALE », les quarts « PHASE
+ * ÉLIMINATOIRE ») ; en anglais, la même règle d'après `round`.
  */
 function phaseText(text: LandingText, match: LandingLiveMatch): string {
   if (text.locale === "fr") return inferPhaseLabel(match);
   if (match.round.kind === "round") return text.t("live.phase.round", { n: String(match.round.number) });
+  if (match.round.kind === "quarter") return text.t("live.phase.knockout");
   return text.t("live.phase.final");
 }
 

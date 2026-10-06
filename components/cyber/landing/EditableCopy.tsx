@@ -61,6 +61,10 @@ export async function submitSiteCopy(
   fr: string,
   en: string,
 ): Promise<SiteCopySubmitOutcome> {
+  // Même ordre que le serveur : le français d'abord.
+  if (fr.trim().length === 0) {
+    return { ok: false, code: "COPY_EMPTY", fallback: SITE_COPY_ERROR_MESSAGES.COPY_EMPTY };
+  }
   if (en.trim().length === 0) {
     return { ok: false, code: "COPY_EN_EMPTY", fallback: SITE_COPY_ERROR_MESSAGES.COPY_EN_EMPTY };
   }

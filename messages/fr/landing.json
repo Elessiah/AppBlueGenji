@@ -68,6 +68,7 @@
     "phase": {
       "waiting": "EN ATTENTE",
       "final": "PHASE FINALE",
+      "knockout": "PHASE ÉLIMINATOIRE",
       "round": "MANCHE {n}"
     },
     "round": {
@@ -87,7 +88,7 @@
     "registration": "INSCRIPTIONS · {name} · {registered}/{max} équipes",
     "winner": "VAINQUEUR · {name} · {winner}",
     "unknownChampion": "Champion inconnu",
-    "teamFallback": "Equipe #{id}",
+    "teamFallback": "Équipe #{id}",
     "news": "NEWS · {title}",
     "defaultResult": "RÉSULTAT · En attente de nouveaux matches",
     "defaultRegistration": "INSCRIPTIONS · Prochains brackets à venir",
