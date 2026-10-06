@@ -177,7 +177,16 @@ describe("route d'image d'un tournoi", () => {
     // afficher un encart sans image.
     expect(OG_ROUTE).toContain("catch(() => null)");
     expect(OG_ROUTE).toContain("if (!card)");
-    expect(OG_ROUTE).toContain("<ShareCard {...SITE_SHARE_CARD} />");
+    expect(OG_ROUTE).toContain("<ShareCard {...SITE_SHARE_CARD} logoSrc={logoSrc} />");
+  });
+
+  it("garde la même revalidation de cinq minutes", () => {
+    expect(OG_ROUTE).toContain("export const revalidate = 300");
+  });
+
+  it("lit le logo sur le disque, jamais par une requête réseau", () => {
+    expect(OG_ROUTE).toContain("await shareCardLogo()");
+    expect(OG_ROUTE).not.toMatch(/\bfetch\(/);
   });
 
   it("annonce la taille attendue d'un aperçu Open Graph", () => {

@@ -5,6 +5,7 @@ import {
   SITE_SHARE_CARD,
   formatShareDate,
   formatShareDateShort,
+  SHARE_STATE_TONES,
   tournamentShareCard,
   tournamentShareDescription,
   tournamentShareState,
@@ -12,6 +13,7 @@ import {
   truncateForShare,
 } from "@/lib/shared/share-metadata";
 import type { TournamentCard } from "@/lib/shared/types";
+import { STATE_META } from "@/app/(secured)/tournois/[id]/_lib/header-meta";
 import { tournamentCard } from "../../helpers/tournament-card";
 
 /**
@@ -213,8 +215,56 @@ describe("tournamentShareDescription", () => {
 describe("tournamentShareCard", () => {
   it("remonte le jeu dans le surtitre : le titre appartient au nom du tournoi", () => {
     const built = tournamentShareCard(card(), NOW);
-    expect(built.eyebrow).toBe("Overwatch · Inscriptions ouvertes");
+    expect(built.eyebrow).toBe("Overwatch");
     expect(built.title).toBe("OW Open Cup");
+  });
+
+  it("met l'état dans sa propre pastille, au ton de son sens", () => {
+    expect(tournamentShareCard(card({ state: "UPCOMING" }), NOW).state).toEqual({ label: "Prochainement", tone: "accent" });
+    expect(tournamentShareCard(card({ state: "REGISTRATION" }), NOW).state).toEqual({
+      label: "Inscriptions ouvertes",
+      tone: "highlight",
+    });
+    expect(tournamentShareCard(card({ state: "RUNNING" }), NOW).state).toEqual({ label: "Tournoi en cours", tone: "info" });
+    expect(tournamentShareCard(card({ state: "FINISHED" }), NOW).state).toEqual({ label: "Tournoi terminé", tone: "success" });
+  });
+
+  it("prend les tons de l'en-tête de la fiche, sans rouge ni ambre", () => {
+    for (const state of Object.keys(STATE_META) as (keyof typeof STATE_META)[]) {
+      expect(SHARE_STATE_TONES[state]).toBe(STATE_META[state].tone);
+    }
+  });
+
+  // Écrits par code point : un caractère invisible collé dans la source ne se
+  // relirait pas en revue.
+  const ZWSP = String.fromCodePoint(0x200b);
+  const WJ = String.fromCodePoint(0x2060);
+  const BELL = String.fromCodePoint(0x07);
+  const NUL = String.fromCodePoint(0x00);
+
+  it("nettoie le nom saisi : ni contrôle ni caractère invisible jusqu'au PNG", () => {
+    const built = tournamentShareCard(
+      card({ name: `${ZWSP}OW${BELL}  Cup${WJ} `, description: `Ligne${NUL} libre${ZWSP}` }),
+      NOW,
+    );
+    expect(built.title).toBe("OW Cup");
+    expect(built.subtitle).toBe("Ligne libre");
+  });
+
+  it("coupe un nom trop long sur un mot, avec une ellipse", () => {
+    const built = tournamentShareCard(card({ name: "Tournoi ".repeat(30) }), NOW);
+    expect(built.title.length).toBeLessThanOrEqual(90);
+    expect(built.title.endsWith("…")).toBe(true);
+    expect(built.title).not.toMatch(/\s…$/u);
+  });
+
+  it("tranche un nom d'une seule pièce plutôt que de le laisser déborder", () => {
+    const built = tournamentShareCard(card({ name: "A".repeat(200) }), NOW);
+    expect(Array.from(built.title)).toHaveLength(90);
+  });
+
+  it("retombe sur « Tournoi » quand le nom ne contient rien de visible", () => {
+    expect(tournamentShareCard(card({ name: `${ZWSP}${WJ} ` }), NOW).title).toBe("Tournoi");
   });
 
   it("étiquette l'échéance et n'en garde que la date en valeur", () => {
