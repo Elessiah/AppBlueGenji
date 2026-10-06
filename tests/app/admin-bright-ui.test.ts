@@ -38,6 +38,7 @@ const AMBER_WARNINGS: Record<string, string> = {
   "app/(secured)/admin/signalements/reports.module.css": "à traiter / contestés non nuls, quarantaine, masquer",
   "components/cyber/landing/EditableCopy.module.css": "texte éditable dont l'anglais reste à rédiger",
   "components/ui/bilingual-field.module.css": "contenu du staff dont l'anglais reste à rédiger (lot 5b)",
+  "app/benevoles/page.module.css": "anglais d'une catégorie repris d'une autre, à vérifier (lot 5b)",
   "app/(secured)/equipes/[id]/team.module.css": "bandeau de modération",
   "app/(secured)/joueurs/[id]/player.module.css": "bandeau de modération",
   "app/(secured)/profil/ConnectedAppsSection.tsx": "refus de détacher la dernière connexion",

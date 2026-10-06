@@ -67,6 +67,12 @@ describe("BilingualField", () => {
     expect(html).toMatch(/aria-describedby="bureau-role-en-error bureau-role-en-hint"/);
   });
 
+  it("l'aide du rattrapage se tait dès que l'anglais est saisi", () => {
+    const html = render({ enMissing: true, en: "Chair" });
+    expect(html).not.toContain("bureau-role-en-hint");
+    expect(html).not.toContain(ENGLISH_BACKFILL_HINT.replace(/'/g, "&#x27;"));
+  });
+
   it("champ facultatif : l'anglais n'est obligatoire qu'avec un français", () => {
     expect(render({ required: false, fr: "" })).not.toMatch(/id="bureau-role-en"[^>]*required=""/);
     expect(render({ required: false, fr: "Texte" })).toMatch(/id="bureau-role-en"[^>]*required=""/);

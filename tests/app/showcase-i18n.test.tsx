@@ -334,6 +334,14 @@ describe("rendu anglais — rien encore traduit : le dire, sans « 0 » ni « au
     expect(optional).not.toContain("Our openings are being translated into English.");
   });
 
+  it("/en/recrutement : les contrôles du staff (lang=fr) nomment l'annonce par son titre français", async () => {
+    mockUser = authUserForMock();
+    const html = await render(RecrutementPage, "en");
+    expect(html).toContain('aria-label="Modifier Arbitres pour le dimanche"');
+    expect(html).toContain('aria-label="Supprimer Arbitres pour le dimanche"');
+    expect(html).not.toContain("Modifier Referees for Sundays");
+  });
+
   it("/en/recrutement : pas de flèches d'ordre pour le staff (une annonce masquée fausserait l'échange)", async () => {
     mockUser = authUserForMock();
     expect(await render(RecrutementPage, "en")).not.toMatch(/aria-label="(Monter|Descendre) l&#x27;annonce/);

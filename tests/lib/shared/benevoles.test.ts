@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   nextCategoryEnglish,
+  borrowedCategoryEnglish,
   BENEVOLE_CATEGORY_MAX,
   BENEVOLE_FIELD_ERRORS,
   benevoleInitials,
@@ -365,7 +366,7 @@ describe("formatJoinedAt — langue", () => {
 
 
 describe("nextCategoryEnglish", () => {
-  const known: Record<string, string> = { Arbitre: "Referee", Caster: "Caster" };
+  const known: Record<string, string> = { Arbitre: "Referee", Caster: "Caster", Developpeur: "Developer" };
   const englishOf = (category: string) => known[category.trim()] ?? null;
 
   it("reprend l'anglais connu de la nouvelle catégorie", () => {
@@ -373,13 +374,32 @@ describe("nextCategoryEnglish", () => {
     expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, "Caster", englishOf)).toBe("Caster");
   });
 
-  it("vers une catégorie nouvelle, l'anglais repris de l'ancienne se vide", () => {
-    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, "Graphiste", englishOf)).toBe("");
-    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, "Arbitr", englishOf)).toBe("");
+  it("vers une catégorie inconnue, l'anglais reste (une faute corrigée ne le vide pas)", () => {
+    expect(nextCategoryEnglish({ category: "Developpeur", categoryEn: "Developer" }, "Dveloppeur", englishOf)).toBe("Developer");
+    expect(nextCategoryEnglish({ category: "Dveloppeur", categoryEn: "Developer" }, "Développeur", englishOf)).toBe("Developer");
   });
 
   it("une saisie anglaise faite à la main n'est jamais écrasée", () => {
     expect(nextCategoryEnglish({ category: "Graphiste", categoryEn: "Designer" }, "Arbitre", englishOf)).toBe("Designer");
     expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Umpire" }, "Graphist", englishOf)).toBe("Umpire");
+  });
+});
+
+describe("borrowedCategoryEnglish", () => {
+  const benevoles = [
+    { category: "Arbitre", categoryEn: "Referee" },
+    { category: "Developpeur", categoryEn: "Developer" },
+  ];
+
+  it("catégorie nouvelle qui porte l'anglais d'une autre : la nomme, à vérifier", () => {
+    expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "Referee" }, benevoles)).toBe("Arbitre");
+    expect(borrowedCategoryEnglish({ category: "Développeur", categoryEn: "Developer" }, benevoles)).toBe("Developpeur");
+  });
+
+  it("rien à signaler : catégorie connue, anglais propre, ou champ vide", () => {
+    expect(borrowedCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, benevoles)).toBeNull();
+    expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "Caster" }, benevoles)).toBeNull();
+    expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "" }, benevoles)).toBeNull();
+    expect(borrowedCategoryEnglish({ category: "", categoryEn: "Referee" }, benevoles)).toBeNull();
   });
 });
