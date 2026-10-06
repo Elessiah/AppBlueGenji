@@ -74,11 +74,14 @@ Exceptions :
   des outils, pas une vitrine.
 - **Ligne en retrait** (`data-podium-muted` : perdant d'un match dans
   `MatchRow`, équipe éliminée ou forfait dans les classements Survie, Suisse et
-  Endurance) : la marche garde son repère (couronne, losange) mais quitte
+  Endurance, et dans l'historique manche par manche de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
+- **Graisse en ligne** des classements Suisse et Survie : `standingNameWeight`
+  (700 pour l'engagé du lecteur, 500 ailleurs) ne l'impose pas à une marche,
+  qui porte la sienne.
 - **Lien-avatar sans texte** (roster des cartes `/equipes`) : `podiumTier={null}`
   — la peinture sur le texte effacerait l'initiale de repli ; le nom de
   l'équipe, au-dessus, porte déjà la marche.
@@ -102,8 +105,10 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
-  fond le plus clair **éclairé par la lueur** au bord des lettres (moitié de
-  chaque opacité, lueurs cumulées) — `tests/app/podium-tiers-style.test.ts`.
+  fond le plus clair où la lueur reste — la ligne de l'engagé du lecteur, à
+  6 % de cyan — **éclairé par la lueur** au bord des lettres (moitié de chaque
+  opacité, lueurs cumulées) — `tests/app/podium-tiers-style.test.ts`. D'où des
+  lueurs retenues : cyan 0,16 + violet 0,3 à la 1re, violet 0,25 à la 3e.
 - **Mouvement** : le reflet ne déplace que `background-position`, motif
   périodique (pas de saut), en pause par `var(--deco-anim-state)` (régime de
   charge `useClientPower`, mouvement réduit, menu d'accessibilité). À l'arrêt,
