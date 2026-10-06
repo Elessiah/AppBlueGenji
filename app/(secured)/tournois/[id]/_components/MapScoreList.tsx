@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -90,9 +90,21 @@ export function MapScoreList({
     fieldErrors.clear(mapFieldKey(index, field));
     onChange(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
   };
+  // Le bouton « Retirer » activé disparaît avec sa ligne : le focus va au
+  // « Retirer » de la ligne qui prend sa place (ou de la dernière), sinon à
+  // « Ajouter une map » — jamais au `<body>`, hors de la modale (WCAG 2.4.3).
+  const focusAfterRemove = useRef<number | null>(null);
+  useEffect(() => {
+    const target = focusAfterRemove.current;
+    if (target === null) return;
+    focusAfterRemove.current = null;
+    const id = maps.length > 0 ? `${idPrefix}-map-${Math.min(target, maps.length - 1)}-remove` : `${idPrefix}-map-add`;
+    document.getElementById(id)?.focus();
+  }, [maps.length, idPrefix]);
   const remove = (index: number) => {
     fieldErrors.clear();
     keys.current = keys.current.filter((_, i) => i !== index);
+    focusAfterRemove.current = index;
     onChange(maps.filter((_, i) => i !== index));
   };
   const add = () => {
@@ -174,6 +186,7 @@ export function MapScoreList({
                   <FieldErrorText fieldId={t2Id} message={fieldErrors.message(t2Key)} />
                 </div>
                 <button
+                  id={`${idPrefix}-map-${index}-remove`}
                   type="button"
                   className={styles.remove}
                   onClick={() => remove(index)}
@@ -189,6 +202,7 @@ export function MapScoreList({
       )}
 
       <button
+        id={`${idPrefix}-map-add`}
         type="button"
         className={styles.add}
         onClick={add}

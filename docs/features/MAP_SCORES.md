@@ -115,7 +115,9 @@ bg_match_maps (
   report d'avant les maps). Sur un intervalle vide, elles posent un verrou
   d'intervalle : deux reports simultanés sur des matchs voisins peuvent
   s'interbloquer, et `reportMatchScorePublic` rejoue alors la transaction
-  annulée (3 essais), comme les deux écritures d'arbitrage (`retryOnDeadlock`).
+  annulée (3 essais), comme les deux écritures d'arbitrage et le forfait déclaré
+  par une engagée (`retryOnDeadlock`). Retirer une map rend le focus à la ligne
+  suivante (ou à « Ajouter une map »).
   Les chemins qui ne rejouent pas leur transaction (clôture d'un match,
   abandons, retour en arrière, entretien des reports expirés) lisent **sans
   verrou** avant d'effacer (`clearMapSets`) ; l'entretien verrouille et relit

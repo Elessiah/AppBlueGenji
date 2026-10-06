@@ -43,6 +43,20 @@ describe("détail map par map — affichage", () => {
   });
 });
 
+describe("détail map par map — focus et interblocages", () => {
+  it("retirer une map rend le focus à la ligne suivante ou à « Ajouter une map »", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list).toContain("focusAfterRemove.current = index;");
+    expect(list).toContain("id={`${idPrefix}-map-add`}");
+    expect(list).toContain("id={`${idPrefix}-map-${index}-remove`}");
+  });
+
+  it("le forfait déclaré par une engagée est rejoué sur interblocage", () => {
+    const index = readSource("lib/server/tournaments/index.ts");
+    expect(index).toMatch(/await retryOnDeadlock\(\(\) =>\s*runPlayerMatchWrite\(tournamentId, matchId, \(connection\) =>\s*forfeitOwnMatch\(/);
+  });
+});
+
 describe("détail map par map — noms accessibles", () => {
   it("chaque champ nomme sa map, et la phrase d'erreur reste hors du label", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");

@@ -1230,8 +1230,12 @@ export async function forfeitOwnMatchPublic(
   userId: number,
 ): Promise<void> {
   const { forfeitOwnMatch } = await import("./player-forfeit");
-  await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-    forfeitOwnMatch(connection, tournamentId, matchId, userId),
+  // L'entretien qui suit (reports expirés) écrit dans `bg_match_maps` : même
+  // risque d'interblocage que le report d'un score (`retryOnDeadlock`).
+  await retryOnDeadlock(() =>
+    runPlayerMatchWrite(tournamentId, matchId, (connection) =>
+      forfeitOwnMatch(connection, tournamentId, matchId, userId),
+    ),
   );
 }
 
