@@ -110,6 +110,10 @@ export function localeHref(href: string, locale: Locale): string {
   const pathname = cut === -1 ? href : href.slice(0, cut);
   const suffix = cut === -1 ? "" : href.slice(cut);
   const { path } = splitLocalePrefix(pathname);
+  // Retiré, le préfixe peut démasquer une adresse d'un autre site :
+  // `/en//evil.test` deviendrait `//evil.test`. Le lien reste alors tel quel —
+  // un chemin du site, que le navigateur ne lit pas comme un autre hôte.
+  if (!isInternalPath(path)) return href;
   if (locale === DEFAULT_LOCALE || isApiPath(path) || !isMigratedRoute(path)) return `${path}${suffix}`;
   return `${localePrefix(locale)}${path === "/" ? "" : path}${suffix}`;
 }

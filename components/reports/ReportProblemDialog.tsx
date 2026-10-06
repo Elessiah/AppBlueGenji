@@ -1,7 +1,7 @@
 "use client";
 
-import { type Dispatch, FormEvent, type SetStateAction, useEffect, useId, useRef, useState } from "react";
-import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { type Dispatch, FormEvent, type ReactNode, type SetStateAction, useEffect, useId, useRef, useState } from "react";
+import { LocaleLink, useLocaleHref } from "@/components/i18n/locale-navigation";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
@@ -487,13 +487,31 @@ function TargetsField({
   }
   return (
     <p className={styles.anonNote}>
-      <LocaleLink href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
+      <LoginReturnLink pathname={pathname} onClose={onClose}>
         Connecte-toi
-      </LocaleLink>{" "}
+      </LoginReturnLink>{" "}
       pour
       désigner directement les joueurs, équipes ou tournois concernés. Sans compte, indique leur nom
       ou l&apos;adresse de la page dans ta description.
     </p>
+  );
+}
+
+/**
+ * Lien de connexion qui ramène à la page signalée **dans sa langue** :
+ * `pathname` est la route sans préfixe (pour reconnaître la cible et tenir le
+ * journal), le retour, lui, reprend `/en` sur une page anglaise.
+ */
+function LoginReturnLink({
+  pathname,
+  onClose,
+  children,
+}: Readonly<{ pathname: string; onClose: () => void; children: ReactNode }>) {
+  const localized = useLocaleHref();
+  return (
+    <LocaleLink href={`/connexion?redirect=${encodeURIComponent(localized(pathname))}`} onClick={onClose}>
+      {children}
+    </LocaleLink>
   );
 }
 
@@ -525,9 +543,9 @@ function ContestField({
   if (!authenticated) {
     return (
       <p className={styles.anonNote}>
-        <LocaleLink href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
+        <LoginReturnLink pathname={pathname} onClose={onClose}>
           Connecte-toi
-        </LocaleLink>{" "}
+        </LoginReturnLink>{" "}
         pour contester un signalement : seuls les joueurs visés, les membres des équipes visées
         et l&apos;auteur d&apos;un signalement de droit d&apos;auteur ou de modération, une fois le
         dossier archivé, peuvent le faire.
