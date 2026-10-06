@@ -11,6 +11,7 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   SITE_COPY_ERROR_MESSAGES,
   SITE_COPY_FIELD_ERRORS,
+  isSiteCopyEnStale,
   siteCopyErrorMessage,
   siteCopyField,
   type SiteCopyEditorEntry,
@@ -116,10 +117,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   };
 
   const field = siteCopyField(copyKey);
-  // Français réécrit, anglais laissé tel quel : l'anglais enregistré ne
-  // suivrait plus. Rien n'est refusé (une coquille corrigée ne change pas le
-  // sens), mais l'éditeur le signale avant l'envoi.
-  const enStale = draft.trim() !== entry.fr.trim() && draftEn === entry.en && entry.en !== "";
+  const enStale = isSiteCopyEnStale(entry, draft, draftEn);
   const label = field?.label ?? copyKey;
   const staffLang = locale === "fr" ? undefined : "fr";
 

@@ -359,6 +359,16 @@ export function resolveSiteCopy(stored: ReadonlyMap<string, string>): SiteCopyBu
   return { fr, en, editor, missingEn };
 }
 
+/**
+ * Français réécrit dans l'éditeur, anglais laissé tel quel : l'anglais
+ * enregistré ne suivrait plus. Rien n'est refusé (une coquille corrigée ne
+ * change pas le sens), mais l'éditeur le signale avant l'envoi. Un anglais
+ * encore vide relève de `enMissing`, pas d'ici.
+ */
+export function isSiteCopyEnStale(entry: SiteCopyEditorEntry, draftFr: string, draftEn: string): boolean {
+  return entry.en !== "" && draftEn === entry.en && draftFr.trim() !== entry.fr.trim();
+}
+
 /** Toutes les clés de stockage du registre, dans les deux langues. */
 export function siteCopySettingKeys(): string[] {
   return SITE_COPY_FIELDS.flatMap((field) => [
