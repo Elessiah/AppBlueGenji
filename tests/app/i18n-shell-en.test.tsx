@@ -86,7 +86,7 @@ describe("coquille en anglais — composants client", () => {
       <AccessibilityPanel id="p" titleId="t" settings={["focus"]} onToggle={noop} onReset={noop} onClose={noop} />,
     );
     expect(html).toContain(">Accessibility</p>");
-    expect(html).toContain('aria-label="Close the accessibility menu"');
+    expect(html).toContain('aria-label="Close accessibility menu"');
     expect(html).toContain("Highly visible focus");
     expect(html).toContain("Accessibility statement");
     expect(html).toContain("Turn all off");
@@ -128,7 +128,7 @@ describe("coquille en anglais — composants client", () => {
 
   it("menu burger de la vitrine", () => {
     const html = english(<PublicNavMenu />);
-    expect(html).toContain('aria-label="Open the menu"');
+    expect(html).toContain('aria-label="Open menu"');
     expect(html).toContain(">MENU<");
   });
 
@@ -144,9 +144,9 @@ describe("coquille en anglais — composants client", () => {
   it("notification : préfixe lu et boutons", () => {
     const html = english(<ToastItem toast={{ id: 1, message: "Saved.", type: "success" }} onDismiss={noop} />);
     expect(html).toContain('<span class="sr-only">Success: </span>');
-    expect(html).toContain('aria-label="Pause the notification"');
+    expect(html).toContain('aria-label="Pause notification"');
     expect(html).toContain('title="Pause"');
-    expect(html).toContain('aria-label="Close the notification"');
+    expect(html).toContain('aria-label="Close notification"');
     expect(html).toContain('title="Close"');
     const error = english(<ToastItem toast={{ id: 2, message: "Nope.", type: "error" }} onDismiss={noop} />);
     expect(error).toContain('<span class="sr-only">Error: </span>');
