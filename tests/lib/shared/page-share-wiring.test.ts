@@ -40,10 +40,10 @@ describe("pageMetadata({ shareCard })", () => {
     const fr = pageMetadata({ title: "Classement", description: "…", path: "/classement", shareCard: "ranking" });
     const en = pageMetadata({ title: "Ranking", description: "…", path: "/classement", shareCard: "ranking", locale: "en" });
     expect(fr.openGraph?.images).toEqual([
-      { url: "/og/fr/ranking.png", width: 1200, height: 630, alt: `Classement · ${SITE_NAME}` },
+      { url: "/og/fr/ranking.png", width: 1200, height: 630, alt: `Classement des équipes · ${SITE_NAME}` },
     ]);
     expect(fr.twitter?.images).toEqual(["/og/fr/ranking.png"]);
-    expect(en.openGraph?.images).toEqual([{ url: "/og/en/ranking.png", width: 1200, height: 630, alt: `Ranking · ${SITE_NAME}` }]);
+    expect(en.openGraph?.images).toEqual([{ url: "/og/en/ranking.png", width: 1200, height: 630, alt: `Team ranking · ${SITE_NAME}` }]);
     expect(en.twitter?.images).toEqual(["/og/en/ranking.png"]);
   });
 
@@ -86,9 +86,13 @@ describe("og:image:alt des cartes qui ne montrent pas le titre de l'encart", () 
   });
 
   it("une section de la documentation du bot ne nomme pas la section", () => {
-    expect(readSource("app/bot/docs/[[...slug]]/page.tsx")).toContain(
-      "shareImageAlt: `Documentation du bot · ${SITE_NAME}`",
-    );
+    const section = pageMetadata({
+      title: "Guide — Documentation du bot",
+      description: "…",
+      path: "/bot/docs/guide",
+      shareCard: "botDocs",
+    });
+    expect(section.openGraph?.images).toEqual([expect.objectContaining({ alt: `Documentation du bot · ${SITE_NAME}` })]);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { pageMetadata } from "@/lib/shared/page-metadata";
+import { pageMetadata, shareCardAlt } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
 
 /**
@@ -101,11 +101,24 @@ describe("pageMetadata — titre de la page racine", () => {
 describe("pageMetadata — texte de remplacement de la carte", () => {
   const base = { title: "Classement", description: "…", path: "/classement", shareCard: "ranking" };
 
-  it("reprend le titre de l'encart par défaut", () => {
+  it("dit par défaut ce que la carte montre : son titre, pas celui de l'encart", () => {
     const built = pageMetadata(base);
     expect(built.openGraph?.images).toEqual([
-      expect.objectContaining({ url: "/og/fr/ranking.png", alt: `Classement · ${SITE_NAME}` }),
+      expect.objectContaining({ url: "/og/fr/ranking.png", alt: `Classement des équipes · ${SITE_NAME}` }),
     ]);
+  });
+
+  it("écrit ce titre dans la langue de la page, mode de règles compris", () => {
+    expect(shareCardAlt("association", "fr")).toBe(`Une association par et pour les joueurs · ${SITE_NAME}`);
+    expect(shareCardAlt("ranking", "en")).toBe(`Team ranking · ${SITE_NAME}`);
+    expect(shareCardAlt("rules-bluegenji-survie", "en")).toBe(`BlueGenji's Survival · ${SITE_NAME}`);
+    expect(shareCardAlt("home", "fr")).toBe(SITE_NAME);
+    expect(shareCardAlt("nope", "fr")).toBeNull();
+  });
+
+  it("retombe sur le titre de l'encart pour une clé inconnue", () => {
+    const built = pageMetadata({ ...base, shareCard: "nope" });
+    expect(built.openGraph?.images).toEqual([expect.objectContaining({ alt: `Classement · ${SITE_NAME}` })]);
   });
 
   it("prend le texte fourni quand la carte montre autre chose (podium)", () => {
