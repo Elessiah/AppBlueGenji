@@ -13,7 +13,8 @@
  *
  * Un motif est un chemin sans préfixe de langue ; un segment `[x]` vaut un
  * segment quelconque (`/regles/[slug]`). Le lot 0 l'a laissée vide ; chaque lot
- * de pages y ajoute ses routes (lot 2 : l'accueil ; lot 3 : les règles).
+ * de pages y ajoute ses routes (lot 2 : l'accueil ; lot 3 : les règles ; lot 4 :
+ * le classement).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
@@ -25,4 +26,6 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // Lot 3 — règles.
   "/regles",
   "/regles/[slug]",
+  // Lot 4 — classement. Titre et sous-titre éditables : anglais du lot 2.
+  "/classement",
 ];

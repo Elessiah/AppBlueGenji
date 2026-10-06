@@ -13,12 +13,12 @@ import type { TournamentGame } from "./types";
 
 export type RankingGameFilter = "all" | "ow" | "mr";
 
-/** Les pastilles, dans l'ordre d'affichage — les mêmes que le leaderboard de l'accueil. */
-export const RANKING_GAME_FILTERS: readonly { id: RankingGameFilter; label: string }[] = [
-  { id: "all", label: "Général" },
-  { id: "ow", label: "Overwatch" },
-  { id: "mr", label: "Marvel Rivals" },
-];
+/**
+ * Les pastilles, dans l'ordre d'affichage — les mêmes que le leaderboard de
+ * l'accueil. Leur libellé est un message (`ranking.board.filter.<id>`), dans la
+ * langue de la page.
+ */
+export const RANKING_GAME_FILTERS: readonly { id: RankingGameFilter }[] = [{ id: "all" }, { id: "ow" }, { id: "mr" }];
 
 /**
  * Lit `?jeu=` : `ow` / `mr`, sans égard à la casse ni aux espaces. Toute autre
@@ -98,9 +98,6 @@ export function pointsBehind(rows: readonly { points: number }[], index: number)
   if (index <= 0 || index >= rows.length) return null;
   return Math.max(0, rows[index - 1].points - rows[index].points);
 }
-
-/** Lettre d'un résultat de forme, telle qu'affichée (Victoire, Défaite, Nul). */
-export const FORM_LETTERS: Record<"w" | "l" | "d", string> = { w: "V", l: "D", d: "N" };
 
 /** Nombre de résultats de forme montrés par ligne. */
 export const RANKING_FORM_LENGTH = 5;

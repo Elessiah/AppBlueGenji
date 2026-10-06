@@ -9,6 +9,7 @@
  *
  * Module pur, importable partout (`lib/shared`).
  */
+import type frLabels from "@/messages/fr/labels.json";
 import type { TournamentFormat, TournamentGame } from "./types";
 
 export const FORMAT_LABELS: Record<TournamentFormat, string> = {
@@ -33,4 +34,25 @@ export function formatLabel(format: TournamentFormat | string): string { // NOSO
 /** Libellé d'un jeu, ou la valeur brute si elle vient d'ailleurs. */
 export function gameLabel(game: TournamentGame | string): string { // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; une valeur brute venue d'ailleurs est rendue telle quelle
   return GAME_LABELS[game as TournamentGame] ?? String(game);
+}
+
+/**
+ * Les mêmes libellés **dans une langue** : espace de messages `labels`
+ * (`messages/<langue>/labels.json`, lot 4 de la traduction). Les tables
+ * françaises ci-dessus restent celles des écrans pas encore traduits et du
+ * journal Discord (D6) ; un test vérifie que le français des messages les égale
+ * mot pour mot. Un écran traduit reçoit les messages de sa langue
+ * (`messagesFor(locale).labels`, ou en prop pour un composant client) et lit
+ * par code — jamais par le libellé français.
+ */
+export type TournamentLabelMessages = typeof frLabels;
+export type TournamentLabelTable = keyof TournamentLabelMessages;
+
+/** Libellé d'un code (`SINGLE`, `OW`, `RUNNING`…) dans une table, ou le code tel quel. */
+export function localizedTournamentLabel<T extends TournamentLabelTable>(
+  messages: Pick<TournamentLabelMessages, T>,
+  table: T,
+  code: string,
+): string {
+  return (messages[table] as Readonly<Record<string, string>>)[code] ?? code;
 }

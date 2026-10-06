@@ -1,0 +1,80 @@
+{
+  "group": {
+    "record": "Palmarès",
+    "matches": "Bilan des matchs",
+    "form": "Forme récente",
+    "byGame": "Répartition par jeu",
+    "byFormat": "Répartition par format",
+    "opponents": "Adversaires",
+    "activity": "Activité des 12 derniers mois"
+  },
+  "tile": {
+    "tournamentsPlayed": "Tournois joués",
+    "upcomingEntries": "+ {count, plural, one {# inscription} other {# inscriptions}} à venir",
+    "tournamentsWon": "Tournois gagnés",
+    "podiums": "Podiums",
+    "podiumsHint": "Top 3",
+    "bestRank": "Meilleur rang",
+    "averageRank": "Rang moyen",
+    "sitePosition": "Classement du site",
+    "sitePositionValue": "#{position}",
+    "sitePositionHint": "sur {total} équipes",
+    "noMatchPlayed": "Aucun match joué",
+    "matchesPlayed": "Matchs joués",
+    "wins": "Victoires",
+    "losses": "Défaites",
+    "draws": "Nuls",
+    "drawsHint": "aucun vainqueur",
+    "winRate": "Ratio de victoires",
+    "maps": "Maps",
+    "mapsHint": "Diff. {diff} · {rate}",
+    "bestStreak": "Meilleure série",
+    "bestStreakHint": "victoires consécutives",
+    "worstStreak": "Pire série",
+    "worstStreakHint": "défaites consécutives",
+    "forfeits": "Forfaits",
+    "forfeitsHint": "donnés / reçus"
+  },
+  "ranking": {
+    "pointsLabel": "Points de classement",
+    "pointsHint": "Base {base} · plus la victoire est improbable, plus elle rapporte · le rang final d'un tournoi en redistribue aussi (plancher {floor})",
+    "placementLabel": "Points de parcours",
+    "placementHint": "compris dans la cote · rang final des tournois",
+    "unrankedHint": "Aucun match joué : cote de départ",
+    "placementOnlyHint": "Aucun match joué · cote issue de ses classements de tournoi"
+  },
+  "form": {
+    "listLabel": "{count} derniers résultats, du plus récent au plus ancien",
+    "win": "Victoire",
+    "loss": "Défaite",
+    "draw": "Match nul",
+    "winLetter": "V",
+    "lossLetter": "D",
+    "drawLetter": "N"
+  },
+  "streak": {
+    "none": "Aucune série",
+    "draw": "Série interrompue par un nul",
+    "wins": "{count, plural, one {# victoire} other {# victoires}} d'affilée",
+    "losses": "{count, plural, one {# défaite} other {# défaites}} d'affilée"
+  },
+  "rate": "{value} %",
+  "record": "{won}V / {lost}D",
+  "recordWithDraws": "{won}V / {drawn}N / {lost}D",
+  "noFinishedMatch": "Aucun match terminé pour le moment.",
+  "splitLabel": "{label} : {won} victoires sur {played} matchs",
+  "opponent": {
+    "favourite": "Adversaire favori",
+    "favouriteEmpty": "Aucune victoire enregistrée.",
+    "nemesis": "Bête noire",
+    "nemesisEmpty": "Aucune défaite enregistrée.",
+    "meetings": "{count, plural, one {# confrontation} other {# confrontations}} · {record}"
+  },
+  "activity": {
+    "chartLabel": "Activité des {months} derniers mois : {played} matchs joués au total",
+    "barTitle": "{month} {year} : {played, plural, one {# match} other {# matchs}}, {won, plural, one {# victoire} other {# victoires}}",
+    "legendPlayed": "Matchs joués",
+    "legendWon": "Victoires",
+    "firstLast": "Premier match le {first} · dernier match le {last}"
+  }
+}

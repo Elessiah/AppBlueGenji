@@ -1,0 +1,90 @@
+{
+  "meta": {
+    "title": "Classement des équipes",
+    "description": "Le classement des équipes BlueGenji Esport : cote de chaque équipe, podium, bilan et forme récente, en général ou par jeu (Overwatch, Marvel Rivals).",
+    "shareDescription": "Qui est au sommet ? Le classement des équipes de la scène BlueGenji."
+  },
+  "breadcrumb": {
+    "home": "Accueil",
+    "ranking": "Classement"
+  },
+  "hero": {
+    "eyebrow": "COMPÉTITION · CLASSEMENT"
+  },
+  "board": {
+    "heading": "Classement des équipes",
+    "filtersLabel": "Filtrer par jeu",
+    "filter": {
+      "all": "Général",
+      "ow": "Overwatch",
+      "mr": "Marvel Rivals"
+    },
+    "empty": "Aucune équipe classée pour le moment : le premier match ouvrira le bal.",
+    "unavailable": "Le classement est momentanément indisponible. Réessaie dans un instant.",
+    "podiumLabel": "Podium",
+    "place": {
+      "first": "1re place",
+      "second": "2e place",
+      "third": "3e place"
+    },
+    "teamLinkTitle": "Voir la fiche de {team}",
+    "pointsUnit": "pts",
+    "record": {
+      "wins": "{count} V",
+      "losses": "{count} D",
+      "draws": "{count} N"
+    },
+    "formLabel": "Forme",
+    "trendLabel": "7 j",
+    "trend": {
+      "up": "Monte de {value} sur 7 jours",
+      "down": "Descend de {value} sur 7 jours",
+      "flat": "Stable sur 7 jours"
+    },
+    "formNone": "Aucun résultat récent",
+    "formSpoken": "Forme récente, du plus récent au plus ancien : {results}",
+    "formLetter": {
+      "w": "V",
+      "l": "D",
+      "d": "N"
+    },
+    "gap": {
+      "leader": "En tête du classement",
+      "tiedWithLeader": "À égalité avec la tête",
+      "behindLeader": "À {leaderGap} pts de la tête",
+      "behindLeaderTiedAbove": "À {leaderGap} pts de la tête · à égalité avec le rang au-dessus",
+      "behindLeaderAndAbove": "À {leaderGap} pts de la tête · {gap} du rang au-dessus"
+    },
+    "tableLabel": "Tableau du classement des équipes",
+    "tableLabelAfterPodium": "Tableau du classement des équipes, à partir de la 4e place",
+    "column": {
+      "rank": "Rang",
+      "team": "Équipe",
+      "points": "Cote",
+      "wins": "V",
+      "losses": "D",
+      "draws": "N",
+      "form": "Forme",
+      "trend": "7 jours",
+      "trendShort": "7 j"
+    }
+  },
+  "more": {
+    "loading": "Chargement…",
+    "showMore": "Afficher plus",
+    "capped": "Affichage limité aux {max} premières équipes.",
+    "added": "{count, plural, one {# équipe ajoutée.} other {# équipes ajoutées.}}",
+    "end": "Fin du classement."
+  },
+  "how": {
+    "title": "Comment marche la cote",
+    "base": "<b>{base} pts</b> au départ, pour toutes les équipes : une équipe sans match est rangée à cette cote, ni devant ni derrière.",
+    "match": "<b>Chaque match</b> transfère des points du perdant au vainqueur — beaucoup pour une victoire improbable, presque rien pour une victoire attendue.",
+    "score": "<b>Le score</b> pèse aussi : une victoire sans perdre de map (3-0, 2-0) transfère jusqu'à {marginMax} fois les points d'une victoire arrachée (3-2, 2-1) — autant de gagné pour le vainqueur, autant de perdu pour le perdant. Un match en une seule map et un forfait comptent comme une victoire simple.",
+    "placement": "<b>Le rang final</b> d'un tournoi redistribue aussi des points, d'autant plus que le plateau était relevé. Plancher à {floor} pts."
+  },
+  "cta": {
+    "register": "Inscrire mon équipe à un tournoi →",
+    "rules": "Lire les règles"
+  }
+}
