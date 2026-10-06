@@ -266,7 +266,8 @@ describe("rendu anglais — aucune phrase française, contenu du staff sans angl
     expect(text).toContain("Urgent");
     expect(text).not.toContain("Annonce d'avant la traduction");
     expect(text).toContain("1 OPENING");
-    // Le référent est un nom propre (« Pôle arbitrage ») : seule exception tolérée.
+    // Le référent est saisi en français, sans anglais : annoncé lang="fr", seule exception tolérée.
+    expect(html).toMatch(/lang="fr"[^>]*>Pôle arbitrage</);
     expect(text.replace(/Pôle arbitrage/g, "")).not.toMatch(FRENCH_LETTERS);
   });
 
@@ -404,7 +405,8 @@ describe("mise en avant du recrutement — dans la langue de la page", () => {
           rolesEn: null,
           body: "Le dimanche.",
           bodyEn: "On Sundays.",
-          teamName: null,
+          // Référent saisi en français : absent du résumé anglais.
+          teamName: "Pôle arbitrage",
           domain: "ARBITRAGE",
           contactUrl: null,
           contactDiscord: null,
@@ -454,6 +456,7 @@ describe("mise en avant du recrutement — dans la langue de la page", () => {
     expect(text).toContain("Voir l'annonce : Arbitres");
     expect(text).toContain("Plus tard");
     expect(text).toContain("Arbitrage");
+    expect(text).toContain("Pôle arbitrage · Arbitrage");
   });
 });
 

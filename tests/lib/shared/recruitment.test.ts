@@ -14,6 +14,7 @@ import {
   recruitmentDismissed,
   recruitmentModalStart,
   recruitmentSeenAmong,
+  recruitmentSeenKept,
   serializeRecruitmentSeen,
   localizeRecruitmentAd,
   localizeRecruitmentAds,
@@ -448,3 +449,20 @@ describe("localizeRecruitmentAd", () => {
   });
 });
 
+
+describe("recruitmentSeenKept", () => {
+  it("garde les annonces vues ailleurs, encore publiées mais masquées sur cette page", () => {
+    // Publiées : 5, 6, 7 ; la page anglaise ne montre que 6 et 7 ; le cookie tient 5 et 6.
+    expect(recruitmentSeenKept("5.6", [5, 6, 7], [6, 7])).toEqual([5]);
+  });
+
+  it("oublie une annonce dépubliée, et rien à garder quand la page montre tout", () => {
+    expect(recruitmentSeenKept("4.5", [5, 6], [6])).toEqual([5]);
+    expect(recruitmentSeenKept("5.6", [5, 6], [5, 6])).toEqual([]);
+  });
+
+  it("cookie absent ou illisible : rien à garder", () => {
+    expect(recruitmentSeenKept(undefined, [5], [])).toEqual([]);
+    expect(recruitmentSeenKept("abc", [5], [])).toEqual([]);
+  });
+});
