@@ -193,7 +193,7 @@ describe("tournaments-service: match state machine", () => {
           ];
         }
         // Une proposition map par map existe (le report vient de l'écrire).
-        if (q.startsWith("SELECT map_number FROM bg_match_maps")) return [[{ map_number: 1 }], []];
+        if (q.startsWith("SELECT match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id")) return [[{ match_id: 10, source: "TEAM1", map_number: 1, replay_code: "MAP001", team1_score: 2, team2_score: 0 }], []];
         if (q.startsWith("UPDATE bg_matches SET team1_report_score")) {
           [row.team1_report_score, row.team1_report_opponent_score] = params as number[];
         }
@@ -341,8 +341,8 @@ describe("tournaments-service: match state machine", () => {
       expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
       expect(queueRefereeAlert).not.toHaveBeenCalled();
       // Le détail de la proposition confirmée devient le résultat retenu.
-      const promote = calls.find((c) => c.sql.includes("SELECT match_id, 'FINAL'"));
-      expect(promote?.params).toEqual([10, "TEAM1"]);
+      const promote = calls.find((c) => c.sql.includes("VALUES (?, 'FINAL'"));
+      expect(promote?.params).toEqual([10, 1, "MAP001", 2, 0, null, expect.any(Date)]);
     });
 
     it("la concordance se lit du point de vue de chaque engagée", async () => {

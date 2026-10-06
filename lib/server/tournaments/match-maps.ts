@@ -20,6 +20,8 @@ type MapRow = RowDataPacket & {
   replay_code: string;
   team1_score: number;
   team2_score: number;
+  submitted_by_user_id?: number | null;
+  submitted_at?: Date | string | null;
 };
 
 /** Remplace le jeu de maps `source` d'un match. Une liste vide l'efface. */
@@ -110,8 +112,15 @@ export async function promoteReportedMaps(
   // expiré (l'entretien tourne à chaque écriture et à chaque chargement) a déjà
   // promu la proposition puis l'a effacée. Sans cette garde, la seconde
   // effaçait le détail retenu par la première sans rien remettre.
-  const pending = await connection.execute<(RowDataPacket & { map_number: number })[]>(
-    `SELECT map_number FROM bg_match_maps WHERE match_id = ? AND source = ?${lock}`,
+  //
+  // La proposition est lue **en entier** puis réécrite par `VALUES` : un
+  // `INSERT … SELECT` sur la table elle-même verrouillerait les lignes lues et
+  // leurs intervalles, même en mode « sans verrou » (`locking: false`, celui
+  // de l'entretien, qui ne rejoue pas sa transaction).
+  const pending = await connection.execute<MapRow[]>(
+    `SELECT match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at
+     FROM bg_match_maps WHERE match_id = ? AND source = ?
+     ORDER BY map_number${lock}`,
     [matchId, from],
   );
   const rows = Array.isArray(pending) && Array.isArray(pending[0]) ? pending[0] : [];
@@ -124,16 +133,22 @@ export async function promoteReportedMaps(
   await connection.execute(
     `INSERT INTO bg_match_maps
        (match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at)
-     SELECT match_id, 'FINAL', map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at
-     FROM bg_match_maps
-     WHERE match_id = ? AND source = ?
+     VALUES ${rows.map(() => "(?, 'FINAL', ?, ?, ?, ?, ?, ?)").join(", ")}
      ON DUPLICATE KEY UPDATE
        replay_code = VALUES(replay_code),
        team1_score = VALUES(team1_score),
        team2_score = VALUES(team2_score),
        submitted_by_user_id = VALUES(submitted_by_user_id),
        submitted_at = VALUES(submitted_at)`,
-    [matchId, from],
+    rows.flatMap((row) => [
+      matchId,
+      Number(row.map_number),
+      String(row.replay_code),
+      Number(row.team1_score),
+      Number(row.team2_score),
+      row.submitted_by_user_id ?? null,
+      row.submitted_at ?? new Date(),
+    ]),
   );
   // Un `FINAL` plus long que la proposition garderait des maps en trop :
   // effacées si une lecture sans verrou en voit (pas de verrou d'intervalle sur

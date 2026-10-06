@@ -53,12 +53,19 @@ describe("stockage map par map (bg_match_maps)", () => {
   });
 
   it("promeut la proposition retenue en résultat, par la clé unique (les propositions partent à la clôture)", async () => {
-    const { execute, connection } = conn([[[{ map_number: 1 }, { map_number: 2 }], []], [{ affectedRows: 2 }, []], [[{ found: 1 }], []]]);
+    const at = new Date("2026-10-05T20:00:00Z");
+    const proposal = [
+      { match_id: 10, source: "TEAM1", map_number: 1, replay_code: "AAA111", team1_score: 2, team2_score: 0, submitted_by_user_id: 7, submitted_at: at },
+      { match_id: 10, source: "TEAM1", map_number: 2, replay_code: "BBB222", team1_score: 1, team2_score: 1, submitted_by_user_id: 7, submitted_at: at },
+    ];
+    const { execute, connection } = conn([[proposal, []], [{ affectedRows: 2 }, []], [[{ found: 1 }], []]]);
     await promoteReportedMaps(connection, 10, "TEAM1");
     const sqls = execute.mock.calls.map((c) => flat(c[0]));
-    expect(sqls[0]).toBe("SELECT map_number FROM bg_match_maps WHERE match_id = ? AND source = ? FOR UPDATE");
-    expect(sqls[1]).toMatch(/INSERT INTO bg_match_maps .* SELECT match_id, 'FINAL'.* ON DUPLICATE KEY UPDATE replay_code = VALUES\(replay_code\)/);
-    expect(execute.mock.calls[1][1]).toEqual([10, "TEAM1"]);
+    expect(sqls[0]).toMatch(/^SELECT .* FROM bg_match_maps WHERE match_id = \? AND source = \? ORDER BY map_number FOR UPDATE$/);
+    // Réécrite par VALUES, jamais par INSERT … SELECT sur la table elle-même.
+    expect(sqls[1]).toMatch(/INSERT INTO bg_match_maps .* VALUES \(\?, 'FINAL', .* ON DUPLICATE KEY UPDATE replay_code = VALUES\(replay_code\)/);
+    expect(sqls[1]).not.toMatch(/SELECT/);
+    expect(execute.mock.calls[1][1]).toEqual([10, 1, "AAA111", 2, 0, 7, at, 10, 2, "BBB222", 1, 1, 7, at]);
     // Un FINAL plus long que la proposition perd ses maps en trop.
     expect(sqls[3]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = 'FINAL' AND map_number > ?");
     expect(execute.mock.calls[3][1]).toEqual([10, 2]);
