@@ -108,7 +108,7 @@ il occupe la largeur du salon. La carte est rendue en PNG 1200×630 par Satori
 (`next/og`), côté serveur.
 
 **Ce n'est pas un composant de l'application** — il n'est jamais monté dans un
-navigateur. D'où trois contraintes qui ne sont pas des maladresses :
+navigateur. D'où quatre contraintes qui ne sont pas des maladresses :
 
 - tout est en `display: flex` : Satori n'implémente ni le flux normal ni la
   grille, et un `<div>` à plusieurs enfants sans `display` explicite lève ;
@@ -119,7 +119,8 @@ navigateur. D'où trois contraintes qui ne sont pas des maladresses :
   soixante caractères ;
 - la police est celle que `next/og` embarque : celles du dépôt sont en WOFF2,
   que Satori ne lit pas, et en télécharger une serait une requête réseau par
-  rendu.
+  rendu. Elle n'a qu'une graisse : `fontWeight: 700` n'y change rien, la
+  hiérarchie tient par la taille.
 
 ### Palette « néons froids » (décision du 2026-10-06)
 
