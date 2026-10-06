@@ -266,6 +266,8 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Soulignement visible malgré le texte transparent (« Liens soulignés »). */
+  text-decoration-color: var(--blue-300);
   animation: nameIridescent 7s ease-in-out infinite alternate;
   animation-play-state: var(--deco-anim-state);
 }
@@ -297,6 +299,8 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Soulignement visible malgré le texte transparent (« Liens soulignés »). */
+  text-decoration-color: var(--blue-300);
   animation: nameIridescent 11s ease-in-out infinite alternate;
   animation-play-state: var(--deco-anim-state);
 }
