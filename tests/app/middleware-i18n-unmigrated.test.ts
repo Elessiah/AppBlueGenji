@@ -40,6 +40,18 @@ describe("middleware — route non traduite sous /en", () => {
     }
   });
 
+  it("préfère la racine figée à la compilation (BG_PUBLIC_ORIGIN), seule lisible sous next start", () => {
+    delete process.env.APP_URL;
+    process.env.BG_PUBLIC_ORIGIN = "https://compile.example/";
+    try {
+      const response = middleware(new NextRequest("http://localhost:3000/en/route-jamais-traduite"));
+      expect(response.headers.get("location")).toBe("https://compile.example/route-jamais-traduite");
+    } finally {
+      delete process.env.BG_PUBLIC_ORIGIN;
+      process.env.APP_URL = PUBLIC;
+    }
+  });
+
   it.each(["/en//evil.example/x", "/en/%5Cevil.example", "/fr//evil.example"])(
     "ne sort jamais du site (%s)",
     (path) => {
