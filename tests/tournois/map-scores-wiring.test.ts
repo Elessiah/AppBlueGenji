@@ -133,7 +133,9 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 
   it("le compteur annonce le format, les maps nulles rejouées en sus", () => {
     expect(list()).toContain("const shownLimit = format ? matchMaxMaps(format) : limit;");
-    expect(list()).toContain("({maps.length}/{Math.max(shownLimit, maps.length)})");
+    expect(list()).toContain("({played}/{Math.max(shownLimit, played)})");
+    // La ligne vierge ouverte ne compte pas comme une map jouée.
+    expect(list()).toContain("const played = maps.filter(isMapTouched).length;");
     expect(list()).toContain("Une map nulle peut être rejouée (${limit - shownLimit} au plus).");
   });
 
@@ -349,9 +351,14 @@ describe("détail map par map — lignes progressives dans les modales", () => {
   const list = () => readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
 
   it("toute modification passe par l'affichage progressif ; une ligne ajoutée s'annonce sans voler le focus", () => {
-    expect(list()).toContain("const change = (next: MatchMapInput[]) => onChange(progressiveMapRows(format, game, next, minRows));");
+    expect(list()).toContain("const rows = progressiveMapRows(format, game, next, minRows);");
+    // Seule une croissance due à l'affichage progressif s'annonce (pas une liste reçue).
+    expect(list()).toContain("autoGrown.current = rows.length > maps.length;");
+    expect(list()).toContain("if (autoGrown.current && !focusNewRow.current) setAnnouncement(");
     expect(list()).toContain('<p className="sr-only" aria-live="polite">');
-    expect(list()).toContain("if (maps.length > previousLength.current && !focusNewRow.current) {");
+    // Pas de « Retirer » sur une ligne vierge, et la cible de focus ne survit pas au rendu suivant.
+    expect(list()).toContain("{(isMapTouched(map) || (minRows === 0 && maps.length === 1)) && (");
+    expect(list()).toContain("}, [maps, idPrefix]);");
     // « Ajouter une map » ne sert plus qu'à ouvrir la première ligne (arbitrage).
     expect(list()).toContain("{maps.length === 0 && (");
   });
