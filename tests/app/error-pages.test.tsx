@@ -160,9 +160,13 @@ describe("app/not-found.tsx et app/global-error.tsx", () => {
 
   it("le dernier filet rend un document complet dans la langue de l'adresse", () => {
     const source = readSource("app/global-error.tsx");
-    expect(source).toContain("<html lang={locale}>");
+    const view = readSource("components/error-page/GlobalErrorView.tsx");
+    expect(view).toContain("<html lang={shown}>");
     expect(source).toContain("splitLocalePrefix(usePathname()");
-    expect(source).toContain("<body");
+    expect(view).toContain("<body");
+    // L'anglais se charge à la demande : un import statique l'enverrait à tous.
+    expect(source).not.toMatch(/import \w+ from "@\/messages\//);
+    expect(view).toContain('await import("@/messages/en/shell.json")');
     // `reset()` rejouerait la réponse fautive : on recharge.
     expect(source).toContain("window.location.reload()");
   });

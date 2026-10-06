@@ -31,8 +31,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ConfirmActionDialog, runConfirmation } from "@/components/ui/confirm-action-dialog";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
-import { ShellTextProvider } from "@/components/i18n/shell-text";
-import { messagesFor } from "@/lib/server/i18n-messages";
 import { diffPlatformRoles, roleChangeNeedsConfirmation } from "@/lib/shared/permissions";
 import { readSource } from "../helpers/read-source";
 

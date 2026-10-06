@@ -39,6 +39,7 @@ jest.mock("@/lib/server/contact-service", () => ({
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import GlobalError from "@/app/global-error";
+import { GlobalErrorView, loadGlobalErrorShell } from "@/components/error-page/GlobalErrorView";
 import NotFound, { generateMetadata } from "@/app/not-found";
 import { AccessibilityPanel, accessibilityButtonLabel } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
@@ -232,8 +233,15 @@ describe("pages d'erreur en anglais", () => {
     });
   });
 
-  it("dernier filet : langue relue dans l'adresse, `<html lang>` compris", () => {
-    const html = renderToStaticMarkup(<GlobalError error={Object.assign(new Error("boom"), { digest: "abc" })} />);
+  it("dernier filet : langue relue dans l'adresse, anglais chargé à la demande, `<html lang>` compris", async () => {
+    const error = Object.assign(new Error("boom"), { digest: "abc" });
+    // Premier rendu : l'anglais n'est pas encore arrivé, la page le dit.
+    const before = renderToStaticMarkup(<GlobalError error={error} />);
+    expect(before).toMatch(/^<html lang="fr">/);
+    const messages = await loadGlobalErrorShell("en");
+    expect(messages).toEqual(EN_SHELL);
+    expect(await loadGlobalErrorShell("fr")).toBeUndefined();
+    const html = renderToStaticMarkup(<GlobalErrorView error={error} locale="en" messages={messages} onRetry={noop} />);
     expect(html).toMatch(/^<html lang="en">/);
     expect(html).toContain("<title>Something went wrong · BlueGenji Esport</title>");
     expect(html).toContain("Try again");
