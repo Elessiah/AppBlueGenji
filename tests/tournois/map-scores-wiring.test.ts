@@ -66,7 +66,8 @@ describe("détail map par map — focus et interblocages", () => {
 
   it("en désaccord, l'engagé voit le détail adverse", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toMatch(/view\?\.phase === "CONFLICT" && view\.theirs[\s\S]{0,300}<MapResultList/);
+    expect(dialog).toMatch(/\{showTheirMaps && view\?\.theirs && \([\s\S]{0,300}<MapResultList/);
+    expect(dialog).toContain('if (phase === "CONFLICT") return true;');
   });
 
   it("une ligne vierge qu'on vient d'ajouter n'affiche pas de reproche", () => {
@@ -290,5 +291,36 @@ describe("détail map par map — steppers verrouillés et libellé de confirmat
   it("« Confirmer le score » ne se confond pas avec « Confirmer le forfait de … »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain('const submitLabel = confirmsAsIs ? "Confirmer le score" : "Envoyer le score";');
+  });
+});
+
+describe("détail map par map — saisie au clavier et au toucher", () => {
+  const list = () => readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+
+  it("le détail adverse reste visible quand le formulaire ne le reprend pas (saisie commencée)", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toContain('return phase === "THEIRS_PENDING" && !sameMapLists(maps, theirMaps);');
+  });
+
+  it("chaque colonne de score porte l'emblème de son engagé", () => {
+    expect(list().match(/<EntrantLogo teamId=\{team[12]Id\}/g)).toHaveLength(2);
+    for (const dialog of ["AdminScoreDialog", "PlayerScoreDialog"]) {
+      expect(readSource(`app/(secured)/tournois/[id]/_components/${dialog}.tsx`)).toContain("team1Id={match.team1Id}");
+    }
+  });
+
+  it("les scores de map ouvrent le pavé numérique", () => {
+    expect(list().match(/inputMode="numeric"/g)).toHaveLength(2);
+  });
+
+  it("un champ désactivé le dit par ses couleurs, jamais par l'opacité", () => {
+    const css = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.module.css");
+    expect(css).toMatch(/\.scoreInput:disabled \{[^}]*color: var\(--ink-dim/);
+    expect(css).not.toMatch(/opacity\s*:/);
+  });
+
+  it("Entrée dans un champ de map ne soumet pas le formulaire", () => {
+    expect(list()).toContain('if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();');
+    expect(list()).toContain("onKeyDown={keepEnterInList}");
   });
 });
