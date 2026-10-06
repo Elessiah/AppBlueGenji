@@ -167,6 +167,15 @@ describe("coquille en anglais — composants client", () => {
     expect(error).toContain('<span class="sr-only">Error: </span>');
   });
 
+  it("notification : message resté en français marqué `lang`, rien sans l'option", () => {
+    const marked = english(
+      <ToastItem toast={{ id: 3, message: "Erreur réseau, réessaye.", type: "error", lang: "fr" }} onDismiss={noop} />,
+    );
+    expect(marked).toContain('<span class="sr-only">Error: </span><span lang="fr">Erreur réseau, réessaye.</span>');
+    const plain = english(<ToastItem toast={{ id: 4, message: "Saved.", type: "success" }} onDismiss={noop} />);
+    expect(plain).not.toContain("lang=");
+  });
+
   it("notification : préfixe français inchangé hors fournisseur", () => {
     const html = renderToStaticMarkup(<ToastItem toast={{ id: 2, message: "Non.", type: "error" }} onDismiss={noop} />);
     expect(html).toContain('<span class="sr-only">Erreur : </span>');
