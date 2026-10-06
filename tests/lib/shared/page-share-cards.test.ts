@@ -11,6 +11,7 @@ import {
   PAGE_SHARE_CARD_STYLES,
   PODIUM_NAME_MAX_LENGTH,
   RULE_MODE_SUBTITLE_MAX_LENGTH,
+  shareTagline,
   allShareCardKeys,
   pageShareImagePath,
   parseShareImageSegments,
@@ -101,6 +102,34 @@ describe.each(LOCALES)("rédaction (%s)", (_locale, messages, rules) => {
       const card = resolvePageShareCard(ruleModeShareCardKey(mode.slug), messages, modeTexts(rules))!;
       expect(card.subtitle.length).toBeLessThanOrEqual(RULE_MODE_SUBTITLE_MAX_LENGTH);
     }
+  });
+});
+
+describe("shareTagline", () => {
+  it("rend une accroche courte inchangée (espaces aplatis)", () => {
+    expect(shareTagline("Un  arbre\nà huit.", 50)).toBe("Un arbre à huit.");
+  });
+
+  it("garde les phrases entières qui tiennent", () => {
+    const text = "Un capital qui fond à chaque map perdue. Personne n'est coupé : on sort quand son capital tombe à zéro.";
+    expect(shareTagline(text, 60)).toBe("Un capital qui fond à chaque map perdue.");
+  });
+
+  it("coupe sur un mot quand la première phrase est trop longue", () => {
+    const text = "Une très longue première phrase qui ne finit jamais avant la limite. Fin.";
+    const cut = shareTagline(text, 30);
+    expect(cut.endsWith("…")).toBe(true);
+    expect(Array.from(cut).length).toBeLessThanOrEqual(30);
+  });
+
+  it("ignore une fin de phrase trop tôt (moins d'un tiers de la limite)", () => {
+    const cut = shareTagline("Oui. Une suite assez longue pour dépasser la limite fixée ici.", 40);
+    expect(cut.startsWith("Oui. Une")).toBe(true);
+    expect(cut.endsWith("…")).toBe(true);
+  });
+
+  it("accepte une phrase qui finit pile sur la limite", () => {
+    expect(shareTagline("Douze lettr. Et la suite.", 12)).toBe("Douze lettr.");
   });
 });
 
