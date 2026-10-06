@@ -37,8 +37,15 @@ function blend(background: string, rgb: [number, number, number], alpha: number)
  * opacité au bord du glyphe (flou gaussien d'un front) — on la compte en entier
  * pour la moitié, et on cumule toutes les lueurs : le cas le plus défavorable.
  */
+/**
+ * Fond le plus clair où une marche garde sa lueur : la ligne de l'engagé du
+ * lecteur, teintée de 6 % de cyan (`isMine`, `.historyRowMine`). Les lignes plus
+ * teintées l'éteignent (vainqueur d'un match, `data-podium-muted`).
+ */
+const MINE_ROW = blend(SURFACE, [89, 212, 255], 0.06);
+
 function litSurface(body: string): string {
-  let background = SURFACE;
+  let background = MINE_ROW;
   for (const [, name, alpha] of body.matchAll(/drop-shadow\([^)]*rgba\(var\((--[a-z0-9-]+-rgb)\), ([\d.]+)\)\)/g)) {
     background = blend(background, rgbOf(name), Number(alpha) / 2);
   }
@@ -149,7 +156,7 @@ describe("marches du podium — écrans où elles s'effacent", () => {
   it.each([
     ["MatchRow.tsx", /data-podium-muted=\{podiumMuted\(team1Win\)\}/],
     ["EnduranceView.tsx", /data-podium-muted=\{ROW_OPACITY\[standing\.status\] < 1/],
-    ["SurvivalView.tsx", /data-podium-muted=\{team\.status === "ELIMINATED"/],
+    ["SurvivalView.tsx", /data-podium-muted=\{team\.status === "ACTIVE" \? undefined : ""\}/],
     ["SwissView.tsx", /data-podium-muted=\{team\.status === "FORFEIT"/],
   ])("marque les lignes en retrait de %s", (file, pattern) => {
     expect(readSource(`app/(secured)/tournois/[id]/_components/${file}`)).toMatch(pattern);
@@ -167,5 +174,18 @@ describe("marches du podium — écrans où elles s'effacent", () => {
   it("garde sobre l'aperçu d'arbitrage de l'Endurance", () => {
     const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
     expect(view).toMatch(/<PodiumTiersOff>\s*<EnduranceNextRoundPanel/);
+  });
+});
+
+describe("marches du podium — historique et graisse des classements de phase", () => {
+  it("met en retrait la ligne d'historique d'une équipe éliminée ou forfait", () => {
+    const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
+    expect(view.match(/data-podium-muted=\{ROW_OPACITY\[standing\.status\] < 1/g)).toHaveLength(2);
+  });
+
+  it.each(["SwissView.tsx", "SurvivalView.tsx"])("%s n'écrase pas la graisse d'une marche en ligne", (file) => {
+    const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
+    expect(source).toContain("standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null)");
+    expect(source).not.toContain("fontWeight: isMine ? 700 : 500");
   });
 });

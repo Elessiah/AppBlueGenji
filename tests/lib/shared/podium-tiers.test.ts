@@ -5,6 +5,7 @@ import {
   memberPodiumTier,
   podiumTeamIds,
   podiumTierClass,
+  standingNameWeight,
   teamPodiumTier,
   visiblePodiumTiers,
 } from "@/lib/shared/podium-tiers";
@@ -72,5 +73,20 @@ describe("podiumTierClass", () => {
     expect(podiumTierClass(3, "team")).toBe("podium-tier podium-tier-3");
     expect(podiumTierClass(2, "member")).toBe("podium-member podium-member-2");
     expect(podiumTierClass(null)).toBeUndefined();
+  });
+});
+
+describe("standingNameWeight", () => {
+  it("met en gras l'engagé du lecteur, marche ou non", () => {
+    expect(standingNameWeight(true, false)).toBe(700);
+    expect(standingNameWeight(true, true)).toBe(700);
+  });
+
+  it("laisse une marche du podium porter sa propre graisse", () => {
+    expect(standingNameWeight(false, true)).toBeUndefined();
+  });
+
+  it("garde 500 pour les autres engagés", () => {
+    expect(standingNameWeight(false, false)).toBe(500);
   });
 });
