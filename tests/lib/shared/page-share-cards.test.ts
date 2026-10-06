@@ -169,8 +169,8 @@ describe("podium", () => {
   it("nettoie un nom saisi (visibleText) et remplace un nom invisible", () => {
     const entries = podiumShareEntries(
       [
-        { ...rows[0], teamName: "Al​pha‮" },
-        { ...rows[1], teamName: "​​" },
+        { ...rows[0], teamName: "Al\u200Bpha\u202E" },
+        { ...rows[1], teamName: "\u200B\u200B" },
         { ...rows[2], teamName: "élan" },
       ],
       frShare,
