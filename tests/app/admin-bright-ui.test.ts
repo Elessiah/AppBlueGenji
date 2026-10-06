@@ -37,6 +37,7 @@ const LEGACY_ORANGE = /--accent-orange|--orange-rgb|255,\s*157,\s*46|#ff9d2e/i;
 const AMBER_WARNINGS: Record<string, string> = {
   "app/(secured)/admin/signalements/reports.module.css": "à traiter / contestés non nuls, quarantaine, masquer",
   "components/cyber/landing/EditableCopy.module.css": "texte éditable dont l'anglais reste à rédiger",
+  "components/ui/bilingual-field.module.css": "contenu du staff dont l'anglais reste à rédiger (lot 5b)",
   "app/(secured)/equipes/[id]/team.module.css": "bandeau de modération",
   "app/(secured)/joueurs/[id]/player.module.css": "bandeau de modération",
   "app/(secured)/profil/ConnectedAppsSection.tsx": "refus de détacher la dernière connexion",

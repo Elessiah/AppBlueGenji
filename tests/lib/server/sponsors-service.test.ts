@@ -86,6 +86,7 @@ describe("sponsors-service", () => {
         bannerUrl: null,
         websiteUrl: "https://l",
         description: null,
+        descriptionEn: null,
       });
     });
 
@@ -141,6 +142,7 @@ describe("sponsors-service", () => {
         bannerUrl: null,
         websiteUrl: null,
         description: null,
+        descriptionEn: null,
       });
     });
 

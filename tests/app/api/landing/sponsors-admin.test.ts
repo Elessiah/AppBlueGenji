@@ -50,7 +50,7 @@ describe("GET /api/landing/sponsors", () => {
       logoUrl: null,
       bannerUrl: null,
       websiteUrl: null,
-      description: null,
+      description: null, descriptionEn: null,
     }];
     jest.mocked(service.listSponsors).mockResolvedValue(sponsors);
 
@@ -89,7 +89,7 @@ describe("POST /api/landing/sponsors", () => {
       logoUrl: null,
       bannerUrl: null,
       websiteUrl: null,
-      description: null,
+      description: null, descriptionEn: null,
     };
     jest.mocked(service.createSponsor).mockResolvedValue(sponsor);
 
@@ -139,7 +139,7 @@ describe("PUT /api/landing/sponsors/[id]", () => {
       logoUrl: null,
       bannerUrl: null,
       websiteUrl: null,
-      description: null,
+      description: null, descriptionEn: null,
     };
     jest.mocked(service.updateSponsor).mockResolvedValue(sponsor);
 
@@ -159,7 +159,7 @@ describe("PUT /api/landing/sponsors/[id]", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.getSponsorImageUrls).mockResolvedValue({ logoUrl: "/api/uploads/sponsors/old.webp", bannerUrl: null });
     jest.mocked(service.updateSponsor).mockResolvedValue({
-      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "/api/uploads/sponsors/new.webp", bannerUrl: null, websiteUrl: null, description: null,
+      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "/api/uploads/sponsors/new.webp", bannerUrl: null, websiteUrl: null, description: null, descriptionEn: null,
     });
 
     await PUT(jsonReq("PUT", { name: "X", logoUrl: "/api/uploads/sponsors/new.webp" }), params("3"));
@@ -171,7 +171,7 @@ describe("PUT /api/landing/sponsors/[id]", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.getSponsorImageUrls).mockResolvedValue({ logoUrl: "https://cdn/old.png", bannerUrl: null });
     jest.mocked(service.updateSponsor).mockResolvedValue({
-      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "https://cdn/new.png", bannerUrl: null, websiteUrl: null, description: null,
+      id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: "https://cdn/new.png", bannerUrl: null, websiteUrl: null, description: null, descriptionEn: null,
     });
 
     await PUT(jsonReq("PUT", { name: "X", logoUrl: "https://cdn/new.png" }), params("3"));
@@ -186,7 +186,7 @@ describe("PUT /api/landing/sponsors/[id]", () => {
     });
     jest.mocked(service.updateSponsor).mockResolvedValue({
       id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: null,
-      bannerUrl: "/api/uploads/sponsors/new-banner.webp", websiteUrl: null, description: null,
+      bannerUrl: "/api/uploads/sponsors/new-banner.webp", websiteUrl: null, description: null, descriptionEn: null,
     });
 
     await PUT(jsonReq("PUT", { name: "X", bannerUrl: "/api/uploads/sponsors/new-banner.webp" }), params("3"));
@@ -205,7 +205,7 @@ describe("PUT /api/landing/sponsors/[id]", () => {
     });
     jest.mocked(service.updateSponsor).mockResolvedValue({
       id: 3, name: "X", slug: "x", tier: "GOLD", logoUrl: null,
-      bannerUrl: "/api/uploads/sponsors/b.webp", websiteUrl: null, description: null,
+      bannerUrl: "/api/uploads/sponsors/b.webp", websiteUrl: null, description: null, descriptionEn: null,
     });
 
     await PUT(jsonReq("PUT", { name: "X", bannerUrl: "/api/uploads/sponsors/b.webp" }), params("3"));

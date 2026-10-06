@@ -33,7 +33,7 @@ describe("GET /api/association/about-stats", () => {
   });
 
   it("returns the public list without auth", async () => {
-    const stats = [{ id: 1, value: "100%", label: "Bénévole" }];
+    const stats = [{ id: 1, value: "100%", label: "Bénévole", labelEn: null }];
     jest.mocked(service.listAboutStats).mockResolvedValue(stats);
 
     const res = await GET();
@@ -64,7 +64,7 @@ describe("POST /api/association/about-stats", () => {
 
   it("creates a stat for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const stat = { id: 5, value: "X", label: "Y" };
+    const stat = { id: 5, value: "X", label: "Y", labelEn: null };
     jest.mocked(service.createAboutStat).mockResolvedValue(stat);
 
     const res = await POST(jsonReq("POST", { value: "X", label: "Y" }));
@@ -105,7 +105,7 @@ describe("PUT /api/association/about-stats/[id]", () => {
 
   it("updates a stat for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const stat = { id: 3, value: "X", label: "Y" };
+    const stat = { id: 3, value: "X", label: "Y", labelEn: null };
     jest.mocked(service.updateAboutStat).mockResolvedValue(stat);
 
     const res = await PUT(jsonReq("PUT", { value: "X", label: "Y" }), params("3"));

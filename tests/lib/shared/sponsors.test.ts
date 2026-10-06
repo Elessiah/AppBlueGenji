@@ -2,9 +2,12 @@ import { describe, expect, it } from "@jest/globals";
 import {
   FALLBACK_SPONSORS,
   SPONSOR_DESCRIPTION_MAX,
+  SPONSOR_FIELD_ERRORS,
   SPONSOR_TIERS,
   isStoredSponsorBanner,
   slugifySponsor,
+  sponsorDescription,
+  sponsorEnglishMissing,
   validateSponsorInput,
 } from "@/lib/shared/sponsors";
 
@@ -38,6 +41,7 @@ describe("validateSponsorInput", () => {
         bannerUrl: null,
         websiteUrl: null,
         description: null,
+        descriptionEn: null,
         active: true,
       });
     }
@@ -122,7 +126,7 @@ describe("validateSponsorInput — bandeau", () => {
 describe("validateSponsorInput — description", () => {
   it("accepts a description at the limit", () => {
     const description = "d".repeat(SPONSOR_DESCRIPTION_MAX);
-    const result = validateSponsorInput({ name: "X", description });
+    const result = validateSponsorInput({ name: "X", description, descriptionEn: "EN" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.description).toBe(description);
   });
@@ -135,7 +139,11 @@ describe("validateSponsorInput — description", () => {
   });
 
   it("measures the trimmed description", () => {
-    const result = validateSponsorInput({ name: "X", description: `  ${"d".repeat(SPONSOR_DESCRIPTION_MAX)}  ` });
+    const result = validateSponsorInput({
+      name: "X",
+      description: `  ${"d".repeat(SPONSOR_DESCRIPTION_MAX)}  `,
+      descriptionEn: "EN",
+    });
     expect(result.ok).toBe(true);
   });
 });
@@ -179,3 +187,28 @@ describe("validateSponsorInput — logo", () => {
     expect(validateSponsorInput({ name: "X", logoUrl })).toEqual({ ok: false, error: "INVALID_LOGO_URL" });
   });
 });
+
+describe("validateSponsorInput — anglais de la description (lot 5b, D9)", () => {
+  it("une description saisie demande son anglais ; sans description, rien", () => {
+    expect(validateSponsorInput({ name: "X", description: "Boutique" })).toEqual({ ok: false, error: "DESCRIPTION_EN_REQUIRED" });
+    const none = validateSponsorInput({ name: "X", descriptionEn: "orphan" });
+    expect(none.ok && none.value.descriptionEn).toBeNull();
+    expect(validateSponsorInput({ name: "X", description: "B", descriptionEn: "e".repeat(SPONSOR_DESCRIPTION_MAX + 1) })).toEqual({
+      ok: false,
+      error: "DESCRIPTION_EN_TOO_LONG",
+    });
+    expect(SPONSOR_FIELD_ERRORS.DESCRIPTION_EN_REQUIRED).toBe("descriptionEn");
+  });
+});
+
+describe("sponsorDescription", () => {
+  it("sous /en, l'anglais ou rien — le partenaire reste, sans sa description", () => {
+    expect(sponsorDescription({ description: "Boutique", descriptionEn: "Shop" }, "en")).toBe("Shop");
+    expect(sponsorDescription({ description: "Boutique", descriptionEn: null }, "en")).toBeNull();
+    expect(sponsorDescription({ description: "Boutique", descriptionEn: null }, "fr")).toBe("Boutique");
+    expect(sponsorDescription({ description: null, descriptionEn: null }, "fr")).toBeNull();
+    expect(sponsorEnglishMissing({ description: "Boutique", descriptionEn: null })).toBe(true);
+    expect(sponsorEnglishMissing({ description: null, descriptionEn: null })).toBe(false);
+  });
+});
+

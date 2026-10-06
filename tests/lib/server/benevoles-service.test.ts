@@ -30,6 +30,7 @@ const INPUT = {
   lastName: "Martin",
   pseudo: "lea",
   category: "Arbitrage",
+  categoryEn: "Refereeing",
   photoUrl: null,
   joinedAt: "2025-01-05",
 };

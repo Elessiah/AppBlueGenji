@@ -10,6 +10,9 @@ import type { RecruitmentAd } from "@/lib/shared/recruitment";
 const ad = {
   id: 7,
   title: "Cherche DPS",
+  titleEn: "Looking for a DPS",
+  rolesEn: null,
+  bodyEn: null,
   teamName: null,
   domain: "ESPORT",
   roles: null,
@@ -26,6 +29,10 @@ describe("recruitmentFormFromAd", () => {
   it("remplace les champs absents par une chaîne vide", () => {
     expect(recruitmentFormFromAd(ad)).toEqual({
       title: "Cherche DPS",
+      titleEn: "Looking for a DPS",
+      // Anglais absent (annonce d'avant le lot 5b) : champ vide, à saisir.
+      rolesEn: "",
+      bodyEn: "",
       teamName: "",
       domain: "ESPORT",
       roles: "",
@@ -46,6 +53,8 @@ describe("recruitmentRequestBody", () => {
       { pseudo: "", id: null },
     );
     expect(body).toMatchObject({ title: "Titre", teamName: null, roles: "Tank", body: null, contactDiscord: null });
+    // L'anglais suit la même règle : rogné, `null` si vide.
+    expect(body).toMatchObject({ titleEn: null, rolesEn: null, bodyEn: null });
     expect(body.contactDiscordId).toBeNull();
   });
 

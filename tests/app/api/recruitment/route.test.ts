@@ -26,6 +26,9 @@ const arbitre = { id: 4, isAdmin: false, roles: ["ARBITRE"] } as Awaited<
 const sampleAd: RecruitmentAd = {
   id: 5,
   title: "Recherche arbitre",
+  titleEn: "Looking for referees",
+  rolesEn: null,
+  bodyEn: null,
   teamName: null,
   domain: "AUTRE",
   roles: null,

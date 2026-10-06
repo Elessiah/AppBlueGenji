@@ -33,7 +33,7 @@ describe("GET /api/association/about-pillars", () => {
   });
 
   it("returns the public list without auth", async () => {
-    const pillars = [{ id: 1, title: "Accessible", text: "Inscription gratuite." }];
+    const pillars = [{ id: 1, title: "Accessible", text: "Inscription gratuite.", titleEn: null, textEn: null }];
     jest.mocked(service.listAboutPillars).mockResolvedValue(pillars);
 
     const res = await GET();
@@ -64,7 +64,7 @@ describe("POST /api/association/about-pillars", () => {
 
   it("creates a pillar for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const pillar = { id: 5, title: "X", text: "Y" };
+    const pillar = { id: 5, title: "X", text: "Y", titleEn: null, textEn: null };
     jest.mocked(service.createAboutPillar).mockResolvedValue(pillar);
 
     const res = await POST(jsonReq("POST", { title: "X", text: "Y" }));
@@ -105,7 +105,7 @@ describe("PUT /api/association/about-pillars/[id]", () => {
 
   it("updates a pillar for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const pillar = { id: 3, title: "X", text: "Y" };
+    const pillar = { id: 3, title: "X", text: "Y", titleEn: null, textEn: null };
     jest.mocked(service.updateAboutPillar).mockResolvedValue(pillar);
 
     const res = await PUT(jsonReq("PUT", { title: "X", text: "Y" }), params("3"));

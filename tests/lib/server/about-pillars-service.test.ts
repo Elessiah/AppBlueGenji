@@ -53,15 +53,15 @@ describe("about-pillars-service", () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 42 }]);
       await mockDb(execute);
 
-      const pillar = await createAboutPillar({ title: "Compétitif", text: "Brackets arbitrés." });
-      expect(pillar).toEqual({ id: 42, title: "Compétitif", text: "Brackets arbitrés." });
+      const pillar = await createAboutPillar({ titleEn: "EN", textEn: "EN text", title: "Compétitif", text: "Brackets arbitrés." });
+      expect(pillar).toEqual({ id: 42, title: "Compétitif", text: "Brackets arbitrés.", titleEn: "EN", textEn: "EN text" });
       expect(execute).toHaveBeenCalledTimes(1);
     });
 
     it("rejects invalid input before touching the database", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(createAboutPillar({ title: "", text: "Brackets arbitrés." })).rejects.toThrow(
+      await expect(createAboutPillar({ titleEn: "EN", textEn: "EN text", title: "", text: "Brackets arbitrés." })).rejects.toThrow(
         "TITLE_REQUIRED",
       );
       expect(execute).not.toHaveBeenCalled();
@@ -73,13 +73,13 @@ describe("about-pillars-service", () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
       await mockDb(execute);
 
-      const pillar = await updateAboutPillar(7, { title: "Communautaire", text: "Watch parties." });
-      expect(pillar).toEqual({ id: 7, title: "Communautaire", text: "Watch parties." });
+      const pillar = await updateAboutPillar(7, { titleEn: "EN", textEn: "EN text", title: "Communautaire", text: "Watch parties." });
+      expect(pillar).toEqual({ id: 7, title: "Communautaire", text: "Watch parties.", titleEn: "EN", textEn: "EN text" });
     });
 
     it("throws NOT_FOUND when no row matches", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
-      await expect(updateAboutPillar(999, { title: "X", text: "Y" })).rejects.toThrow(
+      await expect(updateAboutPillar(999, { titleEn: "EN", textEn: "EN text", title: "X", text: "Y" })).rejects.toThrow(
         "ABOUT_PILLAR_NOT_FOUND",
       );
     });
@@ -87,7 +87,7 @@ describe("about-pillars-service", () => {
     it("rejects invalid input", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(updateAboutPillar(1, { title: "X", text: "" })).rejects.toThrow("TEXT_REQUIRED");
+      await expect(updateAboutPillar(1, { titleEn: "EN", textEn: "EN text", title: "X", text: "" })).rejects.toThrow("TEXT_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
     });
   });

@@ -111,13 +111,13 @@ describe("cachedShowcase", () => {
  */
 describe("écritures de vitrine — chacune invalide sa lecture", () => {
   const cases: { nom: string; read: () => Promise<unknown>; write: () => Promise<unknown> }[] = [
-    { nom: "createAboutStat", read: listAboutStats, write: () => createAboutStat({ value: "1", label: "L" }) },
-    { nom: "updateAboutStat", read: listAboutStats, write: () => updateAboutStat(1, { value: "1", label: "L" }) },
+    { nom: "createAboutStat", read: listAboutStats, write: () => createAboutStat({ value: "1", label: "L", labelEn: "L" }) },
+    { nom: "updateAboutStat", read: listAboutStats, write: () => updateAboutStat(1, { value: "1", label: "L", labelEn: "L" }) },
     { nom: "reorderAboutStats", read: listAboutStats, write: () => reorderAboutStats([1]) },
     { nom: "deleteAboutStat", read: listAboutStats, write: () => deleteAboutStat(1) },
 
-    { nom: "createAboutPillar", read: listAboutPillars, write: () => createAboutPillar({ title: "T", text: "X" }) },
-    { nom: "updateAboutPillar", read: listAboutPillars, write: () => updateAboutPillar(1, { title: "T", text: "X" }) },
+    { nom: "createAboutPillar", read: listAboutPillars, write: () => createAboutPillar({ title: "T", text: "X", titleEn: "T", textEn: "X" }) },
+    { nom: "updateAboutPillar", read: listAboutPillars, write: () => updateAboutPillar(1, { title: "T", text: "X", titleEn: "T", textEn: "X" }) },
     { nom: "reorderAboutPillars", read: listAboutPillars, write: () => reorderAboutPillars([1]) },
     { nom: "deleteAboutPillar", read: listAboutPillars, write: () => deleteAboutPillar(1) },
 

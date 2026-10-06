@@ -15,16 +15,29 @@ import {
   recruitmentModalStart,
   recruitmentSeenAmong,
   serializeRecruitmentSeen,
+  localizeRecruitmentAd,
+  localizeRecruitmentAds,
+  recruitmentAdHasEnglish,
+  recruitmentErrorMessage,
   validateRecruitmentAdInput,
+  RECRUITMENT_FIELD_ERRORS,
+  type RecruitmentAd,
 } from "@/lib/shared/recruitment";
+
+/** L'anglais obligatoire (lot 5b, D9) : ignoré pour un champ dont le français est vide. */
+const EN = { titleEn: "EN title", rolesEn: "EN roles", bodyEn: "EN body" };
 
 describe("validateRecruitmentAdInput", () => {
   it("accepts a minimal valid input with defaults", () => {
-    const result = validateRecruitmentAdInput({ title: "Recherche arbitre" });
+    const result = validateRecruitmentAdInput({ ...EN, title: "Recherche arbitre" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({
         title: "Recherche arbitre",
+        titleEn: "EN title",
+        // Sans missions ni description, leur anglais n'a rien à traduire.
+        rolesEn: null,
+        bodyEn: null,
         teamName: null,
         domain: "AUTRE",
         roles: null,
@@ -42,7 +55,7 @@ describe("validateRecruitmentAdInput", () => {
   });
 
   it("trims the title and optional fields, nulling empties", () => {
-    const result = validateRecruitmentAdInput({
+    const result = validateRecruitmentAdInput({ ...EN,
       title: "  Pôle arbitrage recrute  ",
       teamName: "  ",
       roles: " Arbitrage, litiges ",
@@ -61,7 +74,7 @@ describe("validateRecruitmentAdInput", () => {
 
   it("accepts every valid domain", () => {
     for (const domain of RECRUITMENT_DOMAINS) {
-      const result = validateRecruitmentAdInput({ title: "X", domain });
+      const result = validateRecruitmentAdInput({ ...EN, title: "X", domain });
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.value.domain).toBe(domain);
     }
@@ -69,20 +82,20 @@ describe("validateRecruitmentAdInput", () => {
 
   it("accepts every valid priority", () => {
     for (const priority of RECRUITMENT_PRIORITIES) {
-      const result = validateRecruitmentAdInput({ title: "X", priority });
+      const result = validateRecruitmentAdInput({ ...EN, title: "X", priority });
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.value.priority).toBe(priority);
     }
   });
 
   it("honours an explicit active=false", () => {
-    const result = validateRecruitmentAdInput({ title: "X", active: false });
+    const result = validateRecruitmentAdInput({ ...EN, title: "X", active: false });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.active).toBe(false);
   });
 
   it("falls back to defaults when domain/priority are empty strings", () => {
-    const result = validateRecruitmentAdInput({ title: "X", domain: "", priority: "" });
+    const result = validateRecruitmentAdInput({ ...EN, title: "X", domain: "", priority: "" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.domain).toBe("AUTRE");
@@ -91,7 +104,7 @@ describe("validateRecruitmentAdInput", () => {
   });
 
   it("truncates an over-long body to the max length", () => {
-    const result = validateRecruitmentAdInput({
+    const result = validateRecruitmentAdInput({ ...EN,
       title: "X",
       body: "a".repeat(RECRUITMENT_BODY_MAX + 500),
     });
@@ -100,21 +113,21 @@ describe("validateRecruitmentAdInput", () => {
   });
 
   it("rejects a missing title", () => {
-    expect(validateRecruitmentAdInput({ title: "   " })).toEqual({
+    expect(validateRecruitmentAdInput({ ...EN, title: "   " })).toEqual({
       ok: false,
       error: "TITLE_REQUIRED",
     });
   });
 
   it("rejects an over-long title", () => {
-    expect(validateRecruitmentAdInput({ title: "a".repeat(141) })).toEqual({
+    expect(validateRecruitmentAdInput({ ...EN, title: "a".repeat(141) })).toEqual({
       ok: false,
       error: "TITLE_TOO_LONG",
     });
   });
 
   it("rejects an invalid domain", () => {
-    expect(validateRecruitmentAdInput({ title: "X", domain: "LOL" })).toEqual({
+    expect(validateRecruitmentAdInput({ ...EN, title: "X", domain: "LOL" })).toEqual({
       ok: false,
       error: "INVALID_DOMAIN",
     });
@@ -125,7 +138,7 @@ describe("validateRecruitmentAdInput", () => {
     // client resté sur l'ancien formulaire doit se faire refuser, pas se voir
     // rabattre en silence sur « facultative ».
     for (const priority of ["POPUP", "MODAL", "BANNER", "NONE", "priority"]) {
-      expect(validateRecruitmentAdInput({ title: "X", priority })).toEqual({
+      expect(validateRecruitmentAdInput({ ...EN, title: "X", priority })).toEqual({
         ok: false,
         error: "INVALID_PRIORITY",
       });
@@ -133,43 +146,43 @@ describe("validateRecruitmentAdInput", () => {
   });
 
   it("trims and keeps the Discord contact", () => {
-    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "  marie#0001  " });
+    const result = validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "  marie#0001  " });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.contactDiscord).toBe("marie#0001");
   });
 
   it("nulls an empty Discord contact", () => {
-    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "   " });
+    const result = validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "   " });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.contactDiscord).toBeNull();
   });
 
   it("truncates an over-long Discord contact to the max length", () => {
-    const result = validateRecruitmentAdInput({ title: "X", contactDiscord: "a".repeat(200) });
+    const result = validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "a".repeat(200) });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.contactDiscord).toHaveLength(120);
   });
 
   it("accepts every valid contact channel and defaults to AUTO", () => {
     for (const channel of RECRUITMENT_CONTACT_CHANNELS) {
-      const result = validateRecruitmentAdInput({ title: "X", contactPreferred: channel });
+      const result = validateRecruitmentAdInput({ ...EN, title: "X", contactPreferred: channel });
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.value.contactPreferred).toBe(channel);
     }
-    const empty = validateRecruitmentAdInput({ title: "X", contactPreferred: "" });
+    const empty = validateRecruitmentAdInput({ ...EN, title: "X", contactPreferred: "" });
     expect(empty.ok).toBe(true);
     if (empty.ok) expect(empty.value.contactPreferred).toBe("AUTO");
   });
 
   it("rejects an invalid contact channel", () => {
-    expect(validateRecruitmentAdInput({ title: "X", contactPreferred: "SMS" })).toEqual({
+    expect(validateRecruitmentAdInput({ ...EN, title: "X", contactPreferred: "SMS" })).toEqual({
       ok: false,
       error: "INVALID_CONTACT_CHANNEL",
     });
   });
 
   it("keeps a Discord id only when a pseudo accompanies it", () => {
-    const withPseudo = validateRecruitmentAdInput({
+    const withPseudo = validateRecruitmentAdInput({ ...EN,
       title: "X",
       contactDiscord: "marie",
       contactDiscordId: "123456789012345678",
@@ -178,13 +191,13 @@ describe("validateRecruitmentAdInput", () => {
     if (withPseudo.ok) expect(withPseudo.value.contactDiscordId).toBe("123456789012345678");
 
     // Sans pseudo, l'id seul ne sert à rien : neutralisé.
-    const orphan = validateRecruitmentAdInput({ title: "X", contactDiscordId: "123456789012345678" });
+    const orphan = validateRecruitmentAdInput({ ...EN, title: "X", contactDiscordId: "123456789012345678" });
     expect(orphan.ok).toBe(true);
     if (orphan.ok) expect(orphan.value.contactDiscordId).toBeNull();
   });
 
   it("drops a Discord id that is not a snowflake", () => {
-    const result = validateRecruitmentAdInput({
+    const result = validateRecruitmentAdInput({ ...EN,
       title: "X",
       contactDiscord: "marie",
       contactDiscordId: "not-a-snowflake",
@@ -369,3 +382,69 @@ describe("isRecruitmentBannerRotating", () => {
     expect(isRecruitmentBannerRotating({ ...base, override: "RUNNING", hovered: true, focused: true })).toBe(true);
   });
 });
+
+describe("validateRecruitmentAdInput — anglais (lot 5b, D9)", () => {
+  it("le titre anglais est toujours demandé", () => {
+    expect(validateRecruitmentAdInput({ title: "X" })).toEqual({ ok: false, error: "TITLE_EN_REQUIRED" });
+    expect(validateRecruitmentAdInput({ title: "X", titleEn: "t".repeat(141) })).toEqual({ ok: false, error: "TITLE_EN_TOO_LONG" });
+  });
+
+  it("missions et description demandent leur anglais dès que leur français est saisi", () => {
+    expect(validateRecruitmentAdInput({ title: "X", titleEn: "X", roles: "Arbitrer" })).toEqual({ ok: false, error: "ROLES_EN_REQUIRED" });
+    expect(validateRecruitmentAdInput({ title: "X", titleEn: "X", body: "Texte" })).toEqual({ ok: false, error: "BODY_EN_REQUIRED" });
+    const none = validateRecruitmentAdInput({ title: "X", titleEn: "X", rolesEn: "orphan", bodyEn: "orphan" });
+    expect(none.ok && [none.value.rolesEn, none.value.bodyEn]).toEqual([null, null]);
+  });
+
+  it("chaque refus d'anglais désigne son champ, avec la phrase de l'éditeur des textes de la vitrine", () => {
+    expect(RECRUITMENT_FIELD_ERRORS.TITLE_EN_REQUIRED).toBe("titleEn");
+    expect(RECRUITMENT_FIELD_ERRORS.ROLES_EN_REQUIRED).toBe("rolesEn");
+    expect(RECRUITMENT_FIELD_ERRORS.BODY_EN_REQUIRED).toBe("bodyEn");
+    expect(recruitmentErrorMessage("BODY_EN_REQUIRED", "x")).toBe("La traduction anglaise est requise.");
+    expect(recruitmentErrorMessage("TITLE_REQUIRED", "x")).toBe("Le titre est requis.");
+    expect(recruitmentErrorMessage("NOPE", "x")).toBe("Échec : NOPE");
+  });
+});
+
+describe("localizeRecruitmentAd", () => {
+  const base: RecruitmentAd = {
+    id: 1,
+    title: "Arbitres",
+    titleEn: "Referees",
+    roles: "Arbitrer",
+    rolesEn: "Referee",
+    body: "Le dimanche.",
+    bodyEn: "On Sundays.",
+    teamName: "Pôle arbitrage",
+    domain: "ARBITRAGE",
+    contactUrl: null,
+    contactDiscord: null,
+    contactDiscordId: null,
+    contactPreferred: "AUTO",
+    priority: "IMPORTANT",
+    active: true,
+  };
+
+  it("français : inchangé", () => {
+    expect(localizeRecruitmentAd(base, "fr")).toEqual(base);
+  });
+
+  it("anglais : titre, missions et description traduits, référent tel quel", () => {
+    expect(localizeRecruitmentAd(base, "en")).toMatchObject({
+      title: "Referees",
+      roles: "Referee",
+      body: "On Sundays.",
+      teamName: "Pôle arbitrage",
+    });
+  });
+
+  it("anglais : une annonce sans tout son anglais n'est pas rendue", () => {
+    expect(localizeRecruitmentAd({ ...base, titleEn: null }, "en")).toBeNull();
+    expect(localizeRecruitmentAd({ ...base, bodyEn: null }, "en")).toBeNull();
+    expect(recruitmentAdHasEnglish({ ...base, rolesEn: null })).toBe(false);
+    // Sans missions, rien à traduire.
+    expect(localizeRecruitmentAd({ ...base, roles: null, rolesEn: null }, "en")?.roles).toBeNull();
+    expect(localizeRecruitmentAds([base, { ...base, id: 2, titleEn: null }], "en").map((ad) => ad.id)).toEqual([1]);
+  });
+});
+

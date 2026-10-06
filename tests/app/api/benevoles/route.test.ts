@@ -20,6 +20,7 @@ const sampleBenevole = {
   pseudo: "MarieD",
   lastName: "Dupont",
   category: "Développeur",
+  categoryEn: null,
   photoUrl: null,
   joinedAt: "2024-03-15",
 };

@@ -45,7 +45,11 @@ function docxText(xml: string): string {
 }
 
 describe("section « Adhérer » de /association", () => {
-  const source = read("app/association/page.tsx");
+  const page = read("app/association/page.tsx");
+  // Textes de la page dans les messages depuis le lot 5b : le français y est
+  // le même, la page n'en garde que les clés.
+  const fr = read("messages/fr/association.json");
+  const source = `${page}\n${fr}`;
 
   it("ne présente plus la création d'un compte comme une adhésion", () => {
     expect(source).not.toContain("Il suffit de créer un compte");
@@ -60,13 +64,18 @@ describe("section « Adhérer » de /association", () => {
   });
 
   it("annonce les conditions statutaires : 16 ans, un an, agrément du bureau", () => {
-    expect(source).toContain('["16 ans", "Âge minimum"]');
-    expect(source).toContain('["1 an", "Durée de l\'adhésion"]');
-    expect(source).toContain('["Bureau", "Agrément"]');
+    expect(fr).toContain('"ageValue": "16 ans"');
+    expect(fr).toContain('"ageLabel": "Âge minimum"');
+    expect(fr).toContain('"durationValue": "1 an"');
+    expect(fr).toContain('"durationLabel": "Durée de l\'adhésion"');
+    expect(fr).toContain('"approvalValue": "Bureau"');
+    expect(fr).toContain('"approvalLabel": "Agrément"');
+    expect(page).toContain("[messages.membership.ageValue, messages.membership.ageLabel]");
   });
 
   it("mène au bulletin d'adhésion, et nomme le compte joueur pour ce qu'il est", () => {
-    expect(source).toMatch(/href="\/bulletin_adhesion\.docx"\s+download>\s*Télécharger le bulletin/);
+    expect(page).toMatch(/href="\/bulletin_adhesion\.docx"\s+download hrefLang="fr">\s*\{messages\.membership\.download\}/);
+    expect(fr).toContain('"download": "Télécharger le bulletin →"');
     expect(source).toContain("Créer un compte joueur");
   });
 
