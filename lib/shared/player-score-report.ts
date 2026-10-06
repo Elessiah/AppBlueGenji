@@ -241,9 +241,12 @@ export function withProposalMaps<M extends Pick<BracketMatch, "id" | "team1Repor
  * instant de dépôt (porté par l'instantané), et se relit par la lecture REST.
  */
 export function proposalsNeedRefresh(
-  match: Pick<BracketMatch, "id" | "team1Report" | "team2Report">,
+  match: Pick<BracketMatch, "id" | "status" | "team1Report" | "team2Report">,
   proposals: ReadonlyArray<MatchProposalMaps>,
 ): boolean {
+  // Match clos (forfait déclaré, nul…) : le serveur n'en sert plus aucune
+  // proposition (`proposalMatches`) — l'attendre bloquerait l'arbitrage.
+  if (isMatchPlayed(match)) return false;
   const entry = proposals.find((p) => p.matchId === match.id);
   const stale = (report: MatchScoreReport | null, side: ProposalMaps | null | undefined) =>
     report !== null && side?.reportedAt !== report.reportedAt;
