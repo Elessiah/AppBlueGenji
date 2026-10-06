@@ -321,7 +321,7 @@ sans motif — la carte du site ne change pas.
 l'administration n'ont pas d'encart : rien à partager.
 
 **Rendu** (`lib/server/page-share-image.tsx`) : `ShareCard` avec `accent`,
-`motif` et `footer` (« Association loi 1901 » / « French nonprofit (law of 1901) »). Le
+`motif` et `footer` (« Association loi 1901 » / « Nonprofit association »). Le
 cadre commun (`ShareCardFrame` : fond, halos, filet, pied) est partagé avec la
 carte du podium. Le motif (`components/og/share-motifs.tsx`) est l'icône Lucide
 **redessinée en `<svg>` simple** : Satori ne déroule pas un `forwardRef` ; on lit
