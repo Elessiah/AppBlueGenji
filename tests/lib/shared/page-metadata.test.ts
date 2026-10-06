@@ -97,3 +97,27 @@ describe("pageMetadata — titre de la page racine", () => {
     expect(built.title).toEqual({ absolute: built.openGraph?.title });
   });
 });
+
+describe("pageMetadata — texte de remplacement de la carte", () => {
+  const base = { title: "Classement", description: "…", path: "/classement", shareCard: "ranking" };
+
+  it("reprend le titre de l'encart par défaut", () => {
+    const built = pageMetadata(base);
+    expect(built.openGraph?.images).toEqual([
+      expect.objectContaining({ url: "/og/fr/ranking.png", alt: `Classement · ${SITE_NAME}` }),
+    ]);
+  });
+
+  it("prend le texte fourni quand la carte montre autre chose (podium)", () => {
+    const built = pageMetadata({ ...base, locale: "en", shareImageAlt: "The BlueGenji podium" });
+    expect(built.openGraph?.images).toEqual([
+      expect.objectContaining({ url: "/og/en/ranking.png", alt: "The BlueGenji podium" }),
+    ]);
+  });
+
+  it("ignore le texte fourni sans carte propre (carte du site)", () => {
+    const { shareCard: _omit, ...noCard } = base;
+    const built = pageMetadata({ ...noCard, shareImageAlt: "Ignoré" });
+    expect(built.openGraph?.images).toEqual([expect.objectContaining({ alt: SITE_NAME })]);
+  });
+});
