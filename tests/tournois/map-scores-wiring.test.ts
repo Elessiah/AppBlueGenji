@@ -147,13 +147,13 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   it("l'infobulle d'un bouton actionnable sur une map refusée dit ce refus, pas « score incomplet »", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
     expect(hook).toContain("const resolve = checkMapList(format, game, maps, { decisive: true });");
-    expect(hook).toContain("resolve: resolve.error,");
+    expect(hook).toContain("resolve: isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error,");
   });
 
   it("un forfait ou une saisie fermée taisent les refus de map : la liste est masquée et ses maps ne partent pas", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
     expect(hook).toMatch(/const mapsSent =\s*maps\.length > 0 &&\s*options\.scoreEntryClosed !== true &&\s*state\.forfeitTeamId === undefined &&\s*state\.doubleForfeit !== true;/);
-    expect(hook).toContain("mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : []),");
+    expect(hook).toContain("mapsRefused: mapRefusals(matchFormat, game, mapsSent ? maps : [], decision),");
     expect(hook).toContain("const sendMaps = mapsSent;");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toContain("if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);");
@@ -330,5 +330,15 @@ describe("détail map par map — saisie au clavier et au toucher", () => {
   it("Entrée dans un champ de map ne soumet pas le formulaire", () => {
     expect(list()).toContain('if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();');
     expect(list()).toContain("onKeyDown={keepEnterInList}");
+  });
+});
+
+describe("détail map par map — blocages qui ne tiennent pas aux maps", () => {
+  it("un résultat tranché, un double forfait ou une saisie fermée gardent le bouton fermé malgré un refus de map", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    for (const blocker of ["ALREADY_DECIDED", "DOUBLE_FORFEIT", "NOT_IN_LAUNCH"]) {
+      expect(hook).toContain(`"${blocker}",`);
+    }
+    expect(hook).toContain("save: isStructuralBlocker(decision.saveBlocker) ? null : save.error,");
   });
 });
