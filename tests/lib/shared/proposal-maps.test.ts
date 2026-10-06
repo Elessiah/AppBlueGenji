@@ -35,6 +35,11 @@ describe("propositions complétées par le contexte du lecteur (MAP_SCORES.md)",
     expect(proposalsNeedRefresh(match, [])).toBe(true);
   });
 
+  it("rien à relire sur un match clos, même s'il garde des propositions (forfait déclaré)", () => {
+    const closed = { ...match, status: "COMPLETED" as const };
+    expect(proposalsNeedRefresh(closed, [])).toBe(false);
+  });
+
   it("rien à relire sur un match sans proposition", () => {
     const quiet = bracketMatch({ id: 10, team1Report: null, team2Report: null });
     expect(proposalsNeedRefresh(quiet, [])).toBe(false);
