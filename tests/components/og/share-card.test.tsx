@@ -117,7 +117,6 @@ describe("contraste sur le fond le plus clair de la zone de texte", () => {
   it.each([
     ["titre et valeurs", SHARE_CARD_COLORS.ink],
     ["sous-titre et mentions", SHARE_CARD_COLORS.inkMute],
-    ...SHARE_CARD_FACT_COLORS.map((color, index) => [`intitulé du fait ${index + 1}`, color] as [string, string]),
   ])("%s tient 4,5:1", (_label, color) => {
     expect(worstContrast(color)).toBeGreaterThanOrEqual(4.5);
   });
@@ -145,12 +144,15 @@ describe("rendu", () => {
     expect(html).toContain(props.title);
   });
 
-  it("colore chaque intitulé de fait d'un néon distinct", () => {
+  it("liseré de chaque fait d'un néon distinct, intitulés neutres", () => {
     const props = tournamentShareCard(tournamentCard({ state: "REGISTRATION" }), NOW);
     const html = renderToStaticMarkup(<ShareCard {...props} />);
     props.facts.forEach((_fact, index) => {
       expect(html).toContain(`border-left:4px solid ${SHARE_CARD_FACT_COLORS[index]}`);
+      // Un intitulé au ton d'une pastille se lirait comme une étiquette de plus.
+      expect(html).not.toContain(`text-transform:uppercase;color:${SHARE_CARD_FACT_COLORS[index]}`);
     });
+    expect(html).toContain(`text-transform:uppercase;color:${SHARE_CARD_COLORS.inkMute}`);
   });
 
   it("pose le logo quand il est lu, décoratif (alt vide)", () => {
