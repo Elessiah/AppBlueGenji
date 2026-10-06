@@ -34,6 +34,8 @@ import { playerScoreClosedNotice } from "@/lib/shared/match-planning";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import { mapError } from "../_lib/error-map";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
+import { MapResultList } from "./MatchMapDetails";
+import mapStyles from "./MatchMapDetails.module.css";
 import styles from "./ScoreDialog.module.css";
 
 interface PlayerScoreDialogProps {
@@ -295,6 +297,20 @@ export function PlayerScoreDialog({
             <output className={`${styles.stored} ${styles.notice}`}>
               {status}
             </output>
+          )}
+
+          {/* Désaccord : le détail adverse, codes de replay compris — sans lui,
+              une faute de frappe dans un code ne se retrouverait pas. */}
+          {view?.phase === "CONFLICT" && view.theirs && view.theirs.maps.length > 0 && (
+            <div className={mapStyles.proposals}>
+              <p className={mapStyles.proposalTitle}>Proposition de {opponentName}</p>
+              <MapResultList
+                maps={view.theirs.maps}
+                team1Name={team1}
+                team2Name={team2}
+                label={`Maps proposées par ${opponentName}`}
+              />
+            </div>
           )}
 
           {canReportScore ? (

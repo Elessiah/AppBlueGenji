@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Copy } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
@@ -8,6 +8,7 @@ import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { mapWinnerSide, type MatchMapResult } from "@/lib/shared/match-maps";
 import type { BracketMatch } from "@/lib/shared/types";
+import { matchAnchorId } from "@/lib/shared/match-anchor";
 import dialogStyles from "./ScoreDialog.module.css";
 import styles from "./MatchMapDetails.module.css";
 
@@ -72,28 +73,43 @@ export function MapResultList({
  */
 export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name"> }>) {
   const [open, setOpen] = useState(false);
-  // Le détail disparu (score corrigé à la main, forfait) ferme la modale : elle
-  // ne doit pas se rouvrir d'elle-même au retour d'un détail.
+  // Détail affiché tant que la modale est ouverte, même s'il disparaît de
+  // l'instantané (score corrigé à la main, forfait, retour en arrière) : la
+  // modale reste lisible jusqu'à ce que le lecteur la ferme.
+  const shown = useRef(match.maps);
+  if (match.maps.length > 0) shown.current = match.maps;
   const hasMaps = match.maps.length > 0;
-  useEffect(() => {
-    if (!hasMaps) setOpen(false);
-  }, [hasMaps]);
-  if (!hasMaps) return null;
+  if (!hasMaps && !open) return null;
   const team1 = match.team1Name ?? "Équipe 1";
   const team2 = match.team2Name ?? "Équipe 2";
 
+  const close = () => {
+    setOpen(false);
+    // Le bouton part avec le détail : le focus revient à la carte du match
+    // (focalisable par programme), plutôt qu'au `<body>`.
+    if (!hasMaps) requestAnimationFrame(() => document.getElementById(matchAnchorId(match.id))?.focus());
+  };
+
   return (
     <>
-      <button type="button" className={styles.summary} onClick={() => setOpen(true)} aria-haspopup="dialog">
-        Détail des maps ({match.maps.length})
-      </button>
+      {hasMaps && (
+        <button
+          type="button"
+          className={styles.summary}
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={`Détail des maps (${match.maps.length}) : ${team1} contre ${team2}`}
+        >
+          Détail des maps ({match.maps.length})
+        </button>
+      )}
       {open && (
         <MapDetailsDialog
           matchId={match.id}
-          maps={match.maps}
+          maps={shown.current}
           team1Name={team1}
           team2Name={team2}
-          onClose={() => setOpen(false)}
+          onClose={close}
         />
       )}
     </>

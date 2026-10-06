@@ -57,9 +57,16 @@ describe("détail map par map — focus et interblocages", () => {
     expect(list).toMatch(/mapFieldId\(idPrefix, maps\.length - 1, "replayCode"\)/);
   });
 
-  it("la modale de détail se ferme quand le détail disparaît", () => {
+  it("la modale de détail reste lisible si le détail disparaît, et rend le focus à la carte", () => {
     const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
-    expect(details).toMatch(/if \(!hasMaps\) setOpen\(false\);/);
+    expect(details).toContain("if (!hasMaps && !open) return null;");
+    expect(details).toContain("document.getElementById(matchAnchorId(match.id))?.focus()");
+    expect(details).toMatch(/aria-label=\{`Détail des maps \(\$\{match\.maps\.length\}\) : \$\{team1\} contre \$\{team2\}`\}/);
+  });
+
+  it("en désaccord, l'engagé voit le détail adverse", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toMatch(/view\?\.phase === "CONFLICT" && view\.theirs[\s\S]{0,300}<MapResultList/);
   });
 
   it("une ligne vierge qu'on vient d'ajouter n'affiche pas de reproche", () => {
