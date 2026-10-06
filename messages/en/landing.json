@@ -124,21 +124,21 @@
     }
   },
   "leaderCal": {
-    "title": "Rankings and calendar",
+    "title": "Ranking and calendar",
     "rankedCount": "{count, plural, one {# RANKED TEAM} other {# RANKED TEAMS}}"
   },
   "leaderboard": {
     "heading": "TOP TEAMS",
     "loadError": "Couldn't load this ranking, try again later.",
     "chipAll": "Overall",
-    "tableLabel": "Team rankings",
+    "tableLabel": "Team ranking",
     "team": "TEAM",
     "winLoss": "W–L",
     "points": "PTS",
     "trend": "Trend",
     "trendShort": "±",
     "empty": "No ranked teams yet.",
-    "fullRanking": "VIEW FULL RANKINGS →"
+    "fullRanking": "VIEW FULL RANKING →"
   },
   "calendar": {
     "heading": "UPCOMING EVENTS · PARIS TIME",
