@@ -82,13 +82,13 @@ describe("middleware — adresses préfixées refusées ou renvoyées", () => {
   it("redirige /fr/… en 308 vers l'adresse sans préfixe", () => {
     const response = call("/fr/regles?x=1");
     expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe(`${ORIGIN}/regles?x=1`);
+    expect(response.headers.get("location")).toBe("/regles?x=1");
   });
 
   it("redirige en 307 une route pas encore traduite, requête conservée", () => {
     const response = call("/en/classement?saison=2");
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(`${ORIGIN}/classement?saison=2`);
+    expect(response.headers.get("location")).toBe("/classement?saison=2");
   });
 
   it("ne confond pas /enquete avec une adresse anglaise", () => {
