@@ -129,12 +129,17 @@ const AWAITING_DETAIL_MESSAGE =
 /** La raison affichée sous les boutons, une seule, dans l'ordre de l'infobulle. */
 function visibleBlocker(input: {
   awaitingDetail: boolean;
+  /** Des maps sont listées, aucune encore renseignée (ligne vierge ajoutée). */
+  blankMaps: boolean;
   mapRefusal: MapListViolation | null;
   blocker: ScoreFormBlocker | null;
   format: MatchFormat | null;
   game: TournamentGame | null | undefined;
 }): string | null {
   if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;
+  // Une ligne vierge n'appelle pas encore de reproche — et le score dérivé
+  // (0 – 0, steppers verrouillés) n'est pas à corriger.
+  if (input.blankMaps) return null;
   if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);
   return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : null;
 }
@@ -225,9 +230,11 @@ export function AdminScoreDialog({
   // Phrase visible, dans l'ordre de l'infobulle : détail en lecture, puis map
   // refusée (une fois une map renseignée — les steppers, verrouillés sur le
   // score dérivé, ne sont pas à corriger), puis blocage du score.
+  const mapsTouched = form.maps.some(isMapTouched);
   const blockerText = visibleBlocker({
     awaitingDetail,
-    mapRefusal: form.maps.some(isMapTouched) ? (form.mapsRefused.resolve ?? form.mapsRefused.save) : null,
+    blankMaps: form.maps.length > 0 && !mapsTouched && form.mapsRefused.resolve !== null,
+    mapRefusal: mapsTouched ? (form.mapsRefused.resolve ?? form.mapsRefused.save) : null,
     blocker,
     format: matchFormat,
     game: form.game,

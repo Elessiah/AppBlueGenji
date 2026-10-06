@@ -1,11 +1,12 @@
 /* Détail map par map d'une carte de match (`docs/features/MAP_SCORES.md`). */
 
-/* Cible de 24 px au moins (WCAG 2.5.8) sans grandir la carte : le padding
-   vertical est rendu par une marge négative. */
+/* Cible de 24 px au moins (WCAG 2.5.8), en retrait comme les autres bandes de
+   la carte : le texte ne touche pas le bord, et l'anneau de focus n'est pas
+   rogné par le `overflow: hidden` de la carte. */
 .summary {
   min-height: 24px;
-  margin: 0 0 -6px;
-  padding: 6px 0;
+  margin: 0 12px;
+  padding: 4px 0;
   border: 0;
   background: transparent;
   font-size: 12px;
