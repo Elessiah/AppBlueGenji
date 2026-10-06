@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/shared/i18n-routes", () => ({
   MIGRATED_ROUTES: ["/", "/regles", "/connexion", "/recrutement"],
@@ -11,6 +11,15 @@ import { LOCALE_HEADER } from "@/lib/shared/locales";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 
 const ORIGIN = "https://bluegenji.test";
+
+// Les renvois se rédigent sur la racine publique (`APP_URL`).
+const previousAppUrl = process.env.APP_URL;
+beforeAll(() => {
+  process.env.APP_URL = ORIGIN;
+});
+afterAll(() => {
+  process.env.APP_URL = previousAppUrl;
+});
 
 function call(path: string, init: { method?: string; headers?: Record<string, string> } = {}) {
   return middleware(new NextRequest(`${ORIGIN}${path}`, init));
@@ -82,13 +91,13 @@ describe("middleware — adresses préfixées refusées ou renvoyées", () => {
   it("redirige /fr/… en 308 vers l'adresse sans préfixe", () => {
     const response = call("/fr/regles?x=1");
     expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe("/regles?x=1");
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/regles?x=1`);
   });
 
   it("redirige en 307 une route pas encore traduite, requête conservée", () => {
     const response = call("/en/classement?saison=2");
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("/classement?saison=2");
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/classement?saison=2`);
   });
 
   it("ne confond pas /enquete avec une adresse anglaise", () => {
