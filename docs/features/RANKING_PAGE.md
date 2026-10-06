@@ -85,8 +85,15 @@ départages ci-dessus tranchent, comme sur la page.
   mobile (≤ 720 px), chaque ligne devient une carte et les cellules chiffrées
   portent leur intitulé par `data-label` (`RESPONSIVE_TABLES.md`). Pas de zone
   défilante interne : la page défile.
-- **Affichage progressif** : podium + 50 premières lignes
-  (`RANKING_PAGE_SIZE`), puis « Afficher plus » ajoute les 50 suivantes.
+- **Pas de doublon** (depuis le 2026-10-06) : dès qu'il y a un podium, le
+  tableau **commence à la 4e place** (`splitRankingPodium`) ; son libellé
+  accessible le dit (« … à partir de la 4e place »). La forme et la tendance
+  des trois premières, qui vivaient dans leurs lignes du tableau, passent sur
+  leur marche. Moins de trois équipes : pas de podium, tout au tableau ;
+  exactement trois : le podium seul, sans tableau.
+- **Affichage progressif** : `?n=` compte des **rangs**, podium compris — la
+  première page montre les rangs 1 à 50 (podium 1-3 + tableau 4-50,
+  `RANKING_PAGE_SIZE`), puis « Afficher plus » ajoute les 50 suivantes (51-100).
   C'est un **lien** (`?n=100#rang-51`, onglet `jeu` conservé) : sans
   JavaScript, la page se rend côté serveur avec `n` lignes et descend sur la
   première ajoutée (chaque ligne porte `id="rang-<rang>"`). Avec JavaScript
@@ -109,8 +116,9 @@ départages ci-dessus tranchent, comme sur la page.
   nul (colonne « N » stable d'une page à l'autre, `anyDraws`), puis ne rend
   que les `n` premières : le rendu et le poids de la page sont bornés, et le
   rang reste celui du classement complet.
-- **Comment marche la cote** : trois cartes dérivées des constantes
-  (`RANKING_BASE_POINTS`, `RANKING_FLOOR_POINTS`), puis deux appels à
+- **Comment marche la cote** : quatre cartes dérivées des constantes
+  (`RANKING_BASE_POINTS`, `RANKING_FLOOR_POINTS`, `RANKING_MARGIN_MAX_BONUS`
+  pour le poids du score — `ELO_RANKING.md`), puis deux appels à
   l'action (`/tournois`, `/regles`).
 - Panne de lecture : message « momentanément indisponible », distinct de la
   liste vide.

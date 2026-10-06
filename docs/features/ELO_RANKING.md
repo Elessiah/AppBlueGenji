@@ -50,6 +50,67 @@ L'exploit paie dix fois ce que paie le résultat attendu — c'est exactement le
 rapport que fixe `RANKING_SCALE`, et la base à 500 fait tomber l'exemple
 canonique dessus.
 
+## Le score du match (depuis le 2026-10-06)
+
+Demande : « un 3-0 en BO5 doit rapporter / coûter plus qu'un 3-2 serré ». Le
+transfert est multiplié par `marginMultiplier`, calculé sur le **score du
+match** en maps (`team1_score` / `team2_score`, que la saisie par map dérive
+désormais — la cote ne lit que ce score, jamais le détail des maps) :
+
+```
+marge          = (maps du vainqueur − maps du perdant − 1) / (maps du vainqueur − 1)
+amortisseur    = 2,2 / (2,2 + max(0, cote vainqueur − cote perdant) × 0,001)
+multiplicateur = 1 + 0,5 × marge × amortisseur          (RANKING_MARGIN_MAX_BONUS = 0,5)
+transfert      = arrondi(32 × (1 − probabilité du vainqueur) × multiplicateur)
+```
+
+La marge se rapporte au **format** par le nombre de maps du vainqueur : 0 sur la
+victoire la plus serrée possible, 1 sur un balayage, quel que soit le FT/BO.
+
+| Score | Multiplicateur | Cotes égales (500/500) | Outsider 500 bat 900 | Favorite 900 bat 500 |
+| --- | --- | --- | --- | --- |
+| 3-0 | ×1,5 | **+24 / −24** | +44 | +4 (×1,42, amorti) |
+| 3-1 | ×1,25 | +20 / −20 | +36 | +4 (×1,21, amorti) |
+| 3-2 | ×1 | +16 / −16 | +29 | +3 |
+| 2-0 | ×1,5 | +24 / −24 | +44 | +4 |
+| 2-1 | ×1 | +16 / −16 | +29 | +3 |
+| 1-0 (FT1), forfait, sans score | ×1 | +16 / −16 | +29 | +3 |
+
+Les choix :
+
+- **×1 pour la victoire la plus serrée, ×1,5 au plus.** Une demi-fois de plus,
+  pas le double : l'écart de score dit quelque chose du niveau, mais une seule
+  rencontre ne doit pas valoir deux matchs. Conséquence assumée : à cotes
+  égales, un match nettement gagné déplace plus de points qu'avant — c'est la
+  demande.
+- **Symétrique, à somme nulle.** Le multiplicateur entre dans le calcul unique
+  de `ratingTransfer` : le vainqueur prend exactement ce que le perdant rend.
+  Le plancher reste la seule entorse.
+- **Amortisseur d'autocorrélation (méthode de FiveThirtyEight).** La favorite
+  balaie plus souvent **parce qu'elle** est favorite : majorer chacun de ses
+  balayages gonflerait sa cote match après match. Son bonus est réduit selon
+  son avance (×0,85 à 400 points). Un outsider qui balaie garde son bonus
+  entier — jamais au-delà de ×1,5.
+- **Rien n'est majoré quand le score ne dit rien** : FT1 (une seule map, aucun
+  écart possible), **forfait** (`forfeit_team_id` : le score posé n'a pas été
+  joué), match ancien sans score, score incohérent (le vainqueur n'a pas plus
+  de maps). Le transfert est alors exactement celui d'avant.
+- **Le nul ne change pas** : `ratingDrawTransfer` ignore le score.
+
+### Rétroactif
+
+Rien n'étant stocké, la règle s'applique **à tout l'historique** dès le
+déploiement (décision de l'utilisatrice, 2026-10-06) : le rejeu suivant recalcule
+toutes les cotes, aucune action en production. Sur la matrice du seed
+(1 152 matchs, 589 gagnés sans concéder de map, 144 équipes) : 141 cotes
+bougent, de 49 points au plus, et 136 rangs changent — le podium passe de
+Frost Alliance (672) / Cosmic Void / Bracket Team 45 à Bracket Team 33
+(649 → 698) / Bracket Team 45 (653 → 692) / Frost Alliance (672 → 669).
+
+Les **seeds figés** au lancement d'un tournoi (#386, `frozenSeedsOf` /
+`orderByFrozenSeeds`) ne bougent pas : ils sont stockés, pas relus sur la cote.
+Seuls les tirages **à venir** lisent les nouvelles cotes.
+
 ## Les choix, et pourquoi
 
 ### K constant, et non décroissant avec l'expérience
@@ -138,7 +199,8 @@ matchs de ses équipes successives, ne correspondait à aucune cote.
 ### Forfaits
 
 Inchangé depuis les PR #82/#84 : un forfait est une victoire pleine, et compte
-donc comme telle dans le transfert.
+donc comme telle dans le transfert — **sans** majoration de score (le 3-0 posé
+par un forfait n'a pas été joué).
 
 ## Le match nul
 
@@ -311,6 +373,11 @@ toute valeur absente ou inconnue plutôt que de refuser la requête.
   points conservée), le **plancher** et son entorse assumée, le **rejeu**
   (indépendance à l'ordre reçu, dépendance à l'ordre réel, stabilité à
   l'identifiant), l'assiette, l'ordre de tri.
+- `tests/lib/shared/ranking-margin.test.ts` — le multiplicateur par score
+  (3-0, 3-1, 3-2, 2-0, 2-1, FT1, sans score, incohérent), ses bornes,
+  l'amortisseur, le nul inchangé, la somme nulle et le déterminisme du rejeu.
+  `ranking-service.test.ts` vérifie la collecte du score (vu du vainqueur) et
+  l'absence de majoration sur un forfait ou un match sans score.
 - `tests/lib/server/ranking-service.test.ts` couvre aussi le **redatage** : une
   correction qui repousse `updated_at` rejoue le match en dernier, et le
   classement reste une fonction pure de ce que la base contient.
