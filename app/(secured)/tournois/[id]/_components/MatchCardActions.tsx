@@ -80,6 +80,28 @@ const samePlacement = (a: PanelPlacement | null, b: PanelPlacement) =>
   a.maxHeight === b.maxHeight &&
   a.up === b.up;
 
+/**
+ * Porté en fin de page, le panneau n'a pas de « suivant » naturel : la
+ * tabulation qui en sort par un bout le referme et rend le focus au bouton
+ * (`close`). Écoutée sur **chaque bouton** du panneau, pas sur son conteneur :
+ * un `<div>` qui reçoit des touches se présente comme un contrôle qu'il n'est
+ * pas (SonarQube S6848).
+ */
+export function closePanelOnTabOut(
+  e: { key: string; shiftKey: boolean; currentTarget: Element; preventDefault: () => void },
+  panel: ParentNode | null,
+  close: () => void,
+): void {
+  if (e.key !== "Tab") return;
+  const buttons: Element[] = Array.from(panel?.querySelectorAll("button") ?? []);
+  const index = buttons.indexOf(e.currentTarget);
+  if (index === -1) return;
+  if ((e.shiftKey && index === 0) || (!e.shiftKey && index === buttons.length - 1)) {
+    e.preventDefault();
+    close();
+  }
+}
+
 /** Marge entre le panneau et le bord de la fenêtre. */
 const EDGE = 8;
 /** Le panneau mord de 4 px sur le pied, pour s'y rattacher visuellement. */
@@ -384,20 +406,12 @@ export function MatchCardActions({
   const onMenuBlur = (e: { relatedTarget: EventTarget | null }) => {
     if (expanded && focusLeftMenu(menu, e.relatedTarget)) setOpen(false);
   };
-  // Porté en fin de page, le panneau n'a pas de « suivant » naturel : la
-  // tabulation qui en sort par un bout le referme et rend le focus au bouton.
-  // Écoutée sur chaque bouton du panneau, pas sur son conteneur : un `<div>`
-  // qui reçoit des touches se présente comme un contrôle qu'il n'est pas.
-  const onPanelKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (e.key !== "Tab") return;
-    const buttons = Array.from(panelRef.current?.querySelectorAll("button") ?? []);
-    const index = buttons.indexOf(e.currentTarget);
-    if ((e.shiftKey && index === 0) || (!e.shiftKey && index === buttons.length - 1)) {
-      e.preventDefault();
+  // Écoutée sur chaque bouton du panneau (`closePanelOnTabOut`).
+  const onPanelKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) =>
+    closePanelOnTabOut(e, panelRef.current, () => {
       setOpen(false);
       toggleRef.current?.focus();
-    }
-  };
+    });
 
   return (
     <div ref={rootRef} className={styles.root} onBlur={onMenuBlur}>
