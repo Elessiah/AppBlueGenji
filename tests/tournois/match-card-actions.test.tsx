@@ -1,8 +1,8 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MatchCardActions, panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
+import { MatchCardActions, closePanelOnTabOut, panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import type { CastBlock } from "@/lib/shared/match-launch";
 import {
@@ -239,6 +239,36 @@ describe("MatchCardActions — rendu du pied", () => {
   });
 });
 
+describe("closePanelOnTabOut — la tabulation qui sort du panneau le referme", () => {
+  const first = { id: "a" };
+  const middle = { id: "b" };
+  const last = { id: "c" };
+  const panel = { querySelectorAll: () => [first, middle, last] } as unknown as ParentNode;
+  const press = (key: string, shiftKey: boolean, target: object) => {
+    const close = jest.fn();
+    const preventDefault = jest.fn();
+    closePanelOnTabOut({ key, shiftKey, currentTarget: target as Element, preventDefault }, panel, close);
+    return { closed: close.mock.calls.length, prevented: preventDefault.mock.calls.length };
+  };
+
+  it("referme par un bout : Tab sur le dernier, Maj+Tab sur le premier", () => {
+    expect(press("Tab", false, last)).toEqual({ closed: 1, prevented: 1 });
+    expect(press("Tab", true, first)).toEqual({ closed: 1, prevented: 1 });
+  });
+
+  it("laisse circuler à l'intérieur, et ignore les autres touches", () => {
+    expect(press("Tab", false, middle)).toEqual({ closed: 0, prevented: 0 });
+    expect(press("Tab", true, last)).toEqual({ closed: 0, prevented: 0 });
+    expect(press("Enter", false, last)).toEqual({ closed: 0, prevented: 0 });
+  });
+
+  it("ne referme rien sans panneau monté", () => {
+    const close = jest.fn();
+    closePanelOnTabOut({ key: "Tab", shiftKey: false, currentTarget: last as unknown as Element, preventDefault: () => undefined }, null, close);
+    expect(close).not.toHaveBeenCalled();
+  });
+});
+
 describe("panelPlacement — le panneau ouvert reste à l'écran", () => {
   const footer = { top: 300, bottom: 352, left: 100, width: 258 };
 
@@ -317,8 +347,15 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
   it("la tabulation qui sort du pied et du panneau le referme ; par un bout du panneau, rend le focus", () => {
     expect(source).toContain("focusLeftMenu(menu, e.relatedTarget)");
     expect(source).toMatch(
-      /\(e\.shiftKey && index === 0\) \|\| \(!e\.shiftKey && index === buttons\.length - 1\)[\s\S]{0,120}setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);/,
+      /closePanelOnTabOut\(e, panelRef\.current, \(\) => \{\s*setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);/,
     );
+  });
+
+  it("écoute la tabulation sur les boutons du panneau, jamais sur son conteneur (élément non interactif)", () => {
+    expect(source).toContain("onKeyDown={inMenu ? onPanelKeyDown : undefined}");
+    const panel = /<div\s+id=\{panelId\}[\s\S]*?>/.exec(source)?.[0] ?? "";
+    expect(panel).not.toBe("");
+    expect(panel).not.toMatch(/onKey(Down|Up|Press)=/);
   });
 
   it("une action du menu rend le focus au bouton avant de s'exécuter", () => {
