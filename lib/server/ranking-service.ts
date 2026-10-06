@@ -166,15 +166,6 @@ function isoOrEpoch(value: Date | string | null): string {
 }
 
 /**
- * Rencontres comptées du site, prêtes pour le rejeu.
- *
- * La chronologie est celle des fiches et des barres de forme
- * (`COALESCE(m.updated_at, t.finished_at, t.start_at)`) : une seule lecture de
- * « quand ce match a-t-il eu lieu », donc pas deux histoires du site. Le tri
- * final reste posé par `replayRanking`, à qui la règle appartient — l'`ORDER BY`
- * n'est qu'une commodité.
- */
-/**
  * Score en maps d'un match gagné, vu du vainqueur — ou rien quand il ne doit pas
  * peser : un forfait (le score posé n'a pas été joué) ou un match sans score.
  * Le rejeu retombe alors sur le transfert sans majoration.
@@ -189,6 +180,15 @@ function matchMarginOf(row: RankedMatchRow, winnerIsTeam1: boolean): MatchMargin
     : { winnerMaps: team2, loserMaps: team1 };
 }
 
+/**
+ * Rencontres comptées du site, prêtes pour le rejeu.
+ *
+ * La chronologie est celle des fiches et des barres de forme
+ * (`COALESCE(m.updated_at, t.finished_at, t.start_at)`) : une seule lecture de
+ * « quand ce match a-t-il eu lieu », donc pas deux histoires du site. Le tri
+ * final reste posé par `replayRanking`, à qui la règle appartient — l'`ORDER BY`
+ * n'est qu'une commodité.
+ */
 async function loadRankedMatches(
   db: Queryable,
   days: number | undefined,
