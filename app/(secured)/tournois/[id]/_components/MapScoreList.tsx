@@ -11,6 +11,7 @@ import {
   REPLAY_CODE_MAX_LENGTH,
   deriveMatchScore,
   emptyMap,
+  isMapTouched,
   mapFieldKey,
   mapListLimit,
   progressiveMapRows,
@@ -92,6 +93,8 @@ export function MapScoreList({
   const replayHint =
     format && limit > shownLimit ? ` Une map nulle peut être rejouée (${limit - shownLimit} au plus).` : "";
   const score = deriveMatchScore(maps);
+  // Le compteur ne compte que les maps renseignées, pas la ligne vierge ouverte.
+  const played = maps.filter(isMapTouched).length;
   const hintId = `${idPrefix}-map-hint`;
 
   // Clés de ligne stables : retirer la map 2 ne doit pas faire hériter la
@@ -111,17 +114,21 @@ export function MapScoreList({
   // Lignes progressives : la suivante apparaît quand la dernière est complète
   // et que le match n'est pas acquis ; les lignes vierges devenues inutiles
   // s'en vont, les lignes renseignées restent (refusées sur leur champ).
-  const change = (next: MatchMapInput[]) => onChange(progressiveMapRows(format, game, next, minRows));
+  const change = (next: MatchMapInput[]) => {
+    const rows = progressiveMapRows(format, game, next, minRows);
+    // Seule une ligne ajoutée **par l'affichage progressif** s'annonce : une
+    // liste remplacée de l'extérieur (proposition reçue) arrive déjà remplie.
+    autoGrown.current = rows.length > maps.length;
+    onChange(rows);
+  };
 
   // Ligne ajoutée d'elle-même : annoncée poliment, sans déplacer le focus de
   // celui qui tape (une ligne retirée ne s'annonce pas, elle était vierge).
   const [announcement, setAnnouncement] = useState("");
-  const previousLength = useRef(maps.length);
+  const autoGrown = useRef(false);
   useEffect(() => {
-    if (maps.length > previousLength.current && !focusNewRow.current) {
-      setAnnouncement(`Map ${maps.length} ajoutée : à renseigner.`);
-    }
-    previousLength.current = maps.length;
+    if (autoGrown.current && !focusNewRow.current) setAnnouncement(`Map ${maps.length} ajoutée : à renseigner.`);
+    autoGrown.current = false;
   }, [maps.length]);
 
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
@@ -137,13 +144,18 @@ export function MapScoreList({
   // « Retirer » de la ligne qui prend sa place (ou de la dernière), sinon à
   // « Ajouter une map » — jamais au `<body>`, hors de la modale (WCAG 2.4.3).
   const focusAfterRemove = useRef<number | null>(null);
+  // Suit la liste elle-même, pas sa longueur : un retrait suivi d'une ligne
+  // vierge rouverte garde la même longueur, et la cible armée ne doit pas
+  // survivre pour voler le focus plus tard.
   useEffect(() => {
     const target = focusAfterRemove.current;
     if (target === null) return;
     focusAfterRemove.current = null;
-    const id = maps.length > 0 ? `${idPrefix}-map-${Math.min(target, maps.length - 1)}-remove` : `${idPrefix}-map-add`;
-    document.getElementById(id)?.focus();
-  }, [maps.length, idPrefix]);
+    const index = Math.min(target, maps.length - 1);
+    const id = maps.length > 0 ? `${idPrefix}-map-${index}-remove` : `${idPrefix}-map-add`;
+    // Une ligne vierge n'a pas de « Retirer » : le focus va alors à son code.
+    (document.getElementById(id) ?? document.getElementById(mapFieldId(idPrefix, index, "replayCode")))?.focus();
+  }, [maps, idPrefix]);
   const remove = (index: number) => {
     fieldErrors.clear();
     keys.current = keys.current.filter((_, i) => i !== index);
@@ -172,10 +184,14 @@ export function MapScoreList({
     // code puis valider d'un même geste trancherait le match sans relecture.
     <fieldset className={styles.list} disabled={disabled} onKeyDown={keepEnterInList}>
       <legend className={styles.legend}>
-        Maps jouées <span className={styles.limit}>({maps.length}/{Math.max(shownLimit, maps.length)})</span>
+        Maps jouées{" "}
+        <span className={styles.limit}>
+          ({played}/{Math.max(shownLimit, played)})
+        </span>
       </legend>
       <p id={hintId} className={styles.hint}>
-        {replayCodeHint(game)} Une map nulle ne rapporte de point à personne.{replayHint}
+        {replayCodeHint(game)} Une map nulle ne rapporte de point à personne.
+        {replayHint}
       </p>
 
       {maps.length > 0 && (
@@ -189,7 +205,9 @@ export function MapScoreList({
             const t2Id = mapFieldId(idPrefix, index, "team2Score");
             return (
               <li key={keys.current[index]} className={styles.row}>
-                <span className={styles.mapLabel} aria-hidden="true">Map {index + 1}</span>
+                <span className={styles.mapLabel} aria-hidden="true">
+                  Map {index + 1}
+                </span>
                 {/* Chaque nom de champ porte le numéro de map (masqué à l'œil) : sur
                     cinq lignes, « Code de replay » seul ne dirait pas laquelle. La
                     phrase d'erreur reste hors du `<label>`, sans quoi elle entrerait
@@ -220,7 +238,8 @@ export function MapScoreList({
                   <label className={styles.fieldLabel} htmlFor={t1Id} title={team1Name}>
                     {team1Id !== null && <EntrantLogo teamId={team1Id} name={team1Name} size={16} />}
                     <span className={styles.fieldLabelText}>
-                      <span className="sr-only">Map {index + 1}, score de </span>{team1Name}
+                      <span className="sr-only">Map {index + 1}, score de </span>
+                      {team1Name}
                     </span>
                   </label>
                   <NumberInput
@@ -242,7 +261,8 @@ export function MapScoreList({
                   <label className={styles.fieldLabel} htmlFor={t2Id} title={team2Name}>
                     {team2Id !== null && <EntrantLogo teamId={team2Id} name={team2Name} size={16} />}
                     <span className={styles.fieldLabelText}>
-                      <span className="sr-only">Map {index + 1}, score de </span>{team2Name}
+                      <span className="sr-only">Map {index + 1}, score de </span>
+                      {team2Name}
                     </span>
                   </label>
                   <NumberInput
@@ -260,16 +280,21 @@ export function MapScoreList({
                   />
                   <FieldErrorText fieldId={t2Id} message={fieldErrors.message(t2Key)} />
                 </div>
-                <button
-                  id={`${idPrefix}-map-${index}-remove`}
-                  type="button"
-                  className={styles.remove}
-                  onClick={() => remove(index)}
-                  aria-label={`Retirer la map ${index + 1}`}
-                  title={`Retirer la map ${index + 1}`}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
+                {/* Rien à retirer d'une ligne vierge (elle reviendrait aussitôt) ;
+                    l'arbitrage garde le retrait de sa ligne unique, pour revenir
+                    au score à la main. */}
+                {(isMapTouched(map) || (minRows === 0 && maps.length === 1)) && (
+                  <button
+                    id={`${idPrefix}-map-${index}-remove`}
+                    type="button"
+                    className={styles.remove}
+                    onClick={() => remove(index)}
+                    aria-label={`Retirer la map ${index + 1}`}
+                    title={`Retirer la map ${index + 1}`}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                )}
               </li>
             );
           })}
