@@ -62,14 +62,9 @@ export async function replaceMatchMaps(
  * s'interbloquer, ce que le report d'un engagé rattrape en rejouant sa
  * transaction (`reportMatchScorePublic`).
  */
-async function clearMatchMaps(
-  connection: PoolConnection,
-  matchId: number,
-  source: MatchMapSource,
-  locking = true,
-): Promise<void> {
+async function clearMatchMaps(connection: PoolConnection, matchId: number, source: MatchMapSource): Promise<void> {
   const result = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1${locking ? " FOR UPDATE" : ""}`,
+    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE`,
     [matchId, source],
   );
   const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];
@@ -113,25 +108,46 @@ export async function promoteReportedMaps(
   // expiré (l'entretien tourne à chaque écriture et à chaque chargement) a déjà
   // promu la proposition puis l'a effacée. Sans cette garde, la seconde
   // effaçait le détail retenu par la première sans rien remettre.
-  const pending = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE`,
+  const pending = await connection.execute<(RowDataPacket & { map_number: number })[]>(
+    `SELECT map_number FROM bg_match_maps WHERE match_id = ? AND source = ? FOR UPDATE`,
     [matchId, from],
   );
   const rows = Array.isArray(pending) && Array.isArray(pending[0]) ? pending[0] : [];
   if (rows.length === 0) return;
-  // `FINAL` lu sans verrou : sur un intervalle vide, un verrou y poserait un
-  // verrou d'intervalle sur un chemin (l'entretien) qui ne rejoue pas ses
-  // transactions. La course qu'il couvrirait est fermée en amont : le report
-  // ici promu appartient à un match verrouillé et relu (`finalization.ts`).
-  await clearMatchMaps(connection, matchId, "FINAL", false);
+  // Écrasement **par la clé unique** plutôt qu'un effacement préalable : un
+  // `FINAL` qu'un arbitre vient de valider sur ce match peut échapper à
+  // l'instantané de la transaction (pris avant le verrou du match), et une
+  // insertion simple heurterait alors `uq_bg_match_maps_slot` — un 500 qu'aucun
+  // rejeu ne rattrape. `ON DUPLICATE KEY UPDATE` voit la dernière version.
   await connection.execute(
     `INSERT INTO bg_match_maps
        (match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at)
      SELECT match_id, 'FINAL', map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at
      FROM bg_match_maps
-     WHERE match_id = ? AND source = ?`,
+     WHERE match_id = ? AND source = ?
+     ON DUPLICATE KEY UPDATE
+       replay_code = VALUES(replay_code),
+       team1_score = VALUES(team1_score),
+       team2_score = VALUES(team2_score),
+       submitted_by_user_id = VALUES(submitted_by_user_id),
+       submitted_at = VALUES(submitted_at)`,
     [matchId, from],
   );
+  // Un `FINAL` plus long que la proposition garderait des maps en trop :
+  // effacées si une lecture sans verrou en voit (pas de verrou d'intervalle sur
+  // l'entretien, qui ne rejoue pas). Un reste invisible à l'instantané ne
+  // s'afficherait pas : le détail ne s'affiche que s'il explique le score.
+  const extra = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = 'FINAL' AND map_number > ? LIMIT 1`,
+    [matchId, rows.length],
+  );
+  const extraRows = Array.isArray(extra) && Array.isArray(extra[0]) ? extra[0] : [];
+  if (extraRows.length > 0) {
+    await connection.execute(
+      `DELETE FROM bg_match_maps WHERE match_id = ? AND source = 'FINAL' AND map_number > ?`,
+      [matchId, rows.length],
+    );
+  }
 }
 
 /**

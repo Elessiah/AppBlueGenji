@@ -193,7 +193,7 @@ describe("tournaments-service: match state machine", () => {
           ];
         }
         // Une proposition map par map existe (le report vient de l'écrire).
-        if (q.startsWith("SELECT 1 FROM bg_match_maps")) return [[{ found: 1 }], []];
+        if (q.startsWith("SELECT map_number FROM bg_match_maps")) return [[{ map_number: 1 }], []];
         if (q.startsWith("UPDATE bg_matches SET team1_report_score")) {
           [row.team1_report_score, row.team1_report_opponent_score] = params as number[];
         }
