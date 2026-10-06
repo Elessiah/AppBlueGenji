@@ -1,6 +1,6 @@
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import type { TournamentFormat } from "@/lib/shared/types";
-import { rulesHrefForFormat, ruleModeForFormat } from "@/lib/shared/tournament-rules";
+import { RULE_MODE_LABELS_FR, rulesHrefForFormat } from "@/lib/shared/rule-mode-definitions";
 import { rulesHrefWithTournament } from "@/lib/shared/tournament-settings";
 
 /**
@@ -20,8 +20,8 @@ export function RulesHelpFab({
 }>) {
   const baseHref = format ? rulesHrefForFormat(format) : "/regles";
   const href = format && tournamentId ? rulesHrefWithTournament(baseHref, tournamentId) : baseHref;
-  const mode = format ? ruleModeForFormat(format) : null;
-  const baseLabel = mode ? `Règles du mode ${mode.label}` : "Règles des tournois";
+  const modeLabel = format ? RULE_MODE_LABELS_FR[format] : undefined;
+  const baseLabel = modeLabel ? `Règles du mode ${modeLabel}` : "Règles des tournois";
   const label = contextLabel ? `${baseLabel} — ${contextLabel}` : baseLabel;
 
   return (

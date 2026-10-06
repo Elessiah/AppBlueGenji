@@ -16,9 +16,10 @@
  * (`components/rules/RuleText.tsx`).
  *
  * Module `shared` : importable côté serveur comme côté client. Seul le
- * français y est importé (le bouton d'aide des pages de tournoi, client et pas
- * encore traduit, lit {@link TOURNAMENT_RULE_MODES}) ; l'anglais n'est lu que
- * par le serveur (`messagesFor`).
+ * français y est importé (exports `TOURNAMENT_RULE_MODES` / `COMMON_RULES`) ;
+ * l'anglais n'est lu que par le serveur (`messagesFor`). Un composant client
+ * qui n'a besoin que de la structure importe `rule-mode-definitions.ts`, sans
+ * texte — c'est le cas du bouton d'aide des pages de tournoi.
  */
 import frRules from "@/messages/fr/rules.json";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
@@ -29,12 +30,9 @@ import { MIN_MINUTES_PER_REPORTED_MAP } from "./score-report-deadline";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "./match-launch";
 import { RANKING_BASE_POINTS } from "./ranking";
 import type { TournamentFormat } from "./types";
+import { RULE_MODE_DEFINITIONS, type RuleModeDefinition } from "./rule-mode-definitions";
 
-/** `SOON` = mode décrit mais pas encore ouvert à la création. */
-export type RuleStatus = "AVAILABLE" | "SOON";
-
-/** Identifiant du schéma illustrant le mode (rendu par `components/rules`). */
-export type RuleDiagram = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI" | "BG_SURVIE";
+export * from "./rule-mode-definitions";
 
 /** Messages de l'espace `rules`, dans une langue. */
 export type RulesMessages = Messages["rules"];
@@ -49,15 +47,6 @@ export type RuleSection = {
   bullets?: string[];
 };
 
-/** Ce qui ne dépend pas de la langue : l'adresse, le format, l'état, le schéma. */
-export type RuleModeDefinition = {
-  /** Segment d'URL : `/regles/<slug>` — le même en anglais (`/en/regles/<slug>`). */
-  slug: string;
-  format: TournamentFormat;
-  status: RuleStatus;
-  diagram: RuleDiagram;
-};
-
 export type TournamentRuleMode = RuleModeDefinition & {
   label: string;
   tagline: string;
@@ -68,16 +57,6 @@ export type TournamentRuleMode = RuleModeDefinition & {
   diagramCaption: string;
   sections: RuleSection[];
 };
-
-/** Les modes, dans l'ordre d'affichage. Leurs textes : `rules.modes.<FORMAT>`. */
-export const RULE_MODE_DEFINITIONS: readonly RuleModeDefinition[] = [
-  { slug: "elimination-simple", format: "SINGLE", status: "AVAILABLE", diagram: "SINGLE" },
-  { slug: "double-elimination", format: "DOUBLE", status: "AVAILABLE", diagram: "DOUBLE" },
-  { slug: "bluegenji-survie", format: "BG_SURVIE", status: "AVAILABLE", diagram: "BG_SURVIE" },
-  { slug: "survie", format: "SURVIVAL", status: "AVAILABLE", diagram: "SURVIVAL" },
-  { slug: "ronde-suisse", format: "SWISS", status: "AVAILABLE", diagram: "SWISS" },
-  { slug: "multi-phases", format: "MULTI", status: "AVAILABLE", diagram: "MULTI" },
-];
 
 /** Les modes avec leurs textes dans une langue (messages de l'espace `rules`). */
 export function localizedRuleModes(messages: RulesMessages): TournamentRuleMode[] {
@@ -135,16 +114,7 @@ export function ruleModeBySlug(
   return modes.find((m) => m.slug === slug) ?? null;
 }
 
-/**
- * Résout un mode depuis le format stocké en base — utilisé par le bouton d'aide
- * flottant des pages de tournoi.
- */
+/** Résout un mode (textes français compris) depuis le format stocké en base. */
 export function ruleModeForFormat(format: TournamentFormat): TournamentRuleMode | null {
   return TOURNAMENT_RULE_MODES.find((m) => m.format === format) ?? null;
-}
-
-/** URL des règles d'un format, ou l'index si le format est inconnu. */
-export function rulesHrefForFormat(format: TournamentFormat): string {
-  const definition = RULE_MODE_DEFINITIONS.find((m) => m.format === format);
-  return definition ? `/regles/${definition.slug}` : "/regles";
 }
