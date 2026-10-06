@@ -265,7 +265,9 @@ le tait.
   puis blocage du score. Sous un forfait ou une saisie fermée, la liste masquée ne refuse plus rien
   (ses maps ne partent pas) ; un refus qui désigne une ligne vierge ajoutée
   n'affiche aucune phrase (`refusalOnTouchedRow`, les deux modales), et toute
-  saisie dans la liste lève les refus affichés.
+  saisie dans la liste lève les refus affichés. Un refus de map ne rouvre
+  jamais un bouton fermé pour une autre raison (résultat déjà tranché, double
+  forfait, saisie fermée) : c'est cette raison qui s'affiche.
   Les champs d'une ligne s'alignent en haut : une erreur sous un champ n'allonge
   que sa colonne. Sur un résultat déjà validé, une map refusée se désigne
   **avant** la confirmation de correction, qui couvrirait sinon le champ.
