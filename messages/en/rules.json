@@ -165,7 +165,7 @@
     {
       "title": "Match format",
       "body": [
-        "The match format (Bo — maximum number of maps — or FT — number of maps to win) is set when the tournament is created and applies to the whole tournament. Without a setting, the score is free."
+        "The match format (Bo — maximum number of maps — or FT — number of maps to win) is set when the tournament is created and applies to the whole tournament. Without a setting, any score can be entered (free score entry)."
       ],
       "bullets": [
         "A score that exceeds the format, or that names no winner when the format requires one, is rejected on entry.",
@@ -473,7 +473,7 @@
         "Each round, teams are paired in adjacent pairs from the standings: 1 vs 2, 3 vs 4, 5 vs 6…",
         "At regular intervals, the bottom two teams in the standings are eliminated, until there's a champion. Not to be confused with <b>BlueGenji's Survival</b>, where each team is out when its endurance pool is empty, with no cut."
       ],
-      "diagramCaption": "The standings are replayed every round; the pink zone is the cut zone.",
+      "diagramCaption": "The standings are recalculated every round; the pink zone is the cut zone.",
       "sections": [
         {
           "title": "Starting standings",
