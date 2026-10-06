@@ -227,7 +227,7 @@ export function AdminScoreDialog({
   // geste délibéré.
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
-    if (form.decision.canResolve && !form.submitting) void run("resolve");
+    if ((form.decision.canResolve || form.mapsRefused.resolve) && !form.submitting) void run("resolve");
   };
 
   const toggleForfeit = (teamId: number | null) => {
@@ -489,7 +489,7 @@ export function AdminScoreDialog({
               type="button"
               className="btn ghost"
               onClick={() => void run("save")}
-              disabled={!form.decision.canSave || form.submitting}
+              disabled={(!form.decision.canSave && !form.mapsRefused.save) || form.submitting}
               title={
                 form.decision.saveBlocker
                   ? scoreBlockerMessage(form.decision.saveBlocker, matchFormat)
@@ -501,7 +501,7 @@ export function AdminScoreDialog({
             <button
               type="submit"
               className="btn"
-              disabled={!form.decision.canResolve || form.submitting}
+              disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting}
               title={
                 form.decision.resolveBlocker
                   ? scoreBlockerMessage(form.decision.resolveBlocker, matchFormat)

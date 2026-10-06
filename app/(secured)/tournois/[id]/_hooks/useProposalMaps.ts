@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { proposalsNeedRefresh, withProposalMaps } from "@/lib/shared/player-score-report";
 import type { BracketMatch, MatchProposalMaps } from "@/lib/shared/types";
+
+/** Relectures au plus pour une même proposition, et leur espacement. */
+const PROPOSAL_REFRESH_ATTEMPTS = 3;
+const PROPOSAL_REFRESH_DELAY_MS = 4000;
 
 /**
  * Le match, propositions complétées de leur détail map par map
@@ -26,22 +30,24 @@ export function useProposalMaps(
 ): BracketMatch {
   const match = useMemo(() => withProposalMaps(liveMatch, proposals), [liveMatch, proposals]);
   const needsRefresh = canRead && proposalsNeedRefresh(liveMatch, proposals);
-  const refreshAsked = useRef<string | null>(null);
-  const inFlight = useRef(false);
   const reportsKey = `${liveMatch.team1Report?.reportedAt ?? ""}|${liveMatch.team2Report?.reportedAt ?? ""}`;
   useEffect(() => {
-    if (!needsRefresh || inFlight.current || refreshAsked.current === reportsKey) return;
-    inFlight.current = true;
-    // Notée faite **une fois aboutie** : une relecture échouée (coupure réseau)
-    // se retente au rendu suivant, sans quoi « Confirmer » resterait hors d'atteinte.
-    Promise.resolve(onRefresh())
-      .then(() => {
-        refreshAsked.current = reportsKey;
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        inFlight.current = false;
-      });
+    if (!needsRefresh) return;
+    // Une relecture, puis au plus deux nouvelles tentatives espacées tant que le
+    // détail manque : la lecture REST avale ses échecs (coupure réseau), seul
+    // le détail arrivé dit qu'elle a abouti — il fait alors tomber
+    // `needsRefresh`, et le nettoyage arrête les tentatives.
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const attempt = () => {
+      tries += 1;
+      void Promise.resolve(onRefresh()).catch(() => undefined);
+      if (tries < PROPOSAL_REFRESH_ATTEMPTS) timer = setTimeout(attempt, PROPOSAL_REFRESH_DELAY_MS);
+    };
+    attempt();
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+    };
   }, [needsRefresh, reportsKey, onRefresh]);
   return match;
 }

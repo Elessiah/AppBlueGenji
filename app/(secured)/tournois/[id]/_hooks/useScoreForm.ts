@@ -161,17 +161,19 @@ export function useScoreForm(
   const submit = async (action: "save" | "resolve") => {
     if (!match) return false;
 
+    // Les maps se jugent par la règle du report d'équipe : un résultat validé
+    // doit décrire un match terminé, un enregistrement seulement rester dans
+    // les limites. Un forfait les écarte. **Avant** le contrôle du score : une
+    // map au score vide ou au code manquant doit être désignée à son champ,
+    // pas noyée dans « score incomplet » sur le score qui en dérive.
+    const sendMaps = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;
+    const decisive = action === "resolve";
+    if (sendMaps && refuseMaps(decisive)) return false;
     const blocker = action === "save" ? decision.saveBlocker : decision.resolveBlocker;
     if (blocker) {
       showError(scoreBlockerMessage(blocker, matchFormat));
       return false;
     }
-    // Les maps se jugent par la règle du report d'équipe : un résultat validé
-    // doit décrire un match terminé, un enregistrement seulement rester dans
-    // les limites. Un forfait les écarte.
-    const sendMaps = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;
-    const decisive = action === "resolve";
-    if (sendMaps && refuseMaps(decisive)) return false;
 
     setSubmitting(true);
     try {
@@ -217,6 +219,15 @@ export function useScoreForm(
     score2: state.score2,
     maps,
     setMaps: updateMaps,
+    /**
+     * Une map est refusée (code manquant, score vide…) : le bouton reste
+     * actionnable pour que l'envoi **désigne** le champ fautif, au lieu d'un
+     * bouton grisé sur « score incomplet » (`refuseMaps`).
+     */
+    mapsRefused: {
+      save: maps.length > 0 && checkMapList(matchFormat, game, maps, { decisive: false }).error !== null,
+      resolve: maps.length > 0 && checkMapList(matchFormat, game, maps, { decisive: true }).error !== null,
+    },
     game,
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,

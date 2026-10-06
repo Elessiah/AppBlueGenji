@@ -88,6 +88,24 @@ describe("détail map par map — champs vides", () => {
   });
 });
 
+describe("détail map par map — arbitrage et relecture", () => {
+  it("le refus d'une map passe avant « score incomplet », et le bouton reste actionnable pour le désigner", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook.indexOf("if (sendMaps && refuseMaps(decisive)) return false;")).toBeLessThan(
+      hook.indexOf("const blocker = action === \"save\" ? decision.saveBlocker : decision.resolveBlocker;"),
+    );
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    expect(dialog).toContain("disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting}");
+  });
+
+  it("la relecture du détail adverse se retente tant qu'il manque, au plus trois fois", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useProposalMaps.ts");
+    expect(hook).toContain("const PROPOSAL_REFRESH_ATTEMPTS = 3;");
+    expect(hook).toMatch(/if \(tries < PROPOSAL_REFRESH_ATTEMPTS\) timer = setTimeout\(attempt, PROPOSAL_REFRESH_DELAY_MS\);/);
+    expect(hook).toContain("if (timer !== null) clearTimeout(timer);");
+  });
+});
+
 describe("détail map par map — noms accessibles", () => {
   it("chaque champ nomme sa map, et la phrase d'erreur reste hors du label", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
