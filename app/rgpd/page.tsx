@@ -355,8 +355,8 @@ export default async function RgpdPage() {
             Depuis octobre 2026, un score se saisit <strong>map par map</strong> : chaque map
             porte le <strong>code de replay</strong> de la partie, qui permet de la revoir en
             jeu — et donc d'y lire les identifiants de jeu des joueurs présents. Ces codes
-            sont visibles des membres connectés du site sur la fiche du tournoi une fois le
-            résultat retenu — tant qu'une proposition attend, seules les deux équipes du match
+            sont visibles des membres connectés du site sur la fiche du tournoi une fois
+            enregistrés par l'arbitrage ou retenus comme résultat — tant qu'une proposition d'équipe attend, seules les deux équipes du match
             et l'arbitrage la lisent —, et gardés avec le
             résultat qu'ils documentent ; le compte qui les a saisis n'est lié qu'en interne,
             et ce lien disparaît à la suppression du compte.

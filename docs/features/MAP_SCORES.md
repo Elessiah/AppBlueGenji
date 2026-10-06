@@ -190,7 +190,8 @@ le tait.
 
 ### Affichage
 
-- `attachMatchMaps` pose le détail **retenu** sur l'instantané commun : **une
+- `attachMatchMaps` pose le détail **retenu ou noté par l'arbitrage** (une sauvegarde
+  « Enregistrer » en cours de série est publique, comme son score) sur l'instantané commun : **une
   seule porte de données**, servie à l'identique par le flux SSE et par le REST
   de secours (le détail des propositions, lui, passe par le contexte du
   lecteur — voir ci-dessus).
