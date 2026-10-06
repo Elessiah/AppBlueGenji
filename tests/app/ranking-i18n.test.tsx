@@ -193,6 +193,9 @@ describe("rendu anglais — aucune phrase française sous /en/classement", () =>
     expect(html).toContain('data-label="D"');
     expect(text).toContain("Up 2 over 7 days");
     expect(text).toContain("Down 4 over 7 days");
+    // Tendance « 7-day », jamais « 7d » : mis en capitales, « 7D » se lirait « 7 nuls » à côté de la colonne D.
+    expect(html).toContain('data-label="7-day"');
+    expect(html).not.toMatch(/>7d<|"7d"/);
     expect(text).toContain("Top of the ranking");
     expect(text).toContain("20 pts behind the leader");
     expect(text).toContain("1st place");
