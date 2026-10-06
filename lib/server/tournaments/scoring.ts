@@ -506,7 +506,10 @@ export async function reportMatchScore(
 
   // La proposition map par map, à côté de ses colonnes de score : c'est elle
   // que l'adversaire confirme d'un clic, et elle qui devient le résultat retenu.
-  await replaceMatchMaps(connection, matchId, reporterSource, maps, userId);
+  // Premier report de l'engagée (ligne du match verrouillée) : aucune ligne à
+  // effacer, donc pas de lecture verrouillante sur un intervalle vide.
+  const hadReport = (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;
+  await replaceMatchMaps(connection, matchId, reporterSource, maps, userId, { knownEmpty: !hadReport });
 
   const [updatedRows] = await connection.execute<MatchRow[]>(
     `SELECT

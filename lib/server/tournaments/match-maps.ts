@@ -26,15 +26,26 @@ type MapRow = RowDataPacket & {
   submitted_at?: Date | string | null;
 };
 
-/** Remplace le jeu de maps `source` d'un match. Une liste vide l'efface. */
+/**
+ * Remplace le jeu de maps `source` d'un match. Une liste vide l'efface.
+ *
+ * `knownEmpty` : l'appelant sait, par la ligne du match **verrouillée**, que le
+ * jeu n'existe pas (premier report d'une engagée — ses lignes n'existent
+ * qu'avec ses colonnes de report). La lecture verrouillante de `clearMatchMaps`
+ * poserait alors un verrou d'intervalle sur un intervalle vide, que partagent
+ * tous les matchs sans proposition : deux premiers reports simultanés sur des
+ * matchs voisins s'interbloquaient presque à coup sûr. L'insertion seule ne
+ * prend que des verrous d'intention d'insertion, compatibles entre eux.
+ */
 export async function replaceMatchMaps(
   connection: PoolConnection,
   matchId: number,
   source: MatchMapSource,
   maps: ReadonlyArray<MatchMapInput>,
   userId: number | null,
+  options: { knownEmpty?: boolean } = {},
 ): Promise<void> {
-  await clearMatchMaps(connection, matchId, source);
+  if (!options.knownEmpty) await clearMatchMaps(connection, matchId, source);
   if (maps.length === 0) return;
   const placeholders = maps.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ");
   const values = maps.flatMap((map, index) => [
@@ -49,9 +60,18 @@ export async function replaceMatchMaps(
   await connection.execute(
     `INSERT INTO bg_match_maps
        (match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id)
-     VALUES ${placeholders}`,
+     VALUES ${placeholders}
+     ON DUPLICATE KEY UPDATE
+       replay_code = VALUES(replay_code),
+       team1_score = VALUES(team1_score),
+       team2_score = VALUES(team2_score),
+       submitted_by_user_id = VALUES(submitted_by_user_id),
+       submitted_at = CURRENT_TIMESTAMP`,
     values,
   );
+  // `ON DUPLICATE KEY UPDATE` : une ligne restée là malgré `knownEmpty` (reste
+  // d'une clôture concurrente, jamais affiché) est écrasée au lieu de heurter
+  // la clé unique en 500.
 }
 
 /**
