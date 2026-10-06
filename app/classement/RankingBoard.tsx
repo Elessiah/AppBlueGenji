@@ -11,6 +11,7 @@ import {
   rankingFilterHref,
   rankingMoreHref,
   rankingRowId,
+  splitRankingPodium,
   type RankingGameFilter,
 } from "@/lib/shared/ranking-page";
 import { RankingMore } from "./RankingMore";
@@ -87,11 +88,20 @@ export function podiumGapText(rows: readonly { points: number }[], index: number
   return `À ${leaderGap} pts de la tête${above}`;
 }
 
-function Podium({ rows }: Readonly<{ rows: readonly LandingLeaderboardRow[] }>) {
+/**
+ * Le podium porte aussi la forme et la tendance de ses trois équipes : elles
+ * n'ont plus de ligne au tableau (qui commence à la 4e place), et ces deux
+ * repères ne doivent pas disparaître avec.
+ */
+function Podium({
+  rows,
+  forms,
+}: Readonly<{ rows: readonly LandingLeaderboardRow[]; forms: RankingBoardProps["forms"] }>) {
   const top = rows.slice(0, 3);
   return (
     <ol className={styles.podium} aria-label="Podium">
       {top.map((row, index) => {
+        const trend = trendText(row);
         return (
           <li key={row.teamId} className={styles.podiumCard} data-place={index + 1}>
             <div className={styles.podiumGlow} aria-hidden="true" />
@@ -123,6 +133,13 @@ function Podium({ rows }: Readonly<{ rows: readonly LandingLeaderboardRow[] }>) 
                 </>
               ) : null}
             </p>
+            <p className={styles.podiumMeta}>
+              {forms !== null ? <FormStrip form={forms.get(row.teamId) ?? []} /> : null}
+              <span className={`${styles.trend} ${trend.className}`}>
+                <span aria-hidden="true">{trend.symbol}</span>
+                <span className="sr-only">{trend.label}</span>
+              </span>
+            </p>
             <p className={styles.podiumGap}>{podiumGapText(rows, index)}</p>
           </li>
         );
@@ -131,9 +148,82 @@ function Podium({ rows }: Readonly<{ rows: readonly LandingLeaderboardRow[] }>) 
   );
 }
 
+type RankingTableProps = {
+  rows: readonly LandingLeaderboardRow[];
+  forms: RankingBoardProps["forms"];
+  showDraws: boolean;
+  /** Le podium précède le tableau : son libellé dit où il commence. */
+  afterPodium: boolean;
+};
+
+/** Le tableau des lignes hors podium — rangs absolus, une ligne par équipe. */
+function RankingTable({ rows, forms, showDraws, afterPodium }: Readonly<RankingTableProps>) {
+  const showForm = forms !== null;
+  return (
+    <div
+      className={styles.table}
+      role="table"
+      aria-label={
+        afterPodium
+          ? "Tableau du classement des équipes, à partir de la 4e place"
+          : "Tableau du classement des équipes"
+      }
+      data-draws={showDraws ? "true" : undefined}
+      data-form={showForm ? "true" : undefined}
+    >
+      <div className={`${styles.row} ${styles.head}`} role="row">
+        <span role="columnheader">Rang</span>
+        <span role="columnheader">Équipe</span>
+        <span role="columnheader">Cote</span>
+        <span role="columnheader">V</span>
+        <span role="columnheader">D</span>
+        {showDraws ? <span role="columnheader">N</span> : null}
+        {showForm ? <span role="columnheader">Forme</span> : null}
+        <span role="columnheader">7 jours</span>
+      </div>
+      {rows.map((row) => {
+        const trend = trendText(row);
+        return (
+          <div
+            key={row.teamId}
+            id={rankingRowId(row.rank)}
+            tabIndex={-1}
+            className={styles.row}
+            role="row"
+            data-place={row.rank <= 3 ? row.rank : undefined}>
+            <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
+            <span className={styles.team} role="cell">
+              <TeamSigil label={row.teamName.charAt(0)} size={32} logoUrl={row.logoUrl} />
+              <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
+                {row.teamName}
+              </TeamLink>
+            </span>
+            <span className={styles.points} role="cell" data-label="Cote">{row.points}</span>
+            <span className={styles.wins} role="cell" data-label="V">{row.wins}</span>
+            <span className={lossClass(row.losses)} role="cell" data-label="D">{row.losses}</span>
+            {showDraws ? (
+              <span className={styles.neutral} role="cell" data-label="N">{row.draws}</span>
+            ) : null}
+            {showForm ? (
+              <span className={styles.formCell} role="cell" data-label="Forme">
+                <FormStrip form={forms.get(row.teamId) ?? []} />
+              </span>
+            ) : null}
+            <span className={`${styles.trend} ${trend.className}`} role="cell" data-label="7 j">
+              <span aria-hidden="true">{trend.symbol}</span>
+              <span className="sr-only">{trend.label}</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Le classement : pastilles de jeu, podium des trois premières, puis le
- * tableau des lignes affichées (`?n=`, par pages de `RANKING_PAGE_SIZE`) et
+ * tableau des lignes suivantes — à partir de la 4e place, sans répéter le
+ * podium (`?n=` compte les rangs, par pages de `RANKING_PAGE_SIZE`) — et
  * « Afficher plus ». Composant serveur, sans état : tout se lit dans
  * l'adresse et s'affiche sans JavaScript.
  */
@@ -146,7 +236,8 @@ export function RankingBoard({
   anyDraws,
 }: Readonly<RankingBoardProps>) {
   const showDraws = anyDraws ?? rows.some((row) => row.draws > 0);
-  const showForm = forms !== null;
+  // Le tableau commence à la 4e place dès qu'il y a un podium : pas de doublon.
+  const { podium, table } = splitRankingPodium(rows);
 
   return (
     <>
@@ -172,61 +263,10 @@ export function RankingBoard({
         </p>
       ) : (
         <>
-          {rows.length >= 3 ? <Podium rows={rows} /> : null}
-
-          <div
-            className={styles.table}
-            role="table"
-            aria-label="Tableau du classement des équipes"
-            data-draws={showDraws ? "true" : undefined}
-            data-form={showForm ? "true" : undefined}
-          >
-            <div className={`${styles.row} ${styles.head}`} role="row">
-              <span role="columnheader">Rang</span>
-              <span role="columnheader">Équipe</span>
-              <span role="columnheader">Cote</span>
-              <span role="columnheader">V</span>
-              <span role="columnheader">D</span>
-              {showDraws ? <span role="columnheader">N</span> : null}
-              {showForm ? <span role="columnheader">Forme</span> : null}
-              <span role="columnheader">7 jours</span>
-            </div>
-            {rows.map((row) => {
-              const trend = trendText(row);
-              return (
-                <div
-                  key={row.teamId}
-                  id={rankingRowId(row.rank)}
-                  tabIndex={-1}
-                  className={styles.row}
-                  role="row"
-                  data-place={row.rank <= 3 ? row.rank : undefined}>
-                  <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
-                  <span className={styles.team} role="cell">
-                    <TeamSigil label={row.teamName.charAt(0)} size={32} logoUrl={row.logoUrl} />
-                    <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
-                      {row.teamName}
-                    </TeamLink>
-                  </span>
-                  <span className={styles.points} role="cell" data-label="Cote">{row.points}</span>
-                  <span className={styles.wins} role="cell" data-label="V">{row.wins}</span>
-                  <span className={lossClass(row.losses)} role="cell" data-label="D">{row.losses}</span>
-                  {showDraws ? (
-                    <span className={styles.neutral} role="cell" data-label="N">{row.draws}</span>
-                  ) : null}
-                  {showForm ? (
-                    <span className={styles.formCell} role="cell" data-label="Forme">
-                      <FormStrip form={forms.get(row.teamId) ?? []} />
-                    </span>
-                  ) : null}
-                  <span className={`${styles.trend} ${trend.className}`} role="cell" data-label="7 j">
-                    <span aria-hidden="true">{trend.symbol}</span>
-                    <span className="sr-only">{trend.label}</span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          {podium.length > 0 ? <Podium rows={podium} forms={forms} /> : null}
+          {table.length > 0 ? (
+            <RankingTable rows={table} forms={forms} showDraws={showDraws} afterPodium={podium.length > 0} />
+          ) : null}
           {/* Remonté à chaque onglet : un « Afficher plus » resté en vol ne
               déplace pas le focus sur le classement d'un autre jeu. */}
           <RankingMore
