@@ -26,6 +26,7 @@ import {
   playerReportInitialMaps,
   enteredScoreRelation,
   playerReportView,
+  proposalsNeedRefresh,
   toReporterScores,
 } from "@/lib/shared/player-score-report";
 import { useProposalMaps } from "../_hooks/useProposalMaps";
@@ -111,6 +112,29 @@ function deadlineText(iso: string | null): string | null {
  * joueur vers ce geste. Il s'offre avant même le lancement — l'équipe qui ne
  * pourra pas se présenter le sait avant le coup d'envoi.
  */
+/** Détail adverse en lecture — seulement pour qui peut le lire (`canReportScore`). */
+function proposalDetailLoading(
+  canRead: boolean,
+  match: BracketMatch,
+  proposals: ReadonlyArray<MatchProposalMaps>,
+): boolean {
+  return canRead && proposalsNeedRefresh(match, proposals);
+}
+
+/** Phrase d'état quand l'adversaire a proposé un score, selon le détail reçu. */
+function theirsPendingStatus(opponentName: string, theirs: MatchScoreReport, detailLoading: boolean): string {
+  const proposed = `${opponentName} propose ${scoreText(theirs)}`;
+  if ((theirs.maps ?? []).length > 0) {
+    return `${proposed}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.`;
+  }
+  // Détail encore en lecture (proposition arrivée par le flux) : ne pas
+  // inviter à ressaisir ce qui va pré-remplir le formulaire.
+  if (detailLoading) return `${proposed}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas.`;
+  // Sans détail (proposition antérieure aux maps, ou détail introuvable), le
+  // formulaire s'ouvre vide : « Confirme-le » laisserait sans geste.
+  return `${proposed}, sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay : un désaccord alerte l'arbitrage.`;
+}
+
 export function PlayerScoreDialog({
   tournamentId,
   match: liveMatch,
@@ -125,6 +149,7 @@ export function PlayerScoreDialog({
   // Les propositions complétées de leur détail : la modale s'ouvre sur les maps
   // de l'adversaire (codes et scores), à confirmer d'un clic.
   const match = useProposalMaps(liveMatch, proposals, onRefresh, canReportScore);
+  const detailLoading = proposalDetailLoading(canReportScore, liveMatch, proposals);
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
@@ -276,12 +301,7 @@ export function PlayerScoreDialog({
           deadline ? ` — sans réponse, ce score sera validé à ${deadline}` : ""
         }.`;
       case "THEIRS_PENDING":
-        // Sans détail (proposition antérieure aux maps, ou détail introuvable),
-        // le formulaire s'ouvre vide : « Confirme-le » laisserait sans geste.
-        if ((view.theirs?.maps ?? []).length === 0) {
-          return `${opponentName} propose ${scoreText(view.theirs!)}, sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay : un désaccord alerte l'arbitrage.`;
-        }
-        return `${opponentName} propose ${scoreText(view.theirs!)}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.`;
+        return theirsPendingStatus(opponentName, view.theirs!, detailLoading);
       case "CONFLICT":
         return conflictText(view.mine!, view.theirs!, opponentName);
       default:

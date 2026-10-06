@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
-import type { BracketMatch, MatchProposalMaps } from "@/lib/shared/types";
+import type { BracketMatch, MatchProposalMaps, TournamentGame } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDoubleForfeit, isMatchDrawn, isMatchPlayed } from "@/lib/shared/match-outcome";
@@ -12,6 +12,7 @@ import {
   matchFormatDescription,
   matchFormatLabel,
   matchWinsRequired,
+  type MatchFormat,
 } from "@/lib/shared/match-format";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
@@ -34,7 +35,7 @@ import { ScoreStepper } from "./ScoreStepper";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
 import { MapResultList } from "./MatchMapDetails";
 import mapStyles from "./MatchMapDetails.module.css";
-import { mapFieldKey, mapListViolationMessage, type MapListViolation } from "@/lib/shared/match-maps";
+import { isMapTouched, mapFieldKey, mapListViolationMessage, type MapListViolation } from "@/lib/shared/match-maps";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
 
@@ -125,6 +126,19 @@ const MAP_FIELD_ID_SLOTS = 32;
 const AWAITING_DETAIL_MESSAGE =
   "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.";
 
+/** La raison affichée sous les boutons, une seule, dans l'ordre de l'infobulle. */
+function visibleBlocker(input: {
+  awaitingDetail: boolean;
+  mapRefusal: MapListViolation | null;
+  blocker: ScoreFormBlocker | null;
+  format: MatchFormat | null;
+  game: TournamentGame | null | undefined;
+}): string | null {
+  if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;
+  if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);
+  return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : null;
+}
+
 export function AdminScoreDialog({
   match: liveMatch,
   proposals = NO_PROPOSALS,
@@ -208,6 +222,16 @@ export function AdminScoreDialog({
   // répéter sous les boutons doublerait la même phrase.
   const rawBlocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
   const blocker = rawBlocker === "NOT_IN_LAUNCH" ? null : rawBlocker;
+  // Phrase visible, dans l'ordre de l'infobulle : détail en lecture, puis map
+  // refusée (une fois une map renseignée — les steppers, verrouillés sur le
+  // score dérivé, ne sont pas à corriger), puis blocage du score.
+  const blockerText = visibleBlocker({
+    awaitingDetail,
+    mapRefusal: form.maps.some(isMapTouched) ? (form.mapsRefused.resolve ?? form.mapsRefused.save) : null,
+    blocker,
+    format: matchFormat,
+    game: form.game,
+  });
   // Score proposé par une engagée et jamais confirmé par l'autre — une équipe
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
   // vérifier puis à le valider, sans le recopier.
@@ -492,14 +516,7 @@ export function AdminScoreDialog({
           {/* Une seule raison affichée : celle qui bloque l'action décisive, ou
               à défaut celle de l'enregistrement. Les empiler ferait répéter deux
               fois la même phrase dans le cas courant. */}
-          {awaitingDetail && (
-            <output className={`${styles.blocker} ${styles.notice}`}>{AWAITING_DETAIL_MESSAGE}</output>
-          )}
-          {blocker && (
-            <output className={`${styles.blocker} ${styles.notice}`}>
-              {scoreBlockerMessage(blocker, matchFormat)}
-            </output>
-          )}
+          {blockerText && <output className={`${styles.blocker} ${styles.notice}`}>{blockerText}</output>}
 
           <div className={styles.actions}>
             {/* Trois poids, trois rôles : quitter est un lien, l'enregistrement
