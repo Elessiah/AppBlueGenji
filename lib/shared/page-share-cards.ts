@@ -119,8 +119,27 @@ export const PAGE_SHARE_CARD_STYLES: Readonly<Record<PageShareCardKey, ShareCard
   player: { motif: "user", accent: "pink" },
 };
 
-/** Deux lignes d'accroche à 28 px dans la colonne de 820 px. */
-export const RULE_MODE_SUBTITLE_MAX_LENGTH = 100;
+/**
+ * Deux lignes d'accroche à 28 px dans la colonne de 820 px : environ 125
+ * caractères au rendu ; la limite de deux lignes du rendu coupe le reste.
+ */
+export const RULE_MODE_SUBTITLE_MAX_LENGTH = 120;
+
+/**
+ * L'accroche d'un mode bornée à `maxLength` : entière si elle tient, sinon ses
+ * premières phrases entières (fin de phrase au-delà du tiers de la limite),
+ * sinon coupée sur un mot avec une ellipse — une explication tronquée au
+ * milieu (« Personne n'est coupé… ») dit moins qu'une phrase complète.
+ */
+export function shareTagline(text: string, maxLength: number): string {
+  const flattened = text.replace(/\s+/gu, " ").trim();
+  if (Array.from(flattened).length <= maxLength) return flattened;
+  const head = Array.from(flattened).slice(0, maxLength + 1).join("");
+  let end = -1;
+  for (const match of head.matchAll(/[.!?](?= )/gu)) end = match.index;
+  if (end + 1 >= maxLength / 3) return flattened.slice(0, end + 1);
+  return truncateForShare(flattened, maxLength);
+}
 
 /** Style des cartes de mode de règles. */
 const RULE_MODE_STYLE: ShareCardStyle = { motif: "bracket", accent: "violet" };
@@ -178,9 +197,9 @@ export function resolvePageShareCard(
     return {
       eyebrow: messages.ruleMode.eyebrow,
       title: mode.label,
-      // Coupée sur un mot avant les deux lignes de l'accroche, plutôt que
-      // tranchée au milieu d'un mot par l'ellipse de Satori.
-      subtitle: truncateForShare(mode.tagline, RULE_MODE_SUBTITLE_MAX_LENGTH),
+      // Bornée avant les deux lignes de l'accroche (phrases entières de
+      // préférence), plutôt que tranchée au milieu d'un mot par Satori.
+      subtitle: shareTagline(mode.tagline, RULE_MODE_SUBTITLE_MAX_LENGTH),
       footer: messages.footer,
       ...RULE_MODE_STYLE,
     };
@@ -190,13 +209,12 @@ export function resolvePageShareCard(
 
 /**
  * Longueur maximale d'un nom d'équipe sur le podium : le nom est écrit en
- * 30 px gras dans une colonne utile de 292 px (336 px moins les marges) : deux
- * lignes y tiennent environ 24 caractères de casse ordinaire
- * (une coupe à 20 tronquait déjà « Test - Bracket Team 45 », qui tient). Au-delà, coupe sur
- * un mot avec une ellipse (`truncateForShare`) ; un nom tout en capitales larges
- * peut encore déborder, la limite de deux lignes du rendu le coupe alors.
+ * 30 px dans une colonne utile de 292 px (336 px moins les marges), soit environ
+ * 18 caractères de casse ordinaire par ligne. Au-delà de 32, coupe sur un mot
+ * avec une ellipse (`truncateForShare`) ; un nom plus large (capitales) est
+ * coupé par la limite de deux lignes du rendu, qui pose sa propre ellipse.
  */
-export const PODIUM_NAME_MAX_LENGTH = 24;
+export const PODIUM_NAME_MAX_LENGTH = 32;
 
 /** Une marche du podium telle que la carte la dessine. */
 export type PodiumShareEntry = {
