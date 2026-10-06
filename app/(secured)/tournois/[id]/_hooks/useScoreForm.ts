@@ -161,7 +161,12 @@ export function useScoreForm(
   });
 
   // Un forfait écarte les maps : elles ne partent pas, et leurs refus se taisent.
-  const mapsSent = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;
+  // De même saisie fermée (liste masquée) : c'est la fermeture qui bloque.
+  const mapsSent =
+    maps.length > 0 &&
+    options.scoreEntryClosed !== true &&
+    state.forfeitTeamId === undefined &&
+    state.doubleForfeit !== true;
 
   const submit = async (action: "save" | "resolve") => {
     if (!match) return false;
