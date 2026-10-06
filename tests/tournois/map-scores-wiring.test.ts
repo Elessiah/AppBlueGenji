@@ -188,3 +188,18 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
     expect(dialog).toContain("{blockerText && <output");
   });
 });
+
+describe("détail map par map — saisie du code et confirmation sans détail", () => {
+  it("le code de replay se saisit brut : pas de réécriture qui déplacerait le curseur", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list).toContain("onChange={(event) => update(index, { replayCode: event.target.value }, \"replayCode\")}");
+    expect(list).not.toContain("event.target.value.toUpperCase()");
+    const css = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.module.css");
+    expect(css).toContain("text-transform: uppercase;");
+  });
+
+  it("saisir au même score une proposition sans détail la confirme, comme le serveur la compare", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toContain("const confirmsAsIs = confirmsTheirs && (theirMaps.length === 0 || sameMapLists(maps, theirMaps));");
+  });
+});
