@@ -251,8 +251,10 @@ export function PlayerScoreDialog({
   }, [signature]);
 
   const check = checkMapList(matchFormat, game, maps, { decisive: true });
+  // Rien de saisi : la ligne vierge d'ouverture n'est pas une proposition.
+  const nothingEntered = !maps.some(isMapTouched);
   const entered =
-    maps.length === 0
+    nothingEntered
       ? null
       : { team1Score: check.score.team1, team2Score: check.score.team2, maps };
   // Renvoyer à l'identique la proposition déjà envoyée ne change rien : le
@@ -513,7 +515,7 @@ export function PlayerScoreDialog({
               <button
                 type="submit"
                 className="btn"
-                disabled={maps.length === 0 || unchangedMine || submitting}
+                disabled={nothingEntered || unchangedMine || submitting}
               >
                 {submitting ? "…" : submitLabel}
               </button>
