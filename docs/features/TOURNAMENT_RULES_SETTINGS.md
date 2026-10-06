@@ -12,5 +12,5 @@ Rien n'est exposé qui ne le soit déjà : toutes ces valeurs voyagent dans l'in
 
 ## Voir aussi
 
-- `lib/shared/tournament-rules.ts` : registre des règles (règles communes : lancement d'un match, format des matchs, report des scores, forfait, double forfait).
+- `lib/shared/tournament-rules.ts` : registre des règles (structure) ; textes dans `messages/<langue>/rules.json` (règles communes : lancement d'un match, format des matchs, report des scores, forfait, double forfait).
 - Le mode `SURVIVAL` s'affiche désormais **« Survie par coupes »** partout (`FORMAT_LABELS`, formulaires, statistiques, règles), pour ne plus se confondre avec **BlueGenji Survie**. Le slug `/regles/survie` est inchangé.

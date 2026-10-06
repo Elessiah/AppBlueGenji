@@ -225,6 +225,28 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - `SiteFooterBar` devient composant client (sans état) : un composant serveur asynchrone ne se rend
   pas dans les tests de `ArenaShell`, et ses textes n'ont besoin d'aucune donnée serveur.
 
+### Ce que le lot 3 a établi (2026-10-06) — écarts au plan
+
+- **Première route ouverte** : `/regles`, `/regles/[slug]` dans `MIGRATED_ROUTES` — réécriture,
+  `hreflang`, sitemap et sélecteur s'activent seuls (lot 0). ~370 messages, ~4 100 mots anglais.
+- **Pas de `getTranslations` pour les règles** : leurs textes sont des listes (sections, puces), que
+  `t()` ne parcourt pas. Rendu serveur par `messagesFor(locale).rules` + le formateur réduit du
+  lot 1 (`RuleText`), équivalence avec `next-intl` testée message par message. Gras `<b>`.
+- **Registre** : `tournament-rules.ts` ne garde que la structure ; `TOURNAMENT_RULE_MODES` reste le
+  registre français (bouton d'aide des pages de tournoi, client) et n'importe que le français.
+  `shortLabel`, jamais lu, est retiré. `RANKING_SEEDING_RULE` devient le message
+  `rules.seedingRule` (`{basePoints}`), cité par `{seedingRule}`.
+- **Ancres** : les mêmes dans les deux langues (titres français).
+- **Restent français sous `/en`**, annoncés `lang="fr"` : réglages d'un tournoi (`?tournoi=`, lot
+  8a) ; banderole et modale de recrutement (contenu saisi, lot 5). Le bouton d'aide des tournois
+  (`RulesHelpFab`) attend le lot 8a.
+- **Build** : aucune page des règles n'est prérendue (la mise en page racine lit les en-têtes) ;
+  `APP_URL` est lue au rendu, pour chaque langue — rien n'est figé à la compilation.
+- **Vocabulaire** au-delà du glossaire : « capital d'endurance » → *endurance pool*, « barrage » →
+  *play-in*, « petite finale » → *third-place match*, « victoire d'office » → *walkover* / *bye*,
+  « belle » → *bracket reset*, « side gauche / droite » → *left / right side*, « hors course » →
+  *out of contention*.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -255,7 +277,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 0 | **Infrastructure** | `next-intl`, `i18n/request.ts`, `messages/fr/*.json` + `messages/en/*.json` par espace de noms, réécriture `/en` dans `middleware.ts`, en-tête `x-bg-locale`, liste blanche, `<html lang>`, `LocaleLink`/`localeHref`/`useLocaleRouter`, sélecteur, `pageMetadata` + sitemap + JSON-LD multilingues, formateurs, test de parité des clés, règle ESLint, glossaire, doc `I18N.md`, règle `CLAUDE.md`. **Aucune page migrée** (liste blanche vide → `/en/*` redirige). | ~0 | Middleware (CSP, provenance API, suspension) ; `usePathname` après réécriture ; double TypeScript | **Critique** : deux cycles propres consécutifs + sécurité + performance |
 | 1 ✅ | Coquille partagée | Nav, pied de page, `PublicPageShell`, lien d'évitement, menu d'accessibilité, toasts, `ConfirmActionDialog`, pages d'erreur / 404 / `global-error` | ~250 (C1 + part de C2) | Composants partout : tester FR inchangé | Standard + UI |
 | 2 | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
-| 3 | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
+| 3 ✅ | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
 | 4 | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
 | 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
 | 6 | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |

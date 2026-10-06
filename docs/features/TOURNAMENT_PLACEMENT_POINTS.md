@@ -183,7 +183,7 @@ répond. Sa légende dit l'essentiel : *compris dans la cote*, jamais en plus.
 
 Les légendes partagées suivent la règle depuis les constantes, sans être
 réécrites à la main : `RANKING_POINTS_HINT` (annuaire, leaderboard, fiche) et
-`RANKING_SEEDING_RULE` (pages `/regles` des modes qui seedent au classement)
+`rules.seedingRule` (message des pages `/regles` des modes qui seedent au classement)
 annoncent désormais la redistribution de fin de tournoi.
 
 Le total de points a par ailleurs gagné une **troisième** légende, et le choix
