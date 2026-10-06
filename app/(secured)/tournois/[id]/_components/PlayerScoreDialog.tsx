@@ -276,7 +276,7 @@ export function PlayerScoreDialog({
       flagRefusal(code);
       showError(mapError(code));
       // Proposition changée ou expirée : la modale se recharge sur la nouvelle.
-      if (code === "PROPOSAL_STALE") onRefresh();
+      if (code === "PROPOSAL_STALE") void Promise.resolve(onRefresh()).catch(() => undefined);
     } finally {
       setSubmitting(false);
     }
