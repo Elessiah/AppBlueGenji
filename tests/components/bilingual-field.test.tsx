@@ -80,6 +80,42 @@ describe("BilingualField", () => {
   });
 });
 
+describe("BilingualField — aide, compteurs, touche Entrée", () => {
+  function renderWith(extra: Partial<React.ComponentProps<typeof BilingualField<Field>>>): string {
+    return renderToStaticMarkup(
+      <BilingualField
+        label="Rôle"
+        ids={{ fr: IDS.role, en: IDS.roleEn }}
+        fields={{ fr: "role", en: "roleEn" }}
+        errors={errors(null)}
+        values={{ fr: "Président", en: "Chair" }}
+        onChange={() => undefined}
+        maxLength={120}
+        {...extra}
+      />,
+    );
+  }
+
+  it("aide commune et compteur de chaque langue, lus avec leur contrôle", () => {
+    const html = renderWith({ describedBy: "role-help", counter: true, counterClassName: (n) => (n > 5 ? "warn" : undefined) });
+    expect(html).toMatch(/id="bureau-role"[^>]*aria-describedby="role-help bureau-role-count"/);
+    expect(html).toMatch(/id="bureau-role-en"[^>]*aria-describedby="role-help bureau-role-en-count"/);
+    expect(html).toContain('<span id="bureau-role-count" class="counter warn">9 / 120</span>');
+    expect(html).toContain('<span id="bureau-role-en-count" class="counter">5 / 120</span>');
+  });
+
+  it("sans compteur demandé, aucun compteur", () => {
+    expect(renderWith({})).not.toContain("-count");
+  });
+
+  it("avec onEnter : le français mène à l'anglais, l'anglais enregistre", () => {
+    const html = renderWith({ onEnter: () => undefined });
+    expect(html).toMatch(/id="bureau-role"[^>]*enterKeyHint="next"/i);
+    expect(html).toMatch(/id="bureau-role-en"[^>]*enterKeyHint="done"/i);
+    expect(renderWith({ enterKeyHint: "next" })).toMatch(/id="bureau-role-en"[^>]*enterKeyHint="next"/i);
+  });
+});
+
 describe("refus d'anglais — un code, un champ, la phrase de l'éditeur des textes", () => {
   it("la validation partagée refuse l'anglais vide avant l'envoi, et le code désigne le champ anglais", () => {
     const bureau = validateBureauInput({ name: "Léo", role: "Président", roleEn: "" });

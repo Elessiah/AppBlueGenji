@@ -275,6 +275,12 @@ describe("rendu anglais — aucune phrase française, contenu du staff sans angl
     expect(stripped).not.toContain("Modifier");
     expect(stripped).not.toContain("Supprimer");
   });
+
+  it("sous /en, pas de flèches d'ordre : un voisin sans anglais y est masqué (l'ordre se règle en français)", async () => {
+    mockUser = authUserForMock();
+    expect(await render(AssociationPage, "en")).not.toMatch(/aria-label="Déplacer /);
+    expect(await render(AssociationPage, "fr")).toMatch(/aria-label="Déplacer /);
+  });
 });
 
 describe("rendu français — inchangé, tout le contenu du staff", () => {

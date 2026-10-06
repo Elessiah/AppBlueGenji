@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  nextCategoryEnglish,
   BENEVOLE_CATEGORY_MAX,
   BENEVOLE_FIELD_ERRORS,
   benevoleInitials,
@@ -362,3 +363,23 @@ describe("formatJoinedAt — langue", () => {
   });
 });
 
+
+describe("nextCategoryEnglish", () => {
+  const known: Record<string, string> = { Arbitre: "Referee", Caster: "Caster" };
+  const englishOf = (category: string) => known[category.trim()] ?? null;
+
+  it("reprend l'anglais connu de la nouvelle catégorie", () => {
+    expect(nextCategoryEnglish({ category: "", categoryEn: "" }, "Arbitre", englishOf)).toBe("Referee");
+    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, "Caster", englishOf)).toBe("Caster");
+  });
+
+  it("vers une catégorie nouvelle, l'anglais repris de l'ancienne se vide", () => {
+    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, "Graphiste", englishOf)).toBe("");
+    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, "Arbitr", englishOf)).toBe("");
+  });
+
+  it("une saisie anglaise faite à la main n'est jamais écrasée", () => {
+    expect(nextCategoryEnglish({ category: "Graphiste", categoryEn: "Designer" }, "Arbitre", englishOf)).toBe("Designer");
+    expect(nextCategoryEnglish({ category: "Arbitre", categoryEn: "Umpire" }, "Graphist", englishOf)).toBe("Umpire");
+  });
+});
