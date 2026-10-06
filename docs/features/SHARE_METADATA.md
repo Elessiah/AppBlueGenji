@@ -396,6 +396,25 @@ montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
 - **Aucun joueur** : ni pseudo, ni avatar, ni effectif. La fiche d'un joueur
   reste générique.
 
+### Coût d'un rendu (`lib/server/share-image-cache.ts`)
+
+La route `/og/…` est dynamique et un lien collé dans un gros salon fait venir
+plusieurs robots à la fois : chaque PNG rendu est **gardé en mémoire du
+processus** (`cachedShareImage`, éviction LRU, `SHARE_IMAGE_CACHE_MAX_ENTRIES`
+cartes au plus — quelques Mo), avec vol unique (`cached` à durée nulle, hors du
+cache général que des PNG de 100 Ko chasseraient).
+
+- **Cartes fixes** : une heure en mémoire (elles ne changent qu'au déploiement),
+  `max-age=86400` pour les caches en aval.
+- **Podium et équipe nominative** : `RANKING_TTL_MS` (60 s), `max-age=300`. Le
+  logo d'une équipe n'est converti par `sharp` qu'au rendu, donc une fois par
+  fenêtre.
+- **Équipe hors classement** (`findShareTeam` → `null`, lecture du cache
+  `share-teams` seule) : toutes partagent **une** entrée, la carte générique
+  `team`, servie en `max-age=300`. Énumérer des identifiants ne coûte ni rendu
+  ni mémoire.
+- Un échec de rendu n'est jamais gardé.
+
 ### Vie privée : pourquoi les cartes de l'espace membre sont génériques
 
 Une image d'aperçu est servie **à n'importe qui, sans session** : elle ne doit
