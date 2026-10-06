@@ -66,10 +66,9 @@ le nom du site, mais pas encore leur propre nom (`ACCESSIBILITE.md` §16).
 
 ## Langue des pages légales du bot (WCAG 3.1.2 · RGAA 8.7)
 
-`BotLegalDoc` bascule le texte en anglais sous une page `lang="fr"`. Chaque
-`<section>` déclare désormais `lang={lang}` — sur les sections plutôt qu'un
-conteneur ajouté, pour ne rien changer à la mise en page de l'hôte —, et chaque
-bouton du sélecteur est écrit dans **sa** langue (`lang="en"` sur « English »).
+`BotLegalDoc` basculait le texte en anglais sous une page `lang="fr"`. Depuis le
+lot 7a, chaque langue a son adresse (`/en/…`, `<html lang="en">`) et la bascule a
+disparu ; chaque `<section>` garde `lang={lang}`, désormais celle de la page.
 
 ## Navigations : page courante et pictogrammes (WCAG 1.3.1 / 4.1.2)
 

@@ -1,13 +1,16 @@
 # Pages légales du bot Discord (bilingues)
 
 Deux pages publiques exposent les documents légaux du bot Discord *BlueGenji Bot*,
-chacune disponible en **français** et en **anglais** avec un basculement de langue
-immédiat.
+chacune en **français** et en **anglais**, **une langue par adresse** (lot 7a,
+[`I18N.md`](I18N.md) § Documents légaux du bot) :
 
-| Route | Document |
-| --- | --- |
-| `/terms-of-service-bot` | Conditions d'Utilisation / Terms of Service |
-| `/privacy-policy-bot` | Politique de Confidentialité / Privacy Policy |
+| Document | Français | Anglais |
+| --- | --- | --- |
+| Conditions d'Utilisation / Terms of Service | `/terms-of-service-bot` | `/en/terms-of-service-bot` |
+| Politique de Confidentialité / Privacy Policy | `/privacy-policy-bot` | `/en/privacy-policy-bot` |
+
+Les adresses françaises sont celles déclarées au **portail développeur de Discord**
+(liens « conditions » et « confidentialité » du bot) : elles n'ont pas changé.
 
 ## Source du contenu
 
@@ -47,22 +50,28 @@ elles-mêmes composées de `LegalBlock` (`p`, `subhead`, `bullets`). Les chaîne
 acceptent une syntaxe inline minimale :
 
 - `**gras**` → `<strong>`
-- `[texte](url)` → `<a>` (les liens internes `/…` passent par `next/link`, les liens
-  externes ouvrent un nouvel onglet avec `rel="noreferrer"`).
+- `[texte](url)` → `<a>` (les liens internes `/…` passent par `LocaleLink` : sous
+  `/en`, le renvoi d'un document à l'autre reste anglais, `/rgpd` et
+  `/mentions-legales` gardent leur adresse tant qu'ils ne sont pas traduits ; les
+  liens externes ouvrent un nouvel onglet avec `rel="noreferrer"`).
 
 ## Rendu
 
-[`components/legal/BotLegalDoc.tsx`](../../components/legal/BotLegalDoc.tsx) est un
-composant **client** qui :
+Chaque page lit la langue de la requête (`requestLocale()`) et passe
+`doc[locale]` à [`components/legal/BotLegalDoc.tsx`](../../components/legal/BotLegalDoc.tsx),
+composant **serveur** (aucun JavaScript envoyé) qui rend l'intro, les sections et un
+petit moteur de rendu inline. Le texte légal est rendu **tel quel** : le lot 7a n'a
+touché à aucune phrase de `bot-legal-content.ts`, et `TERMS_VERSION` ne bouge pas.
 
-- porte l'état de langue (`useState<Lang>`, FR par défaut) ;
-- affiche un *segmented control* accessible (`role="group"`, `aria-pressed`) pour
-  basculer FR ⇄ EN ;
-- rend l'intro, les sections et un petit moteur de rendu inline.
+La bascule FR ⇄ EN qu'il portait (un état `useState`, jamais une adresse ni un
+paramètre) a cédé la place au sélecteur de langue du site : aucune ancienne adresse
+n'est à rediriger. Seul texte d'interface, le surtitre « SECTION nn » et les titres et
+descriptions des pages vivent dans `messages/<langue>/bot.json` (`legalPages`) ; les
+titres français sont restés ceux d'avant le lot. Carte d'aperçu par langue
+(`/og/<langue>/botPrivacy.png`, `botTerms`).
 
-Il ne rend **pas** `PublicHeader` / `PublicFooter` (qui importent du code serveur) :
-ces layouts restent dans les pages serveur qui l'enveloppent, ce qui évite de tirer
-`lib/server/*` (mysql2, `next/headers`) dans le bundle client.
+Il ne rend **pas** `PublicHeader` / `PublicFooter` : la page les pose
+(`PublicPageShell`).
 
 ## Partie « hébergeur »
 
@@ -79,3 +88,7 @@ porte l'`id="hebergement"` pour servir de cible d'ancre.
 [`tests/app/bot-legal-pages.test.ts`](../../tests/app/bot-legal-pages.test.ts) vérifie
 le parallélisme FR/EN (mêmes sections, numérotation alignée), l'absence de bloc vide,
 la présence des contacts, la cible de l'ancre hébergeur, et le câblage des pages.
+[`tests/app/bot-legal-lang.test.tsx`](../../tests/app/bot-legal-lang.test.tsx) rend
+chaque page dans chaque langue : texte du document mot pour mot et dans l'ordre,
+aucune phrase française sous `/en`, `lang` des sections, métadonnées, `hreflang`,
+sitemap et liens internes par langue.
