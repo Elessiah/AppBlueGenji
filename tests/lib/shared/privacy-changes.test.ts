@@ -700,7 +700,7 @@ describe("PRIVACY_CHANGES — scores map par map (codes de replay)", () => {
   it("est la dernière entrée, datée de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
-    expect(entry.publishedAt).toBe("2026-10-05");
+    expect(entry.publishedAt).toBe("2026-10-06");
     expect(entry.audience).toBeUndefined();
   });
 

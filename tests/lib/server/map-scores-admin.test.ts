@@ -84,14 +84,16 @@ describe("arbitrage — détail map par map", () => {
     expect(maps[0].sql).not.toMatch(/FOR UPDATE/);
   });
 
-  it("un score à la main avec une liste vide efface le détail ; sans liste, il n'y touche pas", async () => {
+  it("un score à la main avec une liste vide efface le détail ; sans liste, il ne lit que ce qu'il faut pour juger", async () => {
     const first = fakeConnection({ type: "BO", value: 5 });
     await adminSaveMatchScores(first.conn, 10, 1, 0, undefined, { maps: [], userId: 3 });
     expect(first.maps.map((m) => m.sql)).toEqual([CLEAR_FINAL]);
 
+    // Sans liste : le détail retenu est relu, et ne s'efface que s'il
+    // n'explique plus le score (ici, aucun détail : rien d'effacé).
     const second = fakeConnection({ type: "BO", value: 5 });
     await adminSaveMatchScores(second.conn, 10, 1, 0);
-    expect(second.maps).toEqual([]);
+    expect(second.maps.every((m) => /^SELECT /.test(m.sql))).toBe(true);
   });
 
   it("un forfait tranché efface le détail, même déclaré par une engagée (sans mapEntry)", async () => {

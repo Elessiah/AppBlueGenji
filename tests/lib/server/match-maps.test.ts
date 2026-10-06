@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import {
   REPORTED_MAP_SOURCES,
   clearMapSets,
+  dropStaleFinalMaps,
   loadMapsByMatch,
   loadMatchMaps,
   promoteReportedMaps,
@@ -176,5 +177,30 @@ describe("attachMatchMaps — détail posé sur l'instantané (flux et REST de s
   it("laisse un match sans ligne exactement comme avant", () => {
     const match = bracketMatch({ id: 12, team1Score: 2, team2Score: 1 });
     expect(attachMatchMaps([match], new Map())).toEqual([match]);
+  });
+});
+
+describe("dropStaleFinalMaps — un score posé sans détail", () => {
+  const finalRows = [
+    { match_id: 10, source: "FINAL", map_number: 1, replay_code: "AAA111", team1_score: 2, team2_score: 0 },
+    { match_id: 10, source: "FINAL", map_number: 2, replay_code: "BBB222", team1_score: 2, team2_score: 0 },
+  ];
+
+  it("efface un détail qui n'explique plus le score retenu", async () => {
+    const { execute, connection } = conn([[finalRows, []], [[{ found: 1 }], []]]);
+    await dropStaleFinalMaps(connection, 10, 1, 2);
+    expect(execute.mock.calls.some(([sql]) => /^DELETE FROM bg_match_maps/.test(flat(String(sql))))).toBe(true);
+  });
+
+  it("garde un détail qui explique encore le score", async () => {
+    const { execute, connection } = conn([[finalRows, []]]);
+    await dropStaleFinalMaps(connection, 10, 2, 0);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne fait rien sans détail", async () => {
+    const { execute, connection } = conn([[[], []]]);
+    await dropStaleFinalMaps(connection, 10, 1, 0);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 });

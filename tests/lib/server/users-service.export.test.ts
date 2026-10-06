@@ -14,6 +14,20 @@ jest.mock("@/lib/server/connection-logs", () => ({
     { event: "LOGIN_DISCORD", ip: "203.0.113.7", createdAt: "2026-09-01T00:00:00.000Z" },
   ]),
 }));
+jest.mock("@/lib/server/match-map-entries", () => ({
+  listOwnMapEntries: jest.fn(async () => [
+    {
+      matchId: 5,
+      tournamentId: 2,
+      source: "FINAL",
+      mapNumber: 1,
+      replayCode: "ABC123",
+      team1Score: 2,
+      team2Score: 0,
+      submittedAt: "2026-10-06T10:00:00.000Z",
+    },
+  ]),
+}));
 jest.mock("@/lib/server/account-suspensions", () => ({
   getActiveSuspension: jest.fn(async () => null),
   listOwnSuspensions: jest.fn(async () => [
@@ -119,6 +133,11 @@ describe("exportOwnData", () => {
         endsAt: "2026-09-08T10:00:00.000Z",
         liftedAt: null,
       },
+    ]);
+
+    // Les maps saisies par le titulaire (codes de replay) font partie du droit d'accès.
+    expect(data.mapEntries).toEqual([
+      expect.objectContaining({ matchId: 5, source: "FINAL", replayCode: "ABC123" }),
     ]);
 
     // Le journal des connexions (obligation légale) fait partie du droit d'accès.
