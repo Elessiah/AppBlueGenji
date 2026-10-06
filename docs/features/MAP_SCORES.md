@@ -252,7 +252,7 @@ le tait.
   un score validé avant partirait avec `maps: []` et effacerait les codes de la
   proposition à la clôture. Une seule phrase sous les boutons, dans l'ordre de
   l'infobulle : détail en lecture, map refusée (une fois une map renseignée),
-  puis blocage du score. Sous un forfait, la liste masquée ne refuse plus rien
+  puis blocage du score. Sous un forfait ou une saisie fermée, la liste masquée ne refuse plus rien
   (ses maps ne partent pas) ; une ligne vierge ajoutée n'affiche aucune phrase.
   Les champs d'une ligne s'alignent en haut : une erreur sous un champ n'allonge
   que sa colonne.
