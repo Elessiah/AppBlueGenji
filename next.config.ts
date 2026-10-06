@@ -77,6 +77,19 @@ const nextConfig: NextConfig = {
    */
   devIndicators: { position: "top-right" },
 
+  /**
+   * Racine publique figée **à la compilation** pour le middleware.
+   *
+   * Sous `next start`, le middleware tourne dans le bac à sable edge, qui ne
+   * reçoit pas `APP_URL` (ni aucune variable de `.env.production` qu'il
+   * n'aurait pas déclarée) : ses renvois `/en` → `/` partaient sur l'origine
+   * interne `localhost:3000` (constaté en production le 2026-10-06). Une clé à
+   * part plutôt que `APP_URL` elle-même, pour ne pas figer celle-ci dans tout
+   * le serveur. Absente quand `APP_URL` l'est (développement, E2E) : le
+   * middleware retombe alors sur l'origine de la requête.
+   */
+  ...(process.env.APP_URL ? { env: { BG_PUBLIC_ORIGIN: process.env.APP_URL } } : {}),
+
   // `next-intl/config` → {@link I18N_REQUEST_CONFIG}, pour Turbopack (`next
   // dev`, chemin relatif exigé) comme pour webpack (`next build`, chemin absolu).
   turbopack: { resolveAlias: { "next-intl/config": I18N_REQUEST_CONFIG } },

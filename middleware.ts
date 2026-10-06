@@ -137,7 +137,9 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   // site (redirection ouverte) — `\` compte aussi, lu `/` par les navigateurs.
   // Sans `APP_URL` (développement, E2E — en production elle est requise),
   // l'origine de la requête est la bonne : aucun mandataire devant.
-  const base = siteBaseUrl() ?? request.nextUrl.origin;
+  // `BG_PUBLIC_ORIGIN` : `APP_URL` figée à la compilation (`next.config.ts`),
+  // seule lisible dans le bac à sable edge de `next start`.
+  const base = process.env.BG_PUBLIC_ORIGIN?.trim().replace(/\/+$/, "") || siteBaseUrl() || request.nextUrl.origin; // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
   const target = new URL(`/${path.replace(/^[/\\]+/, "")}${request.nextUrl.search}`, base);
   return NextResponse.redirect(target, prefixed === "en" ? 307 : 308);
 }
