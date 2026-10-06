@@ -158,6 +158,16 @@ pm2 save                 # sans ça, un reboot restaure l'ancienne entrée cass�
 Le `pm2 save` n'est pas optionnel : il fige l'entrée réparée dans
 `~/.pm2/dump.pm2`, que `pm2 resurrect` relit au démarrage de la machine.
 
+**Hôte d'écoute `127.0.0.1` et mandataire TLS** — Next rédige l'origine interne
+d'une requête avec cet hôte et le protocole de `X-Forwarded-Proto` (`https`
+derrière nginx), mais remet au middleware une adresse où `127.0.0.1` est devenu
+`localhost`. Toute réécriture **de middleware** (`NextResponse.rewrite`) y est
+donc jugée externe et relayée en HTTPS vers le serveur HTTP : 500 et `EPROTO`
+dans le journal d'erreurs (incident du 2026-10-06, toutes les pages `/en`). Les
+réécritures du site passent par `next.config.ts` (`docs/features/I18N.md`) ; un
+`Failed to proxy https://localhost:3000/…` dans le journal signale qu'une
+réécriture de middleware est revenue.
+
 ## Notifications push : les clés VAPID
 
 Le push est éteint tant que `VAPID_PUBLIC_KEY` et `VAPID_PRIVATE_KEY` manquent
