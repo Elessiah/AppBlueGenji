@@ -65,46 +65,6 @@
   letter-spacing: 0.04em;
 }
 
-/* --- Sélecteur de langue --- */
-.langSwitch {
-  display: inline-flex;
-  padding: 3px;
-  gap: 2px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-cy-sm, 6px);
-  background: var(--cyber-bg-1, #0c0f14);
-}
-
-.langBtn {
-  appearance: none;
-  border: 0;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  padding: 7px 14px;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--ink-mute);
-  transition: color 0.18s ease, background 0.18s ease;
-}
-
-.langBtn:hover {
-  color: var(--ink);
-}
-
-.langBtnActive {
-  color: var(--cyber-bg, #05070a);
-  background: var(--blue-300, #93deff);
-  box-shadow: 0 0 18px var(--blue-glow, rgba(90, 200, 255, 0.35));
-}
-
-.langBtn:focus-visible {
-  outline: 2px solid var(--blue-300);
-  outline-offset: 2px;
-}
-
 /* --- En-têtes de section --- */
 .head {
   display: flex;

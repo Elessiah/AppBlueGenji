@@ -3,19 +3,32 @@ import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { BotLegalDoc } from "@/components/legal/BotLegalDoc";
 import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Bot — Politique de Confidentialité / Privacy Policy",
-  description:
-    "Politique de Confidentialité du bot Discord BlueGenji Bot, disponible en français et en anglais.",
-  path: "/privacy-policy-bot",
-  shareCard: "botPrivacy",
-});
+/**
+ * Politique de confidentialité du bot, une langue par adresse (lot 7a,
+ * `docs/features/I18N.md`) : `/privacy-policy-bot` en français — l'adresse
+ * déclarée au portail développeur de Discord, inchangée —, `/en/…` en anglais.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { meta } = messagesFor(locale).bot.legalPages.privacy;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    path: "/privacy-policy-bot",
+    shareCard: "botPrivacy",
+    locale,
+  });
+}
 
-export default function PrivacyPolicyBotPage() {
+export default async function PrivacyPolicyBotPage() {
+  const locale = await requestLocale();
+  const { legalPages } = messagesFor(locale).bot;
   return (
     <PublicPageShell>
-      <BotLegalDoc doc={PRIVACY_POLICY} />
+      <BotLegalDoc doc={PRIVACY_POLICY[locale]} lang={locale} sectionLabel={legalPages.section} />
     </PublicPageShell>
   );
 }

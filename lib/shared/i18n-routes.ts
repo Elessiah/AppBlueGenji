@@ -15,7 +15,8 @@
  * segment quelconque (`/regles/[slug]`). Le lot 0 l'a laissée vide ; chaque lot
  * de pages y ajoute ses routes (lot 2 : l'accueil ; lot 3 : les règles ; lot 4 :
  * le classement ; lot 6 : la connexion ; lot 5a : le bot et sa documentation ;
- * lot 5b : l'association, les bénévoles, le recrutement).
+ * lot 5b : l'association, les bénévoles, le recrutement ; lot 7a : les
+ * documents légaux du bot).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
@@ -46,4 +47,9 @@ export const MIGRATED_ROUTES: readonly string[] = [
   "/recrutement",
   // Redirection vers la section « Partenaires » de l'accueil, dans sa langue.
   "/partenaires",
+  // Lot 7a — documents légaux du bot : chaque langue de `BilingualDoc` à son
+  // adresse, texte repris tel quel. Les adresses françaises, déclarées au
+  // portail développeur de Discord, ne changent pas.
+  "/privacy-policy-bot",
+  "/terms-of-service-bot",
 ];
