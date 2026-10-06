@@ -293,7 +293,7 @@
         }
       ],
       "principles": [
-        "Two brackets run side by side: the upper bracket (undefeated) and the lower bracket (one loss on the clock).",
+        "Two brackets run side by side: the upper bracket (undefeated) and the lower bracket (one loss so far).",
         "Losing in the upper bracket drops you to the lower bracket; losing in the lower bracket eliminates you.",
         "The two survivors meet in the grand final."
       ],
@@ -319,7 +319,7 @@
         {
           "title": "Team count that isn't a power of 2",
           "body": [
-            "As in single elimination, the bracket is sized to the next power of 2 up and the empty spots become walkovers in the first round of the upper bracket."
+            "As in single elimination, the bracket is sized to the smallest power of 2 that fits all registered teams and the empty spots become walkovers in the first round of the upper bracket."
           ]
         },
         {
@@ -389,14 +389,14 @@
             "Any score that fits within the map cap ends the match: 2-2, 2-1, and even 0-0 if no map was decided.",
             "A drawn map doesn't count in either score — it makes the match longer without eating into the cap.",
             "A draw counts as neither a win nor a loss: it's shown separately in the standings, and breaks the streaks on team pages.",
-            "<b>The final bracket never accepts a tie</b>, whatever the setting: it has to know who plays the next round. The tournament can give it its own format — a real FT3, where the qualifier tolerates draws."
+            "<b>The final bracket never accepts a tie</b>, whatever the setting: it has to know who plays the next round. The tournament can give it its own format — a real FT3, even when the qualifier allows draws."
           ]
         },
         {
           "title": "End of the qualifier",
           "body": [
             "The qualifier stops at the end of the round where only eight teams (or fewer) are left: a round that has started is always played to the end. With no other setting, there's no maximum length: endurance alone does the sorting.",
-            "The tournament can however announce a <b>maximum number of rounds</b>. The qualifier then stops at that round, and the top eight of the standings qualify — even if thirty teams were still in the running. The others leave with the pool they had left: they're not \"eliminated\", they're <b>out of contention</b>."
+            "The tournament can however announce a <b>maximum number of rounds</b>. The qualifier then stops at that round, and the top eight of the standings qualify — even if thirty teams were still in the running. The others leave with the pool they had left: they're not “eliminated”, they're <b>out of contention</b>."
           ],
           "bullets": [
             "Under that cap, a team that can no longer mathematically reach the top eight in the remaining rounds is dropped without waiting for the end.",
@@ -430,7 +430,7 @@
             "The penalty applies to the current round, after its matches: if it empties the pool, the team is eliminated just as by a loss.",
             "It can be lifted as long as no later round has a score; the standings are then recalculated as if it had never existed.",
             "No penalty can be given or lifted once the playoff bracket has started.",
-            "In the standings, \"−N\" next to the pool shows what penalties actually removed."
+            "In the standings, “−N” next to the pool shows what penalties actually removed."
           ]
         },
         {
@@ -441,7 +441,7 @@
           "bullets": [
             "Forfeit on a round: the team doesn't show up to a match. The referee declares it on the match; the team stays in and plays the next round with the pool it has left.",
             "Forfeit on the rest of the tournament: the team withdraws, or the referee withdraws it. Its pool drops to zero, it's no longer paired, and the standings are recalculated right away — the next round is re-paired accordingly.",
-            "In the round-by-round table, a withdrawn team no longer shows a pool: its remaining rounds show \"FF\" in red, like the referees' spreadsheet.",
+            "In the round-by-round table, a withdrawn team no longer shows a pool: its remaining rounds show “FF” in red, like the referees' spreadsheet.",
             "Withdrawing for good is only possible during the qualifier. Once the playoff bracket has started, a forfeit is settled on the match, which moves the bracket forward."
           ]
         }
@@ -666,7 +666,7 @@
           "bullets": [
             "Workable example: Swiss → Survival (cuts) → single elimination.",
             "Workable example: single elimination → double elimination (last stage).",
-            "Not workable: Swiss → double elimination (unless it's the last stage)."
+            "Not workable: Swiss → double elimination → another stage (double elimination can only be the last stage)."
           ]
         },
         {
