@@ -134,8 +134,14 @@ function Podium({
               ) : null}
             </p>
             <p className={styles.podiumMeta}>
-              {forms !== null ? <FormStrip form={forms.get(row.teamId) ?? []} /> : null}
-              <span className={`${styles.trend} ${trend.className}`}>
+              {forms !== null ? (
+                <span className={styles.podiumMetaItem}>
+                  <span className={styles.podiumMetaLabel} aria-hidden="true">Forme</span>
+                  <FormStrip form={forms.get(row.teamId) ?? []} />
+                </span>
+              ) : null}
+              <span className={`${styles.podiumMetaItem} ${styles.trend} ${trend.className}`}>
+                <span className={styles.podiumMetaLabel} aria-hidden="true">7 j</span>
                 <span aria-hidden="true">{trend.symbol}</span>
                 <span className="sr-only">{trend.label}</span>
               </span>

@@ -270,6 +270,22 @@
   gap: 8px;
 }
 
+/* Libellés visibles : sans la tête du tableau, « ▲ 12 » ne dirait pas qu'il
+   s'agit de points gagnés sur 7 jours. Même style que les libellés mobiles. */
+.podiumMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.podiumMetaLabel {
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .podiumGap {
   margin: 0;
   font-size: 12px;
