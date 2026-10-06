@@ -85,7 +85,7 @@ describe("détail map par map — champs vides", () => {
   it("quitter un score vide sans saisie ne lève pas son refus, et pas de 0 – 0 sans map", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
     expect(list).toContain("if (Object.is(maps[index]?.[field], patch[field])) return;");
-    expect(list).toMatch(/\{maps\.length > 0 && \(\s*<output className=\{styles\.summary\}>/);
+    expect(list).toMatch(/\{played > 0 && \(\s*<output className=\{styles\.summary\}>/);
   });
 });
 
@@ -372,5 +372,19 @@ describe("détail map par map — lignes progressives dans les modales", () => {
     expect(hook).toContain("const openingRows = () => progressiveMapRows(matchFormat, game, initialAdminMaps(match), 0);");
     expect(hook).toContain("const sentMaps = trimTrailingBlankMaps(maps);");
     expect(hook).toContain("adminScoreBody(state, sendMaps ? sentMaps : null, decision.scores)");
+  });
+});
+
+describe("détail map par map — refus désignant la ligne ouverte", () => {
+  it("les deux modales désignent le champ par les lignes affichées", () => {
+    const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(player).toContain("const target = refusalFieldOnRows(local, rows);");
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook).toContain("const target = refusalFieldOnRows(local, maps);");
+  });
+
+  it("une ligne retirée vide l'annonce, pour qu'une ligne qui revient s'annonce", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list).toContain('else if (!autoGrown.current) setAnnouncement("");');
   });
 });

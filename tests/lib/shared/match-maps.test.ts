@@ -13,6 +13,7 @@ import {
   MAP_LIST_ERROR_CODES,
   refusalOnTouchedRow,
   progressiveMapRows,
+  refusalFieldOnRows,
   trimTrailingBlankMaps,
   isMapComplete,
   mapWinnerSide,
@@ -377,5 +378,26 @@ describe("progressiveMapRows — lignes une à une au fil du format (demande du 
     expect(trimTrailingBlankMaps([a, emptyMap()])).toEqual([a]);
     expect(trimTrailingBlankMaps([emptyMap()])).toEqual([emptyMap()]);
     expect(trimTrailingBlankMaps([])).toEqual([]);
+  });
+});
+
+describe("refusalFieldOnRows — le refus désigne la ligne à renseigner", () => {
+  const BO3: MatchFormat = { type: "BO", value: 3 };
+  const a = { replayCode: "ABC123", team1Score: 2, team2Score: 0 };
+
+  it("BO3 à 1-0, ligne 2 ouverte : « score incomplet » désigne le code de la ligne 2", () => {
+    const rows = [a, emptyMap()];
+    const check = checkMapList(BO3, "OW", trimTrailingBlankMaps(rows), { decisive: true });
+    expect(check.error).toBe("SCORE_BELOW_MATCH_FORMAT");
+    expect(refusalFieldOnRows(check, rows)).toEqual({ index: 1, field: "replayCode" });
+  });
+
+  it("sans ligne ouverte, ou pour un autre refus, le champ du contrôle", () => {
+    const check = checkMapList(BO3, "OW", [a], { decisive: true });
+    expect(refusalFieldOnRows(check, [a])).toEqual({ index: 0, field: "team1Score" });
+    const bad = [{ ...a, replayCode: "" }, emptyMap()];
+    const codeCheck = checkMapList(BO3, "OW", trimTrailingBlankMaps(bad), { decisive: true });
+    expect(refusalFieldOnRows(codeCheck, bad)).toEqual({ index: 0, field: "replayCode" });
+    expect(refusalFieldOnRows({ error: null, field: null }, bad)).toBeNull();
   });
 });
