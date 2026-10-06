@@ -28,7 +28,7 @@ Jamais deux podiums qui se contredisent.
 | Étape | Où |
 |---|---|
 | Règles pures (marches, membres, plus haute marche, classes) | `lib/shared/podium-tiers.ts` |
-| Chargement : classement « Général » + **une** requête (`bg_team_members` actifs des trois équipes, `left_at IS NULL`, comptes supprimés exclus — une carte anonymisée de `/joueurs` reste sans marche, nom d'équipe compris) | `lib/server/podium-tiers.ts` (`loadPodiumTiers`) |
+| Chargement : classement « Général » + **une** requête (`bg_team_members` actifs des trois équipes, `left_at IS NULL`, comptes supprimés exclus — une carte anonymisée de `/joueurs` et l'historique d'équipes de sa fiche restent sans marche) | `lib/server/podium-tiers.ts` (`loadPodiumTiers`) |
 | Cache | `cachedRanking("podium-tiers")` : même durée (60 s) et **même invalidation** que le classement — tout score qui tombe l'oublie (`invalidateTeamRanking`) |
 | Remise au client | `app/layout.tsx` → `<PodiumTiersProvider>` (`components/podium-tiers.tsx`) : aucune requête par lien |
 
@@ -72,7 +72,8 @@ Exceptions :
   d'arbitrage (`EntrantContactsPanel`) et l'aperçu de l'étape suivante de
   l'Endurance (`EnduranceNextRoundPanel`, enveloppé dans `EnduranceView`), et
   l'aperçu des têtes de série du staff avant lancement (`BracketPreview`,
-  enveloppé dans la page du tournoi) —
+  enveloppé dans la page du tournoi), le tableau des inscriptions en mode staff
+  (`RegistrationsPanel`, `PodiumTiersOffWhen off={showActions}`) —
   des outils, pas une vitrine.
 - **Ligne en retrait** (`data-podium-muted` : perdant d'un match dans
   `MatchRow`, équipe éliminée ou forfait dans les classements Survie, Suisse et
@@ -108,10 +109,11 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
-  fond le plus clair où la lueur reste — la ligne de l'engagé du lecteur, à
-  6 % de cyan — **éclairé par la lueur** au bord des lettres (moitié de chaque
+  fond le plus clair où la lueur reste — le bandeau du champion d'un arbre,
+  à 8 % de vert, devant la ligne de l'engagé du lecteur à 6 % de cyan —
+  **éclairé par la lueur** au bord des lettres (moitié de chaque
   opacité, lueurs cumulées) — `tests/app/podium-tiers-style.test.ts`. D'où des
-  lueurs retenues : cyan 0,16 + violet 0,3 à la 1re, violet 0,25 à la 3e.
+  lueurs retenues : cyan 0,14 + violet 0,26 à la 1re, violet 0,2 à la 3e.
 - **Mouvement** : le reflet ne déplace que `background-position`, motif
   périodique (pas de saut), en pause par `var(--deco-anim-state)` (régime de
   charge `useClientPower`, mouvement réduit, menu d'accessibilité). À l'arrêt,
