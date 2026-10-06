@@ -146,7 +146,7 @@ describe("podium", () => {
   it("garde les trois premières, dans l'ordre, avec leur marche dans la langue", () => {
     const fr = podiumShareEntries(rows, frShare)!;
     expect(fr.map((entry) => [entry.place, entry.placeLabel, entry.name, entry.points])).toEqual([
-      [1, "1er", "Alpha", "1240 pts"],
+      [1, "1re", "Alpha", "1240 pts"],
       [2, "2e", "Bravo", "1180 pts"],
       [3, "3e", "Charlie", "1100 pts"],
     ]);

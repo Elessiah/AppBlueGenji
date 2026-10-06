@@ -191,8 +191,10 @@ export function resolvePageShareCard(
 /**
  * Longueur maximale d'un nom d'équipe sur le podium : le nom est écrit en
  * 30 px gras dans une colonne utile de 292 px (336 px moins les marges) : deux
- * lignes y tiennent environ 24 caractères, même en capitales larges. Au-delà, coupe sur un
- * mot avec une ellipse (`truncateForShare`).
+ * lignes y tiennent environ 24 caractères de casse ordinaire
+ * (une coupe à 20 tronquait déjà « Test - Bracket Team 45 », qui tient). Au-delà, coupe sur
+ * un mot avec une ellipse (`truncateForShare`) ; un nom tout en capitales larges
+ * peut encore déborder, la limite de deux lignes du rendu le coupe alors.
  */
 export const PODIUM_NAME_MAX_LENGTH = 24;
 

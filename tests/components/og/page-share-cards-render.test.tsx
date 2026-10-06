@@ -96,7 +96,7 @@ describe("carte du podium", () => {
     expect(order.every((position) => position > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html).toContain("1240 pts");
-    expect(html).toContain("1er");
+    expect(html).toContain("1re");
     expect(html).toContain("2e");
     expect(html).toContain("3e");
   });
