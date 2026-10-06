@@ -29,17 +29,22 @@ function call(path: string, init: { method?: string; headers?: Record<string, st
 const forwarded = (response: Response, name: string) => response.headers.get(`x-middleware-request-${name}`);
 const rewrittenTo = (response: Response) => response.headers.get("x-middleware-rewrite");
 
-describe("middleware — adresses anglaises réécrites", () => {
-  it("réécrit /en/regles vers /regles, langue en, chemin sans préfixe", () => {
+// La réécriture `/en/…` → `/…` est faite par `next.config.ts`, sur la foi de
+// `x-bg-locale: en` (`tests/app/locale-rewrites.test.ts`) : le middleware ne
+// rédige jamais d'adresse de réécriture (incident du 2026-10-06).
+describe("middleware — adresses anglaises marquées", () => {
+  it("marque /en/regles anglais, chemin sans préfixe, sans réécriture absolue", () => {
     const response = call("/en/regles?mode=swiss");
-    expect(rewrittenTo(response)).toBe(`${ORIGIN}/regles?mode=swiss`);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(rewrittenTo(response)).toBeNull();
     expect(forwarded(response, LOCALE_HEADER)).toBe("en");
     expect(forwarded(response, PATHNAME_HEADER)).toBe("/regles");
   });
 
-  it("réécrit /en vers l'accueil", () => {
+  it("marque /en (l'accueil) anglais", () => {
     const response = call("/en");
-    expect(rewrittenTo(response)).toBe(`${ORIGIN}/`);
+    expect(rewrittenTo(response)).toBeNull();
+    expect(forwarded(response, PATHNAME_HEADER)).toBe("/");
     expect(forwarded(response, LOCALE_HEADER)).toBe("en");
   });
 
@@ -108,9 +113,9 @@ describe("middleware — adresses préfixées refusées ou renvoyées", () => {
 });
 
 describe("middleware — préchargements de /en", () => {
-  it("réécrit et marque anglais un préchargement, langue du client ignorée", () => {
+  it("marque anglais un préchargement, langue du client ignorée", () => {
     const response = call("/en/regles", { headers: { purpose: "prefetch", [LOCALE_HEADER]: "fr" } });
-    expect(rewrittenTo(response)).toBe(`${ORIGIN}/regles`);
+    expect(rewrittenTo(response)).toBeNull();
     expect(forwarded(response, LOCALE_HEADER)).toBe("en");
     expect(forwarded(response, PATHNAME_HEADER)).toBe("/regles");
   });
@@ -120,7 +125,7 @@ describe("middleware — préchargements de /en", () => {
   });
 
   it("déclare /en/:path* au matcher, sans l'exclusion des préchargements", () => {
-    expect(config.matcher).toContain("/en/:path*");
+    expect(config.matcher).toContain("/:prefix([eE][nN])/:path*");
   });
 });
 

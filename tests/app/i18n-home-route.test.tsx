@@ -51,11 +51,14 @@ describe("accueil traduit — middleware", () => {
     process.env.APP_URL = previousAppUrl;
   });
 
-  it("/en est réécrit vers l'accueil, en anglais — plus de 307", () => {
+  // La réécriture vers `/` est faite par `next.config.ts`, sur la foi de la
+  // marque (`tests/app/locale-rewrites.test.ts`).
+  it("/en passe, marqué anglais pour l'accueil — plus de 307", () => {
     for (const path of ["/en", "/en/"]) {
       const response = middleware(new NextRequest(`${PUBLIC}${path}`));
       expect(response.status).not.toBe(307);
-      expect(response.headers.get("x-middleware-rewrite")).toBe(`${PUBLIC}/`);
+      expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(response.headers.get("x-middleware-request-x-pathname")).toBe("/");
       expect(response.headers.get("x-middleware-request-x-bg-locale")).toBe("en");
     }
   });
