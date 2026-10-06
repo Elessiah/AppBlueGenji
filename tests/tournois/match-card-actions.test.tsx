@@ -321,6 +321,14 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     );
   });
 
+  it("écoute la tabulation sur les boutons du panneau, jamais sur son conteneur (élément non interactif)", () => {
+    expect(source).toContain("onKeyDown={inMenu ? onPanelKeyDown : undefined}");
+    expect(source).toContain("const index = buttons.indexOf(e.currentTarget);");
+    const panel = /<div\s+id=\{panelId\}[\s\S]*?>/.exec(source)?.[0] ?? "";
+    expect(panel).not.toBe("");
+    expect(panel).not.toMatch(/onKey(Down|Up|Press)=/);
+  });
+
   it("une action du menu rend le focus au bouton avant de s'exécuter", () => {
     expect(source).toMatch(/setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);\s*\}\s*handlers\[action\.id\]\(\);/);
   });
