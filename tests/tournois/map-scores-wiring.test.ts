@@ -51,6 +51,22 @@ describe("détail map par map — focus et interblocages", () => {
     expect(list).toContain("id={`${idPrefix}-map-${index}-remove`}");
   });
 
+  it("ajouter une map porte le focus sur le code de la nouvelle ligne", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list).toContain("focusNewRow.current = true;");
+    expect(list).toMatch(/mapFieldId\(idPrefix, maps\.length - 1, "replayCode"\)/);
+  });
+
+  it("la modale de détail se ferme quand le détail disparaît", () => {
+    const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
+    expect(details).toMatch(/if \(!hasMaps\) setOpen\(false\);/);
+  });
+
+  it("une ligne vierge qu'on vient d'ajouter n'affiche pas de reproche", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toMatch(/const showBlocker = blocker !== null && \(unchangedMine \|\| touched\);/);
+  });
+
   it("le forfait déclaré par une engagée est rejoué sur interblocage", () => {
     const index = readSource("lib/server/tournaments/index.ts");
     expect(index).toMatch(/await retryOnDeadlock\(\(\) =>\s*runPlayerMatchWrite\(tournamentId, matchId, \(connection\) =>\s*forfeitOwnMatch\(/);

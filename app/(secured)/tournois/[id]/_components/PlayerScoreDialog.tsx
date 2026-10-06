@@ -261,8 +261,10 @@ export function PlayerScoreDialog({
   if (unchangedMine) blocker = `Score déjà envoyé : en attente de ${opponentName}.`;
   else if (check.error) blocker = mapListViolationMessage(check.error, matchFormat, game);
   // Une saisie vide n'est pas un refus : la raison ne s'affiche qu'une fois
-  // une map ajoutée, pour ne pas ouvrir la modale sur un reproche.
-  const showBlocker = blocker !== null && (unchangedMine || maps.length > 0);
+  // une map **renseignée** — une ligne vierge qu'on vient d'ajouter n'appelle
+  // pas encore de reproche.
+  const touched = maps.some((m) => m.replayCode.trim() !== "" || m.team1Score !== 0 || m.team2Score !== 0);
+  const showBlocker = blocker !== null && (unchangedMine || touched);
 
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.backdrop} role="presentation" {...backdrop}>

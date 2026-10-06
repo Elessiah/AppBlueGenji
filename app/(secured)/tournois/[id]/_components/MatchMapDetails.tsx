@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Copy } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
@@ -72,7 +72,13 @@ export function MapResultList({
  */
 export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name"> }>) {
   const [open, setOpen] = useState(false);
-  if (match.maps.length === 0) return null;
+  // Le détail disparu (score corrigé à la main, forfait) ferme la modale : elle
+  // ne doit pas se rouvrir d'elle-même au retour d'un détail.
+  const hasMaps = match.maps.length > 0;
+  useEffect(() => {
+    if (!hasMaps) setOpen(false);
+  }, [hasMaps]);
+  if (!hasMaps) return null;
   const team1 = match.team1Name ?? "Équipe 1";
   const team2 = match.team2Name ?? "Équipe 2";
 

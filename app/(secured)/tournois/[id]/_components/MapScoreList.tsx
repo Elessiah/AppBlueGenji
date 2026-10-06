@@ -107,8 +107,18 @@ export function MapScoreList({
     focusAfterRemove.current = index;
     onChange(maps.filter((_, i) => i !== index));
   };
+  // Après un ajout, le focus va au code de la nouvelle ligne : c'est la suite
+  // de la saisie, et le bouton « Ajouter » peut se désactiver sous le focus
+  // (plafond atteint), ce qui le renverrait au `<body>`.
+  const focusNewRow = useRef(false);
+  useEffect(() => {
+    if (!focusNewRow.current) return;
+    focusNewRow.current = false;
+    if (maps.length > 0) document.getElementById(mapFieldId(idPrefix, maps.length - 1, "replayCode"))?.focus();
+  }, [maps.length, idPrefix]);
   const add = () => {
     keys.current = [...keys.current, newKey()];
+    focusNewRow.current = true;
     onChange([...maps, emptyMap()]);
   };
 
