@@ -26,7 +26,7 @@
 // Avancer la version à chaque modification de `public/offline.html` : le
 // cache précédent est effacé à l'activation.
 const OFFLINE_CACHE_PREFIX = "bg-offline-";
-const OFFLINE_CACHE = OFFLINE_CACHE_PREFIX + "v1";
+const OFFLINE_CACHE = OFFLINE_CACHE_PREFIX + "v2";
 const OFFLINE_URL = "/offline.html";
 
 /**
