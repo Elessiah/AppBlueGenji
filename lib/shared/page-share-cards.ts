@@ -189,11 +189,12 @@ export function resolvePageShareCard(
 }
 
 /**
- * Longueur maximale d'un nom d'équipe sur le podium : une colonne fait 320 px,
- * deux lignes de 34 px y tiennent environ 30 caractères. Au-delà, coupe sur un
+ * Longueur maximale d'un nom d'équipe sur le podium : le nom est écrit en
+ * 30 px gras dans une colonne utile de 292 px (336 px moins les marges) : deux
+ * lignes y tiennent environ 24 caractères, même en capitales larges. Au-delà, coupe sur un
  * mot avec une ellipse (`truncateForShare`).
  */
-export const PODIUM_NAME_MAX_LENGTH = 30;
+export const PODIUM_NAME_MAX_LENGTH = 24;
 
 /** Une marche du podium telle que la carte la dessine. */
 export type PodiumShareEntry = {

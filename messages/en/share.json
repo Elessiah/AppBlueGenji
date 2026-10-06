@@ -1,5 +1,5 @@
 {
-  "footer": "Nonprofit association",
+  "footer": "French nonprofit (law of 1901)",
   "pages": {
     "home": {
       "eyebrow": "Overwatch · Marvel Rivals",
@@ -108,7 +108,7 @@
     }
   },
   "ruleMode": {
-    "eyebrow": "Mode rules"
+    "eyebrow": "Game mode rules"
   },
   "podium": {
     "eyebrow": "Ranking",
