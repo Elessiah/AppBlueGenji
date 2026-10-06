@@ -33,7 +33,7 @@
     },
     "login": {
       "eyebrow": "Member area",
-      "title": "Sign in to BlueGenji",
+      "title": "Log in to BlueGenji",
       "subtitle": "No password: Google, Discord or Battle.net, or a code sent to you on Discord."
     },
     "bot": {
@@ -84,27 +84,27 @@
     "tournaments": {
       "eyebrow": "Tournaments",
       "title": "Amateur tournaments",
-      "subtitle": "Registration, real-time brackets and results of Overwatch and Marvel Rivals tournaments. Sign in required."
+      "subtitle": "Registration, real-time brackets and results of Overwatch and Marvel Rivals tournaments. Login required."
     },
     "teams": {
       "eyebrow": "Teams",
       "title": "The teams of the scene",
-      "subtitle": "Directory of the teams registered on BlueGenji. Sign in to browse it."
+      "subtitle": "Directory of the teams registered on BlueGenji. Log in to browse it."
     },
     "team": {
       "eyebrow": "Teams",
       "title": "Team profile",
-      "subtitle": "Roster, achievements and statistics. Sign in to view it."
+      "subtitle": "Roster, achievements and statistics. Log in to view it."
     },
     "players": {
       "eyebrow": "Players",
       "title": "The players of the scene",
-      "subtitle": "Directory of the players registered on BlueGenji. Sign in to browse it."
+      "subtitle": "Directory of the players registered on BlueGenji. Log in to browse it."
     },
     "player": {
       "eyebrow": "Players",
       "title": "Player profile",
-      "subtitle": "Teams, roles and statistics. Sign in to view it."
+      "subtitle": "Teams, roles and statistics. Log in to view it."
     }
   },
   "teamProfile": {
