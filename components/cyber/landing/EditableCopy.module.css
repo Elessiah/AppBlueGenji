@@ -4,7 +4,10 @@
   display: contents;
 }
 
+/* `position: relative` : au-dessus des calques décoratifs absolus d'un en-tête
+   (trame, aurore), qui sinon voilent le crayon et l'éditeur. */
 .pencil {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -34,6 +37,7 @@
 }
 
 .editor {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;

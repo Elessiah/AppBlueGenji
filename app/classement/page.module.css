@@ -47,6 +47,7 @@
 .heroSub {
   position: relative;
   margin: 20px 0 0;
+  white-space: pre-line;
   color: var(--ink-soft);
   font-size: 17px;
   line-height: 1.6;
@@ -343,6 +344,16 @@
 .nameTier3 :global(.entity-link):hover,
 .nameTier3 :global(.entity-link):focus-visible {
   color: var(--blue-100);
+}
+
+/* Imprimé : les fonds ne s'impriment pas, un nom peint par `background-clip`
+   sortirait vide — couleur pleine, comme `.text-gradient` (globals.css). */
+@media print {
+  .nameTier1 :global(.entity-link),
+  .nameTier2 :global(.entity-link) {
+    background: none;
+    color: var(--blue-500);
+  }
 }
 
 .podiumPoints {
