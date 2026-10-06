@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { clearCache } from "@/lib/server/cache";
 import {
-  SHARE_IMAGE_CACHE_MAX_ENTRIES,
+  MAX_CONCURRENT_RENDERS,
+  SHARE_IMAGE_POOL_LIMITS,
   cachedShareImage,
   clearShareImageCache,
 } from "@/lib/server/share-image-cache";
@@ -54,7 +55,51 @@ describe("cachedShareImage", () => {
     expect(await cachedShareImage("fr:y", 1000, failing)).not.toBeNull();
   });
 
-  it("borne le nombre de cartes gardées (LRU)", async () => {
+  it("ne laisse jamais les cartes d'équipe chasser les cartes fixes", async () => {
+    const fixed = jest.fn(png("fixed"));
+    await cachedShareImage("fr:association", 60_000, fixed);
+    for (let index = 0; index < SHARE_IMAGE_POOL_LIMITS.team * 3; index += 1) {
+      await cachedShareImage(`fr:team-${index}`, 60_000, png(`t${index}`), "team");
+    }
+    await cachedShareImage("fr:association", 60_000, fixed);
+    expect(fixed).toHaveBeenCalledTimes(1);
+  });
+
+  it("borne la réserve des équipes (LRU)", async () => {
+    const first = jest.fn(png("t0"));
+    await cachedShareImage("fr:team-0", 60_000, first, "team");
+    for (let index = 1; index <= SHARE_IMAGE_POOL_LIMITS.team; index += 1) {
+      await cachedShareImage(`fr:team-${index}`, 60_000, png(`t${index}`), "team");
+    }
+    await cachedShareImage("fr:team-0", 60_000, first, "team");
+    expect(first).toHaveBeenCalledTimes(2);
+  });
+
+  it(`ne rend pas plus de ${MAX_CONCURRENT_RENDERS} cartes à la fois`, async () => {
+    let running = 0;
+    let peak = 0;
+    const slow = (key: string) => async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      running -= 1;
+      return new Response(key);
+    };
+    const keys = Array.from({ length: 8 }, (_, index) => `fr:team-${index}`);
+    const images = await Promise.all(keys.map((key) => cachedShareImage(key, 60_000, slow(key), "team")));
+    expect(peak).toBe(MAX_CONCURRENT_RENDERS);
+    expect(images.every((image) => image !== null)).toBe(true);
+  });
+
+  it("libère sa place après un échec", async () => {
+    const failing = jest.fn<() => Promise<Response | null>>().mockRejectedValue(new Error("satori"));
+    for (let index = 0; index < MAX_CONCURRENT_RENDERS + 1; index += 1) {
+      await expect(cachedShareImage(`fr:f${index}`, 1000, failing)).rejects.toThrow("satori");
+    }
+    expect(await cachedShareImage("fr:ok", 1000, png("ok"))).not.toBeNull();
+  });
+
+  it("borne le nombre de cartes fixes gardées (LRU)", async () => {
     const builds = new Map<string, jest.Mock<() => Promise<Response | null>>>();
     const build = (key: string) => {
       const fn = builds.get(key) ?? jest.fn(png(key));
@@ -62,7 +107,7 @@ describe("cachedShareImage", () => {
       return fn;
     };
     await cachedShareImage("k0", 60_000, build("k0"));
-    for (let index = 1; index <= SHARE_IMAGE_CACHE_MAX_ENTRIES; index += 1) {
+    for (let index = 1; index <= SHARE_IMAGE_POOL_LIMITS.fixed; index += 1) {
       // k0 relue à chaque tour : la plus récente, jamais chassée.
       await cachedShareImage("k0", 60_000, build("k0"));
       await cachedShareImage(`k${index}`, 60_000, build(`k${index}`));
