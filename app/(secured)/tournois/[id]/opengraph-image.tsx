@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { ShareCard, SHARE_CARD_SIZE, SHARE_CARD_CONTENT_TYPE } from "@/components/og/share-card";
+import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { SITE_NAME, SITE_SHARE_CARD, tournamentShareCard } from "@/lib/shared/share-metadata";
 
@@ -45,9 +46,11 @@ export default async function Image({ params }: Readonly<{ params: Promise<{ id:
       ? await getVisibleTournamentCard(tournamentId).catch(() => null)
       : null;
 
+  const logoSrc = await shareCardLogo();
+
   if (!card) {
-    return new ImageResponse(<ShareCard {...SITE_SHARE_CARD} />, size);
+    return new ImageResponse(<ShareCard {...SITE_SHARE_CARD} logoSrc={logoSrc} />, size);
   }
 
-  return new ImageResponse(<ShareCard {...tournamentShareCard(card)} />, size);
+  return new ImageResponse(<ShareCard {...tournamentShareCard(card)} logoSrc={logoSrc} />, size);
 }
