@@ -108,7 +108,8 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
   const fieldErrors = useFieldErrors(SPONSOR_FIELD_ERRORS, DESCRIPTION_FIELD_IDS);
-  const { cropImage, cropDialog } = useImageCropper();
+  // Modale portée dans body : sous `/en`, elle dit elle-même sa langue (D4).
+  const { cropImage, cropDialog } = useImageCropper({ lang: staffLang });
   const [items, setItems] = useState<Sponsor[]>(sponsors);
   const [editing, setEditing] = useState<Sponsor | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);

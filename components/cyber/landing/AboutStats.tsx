@@ -271,6 +271,7 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
           <label className={styles.modalField}>
             <span className={styles.modalLabel}>Valeur</span>
             <input
+              id={STAT_FIELD_IDS.value}
               className={styles.modalInput}
               value={form.value}
               maxLength={ABOUT_STAT_VALUE_MAX}

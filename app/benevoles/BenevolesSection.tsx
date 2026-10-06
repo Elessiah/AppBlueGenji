@@ -107,7 +107,8 @@ export function BenevolesSection({
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
   const fieldErrors = useFieldErrors(BENEVOLE_FIELD_ERRORS, CATEGORY_FIELD_IDS);
-  const { cropImage, cropDialog } = useImageCropper();
+  // Modale portée dans body : sous `/en`, elle dit elle-même sa langue (D4).
+  const { cropImage, cropDialog } = useImageCropper({ lang: staffLang });
   const [benevoles, setBenevoles] = useState<Benevole[]>(initialBenevoles);
   // Catégories dans la langue de la page : sous `/en`, celles qui n'ont pas
   // encore d'anglais ne sont pas rendues (`localizedCategories`).
