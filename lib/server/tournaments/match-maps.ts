@@ -224,6 +224,7 @@ const SET_KEY: Readonly<Record<MatchMapSource, keyof MatchMapSets>> = {
 export async function loadMapsByMatch(
   connection: PoolConnection,
   matchIds: ReadonlyArray<number>,
+  sources: ReadonlyArray<MatchMapSource> = ["FINAL"],
 ): Promise<Map<number, MatchMapSets>> {
   const byMatch = new Map<number, MatchMapSets>();
   if (matchIds.length === 0) return byMatch;
@@ -231,8 +232,9 @@ export async function loadMapsByMatch(
     `SELECT match_id, source, map_number, replay_code, team1_score, team2_score
      FROM bg_match_maps
      WHERE match_id IN (${matchIds.map(() => "?").join(", ")})
+       AND source IN (${sources.map(() => "?").join(", ")})
      ORDER BY match_id, source, map_number`,
-    [...matchIds],
+    [...matchIds, ...sources],
   );
   // Tolérant : un double de connexion qui ne connaît pas la table rend rien.
   const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];
@@ -285,7 +287,7 @@ export async function loadViewerProposals(
 ): Promise<MatchProposalMaps[]> {
   const eligible = proposalMatches(matches, scope);
   if (eligible.length === 0) return [];
-  const byMatch = await loadMapsByMatch(connection, eligible.map((match) => match.id));
+  const byMatch = await loadMapsByMatch(connection, eligible.map((match) => match.id), REPORTED_MAP_SOURCES);
   return eligible.map((match) => {
     const sets = byMatch.get(match.id);
     return {

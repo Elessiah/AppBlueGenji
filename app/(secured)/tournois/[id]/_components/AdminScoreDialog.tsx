@@ -66,7 +66,7 @@ interface AdminScoreDialogProps {
   /** Détail des propositions en attente (contexte du lecteur, `MAP_SCORES.md`). */
   proposals?: MatchProposalMaps[];
   /** Relit le contexte du lecteur quand une proposition a changé. */
-  onRefreshProposals?: () => void;
+  onRefreshProposals?: () => void | Promise<unknown>;
   onClose: () => void;
   onSubmitted: () => void;
 }

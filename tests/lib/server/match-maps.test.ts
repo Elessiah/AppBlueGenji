@@ -109,9 +109,12 @@ describe("stockage map par map (bg_match_maps)", () => {
       { match_id: 11, source: "TEAM1", map_number: 1, replay_code: "T1", team1_score: 1, team2_score: 0 },
     ];
     const { execute, connection } = conn([[rows, []]]);
-    const byMatch = await loadMapsByMatch(connection, [10, 11]);
+    const byMatch = await loadMapsByMatch(connection, [10, 11], ["FINAL", "TEAM1", "TEAM2"]);
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[0][1]).toEqual([10, 11]);
+    expect(execute.mock.calls[0][1]).toEqual([10, 11, "FINAL", "TEAM1", "TEAM2"]);
+    // Par défaut, le seul détail retenu — celui que porte l'instantané.
+    await loadMapsByMatch(connection, [10]);
+    expect(execute.mock.calls[1][1]).toEqual([10, "FINAL"]);
     expect(byMatch.get(10)?.final.map((m) => m.replayCode)).toEqual(["F1"]);
     expect(byMatch.get(10)?.team2.map((m) => m.replayCode)).toEqual(["T2"]);
     expect(byMatch.get(11)?.team1.map((m) => m.replayCode)).toEqual(["T1"]);

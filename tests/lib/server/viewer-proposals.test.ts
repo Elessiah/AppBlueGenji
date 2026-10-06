@@ -35,7 +35,7 @@ describe("propositions map par map — qui les lit (MAP_SCORES.md)", () => {
       reportedAt: reportAt,
       maps: [{ mapNumber: 1, replayCode: "SECRET", team1Score: 2, team2Score: 0 }],
     });
-    expect(execute.mock.calls[0][1]).toEqual([10]);
+    expect(execute.mock.calls[0][1]).toEqual([10, "TEAM1", "TEAM2"]);
   });
 
   it("un spectateur, ou un membre sans qualité pour reporter, ne lit rien — et rien n'est lu en base", async () => {

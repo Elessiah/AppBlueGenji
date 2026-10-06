@@ -59,7 +59,7 @@ interface PlayerScoreDialogProps {
   onClose: () => void;
   onSubmitted: () => void;
   /** Relit le contexte du lecteur (lecture REST) : une proposition a changé. */
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<unknown>;
 }
 
 /** Empreinte des propositions en attente : ce que le flux peut changer sous la saisie. */
