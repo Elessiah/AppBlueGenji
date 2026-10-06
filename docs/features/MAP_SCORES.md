@@ -182,7 +182,9 @@ La seconde équipe ne ressaisit rien :
 - **Proposition sans détail** (antérieure aux maps, ou détail resté
   introuvable après trois relectures) : la modale s'ouvre vide et la phrase
   d'état dit de saisir les maps jouées et leurs codes pour confirmer, au lieu
-  de « Confirme-le ».
+  de « Confirme-le ». Tant que le détail est **en lecture** (proposition
+  arrivée par le flux), la phrase le dit, pour que le joueur ne ressaisisse pas
+  ce qui va pré-remplir le formulaire.
 
 **Lisibilité de la saisie.** Le compteur « Maps jouées (n/N) » annonce le format
 (BO3 → 3) ; les maps nulles rejouables au-delà sont dites dans l'aide et ne
@@ -242,7 +244,9 @@ le tait.
   proposition est en lecture (`proposalsNeedRefresh`, formulaire sans map ni
   forfait), « Enregistrer » et « Valider » attendent, avec une phrase visible :
   un score validé avant partirait avec `maps: []` et effacerait les codes de la
-  proposition à la clôture.
+  proposition à la clôture. Une seule phrase sous les boutons, dans l'ordre de
+  l'infobulle : détail en lecture, map refusée (une fois une map renseignée),
+  puis blocage du score.
 
 ## RGPD
 
