@@ -41,6 +41,9 @@ barre. Sont refusés, et remplacés par `/tournois` :
 | `javascript:alert(1)` | schéma exécutable — ne commence pas par `/` |
 | `tournois`, `../admin` | relatif : se résout contre la page courante |
 | `/‹CTRL›/exemple.invalid` | tabulation, saut de ligne, retour chariot |
+| `/en//exemple.invalid`, `/regles//x` | `//` **n'importe où** dans le chemin : le préfixe de langue, retiré puis reposé, le démasquerait (lot 6) |
+| `/en/\exemple.invalid` | contre-barre n'importe où dans le chemin (lue comme une barre) |
+| `/en/%2F%2Fexemple.invalid`, `%5C` | barre ou contre-barre encodée, qu'un relais peut décoder |
 | tout ce qui n'est pas une chaîne | paramètre absent, tableau, objet |
 
 Le dernier cas de refus n'est pas une précaution de forme : les navigateurs
@@ -50,13 +53,40 @@ Le dernier cas de refus n'est pas une précaution de forme : les navigateurs
 légitime n'en contient jamais.
 
 Ce qui passe garde sa requête et son fragment (`/tournois/12?phase=2`,
-`/tournois/12#match-42`) : c'est tout le contexte du lien partagé.
+`/tournois/12#match-42`) : c'est tout le contexte du lien partagé. Les trois
+derniers refus ne lisent que le **chemin** : une requête peut porter une adresse
+(`/tournois?retour=https://…`).
+
+## Langue (lot 6)
+
+La page existe aussi sous `/en/connexion` (`docs/features/I18N.md` § Connexion).
+La destination revient **dans la langue de la page de connexion** :
+`loginDestination(value, locale)` = `localeHref(safeRedirectPath(value), locale)`
+— `/en/connexion?redirect=/regles` ramène sur `/en/regles`, une route pas encore
+traduite reste française (`/tournois`), un visiteur français reste français.
+
+- **Voie Discord** : la page calcule `loginDestination` et navigue par
+  `useLocaleRouter` (chargement complet si la langue change).
+- **Voie OAuth** : les boutons ajoutent `lang=en` à la route de départ
+  (`oauthStartPath(…, { locale })`). L'aller **scelle** la destination dans
+  cette langue (`sealedReturnPath` : `/en/tournois`, préfixe compris même pour
+  une route pas encore traduite) ; le retour relit la langue dans cette
+  destination (`sealedReturnLocale`), renvoie un refus sur `/en/connexion` et une
+  réussite sur `loginDestination(saved.redirectTo, locale)`. Le cookie `bg_oauth`
+  ne gagne **aucun champ** (ce que `/rgpd` en dit, « la page où vous ramener »,
+  reste exact), et l'**adresse de rappel** enregistrée chez Google, Discord et
+  Blizzard (`/api/auth/<slug>/callback`) ne change pas. Sans cookie d'état
+  lisible au retour (expiré, contexte qui l'isole), la langue n'est plus connue :
+  le refus revient sur `/connexion`, en français.
+- **Visiteur déjà connecté** : `signedInLoginRedirect` compare la destination
+  **sans préfixe** (`/en/connexion` est la page elle-même) ; la page la rend
+  ensuite dans sa langue (`localeHref`).
 
 ## Trois portes, pas une
 
 La valeur franchit trois seuils, et chacun filtre :
 
-1. **`/connexion`** — le paramètre d'URL, pour la voie Discord (`router.push`) ;
+1. **`/connexion`** (et `/en/connexion`) — le paramètre d'URL, pour la voie Discord (`router.push`) ;
 2. **l'aller OAuth** (`/api/auth/google/start`) — avant de l'écrire dans le
    cookie d'état ;
 3. **le retour OAuth** (`/api/auth/google/callback`) — en la relisant.
@@ -68,7 +98,8 @@ chose.
 
 `AuthGate`, lui, n'a rien à filtrer : sa destination vient de `usePathname()`,
 pas d'un paramètre — elle ne peut désigner qu'un chemin du site. Le filtre la
-laisse passer telle quelle.
+laisse passer telle quelle. Préfixe de langue compris, et son lien passe par
+`LocaleLink` : la page de connexion est celle de la langue lue.
 
 ## Visiteur déjà connecté
 
