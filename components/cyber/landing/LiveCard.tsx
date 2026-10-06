@@ -1,21 +1,40 @@
 "use client";
 
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
-import type { LandingLive } from "@/lib/shared/landing";
-import {
-  FEATURED_TOURNAMENT_STATE_LABEL,
-  featuredMatchPill,
-  inferPhaseLabel,
-  visibleLiveViewerCount,
-} from "@/lib/shared/landing";
+import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
+import { featuredMatchPill, inferPhaseLabel, visibleLiveViewerCount } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform, type MatchLiveState } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import { useClock } from "@/lib/shared/hooks/useClock";
+import type { LandingText } from "@/lib/shared/landing-text";
+import { useLandingText } from "@/components/i18n/landing-text";
 import styles from "./LiveCard.module.css";
+
+/**
+ * Nom de la manche dans la langue de la page. Le français garde `roundLabel`,
+ * rédigé par le serveur ; l'anglais le relit d'après `round`.
+ */
+function roundText({ t, locale }: LandingText, match: LandingLiveMatch): string {
+  if (locale === "fr") return match.roundLabel;
+  return match.round.kind === "round"
+    ? t("live.round.round", { n: String(match.round.number) })
+    : t(`live.round.${match.round.kind}`);
+}
+
+/**
+ * Phase affichée sous la pastille. En français, `inferPhaseLabel` (inchangé :
+ * la finale, la demi-finale et les quarts se lisent « PHASE FINALE ») ; en
+ * anglais, la même règle d'après `round`.
+ */
+function phaseText(text: LandingText, match: LandingLiveMatch): string {
+  if (text.locale === "fr") return inferPhaseLabel(match);
+  if (match.round.kind === "round") return text.t("live.phase.round", { n: String(match.round.number) });
+  return text.t("live.phase.final");
+}
 
 /** Relecture de l'horloge pour un match daté : à la demi-minute près. */
 const LIVE_CARD_CLOCK_MS = 30_000;
@@ -39,9 +58,10 @@ type LiveCardProps = {
  * vide — bye, adversaire encore à désigner — ne mène nulle part.
  */
 function EntrantName({ href, name }: Readonly<{ href: string | null; name: string }>) {
+  const { t } = useLandingText();
   if (!href) return <>{name}</>;
   return (
-    <EntityLink href={href} className={`${styles.nested} ${styles.entrantLink}`} title={`Voir la fiche de ${name}`}>
+    <EntityLink href={href} className={`${styles.nested} ${styles.entrantLink}`} title={t("common.teamPageTitle", { name })}>
       {name}
     </EntityLink>
   );
@@ -62,17 +82,18 @@ function MatchStreamBanner({
   liveUrl,
   matchLabel,
 }: Readonly<{ liveState: MatchLiveState; liveUrl: string | null; matchLabel: string }>) {
+  const { t } = useLandingText();
   const streamHref = liveState === "LIVE" ? liveUrl : null;
   if (liveState === "SCHEDULED") {
     return (
       <div className={styles.streamBannerScheduled}>
-        <span className={styles.streamLabel}>○ DIFFUSION ANNONCÉE</span>
+        <span className={styles.streamLabel}>{t("live.streamScheduled")}</span>
       </div>
     );
   }
   if (!streamHref) return null;
   const platform = streamPlatform(streamHref);
-  const onPlatform = platform ? ` sur ${PLATFORM_LABELS[platform]}` : "";
+  const platformName = platform ? PLATFORM_LABELS[platform] : null;
   return (
     <div className={styles.streamBanner}>
       <a
@@ -80,10 +101,14 @@ function MatchStreamBanner({
         href={streamHref}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={`Regarder ${matchLabel} en direct${onPlatform} (nouvel onglet)`}
+        aria-label={
+          platformName
+            ? t("live.watchMatchLabelOn", { match: matchLabel, platform: platformName })
+            : t("live.watchMatchLabel", { match: matchLabel })
+        }
       >
         <span aria-hidden="true">▶</span>
-        {platform ? `Regarder${onPlatform}` : "Regarder le live"}
+        {platformName ? t("live.watchOn", { platform: platformName }) : t("common.watchLive")}
       </a>
     </div>
   );
@@ -99,13 +124,12 @@ function sigilFor(name: string | null): string {
  * complément : « dans bientôt » et « dans aujourd'hui » ne se lisent pas,
  * faute de construction commune avec « dans N jours ».
  */
-function noLiveTournamentMessage(iso: string | null | undefined): string {
-  if (!iso) return "Aucun tournoi en cours, et rien n'est encore programmé.";
+function noLiveTournamentMessage({ t }: LandingText, iso: string | null | undefined): string {
+  if (!iso) return t("live.noneScheduled");
   const diff = Math.max(0, new Date(iso).getTime() - Date.now());
   const days = Math.max(0, Math.ceil(diff / 86400000));
-  if (days <= 0) return "Aucun tournoi en cours. Le prochain démarre aujourd'hui.";
-  if (days === 1) return "Aucun tournoi en cours. Le prochain démarre dans 1 jour.";
-  return `Aucun tournoi en cours. Le prochain démarre dans ${days} jours.`;
+  if (days <= 0) return t("live.nextToday");
+  return t("live.nextInDays", { days });
 }
 
 /**
@@ -126,12 +150,14 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   // carte annoncerait « En attente de lancement » jusqu'au sondage suivant.
   // Elle ne tourne que pour un tel match (`useClock` respecte le mode économe).
   const clock = useClock(LIVE_CARD_CLOCK_MS, live?.currentMatch?.launchPhase === "SCHEDULED");
+  const text = useLandingText();
+  const { t } = text;
   if (!live) {
     return (
       <CyberCard ticks className={styles.root}>
         <div className={styles.empty}>
-          <span className="pill pill-blue">INFO TOURNOI</span>
-          <p>{noLiveTournamentMessage(nextUpcomingISO)}</p>
+          <span className="pill pill-blue">{t("live.info")}</span>
+          <p>{noLiveTournamentMessage(text, nextUpcomingISO)}</p>
         </div>
       </CyberCard>
     );
@@ -148,15 +174,16 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   // maps de la qualification. Le serveur l'a déjà résolu (`LandingLiveMatch`).
   const matchFormat = currentMatch?.matchFormat ?? null;
   const title = live.tournament.name.toUpperCase();
-  const matchPill = currentMatch ? featuredMatchPill(currentMatch, clock) : null;
+  const matchPill = currentMatch ? featuredMatchPill(currentMatch, clock, text.locale) : null;
 
   const visibleViewers = visibleLiveViewerCount(live.viewers);
-  const team1Label = currentMatch?.team1Name ?? "Équipe 1";
-  const team2Label = currentMatch?.team2Name ?? "Équipe 2";
+  const team1Label = currentMatch?.team1Name ?? t("live.team1");
+  const team2Label = currentMatch?.team2Name ?? t("live.team2");
   const href = tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null);
+  const tournament = live.tournament.name;
   const openLabel = currentMatch
-    ? `Ouvrir ${live.tournament.name} sur le match ${team1Label} contre ${team2Label}`
-    : `Ouvrir la fiche du tournoi ${live.tournament.name}`;
+    ? t("live.openMatch", { tournament, team1: team1Label, team2: team2Label })
+    : t("live.openTournament", { tournament });
 
   return (
     // `lift` : la carte est cliquable de bout en bout, sa bordure doit réagir au
@@ -166,7 +193,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
     <CyberCard ticks lift className={styles.root}>
       {/* Plaque de lien : posée en premier pour rester sous les liens imbriqués
           dans l'ordre du DOM autant que par le `z-index`. */}
-      <Link href={href} className={styles.cardOverlay} aria-label={openLabel} />
+      <LocaleLink href={href} className={styles.cardOverlay} aria-label={openLabel} />
       {/* Reflet qui balaie la bordure haute : décoratif, figé avec le régime de charge. */}
       <span className={styles.shimmer} aria-hidden="true" />
 
@@ -175,7 +202,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
           se lisait comme l'état du match, alors que celui-ci n'était que daté. */}
       <div className={styles.head}>
         <span className={`${styles.tournamentMeta} mono`}>
-          {FEATURED_TOURNAMENT_STATE_LABEL.toUpperCase()} · {live.game.toUpperCase()}
+          {t("live.tournamentState").toUpperCase()} · {live.game.toUpperCase()}
         </span>
         {visibleViewers !== null && (
           <span className={styles.viewers}>
@@ -192,7 +219,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
           {/* La pastille dit l'état **du match**, dans les mots des sections de
               manche ; le rouge ne sert qu'à « En direct » (vraie diffusion). */}
           <div className={styles.matchHead}>
-            <Pill variant={matchPill.tone}>{matchPill.label}</Pill>
+            <Pill variant={matchPill.tone}>{t(`live.pill.${matchPill.kind}`)}</Pill>
             <span className="mono">
               {/* L'horaire d'un match en attente est l'information de la carte :
                   en cyan gras, pas noyé dans la ligne de phase. */}
@@ -202,13 +229,13 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
                   {" · "}
                 </>
               ) : null}
-              {inferPhaseLabel(currentMatch)}
+              {phaseText(text, currentMatch)}
             </span>
           </div>
           <MatchStreamBanner
             liveState={currentMatch.liveState}
             liveUrl={currentMatch.liveUrl}
-            matchLabel={`${team1Label} contre ${team2Label}`}
+            matchLabel={t("live.versus", { team1: team1Label, team2: team2Label })}
           />
 
           <div className={styles.team}>
@@ -220,14 +247,14 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
               {/* Rien plutôt qu'un seed inventé : la ligne portait « FR · SEED 1 »
                   en dur, identique sur tous les matchs de tous les tournois. */}
               {currentMatch.team1Seed !== null && (
-                <div className="mono">SEED {currentMatch.team1Seed}</div>
+                <div className="mono">{t("live.seed", { seed: String(currentMatch.team1Seed) })}</div>
               )}
             </div>
             <div className="num" style={{ fontSize: 30 }}>{currentMatch.team1Score ?? "—"}</div>
           </div>
 
           <div className={`${styles.vs} mono`}>
-            {currentMatch.roundLabel}
+            {roundText(text, currentMatch)}
             {matchFormat && (
               <>
                 {" · "}
@@ -259,7 +286,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
                 <EntrantName href={currentMatch.team2Href} name={team2Label} />
               </div>
               {currentMatch.team2Seed !== null && (
-                <div className="mono">SEED {currentMatch.team2Seed}</div>
+                <div className="mono">{t("live.seed", { seed: String(currentMatch.team2Seed) })}</div>
               )}
             </div>
             <div className="num" style={{ fontSize: 30 }}>{currentMatch.team2Score ?? "—"}</div>
@@ -267,7 +294,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
         </div>
       ) : (
         <div className={styles.match}>
-          <div className={styles.emptyMatch}>Le prochain match en direct sera affiché ici dès son lancement.</div>
+          <div className={styles.emptyMatch}>{t("live.emptyMatch")}</div>
         </div>
       )}
 
@@ -278,7 +305,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
         promettait la map jouée que le modèle ne porte pas.
       */}
       <div className={styles.footer} aria-hidden="true">
-        <span>{currentMatch ? "Voir le match dans le tournoi" : "Voir le tournoi"}</span>
+        <span>{currentMatch ? t("live.footerMatch") : t("common.viewTournament")}</span>
         <span className={styles.footerArrow}>→</span>
       </div>
     </CyberCard>

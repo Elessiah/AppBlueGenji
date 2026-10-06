@@ -38,6 +38,21 @@ const I18N_MIGRATED_FILES = [
   "components/cyber/landing/PublicNavMenu.tsx",
   "components/cyber/landing/PublicPageShell.tsx",
   "components/cyber/landing/SessionPageShell.tsx",
+  // Lot 2 — accueil. `EditableCopy`, `SponsorsGrid`, `AboutStats` et
+  // `AboutPillars` n'y sont pas : leurs contrôles de staff restent en français
+  // (D4), seuls leurs textes visiteurs passent par `landing`.
+  "app/page.tsx",
+  "components/cyber/CountdownStrip.tsx",
+  "components/cyber/Ticker.tsx",
+  "components/cyber/landing/AboutSection.tsx",
+  "components/cyber/landing/CalendarCard.tsx",
+  "components/cyber/landing/DiscordCommunity.tsx",
+  "components/cyber/landing/Hero.tsx",
+  "components/cyber/landing/JoinCTA.tsx",
+  "components/cyber/landing/LeaderCal.tsx",
+  "components/cyber/landing/Leaderboard.tsx",
+  "components/cyber/landing/LiveCard.tsx",
+  "components/cyber/landing/TournamentBoard.tsx",
   "components/error-page/**",
   "components/legal/SiteFooterBar.tsx",
   // Règles (lot 3) — pas `RulesHelpFab`, bouton des pages de tournoi (lot 8a).

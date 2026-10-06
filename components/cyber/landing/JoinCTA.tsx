@@ -1,9 +1,11 @@
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import { EditableCopy } from "./EditableCopy";
 import styles from "./JoinCTA.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { landingServerText } from "@/lib/server/i18n-landing";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 
 type JoinCTAProps = {
   /**
@@ -15,9 +17,12 @@ type JoinCTAProps = {
   copy: SiteCopy;
   /** Le viewer peut-il éditer les textes (permission `showcase`) ? */
   canEditCopy?: boolean;
+  /** Langue de la page (`requestLocale()`), français par défaut. */
+  locale?: Locale;
 };
 
-export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false }: Readonly<JoinCTAProps>) {
+export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false, locale = DEFAULT_LOCALE }: Readonly<JoinCTAProps>) {
+  const { t } = landingServerText(locale);
   return (
     <section className={styles.root}>
       <CyberCard ticks className={styles.card}>
@@ -58,14 +63,14 @@ export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false }: 
           <div className={styles.actions}>
             <CyberButton variant="primary" asChild>
               {isAuthenticated ? (
-                <Link href="/tournois">Inscrire mon équipe</Link>
+                <LocaleLink href="/tournois">{t("common.registerTeam")}</LocaleLink>
               ) : (
-                <Link href="/connexion">Créer un compte</Link>
+                <LocaleLink href="/connexion">{t("join.createAccount")}</LocaleLink>
               )}
             </CyberButton>
             <CyberButton variant="ghost" asChild>
               <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
-                Rejoindre le Discord
+                {t("common.joinDiscord")}
               </a>
             </CyberButton>
           </div>

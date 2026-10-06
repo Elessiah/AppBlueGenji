@@ -2,21 +2,27 @@
  * Persistance des textes éditables du site vitrine.
  *
  * Stockage dans la table clé/valeur `bg_settings`, comme les coordonnées de
- * contact : une ligne par texte modifié. Une clé absente signifie « jamais
+ * contact : une ligne par texte modifié **et par langue** — `copy_<clé>` pour le
+ * français (inchangée depuis l'origine, aucune migration), `copy_<clé>__en` pour
+ * l'anglais (lot 2 de la traduction). Une clé absente signifie « jamais
  * édité » et retombe sur la valeur par défaut du registre
  * (`lib/shared/site-copy.ts`), de sorte que la page reste toujours peuplée —
- * même base injoignable.
+ * même base injoignable. La règle de rattrapage (français édité sans anglais)
+ * est dans `resolveSiteCopy`.
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
 import {
-  defaultSiteCopy,
+  resolveSiteCopy,
   SITE_COPY_FIELDS,
   siteCopySettingKey,
-  validateSiteCopy,
+  siteCopySettingKeys,
+  validateBilingualSiteCopy,
   type SiteCopy,
+  type SiteCopyBundle,
   type SiteCopyKey,
 } from "@/lib/shared/site-copy";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { cachedShowcase, invalidateShowcase } from "./showcase-cache";
 
 interface SettingRow extends RowDataPacket {
@@ -27,7 +33,7 @@ interface SettingRow extends RowDataPacket {
 export type { SiteCopy } from "@/lib/shared/site-copy";
 
 /**
- * Tous les textes du site vitrine, défauts compris.
+ * Les textes des deux langues, défauts compris, et ce qu'en reprend l'éditeur.
  *
  * Lecture mutualisée : l'accueil est rendu à chaque visite et cette requête y
  * revient à chaque fois, pour un contenu que le staff modifie quelques fois par
@@ -39,58 +45,65 @@ export type { SiteCopy } from "@/lib/shared/site-copy";
  * minute — la visite suivante retente. Le repli d'une table vide, lui, est un
  * résultat légitime : il passe par le chargeur et se met en cache normalement.
  */
-export async function getSiteCopy(): Promise<SiteCopy> {
+export async function getSiteCopyBundle(): Promise<SiteCopyBundle> {
   try {
-    return await cachedShowcase("site-copy", loadGetSiteCopy);
+    return await cachedShowcase("site-copy", loadSiteCopyBundle);
   } catch {
-    return defaultSiteCopy();
+    return resolveSiteCopy(new Map());
   }
 }
 
-async function loadGetSiteCopy(): Promise<SiteCopy> {
-  const copy = defaultSiteCopy();
+/** Tous les textes du site vitrine dans une langue (français par défaut). */
+export async function getSiteCopy(locale: Locale = DEFAULT_LOCALE): Promise<SiteCopy> {
+  const bundle = await getSiteCopyBundle();
+  return locale === "en" ? bundle.en : bundle.fr;
+}
 
+/**
+ * Ce que l'éditeur bilingue reprend, texte par texte (`SiteCopyEditorProvider`) —
+ * à ne demander que pour un porteur de `showcase`.
+ */
+export async function getSiteCopyEditor(): Promise<SiteCopyBundle["editor"]> {
+  return (await getSiteCopyBundle()).editor;
+}
+
+async function loadSiteCopyBundle(): Promise<SiteCopyBundle> {
   try {
     const db = await getDatabase();
-    const keys = SITE_COPY_FIELDS.map((field) => siteCopySettingKey(field.key));
+    const keys = siteCopySettingKeys();
     const [rows] = await db.execute<SettingRow[]>(
       `SELECT setting_key, setting_value
        FROM bg_settings
        WHERE setting_key IN (${keys.map(() => "?").join(",")})`,
       keys,
     );
-
-    const stored = new Map(rows.map((row) => [row.setting_key, row.setting_value]));
-    for (const field of SITE_COPY_FIELDS) {
-      const value = stored.get(siteCopySettingKey(field.key));
-      // Une valeur vide en base ne doit pas effacer la page : on retombe alors
-      // sur le défaut, exactement comme si la clé était absente.
-      if (typeof value === "string" && value.trim().length > 0) {
-        copy[field.key] = value;
-      }
-    }
+    return resolveSiteCopy(new Map(rows.map((row) => [row.setting_key, row.setting_value])));
   } catch {
     // Base injoignable : les défauts font le travail.
+    return resolveSiteCopy(new Map());
   }
-
-  return copy;
 }
 
 /**
- * Enregistre un texte et renvoie l'ensemble à jour.
+ * Enregistre un texte dans les deux langues et renvoie le français à jour.
  *
- * @throws UNKNOWN_COPY_KEY | COPY_EMPTY | COPY_TOO_LONG
+ * L'anglais est **obligatoire** (D9) : sans lui, rien n'est écrit. Les deux
+ * lignes partent dans **une** instruction — jamais un français enregistré dont
+ * l'anglais aurait échoué.
+ *
+ * @throws UNKNOWN_COPY_KEY | COPY_EMPTY | COPY_TOO_LONG | COPY_EN_EMPTY | COPY_EN_TOO_LONG
  */
-export async function setSiteCopy(key: string, value: unknown): Promise<SiteCopy> {
-  const validation = validateSiteCopy(key, value);
+export async function setSiteCopy(key: string, value: unknown, valueEn: unknown): Promise<SiteCopy> {
+  const validation = validateBilingualSiteCopy(key, value, valueEn);
   if (!validation.ok) throw new Error(validation.error);
 
+  const copyKey = key as SiteCopyKey;
   const db = await getDatabase();
   await db.execute<ResultSetHeader>(
     `INSERT INTO bg_settings (setting_key, setting_value)
-     VALUES (?, ?)
+     VALUES (?, ?), (?, ?)
      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
-    [siteCopySettingKey(key as SiteCopyKey), validation.value],
+    [siteCopySettingKey(copyKey, "fr"), validation.fr, siteCopySettingKey(copyKey, "en"), validation.en],
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
@@ -99,7 +112,8 @@ export async function setSiteCopy(key: string, value: unknown): Promise<SiteCopy
 }
 
 /**
- * Réinitialise un texte à sa valeur par défaut (suppression de la ligne).
+ * Réinitialise un texte à sa valeur par défaut, dans les deux langues
+ * (suppression des deux lignes).
  *
  * @throws UNKNOWN_COPY_KEY
  */
@@ -108,7 +122,10 @@ export async function resetSiteCopy(key: string): Promise<SiteCopy> {
   if (!field) throw new Error("UNKNOWN_COPY_KEY");
 
   const db = await getDatabase();
-  await db.execute(`DELETE FROM bg_settings WHERE setting_key = ?`, [siteCopySettingKey(field.key)]);
+  await db.execute(`DELETE FROM bg_settings WHERE setting_key IN (?, ?)`, [
+    siteCopySettingKey(field.key, "fr"),
+    siteCopySettingKey(field.key, "en"),
+  ]);
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();

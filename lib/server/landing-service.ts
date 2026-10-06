@@ -10,7 +10,10 @@ import {
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import {
   compareByStartAt,
+  frenchRoundLabel,
   inferPhaseLabel,
+  landingRound,
+  type LandingRound,
   isFeaturedMatchPhase,
   pickFeaturedMatchIndex,
   type LandingCalendarEvent,
@@ -44,6 +47,8 @@ import { localUploadUrl } from "@/lib/shared/uploads";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
 import { toIso } from "@/lib/server/serialization";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
+import { landingServerText } from "@/lib/server/i18n-landing";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 
 const DEFAULT_SITE_COUNTS: SiteCounts = {
   players: 0,
@@ -51,13 +56,11 @@ const DEFAULT_SITE_COUNTS: SiteCounts = {
   tournaments: 0,
 };
 
-const DEFAULT_TICKER: LandingTickerPayload = {
-  items: [
-    "RÉSULTAT · En attente de nouveaux matches",
-    "INSCRIPTIONS · Prochains brackets à venir",
-    "COMMUNAUTÉ · Rejoindre le Discord BlueGenji",
-  ],
-};
+/** Bandeau d'un site sans actualité : trois phrases d'attente, dans la langue de la page. */
+function defaultTicker(locale: Locale): LandingTickerPayload {
+  const { t } = landingServerText(locale);
+  return { items: [t("ticker.defaultResult"), t("ticker.defaultRegistration"), t("ticker.defaultCommunity")] };
+}
 
 type StatsRow = RowDataPacket & {
   players: number;
@@ -164,13 +167,8 @@ function toLiveInput(row: LiveMatchRow) {
   };
 }
 
-function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: number): string {
-  if ((bracket === "UPPER" || bracket === "GRAND") && matchCount === 1) {
-    return "Finale";
-  }
-  if (matchCount === 2) return "Demi-finale";
-  if (matchCount === 4) return "Quarts de finale";
-  return `Manche ${roundNumber}`;
+function roundOf(bracket: BracketType, roundNumber: number, matchCount: number): LandingRound {
+  return landingRound(bracket, roundNumber, matchCount);
 }
 
 /**
@@ -299,7 +297,14 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       return teamId === null ? null : (frozenSeeds.get(Number(teamId)) ?? null);
     };
 
-    const currentMatch: LandingLiveMatch | null = currentRow
+    const currentRound = currentRow
+      ? roundOf(
+          currentRow.bracket,
+          Number(currentRow.round_number),
+          rows.filter((row) => row.bracket === currentRow.bracket).length,
+        )
+      : null;
+    const currentMatch: LandingLiveMatch | null = currentRow && currentRound
       ? {
           id: Number(currentRow.id),
           team1Name: currentRow.team1_name,
@@ -315,11 +320,8 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           team1Seed: drawSeedOf(currentRow.team1_id, currentRow.team1_seed),
           team2Seed: drawSeedOf(currentRow.team2_id, currentRow.team2_seed),
           bracket: currentRow.bracket,
-          roundLabel: roundLabelFor(
-            currentRow.bracket,
-            Number(currentRow.round_number),
-            rows.filter((row) => row.bracket === currentRow.bracket).length,
-          ),
+          roundLabel: frenchRoundLabel(currentRound),
+          round: currentRound,
           // Le format **de cette manche** : « BlueGenji Survie » en joue deux,
           // et une demi-finale ne se joue pas au format de la qualification.
           // Même règle que la fiche du tournoi et que le garde-fou de saisie.
@@ -492,7 +494,57 @@ export async function getLandingCalendar(bucketsOrLimit?: TournamentBuckets | nu
   }
 }
 
-type TickerEntry = { text: string; sortAt: number };
+/**
+ * Une entrée du bandeau, **en données** : la phrase s'écrit à la sortie, dans
+ * la langue de la page (`formatTickerEntry`), si bien qu'un seul chargement mis
+ * en cache sert les deux langues.
+ */
+type TickerEntry = { sortAt: number } & (
+  | {
+      kind: "result";
+      tournament: string;
+      team1: string | null;
+      team1Id: number | null;
+      score1: number;
+      team2: string | null;
+      team2Id: number | null;
+      score2: number;
+    }
+  | { kind: "registration"; name: string; registered: number; max: number }
+  | { kind: "winner"; name: string; winner: string | null; winnerTeamId: number | null }
+  | { kind: "news"; title: string }
+);
+
+/**
+ * La phrase d'une entrée, ou `null` quand elle n'a rien à dire dans cette
+ * langue : un titre d'actualité est saisi en français par le staff, et
+ * l'accueil anglais n'en montre aucun (`docs/features/I18N.md` § Accueil).
+ */
+function formatTickerEntry(entry: TickerEntry, locale: Locale): string | null {
+  const { t } = landingServerText(locale);
+  const team = (name: string | null, id: number | null) => name ?? t("ticker.teamFallback", { id: String(id) });
+  switch (entry.kind) {
+    case "result":
+      return t("ticker.result", {
+        tournament: entry.tournament,
+        team1: team(entry.team1, entry.team1Id),
+        score1: String(entry.score1),
+        team2: team(entry.team2, entry.team2Id),
+        score2: String(entry.score2),
+      });
+    case "registration":
+      return t("ticker.registration", { name: entry.name, registered: String(entry.registered), max: String(entry.max) });
+    case "winner":
+      return t("ticker.winner", {
+        name: entry.name,
+        winner:
+          entry.winner ??
+          (entry.winnerTeamId === null ? t("ticker.unknownChampion") : team(null, entry.winnerTeamId)),
+      });
+    default:
+      return locale === DEFAULT_LOCALE ? t("ticker.news", { title: entry.title }) : null;
+  }
+}
 
 type MatchResultRow = RowDataPacket & {
   updated_at: Date;
@@ -517,6 +569,7 @@ type WinnerRow = RowDataPacket & {
   finished_at: Date | null;
   name: string;
   winner_name: string | null;
+  winner_team_id: number | null;
 };
 
 async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Promise<TickerEntry[]> {
@@ -530,7 +583,8 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
        LIMIT 3`,
     );
     return rows.map((row) => ({
-      text: `NEWS · ${row.title}`,
+      kind: "news" as const,
+      title: row.title,
       sortAt: new Date(row.created_at).getTime(),
     }));
   } catch {
@@ -538,11 +592,22 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
   }
 }
 
-export async function getLandingTicker(): Promise<LandingTickerPayload> {
-  return cachedLanding("ticker", LANDING_TTL_MS, loadLandingTicker);
+/** Le bandeau de l'accueil, dans la langue de la page (français par défaut). */
+export async function getLandingTicker(locale: Locale = DEFAULT_LOCALE): Promise<LandingTickerPayload> {
+  let entries: TickerEntry[] | null;
+  try {
+    entries = await cachedLanding("ticker", LANDING_TTL_MS, loadLandingTicker);
+  } catch {
+    entries = null;
+  }
+  const items = (entries ?? [])
+    .map((entry) => formatTickerEntry(entry, locale))
+    .filter((item): item is string => item !== null)
+    .slice(0, 10);
+  return items.length === 0 ? defaultTicker(locale) : { items };
 }
 
-async function loadLandingTicker(): Promise<LandingTickerPayload> {
+async function loadLandingTicker(): Promise<TickerEntry[]> {
   try {
     const db = await getDatabase();
     const entries: TickerEntry[] = [];
@@ -567,14 +632,17 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
     );
 
     entries.push(
-      ...resultRows.map((row) => {
-        const team1 = row.team1_name ?? `Equipe #${row.team1_id}`;
-        const team2 = row.team2_name ?? `Equipe #${row.team2_id}`;
-        return {
-          text: `RÉSULTAT · ${row.tournament_name} · ${team1} ${Number(row.team1_score ?? 0)} — ${team2} ${Number(row.team2_score ?? 0)}`,
-          sortAt: new Date(row.updated_at).getTime(),
-        };
-      }),
+      ...resultRows.map((row) => ({
+        kind: "result" as const,
+        tournament: row.tournament_name,
+        team1: row.team1_name,
+        team1Id: row.team1_id,
+        score1: Number(row.team1_score ?? 0),
+        team2: row.team2_name,
+        team2Id: row.team2_id,
+        score2: Number(row.team2_score ?? 0),
+        sortAt: new Date(row.updated_at).getTime(),
+      })),
     );
 
     const [registrationRows] = await db.execute<RegistrationRow[]>(
@@ -593,7 +661,10 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
 
     entries.push(
       ...registrationRows.map((row) => ({
-        text: `INSCRIPTIONS · ${row.name} · ${Number(row.registered_teams)}/${Number(row.max_teams)} équipes`,
+        kind: "registration" as const,
+        name: row.name,
+        registered: Number(row.registered_teams),
+        max: Number(row.max_teams),
         sortAt: new Date(row.registration_open_at).getTime(),
       })),
     );
@@ -602,7 +673,8 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
       `SELECT
         t.finished_at,
         t.name,
-        COALESCE(w.name, CONCAT('Equipe #', r.team_id)) AS winner_name
+        w.name AS winner_name,
+        r.team_id AS winner_team_id
        FROM bg_tournaments t
        LEFT JOIN bg_tournament_registrations r
          ON r.tournament_id = t.id
@@ -615,20 +687,18 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
 
     entries.push(
       ...winnerRows.map((row) => ({
-        text: `VAINQUEUR · ${row.name} · ${row.winner_name ?? "Champion inconnu"}`,
+        kind: "winner" as const,
+        name: row.name,
+        winner: row.winner_name,
+        winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
         sortAt: new Date(row.finished_at ?? Date.now()).getTime(),
       })),
       ...(await loadNewsEntries(db)),
     );
 
     entries.sort((left, right) => right.sortAt - left.sortAt);
-    const items = entries
-      .slice(0, 10)
-      .map((entry) => entry.text);
-
-    if (items.length === 0) return DEFAULT_TICKER;
-    return { items };
+    return entries;
   } catch {
-    return DEFAULT_TICKER;
+    return [];
   }
 }

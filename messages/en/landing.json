@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "title": "Amateur Overwatch esports tournaments",
+    "description": "Amateur esports tournaments online and at LANs, mostly Overwatch: live brackets, team rankings, volunteer refereeing — by the BlueGenji association."
+  },
+  "common": {
+    "newTab": "(new tab)",
+    "registerTeam": "Register my team",
+    "joinDiscord": "Join the Discord",
+    "watchLive": "Watch live",
+    "viewTournament": "View tournament",
+    "teamPageTitle": "View {name}'s page"
+  },
+  "hero": {
+    "watchLiveLabel": "Watch live — {tournament} live now (new tab)",
+    "watchLiveLabelOn": "Watch live — {tournament} live on {platform} (new tab)",
+    "stats": {
+      "players": "Registered players",
+      "teams": "Active teams",
+      "tournaments": "Tournaments organized"
+    },
+    "nextTournament": "NEXT TOURNAMENT · {name}"
+  },
+  "countdown": {
+    "pending": "Loading countdown",
+    "imminent": "Starting any moment",
+    "daysHours": "Starts in {d, plural, one {# day} other {# days}} {h, plural, one {# hour} other {# hours}}",
+    "hoursMinutes": "Starts in {h, plural, one {# hour} other {# hours}} {m, plural, one {# minute} other {# minutes}}",
+    "minutesSeconds": "Starts in {m, plural, one {# minute} other {# minutes}} {s, plural, one {# second} other {# seconds}}",
+    "seconds": "Starts in {s, plural, one {# second} other {# seconds}}",
+    "unit": {
+      "d": "D",
+      "h": "H",
+      "m": "M",
+      "s": "S"
+    }
+  },
+  "discord": {
+    "members": "Discord members",
+    "online": "{count} online",
+    "fallbackTitle": "BlueGenji community",
+    "fallbackLabel": "Announcements, teams, game channels"
+  },
+  "live": {
+    "info": "TOURNAMENT INFO",
+    "noneScheduled": "No tournament in progress, and nothing is scheduled yet.",
+    "nextToday": "No tournament in progress. The next one starts today.",
+    "nextInDays": "{days, plural, one {No tournament in progress. The next one starts in # day.} other {No tournament in progress. The next one starts in # days.}}",
+    "tournamentState": "Tournament in progress",
+    "team1": "Team 1",
+    "team2": "Team 2",
+    "versus": "{team1} vs {team2}",
+    "openMatch": "Open {tournament} at the {team1} vs {team2} match",
+    "openTournament": "Open the {tournament} tournament page",
+    "streamScheduled": "○ STREAM ANNOUNCED",
+    "watchMatchLabel": "Watch {match} live (new tab)",
+    "watchMatchLabelOn": "Watch {match} live on {platform} (new tab)",
+    "watchOn": "Watch on {platform}",
+    "seed": "SEED {seed}",
+    "emptyMatch": "The next live match will show up here as soon as it starts.",
+    "footerMatch": "See the match in the tournament",
+    "pill": {
+      "live": "Live",
+      "playing": "In progress",
+      "lobby": "Launching",
+      "waiting": "Waiting to launch"
+    },
+    "phase": {
+      "waiting": "WAITING",
+      "final": "FINAL STAGE",
+      "round": "ROUND {n}"
+    },
+    "round": {
+      "final": "Final",
+      "semi": "Semifinal",
+      "quarter": "Quarterfinals",
+      "round": "Round {n}"
+    }
+  },
+  "ticker": {
+    "label": "News feed",
+    "resume": "Resume the scrolling banner",
+    "pause": "Pause the scrolling banner",
+    "resumeShort": "Resume",
+    "pauseShort": "Pause",
+    "result": "RESULT · {tournament} · {team1} {score1} — {team2} {score2}",
+    "registration": "REGISTRATION · {name} · {registered}/{max} teams",
+    "winner": "WINNER · {name} · {winner}",
+    "unknownChampion": "Unknown champion",
+    "teamFallback": "Team #{id}",
+    "news": "NEWS · {title}",
+    "defaultResult": "RESULT · Waiting for new matches",
+    "defaultRegistration": "REGISTRATION · More brackets coming soon",
+    "defaultCommunity": "COMMUNITY · Join the BlueGenji Discord"
+  },
+  "board": {
+    "title": "Current and upcoming tournaments",
+    "openCount": "{count, plural, one {# OPEN TOURNAMENT} other {# OPEN TOURNAMENTS}}",
+    "emptyEyebrow": "TOURNAMENTS",
+    "emptyTitle": "No tournaments in progress or coming up right now.",
+    "start": "STARTS",
+    "teams": "TEAMS",
+    "tbd": "TBD",
+    "state": {
+      "full": "Full",
+      "registration": "Registration open",
+      "locked": "Registration closed",
+      "running": "In progress",
+      "finished": "Finished",
+      "soon": "Coming soon"
+    },
+    "action": {
+      "bracket": "View bracket",
+      "follow": "Follow the tournament"
+    },
+    "format": {
+      "SINGLE": "Single elimination",
+      "DOUBLE": "Double elimination",
+      "SWISS": "Swiss",
+      "SURVIVAL": "Survival (cuts)",
+      "MULTI": "Multi-stage",
+      "BG_SURVIE": "BlueGenji's Survival"
+    }
+  },
+  "leaderCal": {
+    "title": "Rankings and calendar",
+    "rankedCount": "{count, plural, one {# RANKED TEAM} other {# RANKED TEAMS}}"
+  },
+  "leaderboard": {
+    "heading": "TOP TEAMS",
+    "loadError": "Couldn't load this ranking, try again later.",
+    "chipAll": "Overall",
+    "tableLabel": "Team rankings",
+    "team": "TEAM",
+    "winLoss": "W–L",
+    "points": "PTS",
+    "trend": "Trend",
+    "trendShort": "TR",
+    "empty": "No ranked teams yet.",
+    "fullRanking": "VIEW FULL RANKINGS →"
+  },
+  "calendar": {
+    "heading": "UPCOMING EVENTS",
+    "ics": "Add to my calendar (.ics)",
+    "empty": "No tournaments scheduled.",
+    "tag": {
+      "running": "IN PROGRESS",
+      "registration": "REGISTRATION OPEN",
+      "finished": "ARCHIVE",
+      "soon": "COMING SOON"
+    }
+  },
+  "about": {
+    "meta": "FRENCH NONPROFIT · JANVILLIERS · {year}"
+  },
+  "sponsors": {
+    "title": "Partners and supporters",
+    "count": "{count, plural, one {# PARTNER} other {# PARTNERS}}",
+    "websiteSuffix": "— partner's website (new tab)",
+    "tier": {
+      "GOLD": "Gold",
+      "SILVER": "Silver",
+      "BRONZE": "Bronze",
+      "PARTNER": "Supporter"
+    }
+  },
+  "join": {
+    "createAccount": "Create an account"
+  }
+}

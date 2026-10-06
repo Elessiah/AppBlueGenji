@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "title": "Tournois esport amateurs Overwatch",
+    "description": "Tournois esport amateurs en ligne et en LAN, principalement Overwatch : brackets en direct, classement des équipes, arbitrage bénévole — association BlueGenji."
+  },
+  "common": {
+    "newTab": "(nouvel onglet)",
+    "registerTeam": "Inscrire mon équipe",
+    "joinDiscord": "Rejoindre le Discord",
+    "watchLive": "Regarder le live",
+    "viewTournament": "Voir le tournoi",
+    "teamPageTitle": "Voir la fiche de {name}"
+  },
+  "hero": {
+    "watchLiveLabel": "Regarder le live — {tournament} en direct (nouvel onglet)",
+    "watchLiveLabelOn": "Regarder le live — {tournament} en direct sur {platform} (nouvel onglet)",
+    "stats": {
+      "players": "Joueurs inscrits",
+      "teams": "Équipes actives",
+      "tournaments": "Tournois organisés"
+    },
+    "nextTournament": "PROCHAIN TOURNOI · {name}"
+  },
+  "countdown": {
+    "pending": "Chargement du compte à rebours",
+    "imminent": "Début imminent",
+    "daysHours": "Début dans {d, plural, one {# jour} other {# jours}} {h, plural, one {# heure} other {# heures}}",
+    "hoursMinutes": "Début dans {h, plural, one {# heure} other {# heures}} {m, plural, one {# minute} other {# minutes}}",
+    "minutesSeconds": "Début dans {m, plural, one {# minute} other {# minutes}} {s, plural, one {# seconde} other {# secondes}}",
+    "seconds": "Début dans {s, plural, one {# seconde} other {# secondes}}",
+    "unit": {
+      "d": "J",
+      "h": "H",
+      "m": "M",
+      "s": "S"
+    }
+  },
+  "discord": {
+    "members": "Membres Discord",
+    "online": "{count} en ligne",
+    "fallbackTitle": "Communauté BlueGenji",
+    "fallbackLabel": "Annonces, équipes, salons de jeu"
+  },
+  "live": {
+    "info": "INFO TOURNOI",
+    "noneScheduled": "Aucun tournoi en cours, et rien n'est encore programmé.",
+    "nextToday": "Aucun tournoi en cours. Le prochain démarre aujourd'hui.",
+    "nextInDays": "{days, plural, one {Aucun tournoi en cours. Le prochain démarre dans # jour.} other {Aucun tournoi en cours. Le prochain démarre dans # jours.}}",
+    "tournamentState": "Tournoi en cours",
+    "team1": "Équipe 1",
+    "team2": "Équipe 2",
+    "versus": "{team1} contre {team2}",
+    "openMatch": "Ouvrir {tournament} sur le match {team1} contre {team2}",
+    "openTournament": "Ouvrir la fiche du tournoi {tournament}",
+    "streamScheduled": "○ DIFFUSION ANNONCÉE",
+    "watchMatchLabel": "Regarder {match} en direct (nouvel onglet)",
+    "watchMatchLabelOn": "Regarder {match} en direct sur {platform} (nouvel onglet)",
+    "watchOn": "Regarder sur {platform}",
+    "seed": "SEED {seed}",
+    "emptyMatch": "Le prochain match en direct sera affiché ici dès son lancement.",
+    "footerMatch": "Voir le match dans le tournoi",
+    "pill": {
+      "live": "En direct",
+      "playing": "En cours",
+      "lobby": "Lancement",
+      "waiting": "En attente de lancement"
+    },
+    "phase": {
+      "waiting": "EN ATTENTE",
+      "final": "PHASE FINALE",
+      "round": "MANCHE {n}"
+    },
+    "round": {
+      "final": "Finale",
+      "semi": "Demi-finale",
+      "quarter": "Quarts de finale",
+      "round": "Manche {n}"
+    }
+  },
+  "ticker": {
+    "label": "Fil d'actualité",
+    "resume": "Relancer le défilement du bandeau",
+    "pause": "Mettre en pause le défilement du bandeau",
+    "resumeShort": "Relancer",
+    "pauseShort": "Pause",
+    "result": "RÉSULTAT · {tournament} · {team1} {score1} — {team2} {score2}",
+    "registration": "INSCRIPTIONS · {name} · {registered}/{max} équipes",
+    "winner": "VAINQUEUR · {name} · {winner}",
+    "unknownChampion": "Champion inconnu",
+    "teamFallback": "Equipe #{id}",
+    "news": "NEWS · {title}",
+    "defaultResult": "RÉSULTAT · En attente de nouveaux matches",
+    "defaultRegistration": "INSCRIPTIONS · Prochains brackets à venir",
+    "defaultCommunity": "COMMUNAUTÉ · Rejoindre le Discord BlueGenji"
+  },
+  "board": {
+    "title": "Tournois en cours et à venir",
+    "openCount": "{count, plural, one {# TOURNOI OUVERT} other {# TOURNOIS OUVERTS}}",
+    "emptyEyebrow": "TOURNAMENTS",
+    "emptyTitle": "Aucun tournoi en cours ni à venir pour le moment.",
+    "start": "DÉBUT",
+    "teams": "ÉQUIPES",
+    "tbd": "À venir",
+    "state": {
+      "full": "Complet",
+      "registration": "Inscriptions ouvertes",
+      "locked": "Inscriptions closes",
+      "running": "En cours",
+      "finished": "Terminé",
+      "soon": "Bientôt"
+    },
+    "action": {
+      "bracket": "Voir le bracket",
+      "follow": "Suivre le tournoi"
+    },
+    "format": {
+      "SINGLE": "Simple élimination",
+      "DOUBLE": "Double élimination",
+      "SWISS": "Ronde suisse",
+      "SURVIVAL": "Survie par coupes",
+      "MULTI": "Multi-phases",
+      "BG_SURVIE": "BlueGenji Survie"
+    }
+  },
+  "leaderCal": {
+    "title": "Classement et calendrier",
+    "rankedCount": "{count, plural, one {# ÉQUIPE CLASSÉE} other {# ÉQUIPES CLASSÉES}}"
+  },
+  "leaderboard": {
+    "heading": "TOP ÉQUIPES",
+    "loadError": "Impossible de charger ce classement, réessaie plus tard.",
+    "chipAll": "Général",
+    "tableLabel": "Classement des équipes",
+    "team": "ÉQUIPE",
+    "winLoss": "V–D",
+    "points": "PTS",
+    "trend": "Tendance",
+    "trendShort": "TR",
+    "empty": "Aucune équipe classée pour le moment.",
+    "fullRanking": "VOIR LE CLASSEMENT COMPLET →"
+  },
+  "calendar": {
+    "heading": "PROCHAINS ÉVÉNEMENTS",
+    "ics": "Ajouter à mon agenda (.ics)",
+    "empty": "Aucun tournoi programmé.",
+    "tag": {
+      "running": "EN COURS",
+      "registration": "INSCRIPTIONS OUVERTES",
+      "finished": "ARCHIVE",
+      "soon": "BIENTÔT"
+    }
+  },
+  "about": {
+    "meta": "LOI 1901 · JANVILLIERS · {year}"
+  },
+  "sponsors": {
+    "title": "Partenaires et soutiens",
+    "count": "{count} PARTENAIRES",
+    "websiteSuffix": "— site du partenaire (nouvel onglet)",
+    "tier": {
+      "GOLD": "Or",
+      "SILVER": "Argent",
+      "BRONZE": "Bronze",
+      "PARTNER": "Soutien"
+    }
+  },
+  "join": {
+    "createAccount": "Créer un compte"
+  }
+}

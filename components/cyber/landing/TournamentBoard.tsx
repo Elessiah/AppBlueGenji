@@ -1,24 +1,32 @@
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { CyberButton, CyberCard, MiniBracket, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { activeTournamentCards } from "@/lib/shared/landing";
-import { boardActionLabel, boardStateLabel, formatBoardStartAt } from "@/lib/shared/landing-board";
-import { formatLabel, gameLabel } from "@/lib/shared/tournament-labels";
+import { boardActionKey, boardStateKey, formatBoardStartAt } from "@/lib/shared/landing-board";
+import { gameLabel } from "@/lib/shared/tournament-labels";
+import { landingServerText } from "@/lib/server/i18n-landing";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
+import type { LandingText } from "@/lib/shared/landing-text";
 import styles from "./TournamentBoard.module.css";
 
 type TournamentBoardProps = {
   buckets: TournamentBuckets;
   featured: TournamentCard | null;
   miniBracket: { a: string; b: string; sa: number | string; sb: number | string }[];
+  /** Langue de la page (`requestLocale()`), français par défaut. */
+  locale?: Locale;
 };
 
-function makeTitle(tournament: TournamentCard | null): string {
-  if (!tournament) return "Aucun tournoi visible pour le moment";
-  return tournament.name;
+/** Action d'une carte : elle mène toujours à la fiche, seul le libellé change (`boardActionKey`). */
+function actionLabel({ t }: LandingText, card: TournamentCard, now: number): string {
+  const key = boardActionKey(card, now);
+  return key === "view" ? t("common.viewTournament") : t(`board.action.${key}`);
 }
 
-export function TournamentBoard({ buckets, featured, miniBracket }: Readonly<TournamentBoardProps>) {
+export function TournamentBoard({ buckets, featured, miniBracket, locale = DEFAULT_LOCALE }: Readonly<TournamentBoardProps>) {
+  const text = landingServerText(locale);
+  const { t } = text;
   // Une seule horloge pour toute la section : deux cartes lues à deux instants
   // pourraient se contredire sur une échéance qui tombe pendant le rendu.
   const now = Date.now();
@@ -30,10 +38,8 @@ export function TournamentBoard({ buckets, featured, miniBracket }: Readonly<Tou
   return (
     <section id="tournois" className={styles.root}>
       <div className={styles.head}>
-        <h2 className={styles.sectionTitle}>Tournois en cours et à venir</h2>
-        <div className={styles.meta}>
-          {openCount} {openCount > 1 ? "TOURNOIS OUVERTS" : "TOURNOI OUVERT"}
-        </div>
+        <h2 className={styles.sectionTitle}>{t("board.title")}</h2>
+        <div className={styles.meta}>{t("board.openCount", { count: openCount })}</div>
       </div>
 
       <div className={styles.grid}>
@@ -51,34 +57,34 @@ export function TournamentBoard({ buckets, featured, miniBracket }: Readonly<Tou
                 * jeu n'est nommé qu'une fois, depuis la donnée du tournoi.
                 */}
               <div className={styles.badgeRow}>
-                <Pill variant="blue">{boardStateLabel(featured, now)}</Pill>
+                <Pill variant="blue">{t(`board.state.${boardStateKey(featured, now)}`)}</Pill>
                 <span className={styles.game}>{gameLabel(featured.game)}</span>
               </div>
 
               <div className={styles.titleRow}>
                 <TournamentImageEmblem image={featured.image} size={56} />
-                <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
+                <h3 className={styles.featuredTitle}>{featured.name}</h3>
               </div>
-              <div className={styles.format}>{formatLabel(featured.format)}</div>
+              <div className={styles.format}>{t(`board.format.${featured.format}`)}</div>
               {/* Un tournoi aux inscriptions n'a pas encore de plateau : pas de cases vides. */}
               {miniBracket.length > 0 && <MiniBracket matches={miniBracket} />}
 
               <div className={styles.footerRow}>
                 <CyberButton variant="primary" asChild>
-                  <Link href={`/tournois/${featured.id}`}>{boardActionLabel(featured, now)} →</Link>
+                  <LocaleLink href={`/tournois/${featured.id}`}>{actionLabel(text, featured, now)} →</LocaleLink>
                 </CyberButton>
               </div>
             </>
           ) : (
             <div className={styles.emptyState}>
-              <span className="eyebrow">TOURNAMENTS</span>
+              <span className="eyebrow">{t("board.emptyEyebrow")}</span>
               {/*
                 * « Encore » dirait que le site n'a jamais rien organisé, ce qui
                 * est faux dès qu'un tournoi s'est terminé : la section ne
                 * montrant que ce qui est en cours ou à venir, son état vide est
                 * atteint aussi bien par un site neuf que par une saison close.
                 */}
-              <h3>Aucun tournoi en cours ni à venir pour le moment.</h3>
+              <h3>{t("board.emptyTitle")}</h3>
             </div>
           )}
         </CyberCard>
@@ -94,7 +100,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: Readonly<Tou
                 className={styles.upcomingBanner}
               />
               <div className={styles.cardTop}>
-                <Pill variant="blue">{boardStateLabel(card, now)}</Pill>
+                <Pill variant="blue">{t(`board.state.${boardStateKey(card, now)}`)}</Pill>
                 <span className={styles.game}>{gameLabel(card.game)}</span>
               </div>
 
@@ -105,11 +111,11 @@ export function TournamentBoard({ buckets, featured, miniBracket }: Readonly<Tou
 
               <div className={styles.metaGrid}>
                 <div>
-                  <div className="mono">DÉBUT</div>
-                  <div>{formatBoardStartAt(card.startAt, now)}</div>
+                  <div className="mono">{t("board.start")}</div>
+                  <div>{formatBoardStartAt(card.startAt, now, locale)}</div>
                 </div>
                 <div>
-                  <div className="mono">ÉQUIPES</div>
+                  <div className="mono">{t("board.teams")}</div>
                   <div><span className="num">{card.registeredTeams}</span><span className={styles.dim}> / {card.maxTeams}</span></div>
                 </div>
               </div>
@@ -120,7 +126,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: Readonly<Tou
 
               <div className={styles.footerRow}>
                 <CyberButton variant="ghost" asChild>
-                  <Link href={`/tournois/${card.id}`}>{boardActionLabel(card, now)}</Link>
+                  <LocaleLink href={`/tournois/${card.id}`}>{actionLabel(text, card, now)}</LocaleLink>
                 </CyberButton>
               </div>
             </CyberCard>

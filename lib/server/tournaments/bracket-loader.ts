@@ -2,6 +2,8 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { cached } from "@/lib/server/cache";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
+import { landingServerText } from "@/lib/server/i18n-landing";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 
 /**
  * Durée de vie du mini-arbre de l'accueil. Il n'accompagne qu'une vignette :
@@ -20,16 +22,23 @@ type MatchRow = {
   team2_score: number | null;
 };
 
+/**
+ * Les quatre premiers matchs du tournoi mis en avant sur l'accueil.
+ *
+ * En anglais, une place vide se lit « TBD » : les libellés d'attente sont
+ * **écrits en base** en français (`bracket-placeholders.ts`), et l'accueil
+ * anglais ne doit en montrer aucun.
+ */
 export async function loadMiniBracket(
   tournamentId: number,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
   // Un incident de lecture n'est pas mis en cache : `cached` ne mémorise jamais
   // un rejet, et la visite suivante retentera plutôt que de servir une vignette
   // vide pendant quinze secondes.
   try {
-    return await cached(`mini-bracket:${tournamentId}`, MINI_BRACKET_TTL_MS, () =>
-      loadMiniBracketRows(tournamentId),
-    );
+    const key = locale === DEFAULT_LOCALE ? `mini-bracket:${tournamentId}` : `mini-bracket:${tournamentId}:${locale}`;
+    return await cached(key, MINI_BRACKET_TTL_MS, () => loadMiniBracketRows(tournamentId, locale));
   } catch {
     return [];
   }
@@ -37,6 +46,7 @@ export async function loadMiniBracket(
 
 async function loadMiniBracketRows(
   tournamentId: number,
+  locale: Locale,
 ): Promise<{ a: string; b: string; sa: number | string; sb: number | string }[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & MatchRow)[]>(
@@ -57,9 +67,13 @@ async function loadMiniBracketRows(
     [tournamentId],
   );
 
+  const pending = (placeholder: string | null) =>
+    locale === DEFAULT_LOCALE
+      ? (localizeBracketPlaceholder(placeholder) ?? "À venir")
+      : landingServerText(locale).t("board.tbd");
   return rows.map((row) => ({
-    a: row.team1_name ?? localizeBracketPlaceholder(row.team1_placeholder) ?? "À venir",
-    b: row.team2_name ?? localizeBracketPlaceholder(row.team2_placeholder) ?? "À venir",
+    a: row.team1_name ?? pending(row.team1_placeholder),
+    b: row.team2_name ?? pending(row.team2_placeholder),
     sa: row.team1_score ?? "—",
     sb: row.team2_score ?? "—",
   }));

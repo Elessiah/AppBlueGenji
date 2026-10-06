@@ -1,5 +1,7 @@
 import Image from "next/image";
 import { DISCORD_INVITE_URL, type DiscordCommunityStats } from "@/lib/shared/discord";
+import { useLandingText } from "@/components/i18n/landing-text";
+import { LANDING_INTL_LOCALE } from "@/lib/shared/landing-text";
 import styles from "./DiscordCommunity.module.css";
 
 type DiscordCommunityProps = {
@@ -27,6 +29,8 @@ type DiscordCommunityProps = {
  * pas l'invitation.
  */
 export function DiscordCommunity({ stats }: Readonly<DiscordCommunityProps>) {
+  const { t, locale } = useLandingText();
+  const tag = LANDING_INTL_LOCALE[locale];
   return (
     <a
       className={styles.root}
@@ -43,31 +47,31 @@ export function DiscordCommunity({ stats }: Readonly<DiscordCommunityProps>) {
       <span className={styles.body}>
         {stats ? (
           <>
-            <span className={`num ${styles.count}`}>{stats.memberCount.toLocaleString("fr-FR")}</span>
-            <span className={`mono ${styles.label}`}>Membres Discord</span>
+            <span className={`num ${styles.count}`}>{stats.memberCount.toLocaleString(tag)}</span>
+            <span className={`mono ${styles.label}`}>{t("discord.members")}</span>
             {/* La présence n'est affichée que si Discord l'a donnée : « 0 en
                 ligne » sur un serveur actif serait un contresens, et le champ
                 peut manquer là où le total ne manque pas. */}
             {stats.onlineCount > 0 && (
               <span className={styles.presence}>
                 <span className={styles.dot} aria-hidden="true" />
-                {stats.onlineCount.toLocaleString("fr-FR")} en ligne
+                {t("discord.online", { count: stats.onlineCount.toLocaleString(tag) })}
               </span>
             )}
           </>
         ) : (
           <>
-            <span className={styles.fallbackTitle}>Communauté BlueGenji</span>
-            <span className={`mono ${styles.label}`}>Annonces, équipes, salons de jeu</span>
+            <span className={styles.fallbackTitle}>{t("discord.fallbackTitle")}</span>
+            <span className={`mono ${styles.label}`}>{t("discord.fallbackLabel")}</span>
           </>
         )}
       </span>
 
       <span className={styles.cta}>
-        Rejoindre le Discord
+        {t("common.joinDiscord")}
         {/* NOSONAR S6772 — bouton en flex avec `gap` */}
         <span aria-hidden="true">→</span>
-        <span className="sr-only"> (nouvel onglet)</span>
+        <span className="sr-only">{` ${t("common.newTab")}`}</span>
       </span>
     </a>
   );

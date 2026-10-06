@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { CountdownStrip, CyberButton } from "@/components/cyber";
 import type { LandingLive, LandingStats } from "@/lib/shared/landing";
 import type { TournamentCard } from "@/lib/shared/types";
@@ -10,6 +10,7 @@ import { LiveCard } from "./LiveCard";
 import { CountUp } from "./CountUp";
 import { useLandingLive } from "./useLandingLive";
 import { EditableCopy } from "./EditableCopy";
+import { useLandingText } from "@/components/i18n/landing-text";
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import styles from "./Hero.module.css";
 
@@ -34,6 +35,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
   // Une seule source pour la carte live et le bouton « Regarder le live » :
   // deux sondages séparés les feraient diverger le temps d'un tick.
   const live = useLandingLive(initialLive);
+  const { t } = useLandingText();
   const stream = live?.stream ?? null;
   const platform = streamPlatform(stream?.url);
 
@@ -67,7 +69,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
 
           <div className={styles.actions}>
             <CyberButton variant="primary" asChild>
-              <Link href="/tournois">Inscrire mon équipe</Link>
+              <LocaleLink href="/tournois">{t("common.registerTeam")}</LocaleLink>
             </CyberButton>
             {/* Aucune diffusion en cours → aucun bouton : un « Regarder le
                 live » qui ne mène nulle part crée plus de confusion qu'il n'en
@@ -83,13 +85,15 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
                      la plateforme) : un lien dont le nom accessible ne contient
                      pas ce qu'on lit dessus ne répond pas à la commande vocale,
                      puisqu'on prononce ce qui est écrit (WCAG 2.5.3). */
-                  aria-label={`Regarder le live — ${stream.tournamentName} en direct${
-                    platform ? ` sur ${PLATFORM_LABELS[platform]}` : ""
-                  } (nouvel onglet)`}
+                  aria-label={
+                    platform
+                      ? t("hero.watchLiveLabelOn", { tournament: stream.tournamentName, platform: PLATFORM_LABELS[platform] })
+                      : t("hero.watchLiveLabel", { tournament: stream.tournamentName })
+                  }
                 >
                   <span aria-hidden="true">▶</span>
                   {/* NOSONAR S6772 — CyberButton en flex avec `gap` */}
-                  Regarder le live
+                  {t("common.watchLive")}
                 </a>
               </CyberButton>
             )}
@@ -98,17 +102,17 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
           <div className={styles.stats}>
             <div className={styles.stat}>
               <CountUp value={stats.players} className={`num text-gradient ${styles.statValue}`} />
-              <div className="mono">Joueurs inscrits</div>
+              <div className="mono">{t("hero.stats.players")}</div>
             </div>
             <span className={styles.sep} />
             <div className={styles.stat}>
               <CountUp value={stats.teams} className={`num text-gradient ${styles.statValue}`} />
-              <div className="mono">Équipes actives</div>
+              <div className="mono">{t("hero.stats.teams")}</div>
             </div>
             <span className={styles.sep} />
             <div className={styles.stat}>
               <CountUp value={LEGACY_TOURNAMENT_COUNT + stats.tournaments} className={`num text-gradient ${styles.statValue}`} />
-              <div className="mono">Tournois organisés</div>
+              <div className="mono">{t("hero.stats.tournaments")}</div>
             </div>
           </div>
 
@@ -121,7 +125,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
         <div className={styles.right}>
           <LiveCard live={live} nextUpcomingISO={nextUpcoming?.startAt ?? null} />
           {nextUpcoming && (
-            <CountdownStrip targetISO={nextUpcoming.startAt} label={`PROCHAIN TOURNOI · ${nextUpcoming.name}`} />
+            <CountdownStrip targetISO={nextUpcoming.startAt} label={t("hero.nextTournament", { name: nextUpcoming.name })} />
           )}
         </div>
       </div>
