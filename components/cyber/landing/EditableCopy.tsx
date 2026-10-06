@@ -187,8 +187,8 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
     };
 
     return (
-      <div className={styles.editor} lang={staffLang}>
-        <span className={styles.label}>{label}</span>
+      <fieldset className={styles.editor} lang={staffLang}>
+        <legend className={styles.label}>{label}</legend>
         <div className={styles.columns}>
           <div className={styles.column}>
             <label className={styles.langLabel} htmlFor={ids.fr}>
@@ -232,7 +232,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             {busy ? "Enregistrement…" : "Enregistrer"}
           </button>
         </div>
-      </div>
+      </fieldset>
     );
   }
 

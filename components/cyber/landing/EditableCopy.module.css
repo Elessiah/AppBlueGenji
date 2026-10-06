@@ -45,6 +45,16 @@
   background: var(--cyber-bg-1, #0c0f14);
   border: 1px solid var(--line-strong-cy, var(--line-soft));
   border-radius: var(--r-cy-md, 10px);
+  /* Un `fieldset` : ses marges et sa largeur minimale par défaut retirées. */
+  margin: 0;
+  min-width: 0;
+}
+
+/* La légende reste dans le flux (le `float` l'ôte de la bordure du cadre). */
+.editor > legend {
+  float: left;
+  width: 100%;
+  padding: 0;
 }
 
 /* Anglais à rédiger : un avertissement, donc l'ambre (seul usage permis). */

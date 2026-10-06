@@ -90,7 +90,11 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   // n'y est pas rendue tant que son éditeur ne demande pas l'anglais (lot 5).
   const staffLang = locale === "fr" ? undefined : "fr";
   const showStaffContent = locale === "fr";
-  const { showError, showSuccess } = useToast();
+  // Ses notifications sont du français d'administration, lues comme tel sous `/en`.
+  const toast = useToast();
+  const staffToast = staffLang ? { lang: staffLang } : undefined;
+  const showError = (message: string) => toast.showError(message, staffToast);
+  const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
   const { cropImage, cropDialog } = useImageCropper();
   const [items, setItems] = useState<Sponsor[]>(sponsors);
   const [editing, setEditing] = useState<Sponsor | null>(null);

@@ -71,7 +71,7 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<Calen
                   </a>
                 </div>
               </div>
-              <div className={`num mono ${styles.time}`}>{date.toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" })}</div>
+              <div className={`num mono ${styles.time}`}>{date.toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</div>
             </div>
           );
         })}
