@@ -97,6 +97,17 @@ Les choix :
   de maps). Le transfert est alors exactement celui d'avant.
 - **Le nul ne change pas** : `ratingDrawTransfer` ignore le score.
 
+### Risque accepté : le report unilatéral
+
+Un report resté seul à l'échéance fait foi (`resolveExpiredScoreReports`) et
+n'est pas un forfait : son score **majore** donc le transfert. Une équipe qui
+déclare 3-0 un 3-2 sans que l'adverse ne réponde gagne jusqu'à ×1,5 au lieu de
+×1. Accepté (revue sécurité de la PR #406) : le même report unilatéral décidait
+déjà **du vainqueur**, enjeu bien plus lourd que la majoration ; la parade reste
+celle d'avant — l'adverse déclare son score avant l'échéance, le désaccord part
+à l'arbitrage. Exclure ces matchs demanderait de stocker l'origine du score
+(accord, arbitrage, report seul), absente des matchs passés.
+
 ### Rétroactif
 
 Rien n'étant stocké, la règle s'applique **à tout l'historique** dès le
