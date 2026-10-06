@@ -1,6 +1,7 @@
 /* Page `/classement` — voir docs/features/RANKING_PAGE.md.
    Palette froide uniquement (DESIGN_SYSTEM.md) : 1re = dégradé de marque,
-   2e = cyan, 3e = violet. Animations : transform/opacity, en pause par
+   2e = cyan, 3e = violet. Animations : transform/opacity (et la position du
+   fond pour le reflet des noms du podium), en pause par
    `var(--deco-anim-state)`. */
 
 .section {
@@ -232,6 +233,116 @@
 
 .podiumCard[data-place="1"] .podiumName {
   font-size: 23px;
+}
+
+/* ---------- Noms du podium : trois effets, du plus riche au plus sobre ----------
+   1re : dégradé irisé cyan → violet → rose traversé d'un reflet clair, qui
+   ondule lentement, halo double et filet irisé sous le nom.
+   2e : givre chromé (glace → platine), reflet plus lent, halo léger, filet fin.
+   3e : liseré néon violet, sans mouvement ni filet.
+   Teintes froides seulement (aucun or : l'ambre est réservé aux avertissements).
+   Chaque arrêt de dégradé est un jeton de texte tenant 4,5:1 sur le fond le
+   plus clair (`ranking-board.test.tsx`). Le texte reste du texte (dégradé par
+   `background-clip`) ; arrêtée (`--deco-anim-state`, mouvement réduit, menu
+   d'accessibilité), chaque marche garde sa peinture : la hiérarchie se lit à
+   l'arrêt. Au survol ou au focus, le lien reprend une couleur pleine et son
+   soulignement. */
+
+.nameTier1 :global(.entity-link) {
+  background-image: linear-gradient(
+    100deg,
+    var(--cyan-400) 0%,
+    var(--blue-300) 18%,
+    var(--violet-300) 36%,
+    var(--pink-400) 50%,
+    var(--ink) 57%,
+    var(--violet-300) 66%,
+    var(--blue-300) 82%,
+    var(--cyan-400) 100%
+  );
+  background-size: 300% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: nameIridescent 7s ease-in-out infinite alternate;
+  animation-play-state: var(--deco-anim-state);
+}
+
+.nameTier1 {
+  position: relative;
+  padding-bottom: 8px;
+  filter:
+    drop-shadow(0 0 2px rgba(var(--cyan-400-rgb), 0.55))
+    drop-shadow(0 0 12px rgba(var(--violet-400-rgb), 0.45));
+}
+
+@keyframes nameIridescent {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+
+.nameTier2 :global(.entity-link) {
+  background-image: linear-gradient(
+    110deg,
+    var(--ink-soft) 0%,
+    var(--blue-100) 32%,
+    var(--ink) 46%,
+    var(--blue-300) 62%,
+    var(--ink-soft) 100%
+  );
+  background-size: 250% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: nameIridescent 11s ease-in-out infinite alternate;
+  animation-play-state: var(--deco-anim-state);
+}
+
+.nameTier2 {
+  position: relative;
+  padding-bottom: 6px;
+  filter: drop-shadow(0 0 6px rgba(var(--cyan-400-rgb), 0.28));
+}
+
+.nameTier3 :global(.entity-link) {
+  color: var(--violet-300);
+  text-shadow:
+    0 0 1px rgba(var(--violet-400-rgb), 0.9),
+    0 0 8px rgba(var(--violet-400-rgb), 0.5);
+}
+
+/* Filet sous le nom : irisé et plus large à la 1re, givré et court à la 2e. */
+.nameTier1::after,
+.nameTier2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.nameTier1::after {
+  width: 64px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan-400), var(--violet-300), var(--pink-400));
+}
+
+.nameTier2::after {
+  width: 36px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--blue-100), var(--blue-300));
+}
+
+.nameTier1 :global(.entity-link):hover,
+.nameTier1 :global(.entity-link):focus-visible,
+.nameTier2 :global(.entity-link):hover,
+.nameTier2 :global(.entity-link):focus-visible,
+.nameTier3 :global(.entity-link):hover,
+.nameTier3 :global(.entity-link):focus-visible {
+  color: var(--blue-100);
 }
 
 .podiumPoints {
