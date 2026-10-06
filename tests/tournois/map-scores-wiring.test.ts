@@ -388,3 +388,12 @@ describe("détail map par map — refus désignant la ligne ouverte", () => {
     expect(list).toContain('else if (!autoGrown.current) setAnnouncement("");');
   });
 });
+
+describe("détail map par map — formulaire vierge", () => {
+  it("la ligne vierge d'ouverture n'est pas une proposition : bouton fermé, rien d'« envoyé »", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toContain("const nothingEntered = !maps.some(isMapTouched);");
+    expect(dialog).toContain("disabled={nothingEntered || unchangedMine || submitting}");
+    expect(dialog).not.toContain("disabled={maps.length === 0 ||");
+  });
+});
