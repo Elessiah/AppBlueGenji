@@ -1,10 +1,9 @@
 import { describe, expect, it, jest } from "@jest/globals";
-
-// Les pages traduites lisent la langue de la requête (`x-bg-locale`) : français ici.
-jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SITE_NAME } from "@/lib/shared/share-metadata";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
+
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 import { TOURNAMENT_RULE_MODES } from "@/lib/shared/tournament-rules";
 
 const ROOT = join(__dirname, "..", "..");
@@ -30,7 +29,8 @@ const DESCRIPTION_MAX = 165;
 
 describe("accueil", () => {
   it("déclare un titre qui dit ce qu'on y trouve, et une URL canonique", async () => {
-    const { metadata } = await import("@/app/page");
+    const { generateMetadata } = await import("@/app/page");
+    const metadata = await generateMetadata();
 
     // Le gabarit de la racine ne s'applique **pas** à la page qui partage son
     // segment : sans titre écrit en entier, l'accueil serait la seule page du
@@ -39,10 +39,14 @@ describe("accueil", () => {
       absolute: `Tournois esport amateurs Overwatch · ${SITE_NAME}`,
     });
     expect(metadata.alternates?.canonical).toBe("/");
+    // Accueil traduit (lot 2) : `hreflang` réciproques, `x-default` en français.
+    expect(metadata.alternates?.languages).toEqual({ fr: "/", en: "/en", "x-default": "/" });
+    expect(metadata.description).toBe(SITE_DESCRIPTION);
   });
 
   it("porte un encart complet, que la racine ne fusionne pas", async () => {
-    const { metadata } = await import("@/app/page");
+    const { generateMetadata } = await import("@/app/page");
+    const metadata = await generateMetadata();
     expect(metadata.openGraph).toMatchObject({ siteName: SITE_NAME, locale: "fr_FR" });
     expect(metadata.twitter).toMatchObject({ card: "summary_large_image" });
   });

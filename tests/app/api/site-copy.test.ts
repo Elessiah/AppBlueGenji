@@ -5,8 +5,8 @@ jest.mock("@/lib/server/site-copy-service");
 
 import { DELETE, GET, PATCH } from "@/app/api/site-copy/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getSiteCopy, resetSiteCopy, setSiteCopy } from "@/lib/server/site-copy-service";
-import { defaultSiteCopy } from "@/lib/shared/site-copy";
+import { getSiteCopyBundle, resetSiteCopy, setSiteCopy } from "@/lib/server/site-copy-service";
+import { defaultSiteCopy, resolveSiteCopy } from "@/lib/shared/site-copy";
 import { authUser } from "../../helpers/auth-user";
 
 const visitor = authUser({ id: 2, isAdmin: false, roles: [] });
@@ -36,12 +36,13 @@ describe("GET /api/site-copy", () => {
   });
 
   it("est public : les textes servent au rendu de la vitrine", async () => {
-    jest.mocked(getSiteCopy).mockResolvedValue(copy);
+    const bundle = resolveSiteCopy(new Map([["copy_home.hero.title", "Titre"]]));
+    jest.mocked(getSiteCopyBundle).mockResolvedValue(bundle);
 
     const res = await GET();
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ copy });
+    expect(await res.json()).toEqual({ copy: bundle.fr, copyEn: bundle.en });
     expect(getCurrentUser).not.toHaveBeenCalled();
   });
 });
@@ -72,10 +73,10 @@ describe("PATCH /api/site-copy", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(cm);
     jest.mocked(setSiteCopy).mockResolvedValue(copy);
 
-    const res = await PATCH(patchReq({ key: "home.hero.title", value: "Titre" }));
+    const res = await PATCH(patchReq({ key: "home.hero.title", value: "Titre", valueEn: "Title" }));
 
     expect(res.status).toBe(200);
-    expect(setSiteCopy).toHaveBeenCalledWith("home.hero.title", "Titre");
+    expect(setSiteCopy).toHaveBeenCalledWith("home.hero.title", "Titre", "Title");
     expect(await res.json()).toEqual({ copy });
   });
 
@@ -163,10 +164,21 @@ describe("/api/site-copy — en-tête de /classement", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(cm);
     jest.mocked(setSiteCopy).mockResolvedValue({ ...copy, "ranking.hero.lede": "Nouveau" });
 
-    const res = await PATCH(patchReq({ key: "ranking.hero.lede", value: "Nouveau" }));
+    const res = await PATCH(patchReq({ key: "ranking.hero.lede", value: "Nouveau", valueEn: "New" }));
 
     expect(res.status).toBe(200);
-    expect(setSiteCopy).toHaveBeenCalledWith("ranking.hero.lede", "Nouveau");
+    expect(setSiteCopy).toHaveBeenCalledWith("ranking.hero.lede", "Nouveau", "New");
+  });
+
+  it("refuse un texte sans anglais : 400, code seul (D9)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(cm);
+    jest.mocked(setSiteCopy).mockRejectedValue(new Error("COPY_EN_EMPTY"));
+
+    const res = await PATCH(patchReq({ key: "home.hero.title", value: "Titre" }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "COPY_EN_EMPTY" });
+    expect(setSiteCopy).toHaveBeenCalledWith("home.hero.title", "Titre", undefined);
   });
 
   it("renvoie le code du service quand le titre est trop long", async () => {

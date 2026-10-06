@@ -3,6 +3,7 @@ import { enforceRateLimit, LANDING_READ_RULE, requestClientIp } from "@/lib/serv
 import { ok } from "@/lib/server/http";
 import { getLandingCalendar } from "@/lib/server/landing-service";
 import type { LandingCalendarEvent } from "@/lib/shared/landing";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 
 /**
  * `revalidate` n'a aucun effet à côté de `force-dynamic` : la route est
@@ -37,7 +38,17 @@ function formatIcsDate(value: string | Date): string {
   return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
 }
 
-function buildIcs(events: LandingCalendarEvent[]): string {
+/**
+ * Libellé de la description d'un événement. Le lien « .ics » de `/en` porte
+ * `lang=en` : un fichier téléchargé depuis la page anglaise ne doit pas
+ * ramener de français. Toute autre valeur garde le français.
+ */
+const ICS_REGISTRATION_LABEL: Readonly<Record<Locale, string>> = {
+  fr: "Inscriptions : ",
+  en: "Registration: ",
+};
+
+function buildIcs(events: LandingCalendarEvent[], locale: Locale = DEFAULT_LOCALE): string {
   const appUrl = process.env.APP_URL?.trim() || "http://localhost:3000";
   const now = formatIcsDate(new Date());
   const lines: string[] = [
@@ -50,7 +61,7 @@ function buildIcs(events: LandingCalendarEvent[]): string {
   for (const event of events) {
     const start = new Date(event.startAt);
     const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
-    const description = `Inscriptions : ${event.registrationOpenAt} -> ${event.registrationCloseAt}`;
+    const description = `${ICS_REGISTRATION_LABEL[locale]}${event.registrationOpenAt} -> ${event.registrationCloseAt}`;
     lines.push(
       "BEGIN:VEVENT",
       `UID:bg-tournament-${event.tournamentId}@bluegenji-esport.fr`,
@@ -78,7 +89,8 @@ export async function GET(req: Request) {
   const events = await getLandingCalendar(limit);
 
   if (format === "ics") {
-    return new NextResponse(buildIcs(events), {
+    const locale: Locale = url.searchParams.get("lang") === "en" ? "en" : DEFAULT_LOCALE;
+    return new NextResponse(buildIcs(events, locale), {
       status: 200,
       headers: {
         "Content-Type": "text/calendar; charset=utf-8",

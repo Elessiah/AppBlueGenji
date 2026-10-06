@@ -225,6 +225,25 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - `SiteFooterBar` devient composant client (sans état) : un composant serveur asynchrone ne se rend
   pas dans les tests de `ArenaShell`, et ses textes n'ont besoin d'aucune donnée serveur.
 
+### Ce que le lot 2 a établi (2026-10-06) — écarts au plan
+
+- **`/` ouvert sous `/en`** (`MIGRATED_ROUTES = ["/"]`), espace `landing`, toujours sans
+  `next-intl` côté client (formateur commun `lib/shared/scoped-text.ts`). Détail : `I18N.md`
+  § Accueil.
+- **Rattrapage des `copy_*` sans migration de données** (écart à D9, qui prévoyait une
+  migration ou un script rejoué une fois) : le code ne connaît pas les textes de production et
+  n'écrit pas à leur place. Règle `resolveSiteCopy` : un français d'origine sert son anglais
+  d'origine ; un français **édité** sans anglais sert aussi l'anglais d'origine (jamais le
+  français) et entre dans la liste de rattrapage, que l'éditeur marque « EN » jusqu'à saisie.
+  **Action requise en production** : `EDITABLE_SITE_COPY.md` § Rattrapage.
+- **Contenu de staff des lots 5** (chiffres, cartes « À propos », description d'un partenaire)
+  **non rendu** sous `/en` en attendant leur éditeur bilingue ; titres d'actualité exclus du
+  bandeau anglais ; places vides du mini-arbre en « TBD ».
+- **Image OG par langue** reportée (refonte de `app/opengraph-image.tsx` en cours, PR #411).
+- **Sélecteur sur mobile** : code « EN » / « FR » sous 720 px (`I18N.md` § Sélecteur).
+- Restent français sous `/en` : mise en avant du recrutement (lot 5), fenêtres globales de
+  confidentialité et de conditions (lots 7b / 9).
+
 ### Ce que le lot 3 a établi (2026-10-06) — écarts au plan
 
 - **Première route ouverte** : `/regles`, `/regles/[slug]` dans `MIGRATED_ROUTES` — réécriture,
@@ -276,7 +295,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 |---|---|---|---:|---|---|
 | 0 | **Infrastructure** | `next-intl`, `i18n/request.ts`, `messages/fr/*.json` + `messages/en/*.json` par espace de noms, réécriture `/en` dans `middleware.ts`, en-tête `x-bg-locale`, liste blanche, `<html lang>`, `LocaleLink`/`localeHref`/`useLocaleRouter`, sélecteur, `pageMetadata` + sitemap + JSON-LD multilingues, formateurs, test de parité des clés, règle ESLint, glossaire, doc `I18N.md`, règle `CLAUDE.md`. **Aucune page migrée** (liste blanche vide → `/en/*` redirige). | ~0 | Middleware (CSP, provenance API, suspension) ; `usePathname` après réécriture ; double TypeScript | **Critique** : deux cycles propres consécutifs + sécurité + performance |
 | 1 ✅ | Coquille partagée | Nav, pied de page, `PublicPageShell`, lien d'évitement, menu d'accessibilité, toasts, `ConfirmActionDialog`, pages d'erreur / 404 / `global-error` | ~250 (C1 + part de C2) | Composants partout : tester FR inchangé | Standard + UI |
-| 2 | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
+| 2 ✅ | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
 | 3 ✅ | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
 | 4 | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
 | 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |

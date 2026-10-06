@@ -49,6 +49,11 @@
   gap: 48px;
 }
 
+/* Intro seule (chiffres et piliers non rendus) : pas de colonne vide. */
+.gridSingle {
+  grid-template-columns: 1fr;
+}
+
 .lede {
   margin: 0;
   font-size: 22px;

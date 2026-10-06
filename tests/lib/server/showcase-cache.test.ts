@@ -160,7 +160,7 @@ describe("écritures de vitrine — chacune invalide sa lecture", () => {
  */
 describe("écritures de textes — le cache est repeuplé sur place", () => {
   const cases = [
-    { nom: "setSiteCopy", write: () => setSiteCopy("home.hero.title", "Titre") },
+    { nom: "setSiteCopy", write: () => setSiteCopy("home.hero.title", "Titre", "Title") },
     { nom: "resetSiteCopy", write: () => resetSiteCopy("home.hero.title") },
   ];
 

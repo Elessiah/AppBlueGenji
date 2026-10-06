@@ -12,6 +12,8 @@
  */
 import enCommon from "@/messages/en/common.json";
 import frCommon from "@/messages/fr/common.json";
+import enLanding from "@/messages/en/landing.json";
+import frLanding from "@/messages/fr/landing.json";
 import enShell from "@/messages/en/shell.json";
 import frShell from "@/messages/fr/shell.json";
 import enRules from "@/messages/en/rules.json";
@@ -20,8 +22,8 @@ import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 
 const CATALOG: Readonly<Record<Locale, Messages>> = {
-  fr: { common: frCommon, shell: frShell, rules: frRules },
-  en: { common: enCommon, shell: enShell, rules: enRules },
+  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules },
+  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules },
 };
 
 export function messagesFor(locale: Locale): Messages {

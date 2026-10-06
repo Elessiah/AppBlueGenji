@@ -9,8 +9,8 @@ import { can } from "@/lib/shared/permissions";
 import { listBureauMembers } from "@/lib/server/bureau-service";
 import { listAboutStats } from "@/lib/server/about-stats-service";
 import { listAboutPillars } from "@/lib/server/about-pillars-service";
-import { getSiteCopy } from "@/lib/server/site-copy-service";
-import { EditableCopy } from "@/components/cyber/landing/EditableCopy";
+import { getSiteCopy, getSiteCopyEditor } from "@/lib/server/site-copy-service";
+import { EditableCopy, SiteCopyEditorProvider } from "@/components/cyber/landing/EditableCopy";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { ORGANIZATION_FOUNDING_YEAR, organizationJsonLd } from "@/lib/shared/structured-data";
@@ -57,9 +57,12 @@ export default async function AssociationPage() {
   ]);
   // Gestion de l'association : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
+  // Éditeur bilingue (FR + EN obligatoire) : ses textes ne voyagent que pour le staff.
+  const copyEditor = isAdmin ? await getSiteCopyEditor() : null;
 
   return (
     <PublicPageShell>
+      <SiteCopyEditorProvider entries={copyEditor ?? null}>
         {/*
           Le même nœud qu'à l'accueil, à la même identité : c'est *la* page qui
           parle de l'association, et un moteur doit y retrouver la structure
@@ -253,6 +256,7 @@ export default async function AssociationPage() {
             </li>
           </ul>
         </section>
+      </SiteCopyEditorProvider>
     </PublicPageShell>
   );
 }

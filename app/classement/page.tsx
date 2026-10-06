@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EditableCopy } from "@/components/cyber/landing/EditableCopy";
+import { EditableCopy, SiteCopyEditorProvider } from "@/components/cyber/landing/EditableCopy";
 import { SessionPageShell } from "@/components/cyber/landing/SessionPageShell";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadLeaderboardRows } from "@/lib/server/landing-service";
-import { getSiteCopy } from "@/lib/server/site-copy-service";
+import { getSiteCopy, getSiteCopyEditor } from "@/lib/server/site-copy-service";
 import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
 import { pageMetadata } from "@/lib/shared/page-metadata";
@@ -58,6 +58,8 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
   ]);
   // Mêmes éditeurs que les textes de la vitrine : administrateurs + Community Managers.
   const canEditCopy = can(user, "showcase");
+  // Éditeur bilingue (FR + EN obligatoire) : ses textes ne voyagent que pour le staff.
+  const copyEditor = canEditCopy ? await getSiteCopyEditor() : null;
   const unavailable = loaded === null;
   const rows = loaded?.slice(0, shown) ?? [];
   const hasMore = (loaded?.length ?? 0) > shown;
@@ -69,6 +71,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
         <div className="fabric" />
         <div className={styles.heroAurora} aria-hidden="true" />
         <span className="eyebrow">COMPÉTITION · CLASSEMENT</span>
+        <SiteCopyEditorProvider entries={copyEditor ?? null}>
         <EditableCopy copyKey="ranking.hero.title" value={copy["ranking.hero.title"]} canEdit={canEditCopy}>
           {/* Une ligne par retour à la ligne saisi, la dernière en dégradé. */}
           <h1 id="classement-title" className={`display ${styles.heroTitle}`}>
@@ -83,6 +86,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
         <EditableCopy copyKey="ranking.hero.lede" value={copy["ranking.hero.lede"]} canEdit={canEditCopy}>
           <p className={styles.heroSub}>{copy["ranking.hero.lede"]}</p>
         </EditableCopy>
+        </SiteCopyEditorProvider>
       </section>
 
       <section className={styles.section} aria-labelledby="classement-board">

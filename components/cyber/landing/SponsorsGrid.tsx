@@ -23,6 +23,7 @@ import {
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { EditableCopy } from "./EditableCopy";
+import { useLandingText } from "@/components/i18n/landing-text";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./SponsorsGrid.module.css";
 
@@ -83,7 +84,17 @@ function sortByTier(list: Sponsor[]): Sponsor[] {
 }
 
 export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<SponsorsGridProps>) {
-  const { showError, showSuccess } = useToast();
+  const { t, locale } = useLandingText();
+  // L'administration reste en français (D4) : sous `/en`, ses contrôles le
+  // disent (`lang="fr"`). La description d'un partenaire, saisie en français,
+  // n'y est pas rendue tant que son éditeur ne demande pas l'anglais (lot 5).
+  const staffLang = locale === "fr" ? undefined : "fr";
+  const showStaffContent = locale === "fr";
+  // Ses notifications sont du français d'administration, lues comme tel sous `/en`.
+  const toast = useToast();
+  const staffToast = staffLang ? { lang: staffLang } : undefined;
+  const showError = (message: string) => toast.showError(message, staffToast);
+  const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
   const { cropImage, cropDialog } = useImageCropper();
   const [items, setItems] = useState<Sponsor[]>(sponsors);
   const [editing, setEditing] = useState<Sponsor | null>(null);
@@ -298,15 +309,15 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
       {cropDialog}
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h2 className={styles.sectionTitle}>Partenaires et soutiens</h2>
+          <h2 className={styles.sectionTitle}>{t("sponsors.title")}</h2>
           <EditableCopy copyKey="home.sponsors.lede" value={copy["home.sponsors.lede"]} canEdit={isAdmin}>
             <p className={styles.lede}>{copy["home.sponsors.lede"]}</p>
           </EditableCopy>
         </div>
         <div className={styles.headActions}>
-          <span className={styles.meta}>{displaySponsors.length} PARTENAIRES</span>
+          <span className={styles.meta}>{t("sponsors.count", { count: displaySponsors.length })}</span>
           {isAdmin && (
-            <CyberButton variant="primary" onClick={openCreate}>
+            <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
               + Ajouter
             </CyberButton>
           )}
@@ -373,7 +384,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                     </div>
                   )}
 
-                  <span className={styles.tier}>{SPONSOR_TIER_LABELS[sponsor.tier]}</span>
+                  <span className={styles.tier}>{t(`sponsors.tier.${sponsor.tier}`)}</span>
                 </div>
 
                 <div className={styles.body}>
@@ -383,13 +394,13 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                       // accessible *est* le nom affiché (WCAG 2.5.3).
                       <a href={href} target="_blank" rel="noreferrer" className={styles.nameLink}>
                         {sponsor.name}
-                        <span className="sr-only"> — site du partenaire (nouvel onglet)</span>
+                        <span className="sr-only">{` ${t("sponsors.websiteSuffix")}`}</span>
                       </a>
                     ) : (
                       sponsor.name
                     )}
                   </h3>
-                  {sponsor.description && <p className={styles.description}>{sponsor.description}</p>}
+                  {sponsor.description && showStaffContent && <p className={styles.description}>{sponsor.description}</p>}
                   {domain && (
                     <span className={styles.domain} aria-hidden="true">
                       {domain} ↗
@@ -398,7 +409,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                 </div>
               </article>
               {canManage(sponsor) && (
-                <div className={styles.slotActions} data-tap-zone>
+                <div className={styles.slotActions} data-tap-zone lang={staffLang}>
                   <button
                     type="button"
                     className={`${styles.slotAction} ${styles.moveAction}`}
@@ -449,6 +460,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
           onClose={close}
           busy={busy}
           className={styles.modal}
+          lang={staffLang}
           label={editing ? "Modifier un partenaire" : "Ajouter un partenaire"}
         >
           <h3 className={styles.modalTitle}>{editing ? "Modifier le partenaire" : "Ajouter un partenaire"}</h3>
@@ -619,6 +631,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
           title={`Supprimer le partenaire « ${pendingRemoval.name} » ?`}
           confirmLabel="Supprimer le partenaire"
           pendingLabel="Suppression…"
+          contentLang={staffLang}
           onClose={() => setPendingRemoval(null)}
           onConfirm={() => remove(pendingRemoval)}
         >

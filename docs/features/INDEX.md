@@ -138,7 +138,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 
 ## Vitrine
 
-- `EDITABLE_SITE_COPY.md` — Textes éditables (`site-copy.ts`, `<EditableCopy>`).
+- `EDITABLE_SITE_COPY.md` — Textes éditables (`site-copy.ts`, `<EditableCopy>`), bilingues (anglais obligatoire) et rattrapage de l’anglais.
 - `LANDING_HERO_FOLD.md` — Accueil en desktop : l'appel principal au premier écran.
 - `LANDING_MOBILE_LAYOUT.md` — Accueil en mobile.
 - `LANDING_LEADERBOARD.md` — Classement de l'accueil.
@@ -176,4 +176,4 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `VERSIONING.md` — Bump, tag et release automatiques à la fusion.
 - `DEPENDENCY_RISKS.md` — Avis npm audit restants (`braces`, `deepmerge`), surcharges (`uri-js`, `sprintf-js`) et règle du lockfile Windows.
 - `I18N.md` — Site bilingue : réécriture `/en` du middleware, liste blanche des routes traduites, `next-intl` sans routage, `LocaleLink`, sélecteur, `hreflang`/sitemap, garde-fous, glossaire.
-- `I18N_MIGRATION_PLAN.md` — Site bilingue FR/EN (`/en/...`) : mesure, choix technique, lots et décisions prises (lot 0 livré).
+- `I18N_MIGRATION_PLAN.md` — Site bilingue FR/EN (`/en/...`) : mesure, choix technique, lots et décisions prises (lots 0 à 2 livrés).

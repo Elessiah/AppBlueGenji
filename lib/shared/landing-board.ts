@@ -14,6 +14,7 @@
  */
 import { computeTournamentProgress, type TournamentStageKey } from "./tournament-progress";
 import type { TournamentCard, TournamentFormat } from "./types";
+import type { Locale } from "./locales";
 
 type BoardCard = Pick<
   TournamentCard,
@@ -35,17 +36,30 @@ type BoardCard = Pick<
  */
 export const BOARD_TIME_ZONE = "Europe/Paris";
 
-// Formateurs construits une fois : leurs options ne varient pas, et une
-// construction coûte bien plus qu'un formatage.
-const YEAR_FORMAT = new Intl.DateTimeFormat("fr-FR", { year: "numeric", timeZone: BOARD_TIME_ZONE });
-const DAY_FORMAT = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: BOARD_TIME_ZONE });
-const DAY_YEAR_FORMAT = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: BOARD_TIME_ZONE,
-});
-const TIME_FORMAT = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: BOARD_TIME_ZONE });
+// Formateurs construits une fois par langue : leurs options ne varient pas, et
+// une construction coûte bien plus qu'un formatage.
+type BoardFormats = {
+  year: Intl.DateTimeFormat;
+  day: Intl.DateTimeFormat;
+  dayYear: Intl.DateTimeFormat;
+  time: Intl.DateTimeFormat;
+};
+
+function buildFormats(tag: string): BoardFormats {
+  return {
+    year: new Intl.DateTimeFormat(tag, { year: "numeric", timeZone: BOARD_TIME_ZONE }),
+    day: new Intl.DateTimeFormat(tag, { day: "numeric", month: "short", timeZone: BOARD_TIME_ZONE }),
+    dayYear: new Intl.DateTimeFormat(tag, { day: "numeric", month: "short", year: "numeric", timeZone: BOARD_TIME_ZONE }),
+    // 24 h dans les deux langues : « 09:00 PM » ne tient pas dans les colonnes
+    // étroites, et l'heure doit se lire comme celle du calendrier voisin.
+    time: new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: BOARD_TIME_ZONE }),
+  };
+}
+
+const BOARD_FORMATS: Readonly<Record<Locale, BoardFormats>> = {
+  fr: buildFormats("fr-FR"),
+  en: buildFormats("en-US"),
+};
 
 /** Formats dont le plateau est un arbre : « Voir le bracket » y a un sens. */
 const BRACKET_FORMATS: ReadonlySet<TournamentFormat> = new Set<TournamentFormat>(["SINGLE", "DOUBLE"]);
@@ -68,20 +82,45 @@ function boardStage(card: BoardCard, now: number): TournamentStageKey {
   return computeTournamentProgress(card, { now }).current;
 }
 
-/** Libellé français de l'état, pour la pastille de la carte. */
-export function boardStateLabel(card: BoardCard, now: number = Date.now()): string {
+/** État d'une carte, clé de `landing.board.state` (`messages/<langue>/landing.json`). */
+export type BoardStateKey = "full" | "registration" | "locked" | "running" | "finished" | "soon";
+
+/** État de la carte, en clé — l'écran le traduit. */
+export function boardStateKey(card: BoardCard, now: number = Date.now()): BoardStateKey {
   switch (boardStage(card, now)) {
     case "REGISTRATION":
-      return isTournamentFull(card) ? "Complet" : "Inscriptions ouvertes";
+      return isTournamentFull(card) ? "full" : "registration";
     case "LOCKED":
-      return "Inscriptions closes";
+      return "locked";
     case "RUNNING":
-      return "En cours";
+      return "running";
     case "FINISHED":
-      return "Terminé";
+      return "finished";
     default:
-      return "Bientôt";
+      return "soon";
   }
+}
+
+const BOARD_STATE_FR: Readonly<Record<BoardStateKey, string>> = {
+  full: "Complet",
+  registration: "Inscriptions ouvertes",
+  locked: "Inscriptions closes",
+  running: "En cours",
+  finished: "Terminé",
+  soon: "Bientôt",
+};
+
+/** Libellé français de l'état, pour la pastille de la carte. */
+export function boardStateLabel(card: BoardCard, now: number = Date.now()): string {
+  return BOARD_STATE_FR[boardStateKey(card, now)];
+}
+
+/** Action d'une carte, en clé : `bracket`, `follow` ou `view` (voir `boardActionLabel`). */
+export type BoardActionKey = "bracket" | "follow" | "view";
+
+export function boardActionKey(card: BoardCard, now: number = Date.now()): BoardActionKey {
+  if (boardStage(card, now) === "RUNNING") return BRACKET_FORMATS.has(card.format) ? "bracket" : "follow";
+  return "view";
 }
 
 /**
@@ -98,12 +137,14 @@ export function boardStateLabel(card: BoardCard, now: number = Date.now()): stri
  * BlueGenji Survie n'en ont pas — ou pas encore), « Voir le tournoi » sinon.
  */
 export function boardActionLabel(card: BoardCard, now: number = Date.now()): string {
-  const stage = boardStage(card, now);
-  if (stage === "RUNNING") {
-    return BRACKET_FORMATS.has(card.format) ? "Voir le bracket" : "Suivre le tournoi";
-  }
-  return "Voir le tournoi";
+  return BOARD_ACTION_FR[boardActionKey(card, now)];
 }
+
+const BOARD_ACTION_FR: Readonly<Record<BoardActionKey, string>> = {
+  bracket: "Voir le bracket",
+  follow: "Suivre le tournoi",
+  view: "Voir le tournoi",
+};
 
 /**
  * Date de début d'une carte : jour, mois et heure à la minute (« 21 sept. ·
@@ -111,11 +152,12 @@ export function boardActionLabel(card: BoardCard, now: number = Date.now()): str
  * grain que le calendrier voisin, sans les secondes de `toLocaleString`.
  * Chaîne vide sur une date illisible, plutôt qu'« Invalid Date ».
  */
-export function formatBoardStartAt(iso: string, now: number = Date.now()): string {
+export function formatBoardStartAt(iso: string, now: number = Date.now(), locale: Locale = "fr"): string {
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "";
 
-  const sameYear = YEAR_FORMAT.format(date) === YEAR_FORMAT.format(new Date(now));
-  const day = (sameYear ? DAY_FORMAT : DAY_YEAR_FORMAT).format(date);
-  return `${day} · ${TIME_FORMAT.format(date)}`;
+  const formats = BOARD_FORMATS[locale];
+  const sameYear = formats.year.format(date) === formats.year.format(new Date(now));
+  const day = (sameYear ? formats.day : formats.dayYear).format(date);
+  return `${day} · ${formats.time.format(date)}`;
 }

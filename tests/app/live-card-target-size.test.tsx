@@ -132,8 +132,8 @@ describe("LiveCard — taille des cibles de l'accueil", () => {
       viewers: 12,
       currentMatch: {
         id: 42,
-        round: 1,
         roundLabel: "Manche 1",
+        round: { kind: "round", number: 1 },
         bracket: "UPPER",
         team1Name: "Alpha",
         team2Name: "Beta",

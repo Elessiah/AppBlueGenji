@@ -2,6 +2,8 @@ import type { AboutPillar } from "@/lib/shared/about-pillars";
 import type { AboutStat } from "@/lib/shared/about-stats";
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import { ORGANIZATION_FOUNDING_YEAR } from "@/lib/shared/structured-data";
+import { landingServerText } from "@/lib/server/i18n-landing";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { AboutPillars } from "./AboutPillars";
 import { AboutStats } from "./AboutStats";
 import { EditableCopy } from "./EditableCopy";
@@ -12,9 +14,21 @@ interface AboutSectionProps {
   pillars: AboutPillar[];
   isAdmin: boolean;
   copy: SiteCopy;
+  /** Langue de la page (`requestLocale()`), français par défaut. */
+  locale?: Locale;
 }
 
-export function AboutSection({ stats, pillars, isAdmin, copy }: Readonly<AboutSectionProps>) {
+/**
+ * Section « L'association » de l'accueil (et de la page association).
+ *
+ * Sous `/en`, les chiffres et les cartes « À propos » ne sont **pas** rendus :
+ * leur texte est saisi en français par le staff, et leur éditeur ne demande
+ * l'anglais qu'au lot 5 (`docs/features/I18N_MIGRATION_PLAN.md`, D9). Mieux
+ * vaut une section plus courte qu'une page anglaise semée de français.
+ */
+export function AboutSection({ stats, pillars, isAdmin, copy, locale = DEFAULT_LOCALE }: Readonly<AboutSectionProps>) {
+  const { t } = landingServerText(locale);
+  const showStaffContent = locale === DEFAULT_LOCALE;
   return (
     <section id="assoc" className={styles.root}>
       <div className={styles.head}>
@@ -23,21 +37,25 @@ export function AboutSection({ stats, pillars, isAdmin, copy }: Readonly<AboutSe
             <h2 className={styles.sectionTitle}>{copy["home.about.title"]}</h2>
           </EditableCopy>
         </div>
-        <div className={styles.meta}>LOI 1901 · JANVILLIERS · {ORGANIZATION_FOUNDING_YEAR}</div>
+        <div className={styles.meta}>{t("about.meta", { year: ORGANIZATION_FOUNDING_YEAR })}</div>
       </div>
 
-      <div className={styles.grid}>
+      {/* Sans chiffres ni piliers (masqués sous `/en` jusqu'au lot 5), une seule
+          colonne : la seconde resterait vide. */}
+      <div className={showStaffContent ? styles.grid : `${styles.grid} ${styles.gridSingle}`}>
         <div className={styles.left}>
           <EditableCopy copyKey="home.about.lede" value={copy["home.about.lede"]} canEdit={isAdmin}>
             <p className={styles.lede}>{copy["home.about.lede"]}</p>
           </EditableCopy>
 
-          <AboutStats initialStats={stats} isAdmin={isAdmin} />
+          {showStaffContent && <AboutStats initialStats={stats} isAdmin={isAdmin} />}
         </div>
 
-        <div className={styles.right}>
-          <AboutPillars initialPillars={pillars} isAdmin={isAdmin} />
-        </div>
+        {showStaffContent && (
+          <div className={styles.right}>
+            <AboutPillars initialPillars={pillars} isAdmin={isAdmin} />
+          </div>
+        )}
       </div>
     </section>
   );

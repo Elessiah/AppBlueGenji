@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLandingText } from "@/components/i18n/landing-text";
 import styles from "./Ticker.module.css";
 
 interface TickerProps {
@@ -24,9 +25,10 @@ interface TickerProps {
  */
 export function Ticker({ items }: Readonly<TickerProps>) {
   const [paused, setPaused] = useState(false);
+  const { t } = useLandingText();
 
   return (
-    <div className={styles.ticker} role="marquee" aria-label="Fil d'actualité" data-paused={paused ? "true" : undefined}>
+    <div className={styles.ticker} role="marquee" aria-label={t("ticker.label")} data-paused={paused ? "true" : undefined}>
       <div className={styles.track}>
         {[0, 1].map((copy) => (
           <div key={copy} className={styles.copy} aria-hidden={copy === 1 ? true : undefined}>
@@ -44,8 +46,8 @@ export function Ticker({ items }: Readonly<TickerProps>) {
       <button
         type="button"
         className={styles.pause}
-        aria-label={paused ? "Relancer le défilement du bandeau" : "Mettre en pause le défilement du bandeau"}
-        title={paused ? "Relancer" : "Pause"}
+        aria-label={paused ? t("ticker.resume") : t("ticker.pause")}
+        title={paused ? t("ticker.resumeShort") : t("ticker.pauseShort")}
         onClick={() => setPaused((value) => !value)}
       >
         <span aria-hidden="true">{paused ? "▶" : "❚❚"}</span>

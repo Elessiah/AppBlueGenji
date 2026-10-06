@@ -72,3 +72,13 @@ describe("SponsorsGrid — logos servis depuis notre origine", () => {
     expect(modal).toContain("form.bannerUrl");
   });
 });
+
+describe("SponsorsGrid — notifications du staff sous /en", () => {
+  it("déclare en français chacune de ses notifications, comme ses contrôles", () => {
+    expect(source).toContain("const staffToast = staffLang ? { lang: staffLang } : undefined;");
+    expect(source).toContain("toast.showError(message, staffToast)");
+    expect(source).toContain("toast.showSuccess(message, staffToast)");
+    // Aucun appel direct au crochet, qui oublierait la langue.
+    expect(source).not.toMatch(/const \{ showError, showSuccess \} = useToast\(\)/);
+  });
+});

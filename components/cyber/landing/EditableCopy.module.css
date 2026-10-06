@@ -45,6 +45,58 @@
   background: var(--cyber-bg-1, #0c0f14);
   border: 1px solid var(--line-strong-cy, var(--line-soft));
   border-radius: var(--r-cy-md, 10px);
+  /* Un `fieldset` : ses marges et sa largeur minimale par défaut retirées. */
+  margin: 0;
+  min-width: 0;
+}
+
+/* La légende reste dans le flux (le `float` l'ôte de la bordure du cadre). */
+.editor > legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+}
+
+/* Anglais à rédiger : un avertissement, donc l'ambre (seul usage permis). */
+.pencilMissing {
+  width: auto;
+  gap: 4px;
+  padding: 0 6px;
+  border-color: var(--amber);
+}
+
+.missing {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+}
+
+/* Français et anglais côte à côte ; l'un sous l'autre quand la place manque. */
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.langLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim, var(--ink));
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--amber);
 }
 
 .label {

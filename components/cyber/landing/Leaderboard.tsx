@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { TeamSigil } from "@/components/cyber";
 import { TeamLink } from "@/components/entity-link";
 import { useToast } from "@/components/ui/toast";
+import { useLandingText } from "@/components/i18n/landing-text";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
 import { rankingFilterHref, type RankingGameFilter } from "@/lib/shared/ranking-page";
 import styles from "./Leaderboard.module.css";
@@ -37,6 +38,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
   const [rows, setRows] = useState(initialRows);
   const [loading, setLoading] = useState(false);
   const { showError } = useToast();
+  const { t } = useLandingText();
   // Dernier filtre chargé avec succès : `initialRows` couvre déjà « all » au
   // premier rendu (le même que cette valeur initiale), donc la garde ci-dessous
   // saute aussi bien la requête au montage qu'un retour au filtre précédent
@@ -63,7 +65,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
       } catch {
         if (!mounted) return;
         setGame(lastLoadedGame.current);
-        showError("Impossible de charger ce classement, réessaie plus tard.");
+        showError(t("leaderboard.loadError"));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -73,10 +75,10 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
     return () => {
       mounted = false;
     };
-  }, [game, showError]);
+  }, [game, showError, t]);
 
   const chips = [
-    { id: "all" as const, label: "Général" },
+    { id: "all" as const, label: t("leaderboard.chipAll") },
     { id: "ow" as const, label: "Overwatch" },
     { id: "mr" as const, label: "Marvel Rivals" },
   ];
@@ -85,7 +87,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
     <div className={styles.root}>
       <div className={styles.head}>
         <h3 className="mono" style={{ fontSize: 11, letterSpacing: "0.2em", color: "var(--ink-mute)", margin: 0, fontWeight: 400 }}>
-          TOP ÉQUIPES
+          {t("leaderboard.heading")}
         </h3>
         <div className={styles.chips}>
           {chips.map((chip) => (
@@ -102,18 +104,18 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
         </div>
       </div>
 
-      <div className={styles.table} role="table" aria-label="Classement des équipes" aria-busy={loading}>
+      <div className={styles.table} role="table" aria-label={t("leaderboard.tableLabel")} aria-busy={loading}>
         <div className={styles.tableHead} role="row">
           <span role="columnheader">#</span>
-          <span role="columnheader">ÉQUIPE</span>
-          <span role="columnheader">V–D</span>
-          <span role="columnheader">PTS</span>
-          <span role="columnheader" className={styles.trendHead} aria-label="Tendance" title="Tendance">TR</span>
+          <span role="columnheader">{t("leaderboard.team")}</span>
+          <span role="columnheader">{t("leaderboard.winLoss")}</span>
+          <span role="columnheader">{t("leaderboard.points")}</span>
+          <span role="columnheader" className={styles.trendHead} aria-label={t("leaderboard.trend")} title={t("leaderboard.trend")}>{t("leaderboard.trendShort")}</span>
         </div>
 
         {rows.length === 0 ? (
           <div role="row">
-            <p className={styles.empty} role="cell">Aucune équipe classée pour le moment.</p>
+            <p className={styles.empty} role="cell">{t("leaderboard.empty")}</p>
           </div>
         ) : (
           rows.map((row) => {
@@ -125,7 +127,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
                 <span className={styles.team} role="cell">
                   <TeamSigil label={row.teamName.charAt(0)} size={24} logoUrl={row.logoUrl} />
-                  <TeamLink teamId={row.teamId} title={`Voir la fiche de ${row.teamName}`}>
+                  <TeamLink teamId={row.teamId} title={t("common.teamPageTitle", { name: row.teamName })}>
                     {row.teamName}
                   </TeamLink>
                 </span>
@@ -144,7 +146,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
       </div>
 
       <div className={styles.footer}>
-        <Link href={rankingFilterHref(game)} className="mono">VOIR LE CLASSEMENT COMPLET →</Link>
+        <LocaleLink href={rankingFilterHref(game)} className="mono">{t("leaderboard.fullRanking")}</LocaleLink>
       </div>
     </div>
   );

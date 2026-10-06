@@ -1,7 +1,9 @@
 "use client";
 
 import { useClock } from "@/lib/shared/hooks/useClock";
-import { computeCountdown, countdownAccessibleLabel } from "@/lib/shared/countdown";
+import { computeCountdown, type CountdownParts } from "@/lib/shared/countdown";
+import type { LandingText } from "@/lib/shared/landing-text";
+import { useLandingText } from "@/components/i18n/landing-text";
 import styles from "./CountdownStrip.module.css";
 
 interface CountdownStripProps {
@@ -9,31 +11,37 @@ interface CountdownStripProps {
   label?: string;
 }
 
-const PLACEHOLDER_UNITS = [
-  { label: "J", value: "--" },
-  { label: "H", value: "--" },
-  { label: "M", value: "--" },
-  { label: "S", value: "--" },
-];
+const UNITS = ["d", "h", "m", "s"] as const;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/**
+ * Phrase lue par un lecteur d'écran, résumée aux deux plus grandes unités non
+ * nulles — même règle que `countdownAccessibleLabel` (`lib/shared/countdown.ts`),
+ * dans la langue de la page.
+ */
+export function countdownText({ t }: LandingText, parts: CountdownParts): string {
+  const { d, h, m, s } = parts;
+  if (d === 0 && h === 0 && m === 0 && s === 0) return t("countdown.imminent");
+  if (d > 0) return t("countdown.daysHours", { d, h });
+  if (h > 0) return t("countdown.hoursMinutes", { h, m });
+  if (m > 0) return t("countdown.minutesSeconds", { m, s });
+  return t("countdown.seconds", { s });
+}
+
 export function CountdownStrip({ targetISO, label }: Readonly<CountdownStripProps>) {
+  const text = useLandingText();
   // Horloge soumise au régime de charge : arrêtée onglet caché, recalée au retour.
   const now = useClock(1000);
 
   const parts = now === null ? null : computeCountdown(targetISO, now);
 
-  const units = parts
-    ? [
-        { label: "J", value: pad(parts.d) },
-        { label: "H", value: pad(parts.h) },
-        { label: "M", value: pad(parts.m) },
-        { label: "S", value: pad(parts.s) },
-      ]
-    : PLACEHOLDER_UNITS;
+  const units = UNITS.map((unit) => ({
+    label: text.t(`countdown.unit.${unit}`),
+    value: parts ? pad(parts[unit]) : "--",
+  }));
 
-  const accessibleLabel = parts ? countdownAccessibleLabel(parts) : "Chargement du compte à rebours";
+  const accessibleLabel = parts ? countdownText(text, parts) : text.t("countdown.pending");
 
   return (
     <div className={styles.root}>

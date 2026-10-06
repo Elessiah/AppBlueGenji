@@ -3,6 +3,7 @@ import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatBoardStartAt } from "@/lib/shared/landing-board";
+import type { Locale } from "@/lib/shared/locales";
 import { MATCH_SECTION_LABELS } from "@/lib/shared/match-sections";
 import type { TournamentBuckets, TournamentCard, TournamentGame } from "@/lib/shared/types";
 
@@ -51,7 +52,10 @@ export type LandingLiveMatch = {
   team1Seed: number | null;
   team2Seed: number | null;
   bracket: string;
+  /** Nom de la manche, en français (« Demi-finale »). */
   roundLabel: string;
+  /** La même manche, en données : l'accueil anglais la nomme d'après elle. */
+  round: LandingRound;
   /**
    * Format **de ce match**, et non du tournoi : « BlueGenji Survie » en joue
    * deux — sa qualification, qui tolère l'égalité, et son arbre final, qui
@@ -108,7 +112,13 @@ export type FeaturedMatchPillTone = "live" | "blue" | "waiting";
  * horaire d'un match en attente (« 5 oct. · 21:00 »), écrit à côté de la
  * pastille et non dedans, pour qu'elle tienne sur une ligne à 320 px.
  */
-export type FeaturedMatchPill = { label: string; tone: FeaturedMatchPillTone; when: string | null };
+export type FeaturedMatchPill = {
+  /** Clé de `landing.live.pill` : l'écran traduit, `label` reste le français. */
+  kind: "live" | "playing" | "lobby" | "waiting";
+  label: string;
+  tone: FeaturedMatchPillTone;
+  when: string | null;
+};
 
 /** État du tournoi sur la carte : une mention secondaire, jamais une pastille. */
 export const FEATURED_TOURNAMENT_STATE_LABEL = "Tournoi en cours";
@@ -138,14 +148,17 @@ export const FEATURED_PILL_WAITING_LABEL = "En attente de lancement";
 export function featuredMatchPill(
   match: Pick<LandingLiveMatch, "launchPhase" | "startAt" | "liveState">,
   now: number | null = Date.now(),
+  locale: Locale = "fr",
 ): FeaturedMatchPill {
-  if (match.liveState === "LIVE") return { label: "En direct", tone: "live", when: null };
-  if (match.launchPhase === "LAUNCHED") return { label: MATCH_SECTION_LABELS.PLAYING, tone: "blue", when: null };
-  if (match.launchPhase === "LOBBY" || (now !== null && startTime(match.startAt) <= now)) {
-    return { label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null };
+  if (match.liveState === "LIVE") return { kind: "live", label: "En direct", tone: "live", when: null };
+  if (match.launchPhase === "LAUNCHED") {
+    return { kind: "playing", label: MATCH_SECTION_LABELS.PLAYING, tone: "blue", when: null };
   }
-  const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now ?? Date.now());
-  return { label: FEATURED_PILL_WAITING_LABEL, tone: "waiting", when: when || null };
+  if (match.launchPhase === "LOBBY" || (now !== null && startTime(match.startAt) <= now)) {
+    return { kind: "lobby", label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null };
+  }
+  const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now ?? Date.now(), locale);
+  return { kind: "waiting", label: FEATURED_PILL_WAITING_LABEL, tone: "waiting", when: when || null };
 }
 
 function startTime(iso: string | null): number {
@@ -338,6 +351,35 @@ const MIN_DISPLAYED_LIVE_VIEWERS = 2;
 /** Audience à afficher sur la carte du direct, ou `null` sous le seuil. */
 export function visibleLiveViewerCount(viewers: number): number | null {
   return viewers >= MIN_DISPLAYED_LIVE_VIEWERS ? viewers : null;
+}
+
+/** Manche du match mis en avant : sa nature, et son numéro. */
+export type LandingRound = { kind: "final" | "semi" | "quarter" | "round"; number: number };
+
+/**
+ * Nature d'une manche d'après son tableau et le nombre de ses matchs : un seul
+ * match du tableau principal (ou de la grande finale) est la finale, deux une
+ * demi-finale, quatre des quarts ; sinon une manche numérotée.
+ */
+export function landingRound(bracket: string, roundNumber: number, matchCount: number): LandingRound {
+  if ((bracket === "UPPER" || bracket === "GRAND") && matchCount === 1) return { kind: "final", number: roundNumber };
+  if (matchCount === 2) return { kind: "semi", number: roundNumber };
+  if (matchCount === 4) return { kind: "quarter", number: roundNumber };
+  return { kind: "round", number: roundNumber };
+}
+
+/** Nom français d'une manche (`roundLabel`). */
+export function frenchRoundLabel(round: LandingRound): string {
+  switch (round.kind) {
+    case "final":
+      return "Finale";
+    case "semi":
+      return "Demi-finale";
+    case "quarter":
+      return "Quarts de finale";
+    default:
+      return `Manche ${round.number}`;
+  }
 }
 
 export function inferPhaseLabel(match: LandingLiveMatch | null): string {

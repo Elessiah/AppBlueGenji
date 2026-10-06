@@ -164,3 +164,12 @@ describe("association", () => {
     expect(blockFor(/\.lede\s*\{/, about)).toMatch(/font-size:\s*22px\s*;/);
   });
 });
+
+describe("association (accueil) sous /en", () => {
+  const aboutTsx = readSource("components/cyber/landing/AboutSection.tsx");
+
+  it("passe sur une colonne quand chiffres et piliers ne sont pas rendus", () => {
+    expect(blockFor(/\.gridSingle\s*\{/, about)).toMatch(/grid-template-columns:\s*1fr\s*;/);
+    expect(aboutTsx).toContain("showStaffContent ? styles.grid : `${styles.grid} ${styles.gridSingle}`");
+  });
+});

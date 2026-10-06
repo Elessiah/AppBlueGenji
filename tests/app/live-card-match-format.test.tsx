@@ -61,6 +61,7 @@ function match(roundLabel: string, matchFormat: MatchFormat | null = null): Land
     team2Seed: null,
     bracket: "UPPER",
     roundLabel,
+    round: { kind: "quarter", number: 1 },
     // Le format voyage désormais **sur le match**, résolu côté serveur : le mode
     // « BlueGenji Survie » en joue deux, et une demi-finale ne se joue pas au
     // format de la qualification.
