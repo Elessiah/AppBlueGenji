@@ -1,5 +1,6 @@
 import { BotActivity } from "@/lib/shared/types";
 import { botPayloadLabel, botPayloadNumber } from "@/lib/shared/bot-payload";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
 
 /**
  * Le nombre de colonnes tracées. La page ne montre que 7 jours ; la borne
@@ -18,18 +19,19 @@ const MAX_COLUMNS = 120;
  * une chute d'activité qui n'a jamais eu lieu. Plus de sélecteur, plus de
  * rechargement côté client : la charge est celle du rendu serveur.
  */
-export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | null }>) {
+export function BotActivityChart({ initial, text = FR_BOT_TEXT }: Readonly<{ initial: BotActivity | null; text?: BotText }>) {
+  const { t } = text;
   const data = initial;
 
   if (!data) {
     return (
       <section className="panel">
         <div className="panel-head">
-          <span className="title">Activité · relais & scrims</span>
-          <span className="meta">7 DERNIERS JOURS</span>
+          <span className="title">{t("activity.title")}</span>
+          <span className="meta">{t("activity.range")}</span>
         </div>
         <div style={{ padding: "2rem", textAlign: "center", color: "var(--ink-mute)" }}>
-          <p>Données indisponibles</p>
+          <p>{t("activity.unavailable")}</p>
         </div>
       </section>
     );
@@ -90,8 +92,8 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
   return (
     <section className="panel">
       <div className="panel-head">
-        <span className="title">Activité · relais & scrims</span>
-        <span className="meta">7 DERNIERS JOURS</span>
+        <span className="title">{t("activity.title")}</span>
+        <span className="meta">{t("activity.range")}</span>
       </div>
       <div className="chart-wrap">
         <div className="chart">
@@ -113,11 +115,11 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
               const scrim = point(scrims[i]);
               return (
                 <div key={i} /* NOSONAR S6479 — élément du i-ème intervalle de la plage, dessin sans état */ style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1.5, height: "100%" }}>
-                  <div className="bar" style={{ height: `${(relay / max) * 100}%`, flex: 1 }} title={`${relay} relais`} />
+                  <div className="bar" style={{ height: `${(relay / max) * 100}%`, flex: 1 }} title={t("activity.relayBar", { count: relay })} />
                   <div
                     className="bar scrims"
                     style={{ height: `${(scrim / max) * 100}%`, flex: 0.4 }}
-                    title={`${scrim} scrims`}
+                    title={t("activity.scrimBar", { count: scrim })}
                   />
                 </div>
               );
@@ -135,10 +137,10 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
           ))}
         </div>
         <div className="chart-legend">
-          <span className="lg">RELAIS INTER-SERVEUR</span>
-          <span className="lg scrims">SCRIMS PROPOSÉS</span>
+          <span className="lg">{t("activity.legendRelays")}</span>
+          <span className="lg scrims">{t("activity.legendScrims")}</span>
           <span style={{ marginLeft: "auto" }}>
-            {`MOY. ${avgLabel} / JOUR`}
+            {t("activity.average", { value: avgLabel })}
           </span>
         </div>
       </div>

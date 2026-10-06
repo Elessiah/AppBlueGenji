@@ -1,4 +1,5 @@
 import type { BotServerEntry } from "@/lib/shared/types";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
 
 /**
  * L'état du relais d'un serveur Discord, **dit en français**.
@@ -38,29 +39,18 @@ export interface BotRelayState {
   tone: "ok" | "lag" | "off" | "unknown";
 }
 
-const RELAY_STATES: Record<BotRelayStatus, BotRelayState> = {
-  ok: {
-    label: "● À jour",
-    hint: "Les annonces sont relayées sans délai sur ce serveur.",
-    tone: "ok",
-  },
-  lag: {
-    label: "● Retard",
-    hint: "Le relais fonctionne mais accuse du retard sur ce serveur.",
-    tone: "lag",
-  },
-  off: {
-    label: "○ Hors ligne",
-    hint: "Le bot ne relaie plus rien sur ce serveur.",
-    tone: "off",
-  },
-};
+type RelayTone = BotRelayState["tone"];
 
-const UNKNOWN_RELAY_STATE: BotRelayState = {
-  label: "● Inconnu",
-  hint: "Le bot a renvoyé un état que cette page ne sait pas encore nommer.",
-  tone: "unknown",
-};
+/** Le dessin de chaque état : puce pleine, sauf l'arrêt (cercle vide). */
+const RELAY_GLYPHS: Record<RelayTone, string> = { ok: "●", lag: "●", off: "○", unknown: "●" };
+
+const KNOWN_RELAY_STATES: Record<BotRelayStatus, true> = { ok: true, lag: true, off: true };
+
+/** L'état dans la langue de la page : libellé (puce comprise) et explication. */
+function relayState(tone: RelayTone, text: BotText): BotRelayState {
+  const label = text.t(`relay.${tone}.label`);
+  return { label: `${RELAY_GLYPHS[tone]} ${label}`, hint: text.t(`relay.${tone}.hint`), tone };
+}
 
 /**
  * Traduit l'état renvoyé par le bot, sans jamais rendre une cellule vide.
@@ -70,12 +60,12 @@ const UNKNOWN_RELAY_STATE: BotRelayState = {
  * (`toString`, `constructor`), que l'indexation rendrait — une fonction, là où
  * la cellule attend un libellé.
  */
-export function resolveBotRelayState(status: string | null | undefined): BotRelayState {
-  if (!status) return UNKNOWN_RELAY_STATE;
-  if (!Object.hasOwn(RELAY_STATES, status)) {
-    return UNKNOWN_RELAY_STATE;
+export function resolveBotRelayState(status: string | null | undefined, text: BotText = FR_BOT_TEXT): BotRelayState {
+  if (!status) return relayState("unknown", text);
+  if (!Object.hasOwn(KNOWN_RELAY_STATES, status)) {
+    return relayState("unknown", text);
   }
-  return RELAY_STATES[status as BotRelayStatus];
+  return relayState(status as BotRelayStatus, text);
 }
 
 /**

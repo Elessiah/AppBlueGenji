@@ -67,6 +67,9 @@ const I18N_MIGRATED_FILES = [
   "components/cyber/RgpdConsentModal.tsx",
   "components/ui/confirm-action-dialog.tsx",
   "components/ui/toast.tsx",
+  // Bot (lot 5a) — `/bot`, `/bot/docs`.
+  "app/bot/**",
+  "components/bot/**",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */

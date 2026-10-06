@@ -1,41 +1,39 @@
-import Link from "next/link";
 import { DiscordIcon } from "./DiscordIcon";
 import { CyberButton } from "@/components/cyber";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
 import { botInvitePermissions, botInviteScopesLabel, botInviteUrl } from "@/lib/server/bot-invite";
 import { decodeDiscordPermissions } from "@/lib/shared/discord-permissions";
 
-export function BotInviteCard() {
+export function BotInviteCard({ text = FR_BOT_TEXT }: Readonly<{ text?: BotText }>) {
+  const { t } = text;
   const inviteUrl = botInviteUrl();
   const permissions = botInvitePermissions();
   // La liste se **déduit** de l'entier envoyé à Discord : écrite à la main,
   // elle annonçait cinq permissions que l'invitation ne demandait pas.
-  const perms = decodeDiscordPermissions(permissions);
+  const perms = decodeDiscordPermissions(permissions, text);
   // Une seule ligne d'absence, dont seul le motif change.
   let emptyNotice: string | null = null;
-  if (perms === null) emptyNotice = "Valeur de permissions illisible";
-  else if (perms.length === 0) emptyNotice = "Aucune permission de serveur";
+  if (perms === null) emptyNotice = t("invite.unreadable");
+  else if (perms.length === 0) emptyNotice = t("invite.none");
 
   return (
     <div className="card card-ticks invite-card" style={{ marginTop: 28 }}>
       <div className="fabric" style={{ opacity: 0.7 }} />
       <div className="invite-inner">
         <div className="invite-copy">
-          <span className="eyebrow">INVITATION</span>
+          <span className="eyebrow">{t("invite.eyebrow")}</span>
           <h3 style={{ marginTop: 16 }}>
-            Connecte ton serveur à la scène
+            {t("invite.titleLead")}
             <br />
-            <span className="a">amateur francophone.</span>
+            <span className="a">{t("invite.titleAccent")}</span>
           </h3>
-          <p>
-            Un seul OAuth, et tous les modules sont actifs d'office. À son arrivée, le bot écrit en
-            privé au propriétaire du serveur — s'il accepte les messages privés — la liste des modules
-            et les commandes pour les régler.
-          </p>
+          <p>{t("invite.body")}</p>
           <div className="row-actions">
             <CyberButton asChild variant="primary">
               <a href={inviteUrl} target="_blank" rel="noreferrer">
                 <DiscordIcon />
-                Inviter le bot
+                {t("invite.invite")}
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path
                     d="M3 8h10M9 4l4 4-4 4"
@@ -48,13 +46,13 @@ export function BotInviteCard() {
               </a>
             </CyberButton>
             <CyberButton asChild variant="ghost">
-              <Link href="/bot/docs">Documentation</Link>
+              <LocaleLink href="/bot/docs">{t("invite.docs")}</LocaleLink>
             </CyberButton>
           </div>
         </div>
 
         <div className="perms">
-          <span className="title">PERMISSIONS DEMANDÉES</span>
+          <span className="title">{t("invite.permissions")}</span>
           {perms?.map((p) => (
             <div key={p.bit} className="perm">
               <svg className="check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -78,8 +76,8 @@ export function BotInviteCard() {
             </div>
           )}
           <div className="perms-foot">
-            <span>SCOPES · {botInviteScopesLabel()}</span>
-            <span>INTEGER · {permissions}</span>
+            <span>{t("invite.scopes", { scopes: botInviteScopesLabel() })}</span>
+            <span>{t("invite.integer", { value: permissions })}</span>
           </div>
         </div>
       </div>

@@ -1,5 +1,9 @@
 import type { BotStatus } from "@/lib/shared/types";
 import { botPayloadNumber } from "@/lib/shared/bot-payload";
+import { botClientText, type BotClientText } from "@/lib/shared/bot-text";
+
+/** Français par défaut : un appel sans texte rend la page française d'avant le lot 5a. */
+const FR_TEXT: BotClientText = botClientText();
 
 /**
  * Le sous-titre de la case « Status » de `/bot` — **il dit l'état affiché
@@ -26,12 +30,12 @@ export type BotStatusLabel = BotStatus["status"] | "UNREACHABLE" | "UNREADABLE";
  * confondre refabrique le défaut qu'on vient de retirer : la case afficherait
  * `MAINTENANCE` en gros avec « le bot n'a pas répondu » juste en dessous.
  */
-const STATUS_SUMMARIES: Record<BotStatusLabel, string> = {
-  OPERATIONAL: "Tous les services répondent",
-  DEGRADED: "Service dégradé — certaines réponses tardent",
-  DOWN: "Le bot ne répond plus",
-  UNREACHABLE: "Le bot n'a pas répondu à la page",
-  UNREADABLE: "Le bot a répondu un état que la page ne sait pas lire",
+const STATUS_SUMMARY_KEYS: Record<BotStatusLabel, `status.summary.${BotStatusLabel}`> = {
+  OPERATIONAL: "status.summary.OPERATIONAL",
+  DEGRADED: "status.summary.DEGRADED",
+  DOWN: "status.summary.DOWN",
+  UNREACHABLE: "status.summary.UNREACHABLE",
+  UNREADABLE: "status.summary.UNREADABLE",
 };
 
 const KNOWN_STATUSES: Record<BotStatus["status"], true> = {
@@ -72,19 +76,19 @@ export function resolveBotStatusLabel(status: string | null | undefined): BotSta
   return status as BotStatusLabel;
 }
 
-/** Les états connus, dits en français — « OPERATIONAL » est le mot du bot. */
-const STATUS_DISPLAYS: Record<BotStatus["status"], string> = {
-  OPERATIONAL: "Opérationnel",
-  DEGRADED: "Dégradé",
-  DOWN: "Hors service",
+/** Les états connus, dits dans la langue de la page — « OPERATIONAL » est le mot du bot. */
+const STATUS_DISPLAY_KEYS: Record<BotStatus["status"], `status.display.${BotStatus["status"]}`> = {
+  OPERATIONAL: "status.display.OPERATIONAL",
+  DEGRADED: "status.display.DEGRADED",
+  DOWN: "status.display.DOWN",
 };
 
 /** Ce que la case affiche en gros : l'état traduit, ou un tiret. */
-export function botStatusDisplay(status: string | null | undefined): string {
+export function botStatusDisplay(status: string | null | undefined, text: BotClientText = FR_TEXT): string {
   if (!status) return "—";
   const label = resolveBotStatusLabel(status);
   if (label === "OPERATIONAL" || label === "DEGRADED" || label === "DOWN") {
-    return STATUS_DISPLAYS[label];
+    return text.t(STATUS_DISPLAY_KEYS[label]);
   }
   // Un état inconnu se montre **tel quel** : c'est une information pour qui
   // lit la page, et la ligne du dessous dira qu'on ne sait pas le lire.
@@ -97,8 +101,8 @@ export function isBotOnline(status: string | null | undefined): boolean {
 }
 
 /** Le sous-titre, jamais vide. */
-export function botStatusSummary(status: string | null | undefined): string {
-  return STATUS_SUMMARIES[resolveBotStatusLabel(status)];
+export function botStatusSummary(status: string | null | undefined, text: BotClientText = FR_TEXT): string {
+  return text.t(STATUS_SUMMARY_KEYS[resolveBotStatusLabel(status)]);
 }
 
 /**
@@ -146,7 +150,11 @@ export function botStatusSummary(status: string | null | undefined): string {
  * la réécrire « pour repartir de `uptimeMs` » ne changerait rien au résultat et
  * remettrait la même illusion.
  */
-export function botUptimeLabel(status: BotStatus | null | undefined, now: number): string | null {
+export function botUptimeLabel(
+  status: BotStatus | null | undefined,
+  now: number,
+  text: BotClientText = FR_TEXT,
+): string | null {
   const base = botPayloadNumber(status?.startupTs);
   const uptimeMs = botPayloadNumber(status?.uptimeMs);
   if (base === null || uptimeMs === null) return null;
@@ -156,5 +164,10 @@ export function botUptimeLabel(status: BotStatus | null | undefined, now: number
   const h = Math.floor((elapsed % 86400) / 3600);
   const m = Math.floor((elapsed % 3600) / 60);
   const s = elapsed % 60;
-  return `${d}j ${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  return text.t("strip.uptimeValue", {
+    days: d,
+    hours: h,
+    minutes: String(m).padStart(2, "0"),
+    seconds: String(s).padStart(2, "0"),
+  });
 }

@@ -19,17 +19,29 @@
  * changer d'adresse.
  */
 
+import type { Locale } from "@/lib/shared/locales";
+import type { BotMessages } from "@/lib/shared/bot-text";
+
+/** Clé des textes d'une section (`bot.docs.sections.<clé>`) : titre, sur-titre, résumé. */
+export type BotDocTextKey = keyof BotMessages["docs"]["sections"];
+
 export interface BotDocSection {
-  /** Segment d'URL sous `/bot/docs`. */
+  /** Segment d'URL sous `/bot/docs` — le même dans les deux langues. */
   slug: string;
-  /** Titre affiché dans la nav et en tête de page. */
-  title: string;
-  /** Sur-titre mono affiché au-dessus du titre. */
-  eyebrow: string;
-  /** Résumé court affiché dans la nav. */
-  summary: string;
-  /** Chemin du fichier, relatif à la racine du projet du bot. */
+  /**
+   * Textes de la nav et de l'en-tête, dans la langue de la page
+   * (`bot.docs.sections.<textKey>` : `title`, `eyebrow`, `summary`).
+   */
+  textKey: BotDocTextKey;
+  /** Chemin du fichier, relatif à la racine du projet du bot — le document français. */
   file: string;
+  /**
+   * Version anglaise du document, servie sous `/en` (`help.md` pour le guide).
+   * Absente : le document n'existe qu'en français ; sous `/en`, il est servi
+   * tel quel, annoncé `lang="fr"` (pages réservées au staff, l'administration
+   * n'est pas traduite — D4).
+   */
+  fileEn?: string;
   /**
    * Réservée au staff (au moins un rôle de permission de plateforme). Ces
    * pages décrivent le fonctionnement interne du bot (API, base de données,
@@ -43,63 +55,43 @@ export interface BotDocSection {
  * Registre des documents exposés publiquement. C'est aussi le garde-fou contre
  * la traversée de chemin : seuls ces fichiers peuvent être lus, un slug inconnu
  * ne résout rien.
+ *
+ * Le guide anglais (`help.md`) avait sa propre entrée, `user-guide-en`, tant
+ * que le site n'avait qu'une langue ; depuis le lot 5a, c'est le guide servi
+ * sous `/en/bot/docs/guide`, et l'ancienne adresse y redirige
+ * ({@link LEGACY_BOT_DOC_REDIRECTS}).
  */
 export const BOT_DOC_SECTIONS: BotDocSection[] = [
-  {
-    slug: "guide",
-    title: "Guide utilisateur",
-    eyebrow: "PRISE EN MAIN · FR",
-    summary: "Jeux couverts, services, format des messages et commandes slash.",
-    file: "helpfr.md",
-  },
-  {
-    slug: "adhesions",
-    title: "Commandes d'adhésion",
-    eyebrow: "SERVEURS BLUEGENJI",
-    summary: "Envoi des documents d'adhésion, rappels et validations.",
-    file: "doc/adhesions-commands-user.md",
-    staffOnly: true,
-  },
-  {
-    slug: "api-interne",
-    title: "API interne",
-    eyebrow: "INTÉGRATION · EXPRESS",
-    summary: "Endpoints HTTP consommés par la plateforme.",
-    file: "doc/internal-api.md",
-    staffOnly: true,
-  },
-  {
-    slug: "architecture",
-    title: "Architecture",
-    eyebrow: "TECHNIQUE · MAIN",
-    summary: "Client Discord, intents et listeners du bot.",
-    file: "doc/main.md",
-    staffOnly: true,
-  },
-  {
-    slug: "base-de-donnees",
-    title: "Base de données",
-    eyebrow: "TECHNIQUE · SQLITE",
-    summary: "Tables, messages dupliqués et salons partenaires.",
-    file: "doc/src/Bdd.md",
-    staffOnly: true,
-  },
+  { slug: "guide", textKey: "guide", file: "helpfr.md", fileEn: "help.md" },
+  { slug: "adhesions", textKey: "adhesions", file: "doc/adhesions-commands-user.md", staffOnly: true },
+  { slug: "api-interne", textKey: "apiInterne", file: "doc/internal-api.md", staffOnly: true },
+  { slug: "architecture", textKey: "architecture", file: "doc/main.md", staffOnly: true },
+  { slug: "base-de-donnees", textKey: "baseDeDonnees", file: "doc/src/Bdd.md", staffOnly: true },
   {
     slug: "reprise-apres-sinistre",
-    title: "Reprise après sinistre",
-    eyebrow: "EXPLOITATION · SAUVEGARDES",
-    summary: "Reconstruire le bot et le site sur une machine neuve depuis les sauvegardes.",
+    textKey: "repriseApresSinistre",
     file: "doc/disaster-recovery.md",
     staffOnly: true,
   },
-  {
-    slug: "user-guide-en",
-    title: "User guide (EN)",
-    eyebrow: "GETTING STARTED · EN",
-    summary: "English version of the user guide.",
-    file: "help.md",
-  },
 ];
+
+/**
+ * Anciennes adresses de section, redirigées en permanence (308) — un lien ou un
+ * favori vers le guide anglais d'avant le lot 5a mène à sa nouvelle place.
+ */
+export const LEGACY_BOT_DOC_REDIRECTS: Readonly<Record<string, string>> = {
+  "user-guide-en": "/en/bot/docs/guide",
+};
+
+/** Le fichier servi dans une langue : l'anglais s'il existe, sinon le français. */
+export function botDocFile(section: BotDocSection, locale: Locale): string {
+  return locale === "en" && section.fileEn ? section.fileEn : section.file;
+}
+
+/** La langue réelle du document servi (`lang` de l'article). */
+export function botDocLanguage(section: BotDocSection, locale: Locale): Locale {
+  return locale === "en" && section.fileEn ? "en" : "fr";
+}
 
 /** Sous-ensemble visible par un visiteur sans rôle de permission de plateforme. */
 export function visibleBotDocSections(isStaff: boolean): BotDocSection[] {
@@ -123,27 +115,17 @@ export function findBotDocSection(slug: string | undefined, isStaff: boolean): B
  * Un document légal, publié à sa propre adresse (`app/privacy-policy-bot`,
  * `app/terms-of-service-bot`) plutôt que servi par `/bot/docs` : ce ne sont pas
  * des fichiers Markdown relus chez le bot, mais des pages du site. Elles
- * occupent la place laissée par les quatre pages techniques masquées au
+ * occupent la place laissée par les pages techniques masquées au
  * visiteur sans rôle — la seule doc du bot qui le concerne vraiment.
  */
 export interface BotLegalLink {
   slug: string;
-  title: string;
-  summary: string;
+  /** Textes : `bot.docs.legal.<textKey>` (`title`, `summary`). */
+  textKey: keyof BotMessages["docs"]["legal"];
   href: string;
 }
 
 export const BOT_LEGAL_LINKS: readonly BotLegalLink[] = [
-  {
-    slug: "confidentialite",
-    title: "Politique de confidentialité",
-    summary: "Données collectées par le bot, leur usage et leur durée de conservation.",
-    href: "/privacy-policy-bot",
-  },
-  {
-    slug: "conditions",
-    title: "Conditions d'utilisation",
-    summary: "Règles d'usage du bot, éligibilité et résiliation d'accès.",
-    href: "/terms-of-service-bot",
-  },
+  { slug: "confidentialite", textKey: "confidentialite", href: "/privacy-policy-bot" },
+  { slug: "conditions", textKey: "conditions", href: "/terms-of-service-bot" },
 ];

@@ -11,8 +11,11 @@ import {
 } from "@/lib/shared/bot-status-summary";
 import { botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
+import { useBotText } from "@/components/i18n/bot-text";
 
 export function BotStatusStrip({ status }: Readonly<{ status: BotStatus | null }>) {
+  const text = useBotText();
+  const { t } = text;
   const [uptime, setUptime] = useState("—");
   // Onglet caché : l'horloge s'arrête, et la relecture au retour la recale.
   const { clocks } = useClientPower();
@@ -27,16 +30,16 @@ export function BotStatusStrip({ status }: Readonly<{ status: BotStatus | null }
     // charge devenue illisible affichait « 1j 04h 23m » juste à côté de « Le
     // bot n'a pas répondu à la page » — la contradiction entre cases voisines
     // que cette page retire.
-    const first = botUptimeLabel(status, Date.now());
+    const first = botUptimeLabel(status, Date.now(), text);
     // Tout de suite, puis chaque seconde : le seul `setInterval` laissait la
     // case au tiret une seconde pleine pendant que ses voisines affichaient
     // déjà leurs valeurs.
     setUptime(first ?? "—");
     // Rien à compter : pas d'horloge à faire tourner pour réécrire un tiret.
     if (first === null || !clocks) return;
-    const id = setInterval(() => setUptime(botUptimeLabel(status, Date.now()) ?? "—"), 1000);
+    const id = setInterval(() => setUptime(botUptimeLabel(status, Date.now(), text) ?? "—"), 1000);
     return () => clearInterval(id);
-  }, [status, clocks]);
+  }, [status, clocks, text]);
 
   const statusLabel = botStatusOf(status);
   const version = botPayloadText(status?.version);
@@ -61,29 +64,29 @@ export function BotStatusStrip({ status }: Readonly<{ status: BotStatus | null }
   return (
     <div className="status-strip">
       <div className={`status-cell ${isBotOnline(statusLabel) ? "online" : ""}`}>
-        <span className="lbl">État</span>
-        <span className="val">{botStatusDisplay(statusLabel)}</span>
-        <span className="sub">{botStatusSummary(statusLabel)}</span>
+        <span className="lbl">{t("strip.state")}</span>
+        <span className="val">{botStatusDisplay(statusLabel, text)}</span>
+        <span className="sub">{botStatusSummary(statusLabel, text)}</span>
       </div>
       <div className="status-cell">
-        <span className="lbl">En service</span>
+        <span className="lbl">{t("strip.uptime")}</span>
         <span className="val">{uptime}</span>
-        <span className="sub">Depuis le dernier démarrage</span>
+        <span className="sub">{t("strip.uptimeSub")}</span>
       </div>
       <div className="status-cell">
-        <span className="lbl">Version</span>
+        <span className="lbl">{t("strip.version")}</span>
         <span className="val">{versionLabel}</span>
-        <span className="sub">Build · {buildDate}</span>
+        <span className="sub">{t("strip.build", { date: buildDate })}</span>
       </div>
       <div className="status-cell">
-        <span className="lbl">Latence passerelle</span>
-        <span className="val">{latency === null ? "—" : `${latency} ms`}</span>
-        <span className="sub">Passerelle Discord · WebSocket</span>
+        <span className="lbl">{t("strip.latency")}</span>
+        <span className="val">{latency === null ? "—" : t("strip.latencyValue", { value: latency })}</span>
+        <span className="sub">{t("strip.latencySub")}</span>
       </div>
       <div className="status-cell">
-        <span className="lbl">Fragments (shards)</span>
+        <span className="lbl">{t("strip.shards")}</span>
         <span className="val">{shards}</span>
-        <span className="sub">Connexions à la passerelle</span>
+        <span className="sub">{t("strip.shardsSub")}</span>
       </div>
     </div>
   );

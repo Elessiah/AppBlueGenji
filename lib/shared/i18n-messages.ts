@@ -19,8 +19,9 @@ import type frStats from "@/messages/fr/stats.json";
 import type frLabels from "@/messages/fr/labels.json";
 import type frShare from "@/messages/fr/share.json";
 import type frLogin from "@/messages/fr/login.json";
+import type frBot from "@/messages/fr/bot.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -40,6 +41,8 @@ export type Messages = {
   /** Cartes d'aperçu des liens partagés (images Open Graph) — `lib/shared/page-share-cards.ts`. */
   share: typeof frShare;
   login: typeof frLogin;
+  /** Pages `/bot` et `/bot/docs` (lot 5a) — `lib/shared/bot-text.ts`. */
+  bot: typeof frBot;
 };
 
 /**

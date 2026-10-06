@@ -1,12 +1,15 @@
-import Link from "next/link";
 // Le registre vient de `lib/shared` et non de `lib/server/bot-docs.ts`, qui
 // importe `node:fs` : « `lib/server/*` ne s'importe jamais depuis un composant »
 // doit rester vrai sans dépendre de ce que ce fichier-ci est aujourd'hui.
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { visibleBotDocSections, BOT_LEGAL_LINKS } from "@/lib/shared/bot-doc-sections";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
 
 interface BotCommandsProps {
   /** Visiteur avec au moins un rôle de permission de plateforme. */
   isStaff: boolean;
+  /** Textes dans la langue de la page (français par défaut). */
+  text?: BotText;
 }
 
 /**
@@ -34,39 +37,46 @@ interface BotCommandsProps {
  * `loadBotDoc`. L'intitulé de la section dit « contenu relu » et non « liste
  * tenue à jour » : elle n'annonce que ce qu'elle tient.
  */
-export function BotCommands({ isStaff }: Readonly<BotCommandsProps>) {
+export function BotCommands({ isStaff, text = FR_BOT_TEXT }: Readonly<BotCommandsProps>) {
+  const { t } = text;
   const sections = visibleBotDocSections(isStaff);
   // Les pages légales du bot vivent à leur propre adresse (pas sous
   // `/bot/docs`) : elles occupent la place laissée par les pages techniques
   // masquées, et restent visibles de tous, staff ou non.
   const items = [
-    ...sections.map((s) => ({ slug: s.slug, title: s.title, summary: s.summary, href: `/bot/docs/${s.slug}` })),
-    ...BOT_LEGAL_LINKS,
+    ...sections.map((s) => ({
+      slug: s.slug,
+      title: t(`docs.sections.${s.textKey}.title`),
+      summary: t(`docs.sections.${s.textKey}.summary`),
+      href: `/bot/docs/${s.slug}`,
+    })),
+    ...BOT_LEGAL_LINKS.map((link) => ({
+      slug: link.slug,
+      title: t(`docs.legal.${link.textKey}.title`),
+      summary: t(`docs.legal.${link.textKey}.summary`),
+      href: link.href,
+    })),
   ];
   return (
     <>
       <div className="bot-section-head">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
-            DOCUMENTATION · DÉPÔT DU BOT
+            {t("commands.eyebrow")}
           </div>
-          <h2>Commandes et documentation</h2>
+          <h2>{t("commands.title")}</h2>
         </div>
-        <div className="meta">CONTENU RELU DANS LE DÉPÔT DU BOT</div>
+        <div className="meta">{t("commands.meta")}</div>
       </div>
 
       <div className="card card-ticks">
         <div className="panel-head">
-          <span className="title mono">~/bluegenji_bot $ help</span>
-          <span className="meta">{items.length} DOCUMENTS</span>
+          <span className="title mono">{t("commands.prompt")}</span>
+          <span className="meta">{t("commands.count", { count: items.length })}</span>
         </div>
         <div className="bot-docs-links">
           <p className="bot-docs-intro">
-            La liste des commandes slash, leurs arguments et leurs droits sont
-            publiés par le bot lui-même. Cette page y renvoie plutôt que d&apos;en
-            garder une copie, qui aurait vieilli sans prévenir : le contenu de
-            chaque page est relu dans le dépôt du bot, une correction là-bas y
-            apparaît dans la minute.
+            {t("commands.intro")}
           </p>
           {/* `role="list"` n'est pas redondant : Safari retire le rôle d'une
               liste dont on a ôté les puces (`list-style: none`), et VoiceOver
@@ -74,10 +84,10 @@ export function BotCommands({ isStaff }: Readonly<BotCommandsProps>) {
           <ul className="bot-docs-list" role="list">{/* NOSONAR S6822 — Safari retire le rôle d'une liste sans puces, voir plus haut */}
             {items.map((item) => (
               <li key={item.slug}>
-                <Link href={item.href} className="bot-docs-link">
+                <LocaleLink href={item.href} className="bot-docs-link">
                   <span className="bot-docs-title">{item.title}</span>
                   <span className="bot-docs-summary">{item.summary}</span>
-                </Link>
+                </LocaleLink>
               </li>
             ))}
           </ul>

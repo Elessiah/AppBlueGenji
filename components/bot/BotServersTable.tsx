@@ -6,6 +6,8 @@ import {
   botPayloadNumber,
   botPayloadText,
 } from "@/lib/shared/bot-payload";
+import { FR_BOT_TEXT, type BotText } from "@/lib/shared/bot-text";
+import { INTL_LOCALE } from "@/lib/shared/locales";
 
 /**
  * Le nombre de barres rendues par cellule de tendance. La série arrive du bot
@@ -47,7 +49,12 @@ const MAX_SPARKLINE_POINTS = 10;
  * différence. `fetchBotServers` est la seule source de `null` ici — coupe-
  * circuit ouvert, appel échoué, réponse non `ok`.
  */
-export function BotServersTable({ payload }: Readonly<{ payload: BotServersPayload | null }>) {
+export function BotServersTable({
+  payload,
+  text = FR_BOT_TEXT,
+}: Readonly<{ payload: BotServersPayload | null; text?: BotText }>) {
+  const { t } = text;
+  const intl = INTL_LOCALE[text.locale];
   // Même précaution que sur `sparkline` plus bas, et pour la même raison :
   // `fetchBotServers` fait un simple `as BotServersPayload` sur du JSON reçu.
   // Un `?? []` ne rattrape que `null` — une charge qui rangerait les serveurs
@@ -83,21 +90,21 @@ export function BotServersTable({ payload }: Readonly<{ payload: BotServersPaylo
   // « le bot n'est installé nulle part » sur une réponse qui n'était
   // simplement pas lisible. Zéro reste réservé à un zéro constaté.
   let meta: string;
-  if (payload === null) meta = "BOT INJOIGNABLE";
-  else if (rows === null || (rows.length > 0 && list.length === 0)) meta = "RÉPONSE ILLISIBLE";
-  else if (rows.length === 0) meta = "AUCUN SERVEUR";
+  if (payload === null) meta = t("servers.unreachable");
+  else if (rows === null || (rows.length > 0 && list.length === 0)) meta = t("servers.unreadable");
+  else if (rows.length === 0) meta = t("servers.none");
   else {
     // On ne dit rien de l'ordre ni du total : `fetchBotServers(8)`
     // **plafonne** la demande, et le tri par activité est encore une
     // case à cocher de `docs/features/BOT_FEATURES_NEEDED.md`. Le
     // panneau ne compte que ce qu'il montre.
-    meta = `${list.length} ${list.length === 1 ? "SERVEUR AFFICHÉ" : "SERVEURS AFFICHÉS"}`;
+    meta = t("servers.shown", { count: list.length });
   }
 
   return (
     <section className="panel">
       <div className="panel-head">
-        <span className="title">Serveurs connectés</span>
+        <span className="title">{t("servers.title")}</span>
         <span className="meta">{meta}</span>
       </div>
       {/* Une grille de `div` reste un tableau pour qui le lit : sans ces rôles,
@@ -105,23 +112,23 @@ export function BotServersTable({ payload }: Readonly<{ payload: BotServersPaylo
           quelle colonne ils viennent. Corollaire : chaque ligne doit exposer
           **autant de cellules** que l'en-tête a de colonnes — un `aria-hidden`
           posé sur l'une d'elles décalerait tout le tableau. */}
-      <div className="srv-table" role="table" aria-label="Serveurs connectés au bot">
+      <div className="srv-table" role="table" aria-label={t("servers.tableLabel")}>
         <div className="srv-head" role="row">
-          <span role="columnheader">#</span>
-          <span role="columnheader">SERVEUR</span>
-          <span role="columnheader" style={{ textAlign: "right" }}>MEMBRES</span>
-          <span role="columnheader" style={{ textAlign: "right" }}>RELAIS 7J</span>
+          <span role="columnheader">{t("servers.rank")}</span>
+          <span role="columnheader">{t("servers.server")}</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>{t("servers.members")}</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>{t("servers.relays")}</span>
           <span role="columnheader" style={{ textAlign: "right" }}>
             {/* « RELAIS 7J » compte, celle-ci qualifie : deux en-têtes
                 homonymes se reliraient l'un pour l'autre. Sous 640 px la
                 colonne des relais est masquée — l'homonymie part avec elle,
                 et « ÉTAT DU » avec, faute de place dans la piste. */}
-            <span className="srv-col-qualifier">ÉTAT DU </span>RELAIS
+            <span className="srv-col-qualifier">{t("servers.relayQualifier")}</span>{t("servers.relayState")}
           </span>
-          <span role="columnheader" style={{ textAlign: "right" }}>TENDANCE</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>{t("servers.trend")}</span>
         </div>
         {list.map((s, rank) => {
-          const relay = resolveBotRelayState(s.status);
+          const relay = resolveBotRelayState(s.status, text);
           // Même raison que pour l'état : la charge du bot n'est pas validée à
           // l'exécution (`as BotServersPayload` sur du JSON reçu). Un champ
           // manquant doit donner une cellule fade, jamais un `TypeError` — qui
@@ -191,8 +198,8 @@ export function BotServersTable({ payload }: Readonly<{ payload: BotServersPaylo
                   **sans aucun membre** — un fait faux, là où la chaîne mal
                   typée n'était que mal formatée. Le zéro reste réservé à un
                   zéro reçu ; ne pas savoir se dit. */}
-              <span className="srv-num" role="cell">{botPayloadNumber(s.memberCount)?.toLocaleString("fr-FR") ?? "—"}</span>
-              <span className="srv-num" role="cell">{botPayloadNumber(s.relays7j)?.toLocaleString("fr-FR") ?? "—"}</span>
+              <span className="srv-num" role="cell">{botPayloadNumber(s.memberCount)?.toLocaleString(intl) ?? "—"}</span>
+              <span className="srv-num" role="cell">{botPayloadNumber(s.relays7j)?.toLocaleString(intl) ?? "—"}</span>
               <span
                 className={"srv-status " + relay.tone}
                 role="cell"
