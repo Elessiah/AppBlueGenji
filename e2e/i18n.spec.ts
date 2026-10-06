@@ -69,10 +69,10 @@ test.describe("Langues — adresses /en", () => {
     await expect(page.locator('a[hreflang="en"]').first()).toHaveAttribute("href", "/en/regles");
   });
 
-  // `/connexion` n'est pas traduite : ni sélecteur ni `hreflang` (l'accueil,
-  // traduit au lot 2, en porte désormais — contrôle ci-dessous).
+  // `/association` n'est pas traduite : ni sélecteur ni `hreflang` (l'accueil,
+  // traduit au lot 2, et `/connexion`, au lot 6, en portent — contrôles ci-dessous).
   test("une page française non traduite garde lang=fr, son nonce, et aucun sélecteur ni hreflang", async ({ page }) => {
-    const response = await page.goto("/connexion");
+    const response = await page.goto("/association");
     const csp = response?.headers()["content-security-policy"] ?? "";
     const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();
@@ -106,6 +106,10 @@ test.describe("Langues — adresses /en", () => {
     await expect(page.locator("h1")).toHaveText("Log in");
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/connexion$/);
+    const hreflangs = await page
+      .locator('link[rel="alternate"][hreflang]')
+      .evaluateAll((links) => links.map((l) => l.getAttribute("hreflang")).sort());
+    expect(hreflangs).toEqual(["en", "fr", "x-default"]);
     // Rappel inchangé (`/api/auth/<slug>/callback`) : seule la route de départ porte la langue.
     await expect(page.locator('a[href^="/api/auth/google/start"]').first()).toHaveAttribute("href", /redirect=%2Fen%2Fregles&lang=en/);
   });

@@ -319,6 +319,8 @@ describe("exposé de suspension", () => {
     expect(text).toContain("This account is suspended until October 15, 2026 at 10:00 (Paris time) (decision S-12)");
     expect(text).toContain("“Behavior”");
     expect(html).toContain('lang="fr">Triche avérée<');
+    // « Autre » : intitulé encore français du formulaire de signalement (lot 9).
+    expect(html).toContain('“<span lang="fr">Autre</span>” (“Other”; no login needed)');
     expectNoFrench(text.replace("Triche avérée", ""));
   });
 
@@ -345,6 +347,9 @@ describe("exposé de suspension", () => {
     expect(suspendedLoginText(FR_TEXT, null)).toBe(suspendedLoginMessage(null));
     expect(suspendedLoginText(FR_TEXT, notice.endsAt)).toBe(suspendedLoginMessage(notice.endsAt));
     expect(suspendedLoginText(FR_TEXT, "pas une date")).toBe(suspendedLoginMessage("pas une date"));
+    // Le toast est d'une seule langue : l'anglais n'y cite pas « Autre ».
+    expect(suspendedLoginText(EN_TEXT, null)).toContain("category “Other” (no login needed)");
+    expect(suspendedLoginText(EN_TEXT, null)).not.toContain("Autre");
     expect(suspensionSpanText(FR_TEXT, null, "S-1")).toBe(
       `Ce compte est suspendu ${suspensionSpan(null)} (décision S-1) : aucune connexion n'est possible tant que la suspension court.`,
     );
@@ -412,7 +417,7 @@ describe("messages `login`", () => {
   });
 
   it.each(LOCALES.map((locale) => [locale]))("%s : même texte que next-intl, message par message", (locale) => {
-    const tags = ["strong", "join", "terms", "policy"];
+    const tags = ["strong", "join", "terms", "policy", "fr"];
     for (const { key, source } of leaves(messagesFor(locale).login)) {
       const values = { audience: "A", provider: "P", time: "T", end: "E", reference: "S-1", day: "D", clause: "C", age: 15 };
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
