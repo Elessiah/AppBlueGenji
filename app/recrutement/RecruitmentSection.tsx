@@ -361,7 +361,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
     // Index dans la liste complète : le réordonnancement porte toujours
     // sur l'ordre réel, jamais sur la vue filtrée (ni traduite).
     const index = ads.findIndex((a) => a.id === ad.id);
-    const enMissing = isAdmin && !recruitmentAdHasEnglish(ads[index] ?? ad);
+    // Enregistrement d'origine (français) : ce que nomment les contrôles du staff.
+    const saved = ads[index] ?? ad;
+    const enMissing = isAdmin && !recruitmentAdHasEnglish(saved);
     const preview = buildRecruitmentPreview(ad.body);
     const canUp = canMoveRecruitmentAd(ads, index, -1);
     const canDown = canMoveRecruitmentAd(ads, index, 1);
@@ -407,7 +409,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
                 className={styles.move}
                 onClick={() => move(index, -1)}
                 disabled={busy || filterActive || !canUp}
-                aria-label={`Monter l'annonce ${ad.title}`}
+                aria-label={`Monter l'annonce ${saved.title}`}
                 title={moveTitle(canUp, "Monter")}
               >
                 ↑
@@ -417,7 +419,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
                 className={styles.move}
                 onClick={() => move(index, 1)}
                 disabled={busy || filterActive || !canDown}
-                aria-label={`Descendre l'annonce ${ad.title}`}
+                aria-label={`Descendre l'annonce ${saved.title}`}
                 title={moveTitle(canDown, "Descendre")}
               >
                 ↓
@@ -470,9 +472,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
               <button
                 type="button"
                 className={styles.action}
-                onClick={() => openEdit(ad)}
+                onClick={() => openEdit(saved)}
                 disabled={busy}
-                aria-label={withEnglishMissing(`Modifier ${ad.title}`, enMissing)}
+                aria-label={withEnglishMissing(`Modifier ${saved.title}`, enMissing)}
               >
                 Modifier
                 {enMissing && <EnglishMissingMark />}
@@ -480,9 +482,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
               <button
                 type="button"
                 className={`${styles.action} ${styles.actionDanger}`}
-                onClick={() => setPendingRemoval(ad)}
+                onClick={() => setPendingRemoval(saved)}
                 disabled={busy}
-                aria-label={`Supprimer ${ad.title}`}
+                aria-label={`Supprimer ${saved.title}`}
               >
                 Supprimer
               </button>

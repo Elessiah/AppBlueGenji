@@ -13,6 +13,7 @@ import {
   BENEVOLE_CATEGORY_MAX,
   BENEVOLE_FIELD_ERRORS,
   benevoleInitials,
+  borrowedCategoryEnglish,
   categoryEnglish,
   nextCategoryEnglish,
   formatDisplayName,
@@ -333,6 +334,8 @@ export function BenevolesSection({
   const pendingTranslation = groups.length === 0 && benevoles.length > 0;
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
   const photoLabel = form.photoUrl ? "Changer la photo" : "Importer une image";
+  // Catégorie nouvelle ou renommée qui garde l'anglais d'une autre : à vérifier.
+  const borrowed = borrowedCategoryEnglish(form, benevoles);
 
   return (
     <>
@@ -547,7 +550,7 @@ export function BenevolesSection({
               inputClassName={styles.modalInput}
               labelClassName={styles.modalLabel}
               listFr="category-suggestions"
-              describedBy="benevole-category-hint"
+              describedBy={borrowed === null ? "benevole-category-hint" : "benevole-category-hint benevole-category-borrowed"}
             />
             <datalist id="category-suggestions">
               {[...new Set(benevoles.map((b) => b.category))].map((cat) => (
@@ -557,6 +560,11 @@ export function BenevolesSection({
             <span id="benevole-category-hint" className={styles.photoHint}>
               Une catégorie se traduit une fois pour toutes : l&apos;anglais vaut pour tous ses bénévoles.
             </span>
+            {borrowed !== null && (
+              <span id="benevole-category-borrowed" className={styles.borrowedHint}>
+                Anglais repris de « {borrowed} » : à vérifier pour cette catégorie.
+              </span>
+            )}
           </div>
 
           <label className={styles.modalField}>

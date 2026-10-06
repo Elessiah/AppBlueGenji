@@ -164,9 +164,11 @@ export function categoryEnglish(members: readonly Pick<Benevole, "categoryEn">[]
 
 /**
  * L'anglais du formulaire quand la catégorie française change : une saisie
- * anglaise faite à la main reste ; l'anglais repris de l'ancienne catégorie
- * cède la place à celui de la nouvelle, ou se vide si elle n'en a pas (une
- * catégorie nouvelle ne garde pas l'anglais d'une autre).
+ * anglaise faite à la main reste ; l'anglais repris d'une catégorie connue
+ * cède la place à celui de la nouvelle quand elle en a un. Vers une catégorie
+ * inconnue (nouvelle, ou correction d'une faute de frappe), il **reste** —
+ * l'effacer ferait retaper la traduction à chaque lettre corrigée ;
+ * {@link borrowedCategoryEnglish} signale alors qu'il est à vérifier.
  */
 export function nextCategoryEnglish(
   form: Readonly<{ category: string; categoryEn: string }>,
@@ -174,7 +176,24 @@ export function nextCategoryEnglish(
   englishOf: (category: string) => string | null,
 ): string {
   const typedByHand = form.categoryEn.trim() !== "" && form.categoryEn !== englishOf(form.category);
-  return typedByHand ? form.categoryEn : (englishOf(nextCategory) ?? "");
+  if (typedByHand) return form.categoryEn;
+  return englishOf(nextCategory) ?? form.categoryEn;
+}
+
+/**
+ * La catégorie dont le formulaire porte encore l'anglais, quand sa propre
+ * catégorie est inconnue (nouvelle ou renommée) : l'anglais d'une autre
+ * catégorie, à vérifier avant d'enregistrer. `null` sinon.
+ */
+export function borrowedCategoryEnglish(
+  form: Readonly<{ category: string; categoryEn: string }>,
+  benevoles: readonly Pick<Benevole, "category" | "categoryEn">[],
+): string | null {
+  const category = form.category.trim();
+  const english = form.categoryEn.trim();
+  if (!category || !english || benevoles.some((b) => b.category === category)) return null;
+  const source = benevoles.find((b) => hasEnglish(b.categoryEn) && b.categoryEn.trim() === english);
+  return source ? source.category : null;
 }
 
 /**

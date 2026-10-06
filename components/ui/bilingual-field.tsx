@@ -81,6 +81,8 @@ export function BilingualField<F extends string>({
   onEnter,
 }: Readonly<BilingualFieldProps<F>>) {
   const hintId = `${ids.en}-hint`;
+  // L'aide du rattrapage se tait dès que l'anglais est saisi.
+  const showHint = enMissing && values.en.trim().length === 0;
   const enRequired = required || values.fr.trim().length > 0;
   const counterId = (lang: BilingualLang) => `${ids[lang]}-count`;
   const counterText = (lang: BilingualLang) =>
@@ -106,7 +108,7 @@ export function BilingualField<F extends string>({
         fields[lang],
         describedBy,
         counter && counterId(lang),
-        lang === "en" && enMissing && hintId,
+        lang === "en" && showHint && hintId,
       ),
       onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         errors.clear(fields[lang]);
@@ -152,7 +154,7 @@ export function BilingualField<F extends string>({
           </label>
           {control("en")}
           {counterText("en")}
-          {enMissing && (
+          {showHint && (
             <span id={hintId} className={styles.hint}>
               {ENGLISH_BACKFILL_HINT}
             </span>
