@@ -365,6 +365,7 @@ export function MatchCardActions({
         title={blocked && castBlock === "CASTER_IDENTITY_REQUIRED" ? CAST_IDENTITY_NOTICE : undefined}
         aria-label={matchCardActionName(action.label, matchLabel)}
         data-action={action.id}
+        onKeyDown={inMenu ? onPanelKeyDown : undefined}
         onClick={() => {
           if (inMenu) {
             setOpen(false);
@@ -385,10 +386,12 @@ export function MatchCardActions({
   };
   // Porté en fin de page, le panneau n'a pas de « suivant » naturel : la
   // tabulation qui en sort par un bout le referme et rend le focus au bouton.
-  const onPanelKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+  // Écoutée sur chaque bouton du panneau, pas sur son conteneur : un `<div>`
+  // qui reçoit des touches se présente comme un contrôle qu'il n'est pas.
+  const onPanelKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (e.key !== "Tab") return;
-    const buttons = Array.from(e.currentTarget.querySelectorAll("button"));
-    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const buttons = Array.from(panelRef.current?.querySelectorAll("button") ?? []);
+    const index = buttons.indexOf(e.currentTarget);
     if ((e.shiftKey && index === 0) || (!e.shiftKey && index === buttons.length - 1)) {
       e.preventDefault();
       setOpen(false);
@@ -432,7 +435,6 @@ export function MatchCardActions({
             // valeur qu'une feuille de style ne peut pas connaître.
             style={placement ? { top: placement.top, left: placement.left, width: placement.width } : undefined}
             onBlur={onMenuBlur}
-            onKeyDown={onPanelKeyDown}
           >
             {/* Bornée à la place disponible : sur une fenêtre basse, la liste
                 défile plutôt que de déborder hors de l'écran. */}
