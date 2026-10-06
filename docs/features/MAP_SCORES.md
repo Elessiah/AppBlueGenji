@@ -301,8 +301,14 @@ le tait.
 
 ## RGPD
 
-Un code de replay mène aux identifiants de jeu des joueurs présents : traité
-comme donnée personnelle. Entrée `2026-10-scores-map-par-map` en fin de
+Un code de replay mène aux identifiants de jeu des joueurs présents (BattleTag
+masqué sur le site compris) : traité comme donnée personnelle. Un score posé par
+l'arbitrage **sans** `maps` efface le détail retenu qui ne l'explique plus
+(`dropStaleFinalMaps`) ; l'export RGPD rend les maps saisies par le titulaire
+(`mapEntries`, `lib/server/match-map-entries.ts`). La suppression d'un compte
+délie la saisie mais garde les codes (la partie est conservée par l'éditeur du
+jeu) — dit sur `/rgpd`, dans l'entrée `PRIVACY_CHANGES` (datée du 2026-10-06,
+jour de mise en ligne) et au registre. Entrée `2026-10-scores-map-par-map` en fin de
 `PRIVACY_CHANGES`, paragraphe sur `/rgpd` (section 03), catégorie et durée
 ajoutées à la fiche T03 du registre (`REGISTER_UPDATED_AT` avancé).
 
