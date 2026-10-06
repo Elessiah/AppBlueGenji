@@ -17,6 +17,7 @@ import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
 import { useProposalMaps } from "../_hooks/useProposalMaps";
+import { proposalsNeedRefresh } from "@/lib/shared/player-score-report";
 import { useLiveControls } from "../_lib/live-context";
 import {
   adminProposalNotice,
@@ -121,6 +122,9 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
 /** Lignes de maps adressables par `useFieldErrors` — au-delà de tout plafond. */
 const MAP_FIELD_ID_SLOTS = 32;
 
+const AWAITING_DETAIL_MESSAGE =
+  "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.";
+
 export function AdminScoreDialog({
   match: liveMatch,
   proposals = NO_PROPOSALS,
@@ -148,11 +152,20 @@ export function AdminScoreDialog({
   const matchFormat = useMatchFormat(match);
   // Infobulle d'un bouton : une map refusée passe avant le score, puisque
   // c'est elle que le clic désignera (`mapsRefused`).
+  // Détail de la proposition encore en lecture : un score validé maintenant
+  // partirait sans maps (`maps: []`) et effacerait les codes de la proposition
+  // à la clôture. Les boutons de score attendent qu'il arrive.
+  const awaitingDetail =
+    proposalsNeedRefresh(liveMatch, proposals) &&
+    form.maps.length === 0 &&
+    form.forfeitTeamId === undefined &&
+    !form.doubleForfeit;
   const buttonTitle = (
     mapRefusal: MapListViolation | null,
     blocker: ScoreFormBlocker | null | undefined,
     idle: string,
   ): string => {
+    if (awaitingDetail) return AWAITING_DETAIL_MESSAGE;
     if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);
     return blocker ? scoreBlockerMessage(blocker, matchFormat) : idle;
   };
@@ -238,7 +251,7 @@ export function AdminScoreDialog({
   // geste délibéré.
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
-    if ((form.decision.canResolve || form.mapsRefused.resolve) && !form.submitting) void run("resolve");
+    if ((form.decision.canResolve || form.mapsRefused.resolve) && !form.submitting && !awaitingDetail) void run("resolve");
   };
 
   const toggleForfeit = (teamId: number | null) => {
@@ -479,6 +492,9 @@ export function AdminScoreDialog({
           {/* Une seule raison affichée : celle qui bloque l'action décisive, ou
               à défaut celle de l'enregistrement. Les empiler ferait répéter deux
               fois la même phrase dans le cas courant. */}
+          {awaitingDetail && (
+            <output className={`${styles.blocker} ${styles.notice}`}>{AWAITING_DETAIL_MESSAGE}</output>
+          )}
           {blocker && (
             <output className={`${styles.blocker} ${styles.notice}`}>
               {scoreBlockerMessage(blocker, matchFormat)}
@@ -500,7 +516,7 @@ export function AdminScoreDialog({
               type="button"
               className="btn ghost"
               onClick={() => void run("save")}
-              disabled={(!form.decision.canSave && !form.mapsRefused.save) || form.submitting}
+              disabled={(!form.decision.canSave && !form.mapsRefused.save) || form.submitting || awaitingDetail}
               title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, "Note l'avancement sans désigner de vainqueur.")}
             >
               {form.submitting ? "…" : "Enregistrer"}
@@ -508,7 +524,7 @@ export function AdminScoreDialog({
             <button
               type="submit"
               className="btn"
-              disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting}
+              disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting || awaitingDetail}
               title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, "Désigne la gagnante et met le plateau à jour.")}
             >
               {form.submitting ? "…" : "Valider le résultat"}

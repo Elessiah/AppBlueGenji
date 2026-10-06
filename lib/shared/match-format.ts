@@ -29,12 +29,13 @@
  * - {@link MatchFormat.drawsAllowed} — le match se clôt sur n'importe quel score
  *   tenant dans le plafond, vainqueur ou non : 2-1 en FT3 comme 2-2.
  *
- * **Ce que plafonne `maxMaps`.** La somme des deux scores, c'est-à-dire les maps
- * qui ont **désigné un vainqueur**. Une map nulle ne figure dans aucun des deux
- * scores — les colonnes de `bg_matches` n'en gardent pas trace — elle allonge
- * donc la rencontre sans consommer le plafond. « 5 maps » veut dire ici « au
- * plus 5 maps décisives », pas « exactement 5 maps jouées » : c'est la seule
- * lecture que les données permettent de tenir.
+ * **Ce que plafonne `maxMaps`.** Sur les colonnes de score de `bg_matches`, la
+ * somme des deux scores — une map nulle n'y figure pas. Le détail map par map
+ * (`lib/shared/match-maps.ts`, décision du 2026-10-06) la compte, lui : là où
+ * les égalités sont ouvertes, une map nulle **consomme** une map du plafond, et
+ * un match clos sans vainqueur a joué toutes ses maps (un 2-2 en BO5 suppose
+ * une cinquième map nulle, `MAP_LIST_INCOMPLETE` sinon). Là où un vainqueur est
+ * exigé, la map nulle se rejoue (`DRAWN_MAP_REPLAY_ALLOWANCE`).
  *
  * Module pur : importable côté serveur comme côté client.
  */
@@ -57,8 +58,9 @@ export interface MatchFormat {
    * Le match peut-il se clore sans que l'objectif soit atteint ?
    *
    * Quand c'est vrai, **n'importe quel** score tenant dans le plafond est un
-   * résultat final : 2-1 en FT3 (une map nulle a consommé la cinquième), 2-2,
-   * et jusqu'à 0-0. Le match n'a alors pas forcément de vainqueur —
+   * résultat final : 2-1 en FT3 (deux maps nulles ont consommé les autres), 2-2
+   * (une cinquième map nulle), et jusqu'à 0-0. Saisi map par map, un tel score
+   * doit couvrir toutes les maps du plafond. Le match n'a alors pas forcément de vainqueur —
    * `winner_team_id` reste `NULL`.
    *
    * Réservé aux formats qui savent absorber un match nul : la phase

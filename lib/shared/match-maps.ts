@@ -121,6 +121,19 @@ export function deriveMatchScore(maps: ReadonlyArray<Pick<MatchMapInput, "team1S
  * superflue) : ce qu'est un résultat final reste l'affaire de
  * `checkMatchScores`, inchangé.
  */
+/** Match sans vainqueur clos avant d'avoir joué toutes ses maps (égalités ouvertes). */
+function unplayedMapsViolation(
+  format: MatchFormat | null,
+  team1: number,
+  team2: number,
+  played: number,
+  decisive: boolean,
+): "MAP_LIST_INCOMPLETE" | null {
+  if (!decisive || !format || !matchAllowsDraw(format)) return null;
+  const short = Math.max(team1, team2) < matchWinsRequired(format) && played < matchMaxMaps(format);
+  return short ? "MAP_LIST_INCOMPLETE" : null;
+}
+
 function isSettled(format: MatchFormat | null, team1: number, team2: number, played: number): boolean {
   if (!format) return false;
   if (Math.max(team1, team2) >= matchWinsRequired(format)) return true;
@@ -137,6 +150,7 @@ export type MapListViolation =
   | "MAP_REPLAY_CODE_DUPLICATE"
   | "MAP_SCORE_INVALID"
   | "MAP_AFTER_DECISION"
+  | "MAP_LIST_INCOMPLETE"
   | MatchScoreViolation;
 
 export interface MapListCheck {
@@ -212,8 +226,13 @@ export function checkMapList(
   }
 
   // Le score dérivé suit la règle d'aujourd'hui, sans rien y ajouter.
-  const formatViolation = checkMatchScores(format, team1, team2, { decisive: options.decisive });
-  if (formatViolation) return refuse(formatViolation, maps.length - 1, "team1Score");
+  // Égalités ouvertes : une map nulle **consomme** une map du BO (décision du
+  // 2026-10-06). Un match clos sans vainqueur a donc joué toutes ses maps —
+  // un 2-2 en BO5 se justifie par une cinquième map nulle, pas par quatre maps.
+  const violation =
+    checkMatchScores(format, team1, team2, { decisive: options.decisive }) ??
+    unplayedMapsViolation(format, team1, team2, maps.length, options.decisive);
+  if (violation) return refuse(violation, maps.length - 1, "team1Score");
 
   return { error: null, field: null, score };
 }
@@ -280,6 +299,10 @@ export function mapListViolationMessage(error: MapListViolation, format: MatchFo
       return `Score de map manquant ou invalide : un entier entre 0 et ${MAP_SCORE_MAX} (0 – 0 pour une map nulle).`;
     case "MAP_AFTER_DECISION":
       return "Cette map suit la fin du match : le résultat était déjà acquis.";
+    case "MAP_LIST_INCOMPLETE":
+      return format
+        ? `Match inachevé : sans vainqueur, les ${matchMaxMaps(format)} maps se jouent toutes (une map nulle en occupe une).`
+        : "Match inachevé.";
     case "DRAW_NOT_ALLOWED":
       return "Match nul impossible : ce tournoi exige un vainqueur.";
     case "SCORE_EXCEEDS_MATCH_FORMAT":
@@ -332,4 +355,5 @@ export const MAP_LIST_ERROR_CODES: ReadonlySet<string> = new Set<MapListViolatio
   "MAP_REPLAY_CODE_DUPLICATE",
   "MAP_SCORE_INVALID",
   "MAP_AFTER_DECISION",
+  "MAP_LIST_INCOMPLETE",
 ]);
