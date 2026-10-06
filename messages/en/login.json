@@ -46,7 +46,7 @@
     "BOT_INTERNAL_UNREACHABLE": "Discord login unavailable (the bot cannot be reached). You can use Google instead.",
     "BOT_RESOLVE_TIMEOUT": "The bot could not find your tag in time. If you are on the BlueGenji server, use your Discord ID instead; otherwise, use the Discord button.",
     "BOT_INTERNAL_UNAUTHORIZED": "Discord login unavailable (invalid internal token). You can use Google instead.",
-    "DISCORD_DM_FAILED": "Could not send you the code by direct message: the bot has to share a server with you, and your DMs must be open there. Join the BlueGenji server, or use the Discord button.",
+    "DISCORD_DM_FAILED": "Could not send you the code by direct message: the bot has to share a server with you, and your direct messages must be open there. Join the BlueGenji server, or use the Discord button.",
     "DISCORD_USER_NOT_FOUND": "Tag not found: the bot has to share a server with you. Join the BlueGenji server, or use the Discord button.",
     "FAILED_TO_SEND_CODE": "The code could not be sent. Try again in a moment.",
     "INVALID_DISCORD_HANDLE": "Enter your Discord tag or your ID.",
