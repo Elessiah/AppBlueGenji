@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import type { IncomingMessage } from "node:http";
 import { NextRequest } from "next/server";
+import * as pageStaticInfo from "next/dist/build/analysis/get-page-static-info";
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { matchHas, prepareDestination } from "next/dist/shared/lib/router/utils/prepare-destination";
 
 import nextConfig from "@/next.config";
-import { middleware } from "@/middleware";
+import { config, middleware } from "@/middleware";
 import { LOCALE_REWRITES } from "@/lib/shared/locale-rewrites";
 import { LOCALE_HEADER } from "@/lib/shared/locales";
 
@@ -37,6 +38,15 @@ function rewrite(pathname: string, headers: Record<string, string> = {}): string
 }
 
 const english = { [LOCALE_HEADER]: "en" };
+
+/**
+ * Compilation du `matcher` par `next build` — exportée par Next, absente de
+ * ses déclarations de types.
+ */
+type CompiledMatcher = { regexp: string; missing?: unknown[] };
+const { getMiddlewareMatchers } = pageStaticInfo as unknown as {
+  getMiddlewareMatchers: (matcher: unknown, nextConfig: object) => CompiledMatcher[];
+};
 
 describe("rewrites — adresses anglaises", () => {
   it("sont déclarées en beforeFiles, seules", async () => {
@@ -70,9 +80,50 @@ describe("rewrites — adresses anglaises", () => {
     }
   });
 
+  it("n'admettent aucun caractère encodé (/en/%61pi/x serait décodé en /api/x)", () => {
+    for (const path of ["/en/%61pi/x", "/EN/%61pi/x", "/en/regles/%2e%2e/api/x", "/en/%2fapi"]) {
+      expect(rewrite(path, english)).toBeNull();
+    }
+  });
+
   it("ne confondent pas /enquete ni /fr/… avec une adresse anglaise", () => {
     expect(rewrite("/enquete", english)).toBeNull();
     expect(rewrite("/fr/regles", english)).toBeNull();
+  });
+});
+
+/**
+ * Revue de sécurité de la PR #415 : le motif des `rewrites` ignore la casse,
+ * celui du `matcher` non. Toute casse de `/en` doit donc passer par le
+ * middleware — qui remplace le `x-bg-locale` forgé —, préchargements compris.
+ */
+describe("middleware — /en dans toutes ses casses", () => {
+  // Le `matcher` compilé comme le fait `next build` (`middleware-manifest.json`),
+  // relu comme à l'exécution : une expression **sans** drapeau `i`.
+  const compiled = getMiddlewareMatchers(config.matcher, {}).map((matcher) => ({
+    regexp: new RegExp(matcher.regexp),
+    missing: matcher.missing ?? [],
+  }));
+  /** Un préchargement : la première entrée (`missing`) l'écarte. */
+  const prefetchReachesMiddleware = (pathname: string) =>
+    compiled.some((matcher) => matcher.missing.length === 0 && matcher.regexp.test(pathname));
+
+  it.each(["/en", "/en/regles", "/EN/regles", "/En/admin", "/eN", "/EN/%61pi/x"])(
+    "fait passer le préchargement de %s par le middleware",
+    (pathname) => {
+      expect(prefetchReachesMiddleware(pathname)).toBe(true);
+    },
+  );
+
+  it("marque fr /EN/… (pas un préfixe de langue) : la marque forgée ne survit pas, rien n'est réécrit", () => {
+    for (const path of ["/EN/regles", "/En/admin", "/EN/%61pi/x"]) {
+      const response = middleware(
+        new NextRequest(`https://127.0.0.1:3000${path}`, { headers: { [LOCALE_HEADER]: "en", purpose: "prefetch" } }),
+      );
+      const locale = response.headers.get(`x-middleware-request-${LOCALE_HEADER}`) ?? "";
+      expect(locale).toBe("fr");
+      expect(rewrite(path, { [LOCALE_HEADER]: locale })).toBeNull();
+    }
   });
 });
 

@@ -125,7 +125,7 @@ describe("middleware — préchargements de /en", () => {
   });
 
   it("déclare /en/:path* au matcher, sans l'exclusion des préchargements", () => {
-    expect(config.matcher).toContain("/en/:path*");
+    expect(config.matcher).toContain("/:prefix([eE][nN])/:path*");
   });
 });
 
