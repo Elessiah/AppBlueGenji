@@ -72,6 +72,7 @@ function snapshotWith(registrations: { teamId: number }[]): TournamentSnapshot {
 function viewerWith(overrides: Partial<TournamentViewerContext> = {}): TournamentViewerContext {
   return {
     canRegister: false,
+    matchProposals: [],
     canRegisterEntrant: true,
     registrationBlock: null,
     myTeamId: null,

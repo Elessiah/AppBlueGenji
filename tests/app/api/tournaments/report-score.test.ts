@@ -51,7 +51,34 @@ describe("POST .../report — match pas encore lancé", () => {
     expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, [
       { replayCode: "ABC123", team1Score: 2, team2Score: 1 },
       { replayCode: "DEF456", team1Score: 1, team2Score: 1 },
-    ]);
+    ], undefined);
+  });
+});
+
+describe("POST .../report — « Confirmer » la proposition adverse (MAP_SCORES.md)", () => {
+  it("transmet l'instant de dépôt confirmé au service", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue();
+    const res = await POST(req({ maps: MAPS, confirm: { reportedAt: "2026-10-05T20:00:00.000Z" } }), params);
+    expect(res.status).toBe(200);
+    expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, expect.any(Array), {
+      reportedAt: "2026-10-05T20:00:00.000Z",
+    });
+  });
+
+  it("refuse une confirmation mal formée en 400, sans atteindre le service", async () => {
+    for (const confirm of ["x", { reportedAt: 12 }, { reportedAt: "x".repeat(41) }]) {
+      const res = await POST(req({ maps: MAPS, confirm }), params);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "INVALID_REQUEST" });
+    }
+    expect(reportMatchScore).not.toHaveBeenCalled();
+  });
+
+  it("rend une proposition changée ou expirée en 409 PROPOSAL_STALE", async () => {
+    jest.mocked(reportMatchScore).mockRejectedValue(new Error("PROPOSAL_STALE"));
+    const res = await POST(req({ maps: MAPS, confirm: { reportedAt: "2026-10-05T20:00:00.000Z" } }), params);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "PROPOSAL_STALE" });
   });
 });
 

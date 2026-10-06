@@ -72,7 +72,9 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
     // Le message d'envoi parle depuis l'engagé : la conversion passe par le
     // module pur, jamais par une inversion recopiée.
     expect(PLAYER_DIALOG).toContain("toReporterScores(myTeamIsTeam1,");
-    expect(PLAYER_DIALOG).toContain("body: JSON.stringify({ maps })");
+    expect(PLAYER_DIALOG).toContain(
+      "confirmsAsIs && view?.theirs ? { maps, confirm: { reportedAt: view.theirs.reportedAt } } : { maps }",
+    );
   });
 
   it("la liste de maps est celle de l'arbitrage : une seule implémentation", () => {

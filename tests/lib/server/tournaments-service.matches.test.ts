@@ -131,6 +131,8 @@ describe("tournaments-service: match state machine", () => {
       team1_report_opponent_score: number | null;
       team2_report_score: number | null;
       team2_report_opponent_score: number | null;
+      team1_reported_at?: Date | null;
+      team2_reported_at?: Date | null;
       launched_at: string | null;
       launch_pairing: string | null;
     };
@@ -356,6 +358,73 @@ describe("tournaments-service: match state machine", () => {
       await reportMatchScore(connection, 1, 10, 42, mapsFor(1, 3));
 
       expect(completion(calls)?.params).toEqual([1, 3, 200, 100, 10]);
+    });
+
+    describe("« Confirmer » la proposition adverse telle quelle (MAP_SCORES.md)", () => {
+      const depositedAt = new Date("2026-10-05T20:00:00.000Z");
+      const pendingTeam2 = {
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 1,
+        team2_report_opponent_score: 3,
+        team2_reported_at: depositedAt,
+      };
+
+      it("clôt la rencontre par le même chemin qu'un envoi concordant", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() });
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+        expect(queueRefereeAlert).not.toHaveBeenCalled();
+      });
+
+      it("refuse une proposition remplacée depuis (autre dépôt), sans rien écrire", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: "2026-10-05T19:00:00.000Z" }),
+        ).rejects.toThrow("PROPOSAL_STALE");
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("refuse une proposition retirée ou expirée (plus de report adverse)", async () => {
+        const { connection, calls } = reportConnection();
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() }),
+        ).rejects.toThrow("PROPOSAL_STALE");
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("refuse une confirmation dont les maps ne sont plus celles de l'adversaire", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+        const execute = connection.execute.bind(connection) as (sql: string, params?: unknown) => Promise<unknown>;
+        (connection as unknown as { execute: typeof execute }).execute = async (sql, params) => {
+          if (sql.includes("SELECT match_id, source, map_number, replay_code, team1_score, team2_score\n")
+            || /^SELECT match_id, source, map_number, replay_code, team1_score, team2_score FROM/.test(sql.replace(/\s+/g, " ").trim())) {
+            await execute(sql, params);
+            return [mapsFor(3, 1).map((m, i) => ({
+              match_id: 10, source: "TEAM2", map_number: i + 1, replay_code: `EDIT${i}`, team1_score: m.team1Score, team2_score: m.team2Score,
+            })), []];
+          }
+          return execute(sql, params);
+        };
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() }),
+        ).rejects.toThrow("PROPOSAL_STALE");
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("une retouche envoyée sans confirmation devient une contre-proposition (désaccord)", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+
+        // L'engagé 1 retouche la proposition (3-0 au lieu de 3-1) et l'envoie.
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0));
+
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
     });
 
     it("même score mais maps différentes : désaccord, l'arbitrage est alerté (MAP_SCORES.md)", async () => {

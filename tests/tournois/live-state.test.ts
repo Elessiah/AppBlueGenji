@@ -101,6 +101,7 @@ const snapshot = (overrides: Partial<TournamentSnapshot> = {}): TournamentSnapsh
 
 const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentViewerContext => ({
   canRegister: false,
+  matchProposals: [],
   // Qualité pour engager son équipe : le cas ordinaire. Le refus a son propre
   // test — sans ce défaut, tous les autres testeraient le mauvais refus.
   canRegisterEntrant: true,

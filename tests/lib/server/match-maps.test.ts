@@ -127,7 +127,7 @@ describe("stockage map par map (bg_match_maps)", () => {
 describe("attachMatchMaps — détail posé sur l'instantané (flux et REST de secours)", () => {
   const map = (code: string, t1: number, t2: number, n: number) => ({ mapNumber: n, replayCode: code, team1Score: t1, team2Score: t2 });
 
-  it("pose le résultat retenu et les propositions qui expliquent leur score", () => {
+  it("pose le résultat retenu, jamais le détail des propositions", () => {
     const match = bracketMatch({
       id: 10,
       team1Score: 1,
@@ -140,7 +140,9 @@ describe("attachMatchMaps — détail posé sur l'instantané (flux et REST de s
       team2: [],
     }]]));
     expect(out.maps.map((m) => m.replayCode)).toEqual(["F1", "F2"]);
-    expect(out.team1Report?.maps.map((m) => m.replayCode)).toEqual(["T1"]);
+    // Jamais le détail d'une proposition dans l'instantané diffusé : il ne
+    // voyage que dans le contexte des deux engagés et de l'arbitrage.
+    expect(out.team1Report?.maps).toEqual([]);
     expect(out.team2Report).toBeNull();
   });
 
