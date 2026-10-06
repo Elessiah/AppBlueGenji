@@ -167,7 +167,8 @@ La seconde équipe ne ressaisit rien :
 - **Pré-remplissage.** La modale s'ouvre sur la proposition adverse : chaque
   ligne reprend son code de replay et son score de map
   (`playerReportInitialMaps` sur le match complété par `withProposalMaps`).
-- **« Confirmer »** (action principale, `confirmsAsIs`) : visible tant que les
+- **« Confirmer le score »** (action principale, `confirmsAsIs` ; pas « Confirmer »
+  seul, que le forfait déclaré emploie aussi) : visible tant que les
   lignes sont celles de l'adversaire, à l'identique. Le corps porte
   `confirm: { reportedAt }` — l'instant de dépôt lu dans la modale — et passe
   par **le même chemin** que tout report (`reportMatchScore`, mêmes contrôles,
@@ -242,7 +243,9 @@ le tait.
   retrait), « Ajouter une map » jusqu'au plafond, score du match dérivé en
   direct.
 - **Arbitrage** (`AdminScoreDialog`) : la même liste sous les steppers. Dès
-  qu'une map est saisie, les steppers suivent le score dérivé (désactivés) ;
+  qu'une map est saisie, les steppers suivent le score dérivé (désactivés, une
+  phrase reliée par `aria-describedby` dit de retirer les maps pour saisir à la
+  main) ;
   sans map, l'arbitre pose le score à la main comme avant (replay perdu). La
   confirmation de correction d'un résultat validé (#381) est inchangée.
   En désaccord (deux propositions), le dialogue montre le détail des deux,
