@@ -45,7 +45,7 @@ export function ruleAnchorSlug(title: string): string {
  * Ancre de chaque règle détaillée, préfixée pour ne jamais heurter une ancre
  * fixe, et rendue unique si deux titres donnent le même segment.
  */
-export function ruleSectionAnchors(sections: RuleSection[]): string[] {
+export function ruleSectionAnchors(sections: ReadonlyArray<Pick<RuleSection, "title">>): string[] {
   const seen = new Map<string, number>();
   return sections.map((section) => {
     const base = `regle-${ruleAnchorSlug(section.title) || "section"}`;
@@ -55,29 +55,38 @@ export function ruleSectionAnchors(sections: RuleSection[]): string[] {
   });
 }
 
+/** Libellés des grandes entrées du sommaire (`rules.toc`), dans la langue de la page. */
+export type RulesOutlineLabels = Readonly<Record<keyof typeof RULES_PAGE_ANCHORS, string>>;
+
 /**
  * Sommaire de la page. Les réglages du tournoi n'y figurent que s'ils sont
  * affichés ; les règles communes, repliées, n'ont qu'une entrée — elles sont
  * les mêmes sur toutes les pages, le lecteur vient pour le mode.
+ *
+ * `anchors` : les ancres des règles du mode, calculées sur leurs titres
+ * **français** ({@link ruleSectionAnchors}) — une ancre ne change pas avec la
+ * langue, `/en/regles/survie#regle-coupes` vise la même section que
+ * `/regles/survie#regle-coupes`. Par défaut, celles des titres reçus.
  */
 export function rulesPageOutline(
   mode: Pick<TournamentRuleMode, "sections">,
-  options: { hasTournamentSettings: boolean },
+  options: { hasTournamentSettings: boolean; labels: RulesOutlineLabels; anchors?: readonly string[] },
 ): RulesOutlineEntry[] {
-  const anchors = ruleSectionAnchors(mode.sections);
+  const { labels } = options;
+  const anchors = options.anchors ?? ruleSectionAnchors(mode.sections);
   const entries: RulesOutlineEntry[] = [];
   if (options.hasTournamentSettings) {
-    entries.push({ id: RULES_PAGE_ANCHORS.tournament, label: "Ce tournoi" });
+    entries.push({ id: RULES_PAGE_ANCHORS.tournament, label: labels.tournament });
   }
   entries.push(
-    { id: RULES_PAGE_ANCHORS.essentials, label: "L'essentiel" },
+    { id: RULES_PAGE_ANCHORS.essentials, label: labels.essentials },
     {
       id: RULES_PAGE_ANCHORS.details,
-      label: "Règles du mode",
+      label: labels.details,
       children: mode.sections.map((section, i) => ({ id: anchors[i], label: section.title })),
     },
-    { id: RULES_PAGE_ANCHORS.common, label: "Règles communes" },
-    { id: RULES_PAGE_ANCHORS.others, label: "Autres modes" },
+    { id: RULES_PAGE_ANCHORS.common, label: labels.common },
+    { id: RULES_PAGE_ANCHORS.others, label: labels.others },
   );
   return entries;
 }

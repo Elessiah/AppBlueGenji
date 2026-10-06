@@ -1,15 +1,14 @@
 /**
  * Découpage d'un texte en segments **gras** / normal.
  *
- * Le registre des règles (`lib/shared/tournament-rules.ts`) est rédigé avec la
- * mise en gras Markdown, mais les pages `/regles` rendaient `{paragraph}` en
- * texte brut : les astérisques s'affichaient telles quelles au visiteur. Plutôt
- * que de retirer l'emphase du registre — elle porte le sens de la phrase, c'est
- * elle qui distingue « un seul match » du reste —, on la rend.
+ * Les conditions d'utilisation (`lib/shared/terms-of-use.ts`) sont rédigées avec
+ * la mise en gras Markdown ; la page les rend par `EmphasisText`. Le registre
+ * des règles l'employait aussi, jusqu'à sa traduction : ses textes sont devenus
+ * des messages ICU, gras en `<b>…</b>` (`components/rules/RuleText.tsx`).
  *
  * Volontairement minimal : `**gras**`, et rien d'autre. Ce n'est pas un moteur
  * Markdown (`lib/server/bot-docs.ts` en tient un, pour de vrais fichiers `.md`)
- * mais la seule marque que le registre emploie. Le module rend des **segments**,
+ * mais la seule marque que ces textes emploient. Le module rend des **segments**,
  * jamais du HTML : la page les monte en `<strong>`, donc rien n'est injecté.
  */
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
+import { useAppLocale } from "@/components/i18n/locale-context";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { CyberButton } from "@/components/cyber";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
@@ -167,6 +168,9 @@ function RecruitmentBanner({
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const { decorativeMotion } = useClientPower();
+  // Annonces saisies en français (lot 5 pour leur anglais) : annoncées comme
+  // telles sur une page anglaise (WCAG 3.1.2, `docs/features/I18N.md`).
+  const contentLang = useAppLocale() === "fr" ? undefined : "fr";
 
   const count = ads.length;
   const multiple = count > 1;
@@ -224,6 +228,7 @@ function RecruitmentBanner({
     <section
       className={styles.banner}
       aria-label="Annonces de recrutement"
+      lang={contentLang}
       onPointerEnter={onPointerEnter}
       onPointerLeave={() => setHovered(false)}
       onFocus={onFocus}
@@ -350,6 +355,7 @@ function RecruitmentArrivalModal({
 
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open, onClose: dismiss });
+  const contentLang = useAppLocale() === "fr" ? undefined : "fr";
   const backdrop = useBackdropDismiss(dismiss);
 
   // Une page « compte » comme vue dès qu'elle est affichée, même si le visiteur
@@ -378,6 +384,7 @@ function RecruitmentArrivalModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        lang={contentLang}
         tabIndex={-1}
       >
         <div className={styles.modalEyebrow}>

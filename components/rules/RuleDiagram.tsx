@@ -7,7 +7,9 @@
  * horizontalement sur mobile (cf. `.scroll` / `.svg` dans le module CSS) plutôt
  * que de se comprimer jusqu'à l'illisibilité.
  */
-import type { RuleDiagram } from "@/lib/shared/tournament-rules";
+import type { Locale } from "@/lib/shared/locales";
+import { formatMessage, type MessageValues } from "@/lib/shared/message-format";
+import type { RuleDiagram, RulesMessages } from "@/lib/shared/tournament-rules";
 import styles from "./RuleDiagram.module.css";
 import { ScrollArea } from "@/components/cyber";
 
@@ -22,6 +24,15 @@ const LINE = "var(--line-strong-cy)";
 const SURFACE = "var(--cyber-bg-2)";
 
 const MONO = "var(--font-mono)";
+
+/** Textes des schémas (`rules.diagram`), dans la langue de la page. */
+type DiagramText = RulesMessages["diagram"];
+
+type DiagramProps = Readonly<{ t: DiagramText; locale: Locale }>;
+
+function format(locale: Locale, message: string, values: MessageValues): string {
+  return formatMessage(locale, message, values);
+}
 
 type BoxProps = {
   x: number;
@@ -126,7 +137,7 @@ function ColumnLabel({ x, y, children }: Readonly<{ x: number; y: number; childr
   );
 }
 
-function SingleEliminationDiagram() {
+function SingleEliminationDiagram({ t, locale }: DiagramProps) {
   const qfY = [30, 100, 170, 240];
   const sfY = [65, 205];
   return (
@@ -134,26 +145,26 @@ function SingleEliminationDiagram() {
       className={styles.svg}
       viewBox="0 0 700 300"
       role="img"
-      aria-label="Bracket à élimination simple : quatre quarts de finale, deux demi-finales, une finale."
+      aria-label={t.single.ariaLabel}
       style={{ color: LINE }}
     >
       <ArrowDefs />
-      <ColumnLabel x={20} y={16}>Quarts</ColumnLabel>
-      <ColumnLabel x={228} y={16}>Demi-finales</ColumnLabel>
-      <ColumnLabel x={436} y={16}>Finale</ColumnLabel>
+      <ColumnLabel x={20} y={16}>{t.single.quarterFinals}</ColumnLabel>
+      <ColumnLabel x={228} y={16}>{t.single.semiFinals}</ColumnLabel>
+      <ColumnLabel x={436} y={16}>{t.single.final}</ColumnLabel>
 
       {qfY.map((y, i) => (
         <Box
           key={y}
           x={20}
           y={y}
-          lines={[`Équipe ${i * 2 + 1}`, `Équipe ${i * 2 + 2}`]}
+          lines={[format(locale, t.team, { name: i * 2 + 1 }), format(locale, t.team, { name: i * 2 + 2 })]}
         />
       ))}
       {sfY.map((y) => (
-        <Box key={y} x={228} y={y} lines={["Vainqueur", "Vainqueur"]} accent={BLUE} />
+        <Box key={y} x={228} y={y} lines={[t.single.winner, t.single.winner]} accent={BLUE} />
       ))}
-      <Box x={436} y={135} lines={["Finaliste", "Finaliste"]} accent={BLUE} />
+      <Box x={436} y={135} lines={[t.single.finalist, t.single.finalist]} accent={BLUE} />
 
       {qfY.map((y, i) => (
         <Elbow
@@ -191,39 +202,39 @@ function SingleEliminationDiagram() {
           textAnchor="middle"
           letterSpacing="0.1em"
         >
-          CHAMPIONNE
+          {t.champion}
         </text>
       </g>
 
       <text x={20} y={292} fill={MUTE} fontSize={11.5} fontFamily={MONO}>
-        Une défaite = sortie du tournoi.
+        {t.single.footnote}
       </text>
     </svg>
   );
 }
 
-function DoubleEliminationDiagram() {
+function DoubleEliminationDiagram({ t }: DiagramProps) {
   return (
     <svg
       className={styles.svg}
       viewBox="0 0 700 330"
       role="img"
-      aria-label="Double élimination : bracket haut, bracket bas et grande finale."
+      aria-label={t.double.ariaLabel}
       style={{ color: LINE }}
     >
       <ArrowDefs />
 
-      <ColumnLabel x={20} y={18}>Bracket haut · invaincues</ColumnLabel>
-      <Box x={20} y={30} lines={["Tour 1"]} h={38} accent={BLUE} />
-      <Box x={186} y={30} lines={["Tour 2"]} h={38} accent={BLUE} />
-      <Box x={352} y={30} lines={["Finale haute"]} h={38} accent={BLUE} />
+      <ColumnLabel x={20} y={18}>{t.double.upperColumn}</ColumnLabel>
+      <Box x={20} y={30} lines={[t.double.upperRound1]} h={38} accent={BLUE} />
+      <Box x={186} y={30} lines={[t.double.upperRound2]} h={38} accent={BLUE} />
+      <Box x={352} y={30} lines={[t.double.upperFinal]} h={38} accent={BLUE} />
       <Elbow from={[152, 49]} to={[186, 49]} color={BLUE} />
       <Elbow from={[318, 49]} to={[352, 49]} color={BLUE} />
 
-      <ColumnLabel x={20} y={216}>Bracket bas · une défaite</ColumnLabel>
-      <Box x={20} y={228} lines={["Tour 1 bas"]} h={38} accent={LOWER} />
-      <Box x={186} y={228} lines={["Tour 2 bas"]} h={38} accent={LOWER} />
-      <Box x={352} y={228} lines={["Finale basse"]} h={38} accent={LOWER} />
+      <ColumnLabel x={20} y={216}>{t.double.lowerColumn}</ColumnLabel>
+      <Box x={20} y={228} lines={[t.double.lowerRound1]} h={38} accent={LOWER} />
+      <Box x={186} y={228} lines={[t.double.lowerRound2]} h={38} accent={LOWER} />
+      <Box x={352} y={228} lines={[t.double.lowerFinal]} h={38} accent={LOWER} />
       <Elbow from={[152, 247]} to={[186, 247]} color={LOWER} />
       <Elbow from={[318, 247]} to={[352, 247]} color={LOWER} />
 
@@ -253,7 +264,7 @@ function DoubleEliminationDiagram() {
             fontFamily={MONO}
             aria-hidden={boxX < 0}
           >
-            perdant
+            {t.double.loser}
           </text>
         </g>
       ))}
@@ -269,32 +280,34 @@ function DoubleEliminationDiagram() {
         strokeWidth={1.3}
       />
       <text x={602} y={140} fill={INK} fontSize={12.5} fontFamily={MONO} textAnchor="middle">
-        Grande finale
+        {t.double.grandFinal}
       </text>
       <text x={602} y={160} fill={MUTE} fontSize={11} fontFamily={MONO} textAnchor="middle">
-        un seul match
+        {t.double.singleMatch}
       </text>
       <Elbow from={[484, 49]} to={[528, 132]} color={BLUE} />
       <Elbow from={[484, 247]} to={[528, 164]} color={LOWER} />
 
       <text x={20} y={312} fill={MUTE} fontSize={11.5} fontFamily={MONO}>
-        Deux défaites = sortie du tournoi. Pas de belle en grande finale.
+        {t.double.footnote}
       </text>
     </svg>
   );
 }
 
-function SwissDiagram() {
+function SwissDiagram({ t, locale }: DiagramProps) {
+  const wins = (count: number) => format(locale, t.swiss.wins, { count });
+  const group = (teams: number) => format(locale, t.swiss.group, { teams, matches: teams / 2 });
   const groups: { label: string; teams: string; y: number; accent: string }[][] = [
-    [{ label: "Seeding", teams: "8 équipes · 4 matchs", y: 120, accent: LINE }],
+    [{ label: t.swiss.seeding, teams: group(8), y: 120, accent: LINE }],
     [
-      { label: "1 victoire", teams: "4 équipes · 2 matchs", y: 60, accent: BLUE },
-      { label: "0 victoire", teams: "4 équipes · 2 matchs", y: 180, accent: LOWER },
+      { label: wins(1), teams: group(4), y: 60, accent: BLUE },
+      { label: wins(0), teams: group(4), y: 180, accent: LOWER },
     ],
     [
-      { label: "2 victoires", teams: "2 équipes · 1 match", y: 30, accent: BLUE },
-      { label: "1 victoire", teams: "4 équipes · 2 matchs", y: 120, accent: MUTE },
-      { label: "0 victoire", teams: "2 équipes · 1 match", y: 210, accent: LOWER },
+      { label: wins(2), teams: group(2), y: 30, accent: BLUE },
+      { label: wins(1), teams: group(4), y: 120, accent: MUTE },
+      { label: wins(0), teams: group(2), y: 210, accent: LOWER },
     ],
   ];
   const colX = [20, 250, 480];
@@ -304,11 +317,11 @@ function SwissDiagram() {
       className={styles.svg}
       viewBox="0 0 700 300"
       role="img"
-      aria-label="Ronde suisse : après chaque ronde, les équipes sont regroupées par score."
+      aria-label={t.swiss.ariaLabel}
       style={{ color: LINE }}
     >
       <ArrowDefs />
-      {["Ronde 1", "Ronde 2", "Ronde 3"].map((label, i) => (
+      {[1, 2, 3].map((number) => format(locale, t.swiss.round, { number })).map((label, i) => (
         <ColumnLabel key={label} x={colX[i]} y={16}>
           {label}
         </ColumnLabel>
@@ -332,13 +345,13 @@ function SwissDiagram() {
       <Elbow from={[418, 205]} to={[480, 235]} color={LOWER} />
 
       <text x={20} y={288} fill={MUTE} fontSize={11.5} fontFamily={MONO}>
-        Personne n&apos;est éliminé : toutes les équipes jouent chaque ronde.
+        {t.swiss.footnote}
       </text>
     </svg>
   );
 }
 
-function SurvivalDiagram() {
+function SurvivalDiagram({ t, locale }: DiagramProps) {
   const rows = (count: number, x: number, y: number, cutFrom: number, prefix: string) =>
     Array.from({ length: count }, (_, i) => {
       const inCut = i >= cutFrom;
@@ -358,7 +371,7 @@ function SurvivalDiagram() {
             {i + 1}
           </text>
           <text x={x + 26} y={y + i * 26 + 15} fill={inCut ? CUT : INK} fontSize={11} fontFamily={MONO}>
-            {`Équipe ${String.fromCodePoint(65 + i)}`}
+            {format(locale, t.team, { name: String.fromCodePoint(65 + i) })}
           </text>
         </g>
       );
@@ -369,12 +382,12 @@ function SurvivalDiagram() {
       className={styles.svg}
       viewBox="0 0 700 330"
       role="img"
-      aria-label="Mode Survie : classement unique, appariement par paires adjacentes et coupe des deux dernières."
+      aria-label={t.survival.ariaLabel}
       style={{ color: LINE }}
     >
       <ArrowDefs />
 
-      <ColumnLabel x={20} y={18}>Classement de la manche</ColumnLabel>
+      <ColumnLabel x={20} y={18}>{t.survival.standings}</ColumnLabel>
       {rows(8, 20, 30, 6, "r1")}
 
       {/* Appariements par paires adjacentes. */}
@@ -387,16 +400,16 @@ function SurvivalDiagram() {
             strokeWidth={1.2}
           />
           <text x={198} y={60 + p * 52} fill={BLUE} fontSize={10.5} fontFamily={MONO}>
-            vs
+            {t.survival.versus}
           </text>
         </g>
       ))}
 
       <text x={244} y={40} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        1 vs 2, 3 vs 4…
+        {t.survival.pairing}
       </text>
       <text x={244} y={58} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        puis reclassement
+        {t.survival.reseed}
       </text>
       <line
         x1={244}
@@ -408,19 +421,19 @@ function SurvivalDiagram() {
         strokeDasharray="3 3"
       />
       <text x={244} y={230} fill={CUT} fontSize={11} fontFamily={MONO}>
-        coupe : les 2
+        {t.survival.cutLine1}
       </text>
       <text x={244} y={248} fill={CUT} fontSize={11} fontFamily={MONO}>
-        dernières sortent
+        {t.survival.cutLine2}
       </text>
 
       <Elbow from={[352, 150]} to={[400, 150]} color={BLUE} />
 
-      <ColumnLabel x={412} y={18}>Manche suivante</ColumnLabel>
+      <ColumnLabel x={412} y={18}>{t.survival.nextRound}</ColumnLabel>
       {rows(6, 412, 30, 4, "r2")}
 
       <text x={412} y={222} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        … jusqu&apos;à la championne.
+        {t.survival.untilChampion}
       </text>
 
       {/* Encart barrage. */}
@@ -435,13 +448,13 @@ function SurvivalDiagram() {
         strokeWidth={1.2}
       />
       <text x={426} y={260} fill={LOWER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
-        ⚖ EFFECTIF IMPAIR
+        {t.survival.oddTitle}
       </text>
       <text x={426} y={278} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        Manche 1 : barrage entre les
+        {t.survival.oddLine1}
       </text>
       <text x={426} y={294} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        2 dernières, le perdant sort.
+        {t.survival.oddLine2}
       </text>
     </svg>
   );
@@ -472,21 +485,21 @@ function FunnelBox({ in: inCount, out: outCount, x, y }: Readonly<FunnelLevel>) 
   );
 }
 
-function MultiDiagram() {
+function MultiDiagram({ t, locale }: DiagramProps) {
   return (
     <svg
       className={styles.svg}
       viewBox="0 0 680 300"
       role="img"
-      aria-label="Tournoi multi-phases : chaque phase affine l'effectif. Phase 1 : Ronde suisse 128→64, Phase 2 : Survie 64→16, Phase 3 : Double élimination 16→1."
+      aria-label={t.multi.ariaLabel}
       style={{ color: LINE }}
     >
       <ArrowDefs />
 
       {/* Phase labels */}
-      <ColumnLabel x={35} y={18}>Phase 1</ColumnLabel>
-      <ColumnLabel x={245} y={18}>Phase 2</ColumnLabel>
-      <ColumnLabel x={460} y={18}>Phase finale</ColumnLabel>
+      <ColumnLabel x={35} y={18}>{format(locale, t.multi.phase, { number: 1 })}</ColumnLabel>
+      <ColumnLabel x={245} y={18}>{format(locale, t.multi.phase, { number: 2 })}</ColumnLabel>
+      <ColumnLabel x={460} y={18}>{t.multi.finalPhase}</ColumnLabel>
 
       {/* Funnel boxes */}
       <FunnelBox in={128} out={64} x={20} y={50} />
@@ -495,13 +508,13 @@ function MultiDiagram() {
 
       {/* Format labels */}
       <text x={100} y={135} fill={BLUE} fontSize={11} fontFamily={MONO} textAnchor="middle" letterSpacing="0.05em">
-        RONDE SUISSE
+        {t.multi.swiss}
       </text>
       <text x={300} y={135} fill={BLUE} fontSize={11} fontFamily={MONO} textAnchor="middle" letterSpacing="0.05em">
-        SURVIE
+        {t.multi.survival}
       </text>
       <text x={500} y={135} fill={BLUE} fontSize={11} fontFamily={MONO} textAnchor="middle" letterSpacing="0.05em">
-        DOUBLE ÉLIM.
+        {t.multi.double}
       </text>
 
       {/* Flow arrows */}
@@ -510,13 +523,13 @@ function MultiDiagram() {
 
       {/* Legend/explanation */}
       <text x={20} y={190} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        Chaque phase joue indépendamment et ne transmet
+        {t.multi.line1}
       </text>
       <text x={20} y={208} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        que ses qualifiées à la suivante. Formats combinables
+        {t.multi.line2}
       </text>
       <text x={20} y={226} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        pour affiner progressivement le podium.
+        {t.multi.line3}
       </text>
 
       {/* Trophy for winner */}
@@ -543,7 +556,7 @@ function MultiDiagram() {
           textAnchor="middle"
           letterSpacing="0.1em"
         >
-          CHAMPIONNE
+          {t.champion}
         </text>
       </g>
 
@@ -556,7 +569,7 @@ function MultiDiagram() {
  * Mode « BlueGenji Survie » : capital d'endurance qui monte et descend, puis
  * arbre à 8 dont les affrontements suivent le tableau imposé.
  */
-function BgSurvieDiagram() {
+function BgSurvieDiagram({ t, locale }: DiagramProps) {
   const teams = ["A", "B", "C", "D", "E"];
   const points = [11, 9, 9, 5, 0];
 
@@ -565,12 +578,12 @@ function BgSurvieDiagram() {
       className={styles.svg}
       viewBox="0 0 700 330"
       role="img"
-      aria-label="Mode BlueGenji Survie : capital d'endurance par équipe, élimination à zéro, puis play-offs à huit."
+      aria-label={t.bgSurvie.ariaLabel}
       style={{ color: LINE }}
     >
       <ArrowDefs />
 
-      <ColumnLabel x={20} y={18}>Endurance</ColumnLabel>
+      <ColumnLabel x={20} y={18}>{t.bgSurvie.endurance}</ColumnLabel>
       {teams.map((team, index) => {
         const out = points[index] === 0;
         return (
@@ -589,7 +602,7 @@ function BgSurvieDiagram() {
               {index + 1}
             </text>
             <text x={48} y={48 + index * 32} fill={out ? CUT : INK} fontSize={11} fontFamily={MONO}>
-              {`Équipe ${team}`}
+              {format(locale, t.team, { name: team })}
             </text>
             <text
               x={196}
@@ -599,31 +612,31 @@ function BgSurvieDiagram() {
               fontFamily={MONO}
               textAnchor="end"
             >
-              {out ? "0 ✕" : `${points[index]} pts`}
+              {out ? "0 ✕" : format(locale, t.bgSurvie.points, { points: points[index] })}
             </text>
           </g>
         );
       })}
 
       <text x={20} y={214} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        +1 par map gagnée · −1 par map perdue
+        {t.bgSurvie.perMap}
       </text>
       <text x={20} y={232} fill={CUT} fontSize={11} fontFamily={MONO}>
-        à 0 : éliminée sur-le-champ
+        {t.bgSurvie.atZero}
       </text>
       <text x={20} y={256} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        Appariement : 1 vs 2, 3 vs 4…
+        {t.bgSurvie.pairing}
       </text>
       <text x={20} y={274} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        égalité de points : ordre du
+        {t.bgSurvie.tieLine1}
       </text>
       <text x={20} y={292} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        classement précédent conservé
+        {t.bgSurvie.tieLine2}
       </text>
 
       <Elbow from={[228, 120]} to={[288, 120]} color={BLUE} />
 
-      <ColumnLabel x={300} y={18}>Play-offs à 8</ColumnLabel>
+      <ColumnLabel x={300} y={18}>{t.bgSurvie.playoffs}</ColumnLabel>
       {[
         ["8", "4"],
         ["6", "2"],
@@ -642,20 +655,20 @@ function BgSurvieDiagram() {
             strokeWidth={1.1}
           />
           <text x={314} y={50 + index * 62} fill={INK} fontSize={11.5} fontFamily={MONO}>
-            {`Seed ${top}`}
+            {format(locale, t.bgSurvie.seed, { number: top })}
           </text>
           <text x={314} y={70 + index * 62} fill={INK} fontSize={11.5} fontFamily={MONO}>
-            {`Seed ${bottom}`}
+            {format(locale, t.bgSurvie.seed, { number: bottom })}
           </text>
           {/* Le côté se lit en face de chaque seed : une seule mention
               « gauche / droite » entre les deux lignes chevauchait les noms. */}
           {index === 0 && (
             <>
               <text x={436} y={50} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
-                gauche
+                {t.bgSurvie.left}
               </text>
               <text x={436} y={70} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
-                droite
+                {t.bgSurvie.right}
               </text>
             </>
           )}
@@ -665,10 +678,10 @@ function BgSurvieDiagram() {
       <Elbow from={[458, 150]} to={[510, 150]} color={BLUE} />
 
       <text x={520} y={60} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        Demi-finales
+        {t.bgSurvie.semiFinals}
       </text>
       <text x={520} y={82} fill={INK} fontSize={11} fontFamily={MONO}>
-        puis finale
+        {t.bgSurvie.thenFinal}
       </text>
       <rect
         x={520}
@@ -681,16 +694,16 @@ function BgSurvieDiagram() {
         strokeWidth={1.2}
       />
       <text x={534} y={122} fill={LOWER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
-        🥉 PETITE FINALE
+        {t.bgSurvie.thirdPlace}
       </text>
       <text x={534} y={142} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
-        jouée avec la finale
+        {t.bgSurvie.withFinal}
       </text>
     </svg>
   );
 }
 
-const DIAGRAMS: Record<RuleDiagram, () => React.JSX.Element> = {
+const DIAGRAMS: Record<RuleDiagram, (props: DiagramProps) => React.JSX.Element> = {
   SINGLE: SingleEliminationDiagram,
   DOUBLE: DoubleEliminationDiagram,
   SWISS: SwissDiagram,
@@ -699,58 +712,66 @@ const DIAGRAMS: Record<RuleDiagram, () => React.JSX.Element> = {
   BG_SURVIE: BgSurvieDiagram,
 };
 
-const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
-  SINGLE: [
-    { color: BLUE, label: "Progression du vainqueur" },
-    { color: LINE, label: "Match du tour" },
-  ],
-  DOUBLE: [
-    { color: BLUE, label: "Bracket haut" },
-    { color: LOWER, label: "Bracket bas" },
-  ],
-  SWISS: [
-    { color: BLUE, label: "Groupe de tête" },
-    { color: LOWER, label: "Groupe de queue" },
-  ],
-  SURVIVAL: [
-    { color: BLUE, label: "Appariement" },
-    { color: CUT, label: "Zone de coupe" },
-    { color: LOWER, label: "Barrage" },
-  ],
-  MULTI: [
-    { color: BLUE, label: "Flux des qualifiées" },
-    { color: LINE, label: "Effectif d'une phase" },
-  ],
-  BG_SURVIE: [
-    { color: BLUE, label: "Endurance restante" },
-    { color: CUT, label: "Capital épuisé" },
-    { color: LOWER, label: "Petite finale" },
-  ],
-};
+function legends(t: DiagramText): Record<RuleDiagram, { color: string; label: string }[]> {
+  return {
+    SINGLE: [
+      { color: BLUE, label: t.single.legendProgress },
+      { color: LINE, label: t.single.legendMatch },
+    ],
+    DOUBLE: [
+      { color: BLUE, label: t.double.legendUpper },
+      { color: LOWER, label: t.double.legendLower },
+    ],
+    SWISS: [
+      { color: BLUE, label: t.swiss.legendTop },
+      { color: LOWER, label: t.swiss.legendBottom },
+    ],
+    SURVIVAL: [
+      { color: BLUE, label: t.survival.legendPairing },
+      { color: CUT, label: t.survival.legendCut },
+      { color: LOWER, label: t.survival.legendPlayIn },
+    ],
+    MULTI: [
+      { color: BLUE, label: t.multi.legendFlow },
+      { color: LINE, label: t.multi.legendSize },
+    ],
+    BG_SURVIE: [
+      { color: BLUE, label: t.bgSurvie.legendEndurance },
+      { color: CUT, label: t.bgSurvie.legendDepleted },
+      { color: LOWER, label: t.bgSurvie.legendThirdPlace },
+    ],
+  };
+}
 
 /**
  * Schéma d'un mode, encadré, légendé et défilable horizontalement sur mobile.
+ * Composant serveur : ses textes (`rules.diagram`) arrivent dans la langue de
+ * la page, rien n'est traduit dans le navigateur.
  */
 export function RuleDiagramFigure({
   diagram,
   caption,
+  text,
+  locale,
 }: Readonly<{
   diagram: RuleDiagram;
   caption: string;
+  text: DiagramText;
+  locale: Locale;
 }>) {
   const Diagram = DIAGRAMS[diagram];
   return (
     <figure className={styles.frame} style={{ margin: 0 }}>
       <ul className={styles.legend}>
-        {LEGENDS[diagram].map((item) => (
+        {legends(text)[diagram].map((item) => (
           <li key={item.label} className={styles.legendItem}>
             <span className={styles.swatch} style={{ color: item.color, background: item.color }} />
             {item.label}
           </li>
         ))}
       </ul>
-      <ScrollArea className={styles.scroll} ariaLabel={`Schéma : ${caption}`}>
-        <Diagram />
+      <ScrollArea className={styles.scroll} ariaLabel={format(locale, text.scrollLabel, { caption })}>
+        <Diagram t={text} locale={locale} />
       </ScrollArea>
       <figcaption className={styles.caption}>{caption}</figcaption>
     </figure>

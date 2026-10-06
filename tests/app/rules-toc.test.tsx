@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { RulesToc } from "@/components/rules/RulesToc";
 import { outlineAnchorIds, rulesPageOutline } from "@/lib/shared/rules-page-outline";
 import { ruleModeBySlug } from "@/lib/shared/tournament-rules";
+import frRules from "@/messages/fr/rules.json";
 
 /**
  * Le sommaire est un composant client, mais son premier rendu (serveur, ou
@@ -11,8 +12,10 @@ import { ruleModeBySlug } from "@/lib/shared/tournament-rules";
  */
 describe("RulesToc", () => {
   const mode = ruleModeBySlug("bluegenji-survie")!;
-  const outline = rulesPageOutline(mode, { hasTournamentSettings: true });
-  const html = renderToStaticMarkup(<RulesToc entries={outline} />);
+  const outline = rulesPageOutline(mode, { hasTournamentSettings: true, labels: frRules.toc });
+  const html = renderToStaticMarkup(
+    <RulesToc entries={outline} label={frRules.toc.label} heading={frRules.toc.heading} />,
+  );
 
   it("est un repère de navigation nommé", () => {
     expect(html).toContain('<nav class="toc" aria-label="Sommaire des règles">');

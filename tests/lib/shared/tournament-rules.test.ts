@@ -3,17 +3,26 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   COMMON_RULES,
+  RULE_MODE_DEFINITIONS,
+  RULE_MODE_LABELS_FR,
   TOURNAMENT_RULE_MODES,
   availableRuleModes,
   ruleModeBySlug,
   ruleModeForFormat,
   rulesHrefForFormat,
+  ruleTextValues,
   upcomingRuleModes,
 } from "@/lib/shared/tournament-rules";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
+import { RANKING_BASE_POINTS } from "@/lib/shared/ranking";
 import { FORMAT_LABELS } from "@/lib/shared/tournament-labels";
 import type { TournamentFormat } from "@/lib/shared/types";
+import { formatMessage } from "@/lib/shared/message-format";
+import frRules from "@/messages/fr/rules.json";
+
+/** Un texte du registre tel que le lit le visiteur français (arguments remplis, balises retirées). */
+const plain = (text: string) => formatMessage("fr", text, ruleTextValues("fr", frRules));
 
 const ROOT = join(__dirname, "..", "..", "..");
 const ALL_FORMATS: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI", "BG_SURVIE"];
@@ -122,7 +131,7 @@ describe("tournament-rules — règles communes", () => {
 
   it("annonce le délai de lancement d'office réellement appliqué", () => {
     const launch = COMMON_RULES.find((r) => r.title === "Lancement d'un match");
-    expect(launch?.bullets?.join(" ")).toContain(`${LAUNCH_AUTO_DELAY_MINUTES} minutes`);
+    expect(plain(launch?.bullets?.join(" ") ?? "")).toContain(`${LAUNCH_AUTO_DELAY_MINUTES} minutes`);
   });
 
   it("n'annonce plus qu'un forfait fait toujours quitter le tournoi (faux en BlueGenji Survie)", () => {
@@ -134,7 +143,7 @@ describe("tournament-rules — règles communes", () => {
 
   it("annonce le délai de confirmation réellement appliqué par le moteur", () => {
     const reporting = COMMON_RULES.find((r) => r.title === "Report des scores");
-    expect(reporting?.bullets?.join(" ")).toContain(String(SCORE_REPORT_TIMEOUT_MINUTES));
+    expect(plain(reporting?.bullets?.join(" ") ?? "")).toContain(`${SCORE_REPORT_TIMEOUT_MINUTES} minutes`);
   });
 });
 
@@ -167,4 +176,50 @@ describe("tournament-rules — câblage des pages", () => {
   it("style le bouton flottant dans la feuille globale", () => {
     expect(read("app/globals.css")).toContain(".cta-float-help");
   });
+});
+
+/**
+ * Les pages `/regles` annonçaient encore « victoire = 3 points, défaite =
+ * 1 point » — l'ancien barème de la carte d'annuaire, retiré du code par la
+ * PR #88 sans que le texte suive. La phrase est désormais unique
+ * (`rules.seedingRule`) et tire ses points des constantes.
+ */
+describe("tournament-rules — règle de seeding", () => {
+  const seeding = String(ruleTextValues("fr", frRules).seedingRule);
+
+  it("explique le seeding avec la règle réellement appliquée", () => {
+    expect(seeding).toContain(`${RANKING_BASE_POINTS} points`);
+    expect(seeding).toContain("Seed 1");
+    expect(seeding).not.toContain("3 points");
+    expect(seeding).not.toMatch(/défaite = \d/);
+  });
+
+  it("est citée telle quelle par les trois modes qui seedent au classement", () => {
+    for (const format of ["BG_SURVIE", "SURVIVAL", "SWISS"] satisfies TournamentFormat[]) {
+      const bodies = ruleModeForFormat(format)?.sections.flatMap((section) => section.body) ?? [];
+      expect(bodies).toContain("{seedingRule}");
+      expect(bodies.map(plain)).toContain(seeding);
+    }
+  });
+});
+
+/**
+ * Le bouton d'aide des pages de tournoi est un composant client : il ne doit
+ * pas embarquer `messages/fr/rules.json` (≈ 38 Ko) pour un seul libellé.
+ */
+describe("bouton d'aide — structure sans texte", () => {
+  it("n'importe que le module de structure, pas le registre de textes", () => {
+    const fab = readFileSync(join(process.cwd(), "components/rules/RulesHelpFab.tsx"), "utf8");
+    expect(fab).toContain("@/lib/shared/rule-mode-definitions");
+    expect(fab).not.toContain("@/lib/shared/tournament-rules");
+    const definitions = readFileSync(join(process.cwd(), "lib/shared/rule-mode-definitions.ts"), "utf8");
+    expect(definitions).not.toMatch(/from\s+["'][^"']*\.json["']/);
+  });
+
+  it("garde les noms français du bouton identiques aux messages", () => {
+    for (const definition of RULE_MODE_DEFINITIONS) {
+      expect(RULE_MODE_LABELS_FR[definition.format]).toBe(frRules.modes[definition.format].label);
+    }
+  });
+
 });

@@ -28,6 +28,7 @@ const I18N_MIGRATED_FILES = [
   "app/error.tsx",
   "app/global-error.tsx",
   "app/not-found.tsx",
+  "app/regles/**",
   "components/accessibility/**",
   "components/account-menu.tsx",
   "components/arena-nav.tsx",
@@ -39,6 +40,10 @@ const I18N_MIGRATED_FILES = [
   "components/cyber/landing/SessionPageShell.tsx",
   "components/error-page/**",
   "components/legal/SiteFooterBar.tsx",
+  // Règles (lot 3) — pas `RulesHelpFab`, bouton des pages de tournoi (lot 8a).
+  "components/rules/RuleDiagram.tsx",
+  "components/rules/RuleText.tsx",
+  "components/rules/RulesToc.tsx",
   "components/ui/confirm-action-dialog.tsx",
   "components/ui/toast.tsx",
 ];

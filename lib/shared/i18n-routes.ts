@@ -12,10 +12,10 @@
  *   tait, ni `hreflang` ni entrée anglaise au sitemap.
  *
  * Un motif est un chemin sans préfixe de langue ; un segment `[x]` vaut un
- * segment quelconque (`/regles/[slug]`). Vide au lot 0 : l'infrastructure est
- * en place, aucune page n'est encore traduite.
+ * segment quelconque (`/regles/[slug]`). Le lot 0 l'a laissée vide ; chaque lot
+ * de pages y ajoute ses routes (lot 3 : les règles).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
  */
-export const MIGRATED_ROUTES: readonly string[] = [];
+export const MIGRATED_ROUTES: readonly string[] = ["/regles", "/regles/[slug]"];

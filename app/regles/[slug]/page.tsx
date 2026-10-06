@@ -1,19 +1,26 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { RuleDiagramFigure } from "@/components/rules/RuleDiagram";
-import { EmphasisText } from "@/components/rules/EmphasisText";
+import { RuleText } from "@/components/rules/RuleText";
 import { RulesToc } from "@/components/rules/RulesToc";
 import {
-  COMMON_RULES,
+  RULE_MODE_DEFINITIONS,
   TOURNAMENT_RULE_MODES,
+  localizedCommonRules,
+  localizedRuleModes,
   ruleModeBySlug,
+  ruleTextValues,
   type RuleSection,
 } from "@/lib/shared/tournament-rules";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
+import { localeHref, type Locale } from "@/lib/shared/locales";
+import { formatMessage, type MessageValues } from "@/lib/shared/message-format";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
@@ -71,39 +78,49 @@ async function loadTournamentSettings(tournamentId: number | null): Promise<Tour
   }
 }
 
-/** Les modes sont un registre statique : toutes les pages sont pré-générées. */
+/**
+ * Un slug par mode, le même dans les deux langues (`/en/regles/<slug>`).
+ *
+ * Les pages ne sont pas prérendues pour autant : la mise en page racine lit les
+ * en-têtes de la requête (nonce CSP, langue `x-bg-locale`), si bien que chaque
+ * page est rendue à la demande, dans la langue de l'adresse.
+ */
 export function generateStaticParams(): { slug: string }[] {
-  return TOURNAMENT_RULE_MODES.map((mode) => ({ slug: mode.slug }));
+  return RULE_MODE_DEFINITIONS.map((mode) => ({ slug: mode.slug }));
 }
 
 export async function generateMetadata({ params }: Pick<PageProps, "params">): Promise<Metadata> {
   const { slug } = await params;
-  const mode = ruleModeBySlug(slug);
+  const locale = await requestLocale();
+  const messages = messagesFor(locale).rules;
+  const mode = ruleModeBySlug(slug, localizedRuleModes(messages));
   if (!mode) return pageMetadata({
-    title: "Règles des tournois",
-    description: "Les règles de chaque mode de tournoi BlueGenji.",
+    title: messages.meta.indexTitle,
+    description: messages.meta.unknownModeDescription,
     path: "/regles",
+    locale,
   });
   return pageMetadata({
-    title: `Règles : ${mode.label}`,
+    title: formatMessage(locale, messages.meta.modeTitle, { mode: mode.label }),
     description: mode.tagline,
     path: `/regles/${mode.slug}`,
+    locale,
   });
 }
 
-function RuleBody({ rule }: Readonly<{ rule: RuleSection }>) {
+function RuleBody({ rule, locale, values }: Readonly<{ rule: RuleSection; locale: Locale; values: MessageValues }>) {
   return (
     <>
       {rule.body.map((paragraph) => (
         <p key={paragraph} className={styles.ruleBody}>
-          <EmphasisText text={paragraph} />
+          <RuleText text={paragraph} locale={locale} values={values} />
         </p>
       ))}
       {rule.bullets && (
         <ul className={styles.bullets}>
           {rule.bullets.map((bullet) => (
             <li key={bullet}>
-              <EmphasisText text={bullet} />
+              <RuleText text={bullet} locale={locale} values={values} />
             </li>
           ))}
         </ul>
@@ -131,16 +148,31 @@ function SectionHead({ id, eyebrow, title }: Readonly<{ id: string; eyebrow: str
  */
 export default async function RuleModePage({ params, searchParams }: Readonly<PageProps>) {
   const { slug } = await params;
-  const mode = ruleModeBySlug(slug);
+  const locale = await requestLocale();
+  const messages = messagesFor(locale).rules;
+  const modes = localizedRuleModes(messages);
+  const mode = ruleModeBySlug(slug, modes);
   if (!mode) notFound();
+  const text = messages.mode;
+  const values = ruleTextValues(locale, messages);
+  // Les ancres descendent des titres **français**, dans les deux langues : un
+  // lien vers une section garde son sens d'une langue à l'autre.
+  const frenchMode = ruleModeBySlug(slug, TOURNAMENT_RULE_MODES) ?? mode;
 
   const tournamentSettings = await loadTournamentSettings(
     parseRulesTournamentParam((await searchParams).tournoi),
   );
 
-  const others = TOURNAMENT_RULE_MODES.filter((m) => m.slug !== mode.slug);
-  const outline = rulesPageOutline(mode, { hasTournamentSettings: tournamentSettings !== null });
-  const ruleAnchors = ruleSectionAnchors(mode.sections);
+  const others = modes.filter((m) => m.slug !== mode.slug);
+  const ruleAnchors = ruleSectionAnchors(frenchMode.sections);
+  const outline = rulesPageOutline(mode, {
+    hasTournamentSettings: tournamentSettings !== null,
+    labels: messages.toc,
+    anchors: ruleAnchors,
+  });
+  // Réglages d'un tournoi : libellés du domaine des tournois, traduits avec
+  // eux (lot 8a) — en attendant, français et annoncés comme tels (WCAG 3.1.2).
+  const settingsLang = locale === "fr" ? undefined : "fr";
 
   return (
     <PublicPageShell>
@@ -150,24 +182,24 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
         Une page de règles arrive rarement par l'accueil : elle doit dire seule
         d'où elle vient.
 
-        La page étant prérendue, la racine du site est lue **à la compilation** —
-        comme l'est déjà l'URL canonique que Next écrit ici : `APP_URL` doit donc
-        être réglée au moment du `build`, pas seulement au démarrage. Voir
-        `siteCanonicalBase()`.
+        Chemins dans la langue de la page (`/en/regles/…` sous `/en`), noms
+        traduits. La page lisant la langue de la requête, elle est rendue à la
+        demande : la racine du site (`siteCanonicalBase()`) est lue au rendu, et
+        non figée à la compilation.
       */}
       <JsonLd
         data={breadcrumbJsonLd(siteCanonicalBase(), [
-          { name: "Accueil", path: "/" },
-          { name: "Règles des tournois", path: "/regles" },
-          { name: mode.label, path: `/regles/${mode.slug}` },
+          { name: messages.breadcrumb.home, path: localeHref("/", locale) },
+          { name: messages.breadcrumb.rules, path: localeHref("/regles", locale) },
+          { name: mode.label, path: localeHref(`/regles/${mode.slug}`, locale) },
         ])}
       />
 
       <section className={`${styles.shell} ${styles.hero} ${tones.tone}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
         <div className="fabric" />
-        <Link href="/regles" className={styles.back}>
-          ← Règles des tournois
-        </Link>
+        <LocaleLink href="/regles" className={styles.back}>
+          {text.back}
+        </LocaleLink>
         <h1 className={`display ${styles.title}`}>
           <span className="text-gradient">{mode.label}</span>
         </h1>
@@ -176,9 +208,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
           <p className={styles.soonBanner}>
             <span aria-hidden="true">⏳</span>
             <span>
-              <strong>Bientôt disponible.</strong> Ce mode n&apos;est pas encore proposé à la
-              création d&apos;un tournoi. Ses règles sont publiées à l&apos;avance pour que les
-              équipes puissent s&apos;y préparer.
+              <RuleText text={text.soonBanner} locale={locale} />
             </span>
           </p>
         )}
@@ -193,30 +223,27 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
       </section>
 
       <div className={`${styles.shell} ${styles.layout} ${tones.tone}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
-        <RulesToc entries={outline} />
+        <RulesToc entries={outline} label={messages.toc.label} heading={messages.toc.heading} />
 
         <div className={styles.content}>
           {tournamentSettings && (
             <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.tournament}>
               <div className={styles.tournamentPanel}>
                 <div className={styles.tournamentHead}>
-                  <span className="eyebrow">CE TOURNOI</span>
+                  <span className="eyebrow">{text.tournamentEyebrow}</span>
                   <h2 id={RULES_PAGE_ANCHORS.tournament} className={styles.tournamentTitle}>
-                    Réglages de « {tournamentSettings.name} »
+                    {formatMessage(locale, text.tournamentTitle, { name: tournamentSettings.name })}
                   </h2>
-                  <p className={styles.settingsIntro}>
-                    Les valeurs retenues à la création de ce tournoi. Elles priment sur les
-                    valeurs par défaut citées plus bas.
-                  </p>
-                  <Link
+                  <p className={styles.settingsIntro}>{text.tournamentIntro}</p>
+                  <LocaleLink
                     href={`/tournois/${tournamentSettings.id}`}
                     className={`entity-link ${styles.backToTournament}`}
                   >
-                    ← Retour au tournoi
-                  </Link>
+                    {text.backToTournament}
+                  </LocaleLink>
                 </div>
                 {tournamentSettings.groups.map((group) => (
-                  <div key={group.title} className={styles.settingsGroup}>
+                  <div key={group.title} className={styles.settingsGroup} lang={settingsLang}>
                     <h3 className={styles.settingsGroupTitle}>{group.title}</h3>
                     <dl className={styles.settings}>
                       {group.settings.map((setting) => (
@@ -233,7 +260,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
           )}
 
           <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.essentials}>
-            <SectionHead id={RULES_PAGE_ANCHORS.essentials} eyebrow="EN BREF" title="L'essentiel" />
+            <SectionHead id={RULES_PAGE_ANCHORS.essentials} eyebrow={text.essentialsEyebrow} title={text.essentialsTitle} />
             <ol className={styles.principles}>
               {mode.principles.map((principle, i) => (
                 <li key={principle} className={styles.principle}>
@@ -241,38 +268,40 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
                     {i + 1}
                   </span>
                   <span>
-                    <EmphasisText text={principle} />
+                    <RuleText text={principle} locale={locale} values={values} />
                   </span>
                 </li>
               ))}
             </ol>
-            <RuleDiagramFigure diagram={mode.diagram} caption={mode.diagramCaption} />
+            <RuleDiagramFigure
+              diagram={mode.diagram}
+              caption={formatMessage(locale, mode.diagramCaption, values)}
+              text={messages.diagram}
+              locale={locale}
+            />
           </section>
 
           <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.details}>
-            <SectionHead id={RULES_PAGE_ANCHORS.details} eyebrow="EN DÉTAIL" title="Règles du mode" />
+            <SectionHead id={RULES_PAGE_ANCHORS.details} eyebrow={text.detailsEyebrow} title={text.detailsTitle} />
             {mode.sections.map((rule, i) => (
               <article key={rule.title} className={styles.rule} aria-labelledby={ruleAnchors[i]}>
                 <h3 id={ruleAnchors[i]} className={styles.ruleTitle}>
                   {rule.title}
                 </h3>
-                <RuleBody rule={rule} />
+                <RuleBody rule={rule} locale={locale} values={values} />
               </article>
             ))}
           </section>
 
           <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.common}>
-            <SectionHead id={RULES_PAGE_ANCHORS.common} eyebrow="TOUS MODES" title="Règles communes" />
-            <p className={styles.sectionIntro}>
-              Identiques dans tous les modes : lancement et format des matchs, report des scores,
-              forfaits. Ouvre une règle pour la lire.
-            </p>
+            <SectionHead id={RULES_PAGE_ANCHORS.common} eyebrow={text.commonEyebrow} title={text.commonTitle} />
+            <p className={styles.sectionIntro}>{text.commonIntro}</p>
             <div className={styles.accordion}>
-              {COMMON_RULES.map((rule) => (
+              {localizedCommonRules(messages).map((rule) => (
                 <details key={rule.title} className={styles.commonRule}>
                   <summary className={styles.commonSummary}>{rule.title}</summary>
                   <div className={styles.commonBody}>
-                    <RuleBody rule={rule} />
+                    <RuleBody rule={rule} locale={locale} values={values} />
                   </div>
                 </details>
               ))}
@@ -280,18 +309,18 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
           </section>
 
           <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.others}>
-            <SectionHead id={RULES_PAGE_ANCHORS.others} eyebrow="COMPARER" title="Autres modes" />
+            <SectionHead id={RULES_PAGE_ANCHORS.others} eyebrow={text.othersEyebrow} title={text.othersTitle} />
             <div className={styles.otherModes}>
               {others.map((other) => (
-                <Link
+                <LocaleLink
                   key={other.slug}
                   href={`/regles/${other.slug}`}
                   className={`${styles.otherMode} ${tones.tone}`}
                   data-tone={RULE_MODE_TONE[other.diagram]}
                 >
                   {other.label}
-                  {other.status === "SOON" && <span className={styles.soonTag}>bientôt</span>}
-                </Link>
+                  {other.status === "SOON" && <span className={styles.soonTag}>{text.soonTag}</span>}
+                </LocaleLink>
               ))}
             </div>
           </section>

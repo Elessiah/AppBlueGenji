@@ -31,7 +31,17 @@ function currentAnchor(ids: string[]): string | null {
  * — c'est ce qui manquait à une page de neuf blocs de même poids. Sans
  * JavaScript, il reste une liste de liens d'ancre qui fonctionne.
  */
-export function RulesToc({ entries }: Readonly<{ entries: RulesOutlineEntry[] }>) {
+export function RulesToc({
+  entries,
+  label,
+  heading,
+}: Readonly<{
+  entries: RulesOutlineEntry[];
+  /** Nom du repère de navigation (« Sommaire des règles »), traduit par la page. */
+  label: string;
+  /** Titre visible (« Sommaire »), masqué aux lecteurs d'écran — le repère porte déjà son nom. */
+  heading: string;
+}>) {
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,9 +65,9 @@ export function RulesToc({ entries }: Readonly<{ entries: RulesOutlineEntry[] }>
   }, [entries]);
 
   return (
-    <nav className={styles.toc} aria-label="Sommaire des règles">
+    <nav className={styles.toc} aria-label={label}>
       <p className={styles.heading} aria-hidden="true">
-        Sommaire
+        {heading}
       </p>
       <ol className={styles.list}>
         {entries.map((entry) => {

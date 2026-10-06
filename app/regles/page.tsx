@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import Link from "next/link";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberCard, Pill } from "@/components/cyber";
-import { EmphasisText } from "@/components/rules/EmphasisText";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { RuleText } from "@/components/rules/RuleText";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import type { Locale } from "@/lib/shared/locales";
+import type { MessageValues } from "@/lib/shared/message-format";
 import {
-  COMMON_RULES,
   availableRuleModes,
+  localizedCommonRules,
+  localizedRuleModes,
+  ruleTextValues,
   upcomingRuleModes,
+  type RuleSection,
+  type RulesMessages,
   type TournamentRuleMode,
 } from "@/lib/shared/tournament-rules";
 import { RULE_MODE_TONE, RULE_STATUS_PILL } from "@/lib/shared/rules-display";
@@ -20,24 +28,30 @@ import tones from "./tones.module.css";
  * sont justement les deux qui n'existent nulle part ailleurs et qu'on cherche
  * par leur nom. Une description qui n'annonce pas ce que la page contient prive
  * la page des recherches qu'elle mérite.
+ *
+ * Page traduite (`/en/regles`, `docs/features/I18N.md`) : métadonnées dans la
+ * langue de la requête, canonique et `hreflang` compris.
  */
-export const metadata: Metadata = pageMetadata({
-  title: "Règles des tournois",
-  description:
-    "Les règles de chaque mode BlueGenji : élimination simple et double, BlueGenji Survie, Survie, ronde suisse et multi-phases — schémas et cas particuliers.",
-  shareDescription:
-    "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple et double, BlueGenji Survie, Survie, ronde suisse, multi-phases.",
-  path: "/regles",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { meta } = messagesFor(locale).rules;
+  return pageMetadata({
+    title: meta.indexTitle,
+    description: meta.indexDescription,
+    shareDescription: meta.indexShareDescription,
+    path: "/regles",
+    locale,
+  });
+}
 
-function ModeCard({ mode }: Readonly<{ mode: TournamentRuleMode }>) {
+function ModeCard({ mode, text }: Readonly<{ mode: TournamentRuleMode; text: RulesMessages["index"] }>) {
   const soon = mode.status === "SOON";
   return (
     <CyberCard lift ticks className={`${styles.modeCard} ${tones.tone}`} tone={RULE_MODE_TONE[mode.diagram]} style={{ height: "100%" }}>
-      <Link href={`/regles/${mode.slug}`} className={styles.card}>
+      <LocaleLink href={`/regles/${mode.slug}`} className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>{mode.label}</h3>
-          <Pill variant={RULE_STATUS_PILL[mode.status]}>{soon ? "Bientôt" : "Disponible"}</Pill>
+          <Pill variant={RULE_STATUS_PILL[mode.status]}>{soon ? text.statusSoon : text.statusAvailable}</Pill>
         </div>
         <p className={styles.cardTagline}>{mode.tagline}</p>
         <dl className={styles.facts}>
@@ -50,47 +64,71 @@ function ModeCard({ mode }: Readonly<{ mode: TournamentRuleMode }>) {
             </div>
           ))}
         </dl>
-        <span className={styles.cardCta}>Lire les règles →</span>
-      </Link>
+        <span className={styles.cardCta}>{text.readRules}</span>
+      </LocaleLink>
     </CyberCard>
   );
 }
 
-export default function ReglesPage() {
-  const available = availableRuleModes();
-  const upcoming = upcomingRuleModes();
+function CommonRuleCard({
+  rule,
+  locale,
+  values,
+}: Readonly<{ rule: RuleSection; locale: Locale; values: MessageValues }>) {
+  return (
+    <CyberCard className={styles.commonCard}>
+      <h3 className={styles.commonTitle}>{rule.title}</h3>
+      {rule.body.map((paragraph) => (
+        <p key={paragraph} className={styles.commonBody}>
+          <RuleText text={paragraph} locale={locale} values={values} />
+        </p>
+      ))}
+      {rule.bullets && (
+        <ul className={styles.bullets}>
+          {rule.bullets.map((bullet) => (
+            <li key={bullet}>
+              <RuleText text={bullet} locale={locale} values={values} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </CyberCard>
+  );
+}
+
+export default async function ReglesPage() {
+  const locale = await requestLocale();
+  const messages = messagesFor(locale).rules;
+  const text = messages.index;
+  const modes = localizedRuleModes(messages);
+  const available = availableRuleModes(modes);
+  const upcoming = upcomingRuleModes(modes);
+  const values = ruleTextValues(locale, messages);
 
   return (
     <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
-        <span className="eyebrow">RÈGLES · MODES DE TOURNOI</span>
+        <span className="eyebrow">{text.eyebrow}</span>
         <h1 className={`display ${styles.heroTitle}`}>
-          Comment se joue
+          {text.heroTitle}
           <br />
-          <span className="text-gradient">un tournoi BlueGenji.</span>
+          <span className="text-gradient">{text.heroTitleAccent}</span>
         </h1>
-        <p className={styles.heroLead}>
-          Chaque tournoi annonce son mode dès la page d&apos;inscription. Le mode détermine le
-          nombre de défaites que l&apos;on peut encaisser, la façon dont les adversaires sont
-          désignés et la manière dont le classement final est établi. Choisis un mode pour en lire
-          les règles détaillées, schémas à l&apos;appui.
-        </p>
+        <p className={styles.heroLead}>{text.heroLead}</p>
       </section>
 
       <section className={styles.section} style={{ paddingTop: 0 }}>
         <div className={styles.head}>
           <div>
-            <span className="eyebrow">MODES DISPONIBLES</span>
-            <h2 className={styles.sectionTitle}>Jouables dès maintenant</h2>
+            <span className="eyebrow">{text.availableEyebrow}</span>
+            <h2 className={styles.sectionTitle}>{text.availableTitle}</h2>
           </div>
-          <p className={styles.headNote}>
-            Ces formats peuvent être choisis à la création d&apos;un tournoi.
-          </p>
+          <p className={styles.headNote}>{text.availableNote}</p>
         </div>
         <div className={styles.grid}>
           {available.map((mode) => (
-            <ModeCard key={mode.slug} mode={mode} />
+            <ModeCard key={mode.slug} mode={mode} text={text} />
           ))}
         </div>
       </section>
@@ -99,16 +137,14 @@ export default function ReglesPage() {
         <section className={styles.section} style={{ paddingTop: 0 }}>
           <div className={styles.head}>
             <div>
-              <span className="eyebrow">À VENIR</span>
-              <h2 className={styles.sectionTitle}>Bientôt sur la plateforme</h2>
+              <span className="eyebrow">{text.upcomingEyebrow}</span>
+              <h2 className={styles.sectionTitle}>{text.upcomingTitle}</h2>
             </div>
-            <p className={styles.headNote}>
-              Les règles sont déjà consultables : le format ouvrira à la création prochainement.
-            </p>
+            <p className={styles.headNote}>{text.upcomingNote}</p>
           </div>
           <div className={styles.grid}>
             {upcoming.map((mode) => (
-              <ModeCard key={mode.slug} mode={mode} />
+              <ModeCard key={mode.slug} mode={mode} text={text} />
             ))}
           </div>
         </section>
@@ -117,32 +153,14 @@ export default function ReglesPage() {
       <section className={styles.section} style={{ paddingTop: 0, paddingBottom: 72 }}>
         <div className={styles.head}>
           <div>
-            <span className="eyebrow">TOUS MODES CONFONDUS</span>
-            <h2 className={styles.sectionTitle}>Règles communes</h2>
+            <span className="eyebrow">{text.commonEyebrow}</span>
+            <h2 className={styles.sectionTitle}>{text.commonTitle}</h2>
           </div>
-          <p className={styles.headNote}>
-            Report des scores et forfaits fonctionnent de la même façon partout.
-          </p>
+          <p className={styles.headNote}>{text.commonNote}</p>
         </div>
         <div className={styles.commonGrid}>
-          {COMMON_RULES.map((rule) => (
-            <CyberCard key={rule.title} className={styles.commonCard}>
-              <h3 className={styles.commonTitle}>{rule.title}</h3>
-              {rule.body.map((paragraph) => (
-                <p key={paragraph} className={styles.commonBody}>
-                  <EmphasisText text={paragraph} />
-                </p>
-              ))}
-              {rule.bullets && (
-                <ul className={styles.bullets}>
-                  {rule.bullets.map((bullet) => (
-                    <li key={bullet}>
-                      <EmphasisText text={bullet} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CyberCard>
+          {localizedCommonRules(messages).map((rule) => (
+            <CommonRuleCard key={rule.title} rule={rule} locale={locale} values={values} />
           ))}
         </div>
       </section>

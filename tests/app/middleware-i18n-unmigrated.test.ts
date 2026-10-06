@@ -66,3 +66,25 @@ describe("middleware — route non traduite sous /en", () => {
     expect(response.headers.get("location")).toBe(`${PUBLIC}/regles`);
   });
 });
+
+/** Lot 3 : les règles sont la première route réellement traduite. */
+describe("middleware — règles traduites (vraie liste)", () => {
+  const previousAppUrl = process.env.APP_URL;
+  beforeAll(() => {
+    process.env.APP_URL = PUBLIC;
+  });
+  afterAll(() => {
+    process.env.APP_URL = previousAppUrl;
+  });
+
+  it.each(["/en/regles", "/en/regles/survie", "/en/regles/ronde-suisse?tournoi=4"])("réécrit %s en anglais", (path) => {
+    const response = middleware(new NextRequest(`https://localhost:3000${path}`));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-rewrite")).toBe(`https://localhost:3000${path.slice(3)}`);
+    expect(response.headers.get("x-middleware-request-x-bg-locale")).toBe("en");
+  });
+
+  it("ne traduit pas pour autant ce qui touche aux règles sans en être (`/reglesx`)", () => {
+    expect(middleware(new NextRequest("https://localhost:3000/en/reglesx")).status).toBe(307);
+  });
+});

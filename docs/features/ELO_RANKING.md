@@ -365,7 +365,8 @@ toute valeur absente ou inconnue plutôt que de refuser la requête.
   encore « victoire = 3 points, défaite = 1 point » — l'ancien barème de la
   carte d'annuaire, celui où une défaite *rapportait* des points, retiré du code
   par la PR #88 sans que le texte suive. La phrase est désormais unique
-  (`RANKING_SEEDING_RULE`) et dérivée des constantes : deux phrases copiées
+  (message `rules.seedingRule`, points par `{basePoints}` — `ruleTextValues()`)
+  et dérivée des constantes : deux phrases copiées
   dérivent, une constante partagée non.
 - La légende annonce la nouvelle règle, **dérivée des constantes** : « Base 500
   · une victoire prend à l'adversaire d'autant plus de points qu'elle était

@@ -1,0 +1,686 @@
+{
+  "meta": {
+    "indexTitle": "Tournament rules",
+    "indexDescription": "The rules of every BlueGenji mode: single and double elimination, BlueGenji's Survival, Survival (cuts), Swiss and multi-stage — with diagrams and edge cases.",
+    "indexShareDescription": "The rules of every tournament mode, explained with diagrams: single and double elimination, BlueGenji's Survival, Survival (cuts), Swiss, multi-stage.",
+    "modeTitle": "Rules: {mode}",
+    "unknownModeDescription": "The rules of every BlueGenji tournament mode."
+  },
+  "breadcrumb": {
+    "home": "Home",
+    "rules": "Tournament rules"
+  },
+  "index": {
+    "eyebrow": "RULES · TOURNAMENT MODES",
+    "heroTitle": "How a BlueGenji",
+    "heroTitleAccent": "tournament is played.",
+    "heroLead": "Every tournament shows its mode right on its registration page. The mode decides how many losses you can take, how opponents are picked and how the final standings are set. Pick a mode to read its detailed rules, diagrams included.",
+    "availableEyebrow": "AVAILABLE MODES",
+    "availableTitle": "Playable right now",
+    "availableNote": "These formats can be picked when creating a tournament.",
+    "upcomingEyebrow": "COMING SOON",
+    "upcomingTitle": "Coming soon to the platform",
+    "upcomingNote": "The rules are already published: the format will open for new tournaments soon.",
+    "commonEyebrow": "ALL MODES",
+    "commonTitle": "Common rules",
+    "commonNote": "Score reporting and forfeits work the same way everywhere.",
+    "statusAvailable": "Available",
+    "statusSoon": "Coming soon",
+    "readRules": "Read the rules →"
+  },
+  "mode": {
+    "back": "← Tournament rules",
+    "soonBanner": "<b>Coming soon.</b> This mode can't be picked for a new tournament yet. Its rules are published ahead of time so teams can get ready.",
+    "tournamentEyebrow": "THIS TOURNAMENT",
+    "tournamentTitle": "Settings of “{name}”",
+    "tournamentIntro": "The values chosen when this tournament was created. They take precedence over the defaults mentioned below.",
+    "backToTournament": "← Back to the tournament",
+    "essentialsEyebrow": "IN SHORT",
+    "essentialsTitle": "The essentials",
+    "detailsEyebrow": "IN DETAIL",
+    "detailsTitle": "Mode rules",
+    "commonEyebrow": "ALL MODES",
+    "commonTitle": "Common rules",
+    "commonIntro": "The same in every mode: match launch and match format, score reporting, forfeits. Open a rule to read it.",
+    "othersEyebrow": "COMPARE",
+    "othersTitle": "Other modes",
+    "soonTag": "soon"
+  },
+  "toc": {
+    "label": "Rules contents",
+    "heading": "Contents",
+    "tournament": "This tournament",
+    "essentials": "The essentials",
+    "details": "Mode rules",
+    "common": "Common rules",
+    "others": "Other modes"
+  },
+  "diagram": {
+    "scrollLabel": "Diagram: {caption}",
+    "champion": "CHAMPION",
+    "team": "Team {name}",
+    "single": {
+      "ariaLabel": "Single elimination bracket: four quarterfinals, two semifinals, one final.",
+      "quarterFinals": "Quarters",
+      "semiFinals": "Semifinals",
+      "final": "Final",
+      "winner": "Winner",
+      "finalist": "Finalist",
+      "footnote": "One loss = out of the tournament.",
+      "legendProgress": "Winner's path",
+      "legendMatch": "Round match"
+    },
+    "double": {
+      "ariaLabel": "Double elimination: upper bracket, lower bracket and grand final.",
+      "upperColumn": "Upper bracket · undefeated",
+      "upperRound1": "Round 1",
+      "upperRound2": "Round 2",
+      "upperFinal": "Upper final",
+      "lowerColumn": "Lower bracket · one loss",
+      "lowerRound1": "Lower round 1",
+      "lowerRound2": "Lower round 2",
+      "lowerFinal": "Lower final",
+      "loser": "loser",
+      "grandFinal": "Grand final",
+      "singleMatch": "a single match",
+      "footnote": "Two losses = out of the tournament. No bracket reset in the grand final.",
+      "legendUpper": "Upper bracket",
+      "legendLower": "Lower bracket"
+    },
+    "swiss": {
+      "ariaLabel": "Swiss: after each round, teams are grouped by score.",
+      "round": "Round {number}",
+      "seeding": "Seeding",
+      "wins": "{count, plural, one {# win} other {# wins}}",
+      "group": "{teams} teams · {matches, plural, one {# match} other {# matches}}",
+      "footnote": "Nobody is eliminated: every team plays every round.",
+      "legendTop": "Top group",
+      "legendBottom": "Bottom group"
+    },
+    "survival": {
+      "ariaLabel": "Survival (cuts) mode: a single standings table, adjacent pairings and the bottom two cut.",
+      "standings": "Round standings",
+      "versus": "vs",
+      "pairing": "1 vs 2, 3 vs 4…",
+      "reseed": "then re-ranking",
+      "cutLine1": "cut: the bottom 2",
+      "cutLine2": "are eliminated",
+      "nextRound": "Next round",
+      "untilChampion": "… down to the champion.",
+      "oddTitle": "⚖ ODD TEAM COUNT",
+      "oddLine1": "Round 1: play-in between the",
+      "oddLine2": "bottom 2, the loser is out.",
+      "legendPairing": "Pairing",
+      "legendCut": "Cut zone",
+      "legendPlayIn": "Play-in"
+    },
+    "multi": {
+      "ariaLabel": "Multi-stage tournament: each stage narrows the field. Stage 1: Swiss 128→64, Stage 2: Survival (cuts) 64→16, Stage 3: Double elimination 16→1.",
+      "phase": "Stage {number}",
+      "finalPhase": "Final stage",
+      "swiss": "SWISS",
+      "survival": "SURVIVAL (CUTS)",
+      "double": "DOUBLE ELIM.",
+      "line1": "Each stage plays on its own and only passes",
+      "line2": "its qualified teams to the next. Mix formats",
+      "line3": "to refine the podium step by step.",
+      "legendFlow": "Qualified teams' flow",
+      "legendSize": "Teams in a stage"
+    },
+    "bgSurvie": {
+      "ariaLabel": "BlueGenji's Survival mode: an endurance pool per team, elimination at zero, then an eight-team playoff.",
+      "endurance": "Endurance",
+      "points": "{points} pts",
+      "perMap": "+1 per map won · −1 per map lost",
+      "atZero": "at 0: eliminated on the spot",
+      "pairing": "Pairing: 1 vs 2, 3 vs 4…",
+      "tieLine1": "tied on points: previous",
+      "tieLine2": "standings order is kept",
+      "playoffs": "Top 8 playoffs",
+      "seed": "Seed {number}",
+      "left": "left",
+      "right": "right",
+      "semiFinals": "Semifinals",
+      "thenFinal": "then final",
+      "thirdPlace": "🥉 3RD-PLACE MATCH",
+      "withFinal": "played with the final",
+      "legendEndurance": "Remaining endurance",
+      "legendDepleted": "Pool depleted",
+      "legendThirdPlace": "Third-place match"
+    }
+  },
+  "seedingRule": "Initial seeding comes from the site ranking: every team starts at {basePoints} points, and each match transfers points from the loser to the winner — the more unlikely the result, the more points move. When a tournament ends, it hands out points again based on its final standings — the stronger its field, the more points. Seed 1 = best team.",
+  "common": [
+    {
+      "title": "Match launch",
+      "body": [
+        "A playable match doesn't start right away: at its start time (or as soon as it becomes playable if it has no schedule), it enters <b>launch</b>. A window then opens for the players of both teams, showing the host team and the useful contacts."
+      ],
+      "bullets": [
+        "Each team confirms it's ready — captain, manager or owner; in a solo tournament, the player themselves. The assigned caster confirms too.",
+        "The match is launched once everyone is ready, when a referee forces it, or automatically after {launchDelay} minutes.",
+        "No score can be reported before the launch."
+      ]
+    },
+    {
+      "title": "Match format",
+      "body": [
+        "The match format (Bo — maximum number of maps — or FT — number of maps to win) is set when the tournament is created and applies to the whole tournament. Without a setting, any score can be entered (free score entry)."
+      ],
+      "bullets": [
+        "A score that exceeds the format, or that names no winner when the format requires one, is rejected on entry.",
+        "Draws only exist if the tournament allows them; they never apply to an elimination bracket."
+      ]
+    },
+    {
+      "title": "Score reporting",
+      "body": [
+        "It works the same way in every mode: each team reports its match score from the tournament page, through its captain, one of its managers or its owner (the player themselves in a solo tournament)."
+      ],
+      "bullets": [
+        "Two matching reports validate the match immediately.",
+        "A single report opens a {reportTimeout}-minute confirmation window, which only starts once a plausible series duration has passed since the launch ({minutesPerMap} minutes per map the format allows): if the opponent doesn't dispute it, the score stands.",
+        "Two conflicting reports put the match in dispute: a referee decides and records the official score.",
+        "A referee or an admin can correct a score as long as the next round has no score entered; after that, the score is locked, for them too."
+      ]
+    },
+    {
+      "title": "Forfeit",
+      "body": [
+        "A referee can declare a team's forfeit on a match: the match is settled in favor of the opponent. For the forfeiting team, it's a loss like any other: in single elimination it's out, in double elimination it drops to the lower bracket, in BlueGenji's Survival it loses the format's full score and stays in the running with the pool it has left."
+      ],
+      "bullets": [
+        "In Survival (cuts), Swiss and BlueGenji's Survival, a team can also withdraw from the rest of the tournament while it's in progress (or the referee can withdraw it): it's no longer paired.",
+        "Its final standing takes into account when it left."
+      ]
+    },
+    {
+      "title": "Double forfeit",
+      "body": [
+        "When neither team shows up, the referee declares a <b>double forfeit</b>: the match is closed with no winner and no score, and both teams lose it."
+      ],
+      "bullets": [
+        "In elimination, both teams are out and nobody advances: the next match becomes a walkover for the other qualified team.",
+        "In Swiss and Survival (cuts), each takes a loss; in the qualifier of BlueGenji's Survival, each loses the format's full score.",
+        "In a final, a double forfeit crowns no champion: both finalists are ranked tied 2nd."
+      ]
+    }
+  ],
+  "modes": {
+    "SINGLE": {
+      "label": "Single elimination",
+      "tagline": "One loss and you're out. The shortest, easiest-to-follow format.",
+      "facts": [
+        {
+          "label": "Teams",
+          "value": "2 to 256"
+        },
+        {
+          "label": "Losses to be out",
+          "value": "1"
+        },
+        {
+          "label": "Length",
+          "value": "The shortest"
+        },
+        {
+          "label": "Option",
+          "value": "Third-place match"
+        }
+      ],
+      "principles": [
+        "Every match eliminates a team: the field is halved each round.",
+        "The bracket is sized to the smallest power of 2 that fits all registered teams; missing spots become byes in the first round.",
+        "Optionally, the two semifinal losers play for 3rd place."
+      ],
+      "diagramCaption": "8-team bracket: quarterfinals, semifinals, final. Each arrow follows the winner.",
+      "sections": [
+        {
+          "title": "How it runs",
+          "body": [
+            "When the tournament starts, the whole bracket is generated at once from the registered teams. A round's matches open as soon as both their teams are known."
+          ],
+          "bullets": [
+            "Lose a match = eliminated on the spot.",
+            "The winner advances to the next match automatically, with no referee needed.",
+            "The tournament ends once the final is validated."
+          ]
+        },
+        {
+          "title": "Team count that isn't a power of 2",
+          "body": [
+            "A bracket can only be played with 2, 4, 8, 16, 32… teams. When the number of registered teams falls between two sizes, the bracket uses the next power of 2 up and the empty spots become walkovers (byes)."
+          ],
+          "bullets": [
+            "A team that gets a bye skips the first round and goes straight to the second.",
+            "Example: with 7 teams, the bracket has 8 spots — 3 matches in the first round and 1 bye.",
+            "Example: with 5 teams, the bracket has 8 spots — 1 match in the first round and 3 byes."
+          ]
+        },
+        {
+          "title": "Third-place match",
+          "body": [
+            "An option chosen when the tournament is created, only available in single elimination. It adds a match between the two semifinal losers to decide 3rd and 4th place."
+          ]
+        },
+        {
+          "title": "Final standings",
+          "body": [
+            "Standings follow the round reached: the champion, the runner-up, then the teams knocked out in the semifinals, in the quarterfinals, and so on. With the third-place match, 3rd and 4th place are decided on the field."
+          ]
+        }
+      ]
+    },
+    "DOUBLE": {
+      "label": "Double elimination",
+      "tagline": "A second chance: you have to lose twice to leave the tournament.",
+      "facts": [
+        {
+          "label": "Teams",
+          "value": "2 to 256"
+        },
+        {
+          "label": "Losses to be out",
+          "value": "2"
+        },
+        {
+          "label": "Length",
+          "value": "≈ 2× single elim."
+        },
+        {
+          "label": "Grand final",
+          "value": "A single match"
+        }
+      ],
+      "principles": [
+        "Two brackets run side by side: the upper bracket (undefeated) and the lower bracket (one loss so far).",
+        "Losing in the upper bracket drops you to the lower bracket; losing in the lower bracket eliminates you.",
+        "The two survivors meet in the grand final."
+      ],
+      "diagramCaption": "Upper bracket in blue, lower bracket in purple: each loss up top drops a team one level.",
+      "sections": [
+        {
+          "title": "Upper and lower bracket",
+          "body": [
+            "Every team starts in the upper bracket. The first loss doesn't eliminate: it drops the team into the lower bracket, where the tournament goes on against the other teams that already fell."
+          ],
+          "bullets": [
+            "Upper bracket: one loss = drop to the lower bracket.",
+            "Lower bracket: one loss = eliminated for good.",
+            "The lower bracket alternates drop-in rounds (taking in the teams that just fell) and elimination rounds."
+          ]
+        },
+        {
+          "title": "Grand final",
+          "body": [
+            "The upper bracket winner faces the lower bracket survivor. The grand final is played as <b>a single match</b>: there's no bracket reset if the finalist from the lower bracket wins — that team is then champion."
+          ]
+        },
+        {
+          "title": "Team count that isn't a power of 2",
+          "body": [
+            "As in single elimination, the bracket is sized to the smallest power of 2 that fits all registered teams and the empty spots become walkovers in the first round of the upper bracket."
+          ]
+        },
+        {
+          "title": "Final standings",
+          "body": [
+            "The champion and the runner-up come out of the grand final; the others are ranked by the lower bracket round where they were eliminated — the longer a team lasts, the better it ranks."
+          ]
+        }
+      ]
+    },
+    "BG_SURVIE": {
+      "label": "BlueGenji's Survival",
+      "tagline": "An endurance pool that shrinks with every map lost, then an eight-team bracket. Nobody gets cut: you're out when your pool is empty.",
+      "facts": [
+        {
+          "label": "Pool",
+          "value": "9 points by default"
+        },
+        {
+          "label": "Scoring",
+          "value": "+1 / −1 per map"
+        },
+        {
+          "label": "Elimination",
+          "value": "At 0 points"
+        },
+        {
+          "label": "Playoffs",
+          "value": "8 teams"
+        }
+      ],
+      "principles": [
+        "Each team starts with an endurance pool: a map won raises it, a map lost lowers it.",
+        "Hitting zero eliminates you immediately — nobody is eliminated by a cut, only by their own results. That's what sets it apart from <b>Survival (cuts)</b>, where the bottom two are out at regular intervals.",
+        "Once only eight teams are left — or after the announced number of rounds, if the tournament sets one — the qualifier stops and gives way to a single-elimination bracket."
+      ],
+      "diagramCaption": "Endurance goes up and down with every map; at zero the team is out. The last eight meet in a fixed bracket.",
+      "sections": [
+        {
+          "title": "Starting standings",
+          "body": [
+            "{seedingRule}",
+            "The referee can <b>reorder</b> these standings as long as no score has been entered: their order then takes precedence. These standings decide the first pairings."
+          ]
+        },
+        {
+          "title": "Qualifier — endurance",
+          "body": [
+            "Every team gets the same starting pool (9 points by default, adjustable at creation). A map win adds a point, a map loss removes one: a match won 3-0 therefore moves three points, a 3-2 only one."
+          ],
+          "bullets": [
+            "A team whose pool hits zero is eliminated on the spot.",
+            "A forfeit counts as the tournament format's maximum score: in FT3, the forfeiting team takes a 3-0 and loses three endurance points.",
+            "Standings are re-read before each round: endurance descending, then — on a tie — the previous standings order.",
+            "Teams face off in adjacent pairs: 1st vs 2nd, 3rd vs 4th, and so on.",
+            "The higher-ranked team of the pair takes the left side, the other the right side.",
+            "With an odd number of teams, the last-placed team sits out that round: its pool stays intact, with no walkover win."
+          ]
+        },
+        {
+          "title": "Draws in the qualifier",
+          "body": [
+            "Overwatch and Marvel Rivals both have <b>drawn maps</b>. The tournament can therefore allow ties in its qualifier: a Bo5 is then played <b>without a tiebreaker</b>, and stops when the maps run out — even if nobody reached three map wins.",
+            "The pool needs no extra rule: it's counted <b>map by map</b>. A 2-2 gives each team two points and takes two away — so nothing, with the default scoring. A 2-1 follows the same math, one net point for the winner."
+          ],
+          "bullets": [
+            "Any score that fits within the map cap ends the match: 2-2, 2-1, and even 0-0 if no map was decided.",
+            "A drawn map doesn't count in either score — it makes the match longer without eating into the cap.",
+            "A draw counts as neither a win nor a loss: it's shown separately in the standings, and breaks the streaks on team pages.",
+            "<b>The final bracket never accepts a tie</b>, whatever the setting: it has to know who plays the next round. The tournament can give it its own format — a real FT3, even when the qualifier allows draws."
+          ]
+        },
+        {
+          "title": "End of the qualifier",
+          "body": [
+            "The qualifier stops at the end of the round where only eight teams (or fewer) are left: a round that has started is always played to the end. With no other setting, there's no maximum length: endurance alone does the sorting.",
+            "The tournament can however announce a <b>maximum number of rounds</b>. The qualifier then stops at that round, and the top eight of the standings qualify — even if thirty teams were still in the running. The others leave with the pool they had left: they're not “eliminated”, they're <b>out of contention</b>."
+          ],
+          "bullets": [
+            "Under that cap, a team that can no longer mathematically reach the top eight in the remaining rounds is dropped without waiting for the end.",
+            "The math is cautious: eight teams must stay ahead of it no matter what, assuming it wins everything left and they lose everything left.",
+            "It therefore needs a known match format (Bo/FT), which caps the number of maps in a round. With free score entry, no team is ever dropped early.",
+            "If dropping teams would leave an odd number of teams in the running, it's pushed back one round: an odd count forces one team to sit out, and a team still in the running shouldn't be penalized to remove teams that are already doomed."
+          ]
+        },
+        {
+          "title": "Playoffs",
+          "body": [
+            "The eight qualified teams play a single-elimination bracket. Matchups don't follow standard seeding but a fixed bracket, in this display order:"
+          ],
+          "bullets": [
+            "Match 1: 8th vs 4th",
+            "Match 2: 6th vs 2nd",
+            "Match 3: 1st vs 5th",
+            "Match 4: 3rd vs 7th",
+            "The team shown on top takes the left side, the one below the right side.",
+            "A third-place match decides 3rd place, played alongside the final.",
+            "The winner of match 1 faces the winner of match 2 in the semifinal, the winner of match 3 the winner of match 4.",
+            "The bracket doesn't allow draws: it's played in the playoffs' own format if it has one, otherwise in the tournament format, with draws disabled."
+          ]
+        },
+        {
+          "title": "Endurance penalties",
+          "body": [
+            "Referees can remove pool points without going through a match score: lateness, an ineligible player, unsportsmanlike conduct. Each penalty carries a public reason and appears in the penalty log below the standings."
+          ],
+          "bullets": [
+            "The penalty applies to the current round, after its matches: if it empties the pool, the team is eliminated just as by a loss.",
+            "It can be lifted as long as no later round has a score; the standings are then recalculated as if it had never existed.",
+            "No penalty can be given or lifted once the playoff bracket has started.",
+            "In the standings, “−N” next to the pool shows what penalties actually removed."
+          ]
+        },
+        {
+          "title": "Forfeit: two different actions",
+          "body": [
+            "A forfeit is never a blank match: it counts as the tournament format's maximum score. In FT3, the absent team takes a 3-0 — three endurance points fewer for it, three more for its opponent — and the match goes on both teams' records as a full win and a full loss."
+          ],
+          "bullets": [
+            "Forfeit on a round: the team doesn't show up to a match. The referee declares it on the match; the team stays in and plays the next round with the pool it has left.",
+            "Forfeit on the rest of the tournament: the team withdraws, or the referee withdraws it. Its pool drops to zero, it's no longer paired, and the standings are recalculated right away — the next round is re-paired accordingly.",
+            "In the round-by-round table, a withdrawn team no longer shows a pool: its remaining rounds show “FF” in red, like the referees' spreadsheet.",
+            "Withdrawing for good is only possible during the qualifier. Once the playoff bracket has started, a forfeit is settled on the match, which moves the bracket forward."
+          ]
+        }
+      ]
+    },
+    "SURVIVAL": {
+      "label": "Survival (cuts)",
+      "tagline": "A single group, cuts at a fixed pace, one last team standing. The cuts eliminate teams, not a points pool.",
+      "facts": [
+        {
+          "label": "Structure",
+          "value": "Single group"
+        },
+        {
+          "label": "Cut",
+          "value": "Bottom 2"
+        },
+        {
+          "label": "Initial seed",
+          "value": "Site ranking"
+        },
+        {
+          "label": "Odd team count",
+          "value": "Play-in"
+        }
+      ],
+      "principles": [
+        "No bracket: all teams stay in the same group, ranked and re-ranked every round.",
+        "Each round, teams are paired in adjacent pairs from the standings: 1 vs 2, 3 vs 4, 5 vs 6…",
+        "At regular intervals, the bottom two teams in the standings are eliminated, until there's a champion. Not to be confused with <b>BlueGenji's Survival</b>, where each team is out when its endurance pool is empty, with no cut."
+      ],
+      "diagramCaption": "The standings are recalculated every round; the pink zone is the cut zone.",
+      "sections": [
+        {
+          "title": "Starting standings",
+          "body": [
+            "{seedingRule}"
+          ]
+        },
+        {
+          "title": "Pairing and re-ranking",
+          "body": [
+            "Each round pits teams two by two in the order of the current standings: 1st faces 2nd, 3rd faces 4th, and so on. The best teams meet each other, and so do the weakest."
+          ],
+          "bullets": [
+            "After each round, the standings are recalculated: wins (descending), then losses (ascending), then initial seed.",
+            "A team that wins climbs and will face tougher opponents; a team that loses slides toward the cut zone."
+          ]
+        },
+        {
+          "title": "Cuts",
+          "body": [
+            "The pace is set when the tournament is created, with two settings: the number of rounds before the <b>first</b> cut, then the interval between the following cuts. You can let the standings settle before eliminating, then speed up. At each cut, the <b>bottom two teams</b> in the standings are out."
+          ],
+          "bullets": [
+            "The cut zone is shown live in the standings: you always know who's on the edge.",
+            "When nobody would be left, the cut eliminates only one team: there's always a single champion."
+          ]
+        },
+        {
+          "title": "Odd team count: the play-in",
+          "body": [
+            "An odd team count would mean handing out a walkover every round — and since a cut removes two teams, the count would stay odd until the end. So the mode fixes the parity right from the start."
+          ],
+          "bullets": [
+            "Odd registrations: round 1 is a play-in between the bottom two in the standings, and the loser is eliminated. The other teams enter in the next round.",
+            "The play-in doesn't count toward the cut pace: it starts with the first full round.",
+            "If a forfeit breaks the parity again mid-tournament, the next cut eliminates only one team instead of two to get back to an even count.",
+            "As a result, outside forfeits, no walkover is ever handed out, whatever the number of registered teams."
+          ]
+        },
+        {
+          "title": "Final standings",
+          "body": [
+            "The champion gets rank 1. The others are ranked by elimination round, latest first — going out late beats going out early — then by wins, losses and initial seed."
+          ]
+        }
+      ]
+    },
+    "SWISS": {
+      "label": "Swiss",
+      "tagline": "A fixed number of rounds, no elimination, reliable standings in few matches.",
+      "facts": [
+        {
+          "label": "Teams",
+          "value": "2 to 256"
+        },
+        {
+          "label": "Elimination",
+          "value": "None"
+        },
+        {
+          "label": "Rounds",
+          "value": "⌈log₂(N)⌉ + 1"
+        },
+        {
+          "label": "Tiebreakers",
+          "value": "Buchholz & co."
+        }
+      ],
+      "principles": [
+        "Every team plays the same number of rounds, set in advance: nobody is eliminated along the way.",
+        "Each round, you face a team with the same number of points as you.",
+        "The final standings are read by points, with ties broken by how tough each team's path was."
+      ],
+      "diagramCaption": "After each round, teams regroup by score and play within their group.",
+      "sections": [
+        {
+          "title": "How it works",
+          "body": [
+            "The Swiss system produces reliable standings with far fewer matches than a full round robin: instead of playing everyone, each team faces an opponent of similar tournament level every round."
+          ],
+          "bullets": [
+            "The number of rounds is set at creation (recommended: ⌈log₂(number of teams)⌉ + 1, suggested by default).",
+            "No elimination: a team that loses its first matches still plays to the end.",
+            "The points system is adjustable at creation: 3 points for a win, 1 for a draw, 0 for a loss by default."
+          ]
+        },
+        {
+          "title": "First round",
+          "body": [
+            "{seedingRule}"
+          ],
+          "bullets": [
+            "The top half of the seeding faces the bottom half: 1st meets (N/2 + 1)th, and so on.",
+            "Top seeds therefore don't knock each other out from the start."
+          ]
+        },
+        {
+          "title": "Pairings for later rounds",
+          "body": [
+            "Teams are grouped by points and paired within their group. The draw explores the possible combinations to avoid rematches, pulling from the neighboring group when a group is stuck."
+          ],
+          "bullets": [
+            "Undefeated teams play undefeated teams, teams with one loss play each other, and so on.",
+            "Two teams never meet twice as long as another combination exists.",
+            "If the team count is odd, one team gets a walkover worth exactly one win — given to the lowest-ranked team that hasn't had one yet.",
+            "Correcting an earlier score automatically re-pairs the next round, as long as no score has been entered there."
+          ]
+        },
+        {
+          "title": "Standings and tiebreakers",
+          "body": [
+            "Standings are by points, recalculated after each match. On a tie, the tiebreakers measure how tough each team's path was rather than the luck of the pairings; they apply in this order:"
+          ],
+          "bullets": [
+            "Buchholz: sum of the points of the opponents faced.",
+            "Sonneborn-Berger: sum of the points of the opponents beaten (half for a draw).",
+            "Win percentage of the opponents faced.",
+            "Head-to-head between the tied teams.",
+            "As a last resort, the initial seed — never a random draw."
+          ]
+        },
+        {
+          "title": "Withdrawal",
+          "body": [
+            "As in Survival (cuts), a team can leave the tournament along the way. It keeps the points it already earned but is no longer paired, and drops below every team still in the running in the final standings."
+          ]
+        },
+        {
+          "title": "Final standings",
+          "body": [
+            "The tournament ends after the last scheduled round: the top of the standings is champion. There's no final — the standings are what count."
+          ]
+        }
+      ]
+    },
+    "MULTI": {
+      "label": "Multi-stage tournament",
+      "tagline": "Several stages in a row, each one eliminating the weakest, down to the champion.",
+      "facts": [
+        {
+          "label": "Stages",
+          "value": "2 to 8"
+        },
+        {
+          "label": "Qualification",
+          "value": "Number or %"
+        },
+        {
+          "label": "Formats",
+          "value": "Can be combined"
+        },
+        {
+          "label": "Outcome",
+          "value": "One champion"
+        }
+      ],
+      "principles": [
+        "Each stage is played in its own format and only passes its qualified teams to the next.",
+        "Qualification can be fixed (a number of teams) or adaptive (a percentage of the actual field).",
+        "The last stage decides the champion; the other teams are ranked by the furthest stage they reached, then by their rank in that stage."
+      ],
+      "diagramCaption": "Example: Swiss 128 → 64, Survival (cuts) 64 → 16, double elimination 16 → 1. Each stage refines the podium.",
+      "sections": [
+        {
+          "title": "Stage sequence",
+          "body": [
+            "The tournament is split into a series of numbered stages. Each stage plays independently in its format — single elimination, double elimination, Swiss or Survival (cuts) — and sets its own standings."
+          ],
+          "bullets": [
+            "Only the qualified teams of stage N reach stage N+1.",
+            "Teams that don't qualify leave the tournament, their final rank set by the last stage they reached.",
+            "The last stage decides the champion and the whole final podium."
+          ]
+        },
+        {
+          "title": "Qualification: fixed number or percentage",
+          "body": [
+            "Each stage sets the number of teams that move on to the next. Two settings are possible:"
+          ],
+          "bullets": [
+            "<b>Fixed number</b> (e.g. 64 teams): the stage eliminates until 64 are left. If the actual field is already ≤ 64, the stage is skipped and the whole group moves on. A fixed number on a single-elimination stage is rounded down to the nearest power of 2.",
+            "<b>Percentage</b> (e.g. 50%): the stage adapts on the fly — if 128 teams enter, 64 move on; if 100 enter, 50 move on."
+          ]
+        },
+        {
+          "title": "Possible combinations",
+          "body": [
+            "Swiss and Survival (cuts) naturally trim the field and can start a cascade. Double elimination is only allowed as the final stage (it needs too many matches to be used earlier)."
+          ],
+          "bullets": [
+            "Workable example: Swiss → Survival (cuts) → single elimination.",
+            "Workable example: single elimination → double elimination (last stage).",
+            "Not workable: Swiss → double elimination → another stage (double elimination can only be the last stage)."
+          ]
+        },
+        {
+          "title": "Final standings",
+          "body": [
+            "Standings are built from the top down: first by the stage reached (later = better), then by the rank within that stage."
+          ],
+          "bullets": [
+            "The winner of the last stage = rank 1.",
+            "A team eliminated in stage 3 at rank 2 is ahead of a team eliminated in stage 2 at rank 1.",
+            "With the same stage and rank, ties are broken by wins and losses within the stage."
+          ]
+        }
+      ]
+    }
+  }
+}
