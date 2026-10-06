@@ -18,7 +18,7 @@
     "averageRank": "Rang moyen",
     "sitePosition": "Classement du site",
     "sitePositionValue": "#{position}",
-    "sitePositionHint": "sur {total} équipes",
+    "sitePositionHint": "{total, plural, one {sur # équipe} other {sur # équipes}}",
     "noMatchPlayed": "Aucun match joué",
     "matchesPlayed": "Matchs joués",
     "wins": "Victoires",
@@ -44,7 +44,7 @@
     "placementOnlyHint": "Aucun match joué · cote issue de ses classements de tournoi"
   },
   "form": {
-    "listLabel": "{count} derniers résultats, du plus récent au plus ancien",
+    "listLabel": "{count, plural, one {Dernier résultat} other {# derniers résultats}}, du plus récent au plus ancien",
     "win": "Victoire",
     "loss": "Défaite",
     "draw": "Match nul",
@@ -62,7 +62,7 @@
   "record": "{won}V / {lost}D",
   "recordWithDraws": "{won}V / {drawn}N / {lost}D",
   "noFinishedMatch": "Aucun match terminé pour le moment.",
-  "splitLabel": "{label} : {won} victoires sur {played} matchs",
+  "splitLabel": "{label} : {won, plural, one {# victoire} other {# victoires}} sur {played, plural, one {# match} other {# matchs}}",
   "opponent": {
     "favourite": "Adversaire favori",
     "favouriteEmpty": "Aucune victoire enregistrée.",
@@ -71,7 +71,7 @@
     "meetings": "{count, plural, one {# confrontation} other {# confrontations}} · {record}"
   },
   "activity": {
-    "chartLabel": "Activité des {months} derniers mois : {played} matchs joués au total",
+    "chartLabel": "Activité des {months} derniers mois : {played, plural, one {# match joué} other {# matchs joués}} au total",
     "barTitle": "{month} {year} : {played, plural, one {# match} other {# matchs}}, {won, plural, one {# victoire} other {# victoires}}",
     "legendPlayed": "Matchs joués",
     "legendWon": "Victoires",

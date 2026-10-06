@@ -95,7 +95,7 @@ function SplitBars({
             <span
               className={s.splitTrack}
               role="img"
-              aria-label={text.t("splitLabel", { label, won: String(split.won), played: String(split.played) })}
+              aria-label={text.t("splitLabel", { label, won: split.won, played: split.played })}
             >
               <span className={s.splitWin} style={{ width: `${(split.won / total) * 100}%` }} />
               <span className={s.splitLoss} style={{ width: `${(split.lost / total) * 100}%` }} />
@@ -267,7 +267,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null, i18n }: Rea
                 value={ranking.position ? text.t("tile.sitePositionValue", { position: String(ranking.position) }) : "—"}
                 hint={
                   ranking.position
-                    ? text.t("tile.sitePositionHint", { total: String(ranking.total) })
+                    ? text.t("tile.sitePositionHint", { total: ranking.total })
                     : text.t("tile.noMatchPlayed")
                 }
               />
