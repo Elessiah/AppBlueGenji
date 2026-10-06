@@ -169,7 +169,7 @@
       ],
       "bullets": [
         "A score that exceeds the format, or that names no winner when the format requires one, is rejected on entry.",
-        "Draws only exist if the tournament allows them; they never apply to a single-elimination bracket."
+        "Draws only exist if the tournament allows them; they never apply to an elimination bracket."
       ]
     },
     {
