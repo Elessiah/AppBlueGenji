@@ -86,6 +86,11 @@ describe("standingNameWeight", () => {
     expect(standingNameWeight(false, true)).toBeUndefined();
   });
 
+  it("rend 500 à une marche éteinte sur une ligne en retrait, comme ses voisins", () => {
+    expect(standingNameWeight(false, true, true)).toBe(500);
+    expect(standingNameWeight(true, true, true)).toBe(700);
+  });
+
   it("garde 500 pour les autres engagés", () => {
     expect(standingNameWeight(false, false)).toBe(500);
   });

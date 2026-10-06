@@ -171,6 +171,11 @@ describe("marches du podium — écrans où elles s'effacent", () => {
     }
   });
 
+  it("garde sobre l'aperçu des têtes de série du staff", () => {
+    const page = readSource("app/(secured)/tournois/[id]/page.tsx");
+    expect(page).toMatch(/<PodiumTiersOff>\s*<BracketPreview/);
+  });
+
   it("garde sobre l'aperçu d'arbitrage de l'Endurance", () => {
     const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
     expect(view).toMatch(/<PodiumTiersOff>\s*<EnduranceNextRoundPanel/);
@@ -185,7 +190,7 @@ describe("marches du podium — historique et graisse des classements de phase",
 
   it.each(["SwissView.tsx", "SurvivalView.tsx"])("%s n'écrase pas la graisse d'une marche en ligne", (file) => {
     const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
-    expect(source).toContain("standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null)");
+    expect(source).toMatch(/standingNameWeight\(isMine, teamPodiumTier\(podiumTiers, team\.teamId\) !== null, team\.status (===|!==) "(FORFEIT|ACTIVE)"\)/);
     expect(source).not.toContain("fontWeight: isMine ? 700 : 500");
   });
 });
