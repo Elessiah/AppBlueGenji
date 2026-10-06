@@ -7,6 +7,8 @@ import {
   teamsToEliminate,
   type SurvivalCutSchedule,
 } from "@/lib/shared/survival";
+import { usePodiumTiers } from "@/components/podium-tiers";
+import { standingNameWeight, teamPodiumTier } from "@/lib/shared/podium-tiers";
 import { EntrantName } from "./EntrantName";
 import {
   ACCENT,
@@ -55,6 +57,8 @@ export function SurvivalView({
   onForfeit,
   emptyLabel = "Aucun match pour l'instant.",
 }: Readonly<SurvivalViewProps>) {
+  // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
+  const podiumTiers = usePodiumTiers();
   const activeCount = survival.standings.filter((s) => s.status === "ACTIVE").length;
   const barrageRounds = survival.barrageRounds ?? 0;
   // Pendant le barrage, le danger porte sur ses deux participants (le perdant
@@ -148,7 +152,7 @@ export function SurvivalView({
                 <div
                   key={team.teamId}
                   className={styles.survivalRow}
-                  data-podium-muted={team.status === "ELIMINATED" ? "" : undefined}
+                  data-podium-muted={team.status === "ACTIVE" ? undefined : ""}
                   style={{
                     padding: "7px 10px",
                     borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,
@@ -171,7 +175,7 @@ export function SurvivalView({
                     // quelques pixels par les colonnes fixes et le bouton
                     // d'abandon. Il retrecit desormais comme les autres.
                     style={{ flex: "1 1 72px" }}
-                    textStyle={{ fontWeight: isMine ? 700 : 500 }}
+                    textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null) }}
                   />
                   <span className="mono" style={{ fontSize: 12, color: "var(--ink-quiet)" }}>
                     {team.wins}-<span className="result-loss">{team.losses}</span>

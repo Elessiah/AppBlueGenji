@@ -102,3 +102,13 @@ export function podiumTierClass(tier: PodiumTier | null, kind: PodiumTierKind = 
   const base = kind === "team" ? "podium-tier" : "podium-member";
   return `${base} ${base}-${tier}`;
 }
+
+/**
+ * Graisse en ligne d'un nom de classement de phase : 700 pour l'engagé du
+ * lecteur, 500 ailleurs — sauf sur une marche du podium, qui porte la sienne
+ * (et la rend sur une ligne en retrait) : un style en ligne l'écraserait.
+ */
+export function standingNameWeight(isMine: boolean, onPodium: boolean): number | undefined {
+  if (isMine) return 700;
+  return onPodium ? undefined : 500;
+}

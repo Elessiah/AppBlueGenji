@@ -185,6 +185,7 @@ function EnduranceHistory({
               ]
                 .filter(Boolean)
                 .join(" ")}
+              data-podium-muted={ROW_OPACITY[standing.status] < 1 ? "" : undefined}
               style={{ "--history-cols": columns } as React.CSSProperties}
             >
               {/* Même affordance que le classement au-dessus : un nom d'engagé

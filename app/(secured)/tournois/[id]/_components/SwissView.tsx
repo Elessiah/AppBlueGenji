@@ -4,6 +4,8 @@ import { type CSSProperties } from "react";
 import type { BracketMatch, SwissMeta, SwissStandingRow } from "@/lib/shared/types";
 import { formatPoints } from "@/lib/shared/swiss";
 import { ScrollArea } from "@/components/cyber";
+import { usePodiumTiers } from "@/components/podium-tiers";
+import { standingNameWeight, teamPodiumTier } from "@/lib/shared/podium-tiers";
 import { EntrantName } from "./EntrantName";
 import {
   ACCENT,
@@ -69,6 +71,8 @@ export function SwissView({
   onForfeit,
   emptyLabel = "Aucun match pour l'instant.",
 }: Readonly<SwissViewProps>) {
+  // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
+  const podiumTiers = usePodiumTiers();
   const activeCount = swiss.standings.filter((s) => s.status === "ACTIVE").length;
   const roundsLeft = Math.max(swiss.totalRounds - swiss.currentRound, 0);
   // Le statut compte autant que le rang : si toutes les équipes ont abandonné,
@@ -246,7 +250,7 @@ export function SwissView({
                             name={team.teamName}
                             title={team.teamName}
                             truncate
-                            textStyle={{ fontWeight: isMine ? 700 : 500 }}
+                            textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null) }}
                           />
                         </span>
                         <span role="cell" className="num" style={{ ...RIGHT, fontWeight: 700 }}>
