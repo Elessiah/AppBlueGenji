@@ -41,7 +41,7 @@ import {
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import { DEFAULT_SHARE_IMAGE, SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
-import { APP_BACKGROUND_COLOR } from "@/lib/shared/web-manifest";
+import { APP_THEME_COLOR } from "@/lib/shared/web-manifest";
 import { appleStartupImageLinks } from "@/lib/shared/apple-startup-images";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
@@ -94,9 +94,9 @@ export const metadata: Metadata = {
   appleWebApp: { title: SITE_NAME, startupImage: appleStartupImageLinks() },
 };
 
-/** Même couleur que le manifeste : la barre du navigateur se fond dans le fond du site. */
+/** Même couleur que le manifeste : barre du navigateur et liseré des aperçus en néon de marque. */
 export const viewport: Viewport = {
-  themeColor: APP_BACKGROUND_COLOR,
+  themeColor: APP_THEME_COLOR,
 };
 
 /** Page où la mise en avant se tait : le visiteur y lit déjà les annonces. */

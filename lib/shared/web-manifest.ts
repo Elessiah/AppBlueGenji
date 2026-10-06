@@ -11,13 +11,20 @@ import { SITE_DESCRIPTION, SITE_NAME } from "./share-metadata";
  * exige plus, et un cache hors ligne servirait un plateau de tournoi périmé à
  * qui croit le lire en direct.
  *
- * Les couleurs sont celles du fond « Cyber minimal » (`--cyber-bg`) : l'écran
- * de lancement et la barre d'état se fondent ainsi dans la première page
- * peinte, au lieu d'un éclair blanc entre les deux.
+ * Le fond est celui de « Cyber minimal » (`--cyber-bg`) : l'écran de lancement
+ * se fond ainsi dans la première page peinte, au lieu d'un éclair blanc entre
+ * les deux. La couleur de thème, elle, est le néon de marque (`APP_THEME_COLOR`).
  */
 
 /** `--cyber-bg` — fond du site, écran de lancement et barre d'état. */
 export const APP_BACKGROUND_COLOR = "#05060a";
+
+/**
+ * `--cyan-400` — couleur de thème : barre d'adresse mobile, barre de titre de
+ * l'app installée et liseré des aperçus Discord. Le néon le plus vif de la
+ * marque, choisi le 2026-10-06 à la place du fond (`docs/features/SHARE_METADATA.md`).
+ */
+export const APP_THEME_COLOR = "#3ee6ff";
 
 /**
  * `minimal-ui`, et pas `standalone` : les connexions Google, Discord et
@@ -103,7 +110,7 @@ export function buildWebManifest(): MetadataRoute.Manifest {
     display: APP_DISPLAY,
     orientation: "any",
     background_color: APP_BACKGROUND_COLOR,
-    theme_color: APP_BACKGROUND_COLOR,
+    theme_color: APP_THEME_COLOR,
     categories: ["sports", "games", "entertainment"],
     icons: APP_ICONS.map((icon) => ({ ...icon })),
     screenshots: APP_SCREENSHOTS.map((screenshot) => ({ ...screenshot })),
