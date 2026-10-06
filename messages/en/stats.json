@@ -18,7 +18,7 @@
     "averageRank": "Average placement",
     "sitePosition": "Site ranking",
     "sitePositionValue": "#{position}",
-    "sitePositionHint": "{total, plural, one {out of # team} other {out of # teams}}",
+    "sitePositionHint": "{total, plural, one {out of {totalText} team} other {out of {totalText} teams}}",
     "noMatchPlayed": "No matches played",
     "matchesPlayed": "Matches played",
     "wins": "Wins",

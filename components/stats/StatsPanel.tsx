@@ -267,7 +267,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null, i18n }: Rea
                 value={ranking.position ? text.t("tile.sitePositionValue", { position: String(ranking.position) }) : "—"}
                 hint={
                   ranking.position
-                    ? text.t("tile.sitePositionHint", { total: ranking.total })
+                    ? text.t("tile.sitePositionHint", { total: ranking.total, totalText: String(ranking.total) })
                     : text.t("tile.noMatchPlayed")
                 }
               />

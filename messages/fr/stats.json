@@ -18,7 +18,7 @@
     "averageRank": "Rang moyen",
     "sitePosition": "Classement du site",
     "sitePositionValue": "#{position}",
-    "sitePositionHint": "{total, plural, one {sur # équipe} other {sur # équipes}}",
+    "sitePositionHint": "{total, plural, one {sur {totalText} équipe} other {sur {totalText} équipes}}",
     "noMatchPlayed": "Aucun match joué",
     "matchesPlayed": "Matchs joués",
     "wins": "Victoires",
