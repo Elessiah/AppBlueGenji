@@ -130,6 +130,15 @@ describe("recruitment-service", () => {
       expect(sql).toContain("priority <> 'OPTIONAL'");
     });
 
+    it("n'envoie qu'une langue au navigateur : sans colonnes anglaises en français, l'anglais seul sous /en", async () => {
+      const row = { ...HIGHLIGHT_ROW, title_en: "URGENT EN", roles_en: null, body_en: null };
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[row]]));
+      const fr = await getRecruitmentSpotlight();
+      expect(fr.banner[0]).toMatchObject({ title: "URGENT", titleEn: null, rolesEn: null, bodyEn: null });
+      const en = await getRecruitmentSpotlight("en");
+      expect(en.banner[0]).toMatchObject({ title: "URGENT EN", titleEn: null });
+    });
+
     it("rend des listes vides quand rien n'est mis en avant", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await getRecruitmentSpotlight()).toEqual({ modal: [], banner: [] });

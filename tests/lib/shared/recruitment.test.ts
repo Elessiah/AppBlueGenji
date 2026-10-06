@@ -18,6 +18,8 @@ import {
   serializeRecruitmentSeen,
   localizeRecruitmentAd,
   localizeRecruitmentAds,
+  publicRecruitmentAds,
+  withoutEnglish,
   recruitmentAdHasEnglish,
   recruitmentErrorMessage,
   validateRecruitmentAdInput,
@@ -446,6 +448,25 @@ describe("localizeRecruitmentAd", () => {
     // Sans missions, rien à traduire.
     expect(localizeRecruitmentAd({ ...base, roles: null, rolesEn: null }, "en")?.roles).toBeNull();
     expect(localizeRecruitmentAds([base, { ...base, id: 2, titleEn: null }], "en").map((ad) => ad.id)).toEqual([1]);
+  });
+
+  it("vue du visiteur, français : le français seul, sans les colonnes anglaises", () => {
+    const view = publicRecruitmentAds([base], "fr");
+    expect(view.hidden).toEqual([]);
+    expect(view.ads).toEqual([{ ...base, titleEn: null, rolesEn: null, bodyEn: null }]);
+  });
+
+  it("vue du visiteur, anglais : l'anglais seul, et les annonces masquées réduites à leur pôle et leur statut", () => {
+    const view = publicRecruitmentAds([base, { ...base, id: 2, titleEn: null, priority: "PRIORITY" }], "en");
+    expect(view.ads).toEqual([
+      { ...base, title: "Referees", roles: "Referee", body: "On Sundays.", titleEn: null, rolesEn: null, bodyEn: null },
+    ]);
+    expect(view.hidden).toEqual([{ id: 2, domain: "ARBITRAGE", priority: "PRIORITY" }]);
+    expect(JSON.stringify(view)).not.toContain("Le dimanche");
+  });
+
+  it("withoutEnglish ne touche qu'aux colonnes anglaises", () => {
+    expect(withoutEnglish(base)).toEqual({ ...base, titleEn: null, rolesEn: null, bodyEn: null });
   });
 });
 
