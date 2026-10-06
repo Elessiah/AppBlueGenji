@@ -126,3 +126,35 @@ describe("détail map par map — refus rattachés au champ", () => {
     expect(dialog).toContain("mais le détail des maps diffère");
   });
 });
+
+describe("détail map par map — retours de la revue UI/UX", () => {
+  const list = () => readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+
+  it("le compteur annonce le format, les maps nulles rejouées en sus", () => {
+    expect(list()).toContain("const shownLimit = format ? matchMaxMaps(format) : limit;");
+    expect(list()).toContain("({maps.length}/{Math.max(shownLimit, maps.length)})");
+    expect(list()).toContain("Une map nulle peut être rejouée (${limit - shownLimit} au plus).");
+  });
+
+  it("la liste passe sur deux lignes selon sa propre largeur (modale de 460 px)", () => {
+    const css = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.module.css");
+    expect(css).toContain("container-type: inline-size;");
+    expect(css).toContain("@container (max-width: 560px)");
+    expect(css).not.toContain("@media (max-width: 560px)");
+  });
+
+  it("l'infobulle d'un bouton actionnable sur une map refusée dit ce refus, pas « score incomplet »", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook).toContain("resolve: maps.length > 0 ? checkMapList(matchFormat, game, maps, { decisive: true }).error : null,");
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    expect(dialog).toContain("if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);");
+    expect(dialog).toContain("title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker,");
+    expect(dialog).toContain("title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker,");
+  });
+
+  it("une proposition adverse sans détail dit quoi saisir au lieu de « Confirme-le »", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toContain("if ((view.theirs?.maps ?? []).length === 0) {");
+    expect(dialog).toContain("sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay");
+  });
+});
