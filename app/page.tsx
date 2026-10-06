@@ -62,6 +62,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: t("meta.title"),
     description: t("meta.description"),
     path: "/",
+    shareCard: "home",
     // Le gabarit de la racine ne s'applique pas à la page qui partage son
     // segment : sans ce drapeau, l'accueil serait la seule page du site à ne pas
     // porter le nom du site dans son titre.

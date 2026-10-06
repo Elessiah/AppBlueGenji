@@ -37,6 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: meta.description,
     shareDescription: meta.shareDescription,
     path: "/classement",
+    shareCard: "ranking",
     locale,
   });
 }

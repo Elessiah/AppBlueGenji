@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
+import { ruleModeShareCardKey } from "@/lib/shared/page-share-cards";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
@@ -98,12 +99,14 @@ export async function generateMetadata({ params }: Pick<PageProps, "params">): P
     title: messages.meta.indexTitle,
     description: messages.meta.unknownModeDescription,
     path: "/regles",
+    shareCard: "rules",
     locale,
   });
   return pageMetadata({
     title: formatMessage(locale, messages.meta.modeTitle, { mode: mode.label }),
     description: mode.tagline,
     path: `/regles/${mode.slug}`,
+    shareCard: ruleModeShareCardKey(mode.slug),
     locale,
   });
 }

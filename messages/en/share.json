@@ -1,0 +1,119 @@
+{
+  "footer": "Nonprofit association",
+  "pages": {
+    "home": {
+      "eyebrow": "Overwatch · Marvel Rivals",
+      "title": "BlueGenji Esport",
+      "subtitle": "French-speaking amateur tournaments, live brackets, team ranking and a Discord bot."
+    },
+    "association": {
+      "eyebrow": "The association",
+      "title": "An association by players, for players",
+      "subtitle": "Online and LAN tournaments, united teams, and the French-speaking amateur scene in the spotlight."
+    },
+    "ranking": {
+      "eyebrow": "Ranking",
+      "title": "Team ranking",
+      "subtitle": "Rating, record and recent form of every team on the BlueGenji scene."
+    },
+    "rules": {
+      "eyebrow": "Rulebook",
+      "title": "Tournament rules",
+      "subtitle": "Every mode explained with diagrams: elimination, survival, Swiss, multi-stage."
+    },
+    "recruitment": {
+      "eyebrow": "Recruitment",
+      "title": "Join the BlueGenji staff",
+      "subtitle": "Refereeing, casting, development, communication, design, moderation: the association is recruiting."
+    },
+    "volunteers": {
+      "eyebrow": "Volunteers",
+      "title": "The people behind BlueGenji",
+      "subtitle": "The enthusiasts who organize, host and build the French-speaking esports scene."
+    },
+    "login": {
+      "eyebrow": "Member area",
+      "title": "Sign in to BlueGenji",
+      "subtitle": "No password: Google, Discord or Battle.net, or a code sent to you on Discord."
+    },
+    "bot": {
+      "eyebrow": "Discord bot",
+      "title": "BlueGenji Bot",
+      "subtitle": "Synced announcements, statistics and tournament commands, right inside Discord."
+    },
+    "botDocs": {
+      "eyebrow": "Discord bot",
+      "title": "Bot documentation",
+      "subtitle": "Commands, settings and how the BlueGenji bot works, step by step."
+    },
+    "legalNotice": {
+      "eyebrow": "Legal information",
+      "title": "Legal notice",
+      "subtitle": "Publisher, hosting, intellectual property and personal data."
+    },
+    "privacy": {
+      "eyebrow": "Privacy",
+      "title": "Privacy policy",
+      "subtitle": "Data collected, retention periods, your rights and GDPR contact."
+    },
+    "processingRegister": {
+      "eyebrow": "Privacy",
+      "title": "Record of processing activities",
+      "subtitle": "Purposes, data, retention periods and recipients of each processing activity."
+    },
+    "terms": {
+      "eyebrow": "Legal information",
+      "title": "Terms of use",
+      "subtitle": "What everyone agrees to respect on BlueGenji Esport."
+    },
+    "accessibility": {
+      "eyebrow": "Accessibility",
+      "title": "Accessibility statement",
+      "subtitle": "RGAA compliance status, inaccessible content and available help."
+    },
+    "botPrivacy": {
+      "eyebrow": "Discord bot",
+      "title": "Bot privacy policy",
+      "subtitle": "What the BlueGenji bot reads, keeps and deletes, in French and English."
+    },
+    "botTerms": {
+      "eyebrow": "Discord bot",
+      "title": "Bot terms of service",
+      "subtitle": "The usage rules of the BlueGenji bot, in French and English."
+    },
+    "tournaments": {
+      "eyebrow": "Tournaments",
+      "title": "Amateur tournaments",
+      "subtitle": "Registration, live brackets and results of Overwatch and Marvel Rivals tournaments."
+    },
+    "teams": {
+      "eyebrow": "Teams",
+      "title": "The teams of the scene",
+      "subtitle": "Directory of the teams registered on BlueGenji. Sign in to browse it."
+    },
+    "team": {
+      "eyebrow": "Teams",
+      "title": "Team profile",
+      "subtitle": "Roster, achievements and statistics. Sign in to view it."
+    },
+    "players": {
+      "eyebrow": "Players",
+      "title": "The players of the scene",
+      "subtitle": "Directory of the players registered on BlueGenji. Sign in to browse it."
+    },
+    "player": {
+      "eyebrow": "Players",
+      "title": "Player profile",
+      "subtitle": "Teams, roles and statistics. Sign in to view it."
+    }
+  },
+  "ruleMode": {
+    "eyebrow": "Mode rules"
+  },
+  "podium": {
+    "eyebrow": "Ranking",
+    "title": "The BlueGenji podium",
+    "points": "pts",
+    "places": ["1st", "2nd", "3rd"]
+  }
+}

@@ -13,7 +13,9 @@
  */
 import type { Metadata } from "next";
 import { SITE_NAME } from "./share-metadata";
+import frShare from "@/messages/fr/share.json";
 import { DEFAULT_LOCALE, OPEN_GRAPH_LOCALE, localeAlternates, localeHref, type Locale } from "./locales";
+import { pageShareImagePath, type PageShareCardKey } from "./page-share-cards";
 
 /** Le gabarit de titre du site, celui que déclare la mise en page racine. */
 export const SITE_TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -66,7 +68,18 @@ export type PageMetadataInput = {
    * `fr` par défaut. L'URL canonique est celle de **cette** langue.
    */
   locale?: Locale;
+  /**
+   * Carte d'aperçu propre à la page (`lib/shared/page-share-cards.ts`), servie
+   * dans la langue de la page (`/og/<langue>/<clé>.png`). Absente : la carte
+   * du site ({@link DEFAULT_SHARE_IMAGE}).
+   */
+  shareCard?: string;
 };
+
+/** L'image d'aperçu d'une page : sa carte dans sa langue, ou celle du site. */
+export function shareImageFor(shareCard: string | undefined, locale: Locale = DEFAULT_LOCALE): string {
+  return shareCard ? pageShareImagePath(shareCard, locale) : DEFAULT_SHARE_IMAGE;
+}
 
 export function pageMetadata({
   title,
@@ -75,8 +88,10 @@ export function pageMetadata({
   path,
   selfTitled = false,
   locale = DEFAULT_LOCALE,
+  shareCard,
 }: PageMetadataInput): Metadata {
   const share = shareDescription ?? description;
+  const image = shareImageFor(shareCard, locale);
   // L'encart, lui, n'hérite d'aucun gabarit : son titre porte le nom du site,
   // sans quoi « Bénévoles » collé seul dans un salon ne dit pas de qui il parle.
   const shareTitle = siteTitle(title);
@@ -101,14 +116,43 @@ export function pageMetadata({
       title: shareTitle,
       description: share,
       url: canonical,
-      images: [{ url: DEFAULT_SHARE_IMAGE, width: 1200, height: 630, alt: SITE_NAME }],
+      // Le texte de l'image est le titre de l'encart : c'est ce qu'elle montre.
+      images: [{ url: image, width: 1200, height: 630, alt: shareCard ? shareTitle : SITE_NAME }],
     },
     twitter: {
       card: "summary_large_image",
       title: shareTitle,
       description: share,
-      images: [DEFAULT_SHARE_IMAGE],
+      images: [image],
     },
+  };
+}
+
+/**
+ * L'encart d'une page **réservée aux membres** (`/tournois`, `/equipes`,
+ * `/equipes/[id]`, `/joueurs`, `/joueurs/[id]`), posé par la mise en page de
+ * son segment.
+ *
+ * Générique par construction : titre et phrase sont ceux de la carte, jamais
+ * le nom d'une équipe ou le pseudo d'un joueur — le robot d'aperçu n'a pas de
+ * session, et le `<head>` anonyme de ces pages n'en montre pas non plus. Pas
+ * d'`og:url` : la mise en page habille aussi ses sous-pages (`/equipes/creer`),
+ * qu'une adresse fixe désignerait mal. Pages non traduites : français seul.
+ */
+export function memberAreaShareMetadata(key: PageShareCardKey): Pick<Metadata, "openGraph" | "twitter"> {
+  const { title, subtitle } = frShare.pages[key];
+  const shareTitle = siteTitle(title);
+  const image = pageShareImagePath(key, DEFAULT_LOCALE);
+  return {
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      locale: OPEN_GRAPH_LOCALE[DEFAULT_LOCALE],
+      title: shareTitle,
+      description: subtitle,
+      images: [{ url: image, width: 1200, height: 630, alt: shareTitle }],
+    },
+    twitter: { card: "summary_large_image", title: shareTitle, description: subtitle, images: [image] },
   };
 }
 

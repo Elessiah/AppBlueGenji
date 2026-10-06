@@ -25,7 +25,7 @@
  * pastille d'état au ton de son sens. La carte entièrement noire d'avant
  * passait pour éteinte au milieu d'un salon.
  */
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { ShareStateTone } from "@/lib/shared/share-metadata";
 
 /** Format canonique d'une image d'aperçu (1,91:1), attendu par Open Graph. */
@@ -152,8 +152,17 @@ function Glows(): ReactElement {
 export type ShareCardFact = { label: string; value: string };
 
 export type ShareCardProps = {
-  /** Première pastille : le jeu, la rubrique. Toujours cyan. */
+  /** Première pastille : le jeu, la rubrique. Cyan, sauf {@link accent}. */
   eyebrow: string;
+  /** Couleur de la première pastille et du motif — un ton `.pill-*`. */
+  accent?: string;
+  /**
+   * Motif décoratif dessiné à droite (`ShareMotifIcon`). Présent, il réserve
+   * sa colonne : titre et accroche s'arrêtent avant lui.
+   */
+  motif?: ReactNode;
+  /** Mention de pied, dans la langue de la carte. */
+  footer?: string;
   /** Seconde pastille, colorée par son sens : l'état d'un tournoi. */
   state?: { label: string; tone: ShareCardTone };
   /** Le titre, seule ligne que le lecteur retient. */
@@ -186,8 +195,10 @@ export function titleFontSize(title: string): number {
  * La colonne de texte n'a que 528 px de haut : un titre sur deux ou trois
  * lignes plus une accroche sur deux pousserait celle-ci dans les faits du pied.
  * Seul un titre qui tient sur une ligne laisse la place d'une seconde.
+ * Sans faits (carte d'une page), le pied libère la place : deux lignes.
  */
-export function subtitleLineClamp(title: string): number {
+export function subtitleLineClamp(title: string, hasFacts = true): number {
+  if (!hasFacts) return 2;
   return title.length <= 16 ? 2 : 1;
 }
 
@@ -225,15 +236,40 @@ function Badge({ label, color }: Readonly<{ label: string; color: string }>): Re
   );
 }
 
-/** La carte, prête à être passée à `ImageResponse`. */
-export function ShareCard({
-  eyebrow,
-  state,
-  title,
-  subtitle,
-  facts = [],
+/** Mention de pied par défaut, celle de la carte française. */
+export const SHARE_CARD_DEFAULT_FOOTER = "Association loi 1901";
+
+/**
+ * Largeur de la colonne de texte quand un motif occupe la droite : le motif
+ * commence à 920 px ({@link SHARE_CARD_MOTIF_BOX}), le texte s'arrête avant.
+ */
+export const SHARE_CARD_MOTIF_TEXT_WIDTH = 820;
+
+/** Boîte du motif décoratif, en pixels de la carte. */
+export const SHARE_CARD_MOTIF_BOX = { top: 92, left: 920, size: 208 } as const;
+
+/** Opacité du trait du motif : décor, jamais lu comme un texte. */
+export const SHARE_CARD_MOTIF_ALPHA = 0.75;
+
+/**
+ * Le cadre commun à toutes les cartes : fond, halos, filet de marque, puis le
+ * contenu (qui s'étire) et le pied — logo, nom, mention.
+ */
+export function ShareCardFrame({
+  children,
   logoSrc,
-}: Readonly<ShareCardProps>): ReactElement {
+  footer = SHARE_CARD_DEFAULT_FOOTER,
+  aside,
+  bottom,
+}: Readonly<{
+  children: ReactNode;
+  logoSrc?: string | null;
+  footer?: string;
+  /** Décor posé hors du flux (motif). */
+  aside?: ReactNode;
+  /** Ce qui s'aligne au-dessus du pied (les faits d'un tournoi). */
+  bottom?: ReactNode;
+}>): ReactElement {
   return (
     <div
       style={{
@@ -251,6 +287,7 @@ export function ShareCard({
       }}
     >
       <Glows />
+      {aside}
       {/* Filet de marque en tête : ce qui se voit en premier à petite taille. */}
       <div style={{ display: "flex", width: "100%", height: BRAND_BAR_HEIGHT, backgroundImage: BRAND_GRADIENT }} />
 
@@ -260,105 +297,14 @@ export function ShareCard({
           flexDirection: "column",
           justifyContent: "space-between",
           flexGrow: 1,
+          minHeight: 0,
           padding: `${SHARE_CARD_PADDING.top}px ${SHARE_CARD_PADDING.right}px ${SHARE_CARD_PADDING.bottom}px ${SHARE_CARD_PADDING.left}px`,
         }}
       >
-        {/* Le bloc du haut cède avant le pied : s'il manque de place, il est
-            rogné au lieu de chevaucher les faits. */}
-        <div style={{ display: "flex", flexDirection: "column", flexShrink: 1, minHeight: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <Badge label={eyebrow} color={SHARE_CARD_COLORS.cyan} />
-            {state ? <Badge label={state.label} color={SHARE_CARD_TONE_COLORS[state.tone]} /> : null}
-          </div>
-
-          <div
-            style={{
-              marginTop: 30,
-              fontSize: titleFontSize(title),
-              lineHeight: 1.08,
-              fontWeight: 700,
-              wordBreak: "break-word",
-              // Satori ne coupe pas les mots : un nom d'équipe sans espace
-              // déborderait sans cette limite de lignes.
-              display: "-webkit-box",
-              WebkitBoxOrient: "vertical",
-              WebkitLineClamp: 3,
-              // Satori n'applique la limite de lignes qu'avec l'ellipse.
-              textOverflow: "ellipsis",
-              overflow: "hidden",
-            }}
-          >
-            {title}
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              width: 180,
-              height: 6,
-              marginTop: 22,
-              borderRadius: 3,
-              backgroundImage: BRAND_GRADIENT,
-            }}
-          />
-
-          {subtitle ? (
-            <div
-              style={{
-                marginTop: 20,
-                fontSize: 28,
-                lineHeight: 1.35,
-                color: SHARE_CARD_COLORS.inkMute,
-                display: "-webkit-box",
-                WebkitBoxOrient: "vertical",
-                WebkitLineClamp: subtitleLineClamp(title),
-                textOverflow: "ellipsis",
-                overflow: "hidden",
-              }}
-            >
-              {subtitle}
-            </div>
-          ) : null}
-        </div>
+        {children}
 
         <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
-          {facts.length > 0 ? (
-            <div style={{ display: "flex", marginBottom: 28 }}>
-              {facts.map((fact, index) => {
-                const color = SHARE_CARD_FACT_COLORS[index % SHARE_CARD_FACT_COLORS.length];
-                return (
-                  <div
-                    key={fact.label}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      marginRight: 48,
-                      maxWidth: 420,
-                      paddingLeft: 18,
-                      borderLeft: `4px solid ${color}`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        // 24 px : la vignette Discord réduit la carte de moitié, voire au tiers ;
-                        // les mêmes faits figurent en texte sous l'encart.
-                        fontSize: 24,
-                        letterSpacing: 2,
-                        textTransform: "uppercase",
-                        color: SHARE_CARD_COLORS.inkMute,
-                      }}
-                    >
-                      {fact.label}
-                    </div>
-                    <div style={{ marginTop: 8, fontSize: 32, fontWeight: 700, color: SHARE_CARD_COLORS.ink }}>
-                      {fact.value}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
-
+          {bottom}
           <div style={{ display: "flex", width: "100%", height: 2, backgroundImage: BRAND_GRADIENT, opacity: 0.6 }} />
 
           <div
@@ -377,12 +323,167 @@ export function ShareCard({
               ) : null}
               <div style={{ display: "flex", fontSize: 30, fontWeight: 700, letterSpacing: 2 }}>BLUEGENJI</div>
             </div>
-            <div style={{ display: "flex", fontSize: 24, color: SHARE_CARD_COLORS.inkMute }}>
-              Association loi 1901
-            </div>
+            <div style={{ display: "flex", fontSize: 24, color: SHARE_CARD_COLORS.inkMute }}>{footer}</div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** Pastilles du haut : la rubrique (au ton de la carte), puis l'état éventuel. */
+export function ShareCardBadges({
+  eyebrow,
+  accent = SHARE_CARD_COLORS.cyan,
+  state,
+}: Readonly<{ eyebrow: string; accent?: string; state?: { label: string; tone: ShareCardTone } }>): ReactElement {
+  return (
+    <div style={{ display: "flex", alignItems: "center" }}>
+      <Badge label={eyebrow} color={accent} />
+      {state ? <Badge label={state.label} color={SHARE_CARD_TONE_COLORS[state.tone]} /> : null}
+    </div>
+  );
+}
+
+/** Le trait au dégradé de marque posé sous un titre. */
+export function ShareCardRule(): ReactElement {
+  return (
+    <div
+      style={{
+        display: "flex",
+        width: 180,
+        height: 6,
+        marginTop: 22,
+        borderRadius: 3,
+        backgroundImage: BRAND_GRADIENT,
+      }}
+    />
+  );
+}
+
+/** La carte, prête à être passée à `ImageResponse`. */
+export function ShareCard({
+  eyebrow,
+  accent,
+  motif,
+  footer,
+  state,
+  title,
+  subtitle,
+  facts = [],
+  logoSrc,
+}: Readonly<ShareCardProps>): ReactElement {
+  const aside = motif ? (
+    <div
+      style={{
+        display: "flex",
+        position: "absolute",
+        top: SHARE_CARD_MOTIF_BOX.top,
+        left: SHARE_CARD_MOTIF_BOX.left,
+        width: SHARE_CARD_MOTIF_BOX.size,
+        height: SHARE_CARD_MOTIF_BOX.size,
+      }}
+    >
+      {motif}
+    </div>
+  ) : null;
+
+  const factRow =
+    facts.length > 0 ? (
+      <div style={{ display: "flex", marginBottom: 28 }}>
+        {facts.map((fact, index) => {
+          const color = SHARE_CARD_FACT_COLORS[index % SHARE_CARD_FACT_COLORS.length];
+          return (
+            <div
+              key={fact.label}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                marginRight: 48,
+                maxWidth: 420,
+                paddingLeft: 18,
+                borderLeft: `4px solid ${color}`,
+              }}
+            >
+              <div
+                style={{
+                  // 24 px : la vignette Discord réduit la carte de moitié, voire au tiers ;
+                  // les mêmes faits figurent en texte sous l'encart.
+                  fontSize: 24,
+                  letterSpacing: 2,
+                  textTransform: "uppercase",
+                  color: SHARE_CARD_COLORS.inkMute,
+                }}
+              >
+                {fact.label}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 32, fontWeight: 700, color: SHARE_CARD_COLORS.ink }}>
+                {fact.value}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    ) : null;
+
+  return (
+    <ShareCardFrame logoSrc={logoSrc} footer={footer} aside={aside} bottom={factRow}>
+      {/* Le bloc du haut cède avant le pied : s'il manque de place, il est
+          rogné au lieu de chevaucher les faits. */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flexShrink: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          // Pas de `maxWidth: undefined` : Satori lit toute clé présente et
+          // échoue sur une valeur absente (« reading 'trim' », vérifié au rendu).
+          ...(motif ? { maxWidth: SHARE_CARD_MOTIF_TEXT_WIDTH } : {}),
+        }}
+      >
+        <ShareCardBadges eyebrow={eyebrow} accent={accent} state={state} />
+
+        <div
+          style={{
+            marginTop: 30,
+            fontSize: titleFontSize(title),
+            lineHeight: 1.08,
+            fontWeight: 700,
+            wordBreak: "break-word",
+            // Satori ne coupe pas les mots : un nom d'équipe sans espace
+            // déborderait sans cette limite de lignes.
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: 3,
+            // Satori n'applique la limite de lignes qu'avec l'ellipse.
+            textOverflow: "ellipsis",
+            overflow: "hidden",
+          }}
+        >
+          {title}
+        </div>
+
+        <ShareCardRule />
+
+        {subtitle ? (
+          <div
+            style={{
+              marginTop: 20,
+              fontSize: 28,
+              lineHeight: 1.35,
+              color: SHARE_CARD_COLORS.inkMute,
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: subtitleLineClamp(title, facts.length > 0),
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+            }}
+          >
+            {subtitle}
+          </div>
+        ) : null}
+      </div>
+    </ShareCardFrame>
   );
 }

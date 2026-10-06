@@ -33,12 +33,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: "Documentation du bot",
       description: "La documentation du bot Discord BlueGenji.",
       path: "/bot/docs",
+      shareCard: "botDocs",
     });
   }
   return pageMetadata({
     title: `${section.title} — Documentation du bot`,
     description: section.summary,
     path: `/bot/docs/${section.slug}`,
+    shareCard: "botDocs",
   });
 }
 

@@ -24,12 +24,14 @@ import enStats from "@/messages/en/stats.json";
 import frStats from "@/messages/fr/stats.json";
 import enLabels from "@/messages/en/labels.json";
 import frLabels from "@/messages/fr/labels.json";
+import enShare from "@/messages/en/share.json";
+import frShare from "@/messages/fr/share.json";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 
 const CATALOG: Readonly<Record<Locale, Messages>> = {
-  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels },
-  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels },
+  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels, share: frShare },
+  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels, share: enShare },
 };
 
 export function messagesFor(locale: Locale): Messages {

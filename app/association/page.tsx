@@ -45,6 +45,7 @@ export const metadata: Metadata = pageMetadata({
   shareDescription:
     "Structure associative compétitive et inclusive pour la scène esport francophone.",
   path: "/association",
+  shareCard: "association",
 });
 
 export default async function AssociationPage() {
