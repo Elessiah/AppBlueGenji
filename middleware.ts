@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
-import { siteMetadataBase } from "@/lib/server/site-url";
+import { siteBaseUrl } from "@/lib/server/site-url";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
@@ -135,7 +135,10 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   // quelle au visiteur. Les barres de tête sont réduites à une seule :
   // `/en//hote.tld` donnerait sinon `//hote.tld`, que `new URL` résout hors du
   // site (redirection ouverte) — `\` compte aussi, lu `/` par les navigateurs.
-  const target = new URL(`/${path.replace(/^[/\\]+/, "")}${request.nextUrl.search}`, siteMetadataBase());
+  // Sans `APP_URL` (développement, E2E — en production elle est requise),
+  // l'origine de la requête est la bonne : aucun mandataire devant.
+  const base = siteBaseUrl() ?? request.nextUrl.origin;
+  const target = new URL(`/${path.replace(/^[/\\]+/, "")}${request.nextUrl.search}`, base);
   return NextResponse.redirect(target, prefixed === "en" ? 307 : 308);
 }
 
