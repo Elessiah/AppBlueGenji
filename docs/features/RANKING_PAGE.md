@@ -197,6 +197,14 @@ complète sans JavaScript.
   `/joueurs`).
 - Plan du site (`lib/shared/sitemap.ts`), quotidien.
 
+## Langues
+
+Page traduite depuis le lot 4 (`/en/classement`, `I18N.md` § Classement) : textes de
+`messages/<langue>/ranking.json`, métadonnées et fil d'Ariane JSON-LD par langue, liens par
+`LocaleLink`. Titre et sous-titre éditables : leur anglais (lot 2). Sous `/en`, lettres de forme
+W / L / D, colonne « Rating ». Les adresses (`?jeu=`, `?n=`, ancres `rang-N`) sont les mêmes dans
+les deux langues.
+
 ## Fichiers
 
 | Rôle | Fichier |
@@ -206,6 +214,7 @@ complète sans JavaScript.
 | Podium + tableau | `app/classement/RankingBoard.tsx` |
 | « Afficher plus » (client) | `app/classement/RankingMore.tsx` |
 | Styles | `app/classement/page.module.css` |
+| Textes (FR/EN) | `messages/<langue>/ranking.json`, `lib/shared/ranking-text.ts` |
 | Logique pure (filtre, `?n=`, écarts) | `lib/shared/ranking-page.ts` |
 | Lignes (cote, bilan, tendance) | `loadLeaderboardRows` (`lib/server/landing-service.ts`) |
 | Forme | `loadCachedTeamForms` (`lib/server/teams/directory.ts`) |
@@ -230,3 +239,7 @@ complète sans JavaScript.
 - `tests/app/classement-page-copy.test.tsx` — en-tête éditable : défauts,
   textes édités (échappés), crayons réservés à `showcase`, `<h1>` unique,
   métadonnées figées.
+- `tests/app/ranking-i18n.test.tsx` — `/en/classement` : liste blanche, sitemap
+  et `hreflang`, métadonnées par langue, aucune phrase française ni lettre
+  accentuée, liens préfixés (sauf `/tournois`), fil d'Ariane, W / L / D,
+  marches du podium dans les deux langues, français inchangé.

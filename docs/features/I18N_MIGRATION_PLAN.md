@@ -266,6 +266,28 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   « belle » → *bracket reset*, « side gauche / droite » → *left / right side*, « hors course » →
   *out of contention*.
 
+### Ce que le lot 4 a établi (2026-10-06) — écarts au plan
+
+- **`/classement` ouvert sous `/en`** ; ~140 messages en trois espaces : `ranking` (page),
+  `stats` (bloc de statistiques), `labels` (format, jeu, état par code). Détail : `I18N.md`
+  § Classement et § Dates, nombres, pluriels.
+- **Toujours pas de `next-intl` côté client** : page et tableau serveur ; « Afficher plus » reçoit
+  l'espace `ranking.more` en prop. Le bloc de statistiques (client) inclut son français, comme
+  avant (chaînes déplacées, pas ajoutées) ; son anglais attend la prop `i18n` du lot 9.
+- **`dates.ts` / `plural.ts`** : écart au plan — pas de remplacement global par `useFormatter()`.
+  Les fonctions de date prennent une langue **facultative** (français par défaut, rendu inchangé
+  sur les écrans non traduits) ; `plural.ts` reste l'outil français des écrans non traduits, les
+  écrans traduits écrivent leurs pluriels en ICU. Les ~90 appels `fr-FR`/`toLocale*` migrent
+  toujours avec leur lot.
+- **Libellés partagés** : les tables françaises restent (écrans non traduits, Discord D6) ; leur
+  traduction vit dans `labels`, égalité FR testée. Les états reprennent ceux de l'en-tête de fiche
+  (`STATE_META` : « Prochainement »…) ; l'anglais suit le glossaire (*Upcoming*, *Registration
+  open*, *In progress*, *Finished*).
+- **Ajout** : fil d'Ariane JSON-LD sur `/classement` (les deux langues), comme les règles.
+- **Français inchangé** : rendu de la page, du tableau et du bloc comparé avant/après — seuls
+  diffèrent les séparateurs `<!-- -->` du rendu serveur (un nœud texte au lieu de deux) et le
+  JSON-LD ajouté.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -297,7 +319,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 1 ✅ | Coquille partagée | Nav, pied de page, `PublicPageShell`, lien d'évitement, menu d'accessibilité, toasts, `ConfirmActionDialog`, pages d'erreur / 404 / `global-error` | ~250 (C1 + part de C2) | Composants partout : tester FR inchangé | Standard + UI |
 | 2 ✅ | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
 | 3 ✅ | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
-| 4 | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
+| 4 ✅ | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
 | 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
 | 6 | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
 | 7a | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
