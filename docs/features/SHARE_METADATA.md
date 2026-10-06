@@ -335,7 +335,7 @@ La carte du classement dessine le **vrai podium** : les trois premières du
 classement général (`loadTeamRanking({ includeUnplayed: true })`, l'onglet
 « Général », le même que la page et que `PODIUM_TIERS.md`), ordre 2-1-3 avec la
 1re au centre et plus haute, logo, nom, cote (« 1240 pts », sans séparateur comme
-la page) et marche dans la langue (« 1er / 2e / 3e », « 1st / 2nd / 3rd »).
+la page) et marche dans la langue (« 1re / 2e / 3e », « 1st / 2nd / 3rd »).
 Couleurs des marches reprises de la page : glacier (`--blue-500`), cyan, violet
 (`--violet-300`) — **ni or ni bronze** (décision du 2026-10-06). Un test tient le
 contraste du nom et du rang (4,5:1) sur le voile de chaque marche.
