@@ -263,7 +263,10 @@ le tait.
   s'annonce poliment (`aria-live`) sans déplacer le focus — seulement quand
   l'affichage progressif l'ajoute, pas sur une liste reçue déjà remplie. Une
   ligne vierge n'a pas de « Retirer » (elle reviendrait aussitôt), et le
-  compteur « Maps jouées » ne la compte pas. En confirmation,
+  compteur « Maps jouées » ne la compte pas (ni le « Score du match », absent
+  tant qu'aucune map n'est renseignée). Un refus qui dit qu'il manque des maps
+  (score incomplet, match inachevé) désigne le code de la ligne ouverte
+  (`refusalFieldOnRows`), pas le score de la dernière map jouée. En confirmation,
   la modale montre exactement les lignes adverses, puis le même comportement si
   l'engagé les retouche. L'arbitrage partage la liste (`MapScoreList`) : sans
   ligne d'emblée (`minRows = 0`, score à la main), « Ajouter une map » ouvre la
