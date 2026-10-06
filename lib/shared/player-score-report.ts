@@ -229,7 +229,7 @@ export function withProposalMaps<M extends Pick<BracketMatch, "id" | "team1Repor
   const entry = proposals.find((p) => p.matchId === match.id);
   if (!entry) return match;
   const fill = (report: MatchScoreReport | null, side: ProposalMaps | null): MatchScoreReport | null =>
-    report && side && side.reportedAt === report.reportedAt ? { ...report, maps: side.maps } : report;
+    report && side?.reportedAt === report.reportedAt && side ? { ...report, maps: side.maps } : report;
   return { ...match, team1Report: fill(match.team1Report, entry.team1), team2Report: fill(match.team2Report, entry.team2) };
 }
 
