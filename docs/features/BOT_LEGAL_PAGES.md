@@ -67,7 +67,9 @@ La bascule FR ⇄ EN qu'il portait (un état `useState`, jamais une adresse ni u
 paramètre) a cédé la place au sélecteur de langue du site : aucune ancienne adresse
 n'est à rediriger. Seul texte d'interface, le surtitre « SECTION nn » et les titres et
 descriptions des pages vivent dans `messages/<langue>/bot.json` (`legalPages`) ; les
-titres français sont restés ceux d'avant le lot. Carte d'aperçu par langue
+titres français ont perdu leur moitié anglaise (« … / Privacy Policy ») : la page
+n'affiche plus d'anglais. Habillage seulement, le texte légal ne change pas. Carte
+d'aperçu par langue
 (`/og/<langue>/botPrivacy.png`, `botTerms`).
 
 Il ne rend **pas** `PublicHeader` / `PublicFooter` : la page les pose
