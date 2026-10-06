@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { richNodes } from "@/components/i18n/shell-text";
@@ -134,8 +134,14 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     router.push("/");
   };
 
+  // L'adresse ne se lit qu'**une fois** par montage : `suspensionNotice` passe
+  // à `null` au `router.refresh()` qui suit une connexion réussie (le
+  // middleware ne le remet qu'à une requête de document), et relancer l'effet
+  // réafficherait le refus de `?error=` au moment même où l'on part.
+  const urlRead = useRef(false);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || urlRead.current) return;
+    urlRead.current = true;
     const params = new URLSearchParams(window.location.search);
     setRedirect(loginDestination(params.get("redirect"), text.locale));
     // Le refus vient du module partagé, qui compose la phrase depuis le motif
