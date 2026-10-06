@@ -4,7 +4,7 @@ import { getDatabase } from "@/lib/server/database";
 import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { loadTeamRanking, type TeamRankingRow } from "@/lib/server/ranking-service";
 import { teamLogoDataUrl } from "@/lib/server/share-podium";
-import { TEAM_SHARE_LOGO_SIZE, loadShareTeam } from "@/lib/server/share-team";
+import { TEAM_SHARE_LOGO_SIZE, findShareTeam, loadShareTeam } from "@/lib/server/share-team";
 import { RANKING_MAX_SHOWN } from "@/lib/shared/ranking-page";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
@@ -104,6 +104,12 @@ describe("loadShareTeam", () => {
     jest.mocked(loadTeamRanking).mockRejectedValue(new Error("ECONNREFUSED"));
     expect(await loadShareTeam(1)).toBeNull();
     expect(console.error).toHaveBeenCalled();
+  });
+
+  it("findShareTeam décide sans convertir le logo", async () => {
+    expect(await findShareTeam(1)).toMatchObject({ teamName: "Test - 1", logoUrl: "/api/uploads/teams/1.webp" });
+    expect(await findShareTeam(2)).toBeNull();
+    expect(teamLogoDataUrl).not.toHaveBeenCalled();
   });
 
   it("garde l'initiale quand le logo est illisible", async () => {

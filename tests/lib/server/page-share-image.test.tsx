@@ -4,11 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   PODIUM_CARD_CACHE_CONTROL,
   STATIC_CARD_CACHE_CONTROL,
+  buildPageShareImage,
   renderPageShareImage,
 } from "@/lib/server/page-share-image";
+import { clearShareImageCache } from "@/lib/server/share-image-cache";
 import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { loadSharePodium } from "@/lib/server/share-podium";
-import { loadShareTeam } from "@/lib/server/share-team";
+import { findShareTeam, loadShareTeam } from "@/lib/server/share-team";
 import { GET } from "@/app/og/[locale]/[card]/route";
 
 /**
@@ -29,13 +31,19 @@ jest.mock("next/og", () => ({
       readonly element: unknown,
       readonly options: unknown,
     ) {
-      super("png", { headers: { "content-type": "image/png" } });
+      super("png", {
+        headers: { "content-type": "image/png", ...(options as { headers?: Record<string, string> }).headers },
+      });
     }
   },
 }));
 jest.mock("@/lib/server/share-podium");
 jest.mock("@/lib/server/share-card-logo");
-jest.mock("@/lib/server/share-team", () => ({ TEAM_SHARE_LOGO_SIZE: 208, loadShareTeam: jest.fn() }));
+jest.mock("@/lib/server/share-team", () => ({
+  TEAM_SHARE_LOGO_SIZE: 208,
+  findShareTeam: jest.fn(),
+  loadShareTeam: jest.fn(),
+}));
 
 const PODIUM = [
   { teamName: "Alpha", points: 1240, logoSrc: null },
@@ -44,7 +52,7 @@ const PODIUM = [
 ];
 
 async function render(key: string, locale: "fr" | "en" = "fr") {
-  const image = (await renderPageShareImage(key, locale)) as unknown as FakeImageResponse | null;
+  const image = (await buildPageShareImage(key, locale)) as unknown as FakeImageResponse | null;
   return image ? { image, html: renderToStaticMarkup(image.element) } : null;
 }
 
@@ -52,6 +60,56 @@ beforeEach(() => {
   jest.mocked(loadSharePodium).mockReset().mockResolvedValue(PODIUM);
   jest.mocked(shareCardLogo).mockReset().mockResolvedValue(null);
   jest.mocked(loadShareTeam).mockReset().mockResolvedValue(null);
+  jest.mocked(findShareTeam).mockReset().mockResolvedValue(null);
+  clearShareImageCache();
+});
+
+describe("renderPageShareImage — coût d'un rendu", () => {
+  const TEAM_ROW = { teamName: "Dragon Squad", logoUrl: null, wins: 1, losses: 0, draws: 0, points: 1000 };
+
+  it("rend une carte fixe une fois, puis la ressert depuis la mémoire", async () => {
+    const first = await renderPageShareImage("association", "fr");
+    const second = await renderPageShareImage("association", "fr");
+    expect(shareCardLogo).toHaveBeenCalledTimes(1);
+    expect(second!.headers.get("content-type")).toBe("image/png");
+    expect(second!.headers.get("cache-control")).toBe(STATIC_CARD_CACHE_CONTROL);
+    expect(await second!.text()).toBe(await first!.text());
+  });
+
+  it("ne partage pas une carte entre les langues", async () => {
+    await renderPageShareImage("association", "fr");
+    await renderPageShareImage("association", "en");
+    expect(shareCardLogo).toHaveBeenCalledTimes(2);
+  });
+
+  it("partage un seul rendu entre des robots simultanés", async () => {
+    await Promise.all([1, 2, 3].map(() => renderPageShareImage("ranking", "fr")));
+    expect(loadSharePodium).toHaveBeenCalledTimes(1);
+  });
+
+  it("sert à toute équipe hors classement la même carte générique, en cache court", async () => {
+    const responses = await Promise.all([11, 12, 13].map((id) => renderPageShareImage(`team-${id}`, "fr")));
+    expect(findShareTeam).toHaveBeenCalledTimes(3);
+    expect(loadShareTeam).toHaveBeenCalledTimes(0);
+    expect(shareCardLogo).toHaveBeenCalledTimes(1);
+    for (const response of responses) expect(response!.headers.get("cache-control")).toBe(PODIUM_CARD_CACHE_CONTROL);
+    // La carte générique de la page `team`, elle, garde sa durée d'un jour.
+    expect((await renderPageShareImage("team", "fr"))!.headers.get("cache-control")).toBe(STATIC_CARD_CACHE_CONTROL);
+  });
+
+  it("rend une équipe classée une fois (logo compris) pour plusieurs robots", async () => {
+    jest.mocked(findShareTeam).mockResolvedValue(TEAM_ROW);
+    jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM_ROW, logoSrc: null });
+    await Promise.all([1, 2, 3].map(() => renderPageShareImage("team-42", "fr")));
+    await renderPageShareImage("team-42", "fr");
+    expect(loadShareTeam).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne garde pas un échec de rendu", async () => {
+    jest.mocked(shareCardLogo).mockRejectedValueOnce(new Error("disque"));
+    await expect(renderPageShareImage("association", "fr")).rejects.toThrow("disque");
+    expect(await renderPageShareImage("association", "fr")).not.toBeNull();
+  });
 });
 
 describe("carte nominative d'une équipe", () => {
@@ -142,6 +200,7 @@ describe("renderPageShareImage", () => {
   );
 
   it("rend null pour une clé inconnue", async () => {
+    expect(await buildPageShareImage("nope", "fr")).toBeNull();
     expect(await renderPageShareImage("nope", "fr")).toBeNull();
   });
 });
