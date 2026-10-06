@@ -124,3 +124,33 @@ describe("StatsPanel — français inchangé", () => {
     expect(readSource("app/classement/RankingMore.tsx")).not.toMatch(/messages\/(fr|en)\/ranking\.json/);
   });
 });
+
+describe("StatsPanel — accords du pluriel français", () => {
+  const single = computeDeepStats([match(1, "WIN")], [], NOW);
+  const solo: TeamRankingPosition = { position: 1, total: 1, points: 520, placementPoints: 0 };
+
+  it("un seul match : singulier partout (répartition, activité, forme, classement)", () => {
+    const visible = text(renderToStaticMarkup(<StatsPanel stats={single} ranking={solo} />));
+    expect(visible).toContain("1 victoire sur 1 match");
+    expect(visible).toContain(": 1 match joué au total");
+    expect(visible).toContain("Dernier résultat, du plus récent au plus ancien");
+    expect(visible).toContain("sur 1 équipe");
+    expect(visible).not.toMatch(/\b1 (victoires|matchs|équipes|derniers)\b/);
+  });
+
+  it("zéro victoire au singulier, plusieurs matchs au pluriel", () => {
+    const losses = computeDeepStats([match(1, "LOSS"), match(3, "LOSS")], [], NOW);
+    const visible = text(renderToStaticMarkup(<StatsPanel stats={losses} />));
+    expect(visible).toContain("0 victoire sur 2 matchs");
+    expect(visible).toContain(": 2 matchs joués au total");
+    expect(visible).toContain("2 derniers résultats");
+  });
+
+  it("anglais : singulier d'une seule équipe, dernier résultat", () => {
+    const visible = text(renderToStaticMarkup(<StatsPanel stats={single} ranking={solo} i18n={EN} />));
+    expect(visible).toContain("out of 1 team");
+    expect(visible).not.toContain("out of 1 teams");
+    expect(visible).toContain("Last result, most recent first");
+    expect(visible).toContain("won 1 of 1");
+  });
+});
