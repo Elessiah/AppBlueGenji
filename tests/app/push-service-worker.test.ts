@@ -255,9 +255,9 @@ describe("page hors ligne", () => {
   });
 
   it("prend le fond de l'app installée", async () => {
-    const { APP_BACKGROUND_COLOR } = await import("@/lib/shared/web-manifest");
+    const { APP_BACKGROUND_COLOR, APP_THEME_COLOR } = await import("@/lib/shared/web-manifest");
     expect(page).toContain(`--bg: ${APP_BACKGROUND_COLOR};`);
-    expect(page).toContain(`name="theme-color" content="${APP_BACKGROUND_COLOR}"`);
+    expect(page).toContain(`name="theme-color" content="${APP_THEME_COLOR}"`);
   });
 
   it("est posée pour tout visiteur, par le même service worker que les notifications", async () => {

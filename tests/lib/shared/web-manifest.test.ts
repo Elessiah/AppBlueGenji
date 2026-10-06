@@ -11,6 +11,7 @@ import {
   APP_SCREENSHOTS,
   APP_SHORTCUTS,
   APP_SHORT_NAME,
+  APP_THEME_COLOR,
   buildWebManifest,
 } from "@/lib/shared/web-manifest";
 
@@ -52,7 +53,17 @@ describe("buildWebManifest", () => {
     const cyberBg = /--cyber-bg:\s*(#[0-9a-f]{6})/i.exec(css)?.[1];
     expect(cyberBg?.toLowerCase()).toBe(APP_BACKGROUND_COLOR);
     expect(webManifest.background_color).toBe(APP_BACKGROUND_COLOR);
-    expect(webManifest.theme_color).toBe(APP_BACKGROUND_COLOR);
+  });
+
+  it("prend le néon `--cyan-400` pour couleur de thème, dans le manifeste et la page", () => {
+    const css = readFileSync(path.join(ROOT, "app/globals.css"), "utf8");
+    const cyan = /--cyan-400:\s*(#[0-9a-f]{6})/i.exec(css)?.[1];
+    expect(APP_THEME_COLOR).toBe("#3ee6ff");
+    expect(cyan?.toLowerCase()).toBe(APP_THEME_COLOR);
+    expect(webManifest.theme_color).toBe(APP_THEME_COLOR);
+    expect(APP_THEME_COLOR).not.toBe(APP_BACKGROUND_COLOR);
+    const layout = readFileSync(path.join(ROOT, "app/layout.tsx"), "utf8");
+    expect(layout).toMatch(/themeColor:\s*APP_THEME_COLOR/);
   });
 
   it("déclare les icônes qu'exigent Chrome et Android : 192, 512 et une masquable", () => {

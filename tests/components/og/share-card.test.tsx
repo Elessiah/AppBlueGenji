@@ -18,6 +18,7 @@ import {
   SHARE_CARD_GLOWS,
   SHARE_CARD_TEXT_BOX,
   SHARE_CARD_TONE_COLORS,
+  subtitleLineClamp,
   titleFontSize,
   type ShareCardTone,
 } from "@/components/og/share-card";
@@ -177,6 +178,29 @@ describe("rendu", () => {
     expect(titleFontSize(props.title)).toBe(44);
     expect(html).toContain("-webkit-line-clamp:3");
     expect(html).toContain("…");
+  });
+
+  it("pose l'ellipse sans laquelle Satori ignore la limite de lignes", () => {
+    const html = renderToStaticMarkup(
+      <ShareCard eyebrow="Overwatch" title={"Coupe ".repeat(10)} subtitle={"Accroche ".repeat(40)} logoSrc={null} />,
+    );
+    expect(html).toContain("-webkit-line-clamp:3;text-overflow:ellipsis");
+    expect(html).toContain("-webkit-line-clamp:1;text-overflow:ellipsis");
+  });
+
+  it("garde le pied hors du rognage du bloc du haut", () => {
+    const html = renderToStaticMarkup(<ShareCard {...SITE_SHARE_CARD} logoSrc={null} />);
+    expect(html).toContain("flex-shrink:1;min-height:0;overflow:hidden");
+    expect(html).toContain("flex-shrink:0");
+  });
+});
+
+describe("subtitleLineClamp", () => {
+  it("n'accorde deux lignes d'accroche qu'à un titre tenant sur une ligne", () => {
+    expect(subtitleLineClamp("OW Cup")).toBe(2);
+    expect(subtitleLineClamp("x".repeat(16))).toBe(2);
+    expect(subtitleLineClamp("x".repeat(17))).toBe(1);
+    expect(subtitleLineClamp("x".repeat(90))).toBe(1);
   });
 });
 
