@@ -140,8 +140,9 @@ refonte (`DESIGN_SYSTEM.md`), chaque valeur recopiée d'un jeton de
   « Tournoi terminé ». Ni rouge (une vraie diffusion seulement) ni ambre (un
   avertissement seulement). `SHARE_STATE_TONES` porte la correspondance, un test
   la tient alignée sur `STATE_META` ;
-- **faits** : chaque intitulé dans son néon (cyan, violet, turquoise) avec un
-  liseré à gauche, la valeur en `--ink` ;
+- **faits** : chaque intitulé dans son néon (cyan, violet, turquoise), en 24 px
+  pour rester lisible dans la vignette Discord (la carte y est réduite de
+  moitié), avec un liseré à gauche, la valeur en `--ink` ;
 - **logo** BlueGenji en pied, lu sur le disque (`lib/server/share-card-logo.ts` :
   `public/icons/icon-192.png` en URL `data:`, mémorisé par processus). Satori ne
   décode pas le WebP de la vitrine ; un fichier absent rend `null` et la carte
@@ -160,14 +161,22 @@ tienne dans le coin haut-droit.
 mot à 90 caractères (trois lignes à la plus petite taille), avec une ellipse ;
 un nom sans caractère visible devient « Tournoi ».
 
-**Barre colorée de l'encart Discord — non changée, décision requise.** Discord
-colore le liseré gauche d'un encart d'après `<meta name="theme-color">`, réglé à
-`APP_BACKGROUND_COLOR` (`#05060a`) dans `app/layout.tsx` et le manifeste. Le
-passer au glacier `#5ac8ff` colorerait aussi la barre d'adresse des navigateurs
-mobiles et la barre d'état de l'application installée — une bande bleu vif
-au-dessus d'un site noir. Un `theme-color` propre à la fiche d'un tournoi
-(`generateViewport`) aurait le même effet sur cette seule page. Laissé tel quel
-en attendant l'arbitrage.
+**Hauteur bornée.** La colonne de texte n'a que 528 px : l'accroche n'a droit
+qu'à une ligne dès que le titre en prend plus d'une (`subtitleLineClamp`, deux
+lignes jusqu'à 16 caractères), et le bloc du haut cède avant le pied
+(`flex-shrink`, rogné plutôt que de chevaucher les faits). **Piège Satori :**
+`WebkitLineClamp` n'y est appliqué qu'avec `textOverflow: "ellipsis"` — sans
+elle, titre et accroche couraient sur autant de lignes qu'il en fallait.
+
+**Barre colorée de l'encart Discord — néon de marque (décision du 2026-10-06).**
+Discord colore le liseré gauche d'un encart d'après `<meta name="theme-color">`.
+Il est réglé à `APP_THEME_COLOR` = `--cyan-400` (`#3ee6ff`), le bleu le plus
+vif de la palette, dans `app/layout.tsx` (`viewport.themeColor`), le manifeste
+(`theme_color`) et la page hors ligne. Contrepartie acceptée : la barre
+d'adresse des navigateurs mobiles et la barre de l'application installée
+prennent ce néon sur tout le site, au-dessus d'un fond noir. Le fond
+(`APP_BACKGROUND_COLOR`, `#05060a`) reste celui du manifeste
+(`background_color`) et des écrans de lancement.
 
 Deux routes la servent :
 
