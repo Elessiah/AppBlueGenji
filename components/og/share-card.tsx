@@ -73,8 +73,10 @@ export const SHARE_CARD_TONE_COLORS: Record<ShareCardTone, string> = {
 };
 
 /**
- * Couleur de l'intitulé de chaque fait, dans l'ordre : trois néons distincts
- * plutôt qu'un gris répété trois fois.
+ * Couleur du liseré de chaque fait, dans l'ordre : trois néons distincts.
+ * L'intitulé, lui, reste en `--ink-mute` : en néon, il reprenait la couleur
+ * d'une pastille (« FORMAT » au cyan du jeu, un fait au turquoise de « Tournoi
+ * terminé ») et se lisait comme une étiquette de plus.
  */
 export const SHARE_CARD_FACT_COLORS = [
   SHARE_CARD_COLORS.cyan,
@@ -343,7 +345,7 @@ export function ShareCard({
                         fontSize: 24,
                         letterSpacing: 2,
                         textTransform: "uppercase",
-                        color,
+                        color: SHARE_CARD_COLORS.inkMute,
                       }}
                     >
                       {fact.label}
