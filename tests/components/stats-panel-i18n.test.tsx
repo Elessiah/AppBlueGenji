@@ -153,4 +153,12 @@ describe("StatsPanel — accords du pluriel français", () => {
     expect(visible).toContain("Last result, most recent first");
     expect(visible).toContain("won 1 of 1");
   });
+
+  it("nombre d'équipes classées sans séparateur de milliers, comme le rang", () => {
+    const big: TeamRankingPosition = { position: 1200, total: 1200, points: 520, placementPoints: 0 };
+    expect(text(renderToStaticMarkup(<StatsPanel stats={single} ranking={big} />))).toContain("sur 1200 équipes");
+    const en = text(renderToStaticMarkup(<StatsPanel stats={single} ranking={big} i18n={EN} />));
+    expect(en).toContain("#1200");
+    expect(en).toContain("out of 1200 teams");
+  });
 });
