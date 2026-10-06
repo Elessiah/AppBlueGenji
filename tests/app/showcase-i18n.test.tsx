@@ -325,6 +325,18 @@ describe("rendu anglais — rien encore traduit : le dire, sans « 0 » ni « au
     const partial = readable(await render(RecrutementPage, "en"));
     expect(partial).not.toContain("No urgent openings right now.");
     expect(partial).toContain("Our openings are being translated into English.");
+
+    // Masquée mais facultative : « aucune urgence » reste vrai, des annonces anglaises suivent.
+    jest.mocked(listRecruitmentAds).mockResolvedValueOnce(all.map((ad) => ({ ...ad, priority: "OPTIONAL" as const })));
+    const optional = readable(await render(RecrutementPage, "en"));
+    expect(optional).toContain("No urgent openings right now.");
+    expect(optional).not.toContain("Our openings are being translated into English.");
+  });
+
+  it("/en/recrutement : pas de flèches d'ordre pour le staff (une annonce masquée fausserait l'échange)", async () => {
+    mockUser = authUserForMock();
+    expect(await render(RecrutementPage, "en")).not.toMatch(/aria-label="(Monter|Descendre) l&#x27;annonce/);
+    expect(await render(RecrutementPage, "fr")).toMatch(/aria-label="(Monter|Descendre) l&#x27;annonce/);
   });
 });
 
