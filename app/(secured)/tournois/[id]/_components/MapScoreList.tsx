@@ -128,6 +128,9 @@ export function MapScoreList({
   const autoGrown = useRef(false);
   useEffect(() => {
     if (autoGrown.current && !focusNewRow.current) setAnnouncement(`Map ${maps.length} ajoutée : à renseigner.`);
+    // Ligne retirée (un nul de passage pendant la frappe) : l'annonce se vide,
+    // pour qu'une ligne qui revient soit annoncée de nouveau.
+    else if (!autoGrown.current) setAnnouncement("");
     autoGrown.current = false;
   }, [maps.length]);
 
@@ -314,7 +317,7 @@ export function MapScoreList({
 
       {/* Région d'état : le score dérivé change à chaque frappe. Rien sans map —
           un « 0 – 0 » contredirait le score posé à la main au-dessus. */}
-      {maps.length > 0 && (
+      {played > 0 && (
         <output className={styles.summary}>
           <span className={styles.summaryLabel}>Score du match</span>
           <span className={styles.summaryScore}>

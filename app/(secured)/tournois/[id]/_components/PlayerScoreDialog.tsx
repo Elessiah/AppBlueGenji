@@ -17,6 +17,7 @@ import {
   mapFieldKey,
   isMapTouched,
   progressiveMapRows,
+  refusalFieldOnRows,
   trimTrailingBlankMaps,
   refusalOnTouchedRow,
   type MapListCheck,
@@ -274,11 +275,9 @@ export function PlayerScoreDialog({
   // qu'un code : la même règle, rejouée ici, retrouve le champ.
   const flagRefusal = (code: string): boolean => {
     const local = checkMapList(matchFormat, game, maps, { decisive: true });
-    if (!local.field || local.error !== code) return false;
-    fieldErrors.flag(
-      mapFieldKey(Math.min(local.field.index, Math.max(maps.length - 1, 0)), local.field.field),
-      mapListViolationMessage(local.error, matchFormat, game),
-    );
+    const target = refusalFieldOnRows(local, rows);
+    if (!target || local.error !== code) return false;
+    fieldErrors.flag(mapFieldKey(target.index, target.field), mapListViolationMessage(local.error, matchFormat, game));
     return true;
   };
 

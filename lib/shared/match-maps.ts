@@ -395,6 +395,29 @@ export function progressiveMapRows(
   return rows;
 }
 
+/** Refus qui disent « il manque des maps » : ils désignent la ligne à renseigner. */
+const MISSING_MAP_VIOLATIONS: ReadonlySet<MapListViolation> = new Set<MapListViolation>([
+  "MAP_LIST_EMPTY",
+  "SCORE_BELOW_MATCH_FORMAT",
+  "MAP_LIST_INCOMPLETE",
+]);
+
+/**
+ * Champ à désigner pour un refus, sur les lignes **affichées** : la liste
+ * validée en retire la ligne vierge de fin, mais quand le refus dit qu'il
+ * manque des maps, c'est elle qu'il faut renseigner — pas le score, juste,
+ * de la dernière map jouée. Ailleurs, le champ du contrôle (borné aux lignes).
+ */
+export function refusalFieldOnRows(
+  check: Pick<MapListCheck, "error" | "field">,
+  rows: ReadonlyArray<MatchMapInput>,
+): { index: number; field: MapField } | null {
+  if (!check.field || !check.error) return null;
+  const sent = trimTrailingBlankMaps(rows).length;
+  if (rows.length > sent && MISSING_MAP_VIOLATIONS.has(check.error)) return { index: sent, field: "replayCode" };
+  return { index: Math.min(check.field.index, Math.max(rows.length - 1, 0)), field: check.field.field };
+}
+
 /** Clé d'un champ de la liste, pour le rattachement des erreurs. */
 export function mapFieldKey(index: number, field: MapField): string {
   return `${index}:${field}`;

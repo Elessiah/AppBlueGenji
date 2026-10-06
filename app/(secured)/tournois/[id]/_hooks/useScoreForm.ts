@@ -19,6 +19,7 @@ import {
   checkMapList,
   deriveMatchScore,
   progressiveMapRows,
+  refusalFieldOnRows,
   trimTrailingBlankMaps,
   refusalOnTouchedRow,
   mapListViolationMessage,
@@ -132,9 +133,9 @@ export function useScoreForm(
   // champ qu'il désigne.
   const flagMapRefusal = (code: string, decisive: boolean) => {
     const local = checkMapList(matchFormat, game, sentMaps, { decisive });
-    if (!local.field || local.error !== code || !options.onMapRefusal) return;
-    const index = Math.min(local.field.index, Math.max(sentMaps.length - 1, 0));
-    options.onMapRefusal({ index, field: local.field.field }, mapListViolationMessage(local.error, matchFormat, game));
+    const target = refusalFieldOnRows(local, maps);
+    if (!target || local.error !== code || !options.onMapRefusal) return;
+    options.onMapRefusal(target, mapListViolationMessage(local.error, matchFormat, game));
   };
 
   /** Contrôle des maps avant l'envoi ; `true` (refus signalé) bloque l'envoi. */
