@@ -120,6 +120,14 @@ describe("submitSiteCopy", () => {
     expect(fieldForError(outcome.ok ? null : outcome.code, SITE_COPY_FIELD_ERRORS)).toBe("en");
   });
 
+  it("refuse d'abord un français vide, comme le serveur, et le refus désigne le champ français", async () => {
+    const fetcher = jest.fn<typeof fetch>();
+    const outcome = await submitSiteCopy(fetcher, "home.hero.title", " ", "");
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ ok: false, code: "COPY_EMPTY", fallback: "Le texte français est requis." });
+    expect(fieldForError(outcome.ok ? null : outcome.code, SITE_COPY_FIELD_ERRORS)).toBe("fr");
+  });
+
   it("envoie les deux langues", async () => {
     const fetcher = jest.fn<typeof fetch>().mockResolvedValue(response(200, { copy: {} }));
     await expect(submitSiteCopy(fetcher, "home.hero.title", "Titre", "Title")).resolves.toEqual({ ok: true });

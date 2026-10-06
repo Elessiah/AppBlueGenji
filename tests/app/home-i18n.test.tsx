@@ -168,6 +168,26 @@ describe("accueil — anglais", () => {
     expect(markup).toContain('"inLanguage":"en-US"');
   });
 
+  it("lit un quart de finale « KNOCKOUT STAGE », comme « PHASE ÉLIMINATOIRE » en français", async () => {
+    const service = jest.requireMock<{ getLandingLive: jest.Mock<() => Promise<Record<string, unknown>>> }>(
+      "@/lib/server/landing-service",
+    );
+    const base = await service.getLandingLive();
+    const match = base.currentMatch as Record<string, unknown>;
+    service.getLandingLive.mockResolvedValueOnce({
+      ...base,
+      currentMatch: { ...match, roundLabel: "Quart de finale", round: { kind: "quarter", number: 1 } },
+    });
+    const markup = await renderHome("en");
+    expect(markup).toContain("KNOCKOUT STAGE");
+    expect(markup).toContain("Quarterfinal");
+  });
+
+  it("propose un fichier .ics rédigé en anglais", async () => {
+    expect(await renderHome("en")).toContain('href="/api/landing/calendar?format=ics&amp;lang=en"');
+    expect(await renderHome("fr")).toContain('href="/api/landing/calendar?format=ics"');
+  });
+
   it("ne rend pas le contenu de staff encore français (chiffres, cartes, description d'un partenaire)", async () => {
     const markup = await renderHome("en");
     expect(markup).not.toContain("Bénévole");

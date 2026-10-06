@@ -42,9 +42,9 @@ describe("getLandingTicker", () => {
     await mockRows(rowsExecute());
     expect((await getLandingTicker()).items).toEqual([
       "NEWS · Nouvelle saison annoncée",
-      "RÉSULTAT · Alpha Cup · Alpha 2 — Equipe #7 1",
+      "RÉSULTAT · Alpha Cup · Alpha 2 — Équipe #7 1",
       "INSCRIPTIONS · Beta Open · 3/8 équipes",
-      "VAINQUEUR · Gamma League · Equipe #9",
+      "VAINQUEUR · Gamma League · Équipe #9",
       "VAINQUEUR · Delta Cup · Champion inconnu",
     ]);
   });
@@ -57,7 +57,7 @@ describe("getLandingTicker", () => {
     const calls = execute.mock.calls.length;
     expect((await getLandingTicker("en")).items).toEqual([
       "RESULT · Alpha Cup · Alpha 2 — Team #7 1",
-      "REGISTRATION · Beta Open · 3/8 teams",
+      "REGISTRATION OPEN · Beta Open · 3/8 teams",
       "WINNER · Gamma League · Team #9",
       "WINNER · Delta Cup · Unknown champion",
     ]);
@@ -68,7 +68,7 @@ describe("getLandingTicker", () => {
     await mockRows(jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN")));
     expect((await getLandingTicker("en")).items).toEqual([
       "RESULT · Waiting for new matches",
-      "REGISTRATION · More brackets coming soon",
+      "REGISTRATION OPEN · More brackets coming soon",
       "COMMUNITY · Join the BlueGenji Discord",
     ]);
     expect((await getLandingTicker()).items[0]).toBe("RÉSULTAT · En attente de nouveaux matches");
