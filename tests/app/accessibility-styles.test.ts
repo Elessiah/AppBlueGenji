@@ -349,7 +349,7 @@ describe("mise en page racine", () => {
 
   it("pose l'attribut dès le HTML initial, depuis le cookie", () => {
     expect(layout).toMatch(/parseA11yCookie\(cookieStore\.get\(A11Y_COOKIE\)\?\.value\)/);
-    expect(layout).toMatch(/<html lang="fr" data-a11y=\{a11yAttribute\(a11ySettings\)\}>/);
+    expect(layout).toMatch(/<html lang=\{locale\} data-a11y=\{a11yAttribute\(a11ySettings\)\}>/);
   });
 
   it("rend le menu en premier dans la page", () => {

@@ -174,3 +174,5 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `MIGRATION_LOCK.md` — Migrations sous verrou nommé.
 - `VERSIONING.md` — Bump, tag et release automatiques à la fusion.
 - `DEPENDENCY_RISKS.md` — Avis npm audit restants (`braces`, `deepmerge`), surcharges (`uri-js`, `sprintf-js`) et règle du lockfile Windows.
+- `I18N.md` — Site bilingue : réécriture `/en` du middleware, liste blanche des routes traduites, `next-intl` sans routage, `LocaleLink`, sélecteur, `hreflang`/sitemap, garde-fous, glossaire.
+- `I18N_MIGRATION_PLAN.md` — Site bilingue FR/EN (`/en/...`) : mesure, choix technique, lots et décisions prises (lot 0 livré).

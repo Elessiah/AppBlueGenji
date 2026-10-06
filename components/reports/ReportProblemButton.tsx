@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { CyberButton } from "@/components/cyber";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
@@ -38,7 +38,9 @@ export function ReportProblemButton({
   cyber = false,
 }: Readonly<ReportProblemButtonProps>) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname() ?? "/";
+  // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
+  // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
+  const { path: pathname } = useLocalePathname();
 
   return (
     <>

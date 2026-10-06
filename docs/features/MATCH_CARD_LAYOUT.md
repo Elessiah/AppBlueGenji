@@ -96,7 +96,10 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
   focus rendu au bouton : la carte pourrait y sortir de la partie visible.
 - À l'ouverture, le focus entre dans le panneau (premier bouton) : porté en
   fin de page, il n'est pas sur le chemin de la tabulation. La tabulation
-  qui en sort par un bout le referme et rend le focus au bouton.
+  qui en sort par un bout le referme et rend le focus au bouton. Elle est
+  écoutée sur **chaque bouton** du panneau, jamais sur son `<div>` : un
+  conteneur qui reçoit des touches se présente comme un contrôle qu'il n'est
+  pas (SonarQube S6848).
 - Échap referme et rend le focus au bouton (`handleMenuEscape`) ; un clic
   extérieur ou un focus qui quitte le pied **et** le panneau le referme
   (`focusLeftMenu`).

@@ -1,8 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -55,7 +54,8 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
   // plus parler d'une modale que le joueur a quittée.
   const leftByLink = useRef(false);
 
-  const pathname = usePathname();
+  // Route sans préfixe de langue : `/en/rgpd` est la page de confidentialité.
+  const { path: pathname } = useLocalePathname();
   const open = changes.length > 0 && !answered && pathname !== PRIVACY_POLICY_PATH;
   const dialogRef = useDialogBehavior({
     open,
@@ -71,6 +71,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ changeIds }),
+      // Un lien d'action qui change de langue charge un nouveau document
+      // (`LocaleLink`) : sans `keepalive`, ce départ annulerait l'écriture.
+      keepalive: true,
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
   };
@@ -157,9 +160,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
                   <ul className={styles.changeLinks}>
                     {change.links.map((link) => (
                       <li key={link.href}>
-                        <Link href={link.href} onClick={() => followLink(change.id)}>
+                        <LocaleLink href={link.href} onClick={() => followLink(change.id)}>
                           {link.label}
-                        </Link>
+                        </LocaleLink>
                       </li>
                     ))}
                   </ul>
@@ -173,9 +176,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
           Ce qui repose sur ton choix se règle dans « Mon profil », sans rien perdre d&apos;autre.
           Tu peux t&apos;opposer à un traitement ou exercer tes autres droits comme l&apos;explique
           la{" "}
-          <Link href="/rgpd" target="_blank" rel="noreferrer">
+          <LocaleLink href="/rgpd" target="_blank" rel="noreferrer">
             politique de confidentialité
-          </Link>
+          </LocaleLink>
           .
         </p>
 

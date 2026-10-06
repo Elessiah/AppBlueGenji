@@ -4,10 +4,19 @@ module.exports = {
     testEnvironment: 'node',
     transform: {
         '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
+        // `next-intl` et ses dépendances ne sont publiés qu'en modules ES, que
+        // Jest (CommonJS) ne sait pas charger : transpilés à la volée, eux
+        // seuls (`transformIgnorePatterns` ci-dessous).
+        '^.+\\.m?js$': ['ts-jest', { tsconfig: { allowJs: true, module: 'CommonJS', esModuleInterop: true }, diagnostics: false }],
     },
+    transformIgnorePatterns: [
+        '/node_modules/(?!(next-intl|use-intl|intl-messageformat|icu-minify|@formatjs|@schummar)/)',
+    ],
     moduleNameMapper: {
         // Les composants importent leurs modules CSS ; Node ne sait pas les lire.
         '\\.(css|scss|sass)$': '<rootDir>/tests/__mocks__/style-mock.cjs',
+        // Le vrai `next-intl/server` n'existe que dans le rendu serveur de Next.
+        '^next-intl/server$': '<rootDir>/tests/__mocks__/next-intl-server.ts',
         '^@/(.*)$': '<rootDir>/$1',
     },
     setupFiles: ['<rootDir>/tests/setup-env.cjs'],

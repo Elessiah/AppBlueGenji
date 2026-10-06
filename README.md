@@ -83,7 +83,7 @@ Le site est installable (manifeste `/manifest.webmanifest`, voir [`docs/features
 
 ## Déploiement
 
-`./update.sh` — voir [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+En production : `~/apps/updateBlueGenji.sh` (bot puis site, sans `sudo` ; `site` pour le site seul), qui appelle le `./update.sh` de ce dépôt — voir [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Documentation
 

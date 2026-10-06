@@ -13,6 +13,7 @@
  */
 import type { Metadata } from "next";
 import { SITE_NAME } from "./share-metadata";
+import { DEFAULT_LOCALE, OPEN_GRAPH_LOCALE, localeAlternates, localeHref, type Locale } from "./locales";
 
 /** Le gabarit de titre du site, celui que déclare la mise en page racine. */
 export const SITE_TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -60,6 +61,11 @@ export type PageMetadataInput = {
    * enfants.
    */
   selfTitled?: boolean;
+  /**
+   * Langue de la page rendue (`requestLocale()` dans un `generateMetadata`),
+   * `fr` par défaut. L'URL canonique est celle de **cette** langue.
+   */
+  locale?: Locale;
 };
 
 export function pageMetadata({
@@ -68,25 +74,33 @@ export function pageMetadata({
   shareDescription,
   path,
   selfTitled = false,
+  locale = DEFAULT_LOCALE,
 }: PageMetadataInput): Metadata {
   const share = shareDescription ?? description;
   // L'encart, lui, n'hérite d'aucun gabarit : son titre porte le nom du site,
   // sans quoi « Bénévoles » collé seul dans un salon ne dit pas de qui il parle.
   const shareTitle = siteTitle(title);
+  // Chaque langue est sa propre canonique — jamais l'anglais vers le
+  // français, que Google lirait comme un doublon à écarter. Les `hreflang`
+  // réciproques (`x-default` = français) n'existent que pour une route
+  // traduite (`lib/shared/i18n-routes.ts`) : annoncer une page anglaise qui
+  // redirige serait faux.
+  const canonical = localeHref(path, locale);
+  const languages = localeAlternates(path);
 
   return {
     // `absolute` court-circuite le gabarit : ici non pour l'éviter — il ne
     // s'appliquerait pas — mais pour écrire à la main ce qu'il aurait écrit.
     title: selfTitled ? { absolute: shareTitle } : title,
     description,
-    alternates: { canonical: path },
+    alternates: languages ? { canonical, languages } : { canonical },
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
-      locale: "fr_FR",
+      locale: OPEN_GRAPH_LOCALE[locale],
       title: shareTitle,
       description: share,
-      url: path,
+      url: canonical,
       images: [{ url: DEFAULT_SHARE_IMAGE, width: 1200, height: 630, alt: SITE_NAME }],
     },
     twitter: {

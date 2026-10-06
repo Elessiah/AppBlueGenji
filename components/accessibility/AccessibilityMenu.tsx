@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import {
   A11Y_SETTINGS,
@@ -278,9 +278,9 @@ export function AccessibilityPanel({
         {/* Le menu est la seule porte d'accessibilité présente sur **toutes** les
             pages, espace connecté compris (qui n'a pas de pied de page) : la
             déclaration s'y atteint de partout. */}
-        <Link href="/accessibilite" className={styles.statementLink} onClick={onNavigate}>
+        <LocaleLink href="/accessibilite" className={styles.statementLink} onClick={onNavigate}>
           Déclaration d&apos;accessibilité
-        </Link>
+        </LocaleLink>
         {/* `aria-disabled` et non `disabled` : le bouton garde le focus après
             avoir servi, au lieu de le jeter au `<body>` en se désactivant. */}
         <button

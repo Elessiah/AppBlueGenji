@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import Image from "next/image";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getContactInfo } from "@/lib/server/contact-service";
@@ -51,17 +51,17 @@ export async function PublicFooter() {
           <div>
             <div className={styles.heading}>COMPÉTITIONS</div>
             <ul>
-              <li><Link className="tap-target" href="/tournois">Tournois</Link></li>
-              <li><Link className="tap-target" href="/classement">Classement</Link></li>
-              <li><Link className="tap-target" href="/bot">Bot</Link></li>
+              <li><LocaleLink className="tap-target" href="/tournois">Tournois</LocaleLink></li>
+              <li><LocaleLink className="tap-target" href="/classement">Classement</LocaleLink></li>
+              <li><LocaleLink className="tap-target" href="/bot">Bot</LocaleLink></li>
             </ul>
           </div>
           <div>
             <div className={styles.heading}>ASSOCIATION</div>
             <ul>
-              <li><Link className="tap-target" href="/association#manifeste">Manifeste</Link></li>
-              <li><Link className="tap-target" href="/benevoles">Bénévoles</Link></li>
-              <li><Link className="tap-target" href="/#sponsors">Partenaires</Link></li>
+              <li><LocaleLink className="tap-target" href="/association#manifeste">Manifeste</LocaleLink></li>
+              <li><LocaleLink className="tap-target" href="/benevoles">Bénévoles</LocaleLink></li>
+              <li><LocaleLink className="tap-target" href="/#sponsors">Partenaires</LocaleLink></li>
             </ul>
           </div>
           <div>
@@ -71,18 +71,18 @@ export async function PublicFooter() {
           <div>
             <div className={styles.heading}>LÉGAL</div>
             <ul>
-              <li><Link className="tap-target" href="/mentions-legales">Mentions légales</Link></li>
-              <li><Link className="tap-target" href={TERMS_PATH}>Conditions d&apos;utilisation</Link></li>
-              <li><Link className="tap-target" href="/rgpd">RGPD</Link></li>
+              <li><LocaleLink className="tap-target" href="/mentions-legales">Mentions légales</LocaleLink></li>
+              <li><LocaleLink className="tap-target" href={TERMS_PATH}>Conditions d&apos;utilisation</LocaleLink></li>
+              <li><LocaleLink className="tap-target" href="/rgpd">RGPD</LocaleLink></li>
               <li><a className="tap-target" href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
               <li><a className="tap-target" href={REGLEMENT_URL} target="_blank" rel="noreferrer">Règlement intérieur</a></li>
-              <li><Link className="tap-target" href="/rgpd#cookies">Cookies</Link></li>
+              <li><LocaleLink className="tap-target" href="/rgpd#cookies">Cookies</LocaleLink></li>
               {/* AGPL, art. 13 : le code source s'offre à chaque utilisateur du service. */}
               <li><a className="tap-target" href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">{SOURCE_CODE_LINK_LABEL}</a></li>
               <li><AccessibilityFooterLink className={`${styles.linkButton} tap-target`} /></li>
               {/* Mention imposée par le RGAA sur chaque page, dans ses termes
                   exacts : l'état de conformité se lit sans ouvrir la page. */}
-              <li><Link className="tap-target" href="/accessibilite">{accessibilityFooterLabel()}</Link></li>
+              <li><LocaleLink className="tap-target" href="/accessibilite">{accessibilityFooterLabel()}</LocaleLink></li>
             </ul>
           </div>
         </div>

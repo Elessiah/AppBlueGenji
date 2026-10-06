@@ -10,7 +10,11 @@ jest.mock("react-dom", () => {
   return { ...actual, createPortal: (node: unknown) => node };
 });
 
+// La fiche d'équipe simulée comme traduite : le retour de connexion y garde `/en`.
+jest.mock("@/lib/shared/i18n-routes", () => ({ MIGRATED_ROUTES: ["/equipes/[id]"] }));
+
 import { renderToStaticMarkup } from "react-dom/server";
+import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
 import { REPORT_CATEGORIES, REPORT_CATEGORY_DEFINITIONS, type ReportCategory } from "@/lib/shared/content-reports";
@@ -84,5 +88,16 @@ describe("ReportProblemDialog — contestation", () => {
     const html = render({ contestOf: 42, authenticated: false });
     expect(html).toContain("pour contester un signalement");
     expect(html).toContain("/connexion?redirect=%2Fequipes%2F12");
+  });
+
+  it("ramène à la page dans sa langue : /en/… sur une page anglaise traduite", () => {
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <ToastProvider>
+          <ReportProblemDialog pathname="/equipes/12" authenticated={false} contestOf={42} onClose={() => undefined} />
+        </ToastProvider>
+      </AppLocaleProvider>,
+    );
+    expect(html).toContain("/connexion?redirect=%2Fen%2Fequipes%2F12");
   });
 });

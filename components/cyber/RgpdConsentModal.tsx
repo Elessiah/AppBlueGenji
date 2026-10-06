@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { TERMS_AGE_DECLARATION, TERMS_CHECKBOX_LABEL, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -126,14 +126,14 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
 
         <p style={{ color: "var(--ink-dim)", fontSize: 12.5, lineHeight: 1.6, margin: "0 0 24px" }}>
           Détail complet dans notre{" "}
-          <Link
+          <LocaleLink
             href="/rgpd"
             target="_blank"
             rel="noreferrer"
             style={{ color: "var(--blue-300)", textDecoration: "underline" }}
           >
             politique de confidentialité
-          </Link>
+          </LocaleLink>
           . Si tu reviens en arrière, aucun compte n&apos;est créé ; seule la mesure d&apos;audience du site a pu compter ta visite.
         </p>
 
@@ -157,14 +157,14 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
           />
           <span>
             {TERMS_CHECKBOX_LABEL} (
-            <Link
+            <LocaleLink
               href={TERMS_PATH}
               target="_blank"
               rel="noreferrer"
               style={{ color: "var(--blue-300)", textDecoration: "underline" }}
             >
               lire les conditions
-            </Link>
+            </LocaleLink>
             ), et {TERMS_AGE_DECLARATION}.
           </span>
         </label>

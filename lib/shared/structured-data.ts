@@ -18,6 +18,10 @@
  * lieu d'en déclarer deux.
  */
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
+
+/** Étiquette de langue BCP 47 de `inLanguage`, par langue du site. */
+export const JSON_LD_LANGUAGE: Readonly<Record<Locale, string>> = { fr: "fr-FR", en: "en-US" };
 
 /** Raison sociale telle qu'elle figure aux mentions légales. */
 export const ORGANIZATION_LEGAL_NAME = "Bluegenji Esport";
@@ -91,8 +95,11 @@ export function organizationJsonLd(baseUrl: string, description: string): JsonLd
  * peut fermer un site sans dissoudre une association. `publisher` fait le lien,
  * par l'identité stable du nœud précédent — d'où l'`@id` plutôt qu'une seconde
  * description recopiée.
+ *
+ * `inLanguage` suit la langue de la page qui le publie (`docs/features/I18N.md`) :
+ * la description est écrite dans cette langue-là.
  */
-export function webSiteJsonLd(baseUrl: string, description: string): JsonLdNode {
+export function webSiteJsonLd(baseUrl: string, description: string, locale: Locale = DEFAULT_LOCALE): JsonLdNode {
   const base = normalizeBase(baseUrl);
 
   return {
@@ -102,7 +109,7 @@ export function webSiteJsonLd(baseUrl: string, description: string): JsonLdNode 
     name: ORGANIZATION_NAME,
     url: `${base}/`,
     description,
-    inLanguage: "fr-FR",
+    inLanguage: JSON_LD_LANGUAGE[locale],
     publisher: { "@id": `${base}/#organisation` },
   };
 }

@@ -32,6 +32,11 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(render([...PRIVACY_CHANGES])).not.toMatch(/role="dialog"/);
   });
 
+  it("se tait aussi sur /en/rgpd : la route compte, pas le préfixe de langue", () => {
+    mockPathname = "/en/rgpd";
+    expect(render([...PRIVACY_CHANGES])).not.toMatch(/role="dialog"/);
+  });
+
   it("revient sur toute autre page, sous-pages de /rgpd comprises", () => {
     for (const path of ["/", "/profil", "/rgpd/autre", "/regles"]) {
       mockPathname = path;
@@ -92,6 +97,10 @@ describe("PrivacyChangesModal — contrats du geste", () => {
   it("envoie les identifiants montrés, pas « tout ce qui est dû »", () => {
     expect(source).toContain('fetch("/api/profile/privacy-changes"');
     expect(source).toContain("await record(changes.map((change) => change.id));");
+  });
+
+  it("garde l'écriture en vol quand un lien d'action charge un nouveau document (changement de langue)", () => {
+    expect(source).toMatch(/fetch\("\/api\/profile\/privacy-changes", \{[\s\S]*?keepalive: true,[\s\S]*?\}\)/);
   });
 
   it("suivre un lien d'action vaut prise de connaissance et ferme la modale sans attendre", () => {

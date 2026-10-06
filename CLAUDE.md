@@ -23,7 +23,7 @@ NODE_ENV=production npm run replay:deletions  # après restauration d'une sauveg
 NODE_ENV=production npm run rotate:hidden-avatars  # une fois après déploiement : renomme les avatars déjà masqués
 npm run push:keys  # paire de clés VAPID, une fois pour toutes
 npm run sonar  # SonarQube local de la branche (Docker, aucun jeton) — voir Pipeline Git
-./update.sh  # Déploiement (docs/DEPLOYMENT.md — ne jamais effacer les journaux pm2)
+~/apps/updateBlueGenji.sh [bot|site] [--force|--dry-run]  # Déploiement prod, sans sudo (docs/DEPLOYMENT.md — ne jamais effacer les journaux pm2)
 npx jest tests/path/to/file.test.ts  # un seul fichier
 ```
 
@@ -63,7 +63,8 @@ Appels toujours app → bot, dégradation si injoignable.
 
 ## Key Conventions (règles transverses)
 
-- Toute l'interface est en **français**. Licence AGPL : lien « Code source » dans les pieds de page → `LICENSE_SOURCE_CODE.md`.
+- **Langues** (FR sans préfixe, EN sous `/en`) : tout texte UI d'un dossier migré passe par une clé de traduction (`getTranslations` / `useTranslations`) présente en `fr` **et** `en` ; un lien interne y passe par `LocaleLink` / `useLocaleRouter` (chemin sans préfixe) ; seule l'URL dit la langue → `I18N.md`.
+- Interface rédigée en **français** d'abord (l'anglais suit, route par route). Licence AGPL : lien « Code source » dans les pieds de page → `LICENSE_SOURCE_CODE.md`.
 - **Erreurs et succès** : toujours en notification bas-gauche via `useToast()` (`@/components/ui/toast` : `showError`, `showSuccess`), jamais en ligne.
 - `lib/server/*` : serveur seulement, jamais importé côté client. `lib/shared/*` : importable partout (logique pure).
 - Helpers obligatoires : `normalizePseudo()` / `slugifyPseudo()`, `toIso()`, `parseRoles()`. Noms saisis via `visibleText` → `UNTRUSTED_NAMES.md`.

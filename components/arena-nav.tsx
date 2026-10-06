@@ -1,9 +1,9 @@
 ﻿"use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { LogoWithGlow } from "./logo-with-glow";
 import { AccountMenu } from "./account-menu";
+import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import s from "./arena-nav.module.css";
@@ -17,6 +17,11 @@ type ArenaNavProps = {
    * lien n'est pas rendu). Le nombre est celui du chargement de la page.
    */
   openReports?: number | null;
+  /**
+   * Précision du sélecteur de langue, traduite côté serveur
+   * (`languageSwitcherLabel()`). Absente : pas de sélecteur.
+   */
+  languageSwitcherLabel?: string;
 };
 
 /**
@@ -33,8 +38,15 @@ export const ARENA_NAV_LINKS = [
 ] as const;
 const links = ARENA_NAV_LINKS;
 
-export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: Readonly<ArenaNavProps>) {
-  const pathname = usePathname();
+export function ArenaNav({
+  pseudo,
+  avatarUrl,
+  activeTeam,
+  openReports = null,
+  languageSwitcherLabel,
+}: Readonly<ArenaNavProps>) {
+  // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
+  const { path: pathname } = useLocalePathname();
 
   return (
     <nav className={s.nav} aria-label="Navigation principale" data-sticky-header>
@@ -43,7 +55,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
           {links.map((link) => {
             const isActive = isNavLinkActive(pathname, link.href);
             return (
-              <Link
+              <LocaleLink
                 key={link.href}
                 href={link.href}
                 aria-current={isActive ? "page" : undefined}
@@ -51,12 +63,12 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
                 style={{ "--nav-rgb": link.rgb } as React.CSSProperties}
               >
                 {link.label}
-              </Link>
+              </LocaleLink>
             );
           })}
         </div>
 
-        <Link href="/" className={s.navLogo} aria-label="Accueil">
+        <LocaleLink href="/" className={s.navLogo} aria-label="Accueil">
           <LogoWithGlow
             src="/logo_bg.webp"
             alt="BlueGenji"
@@ -66,26 +78,26 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
             borderRadius={8}
             borderColor="rgba(0,0,0,0)"
           />
-        </Link>
+        </LocaleLink>
 
         <div className={s.navRight}>
           {/* Les pictogrammes sont décoratifs : lus à voix haute, « ⌂ » et
               « 🛡 » précédaient le nom du lien d'un mot sans rapport. */}
-          <Link href="/" className={s.navHome}>
+          <LocaleLink href="/" className={s.navHome}>
             <span aria-hidden="true">⌂</span> <span className={s.navHomeLabel}>Accueil</span>
-          </Link>
+          </LocaleLink>
           {activeTeam && (
-            <Link
+            <LocaleLink
               href={`/equipes/${activeTeam.teamId}`}
               className={s.navHome}
               aria-label={`Mon équipe : ${activeTeam.teamName}`}
               title={activeTeam.teamName}
             >
               <span aria-hidden="true">🛡</span> <span className={s.navHomeLabel}>Mon équipe</span>
-            </Link>
+            </LocaleLink>
           )}
           {openReports !== null && (
-            <Link
+            <LocaleLink
               href={REPORTS_ADMIN_PATH}
               className={`${s.navHome} ${s.navReports}`}
               aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
@@ -97,10 +109,12 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
                   <span className="sr-only"> à traiter</span>
                 </span>
               )}
-            </Link>
+            </LocaleLink>
           )}
           {/* Profil, équipe et déconnexion, à portée de main sur toutes les
               largeurs — sous 720 px, c'est le seul chemin vers sa propre équipe. */}
+          {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
+          {languageSwitcherLabel && <LanguageSwitcher label={languageSwitcherLabel} />}
           <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
       </div>
