@@ -275,9 +275,9 @@
 .nameTier1 {
   position: relative;
   padding-bottom: 8px;
-  filter:
-    drop-shadow(0 0 2px rgba(var(--cyan-400-rgb), 0.55))
-    drop-shadow(0 0 12px rgba(var(--violet-400-rgb), 0.45));
+  /* Halo large et léger seulement : un halo serré éclaircirait le fond au
+     bord des lettres et ferait passer le contraste sous 4,5:1. */
+  filter: drop-shadow(0 0 12px rgba(var(--violet-400-rgb), 0.3));
 }
 
 @keyframes nameIridescent {
@@ -308,7 +308,7 @@
 .nameTier2 {
   position: relative;
   padding-bottom: 6px;
-  filter: drop-shadow(0 0 6px rgba(var(--cyan-400-rgb), 0.28));
+  filter: drop-shadow(0 0 10px rgba(var(--cyan-400-rgb), 0.2));
 }
 
 .nameTier3 :global(.entity-link) {
