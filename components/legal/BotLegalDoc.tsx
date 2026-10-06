@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { crossesLocale } from "@/lib/shared/locales";
 import {
   HEBERGEUR_HREF,
   type Lang,
@@ -29,7 +30,9 @@ export function BotLegalDoc({
   doc: content,
   lang,
   sectionLabel,
-}: Readonly<{ doc: LegalDoc; lang: Lang; sectionLabel: string }>) {
+  inFrenchLabel,
+}: Readonly<{ doc: LegalDoc; lang: Lang; sectionLabel: string; inFrenchLabel: string }>) {
+  const hostingInFrench = crossesLocale(HEBERGEUR_HREF, lang);
   const [titleLine1, titleLine2] = content.title.split("\n");
 
   return (
@@ -49,7 +52,7 @@ export function BotLegalDoc({
             </>
           ) : null}
         </h1>
-        <p className={styles.intro}>{renderInline(content.intro)}</p>
+        <p className={styles.intro}>{renderInline(content.intro, lang)}</p>
         <div className={styles.updated}>
           <span className={styles.updatedLabel}>{content.lastUpdatedLabel}</span>
           <span className={styles.updatedValue}>{content.lastUpdated}</span>
@@ -67,7 +70,7 @@ export function BotLegalDoc({
           </header>
           <div className={styles.prose}>
             {section.blocks.map((block, i) => (
-              <Block key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */ block={block} />
+              <Block key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */ block={block} lang={lang} />
             ))}
           </div>
         </section>
@@ -87,15 +90,20 @@ export function BotLegalDoc({
         <div className={styles.prose}>
           <p>{content.hosting.text}</p>
         </div>
-        <LocaleLink href={HEBERGEUR_HREF} className={styles.hostingLink}>
+        <LocaleLink
+          href={HEBERGEUR_HREF}
+          hrefLang={hostingInFrench ? "fr" : undefined}
+          className={styles.hostingLink}
+        >
           {content.hosting.linkLabel}
+          {hostingInFrench ? ` ${inFrenchLabel}` : null}
         </LocaleLink>
       </section>
     </>
   );
 }
 
-function Block({ block }: Readonly<{ block: LegalBlock }>) {
+function Block({ block, lang }: Readonly<{ block: LegalBlock; lang: Lang }>) {
   if (block.kind === "subhead") {
     return <h3 className={styles.subhead}>{block.text}</h3>;
   }
@@ -103,20 +111,21 @@ function Block({ block }: Readonly<{ block: LegalBlock }>) {
     return (
       <ul className={styles.bullets}>
         {block.items?.map((item, i) => (
-          <li key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */>{renderInline(item)}</li>
+          <li key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */>{renderInline(item, lang)}</li>
         ))}
       </ul>
     );
   }
-  return <p>{renderInline(block.text ?? "")}</p>;
+  return <p>{renderInline(block.text ?? "", lang)}</p>;
 }
 
 /**
  * Rendu inline minimal : `**gras**` → <strong>, `[texte](url)` → <a>.
- * Les liens internes (`/…`) passent par `LocaleLink` ; les liens externes
- * ouvrent un nouvel onglet de façon sûre.
+ * Les liens internes (`/…`) passent par `LocaleLink` — `hrefLang="fr"` quand
+ * ils mènent d'une page anglaise à une page encore française ; les liens
+ * externes ouvrent un nouvel onglet de façon sûre.
  */
-function renderInline(text: string): ReactNode {
+function renderInline(text: string, lang: Lang): ReactNode {
   // Découpe sur les liens markdown, puis traite le gras dans chaque segment.
   const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g; // NOSONAR typescript:S8786 — Markdown du dépôt du bot, source de confiance
   const nodes: ReactNode[] = [];
@@ -132,7 +141,12 @@ function renderInline(text: string): ReactNode {
     const isInternal = href.startsWith("/") || href.startsWith("#");
     if (isInternal) {
       nodes.push(
-        <LocaleLink key={key++} href={href} className={styles.link}>
+        <LocaleLink
+          key={key++}
+          href={href}
+          hrefLang={crossesLocale(href, lang) ? "fr" : undefined}
+          className={styles.link}
+        >
           {label}
         </LocaleLink>,
       );

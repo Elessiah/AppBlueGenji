@@ -28,7 +28,12 @@ export default async function PrivacyPolicyBotPage() {
   const { legalPages } = messagesFor(locale).bot;
   return (
     <PublicPageShell>
-      <BotLegalDoc doc={PRIVACY_POLICY[locale]} lang={locale} sectionLabel={legalPages.section} />
+      <BotLegalDoc
+        doc={PRIVACY_POLICY[locale]}
+        lang={locale}
+        sectionLabel={legalPages.section}
+        inFrenchLabel={legalPages.inFrench}
+      />
     </PublicPageShell>
   );
 }

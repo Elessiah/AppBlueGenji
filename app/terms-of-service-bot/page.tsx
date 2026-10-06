@@ -28,7 +28,12 @@ export default async function TermsOfServiceBotPage() {
   const { legalPages } = messagesFor(locale).bot;
   return (
     <PublicPageShell>
-      <BotLegalDoc doc={TERMS_OF_SERVICE[locale]} lang={locale} sectionLabel={legalPages.section} />
+      <BotLegalDoc
+        doc={TERMS_OF_SERVICE[locale]}
+        lang={locale}
+        sectionLabel={legalPages.section}
+        inFrenchLabel={legalPages.inFrench}
+      />
     </PublicPageShell>
   );
 }

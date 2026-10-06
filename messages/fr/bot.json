@@ -252,6 +252,7 @@
   },
   "legalPages": {
     "section": "SECTION",
+    "inFrench": "(en français)",
     "privacy": {
       "meta": {
         "title": "Bot — Politique de Confidentialité",
