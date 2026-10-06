@@ -95,13 +95,21 @@ export function BotLegalDoc({
           hrefLang={hostingInFrench ? "fr" : undefined}
           className={styles.hostingLink}
         >
-          {content.hosting.linkLabel}
-          {hostingInFrench ? ` ${inFrenchLabel}` : null}
+          {hostingInFrench ? withNote(content.hosting.linkLabel, inFrenchLabel) : content.hosting.linkLabel}
         </LocaleLink>
       </section>
     </>
   );
 }
+
+/** Glisse la mention (« (in French) ») avant la flèche finale d'un libellé : « … (in French) → ». */
+function withNote(label: string, note: string): string {
+  const arrow = " →";
+  return label.endsWith(arrow) ? `${label.slice(0, -arrow.length)} ${note}${arrow}` : `${label} ${note}`;
+}
+
+/** Page externe en français (`https://www.cnil.fr/fr/…`) : à signaler depuis une page anglaise. */
+const FRENCH_EXTERNAL = /^https:\/\/[^/]+\/fr\//;
 
 function Block({ block, lang }: Readonly<{ block: LegalBlock; lang: Lang }>) {
   if (block.kind === "subhead") {
@@ -152,7 +160,14 @@ function renderInline(text: string, lang: Lang): ReactNode {
       );
     } else {
       nodes.push(
-        <a key={key++} href={href} target="_blank" rel="noreferrer" className={styles.link}>
+        <a
+          key={key++}
+          href={href}
+          hrefLang={lang !== "fr" && FRENCH_EXTERNAL.test(href) ? "fr" : undefined}
+          target="_blank"
+          rel="noreferrer"
+          className={styles.link}
+        >
           {label}
         </a>,
       );
