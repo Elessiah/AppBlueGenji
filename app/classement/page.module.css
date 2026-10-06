@@ -238,7 +238,7 @@
 
 /* ---------- Noms du podium : trois effets, du plus riche au plus sobre ----------
    1re : dégradé irisé cyan → violet → rose traversé d'un reflet clair, qui
-   ondule lentement, halo double et filet irisé sous le nom.
+   ondule lentement, lueur fixe et filet irisé sous le nom.
    2e : givre chromé (glace → platine), reflet plus lent, halo léger, filet fin.
    3e : liseré néon violet, sans mouvement ni filet.
    Teintes froides seulement (aucun or : l'ambre est réservé aux avertissements).
@@ -274,10 +274,29 @@
 
 .nameTier1 {
   position: relative;
+  isolation: isolate;
   padding-bottom: 8px;
-  /* Halo large et léger seulement : un halo serré éclaircirait le fond au
-     bord des lettres et ferait passer le contraste sous 4,5:1. */
-  filter: drop-shadow(0 0 12px rgba(var(--violet-400-rgb), 0.3));
+}
+
+/* Halo des noms animés : une lueur fixe peinte derrière le nom (`::before`),
+   pas un `filter` — un flou sur le parent serait recalculé à chaque image du
+   reflet. Large et léger : le fond au bord des lettres reste sous 4,5:1. */
+.nameTier1::before,
+.nameTier2::before {
+  content: "";
+  position: absolute;
+  inset: -8px -12px;
+  z-index: -1;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.nameTier1::before {
+  background: radial-gradient(ellipse at 35% 50%, rgba(var(--violet-400-rgb), 0.18), transparent 70%);
+}
+
+.nameTier2::before {
+  background: radial-gradient(ellipse at 35% 50%, rgba(var(--cyan-400-rgb), 0.12), transparent 70%);
 }
 
 @keyframes nameIridescent {
@@ -307,8 +326,8 @@
 
 .nameTier2 {
   position: relative;
+  isolation: isolate;
   padding-bottom: 6px;
-  filter: drop-shadow(0 0 10px rgba(var(--cyan-400-rgb), 0.2));
 }
 
 .nameTier3 :global(.entity-link) {
