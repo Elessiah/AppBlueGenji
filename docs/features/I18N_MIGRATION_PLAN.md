@@ -349,8 +349,8 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **`/privacy-policy-bot` et `/terms-of-service-bot` ouverts sous `/en`**, texte de `BilingualDoc`
   repris **tel quel** (aucune phrase réécrite, `TERMS_VERSION` inchangé) ; bascule interne
   retirée. Détail : `I18N.md` § Documents légaux du bot.
-- **Pas d'espace de messages propre** : les quatre textes d'interface (titres, descriptions,
-  « SECTION ») vont dans `bot.legalPages` — le contenu légal, lui, reste dans
+- **Pas d'espace de messages propre** : les six textes d'interface (titre et description de chaque page,
+  « SECTION », « (in French) ») vont dans `bot.legalPages` — le contenu légal, lui, reste dans
   `bot-legal-content.ts`. Titres français sans leur moitié anglaise (« … / Privacy Policy » retiré : habillage, pas texte légal).
 - **Aucune redirection** : la bascule était un état client, sans adresse publique.
 - **Hors lot** : les copies anglaises du dépôt `blueGenjiBot` (`LegalTerms/PolicyPrivacy.md`,

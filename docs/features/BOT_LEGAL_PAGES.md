@@ -83,6 +83,11 @@ glossaire de `I18N.md` (« licence » britannique, « French non-profit associat
 the law of 1901 ») : il est repris mot pour mot du dépôt du bot. Toute retouche se fait
 là-bas, comme une nouvelle version du document.
 
+**Version qui fait foi — décision requise.** Chaque langue dit que la version en vigueur
+est « celle publiée sur cette page » ; aucune clause ne départage le français et l'anglais
+en cas d'écart (déjà vrai quand les deux langues partageaient une page). Ajouter « the
+French version prevails » est un choix juridique, à faire dans le dépôt du bot.
+
 Il ne rend **pas** `PublicHeader` / `PublicFooter` : la page les pose
 (`PublicPageShell`).
 
