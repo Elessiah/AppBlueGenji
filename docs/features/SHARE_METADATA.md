@@ -400,9 +400,13 @@ montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
 
 La route `/og/…` est dynamique et un lien collé dans un gros salon fait venir
 plusieurs robots à la fois : chaque PNG rendu est **gardé en mémoire du
-processus** (`cachedShareImage`, éviction LRU, `SHARE_IMAGE_CACHE_MAX_ENTRIES`
-cartes au plus — quelques Mo), avec vol unique (`cached` à durée nulle, hors du
-cache général que des PNG de 100 Ko chasseraient).
+processus** (`cachedShareImage`), avec vol unique (`cached` à durée nulle, hors
+du cache général que des PNG de 100 Ko chasseraient), dans **deux réserves
+LRU** (`SHARE_IMAGE_POOL_LIMITS`) : `fixed` (pages, modes, podium, carte
+générique d'équipe — en nombre fini) et `team` (cartes nominatives), pour
+qu'un robot qui fait tourner les équipes ne chasse jamais les cartes fixes. Et
+**`MAX_CONCURRENT_RENDERS` (2) rendus à la fois** au plus : au-delà de la
+réserve, un tel robot obtient des réponses plus lentes, pas un processeur saturé.
 
 - **Cartes fixes** : une heure en mémoire (elles ne changent qu'au déploiement),
   `max-age=86400` pour les caches en aval.
