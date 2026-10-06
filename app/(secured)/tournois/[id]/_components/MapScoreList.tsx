@@ -120,9 +120,15 @@ export function MapScoreList({
             const t2Id = mapFieldId(idPrefix, index, "team2Score");
             return (
               <li key={keys.current[index]} className={styles.row}>
-                <span className={styles.mapLabel}>Map {index + 1}</span>
-                <label className={styles.code} htmlFor={codeId}>
-                  <span className={styles.fieldLabel}>Code de replay</span>
+                <span className={styles.mapLabel} aria-hidden="true">Map {index + 1}</span>
+                {/* Chaque nom de champ porte le numéro de map (masqué à l'œil) : sur
+                    cinq lignes, « Code de replay » seul ne dirait pas laquelle. La
+                    phrase d'erreur reste hors du `<label>`, sans quoi elle entrerait
+                    dans le nom du champ et serait lue deux fois. */}
+                <div className={styles.code}>
+                  <label className={styles.fieldLabel} htmlFor={codeId}>
+                    <span className="sr-only">Map {index + 1}, </span>Code de replay
+                  </label>
                   <input
                     id={codeId}
                     className={styles.codeInput}
@@ -136,9 +142,11 @@ export function MapScoreList({
                     {...fieldErrors.aria(codeKey, hintId)}
                   />
                   <FieldErrorText fieldId={codeId} message={fieldErrors.message(codeKey)} />
-                </label>
-                <label className={styles.score} htmlFor={t1Id}>
-                  <span className={styles.fieldLabel} title={team1Name}>{team1Name}</span>
+                </div>
+                <div className={styles.score}>
+                  <label className={styles.fieldLabel} htmlFor={t1Id} title={team1Name}>
+                    <span className="sr-only">Map {index + 1}, score de </span>{team1Name}
+                  </label>
                   <NumberInput
                     id={t1Id}
                     className={styles.scoreInput}
@@ -149,9 +157,11 @@ export function MapScoreList({
                     {...fieldErrors.aria(t1Key)}
                   />
                   <FieldErrorText fieldId={t1Id} message={fieldErrors.message(t1Key)} />
-                </label>
-                <label className={styles.score} htmlFor={t2Id}>
-                  <span className={styles.fieldLabel} title={team2Name}>{team2Name}</span>
+                </div>
+                <div className={styles.score}>
+                  <label className={styles.fieldLabel} htmlFor={t2Id} title={team2Name}>
+                    <span className="sr-only">Map {index + 1}, score de </span>{team2Name}
+                  </label>
                   <NumberInput
                     id={t2Id}
                     className={styles.scoreInput}
@@ -162,7 +172,7 @@ export function MapScoreList({
                     {...fieldErrors.aria(t2Key)}
                   />
                   <FieldErrorText fieldId={t2Id} message={fieldErrors.message(t2Key)} />
-                </label>
+                </div>
                 <button
                   type="button"
                   className={styles.remove}

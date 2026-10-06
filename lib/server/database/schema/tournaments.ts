@@ -201,8 +201,8 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       team2_score TINYINT UNSIGNED NOT NULL,
       submitted_by_user_id BIGINT NULL,
       submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- Sert aussi toutes les lectures par (match_id, source) : préfixe de la clé.
       UNIQUE KEY uq_bg_match_maps_slot (match_id, source, map_number),
-      KEY idx_bg_match_maps_match (match_id, source),
       CONSTRAINT fk_bg_match_maps_match FOREIGN KEY (match_id)
         REFERENCES bg_matches(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_match_maps_user FOREIGN KEY (submitted_by_user_id)

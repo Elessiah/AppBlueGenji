@@ -22,6 +22,21 @@ describe("détail map par map — effacé avec ce qu'il documente", () => {
   });
 });
 
+describe("détail map par map — entretien de l'instantané", () => {
+  it("un interblocage de l'entretien rend l'instantané sur l'état d'avant, sans 500", () => {
+    const snapshot = readSource("lib/server/tournaments/snapshot.ts");
+    expect(snapshot).toMatch(/if \(isTransactionAborted\(error\)\) return tournamentRow;/);
+  });
+});
+
+describe("détail map par map — noms accessibles", () => {
+  it("chaque champ nomme sa map, et la phrase d'erreur reste hors du label", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list.match(/<span className="sr-only">Map \{index \+ 1\}, /g)).toHaveLength(3);
+    expect(list).not.toMatch(/<FieldErrorText[^>]*\/>\s*<\/label>/);
+  });
+});
+
 describe("détail map par map — refus rattachés au champ", () => {
   it("le dialogue d'arbitrage rattache un refus de map à son champ", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");

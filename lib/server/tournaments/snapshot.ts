@@ -24,6 +24,7 @@
  * l'entrée ({@link invalidateTournamentSnapshot}). Personne ne lit donc un
  * score périmé.
  */
+import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import type { TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
@@ -233,6 +234,11 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     return syncResult.row;
   } catch (error) {
     await connection.rollback();
+    // Interblocage (verrous de `bg_match_maps` pendant la clôture d'un report
+    // expiré, `MAP_SCORES.md`) : l'entretien est rejoué au prochain passage, et
+    // l'instantané se construit sur l'état d'avant plutôt que de rendre un 500
+    // à tous les spectateurs.
+    if (isTransactionAborted(error)) return tournamentRow;
     throw error;
   } finally {
     discardBotLogs(connection);

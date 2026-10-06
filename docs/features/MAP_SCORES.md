@@ -19,8 +19,10 @@ rapporte de point à personne. Aucun état « nul » nouveau, aucun libellé
 1. Module pur `lib/shared/match-maps.ts` : dérivation du score, plafond de
    lignes, contrôle d'une liste (`checkMapList`), lecture du corps de route.
    Le score dérivé passe par `checkMatchScores` **tel quel**.
-2. Table `bg_match_maps` (CREATE TABLE + entrée tolérante dans
-   `RECENT_SCHEMA_CHANGES`), stockage `lib/server/tournaments/match-maps.ts`.
+2. Table `bg_match_maps` (son `CREATE TABLE IF NOT EXISTS` est sa migration :
+   table neuve, rien à rejouer dans `RECENT_SCHEMA_CHANGES` ; la clé unique
+   `(match_id, source, map_number)` sert aussi les lectures par match), stockage
+   `lib/server/tournaments/match-maps.ts`.
 3. Report d'équipe : `POST …/report` prend `{ maps }` ; arbitrage : `maps`
    facultatif sur `PATCH …/scores` et `POST …/resolve`.
 4. Instantané commun (flux SSE **et** REST de secours) : `BracketMatch.maps`,
