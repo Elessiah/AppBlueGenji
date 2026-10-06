@@ -151,7 +151,7 @@ riche au plus sobre (`PODIUM_NAME_TIERS` → `.nameTier1/2/3` sur le `<h3>`) :
 
 | Place | Effet du nom |
 |---|---|
-| 1re | dégradé **irisé** cyan → glacier → violet → rose traversé d'un reflet clair (`--ink`), qui ondule (7 s, `background-position`) ; double halo cyan/violet (`drop-shadow`) ; filet irisé de 64 px sous le nom |
+| 1re | dégradé **irisé** cyan → glacier → violet → rose traversé d'un reflet clair (`--ink`), qui ondule (7 s, `background-position`) ; halo violet large et léger (`drop-shadow` 12 px, 0,3 — un halo serré ferait tomber le contraste au bord des lettres) ; filet irisé de 64 px sous le nom |
 | 2e | **givre chromé** (`--ink-soft` → `--blue-100` → `--ink` → `--blue-300`), reflet plus lent (11 s), halo cyan léger, filet givré de 36 px |
 | 3e | **liseré néon** : `--violet-300` plein, `text-shadow` violet ; ni mouvement ni filet |
 
