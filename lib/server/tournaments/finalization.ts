@@ -508,7 +508,16 @@ export async function resolveExpiredScoreReports(
     // la règle vit dans `matchWinnerSide`, partagée avec l'arbitrage et
     // l'accord des deux engagés.
     if (team1Reported !== team2Reported) {
-      const { team1Score, team2Score } = singleReportScores(match);
+      // Verrou du match et relecture de son statut avant de le clore : la
+      // sélection ci-dessus ne verrouille rien, et l'entretien tourne à chaque
+      // écriture comme à chaque chargement. Deux clôtures concurrentes du même
+      // report réécrivaient le même score sans dommage ; avec le détail map par
+      // map, la seconde effaçait celui que la première venait de retenir.
+      const fresh = await stillSingleReport(connection, match, team1Reported);
+      if (!fresh) continue;
+      // Scores relus sous verrou : une correction du report validée entre la
+      // sélection et le verrou fait foi, pas la copie lue sans verrou.
+      const { team1Score, team2Score } = singleReportScores(fresh);
 
       const format = await loadTournamentMatchFormat(
         connection,
@@ -517,6 +526,15 @@ export async function resolveExpiredScoreReports(
       );
       const { winnerTeamId, loserTeamId } = resolveSides(match, format, team1Score, team2Score);
 
+      // Le détail map par map du report qui fait foi devient le résultat
+      // retenu (`docs/features/MAP_SCORES.md`), avant que la clôture n'efface
+      // les propositions.
+      const { promoteReportedMaps } = await import("./match-maps");
+      // Lecture verrouillante de la proposition : une lecture cohérente verrait
+      // l'instantané de la transaction, pris avant le verrou du match, et
+      // promouvrait des codes de replay périmés par une correction. Les lignes existent
+      // (un report attend) : le verrou porte sur elles, pas sur un intervalle vide.
+      await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2");
       await finalizeMatch(connection, tournamentId, match, {
         team1Score,
         team2Score,
@@ -543,6 +561,33 @@ export async function resolveExpiredScoreReports(
   }
 
   return resolved;
+}
+
+/**
+ * Le match attend-il toujours la confirmation d'un **seul** report — le même
+ * que celui lu sans verrou —, une fois sa ligne verrouillée (table seule, sans
+ * jointure — MariaDB) ? Une contestation arrivée entre-temps fait deux reports :
+ * la clôture d'office la trancherait au profit du premier, et effacerait la
+ * seconde avec son détail. Une ligne introuvable, ou un double de test qui ne
+ * la décrit pas, ne bloque rien : la suite n'écrira rien de plus qu'avant.
+ */
+async function stillSingleReport(
+  connection: PoolConnection,
+  match: ExpiredMatchRow,
+  team1Reported: boolean,
+): Promise<ExpiredMatchRow | null> {
+  const matchId = Number(match.id);
+  const result = await connection.execute<(RowDataPacket & Partial<ExpiredMatchRow> & { status?: string })[]>(
+    `SELECT status, team1_report_score, team1_report_opponent_score,
+            team2_report_score, team2_report_opponent_score
+     FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
+    [matchId],
+  );
+  const fresh = Array.isArray(result) && Array.isArray(result[0]) ? result[0][0] : undefined;
+  if (fresh?.status === undefined) return match;
+  if (fresh.status !== "AWAITING_CONFIRMATION") return null;
+  const row = { ...match, ...fresh } as ExpiredMatchRow;
+  return hasTeam1Report(row) === team1Reported && hasTeam2Report(row) === !team1Reported ? row : null;
 }
 
 /** L'engagé 1 a-t-il déposé son report (son score et celui de l'adversaire) ? */

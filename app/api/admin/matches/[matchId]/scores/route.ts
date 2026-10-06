@@ -3,7 +3,8 @@ import { fail, ok } from "@/lib/server/http";
 import { adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
-import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
+import { parseAdminScoreBody, parseAdminMapEntry } from "@/lib/shared/admin-score-body";
+import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
 
 export async function PATCH(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -19,6 +20,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
     team2Score?: unknown;
     forfeitTeamId?: unknown;
     doubleForfeit?: unknown;
+    maps?: unknown;
   };
 
   // Un double forfait **tranche** la rencontre : il n'a rien d'un avancement à
@@ -26,17 +28,24 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   // l'accepter ici laisserait une rencontre « en cours » sans score ni équipe.
   if (body.doubleForfeit === true) return fail("DOUBLE_FORFEIT_RESOLVE_ONLY", 400);
 
-  const parsed = parseAdminScoreBody(body);
+  // Détail map par map facultatif (`docs/features/MAP_SCORES.md`) : présent,
+  // il fait foi et le score se dérive des maps.
+  const mapParse = parseAdminMapEntry(body.maps);
+  if (!mapParse.ok) return fail(mapParse.error, 400);
+  const hasMaps = (mapParse.maps?.length ?? 0) > 0;
+  const parsed = parseAdminScoreBody(hasMaps ? { ...body, ...mapParse.placeholderScores } : body);
   if (!parsed.ok) return fail(parsed.error, 400);
   // L'égalité est autorisée sur cette route : on enregistre les scores sans déclarer de vainqueur.
   const { team1Score, team2Score, forfeitTeamId } = parsed.value;
+  const mapEntry = mapParse.maps === null ? undefined : { maps: mapParse.maps, userId: user.id };
 
   try {
-    await adminSaveMatchScores(matchId_, team1Score, team2Score, forfeitTeamId);
+    await adminSaveMatchScores(matchId_, team1Score, team2Score, forfeitTeamId, mapEntry);
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;
-    return fail(msg || "ADMIN_SAVE_SCORES_FAILED", SAVE_SCORES_ERROR_STATUS.get(msg) ?? 500);
+    const status = MAP_LIST_ERROR_CODES.has(msg) ? 400 : SAVE_SCORES_ERROR_STATUS.get(msg);
+    return fail(msg || "ADMIN_SAVE_SCORES_FAILED", status ?? 500);
   }
 }
 

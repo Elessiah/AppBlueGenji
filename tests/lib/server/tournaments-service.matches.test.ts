@@ -16,6 +16,7 @@ import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { qualifyDestinationMatchId } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import { tournamentRow } from "../../helpers/tournament-rows";
+import { mapsFor } from "../../helpers/match-maps";
 
 describe("tournaments-service: match state machine", () => {
   // Avancement réel : on exerce `finalizeMatch` avec une connexion mockée et on
@@ -130,6 +131,8 @@ describe("tournaments-service: match state machine", () => {
       team1_report_opponent_score: number | null;
       team2_report_score: number | null;
       team2_report_opponent_score: number | null;
+      team1_reported_at?: Date | null;
+      team2_reported_at?: Date | null;
       launched_at: string | null;
       launch_pairing: string | null;
     };
@@ -191,6 +194,8 @@ describe("tournaments-service: match state machine", () => {
             [],
           ];
         }
+        // Une proposition map par map existe (le report vient de l'écrire).
+        if (q.startsWith("SELECT match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id")) return [[{ match_id: 10, source: "TEAM1", map_number: 1, replay_code: "MAP001", team1_score: 2, team2_score: 0 }], []];
         if (q.startsWith("UPDATE bg_matches SET team1_report_score")) {
           [row.team1_report_score, row.team1_report_opponent_score] = params as number[];
         }
@@ -246,7 +251,7 @@ describe("tournaments-service: match state machine", () => {
     it("un premier report met la rencontre en attente de confirmation, délai armé", async () => {
       const { connection, calls } = reportConnection();
 
-      await reportMatchScore(connection, 1, 10, 42, 3, 1);
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
 
       expect(writes(calls)).toHaveLength(1);
       const [report] = writes(calls);
@@ -262,7 +267,7 @@ describe("tournaments-service: match state machine", () => {
     it("l'échéance d'un premier report ne court qu'après une fin de série plausible", async () => {
       const { connection, calls } = reportConnection();
 
-      await reportMatchScore(connection, 1, 10, 42, 3, 0);
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0));
 
       const [report] = writes(calls);
       // Calculée par la base et posée une fois (COALESCE) : max(maintenant,
@@ -279,9 +284,9 @@ describe("tournaments-service: match state machine", () => {
       // Un « 1-0 » ne l'abrège pas, un « 3-2 » ne la repousse pas : lue sur le
       // score, elle était à la main du déclarant.
       const short = reportConnection();
-      await reportMatchScore(short.connection, 1, 10, 42, 3, 0);
+      await reportMatchScore(short.connection, 1, 10, 42, mapsFor(3, 0));
       const long = reportConnection();
-      await reportMatchScore(long.connection, 1, 10, 42, 3, 2);
+      await reportMatchScore(long.connection, 1, 10, 42, mapsFor(3, 2));
 
       expect(writes(short.calls)[0].params[4]).toBe(plausibleSeriesMinutes(null));
       expect(writes(long.calls)[0].params[4]).toBe(plausibleSeriesMinutes(null));
@@ -294,7 +299,8 @@ describe("tournaments-service: match state machine", () => {
       reporterIs(200);
       const { connection, calls } = reportConnection();
 
-      await reportMatchScore(connection, 1, 10, 42, 1, 3);
+      // Maps dans l'orientation du plateau : l'engagée 2 en gagne 3.
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(1, 3));
 
       expect(writes(calls)[0].sql).toMatch(
         /score_deadline_at = CASE WHEN team1_report_score IS NOT NULL THEN LEAST\( COALESCE\(score_deadline_at, DATE_ADD\(NOW\(\), INTERVAL \? MINUTE\)\), DATE_ADD\(NOW\(\), INTERVAL \? MINUTE\) \)/,
@@ -307,7 +313,7 @@ describe("tournaments-service: match state machine", () => {
       reporterIs(100, "RUNNING", false);
       const { connection, calls } = reportConnection();
 
-      await expect(reportMatchScore(connection, 1, 10, 42, 0, 3)).rejects.toThrow("NOT_TEAM_MATCH_LEADER");
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(0, 3))).rejects.toThrow("NOT_TEAM_MATCH_LEADER");
       expect(calls.some((c) => c.sql.includes("FROM bg_matches"))).toBe(false);
       expect(writes(calls)).toHaveLength(0);
     });
@@ -316,7 +322,9 @@ describe("tournaments-service: match state machine", () => {
       reporterIs(200);
       const { connection, calls } = reportConnection();
 
-      await reportMatchScore(connection, 1, 10, 42, 1, 3);
+      // Maps dans l'orientation du plateau : 3-1 pour l'équipe 1, donc
+      // « mon score » 1 et « score adverse » 3 du point de vue de l'engagée 2.
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
 
       expect(writes(calls)[0].sql).toMatch(/SET team2_report_score = \?/);
       expect(writes(calls)[0].params).toEqual(reportParams(1, 3));
@@ -329,11 +337,14 @@ describe("tournaments-service: match state machine", () => {
         team2_report_opponent_score: 3,
       });
 
-      await reportMatchScore(connection, 1, 10, 42, 3, 1);
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
 
       // team1_score, team2_score, vainqueur, perdant, match.
       expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
       expect(queueRefereeAlert).not.toHaveBeenCalled();
+      // Le détail de la proposition confirmée devient le résultat retenu.
+      const promote = calls.find((c) => c.sql.includes("VALUES (?, 'FINAL'"));
+      expect(promote?.params).toEqual([10, 1, "MAP001", 2, 0, null, expect.any(Date)]);
     });
 
     it("la concordance se lit du point de vue de chaque engagée", async () => {
@@ -344,9 +355,105 @@ describe("tournaments-service: match state machine", () => {
         team1_report_opponent_score: 3,
       });
 
-      await reportMatchScore(connection, 1, 10, 42, 3, 1);
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(1, 3));
 
       expect(completion(calls)?.params).toEqual([1, 3, 200, 100, 10]);
+    });
+
+    describe("« Confirmer » la proposition adverse telle quelle (MAP_SCORES.md)", () => {
+      const depositedAt = new Date("2026-10-05T20:00:00.000Z");
+      const pendingTeam2 = {
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 1,
+        team2_report_opponent_score: 3,
+        team2_reported_at: depositedAt,
+      };
+
+      it("clôt la rencontre par le même chemin qu'un envoi concordant", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() });
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+        expect(queueRefereeAlert).not.toHaveBeenCalled();
+      });
+
+      it("refuse une proposition remplacée depuis (autre dépôt), sans rien écrire", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: "2026-10-05T19:00:00.000Z" }),
+        ).rejects.toThrow("PROPOSAL_STALE");
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("refuse une proposition retirée ou expirée (plus de report adverse)", async () => {
+        const { connection, calls } = reportConnection();
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() }),
+        ).rejects.toThrow("PROPOSAL_STALE");
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("refuse une confirmation dont les maps ne sont plus celles de l'adversaire", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+        const execute = connection.execute.bind(connection) as (sql: string, params?: unknown) => Promise<unknown>;
+        (connection as unknown as { execute: typeof execute }).execute = async (sql, params) => {
+          if (sql.includes("SELECT match_id, source, map_number, replay_code, team1_score, team2_score\n")
+            || /^SELECT match_id, source, map_number, replay_code, team1_score, team2_score FROM/.test(sql.replace(/\s+/g, " ").trim())) {
+            await execute(sql, params);
+            return [mapsFor(3, 1).map((m, i) => ({
+              match_id: 10, source: "TEAM2", map_number: i + 1, replay_code: `EDIT${i}`, team1_score: m.team1Score, team2_score: m.team2Score,
+            })), []];
+          }
+          return execute(sql, params);
+        };
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() }),
+        ).rejects.toThrow("PROPOSAL_STALE");
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("une retouche envoyée sans confirmation devient une contre-proposition (désaccord)", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+
+        // L'engagé 1 retouche la proposition (3-0 au lieu de 3-1) et l'envoie.
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0));
+
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+    });
+
+    it("même score mais maps différentes : désaccord, l'arbitrage est alerté (MAP_SCORES.md)", async () => {
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 1,
+        team2_report_opponent_score: 3,
+      });
+      const execute = connection.execute.bind(connection) as (sql: string, params?: unknown) => Promise<unknown>;
+      (connection as unknown as { execute: typeof execute }).execute = async (sql, params) => {
+        if (sql.includes("SELECT match_id, source, map_number")) {
+          await execute(sql, params);
+          // Proposition de l'engagée 2 : même 3-1, autres codes.
+          return [mapsFor(3, 1).map((m, i) => ({
+            match_id: 10,
+            source: "TEAM2",
+            map_number: i + 1,
+            replay_code: `OTHER${i}`,
+            team1_score: m.team1Score,
+            team2_score: m.team2Score,
+          })), []];
+        }
+        return execute(sql, params);
+      };
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+
+      expect(completion(calls)).toBeUndefined();
+      expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
     });
 
     it("deux reports contradictoires laissent la rencontre en attente et alertent l'arbitrage", async () => {
@@ -356,7 +463,7 @@ describe("tournaments-service: match state machine", () => {
         team2_report_opponent_score: 2,
       });
 
-      await reportMatchScore(connection, 1, 10, 42, 3, 1);
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
 
       expect(completion(calls)).toBeUndefined();
       expect(calls.map((c) => c.sql)).toContain(
@@ -368,23 +475,25 @@ describe("tournaments-service: match state machine", () => {
       });
     });
 
-    it.each<[string, number, string]>([
-      ["hors bornes (négatif)", -1, "INVALID_SCORE_RANGE"],
-      ["hors bornes (au-delà de 99)", 100, "INVALID_SCORE_RANGE"],
-      ["non fini", Number.NaN, "INVALID_SCORE"],
-    ])("refuse un score %s avant toute lecture", async (_label, score, error) => {
+    it.each<[string, number]>([
+      ["hors bornes (négatif)", -1],
+      ["hors bornes (au-delà de 99)", 100],
+      ["non entier", 1.5],
+      ["non fini", Number.NaN],
+    ])("refuse un score de map %s, sans rien écrire", async (_label, score) => {
       const { connection, calls } = reportConnection();
+      const maps = mapsFor(3, 1);
+      maps[0] = { ...maps[0], team1Score: score };
 
-      await expect(reportMatchScore(connection, 1, 10, 42, score, 1)).rejects.toThrow(error);
-      expect(syncTournamentState).not.toHaveBeenCalled();
-      expect(calls).toHaveLength(0);
+      await expect(reportMatchScore(connection, 1, 10, 42, maps)).rejects.toThrow("MAP_SCORE_INVALID");
+      expect(writes(calls)).toHaveLength(0);
     });
 
     it("refuse un report sur un tournoi qui n'est pas en cours", async () => {
       reporterIs(100, "FINISHED");
       const { connection, calls } = reportConnection();
 
-      await expect(reportMatchScore(connection, 1, 10, 42, 3, 1)).rejects.toThrow(
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1))).rejects.toThrow(
         "TOURNAMENT_NOT_RUNNING",
       );
       expect(writes(calls)).toHaveLength(0);
@@ -394,7 +503,7 @@ describe("tournaments-service: match state machine", () => {
       reporterIs(null);
       const { connection, calls } = reportConnection();
 
-      await expect(reportMatchScore(connection, 1, 10, 42, 3, 1)).rejects.toThrow("NO_ACTIVE_TEAM");
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1))).rejects.toThrow("NO_ACTIVE_TEAM");
       expect(writes(calls)).toHaveLength(0);
     });
 
@@ -402,21 +511,21 @@ describe("tournaments-service: match state machine", () => {
       reporterIs(300);
       const { connection, calls } = reportConnection();
 
-      await expect(reportMatchScore(connection, 1, 10, 42, 3, 1)).rejects.toThrow("NOT_IN_MATCH");
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1))).rejects.toThrow("NOT_IN_MATCH");
       expect(writes(calls)).toHaveLength(0);
     });
 
     it("refuse une rencontre dont un adversaire n'est pas encore connu", async () => {
       const { connection, calls } = reportConnection({ status: "PENDING", team2_id: null });
 
-      await expect(reportMatchScore(connection, 1, 10, 42, 3, 1)).rejects.toThrow("MATCH_NOT_READY");
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1))).rejects.toThrow("MATCH_NOT_READY");
       expect(writes(calls)).toHaveLength(0);
     });
 
     it("refuse une rencontre déjà tranchée", async () => {
       const { connection, calls } = reportConnection({ status: "COMPLETED" });
 
-      await expect(reportMatchScore(connection, 1, 10, 42, 3, 1)).rejects.toThrow(
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1))).rejects.toThrow(
         "MATCH_ALREADY_COMPLETED",
       );
       expect(writes(calls)).toHaveLength(0);

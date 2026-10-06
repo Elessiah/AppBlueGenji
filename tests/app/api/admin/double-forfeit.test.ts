@@ -33,7 +33,7 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
     const res = await resolveRoute(req("POST", { doubleForfeit: true }), params);
 
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, undefined, undefined, undefined, true);
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, undefined, undefined, undefined, true, { maps: [], userId: 3 });
   });
 
   it("refuse un double forfait accompagné d'un score", async () => {
@@ -65,7 +65,7 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
       params,
     );
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false);
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false, { maps: [], userId: 3 });
   });
 
   it("traite `doubleForfeit: false` comme une saisie ordinaire", async () => {
@@ -74,7 +74,7 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
       params,
     );
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false);
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false, { maps: [], userId: 3 });
   });
 
   it("réserve le geste à la permission tournois", async () => {

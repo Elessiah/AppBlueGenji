@@ -11,6 +11,7 @@ import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import { tournamentRow } from "../../helpers/tournament-rows";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * Connexion factice : elle reconnaît les requêtes de `reportMatchScore` à leur
@@ -27,8 +28,10 @@ type FakeFormat = {
 function fakeConnection(
   format: FakeFormat = null,
   tournamentFormat = "SINGLE",
-): { conn: PoolConnection; writes: string[] } {
+  game: "OW" | "MR" | null = null,
+): { conn: PoolConnection; writes: string[]; mapWrites: { sql: string; params: unknown }[] } {
   const writes: string[] = [];
+  const mapWrites: { sql: string; params: unknown }[] = [];
   const match = {
     id: 10,
     tournament_id: 1,
@@ -53,8 +56,12 @@ function fakeConnection(
   };
 
   const conn = {
-    execute: async (sql: string) => {
+    execute: async (sql: string, params?: unknown) => {
       const q = sql.replace(/\s+/g, " ").trim();
+      if (q.includes("bg_match_maps")) {
+        mapWrites.push({ sql: q, params });
+        return [[], []];
+      }
       if (q.startsWith("UPDATE")) {
         writes.push(q);
         return [{ affectedRows: 1 }, []];
@@ -67,6 +74,7 @@ function fakeConnection(
           [
             {
               format: tournamentFormat,
+              game,
               match_format_type: format?.type ?? null,
               match_format_value: format?.value ?? null,
               match_format_max_maps: format?.maxMaps ?? null,
@@ -83,7 +91,7 @@ function fakeConnection(
     },
   } as unknown as PoolConnection;
 
-  return { conn, writes };
+  return { conn, writes, mapWrites };
 }
 
 function mockTournament(matchFormat: FakeFormat, format: TournamentRow["format"] = "SINGLE"): void {
@@ -127,7 +135,7 @@ describe("reportMatchScore — respect du format de match", () => {
       return (execute as (sql: string, p?: unknown) => unknown)(sql, params);
     };
 
-    await reportMatchScore(conn, 1, 10, 42, 3, 1);
+    await reportMatchScore(conn, 1, 10, 42, mapsFor(3, 1));
     const firstMatchRead = seen.findIndex((q) => q.includes("FROM bg_matches"));
     const firstWrite = seen.findIndex((q) => q.startsWith("UPDATE"));
     expect(seen[firstMatchRead]).toMatch(/AND tournament_id = \? LIMIT 1 FOR UPDATE$/);
@@ -139,16 +147,17 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "BO", value: 5 });
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 3, 1)).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(3, 1))).resolves.toBeUndefined();
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
-  it("refuse un score au-dessus de l'objectif, sans rien écrire", async () => {
+  it("refuse une map jouée après la victoire acquise, sans rien écrire", async () => {
+    // 4-1 en BO5 : la quatrième map gagnée suit un 3-1 déjà décisif.
     mockTournament({ type: "BO", value: 5 });
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 4, 1)).rejects.toThrow(
-      "SCORE_EXCEEDS_MATCH_FORMAT",
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(4, 1))).rejects.toThrow(
+      "MAP_AFTER_DECISION",
     );
     expect(writes).toHaveLength(0);
   });
@@ -157,7 +166,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "FT", value: 3 });
     const { conn, writes } = fakeConnection({ type: "FT", value: 3 });
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 2, 1)).rejects.toThrow(
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 1))).rejects.toThrow(
       "SCORE_BELOW_MATCH_FORMAT",
     );
     expect(writes).toHaveLength(0);
@@ -167,7 +176,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament(null);
     const { conn, writes } = fakeConnection();
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 7, 2)).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(7, 2))).resolves.toBeUndefined();
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
@@ -178,7 +187,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "BO", value: 5 });
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).rejects.toThrow(
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).rejects.toThrow(
       "SCORE_BELOW_MATCH_FORMAT",
     );
     expect(writes).toHaveLength(0);
@@ -188,7 +197,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament(null);
     const { conn, writes } = fakeConnection(null);
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).rejects.toThrow("DRAW_NOT_ALLOWED");
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).rejects.toThrow("DRAW_NOT_ALLOWED");
     expect(writes).toHaveLength(0);
   });
 
@@ -199,7 +208,8 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "FT", value: 3, draws: true }, "BG_SURVIE");
     const { conn, writes } = fakeConnection({ type: "FT", value: 3, draws: true }, "BG_SURVIE");
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).resolves.toBeUndefined();
+    // Cinq maps sans tiebreaker : deux gagnées de chaque côté, une nulle.
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2, 1))).resolves.toBeUndefined();
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
@@ -209,7 +219,44 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "FT", value: 3, draws: true }, "BG_SURVIE");
     const { conn, writes } = fakeConnection({ type: "FT", value: 3, draws: true }, "BG_SURVIE");
 
-    await expect(reportMatchScore(conn, 1, 10, 42, 2, 1)).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 1, 2))).resolves.toBeUndefined();
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
+  });
+});
+
+describe("reportMatchScore — détail map par map (MAP_SCORES.md)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 100, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
+  });
+
+  it("écrit le score dérivé dans le circuit habituel et la proposition map par map", async () => {
+    mockTournament({ type: "BO", value: 5 });
+    const { conn, writes, mapWrites } = fakeConnection({ type: "BO", value: 5 });
+
+    await reportMatchScore(conn, 1, 10, 42, mapsFor(3, 1, 1));
+
+    const report = writes.find((q) => q.includes("team1_report_score"));
+    expect(report).toBeDefined();
+    const insert = mapWrites.find((w) => w.sql.startsWith("INSERT INTO bg_match_maps"));
+    expect(insert?.params).toEqual(expect.arrayContaining([10, "TEAM1", 1, "MAP001", 1, 1, 42]));
+  });
+
+  it("juge le code de replay selon le jeu : Overwatch exige six caractères", async () => {
+    mockTournament({ type: "BO", value: 5 });
+    const { conn, writes, mapWrites } = fakeConnection({ type: "BO", value: 5 }, "SINGLE", "OW");
+    const maps = mapsFor(3, 0).map((m, i) => ({ ...m, replayCode: i === 0 ? "AB12" : `ABC12${i}` }));
+
+    await expect(reportMatchScore(conn, 1, 10, 42, maps)).rejects.toThrow("MAP_REPLAY_CODE_INVALID");
+    expect(writes).toHaveLength(0);
+    expect(mapWrites).toHaveLength(0);
+  });
+
+  it("refuse une liste vide", async () => {
+    mockTournament(null);
+    const { conn, writes } = fakeConnection();
+    await expect(reportMatchScore(conn, 1, 10, 42, [])).rejects.toThrow("MAP_LIST_EMPTY");
+    expect(writes).toHaveLength(0);
   });
 });

@@ -65,6 +65,7 @@ import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { insertPhases } from "@/lib/server/tournaments/phases-repository";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * Les écritures publiques du moteur de tournois (`lib/server/tournaments/index.ts`) :
@@ -381,12 +382,27 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
       .mockResolvedValueOnce([after ? [{ state: after }] : [], undefined]);
   }
 
+  it("rejoue un report annulé par un interblocage, et seulement celui-là (MAP_SCORES.md)", async () => {
+    poolExecute.mockResolvedValue([[{ state: "RUNNING" }], undefined]);
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(reportMatchScore).mockRejectedValueOnce(deadlock).mockResolvedValueOnce(undefined);
+
+    await reportMatchScorePublic(5, 70, 12, mapsFor(3, 1));
+    expect(reportMatchScore).toHaveBeenCalledTimes(2);
+
+    jest.mocked(reportMatchScore).mockReset();
+    jest.mocked(reportMatchScore).mockRejectedValue(new Error("NOT_IN_MATCH"));
+    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).rejects.toThrow("NOT_IN_MATCH");
+    expect(reportMatchScore).toHaveBeenCalledTimes(1);
+    jest.mocked(reportMatchScore).mockReset();
+  });
+
   it("réconcilie chaque mode, clôt, puis publie et prévient l'adversaire", async () => {
     statesBeforeAfter("RUNNING", "RUNNING");
 
-    await reportMatchScorePublic(5, 70, 12, 3, 1);
+    await reportMatchScorePublic(5, 70, 12, mapsFor(3, 1));
 
-    expect(reportMatchScore).toHaveBeenCalledWith(expect.anything(), 5, 70, 12, 3, 1);
+    expect(reportMatchScore).toHaveBeenCalledWith(expect.anything(), 5, 70, 12, mapsFor(3, 1), undefined);
     const chain = [
       reportMatchScore,
       resolveExpiredScoreReports,
@@ -407,7 +423,7 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
   it("ne vide pas la liste quand l'état n'a pas bougé", async () => {
     statesBeforeAfter("RUNNING", "RUNNING");
 
-    await reportMatchScorePublic(5, 70, 12, 3, 1);
+    await reportMatchScorePublic(5, 70, 12, mapsFor(3, 1));
 
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
   });
@@ -415,7 +431,7 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
   it("vide la liste quand le score a clos le tournoi", async () => {
     statesBeforeAfter("RUNNING", "FINISHED");
 
-    await reportMatchScorePublic(5, 70, 12, 3, 1);
+    await reportMatchScorePublic(5, 70, 12, mapsFor(3, 1));
 
     expect(invalidateTournamentLists).toHaveBeenCalledTimes(1);
   });
@@ -425,14 +441,14 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
       .mockResolvedValueOnce([[{ state: "RUNNING" }], undefined])
       .mockRejectedValueOnce(new Error("DB_DOWN"));
 
-    await expect(reportMatchScorePublic(5, 70, 12, 3, 1)).resolves.toBeUndefined();
+    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).resolves.toBeUndefined();
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
   });
 
   it("défait tout et ne publie rien quand le report est refusé", async () => {
     jest.mocked(reportMatchScore).mockRejectedValue(new Error("NOT_TEAM_MATCH_LEADER"));
 
-    await expect(reportMatchScorePublic(5, 70, 12, 3, 1)).rejects.toThrow("NOT_TEAM_MATCH_LEADER");
+    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).rejects.toThrow("NOT_TEAM_MATCH_LEADER");
 
     expect(finalizeTournamentIfDone).not.toHaveBeenCalled();
     expect(notifyScoreToConfirm).not.toHaveBeenCalled();
@@ -457,7 +473,7 @@ describe("adminSaveMatchScoresPublic", () => {
 
     await adminSaveMatchScoresPublic(70, 2, 1, undefined);
 
-    expect(adminSaveMatchScores).toHaveBeenCalledWith(expect.anything(), 70, 2, 1, undefined);
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(expect.anything(), 70, 2, 1, undefined, undefined);
     for (const fn of [reconcileSurvival, reconcileSwiss, reconcileEndurance, reconcilePhases]) {
       expect(fn).toHaveBeenCalledWith(8, expect.anything());
     }
@@ -489,7 +505,7 @@ describe("adminResolveMatchPublic", () => {
 
     await adminResolveMatchPublic(70, undefined, undefined, 3, false);
 
-    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, undefined, undefined, 3, false);
+    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, undefined, undefined, 3, false, undefined);
     expect(tryAutoResolveByes).toHaveBeenCalledWith(expect.anything(), 8);
     expect(finalizeTournamentIfDone).toHaveBeenCalledWith(expect.anything(), 8);
     expect(order(jest.mocked(finalizeTournamentIfDone))).toBeGreaterThan(order(jest.mocked(reconcilePhases)));
@@ -503,7 +519,18 @@ describe("adminResolveMatchPublic", () => {
 
     await adminResolveMatchPublic(70, undefined, undefined, undefined, true);
 
-    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, undefined, undefined, undefined, true);
+    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, undefined, undefined, undefined, true, undefined);
+  });
+
+  it("rejoue un arbitrage annulé par un interblocage (MAP_SCORES.md)", async () => {
+    connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(adminResolveMatch).mockRejectedValueOnce(deadlock).mockResolvedValueOnce(undefined);
+
+    await adminResolveMatchPublic(70, 2, 1);
+
+    expect(adminResolveMatch).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
   });
 
   it("lève MATCH_NOT_FOUND sans rien trancher", async () => {

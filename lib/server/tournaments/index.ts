@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   FinishedTournamentTotals,
@@ -166,7 +167,11 @@ import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
 import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { getTournamentListRow, loadTournamentRow } from "./repository";
-import { reportMatchScore } from "./scoring";
+import { reportMatchScore, type ProposalConfirmation } from "./scoring";
+import { loadViewerProposals, proposalMatches } from "./match-maps";
+import type { MatchMapInput } from "@/lib/shared/match-maps";
+import { isTransactionAborted } from "@/lib/server/mysql-errors";
+import type { AdminMapEntry } from "./admin";
 import {
   publishMatchUpdatedEvent,
   publishUpdatedEvent,
@@ -1044,6 +1049,18 @@ export async function getTournamentViewerContext(
   // identité vérifiée (`castBlockReason`).
   const castBlock = await loadViewerCastBlock(userId, canManageLive);
 
+  // Détail des propositions en attente : aux deux engagés qui mènent leur
+  // match, et à l'arbitrage — jamais dans l'instantané diffusé. Calculé ici,
+  // porte commune du flux et de la lecture REST de secours.
+  const reportTeamIds = myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles)) ? [myTeamId] : [];
+  // Une place du pool n'est prise que s'il y a quelque chose à lire — presque
+  // jamais : la plupart des lecteurs n'ont aucune proposition en attente.
+  const proposalScope = { all: canManage, teamIds: reportTeamIds };
+  const matchProposals =
+    proposalMatches(snapshot.matches, proposalScope).length === 0
+      ? []
+      : await withConnection((connection) => loadViewerProposals(connection, snapshot.matches, proposalScope));
+
   return {
     preview,
     // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
@@ -1055,13 +1072,13 @@ export async function getTournamentViewerContext(
     // Reporter un score revient à ceux qui mènent le match — capitaine, manager,
     // propriétaire (`reportMatchScore` refuse `NOT_TEAM_MATCH_LEADER`) : un
     // bouton qui mène à un 403 est un bouton qui ment.
-    canCreateReportsForTeamIds:
-      myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles)) ? [myTeamId] : [],
+    canCreateReportsForTeamIds: reportTeamIds,
     isAdmin: canManage,
     canDelete,
     canManageLive,
     viewerUserId: userId,
     castBlock,
+    matchProposals,
   };
 }
 
@@ -1181,15 +1198,42 @@ async function readTournamentState(tournamentId: number): Promise<TournamentStat
   return rows[0]?.state ?? null;
 }
 
+const REPORT_DEADLOCK_ATTEMPTS = 3;
+
+/**
+ * Rejoue une écriture de résultat annulée par un interblocage InnoDB : les
+ * verrous d'intervalle de `bg_match_maps` (`./match-maps`) peuvent opposer deux
+ * écritures sur des matchs voisins — report d'équipe ou geste d'arbitrage.
+ * Toute autre erreur remonte telle quelle.
+ */
+async function retryOnDeadlock(write: () => Promise<void>): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await write();
+      return;
+    } catch (error) {
+      if (!isTransactionAborted(error) || attempt >= REPORT_DEADLOCK_ATTEMPTS) throw error;
+      // Attente courte et aléatoire : deux transactions annulées ensemble ne
+      // repartent pas au même instant pour se heurter de nouveau.
+      await new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));
+    }
+  }
+}
+
 export async function reportMatchScorePublic(
   tournamentId: number,
   matchId: number,
   userId: number,
-  myScoreRaw: number,
-  opponentScoreRaw: number,
+  maps: ReadonlyArray<MatchMapInput>,
+  confirm?: ProposalConfirmation,
 ): Promise<void> {
-  await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-    reportMatchScore(connection, tournamentId, matchId, userId, myScoreRaw, opponentScoreRaw),
+  // Deux reports simultanés sur des matchs voisins peuvent s'interbloquer sur
+  // `bg_match_maps` : InnoDB annule l'un, qui est rejoué tel quel plutôt que de
+  // rendre un 500 à l'équipe.
+  await retryOnDeadlock(() =>
+    runPlayerMatchWrite(tournamentId, matchId, (connection) =>
+      reportMatchScore(connection, tournamentId, matchId, userId, maps, confirm),
+    ),
   );
 }
 
@@ -1204,8 +1248,12 @@ export async function forfeitOwnMatchPublic(
   userId: number,
 ): Promise<void> {
   const { forfeitOwnMatch } = await import("./player-forfeit");
-  await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-    forfeitOwnMatch(connection, tournamentId, matchId, userId),
+  // L'entretien qui suit (reports expirés) écrit dans `bg_match_maps` : même
+  // risque d'interblocage que le report d'un score (`retryOnDeadlock`).
+  await retryOnDeadlock(() =>
+    runPlayerMatchWrite(tournamentId, matchId, (connection) =>
+      forfeitOwnMatch(connection, tournamentId, matchId, userId),
+    ),
   );
 }
 
@@ -1273,6 +1321,18 @@ export async function adminSaveMatchScoresPublic(
   team1Score?: number,
   team2Score?: number,
   forfeitTeamId?: number,
+  mapEntry?: AdminMapEntry,
+): Promise<void> {
+  // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
+  await retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, team1Score, team2Score, forfeitTeamId, mapEntry));
+}
+
+async function adminSaveMatchScoresOnce(
+  matchId: number,
+  team1Score?: number,
+  team2Score?: number,
+  forfeitTeamId?: number,
+  mapEntry?: AdminMapEntry,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1281,7 +1341,7 @@ export async function adminSaveMatchScoresPublic(
     await connection.beginTransaction();
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
-    await adminSaveInternal(connection, matchId, team1Score, team2Score, forfeitTeamId);
+    await adminSaveInternal(connection, matchId, team1Score, team2Score, forfeitTeamId, mapEntry);
 
     // Need to get tournament ID for event + Survival reconciliation
     const [matchData] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
@@ -1518,6 +1578,21 @@ export async function adminResolveMatchPublic(
   team2Score?: number,
   forfeitTeamId?: number,
   doubleForfeit = false,
+  mapEntry?: AdminMapEntry,
+): Promise<void> {
+  // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
+  await retryOnDeadlock(() =>
+    adminResolveMatchOnce(matchId, team1Score, team2Score, forfeitTeamId, doubleForfeit, mapEntry),
+  );
+}
+
+async function adminResolveMatchOnce(
+  matchId: number,
+  team1Score?: number,
+  team2Score?: number,
+  forfeitTeamId?: number,
+  doubleForfeit = false,
+  mapEntry?: AdminMapEntry,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1542,6 +1617,7 @@ export async function adminResolveMatchPublic(
       team2Score,
       forfeitTeamId,
       doubleForfeit,
+      mapEntry,
     );
 
     await tryAutoResolveByes(connection, tournamentId);

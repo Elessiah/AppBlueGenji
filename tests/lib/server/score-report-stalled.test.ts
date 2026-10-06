@@ -3,10 +3,12 @@ import type { PoolConnection } from "mysql2/promise";
 
 jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/bot-logs");
+jest.mock("@/lib/server/tournaments/match-maps");
 
 import { resolveExpiredScoreReports } from "@/lib/server/tournaments/finalization";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
+import { promoteReportedMaps } from "@/lib/server/tournaments/match-maps";
 
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
 function fakeConnection(options: {
@@ -57,6 +59,75 @@ beforeEach(() => {
 describe("resolveExpiredScoreReports", () => {
   // Un seul report : le silence de l'adversaire vaut accord, le moteur
   // tranche seul. Rien à arbitrer, donc aucune alerte.
+  it("ne clôt pas deux fois un report qu'une clôture concurrente vient de trancher (MAP_SCORES.md)", async () => {
+    const seen: string[] = [];
+    const connection = fakeConnection({
+      seen,
+      rows: (q) => {
+        if (q.startsWith("SELECT status,")) return [{ status: "COMPLETED" }];
+        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
+        return [];
+      },
+    });
+
+    await resolveExpiredScoreReports(connection, 12);
+
+    expect(seen.some((q) => q.startsWith("SELECT status,") && q.endsWith("FOR UPDATE"))).toBe(true);
+    expect(promoteReportedMaps).not.toHaveBeenCalled();
+    expect(finalizeMatch).not.toHaveBeenCalled();
+  });
+
+  it("clôt sur le report relu sous verrou, pas sur la copie lue avant (MAP_SCORES.md)", async () => {
+    const connection = fakeConnection({
+      rows: (q) => {
+        if (q.startsWith("SELECT status,")) {
+          // L'équipe 1 a corrigé 2-1 en 2-0 entre la sélection et le verrou.
+          return [{
+            status: "AWAITING_CONFIRMATION",
+            team1_report_score: 2,
+            team1_report_opponent_score: 0,
+            team2_report_score: null,
+            team2_report_opponent_score: null,
+          }];
+        }
+        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
+        return [];
+      },
+    });
+
+    await resolveExpiredScoreReports(connection, 12);
+
+    expect(finalizeMatch).toHaveBeenCalledWith(
+      connection,
+      12,
+      expect.objectContaining({ id: 31 }),
+      expect.objectContaining({ team1Score: 2, team2Score: 0 }),
+    );
+  });
+
+  it("ne tranche pas d'office un report contesté entre-temps (MAP_SCORES.md)", async () => {
+    const connection = fakeConnection({
+      rows: (q) => {
+        if (q.startsWith("SELECT status,")) {
+          return [{
+            status: "AWAITING_CONFIRMATION",
+            team1_report_score: 2,
+            team1_report_opponent_score: 1,
+            team2_report_score: 2,
+            team2_report_opponent_score: 1,
+          }];
+        }
+        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
+        return [];
+      },
+    });
+
+    await resolveExpiredScoreReports(connection, 12);
+
+    expect(promoteReportedMaps).not.toHaveBeenCalled();
+    expect(finalizeMatch).not.toHaveBeenCalled();
+  });
+
   it("résout un report expiré quand seul team1 a saisi le score", async () => {
     const connection = fakeConnection({
       rows: (q) => {
@@ -100,6 +171,7 @@ describe("resolveExpiredScoreReports", () => {
       }),
     );
 
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, expect.any(Number), "TEAM1");
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
@@ -148,6 +220,8 @@ describe("resolveExpiredScoreReports", () => {
       }),
     );
 
+    // Le détail map par map du report qui fait foi devient le résultat retenu.
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, 32, "TEAM2");
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });

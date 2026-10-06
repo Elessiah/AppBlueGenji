@@ -89,6 +89,7 @@ export interface TournamentDef extends ReportStateCounts {
   matchSchedule?: SeedMatchSchedule; // dates de début des manches ; absent = aucun horaire
   image?: SeedImage; // illustration ou logo ; absent = aucune image (cas majoritaire)
   replays?: boolean; // rediff YouTube sur un match joué sur deux ; absent = aucune rediff
+  mapDetails?: boolean; // détail map par map (MAP_SCORES.md) sur les matchs joués ; absent = aucun
   /**
    * Matchs planifiés par l'arbitrage (`lib/shared/match-planning.ts`) ;
    * absent = option éteinte. Combinée à `matchSchedule`, elle couvre « en
@@ -197,7 +198,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // ---- RUNNING · diffusion en direct ---------------------------------------
   // Le cas nominal du bouton « Regarder le live » de l'accueil : chaîne
   // officielle + manches castées en automatique, donc réellement à l'antenne.
-  { name: "Live Auto (à l'antenne)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 60, live: { url: "https://www.twitch.tv/bluegenji", trigger: "AUTO", matchUrl: "https://www.twitch.tv/bluegenji" }, replays: true },
+  { name: "Live Auto (à l'antenne)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 60, live: { url: "https://www.twitch.tv/bluegenji", trigger: "AUTO", matchUrl: "https://www.twitch.tv/bluegenji" }, replays: true, mapDetails: true },
   // Chaîne renseignée mais antenne fermée : les matchs restent « programmés »
   // et ce tournoi ne doit PAS faire apparaître le bouton d'accueil.
   { name: "Live Manuel (hors antenne)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 68, live: { url: "https://www.youtube.com/@bluegenji", trigger: "MANUAL" } },
@@ -231,7 +232,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // indéfiniment sans jamais retomber à huit.
   // Le cas du règlement : BO5 sans tiebreaker en qualification (une map nulle
   // peut arrêter la rencontre sur 2-2), vrai FT3 en play-offs.
-  { name: "BG Survie Égalités", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66 },
+  { name: "BG Survie Égalités", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66, mapDetails: true },
   { name: "BG Survie Plafond Manches", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -3, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 108 },
   { name: "BG Survie Plafond Atteint", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 16, maxTeams: 32, daysOffset: -18, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 3, matchFormat: { type: "FT", value: 3 }, teamOffset: 128 },
 

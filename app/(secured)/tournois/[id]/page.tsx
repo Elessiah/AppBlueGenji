@@ -324,6 +324,9 @@ export default function TournamentDetailPage() {
   const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
+  // Relecture du contexte du lecteur quand une proposition a changé sous la
+  // modale de score (son détail map par map n'arrive qu'avec lui).
+  const refreshProposals = useCallback(() => refresh(), [refresh]);
   // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
   // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
   // dialogue continuait d'afficher « 0 – 0 » sur un match que le flux venait de
@@ -932,6 +935,7 @@ export default function TournamentDetailPage() {
         format={detail.card.matchFormat}
         playoffFormat={detail.card.endurancePlayoffFormat}
         tournamentFormat={detail.card.format}
+        game={detail.card.game}
       >
       <LiveProvider
         canManage={detail.canManageLive}
@@ -1054,6 +1058,8 @@ export default function TournamentDetailPage() {
         <AdminScoreDialog
           key={matchForAdminScore.id}
           match={matchForAdminScore}
+          proposals={detail.matchProposals}
+          onRefreshProposals={refreshProposals}
           onClose={() => setSelectedMatchForAdminId(null)}
           onSubmitted={() => {
             setSelectedMatchForAdminId(null);
@@ -1070,8 +1076,10 @@ export default function TournamentDetailPage() {
           myTeamId={detail.myTeamId}
           canReportScore={canReportScore(matchForPlayerScore)}
           canForfeit={detail.canRegisterEntrant}
+          proposals={detail.matchProposals}
           onClose={() => setPlayerScoreMatchId(null)}
           onSubmitted={() => void refresh()}
+          onRefresh={refreshProposals}
         />
       )}
 

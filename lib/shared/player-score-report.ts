@@ -12,8 +12,9 @@
  *
  * Module pur : la carte, la modale et les tests partagent les mêmes décisions.
  */
-import type { BracketMatch, MatchScoreReport } from "./types";
+import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "./types";
 import { isMatchPlayed } from "./match-outcome";
+import { sameMapLists, type MatchMapInput } from "./match-maps";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
 export type PlayerReportPhase =
@@ -34,11 +35,33 @@ export interface PlayerReportView {
   theirs: MatchScoreReport | null;
 }
 
-/** Deux propositions disent-elles le même score ? */
-type ReportedScore = Pick<MatchScoreReport, "team1Score" | "team2Score">;
+/**
+ * Deux propositions disent-elles le même score — et, quand toutes deux portent
+ * leur détail, les mêmes maps (`MAP_SCORES.md`) ? C'est la règle du serveur :
+ * deux 2-1 aux codes de replay différents se contredisent.
+ */
+type ReportedScore = Pick<MatchScoreReport, "team1Score" | "team2Score"> & {
+  maps?: ReadonlyArray<MatchMapInput>;
+};
 
 export function sameReportedScore(a: ReportedScore, b: ReportedScore): boolean {
-  return a.team1Score === b.team1Score && a.team2Score === b.team2Score;
+  if (a.team1Score !== b.team1Score || a.team2Score !== b.team2Score) return false;
+  const aMaps = a.maps ?? [];
+  const bMaps = b.maps ?? [];
+  return aMaps.length === 0 || bMaps.length === 0 || sameMapLists(aMaps, bMaps);
+}
+
+/**
+ * Maps à l'ouverture de la modale : la proposition du lecteur, sinon celle de
+ * l'adversaire (confirmer d'un clic), sinon une liste vide.
+ */
+export function playerReportInitialMaps(view: PlayerReportView | null): MatchMapInput[] {
+  const source = view?.mine ?? view?.theirs ?? null;
+  return (source?.maps ?? []).map(({ replayCode, team1Score, team2Score }) => ({
+    replayCode,
+    team1Score,
+    team2Score,
+  }));
 }
 
 /**
@@ -78,11 +101,11 @@ export function playerReportView(
   const theirs = iAmTeam1 ? match.team2Report : match.team1Report;
 
   // Deux propositions concordantes tranchent le match dans la même
-  // transaction : on ne les voit donc jamais ensemble sur un match ouvert.
-  // Les lire comme un conflit serait pourtant faux si la course survenait —
-  // elles s'accordent, le flux apportera le résultat.
+  // transaction : deux propositions **ensemble** sur un match ouvert se
+  // contredisent donc toujours — par le score, ou, à score égal, par le détail
+  // des maps (`MAP_SCORES.md`), que l'instantané diffusé ne porte pas.
   let phase: PlayerReportPhase;
-  if (mine && theirs) phase = sameReportedScore(mine, theirs) ? "MINE_PENDING" : "CONFLICT";
+  if (mine && theirs) phase = "CONFLICT";
   else if (mine) phase = "MINE_PENDING";
   else if (theirs) phase = "THEIRS_PENDING";
   else phase = "NONE";
@@ -183,11 +206,49 @@ export function pendingReportNotice(
 ): string | null {
   if (isMatchPlayed(match)) return null;
   const { team1Report, team2Report } = match;
-  if (team1Report && team2Report && !sameReportedScore(team1Report, team2Report)) {
+  // Deux propositions sur un match ouvert se contredisent toujours (voir
+  // `playerReportView`) — à score égal, par leurs maps.
+  if (team1Report && team2Report) {
     return "Scores contradictoires · arbitrage alerté";
   }
   const report = team1Report ?? team2Report;
   if (!report) return null;
   const reporter = team1Report ? match.team1Name ?? "Équipe 1" : match.team2Name ?? "Équipe 2";
   return `${report.team1Score} – ${report.team2Score} proposé par ${reporter} · à confirmer`;
+}
+
+/**
+ * Le match, propositions **complétées de leur détail** map par map lu dans le
+ * contexte du lecteur (`TournamentViewerContext.matchProposals`) : l'instantané
+ * diffusé ne le porte pas (`docs/features/MAP_SCORES.md`). Un détail ne se pose
+ * que sur la proposition dont il porte l'instant de dépôt — sinon il décrirait
+ * une proposition remplacée depuis.
+ */
+export function withProposalMaps<M extends Pick<BracketMatch, "id" | "team1Report" | "team2Report">>(
+  match: M,
+  proposals: ReadonlyArray<MatchProposalMaps>,
+): M {
+  const entry = proposals.find((p) => p.matchId === match.id);
+  if (!entry) return match;
+  const fill = (report: MatchScoreReport | null, side: ProposalMaps | null): MatchScoreReport | null =>
+    report && side?.reportedAt === report.reportedAt && side ? { ...report, maps: side.maps } : report;
+  return { ...match, team1Report: fill(match.team1Report, entry.team1), team2Report: fill(match.team2Report, entry.team2) };
+}
+
+/**
+ * Le contexte du lecteur est-il en retard d'une proposition ? Il n'arrive
+ * qu'à la connexion au flux : une proposition déposée depuis se repère à son
+ * instant de dépôt (porté par l'instantané), et se relit par la lecture REST.
+ */
+export function proposalsNeedRefresh(
+  match: Pick<BracketMatch, "id" | "status" | "team1Report" | "team2Report">,
+  proposals: ReadonlyArray<MatchProposalMaps>,
+): boolean {
+  // Match clos (forfait déclaré, nul…) : le serveur n'en sert plus aucune
+  // proposition (`proposalMatches`) — l'attendre bloquerait l'arbitrage.
+  if (isMatchPlayed(match)) return false;
+  const entry = proposals.find((p) => p.matchId === match.id);
+  const stale = (report: MatchScoreReport | null, side: ProposalMaps | null | undefined) =>
+    report !== null && side?.reportedAt !== report.reportedAt;
+  return stale(match.team1Report, entry?.team1) || stale(match.team2Report, entry?.team2);
 }

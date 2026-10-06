@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
-import { checkMatchScores, matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
+import { matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
+import { checkMapList, sameMapLists, type MatchMapInput } from "@/lib/shared/match-maps";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
@@ -13,7 +14,14 @@ import {
   queueRefereeAlert,
 } from "./bot-logs";
 import { resolveUserEntrant } from "./registration";
-import { loadTournamentMatchFormat } from "./repository";
+import { loadTournamentMatchRules } from "./repository";
+import {
+  REPORTED_MAP_SOURCES,
+  clearMapSets,
+  loadMatchMaps,
+  promoteReportedMaps,
+  replaceMatchMaps,
+} from "./match-maps";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
@@ -165,6 +173,10 @@ export async function finalizeMatch(
     match.next_loser_slot === null ? null : Number(match.next_loser_slot),
     result.loserTeamId,
   );
+
+  // Les propositions map par map partent avec leurs colonnes de score
+  // (`docs/features/MAP_SCORES.md`) : celle qui fait foi a déjà été promue.
+  await clearMapSets(connection, [Number(match.id)], REPORTED_MAP_SOURCES);
 }
 
 /**
@@ -215,16 +227,6 @@ function scoreDeadlineAssignment(otherSide: "team1" | "team2"): string {
              )
              ELSE COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL})
            END`;
-}
-
-function validateScoreValue(value: number): number {
-  if (!Number.isFinite(value)) {
-    throw new TypeError("INVALID_SCORE");
-  }
-  if (value < 0 || value > 99) {
-    throw new Error("INVALID_SCORE_RANGE");
-  }
-  return Math.trunc(value);
 }
 
 /**
@@ -289,17 +291,79 @@ function assertMatchLaunchedForPlayers(match: MatchRow): void {
   }
 }
 
+/**
+ * Les deux reports concordent-ils ? Sur le score **et** le détail
+ * (`docs/features/MAP_SCORES.md`) : deux 2-1 aux codes de replay différents ne
+ * décrivent pas la même série, et les codes sont justement ce que l'arbitrage
+ * vérifie. Un désaccord sur les maps suit donc le chemin de tout désaccord —
+ * arbitrage alerté —, sans rien changer à la mécanique vainqueur / perdant.
+ * Une proposition adverse d'avant les maps (aucune ligne) ne se compare que
+ * sur le score.
+ */
+async function reportsConcord(
+  connection: PoolConnection,
+  updated: MatchRow,
+  maps: ReadonlyArray<MatchMapInput>,
+  reporterSource: "TEAM1" | "TEAM2",
+): Promise<boolean> {
+  const scoresAgree =
+    Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
+    Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
+  if (!scoresAgree) return false;
+  const otherSource = reporterSource === "TEAM1" ? "TEAM2" : "TEAM1";
+  const otherMaps = await loadMatchMaps(connection, Number(updated.id), otherSource);
+  return otherMaps.length === 0 || sameMapLists(maps, otherMaps);
+}
+
+/** Ce que l'engagé confirme : le dépôt de la proposition adverse qu'il a lue. */
+export type ProposalConfirmation = { reportedAt: string };
+
+/**
+ * La proposition adverse est-elle toujours celle que l'engagé confirme ? Même
+ * instant de dépôt, et — quand elle porte un détail — les mêmes maps que
+ * celles renvoyées. Lève `PROPOSAL_STALE` sinon. La ligne du match est déjà
+ * verrouillée ; le détail adverse est relu sous verrou (la dernière version).
+ */
+async function assertProposalUnchanged(
+  connection: PoolConnection,
+  match: MatchRow,
+  isTeam1Reporter: boolean,
+  maps: ReadonlyArray<MatchMapInput>,
+  confirm: ProposalConfirmation,
+): Promise<void> {
+  const reportedAt = isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at;
+  const score = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
+  if (score === null || score === undefined || toIso(reportedAt ?? null) !== confirm.reportedAt) {
+    throw new Error("PROPOSAL_STALE");
+  }
+  const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
+  if (theirMaps.length > 0 && !sameMapLists(maps, theirMaps)) throw new Error("PROPOSAL_STALE");
+}
+
+/**
+ * Score dérivé des maps, vu de l'engagée qui reporte (« mon score », « score
+ * adverse » — le contrat des colonnes `teamN_report_*`). Lève le refus de la
+ * liste, s'il y en a un.
+ */
+function reporterView(
+  check: ReturnType<typeof checkMapList>,
+  isTeam1Reporter: boolean,
+): { myScore: number; opponentScore: number; reporterSource: "TEAM1" | "TEAM2" } {
+  if (check.error) throw new Error(check.error);
+  const { team1, team2 } = check.score;
+  return isTeam1Reporter
+    ? { myScore: team1, opponentScore: team2, reporterSource: "TEAM1" }
+    : { myScore: team2, opponentScore: team1, reporterSource: "TEAM2" };
+}
+
 export async function reportMatchScore(
   connection: PoolConnection,
   tournamentId: number,
   matchId: number,
   userId: number,
-  myScoreRaw: number,
-  opponentScoreRaw: number,
+  maps: ReadonlyArray<MatchMapInput>,
+  confirm?: ProposalConfirmation,
 ): Promise<void> {
-  const myScore = validateScoreValue(myScoreRaw);
-  const opponentScore = validateScoreValue(opponentScoreRaw);
-
   const reporterTeamId = await resolveReportingTeamId(connection, tournamentId, userId);
 
   const [matches] = await connection.execute<MatchRow[]>(
@@ -371,15 +435,25 @@ export async function reportMatchScore(
   // deux formats, et sa qualification tolère l'égalité (`checkMatchScores`).
   // D'où le contrôle **ici** et non avant le chargement du match : il lui faut
   // le numéro de manche.
-  const matchFormat = await loadTournamentMatchFormat(
+  //
+  // Le score se **dérive** des maps (`lib/shared/match-maps.ts`) : une map
+  // gagnée vaut un point, une map nulle n'en vaut à personne. Chaque map porte
+  // son code de replay, jugé selon le jeu du tournoi — d'où la lecture du jeu
+  // avec le format, dans la même requête.
+  const { format: matchFormat, game } = await loadTournamentMatchRules(
     connection,
     tournamentId,
     Number(match.round_number),
   );
-  const matchFormatViolation = checkMatchScores(matchFormat, myScore, opponentScore, {
-    decisive: true,
-  });
-  if (matchFormatViolation) throw new Error(matchFormatViolation);
+  const { myScore, opponentScore, reporterSource } = reporterView(
+    checkMapList(matchFormat, game, maps, { decisive: true }),
+    isTeam1Reporter,
+  );
+  // « Confirmer » : la proposition adverse doit être **celle que l'engagé a
+  // vue** — même dépôt, même détail. Elle a pu changer ou partir entre
+  // l'ouverture de la modale et le clic : on refuse plutôt que de clore sur
+  // autre chose que ce qui a été lu (`docs/features/MAP_SCORES.md`).
+  if (confirm) await assertProposalUnchanged(connection, match, isTeam1Reporter, maps, confirm);
 
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
@@ -430,6 +504,13 @@ export async function reportMatchScore(
     );
   }
 
+  // La proposition map par map, à côté de ses colonnes de score : c'est elle
+  // que l'adversaire confirme d'un clic, et elle qui devient le résultat retenu.
+  // Premier report de l'engagée (ligne du match verrouillée) : aucune ligne à
+  // effacer, donc pas de lecture verrouillante sur un intervalle vide.
+  const hadReport = (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;
+  await replaceMatchMaps(connection, matchId, reporterSource, maps, userId, { knownEmpty: !hadReport });
+
   const [updatedRows] = await connection.execute<MatchRow[]>(
     `SELECT
       id,
@@ -461,9 +542,7 @@ export async function reportMatchScore(
     updated.team2_report_score !== null &&
     updated.team2_report_opponent_score !== null
   ) {
-    const consistent =
-      Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
-      Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
+    const consistent = await reportsConcord(connection, updated, maps, reporterSource);
 
     if (consistent) {
       const team1Score = Number(updated.team1_report_score);
@@ -473,6 +552,9 @@ export async function reportMatchScore(
       const side = matchWinnerSide(matchFormat, team1Score, team2Score);
       const { winnerTeamId, loserTeamId } = sideTeamIds(side, updated.team1_id, updated.team2_id);
 
+      // Le détail confirmé devient le résultat retenu, avant que la clôture
+      // n'efface les propositions.
+      await promoteReportedMaps(connection, matchId, reporterSource);
       await finalizeMatch(connection, tournamentId, updated, {
         team1Score,
         team2Score,

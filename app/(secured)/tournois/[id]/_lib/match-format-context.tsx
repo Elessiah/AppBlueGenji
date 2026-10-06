@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
-import type { TournamentFormat } from "@/lib/shared/types";
+import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 
 /**
  * Format de match du tournoi (BO5, FT3…), mis à disposition des composants de
@@ -25,31 +25,36 @@ type MatchFormatContextValue = {
   /** BG Survie : format de l'arbre final. `null` = celui du tournoi. */
   playoffFormat: MatchFormat | null;
   tournamentFormat: TournamentFormat;
+  /** Jeu du tournoi : il fixe le format des codes de replay (`MAP_SCORES.md`). */
+  game: TournamentGame | null;
 };
 
 const MatchFormatContext = createContext<MatchFormatContextValue>({
   format: null,
   playoffFormat: null,
   tournamentFormat: "SINGLE",
+  game: null,
 });
 
 export function MatchFormatProvider({
   format,
   playoffFormat,
   tournamentFormat,
+  game = null,
   children,
 }: Readonly<{
   format: MatchFormat | null;
   playoffFormat: MatchFormat | null;
   tournamentFormat: TournamentFormat;
+  game?: TournamentGame | null;
   children: ReactNode;
 }>) {
   // Valeur stable tant que les formats ne changent pas **de contenu** : chaque
   // instantané du flux en apporte des objets neufs, et une valeur neuve à
   // chaque rendu redessinerait toutes les cartes de match, pourtant mémorisées.
-  const key = JSON.stringify([format, playoffFormat, tournamentFormat]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- la clé porte le contenu des trois.
-  const value = useMemo(() => ({ format, playoffFormat, tournamentFormat }), [key]);
+  const key = JSON.stringify([format, playoffFormat, tournamentFormat, game]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- la clé porte le contenu des quatre.
+  const value = useMemo(() => ({ format, playoffFormat, tournamentFormat, game }), [key]);
   return (
     <MatchFormatContext.Provider value={value}>
       {children}
@@ -73,4 +78,9 @@ export function useMatchFormat(match?: { roundNumber: number } | null): MatchFor
     playoffFormat,
     match ? match.roundNumber : null,
   );
+}
+
+/** Jeu du tournoi, pour juger les codes de replay (`lib/shared/match-maps.ts`). */
+export function useTournamentGame(): TournamentGame | null {
+  return useContext(MatchFormatContext).game;
 }

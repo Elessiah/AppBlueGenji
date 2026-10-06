@@ -66,17 +66,20 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
     expect(MATCH_ROW).toContain("pendingReportNotice(match)");
   });
 
-  it("la modale ordonne ses deux champs comme la carte, nommés par équipe", () => {
-    expect(PLAYER_DIALOG).toMatch(/id="player-score-team1"[\s\S]{0,80}teamId=\{match\.team1Id\}[\s\S]{0,40}teamName=\{team1\}/);
-    expect(PLAYER_DIALOG).toMatch(/id="player-score-team2"[\s\S]{0,80}teamId=\{match\.team2Id\}[\s\S]{0,40}teamName=\{team2\}/);
-    // Le contrat de la route parle depuis l'engagé : la conversion passe par
-    // le module pur, jamais par une inversion recopiée.
+  it("la modale saisit map par map, colonnes ordonnées comme la carte (MAP_SCORES.md)", () => {
+    // Une ligne par map : équipe 1 puis équipe 2, dans l'orientation du plateau.
+    expect(PLAYER_DIALOG).toMatch(/<MapScoreList[\s\S]{0,300}team1Name=\{team1\}[\s\S]{0,40}team2Name=\{team2\}/);
+    // Le message d'envoi parle depuis l'engagé : la conversion passe par le
+    // module pur, jamais par une inversion recopiée.
     expect(PLAYER_DIALOG).toContain("toReporterScores(myTeamIsTeam1,");
+    expect(PLAYER_DIALOG).toContain(
+      "confirmsAsIs && view?.theirs ? { maps, confirm: { reportedAt: view.theirs.reportedAt } } : { maps }",
+    );
   });
 
-  it("le stepper est celui de l'arbitrage : une seule implémentation", () => {
-    expect(PLAYER_DIALOG).toContain('from "./ScoreStepper"');
-    expect(ADMIN_DIALOG).toContain('from "./ScoreStepper"');
+  it("la liste de maps est celle de l'arbitrage : une seule implémentation", () => {
+    expect(PLAYER_DIALOG).toContain('from "./MapScoreList"');
+    expect(ADMIN_DIALOG).toContain('from "./MapScoreList"');
   });
 });
 

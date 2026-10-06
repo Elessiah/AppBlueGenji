@@ -9,6 +9,8 @@
  * service, une fois le match chargé.
  */
 
+import { parseMapListBody, type MatchMapInput } from "./match-maps";
+
 /** Plus haut score accepté sur une manche. */
 export const ADMIN_SCORE_MAX = 99;
 
@@ -57,4 +59,35 @@ export function parseAdminScoreBody(body: AdminScoreBody): AdminScoreParse {
     return { ok: false, error: "INVALID_SCORES" };
   }
   return { ok: true, value };
+}
+
+export type AdminMapEntryParse =
+  | {
+      ok: true;
+      /**
+       * Maps saisies ; `[]` = liste explicitement vide (le détail retenu est
+       * effacé), `null` = champ absent (le détail n'est pas touché).
+       */
+      maps: MatchMapInput[] | null;
+      /**
+       * Scores de façade pour `parseAdminScoreBody` quand des maps sont
+       * fournies : le service les ignore et **dérive** le score des maps.
+       */
+      placeholderScores: { team1Score: number; team2Score: number };
+    }
+  | { ok: false; error: "INVALID_MAPS" };
+
+/**
+ * Lecture du détail map par map facultatif d'une saisie d'arbitrage
+ * (`docs/features/MAP_SCORES.md`). Absent ou `null` : champ ignoré. Vide : la
+ * saisie est un score à la main qui efface le détail retenu. Les règles
+ * (codes, plafond, fin de match) se jugent dans le service, qui connaît le
+ * format et le jeu.
+ */
+export function parseAdminMapEntry(raw: unknown): AdminMapEntryParse {
+  const placeholderScores = { team1Score: 0, team2Score: 0 };
+  if (raw === undefined || raw === null) return { ok: true, maps: null, placeholderScores };
+  const maps = parseMapListBody(raw);
+  if (maps === null) return { ok: false, error: "INVALID_MAPS" };
+  return { ok: true, maps, placeholderScores };
 }

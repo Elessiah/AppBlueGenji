@@ -1,4 +1,5 @@
-﻿import type { EnduranceRoundCell } from "./bg-survie/replay";
+﻿import type { MatchMapResult } from "./match-maps";
+import type { EnduranceRoundCell } from "./bg-survie/replay";
 import type { EnduranceStatus } from "./bg-survie/standings";
 import type { AccountSuspensionView } from "./account-suspension";
 import type { ConnectionMethod } from "./account-connections";
@@ -498,6 +499,11 @@ export type MatchScoreReport = {
   team1Score: number;
   team2Score: number;
   reportedAt: string;
+  /**
+   * Détail map par map de la proposition (`docs/features/MAP_SCORES.md`),
+   * orientation du plateau ; vide pour une proposition d'avant les maps.
+   */
+  maps: MatchMapResult[];
 };
 
 export type BracketMatch = {
@@ -534,6 +540,13 @@ export type BracketMatch = {
   team1Report: MatchScoreReport | null;
   /** Proposition de score de l'équipe 2 en attente ; `null` = aucune. */
   team2Report: MatchScoreReport | null;
+  /**
+   * Détail map par map du résultat **retenu** (`docs/features/MAP_SCORES.md`) :
+   * code de replay et score de chaque map. Vide pour un match d'avant les maps,
+   * un forfait, une exemption, ou un score corrigé à la main par l'arbitrage —
+   * le score du match s'affiche alors seul, comme avant.
+   */
+  maps: MatchMapResult[];
   updatedAt: string;
   /** ID de la phase du tournoi (0 pour un tournoi sans phases). */
   phaseId: number;
@@ -705,6 +718,24 @@ export type TournamentViewerContext = {
    * Battle.net rattaché (`castBlockReason`, `lib/shared/match-launch.ts`).
    */
   castBlock: CastBlock | null;
+  /**
+   * Détail map par map des propositions **en attente** que ce lecteur a le
+   * droit de lire (`docs/features/MAP_SCORES.md`) : celles des matchs de son
+   * engagé s'il mène le match (`canCreateReportsForTeamIds`), toutes pour
+   * l'arbitrage. Jamais dans l'instantané diffusé : les codes de replay d'une
+   * proposition ne regardent que les deux engagés et le staff.
+   */
+  matchProposals: MatchProposalMaps[];
+};
+
+/** Proposition map par map d'un engagé, datée de son dépôt. */
+export type ProposalMaps = { reportedAt: string; maps: MatchMapResult[] };
+
+/** Détail des propositions en attente sur un match, par côté du plateau. */
+export type MatchProposalMaps = {
+  matchId: number;
+  team1: ProposalMaps | null;
+  team2: ProposalMaps | null;
 };
 
 /** Détail complet d'un tournoi pour un lecteur donné. */
@@ -950,6 +981,21 @@ export type PersonalDataExport = {
    * légale de l'hébergeur — porte, adresse IP et date.
    */
   connectionLogs: { event: string; ip: string | null; createdAt: string }[];
+  /**
+   * Détail map par map que le titulaire a saisi (`bg_match_maps`) : match,
+   * jeu de lignes (proposition `TEAM1`/`TEAM2` ou résultat `FINAL`), code de
+   * replay et scores de chaque map.
+   */
+  mapEntries: {
+    matchId: number;
+    tournamentId: number;
+    source: string;
+    mapNumber: number;
+    replayCode: string;
+    team1Score: number;
+    team2Score: number;
+    submittedAt: string | null;
+  }[];
   /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.

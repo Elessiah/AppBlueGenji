@@ -27,6 +27,7 @@ jest.mock("@/lib/server/tournaments/bg-survie/meta");
 // l'ordre qu'il rend.
 jest.mock("@/lib/server/ranking-service");
 jest.mock("@/lib/server/tournaments/player-pushes");
+jest.mock("@/lib/server/tournaments/match-maps");
 
 import {
   getTournamentSnapshot,
@@ -48,6 +49,7 @@ import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
 import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { getDatabase } from "@/lib/server/database";
+import { loadMapsByMatch } from "@/lib/server/tournaments/match-maps";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
 import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie/meta";
@@ -118,6 +120,7 @@ beforeEach(() => {
   clearCache();
   expiredRows = [];
 
+  jest.mocked(loadMapsByMatch).mockResolvedValue(new Map());
   jest.mocked(getDatabase).mockResolvedValue(fakePool({
     getConnection: jest.fn(async () => connection),
     execute: jest.fn(async () => [expiredRows]),

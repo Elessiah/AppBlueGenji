@@ -15,6 +15,7 @@ const report = (team1Score: number, team2Score: number): MatchScoreReport => ({
   team1Score,
   team2Score,
   reportedAt: "2026-09-28T20:00:00.000Z",
+  maps: [],
 });
 
 const base = bracketMatch({
@@ -54,9 +55,11 @@ describe("playerReportView", () => {
     expect(playerReportView(match, 20)?.phase).toBe("CONFLICT");
   });
 
-  it("deux propositions concordantes ne sont pas un conflit (course avec la clôture)", () => {
+  it("deux propositions au même score sur un match ouvert se contredisent par leurs maps (MAP_SCORES.md)", () => {
     const match = { ...base, team1Report: report(2, 1), team2Report: report(2, 1) };
-    expect(playerReportView(match, 10)?.phase).toBe("MINE_PENDING");
+    // Concordantes, elles auraient clos le match dans la même transaction.
+    expect(playerReportView(match, 10)?.phase).toBe("CONFLICT");
+    expect(pendingReportNotice(match)).toBe("Scores contradictoires · arbitrage alerté");
   });
 });
 

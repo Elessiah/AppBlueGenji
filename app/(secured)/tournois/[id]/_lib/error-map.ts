@@ -31,6 +31,18 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // remplace ces messages par une version chiffrée (`matchScoreViolationMessage`).
   SCORE_EXCEEDS_MATCH_FORMAT: "Score impossible pour le format de match du tournoi.",
   SCORE_BELOW_MATCH_FORMAT: "Le vainqueur doit atteindre le nombre de manches du format.",
+  // Saisie map par map (`docs/features/MAP_SCORES.md`) — formulations de
+  // repli, l'interface les chiffre par `mapListViolationMessage`.
+  MAP_LIST_EMPTY: "Ajoute au moins une map jouée.",
+  MAP_COUNT_EXCEEDED: "Trop de maps pour le format de ce match.",
+  MAP_REPLAY_CODE_REQUIRED: "Chaque map doit porter son code de replay.",
+  MAP_REPLAY_CODE_INVALID: "Code de replay invalide.",
+  MAP_REPLAY_CODE_DUPLICATE: "Le même code de replay figure sur deux maps.",
+  MAP_SCORE_INVALID: "Score de map invalide.",
+  MAP_AFTER_DECISION: "Une map suit la fin du match : le résultat était déjà acquis.",
+  MAP_LIST_INCOMPLETE: "Match inachevé : sans vainqueur, toutes les maps du format se jouent (une map nulle en occupe une).",
+  INVALID_MAPS: "Détail des maps illisible.",
+  PROPOSAL_STALE: "La proposition adverse a changé ou n'est plus en attente : la fenêtre affiche la version à jour.",
   INVALID_MATCH_FORMAT: "Format de match invalide.",
   INVALID_MATCH_FORMAT_MAX_MAPS:
     "Plafond de maps invalide : il doit rester entre l'objectif du format et son maximum naturel.",

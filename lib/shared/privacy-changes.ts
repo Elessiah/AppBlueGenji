@@ -599,6 +599,21 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/privacy-policy-bot", label: "Lire la politique de confidentialité du bot" }],
   },
+  {
+    id: "2026-10-scores-map-par-map",
+    publishedAt: "2026-10-06",
+    title: "Scores de match : le détail map par map et les codes de replay",
+    summary:
+      "Un score de match se saisit désormais map par map, chaque map avec le code de replay de la partie.",
+    details: [
+      "Chaque map d'un match porte son score et son code de replay ; le score du match en découle.",
+      "Un code de replay permet de revoir la partie en jeu, et d'y lire les identifiants de jeu des joueurs présents, y compris un BattleTag masqué sur le site.",
+      "Les codes enregistrés par l'arbitrage ou retenus comme résultat sont visibles des membres connectés sur la fiche du tournoi, pour qu'un match diffusé en direct et un match qui ne l'est pas offrent les mêmes informations ; ceux d'une proposition d'équipe en attente, des seules deux équipes du match et de l'arbitrage. Ils sont gardés avec le résultat qu'ils documentent.",
+      "Le site retient quel compte a saisi le détail ; ce lien est effacé à la suppression du compte, et figure dans l'export de vos données.",
+      "Un détail qui n'explique plus le résultat retenu (score corrigé par l'arbitrage) est effacé. La partie reste conservée par l'éditeur du jeu : supprimer son compte n'efface pas ses identifiants d'un replay, et les codes restent attachés au résultat.",
+    ],
+    links: [{ href: "/rgpd", label: "Lire la politique de confidentialité" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

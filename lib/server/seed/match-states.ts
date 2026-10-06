@@ -7,6 +7,8 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
+import { matchMaxMaps, matchWinsRequired } from "@/lib/shared/match-format";
+import { mapListLimit } from "@/lib/shared/match-maps";
 import type { ReportStateCounts, TournamentDef } from "./cases";
 
 // Transforme des matchs READY en états intermédiaires du cycle de report :
@@ -198,4 +200,89 @@ export async function applyMatchReplays(
        AND MOD(id, 2) = 0`,
     [normalizeReplayUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), tournamentId]
   );
+}
+
+/**
+ * Détail map par map (`docs/features/MAP_SCORES.md`) des matchs joués d'un cas
+ * qui le demande : une map gagnée 2-0 / 0-2 par point du score, plus — un match
+ * sur trois — une map nulle 1-1 jouée d'abord (elle ne rapporte rien, le score
+ * stocké reste juste). Codes de replay au format Overwatch (six caractères),
+ * uniques, déterministes. Les matchs sans score (forfaits, exemptions) n'en
+ * reçoivent pas : leur carte s'affiche comme avant.
+ */
+export async function applyMatchMapDetails(
+  db: Pool,
+  tournamentId: number,
+  def: TournamentDef
+): Promise<void> {
+  if (!def.mapDetails) return;
+  const [rows] = await db.execute<(RowDataPacket & { id: number; team1_score: number; team2_score: number })[]>(
+    `SELECT id, team1_score, team2_score
+     FROM bg_matches
+     WHERE tournament_id = ?
+       AND status = 'COMPLETED'
+       AND team1_id IS NOT NULL
+       AND team2_id IS NOT NULL
+       AND forfeit_team_id IS NULL
+       AND double_forfeit = 0
+       AND team1_score IS NOT NULL
+       AND team2_score IS NOT NULL`,
+    [tournamentId]
+  );
+  // Plafond le plus serré des deux phases possibles (format à égalités, où la
+  // map nulle consomme une map) : la map nulle n'est ajoutée que s'il reste
+  // de la place, si bien que la liste se resaisit telle quelle.
+  const drawFormat = def.matchFormat ? { ...def.matchFormat, drawsAllowed: true } : null;
+  const limit = mapListLimit(drawFormat);
+  for (const row of rows) {
+    const team1Wins = Number(row.team1_score);
+    const team2Wins = Number(row.team2_score);
+    const maps = seedMapSequence(team1Wins, team2Wins);
+    // Clos sans vainqueur (qualification à égalités) : la map nulle consomme une
+    // map du BO, la liste couvre donc toutes les maps (`MAP_LIST_INCOMPLETE`).
+    const unfinished =
+      def.matchFormatDraws === true && drawFormat !== null && Math.max(team1Wins, team2Wins) < matchWinsRequired(drawFormat);
+    if (unfinished) {
+      while (maps.length < matchMaxMaps(drawFormat)) maps.unshift([1, 1]);
+    } else if (maps.length > 0 && Number(row.id) % 3 === 0 && maps.length < limit) {
+      maps.unshift([1, 1]);
+    }
+    if (maps.length === 0) continue;
+    const values = maps.flatMap(([t1, t2], index) => [
+      Number(row.id),
+      index + 1,
+      (Number(row.id) * 16 + index).toString(36).toUpperCase().padStart(6, "0").slice(-6),
+      t1,
+      t2,
+    ]);
+    await db.execute(
+      `INSERT INTO bg_match_maps (match_id, source, map_number, replay_code, team1_score, team2_score)
+       VALUES ${maps.map(() => "(?, 'FINAL', ?, ?, ?, ?)").join(", ")}`,
+      values
+    );
+  }
+}
+
+/**
+ * Maps qui dérivent `team1Wins`-`team2Wins`, en alternance, la dernière revenant
+ * au camp qui mène : la rencontre ne se décide qu'à la dernière map, comme dans
+ * une vraie série (sans quoi la liste porterait une map après la fin acquise).
+ */
+function seedMapSequence(team1Wins: number, team2Wins: number): [number, number][] {
+  const maps: [number, number][] = [];
+  const leader: 1 | 2 = team1Wins >= team2Wins ? 1 : 2;
+  let a = team1Wins - (leader === 1 && team1Wins > 0 ? 1 : 0);
+  let b = team2Wins - (leader === 2 && team2Wins > 0 ? 1 : 0);
+  while (a > 0 || b > 0) {
+    if (a > 0) {
+      maps.push([2, 0]);
+      a -= 1;
+    }
+    if (b > 0) {
+      maps.push([0, 2]);
+      b -= 1;
+    }
+  }
+  if (team1Wins + team2Wins > 0) maps.push(leader === 1 ? [2, 0] : [0, 2]);
+  return maps;
 }

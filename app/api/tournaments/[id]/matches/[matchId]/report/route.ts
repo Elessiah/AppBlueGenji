@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
 import { readJsonBody } from "@/lib/server/request-body";
+import { MAP_LIST_ERROR_CODES, parseMapListBody } from "@/lib/shared/match-maps";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string; matchId: string }> }) {
   const user = await getCurrentUser();
@@ -27,46 +28,59 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   try {
-    const body = (await readJsonBody(req)) as { myScore?: number; opponentScore?: number };
+    const body = (await readJsonBody(req)) as { maps?: unknown; confirm?: unknown };
 
-    await reportMatchScore(
-      tournamentId,
-      matchId,
-      user.id,
-      Number(body.myScore),
-      Number(body.opponentScore),
-    );
+    // Un score se déclare **map par map** (`docs/features/MAP_SCORES.md`) :
+    // l'ancien corps `myScore` / `opponentScore` n'a plus cours, et se refuse
+    // comme une liste vide.
+    if (body.maps === undefined || body.maps === null) return fail("MAP_LIST_EMPTY", 400);
+    const maps = parseMapListBody(body.maps);
+    if (maps === null) return fail("INVALID_MAPS", 400);
+
+    const confirm = parseConfirm(body.confirm);
+    if (confirm === false) return fail("INVALID_REQUEST", 400);
+
+    await reportMatchScore(tournamentId, matchId, user.id, maps, confirm);
 
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;
-    if (
-      message === "DRAW_NOT_ALLOWED"
-      || message === "INVALID_SCORE"
-      || message === "INVALID_SCORE_RANGE"
-      || message === "NO_ACTIVE_TEAM"
-      || message === "TOURNAMENT_NOT_RUNNING"
-      || message === "MATCH_NOT_READY"
-      || message === "NOT_IN_MATCH"
-      || message === "MATCH_ALREADY_COMPLETED"
-      || message === "SCORE_EXCEEDS_MATCH_FORMAT"
-      || message === "SCORE_BELOW_MATCH_FORMAT"
-    ) {
-      return fail(message, 400);
-    }
-
-    // Membre sportif du roster : reporter un score engage l'équipe entière, et
-    // revient à ceux qui mènent le match (capitaine, manager, propriétaire).
-    if (message === "NOT_TEAM_MATCH_LEADER") return fail(message, 403);
-
-    // Le match existe et le score est bien formé : c'est son état qui refuse,
-    // le temps que les parties se déclarent prêtes (`lib/shared/match-launch.ts`).
-    if (message === "MATCH_NOT_LAUNCHED") return fail(message, 409);
-
-    if (message === "TOURNAMENT_NOT_FOUND" || message === "MATCH_NOT_FOUND") {
-      return fail(message, 404);
-    }
-
-    return fail(message || "SCORE_REPORT_FAILED", 500);
+    const status = MAP_LIST_ERROR_CODES.has(message) ? 400 : REPORT_ERROR_STATUS.get(message);
+    return fail(message || "SCORE_REPORT_FAILED", status ?? 500);
   }
 }
+
+/**
+ * « Confirmer » la proposition adverse telle quelle : l'instant de dépôt lu
+ * dans la modale, que le serveur rapproche du dépôt en base
+ * (`docs/features/MAP_SCORES.md`). `undefined` = simple envoi, `false` = corps
+ * mal formé.
+ */
+function parseConfirm(raw: unknown): { reportedAt: string } | undefined | false {
+  if (raw === undefined || raw === null) return undefined;
+  const reportedAt = (raw as { reportedAt?: unknown }).reportedAt;
+  return typeof reportedAt === "string" && reportedAt.length <= 40 ? { reportedAt } : false;
+}
+
+const REPORT_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
+  ["DRAW_NOT_ALLOWED", 400],
+  ["INVALID_SCORE", 400],
+  ["INVALID_SCORE_RANGE", 400],
+  ["NO_ACTIVE_TEAM", 400],
+  ["TOURNAMENT_NOT_RUNNING", 400],
+  ["MATCH_NOT_READY", 400],
+  ["NOT_IN_MATCH", 400],
+  ["MATCH_ALREADY_COMPLETED", 400],
+  ["SCORE_EXCEEDS_MATCH_FORMAT", 400],
+  ["SCORE_BELOW_MATCH_FORMAT", 400],
+  // Membre sportif du roster : reporter un score engage l'équipe entière, et
+  // revient à ceux qui mènent le match (capitaine, manager, propriétaire).
+  ["NOT_TEAM_MATCH_LEADER", 403],
+  // Le match existe et le score est bien formé : c'est son état qui refuse,
+  // le temps que les parties se déclarent prêtes (`lib/shared/match-launch.ts`).
+  ["MATCH_NOT_LAUNCHED", 409],
+  // La proposition confirmée a changé ou n'existe plus : la modale se recharge.
+  ["PROPOSAL_STALE", 409],
+  ["TOURNAMENT_NOT_FOUND", 404],
+  ["MATCH_NOT_FOUND", 404],
+]);

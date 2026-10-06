@@ -11,7 +11,9 @@ import {
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
-import { forfeitMatchScores, loadTournamentMatchFormat, reopenTournament } from "./repository";
+import { forfeitMatchScores, loadTournamentMatchFormat, loadTournamentMatchRules, reopenTournament } from "./repository";
+import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
+import { clearMapSets, dropStaleFinalMaps, replaceMatchMaps } from "./match-maps";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
@@ -373,12 +375,37 @@ function assertForfeitBelongsToMatch(match: MatchRow, forfeitTeamId: number): vo
   }
 }
 
+/** Maps saisies par l'arbitrage, et qui les a saisies. */
+export type AdminMapEntry = { maps: ReadonlyArray<MatchMapInput>; userId: number };
+
+/**
+ * Contrôle des maps d'arbitrage contre le format de la manche et le jeu du
+ * tournoi (`checkMapList`, la règle du report d'équipe). Rend le score dérivé
+ * et le format lu, pour en déduire le vainqueur sans relire le tournoi.
+ */
+async function checkAdminMaps(
+  connection: PoolConnection,
+  match: MatchRow,
+  maps: ReadonlyArray<MatchMapInput>,
+  decisive: boolean,
+): Promise<{ format: MatchFormat | null; score: { team1: number; team2: number } }> {
+  const { format, game } = await loadTournamentMatchRules(
+    connection,
+    Number(match.tournament_id),
+    Number(match.round_number),
+  );
+  const check = checkMapList(format, game, maps, { decisive });
+  if (check.error) throw new Error(check.error);
+  return { format, score: check.score };
+}
+
 export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
   team1Score?: number,
   team2Score?: number,
   forfeitTeamId?: number,
+  mapEntry?: AdminMapEntry,
 ): Promise<void> {
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
@@ -446,6 +473,23 @@ export async function adminSaveMatchScores(
        WHERE id = ?`,
       [scores.team1Score, scores.team2Score, forfeitTeamId, matchId],
     );
+    // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit
+    // plus, que le client ait envoyé des maps ou non.
+    await clearMapSets(connection, [matchId], ["FINAL"]);
+  } else if (mapEntry && mapEntry.maps.length > 0) {
+    // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
+    // exiger un match terminé (l'arbitrage note l'avancement).
+    await assertScoreEntryOpen(connection, match);
+    const { score: derived } = await checkAdminMaps(connection, match, mapEntry.maps, false);
+    await connection.execute(
+      `UPDATE bg_matches
+       SET team1_score = ?,
+           team2_score = ?,
+           forfeit_team_id = NULL
+       WHERE id = ?`,
+      [derived.team1, derived.team2, matchId],
+    );
+    await replaceMatchMaps(connection, matchId, "FINAL", mapEntry.maps, mapEntry.userId);
   } else if (team1Score !== undefined && team2Score !== undefined) {
     await assertScoreEntryOpen(connection, match);
     await checkScoresAgainstMatchFormat(
@@ -465,6 +509,11 @@ export async function adminSaveMatchScores(
        WHERE id = ?`,
       [team1Score, team2Score, matchId],
     );
+    // Liste explicitement vide : l'arbitre a retiré toutes les maps, le
+    // détail retenu ne décrit plus ce score posé à la main.
+    if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", [], null);
+    // Sans `maps` du tout, un détail qui n'explique plus ce score s'en va aussi.
+    else await dropStaleFinalMaps(connection, matchId, team1Score, team2Score);
   } else {
     throw new Error("INVALID_REQUEST");
   }
@@ -487,6 +536,7 @@ export async function adminResolveMatch(
   team2Score?: number,
   forfeitTeamId?: number,
   doubleForfeit = false,
+  mapEntry?: AdminMapEntry,
 ): Promise<void> {
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
@@ -526,7 +576,7 @@ export async function adminResolveMatch(
     connection,
     tournamentId,
     match,
-    { team1Score, team2Score, forfeitTeamId, doubleForfeit },
+    { team1Score, team2Score, forfeitTeamId, doubleForfeit, maps: mapEntry?.maps },
   );
 
   // Effets en cascade : ce que l'**ancien** résultat avait fait descendre dans
@@ -548,6 +598,19 @@ export async function adminResolveMatch(
     `UPDATE bg_matches SET forfeit_team_id = ?, double_forfeit = ? WHERE id = ?`,
     [forfeitTeamId ?? null, doubleForfeit ? 1 : 0, matchId],
   );
+
+  // Détail map par map du résultat retenu (`docs/features/MAP_SCORES.md`) :
+  // les maps de l'arbitre sur un score, **rien** sur un forfait — y compris
+  // celui qu'une engagée déclare (`./player-forfeit`, sans `mapEntry`), dont
+  // le score plein pourrait sinon coïncider avec un détail noté plus tôt.
+  // Sans `mapEntry` sur un score, le détail existant ne reste que s'il explique
+  // encore le score retenu (`dropStaleFinalMaps`).
+  const forfeited = forfeitTeamId !== undefined || doubleForfeit;
+  // Lecture sans verrou (`clearMapSets`) : le forfait déclaré par une engagée
+  // passe ici sans rejeu sur interblocage.
+  if (forfeited) await clearMapSets(connection, [matchId], ["FINAL"]);
+  else if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", mapEntry.maps, mapEntry.userId);
+  else await dropStaleFinalMaps(connection, matchId, resultTeam1Score, resultTeam2Score);
 
   await tryAutoResolveByes(connection, tournamentId);
 }
@@ -573,9 +636,10 @@ async function resolveAdminOutcome(
     team2Score?: number;
     forfeitTeamId?: number;
     doubleForfeit: boolean;
+    maps?: ReadonlyArray<MatchMapInput>;
   },
 ): Promise<AdminOutcome> {
-  const { team1Score, team2Score, forfeitTeamId, doubleForfeit } = input;
+  const { team1Score, team2Score, forfeitTeamId, doubleForfeit, maps } = input;
   let winnerTeamId: number | null;
   let loserTeamId: number | null;
   let resultTeam1Score: number | null;
@@ -609,6 +673,15 @@ async function resolveAdminOutcome(
     const scores = await forfeitScores(connection, tournamentId, match, forfeitTeamId);
     resultTeam1Score = scores.team1Score;
     resultTeam2Score = scores.team2Score;
+  } else if (maps && maps.length > 0) {
+    // Résultat **map par map** : le score se dérive des maps, qui doivent
+    // décrire un match terminé (vainqueur, ou nul là où le format l'admet).
+    await assertScoreEntryOpen(connection, match);
+    const { format, score: derived } = await checkAdminMaps(connection, match, maps, true);
+    const side = matchWinnerSide(format, derived.team1, derived.team2);
+    ({ winnerTeamId, loserTeamId } = sideTeamIds(side, match.team1_id, match.team2_id));
+    resultTeam1Score = derived.team1;
+    resultTeam2Score = derived.team2;
   } else if (team1Score !== undefined && team2Score !== undefined) {
     await assertScoreEntryOpen(connection, match);
     // Le format de la manche sert deux fois : à refuser la saisie, puis à en

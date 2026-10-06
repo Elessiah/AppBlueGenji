@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-01";
+export const REGISTER_UPDATED_AT = "2026-10-06";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -391,10 +391,12 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataCategories: [
       "Appartenance à une équipe et rôles d'équipe",
       "Inscriptions, scores, forfaits, pénalités (avec motif et arbitre auteur), classements",
+      "Détail map par map d'un match : score et code de replay de chaque map (le replay montre en jeu les identifiants des joueurs, BattleTag masqué compris), compte qui l'a saisi",
     ],
     sensitiveData: "Aucune",
     retention: [
       "Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)",
+      "Codes de replay : gardés avec le résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le lien vers le compte qui les a saisis est effacé à la suppression du compte, les codes restent (la partie est conservée par l'éditeur du jeu)",
       "Droit d'opposition ouvert sur demande",
     ],
     recipients: [

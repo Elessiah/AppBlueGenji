@@ -177,6 +177,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // tournoi existant ne change de comportement.
     `ALTER TABLE bg_tournaments ADD COLUMN referee_scheduling TINYINT(1) NOT NULL DEFAULT 0
        AFTER registration_min_players`,
+    // Détail map par map (`docs/features/MAP_SCORES.md`) : table neuve, son
+    // `CREATE TABLE IF NOT EXISTS` est sa migration — rien à rejouer ici.
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

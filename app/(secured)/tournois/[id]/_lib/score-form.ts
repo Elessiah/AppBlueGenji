@@ -5,6 +5,7 @@ import {
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import type { MatchMapInput } from "@/lib/shared/match-maps";
 
 export interface ScoreFormState {
   score1: string;
@@ -61,6 +62,22 @@ export function pendingScoreProposal(match: BracketMatch | null): PendingScorePr
     team2Score: report.team2Score,
     proposedBy: team1Report ? "team1" : "team2",
   };
+}
+
+/**
+ * Maps d'ouverture du dialogue d'arbitrage (`docs/features/MAP_SCORES.md`) :
+ * le détail retenu s'il y en a un, sinon celui de la proposition unique qui
+ * pré-remplit déjà le score (`pendingScoreProposal`), sinon rien — l'arbitre
+ * peut alors poser un score à la main, comme avant.
+ */
+export function initialAdminMaps(match: BracketMatch | null): MatchMapInput[] {
+  if (!match) return [];
+  const proposal = pendingScoreProposal(match);
+  let source = match.maps ?? [];
+  if (source.length === 0 && proposal) {
+    source = (proposal.proposedBy === "team1" ? match.team1Report : match.team2Report)?.maps ?? [];
+  }
+  return source.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score }));
 }
 
 /**
@@ -129,7 +146,14 @@ export function storedResultSignature(match: BracketMatch | null): string {
     match.doubleForfeit ? "FF2" : "∅",
     match.winnerTeamId ?? "∅",
     match.status,
+    // Le détail map par map compte aussi (`MAP_SCORES.md`) : un code corrigé
+    // à score égal doit réaligner le dialogue. Absent, l'empreinte d'avant.
+    ...mapsSignature(match.maps),
   ].join("|");
+}
+
+function mapsSignature(maps: ReadonlyArray<MatchMapInput> | undefined): string[] {
+  return maps && maps.length > 0 ? [JSON.stringify(maps.map((m) => [m.replayCode, m.team1Score, m.team2Score]))] : [];
 }
 
 /**
@@ -156,7 +180,8 @@ export function pendingProposalSignature(match: BracketMatch | null): string {
 }
 
 function reportSignature(report: BracketMatch["team1Report"] | undefined): string {
-  return report ? `${report.team1Score}-${report.team2Score}` : "∅";
+  if (!report) return "∅";
+  return [`${report.team1Score}-${report.team2Score}`, ...mapsSignature(report.maps)].join(":");
 }
 
 /** Le formulaire est-il resté sur les valeurs du match, sans une saisie ? */

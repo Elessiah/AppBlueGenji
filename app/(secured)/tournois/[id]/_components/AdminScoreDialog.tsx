@@ -3,31 +3,40 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, MatchProposalMaps, TournamentGame } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
+import { isMatchDoubleForfeit, isMatchDrawn, isMatchPlayed } from "@/lib/shared/match-outcome";
 import {
   forfeitMapCount,
   matchFormatDescription,
   matchFormatLabel,
   matchWinsRequired,
+  type MatchFormat,
 } from "@/lib/shared/match-format";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
+import { useProposalMaps } from "../_hooks/useProposalMaps";
+import { proposalsNeedRefresh } from "@/lib/shared/player-score-report";
 import { useLiveControls } from "../_lib/live-context";
 import {
   adminProposalNotice,
   forfeitParties,
   pendingScoreProposal,
   scoreBlockerMessage,
+  type ScoreFormBlocker,
   scoreCorrectionNeedsConfirmation,
   storedResultSignature,
 } from "../_lib/score-form";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
+import { MapScoreList, mapFieldIds } from "./MapScoreList";
+import { MapResultList } from "./MatchMapDetails";
+import mapStyles from "./MatchMapDetails.module.css";
+import { isMapTouched, mapFieldKey, mapListViolationMessage, type MapListViolation } from "@/lib/shared/match-maps";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
 
 /**
@@ -57,9 +66,16 @@ function forfeitHint(input: {
 interface AdminScoreDialogProps {
   /** Match **résolu à chaque rendu** depuis la liste rafraîchie par le flux. */
   match: BracketMatch;
+  /** Détail des propositions en attente (contexte du lecteur, `MAP_SCORES.md`). */
+  proposals?: MatchProposalMaps[];
+  /** Relit le contexte du lecteur quand une proposition a changé. */
+  onRefreshProposals?: () => void | Promise<unknown>;
   onClose: () => void;
   onSubmitted: () => void;
 }
+
+const NO_PROPOSALS: MatchProposalMaps[] = [];
+const NO_REFRESH = () => undefined;
 
 /** Résultat déjà enregistré, en une phrase — ou `null` s'il n'y en a pas. */
 function storedResultLabel(match: BracketMatch, team1: string, team2: string): string | null {
@@ -104,15 +120,106 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
  * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
-export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<AdminScoreDialogProps>) {
+/** Lignes de maps adressables par `useFieldErrors` — au-delà de tout plafond. */
+const MAP_FIELD_ID_SLOTS = 32;
+
+const DERIVED_SCORE_HINT_ID = "admin-score-derived-hint";
+
+/** Steppers verrouillés sur le score dérivé des maps : l'`id` de la phrase qui le dit. */
+function derivedScoreHintId(mapCount: number, mapsSetAside: boolean): string | undefined {
+  return mapCount > 0 && !mapsSetAside ? DERIVED_SCORE_HINT_ID : undefined;
+}
+
+const AWAITING_DETAIL_MESSAGE =
+  "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.";
+
+/**
+ * Infobulle d'un bouton, dans l'ordre de la phrase sous les boutons : détail
+ * en lecture, map refusée (sauf sur une ligne vierge ajoutée — même silence),
+ * puis blocage du score.
+ */
+function buttonTitleFor(input: {
+  awaitingDetail: boolean;
+  onBlankRow: boolean;
+  mapRefusal: MapListViolation | null;
+  blocker: ScoreFormBlocker | null | undefined;
+  idle: string;
+  format: MatchFormat | null;
+  game: TournamentGame | null | undefined;
+}): string {
+  if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;
+  if (input.mapRefusal && input.onBlankRow) return input.idle;
+  if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);
+  return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : input.idle;
+}
+
+/** La raison affichée sous les boutons, une seule, dans l'ordre de l'infobulle. */
+function visibleBlocker(input: {
+  awaitingDetail: boolean;
+  /** Le refus des maps désigne une ligne vierge, qu'on vient d'ajouter. */
+  blankMaps: boolean;
+  mapRefusal: MapListViolation | null;
+  blocker: ScoreFormBlocker | null;
+  format: MatchFormat | null;
+  game: TournamentGame | null | undefined;
+}): string | null {
+  if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;
+  // Une ligne vierge n'appelle pas encore de reproche — et le score dérivé
+  // (0 – 0, steppers verrouillés) n'est pas à corriger.
+  if (input.blankMaps) return null;
+  if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);
+  return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : null;
+}
+
+export function AdminScoreDialog({
+  match: liveMatch,
+  proposals = NO_PROPOSALS,
+  onRefreshProposals = NO_REFRESH,
+  onClose,
+  onSubmitted,
+}: Readonly<AdminScoreDialogProps>) {
+  // Propositions complétées de leur détail map par map : l'arbitre s'ouvre sur
+  // les maps de la proposition unique, et voit celles des deux en désaccord.
+  const match = useProposalMaps(liveMatch, proposals, onRefreshProposals);
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
   // attente de départ » s'ouvre de lui-même à l'heure dite.
   const { refereeScheduling } = useLiveControls();
   const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
   const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
-  const form = useScoreForm(match, { scoreEntryClosed });
+  // Déclaré avant le formulaire : un refus de map s'y rattache à son champ.
+  // Les `id` couvrent tout plafond de lignes possible (`mapListLimit`).
+  const mapFieldErrors = useFieldErrors<string>({}, mapFieldIds("admin-score", MAP_FIELD_ID_SLOTS));
+  const form = useScoreForm(match, {
+    scoreEntryClosed,
+    onMapRefusal: (field, message) => mapFieldErrors.flag(mapFieldKey(field.index, field.field), message),
+    onMapsReset: () => mapFieldErrors.clear(),
+  });
   const matchFormat = useMatchFormat(match);
+  // Infobulle d'un bouton : une map refusée passe avant le score, puisque
+  // c'est elle que le clic désignera (`mapsRefused`).
+  // Détail de la proposition encore en lecture : un score validé maintenant
+  // partirait sans maps (`maps: []`) et effacerait les codes de la proposition
+  // à la clôture. Les boutons de score attendent qu'il arrive.
+  const awaitingDetail =
+    proposalsNeedRefresh(liveMatch, proposals) &&
+    form.maps.length === 0 &&
+    form.forfeitTeamId === undefined &&
+    !form.doubleForfeit;
+  const buttonTitle = (
+    mapRefusal: MapListViolation | null,
+    blocker: ScoreFormBlocker | null | undefined,
+    idle: string,
+  ): string =>
+    buttonTitleFor({
+      awaitingDetail,
+      onBlankRow: form.mapsRefused.onBlankRow,
+      mapRefusal,
+      blocker,
+      idle,
+      format: matchFormat,
+      game: form.game,
+    });
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });
@@ -152,6 +259,19 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   // répéter sous les boutons doublerait la même phrase.
   const rawBlocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
   const blocker = rawBlocker === "NOT_IN_LAUNCH" ? null : rawBlocker;
+  // Phrase visible, dans l'ordre de l'infobulle : détail en lecture, puis map
+  // refusée (une fois une map renseignée — les steppers, verrouillés sur le
+  // score dérivé, ne sont pas à corriger), puis blocage du score.
+  const mapRefusal = form.mapsRefused.resolve ?? form.mapsRefused.save;
+  const derivedHintId = derivedScoreHintId(form.maps.length, anyForfeit || scoreEntryClosed);
+  const blockerText = visibleBlocker({
+    awaitingDetail,
+    blankMaps: mapRefusal !== null && form.mapsRefused.onBlankRow,
+    mapRefusal: form.maps.some(isMapTouched) ? mapRefusal : null,
+    blocker,
+    format: matchFormat,
+    game: form.game,
+  });
   // Score proposé par une engagée et jamais confirmé par l'autre — une équipe
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
   // vérifier puis à le valider, sans le recopier.
@@ -183,6 +303,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   };
 
   const run = async (action: "save" | "resolve") => {
+    // Une map refusée se désigne avant la confirmation de correction : la
+    // modale de confirmation piégerait sinon le focus loin du champ fautif.
+    if (form.refuseMapsBefore(action)) return;
     if (scoreCorrectionNeedsConfirmation(match)) {
       setConfirmingCorrection(action);
       return;
@@ -195,7 +318,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   // geste délibéré.
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
-    if (form.decision.canResolve && !form.submitting) void run("resolve");
+    if ((form.decision.canResolve || form.mapsRefused.resolve) && !form.submitting && !awaitingDetail) void run("resolve");
   };
 
   const toggleForfeit = (teamId: number | null) => {
@@ -262,6 +385,27 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
             </output>
           )}
 
+          {/* Désaccord : le détail des deux propositions, codes de replay
+              compris — c'est ce que l'arbitre vérifie, et le formulaire ne
+              s'ouvre sur aucune des deux (`pendingScoreProposal`). */}
+          {!isMatchPlayed(match) && match.team1Report && match.team2Report && (
+            <div className={mapStyles.proposals}>
+              {[
+                { report: match.team1Report, by: team1 },
+                { report: match.team2Report, by: team2 },
+              ].map(({ report, by }) => (
+                <section key={by} aria-label={`Proposition de ${by}`}>
+                  <p className={mapStyles.proposalTitle}>
+                    Proposition de {by} : {report.team1Score} – {report.team2Score}
+                  </p>
+                  {report.maps.length > 0 && (
+                    <MapResultList maps={report.maps} team1Name={team1} team2Name={team2} label={`Maps proposées par ${by}`} />
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+
           {form.conflict && (
             <div className={styles.conflict} role="alert">
               Ce match a été modifié pendant ta saisie — quelqu&apos;un d&apos;autre a
@@ -285,8 +429,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
               teamName={team1}
               value={form.score1}
               max={maxScore}
-              disabled={form.submitting || anyForfeit || scoreEntryClosed}
+              disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
               onChange={form.setScore1}
+              describedBy={derivedHintId}
             />
             <span className={styles.versus} aria-hidden="true">
               VS
@@ -297,16 +442,44 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
               teamName={team2}
               value={form.score2}
               max={maxScore}
-              disabled={form.submitting || anyForfeit || scoreEntryClosed}
+              disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
               onChange={form.setScore2}
+              describedBy={derivedHintId}
             />
           </div>
+
+          {/* Steppers verrouillés par les maps : la raison est dite, et le
+              geste pour reprendre la main (saisie de secours, replay perdu). */}
+          {derivedHintId && (
+            <p id={derivedHintId} className={styles.formatHint}>
+              Score calculé à partir des maps ci-dessous : retire toutes les maps pour le saisir à la main.
+            </p>
+          )}
 
           {/* La règle chiffrée sous les champs plutôt qu'en `title` de la
               pastille : une infobulle sur un `<span>` ne s'atteint ni au clavier
               ni au doigt, et c'est la seule chose qui borne la saisie. */}
           {matchFormat && (
             <p className={styles.formatHint}>{matchFormatDescription(matchFormat)}</p>
+          )}
+
+          {/* Détail map par map (`MAP_SCORES.md`) : dès qu'une map est saisie,
+              le score ci-dessus en découle. Sans map, l'arbitre pose le score
+              à la main, comme avant (replay perdu, saisie de secours). */}
+          {!anyForfeit && !scoreEntryClosed && (
+            <MapScoreList
+              idPrefix="admin-score"
+              maps={form.maps}
+              onChange={form.setMaps}
+              format={matchFormat}
+              game={form.game}
+              team1Name={team1}
+              team2Name={team2}
+              team1Id={match.team1Id}
+              team2Id={match.team2Id}
+              disabled={form.submitting}
+              fieldErrors={mapFieldErrors}
+            />
           )}
 
           <div className={styles.forfeitZone}>
@@ -398,11 +571,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
           {/* Une seule raison affichée : celle qui bloque l'action décisive, ou
               à défaut celle de l'enregistrement. Les empiler ferait répéter deux
               fois la même phrase dans le cas courant. */}
-          {blocker && (
-            <output className={`${styles.blocker} ${styles.notice}`}>
-              {scoreBlockerMessage(blocker, matchFormat)}
-            </output>
-          )}
+          {blockerText && <output className={`${styles.blocker} ${styles.notice}`}>{blockerText}</output>}
 
           <div className={styles.actions}>
             {/* Trois poids, trois rôles : quitter est un lien, l'enregistrement
@@ -419,24 +588,16 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
               type="button"
               className="btn ghost"
               onClick={() => void run("save")}
-              disabled={!form.decision.canSave || form.submitting}
-              title={
-                form.decision.saveBlocker
-                  ? scoreBlockerMessage(form.decision.saveBlocker, matchFormat)
-                  : "Note l'avancement sans désigner de vainqueur."
-              }
+              disabled={(!form.decision.canSave && !form.mapsRefused.save) || form.submitting || awaitingDetail}
+              title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, "Note l'avancement sans désigner de vainqueur.")}
             >
               {form.submitting ? "…" : "Enregistrer"}
             </button>
             <button
               type="submit"
               className="btn"
-              disabled={!form.decision.canResolve || form.submitting}
-              title={
-                form.decision.resolveBlocker
-                  ? scoreBlockerMessage(form.decision.resolveBlocker, matchFormat)
-                  : "Désigne la gagnante et met le plateau à jour."
-              }
+              disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting || awaitingDetail}
+              title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, "Désigne la gagnante et met le plateau à jour.")}
             >
               {form.submitting ? "…" : "Valider le résultat"}
             </button>

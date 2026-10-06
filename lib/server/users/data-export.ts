@@ -4,6 +4,7 @@ import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import { toIso } from "@/lib/server/serialization";
 import { listPrivacyAcknowledgments } from "@/lib/server/privacy-consent";
 import { listOwnConnectionLogs } from "@/lib/server/connection-logs";
+import { listOwnMapEntries } from "@/lib/server/match-map-entries";
 import { listTermsAcceptances } from "@/lib/server/terms-acceptance";
 import { listReportsByAuthor } from "@/lib/server/content-reports";
 import { exportPushData } from "@/lib/server/push-subscriptions";
@@ -105,6 +106,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     reports: await listReportsByAuthor(userId),
     pushNotifications: await exportPushData(userId),
     connectionLogs: await listOwnConnectionLogs(userId),
+    mapEntries: await listOwnMapEntries(userId),
     suspensions: (await listOwnSuspensions(userId)).map((suspension) => ({
       reason: suspension.reason,
       ground: suspension.ground,
