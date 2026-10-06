@@ -111,7 +111,7 @@ describe("accueil — l'anglais applique le glossaire figé", () => {
 
   it("dates du tableau à l'américaine, même fuseau", () => {
     const now = Date.parse("2026-10-06T12:00:00Z");
-    expect(formatBoardStartAt("2026-10-21T18:30:00Z", now, "en")).toBe("Oct 21 · 08:30 PM");
+    expect(formatBoardStartAt("2026-10-21T18:30:00Z", now, "en")).toBe("Oct 21 · 20:30");
     expect(formatBoardStartAt("2026-10-21T18:30:00Z", now, "fr")).toBe("21 oct. · 20:30");
   });
 });

@@ -1,4 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CalendarCard } from "@/components/cyber/landing/CalendarCard";
 import { JoinCTA } from "@/components/cyber/landing/JoinCTA";
@@ -102,6 +104,19 @@ describe("CalendarCard — accessibilité", () => {
     const markup = renderToStaticMarkup(<CalendarCard events={[event]} locale="en" />);
     const time = markup.match(/<div class="[^"]*time[^"]*">([^<]*)<\/div>/);
     expect(time?.[1]).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it("donne à l'info-bulle la même heure, sur 24 h et à l'heure de Paris", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[event]} locale="en" />);
+    const title = markup.match(/<div class="[^"]*title[^"]*" title="([^"]*)"/);
+    // 18:00 UTC le 12 octobre 2026 = 20:00 à Paris (heure d'été).
+    expect(title?.[1]).toContain("20:00");
+    expect(title?.[1]).not.toMatch(/[AP]M/);
+  });
+
+  it("nomme un seul quart de finale au singulier, comme la demie et la finale", () => {
+    const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "messages", "en", "landing.json"), "utf8"));
+    expect(en.live.round.quarter).toBe("Quarterfinal");
   });
 });
 
