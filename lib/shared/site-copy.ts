@@ -253,7 +253,11 @@ export type SiteCopyValidation =
 
 /** Texte saisi, fins de ligne normalisées (`\r\n` → `\n`) et bords rognés. */
 function normalizeCopy(rawValue: unknown): string {
-  return String(rawValue ?? "").replace(/\r\n/g, "\n").trim(); // NOSONAR typescript:S6551 — champ d'un corps JSON ; un objet y serait de toute façon refusé à la validation de longueur
+  // Un corps JSON peut porter n'importe quoi : seul un texte en est un. Un objet,
+  // un tableau ou un booléen comptent pour vide (`String({})` donnerait
+  // « [object Object] », qui passerait le contrôle de longueur).
+  if (typeof rawValue !== "string") return "";
+  return rawValue.replace(/\r\n/g, "\n").trim();
 }
 
 /**
