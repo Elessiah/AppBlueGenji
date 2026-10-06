@@ -288,6 +288,13 @@ aurait affiché la carte française. Ici, `pageMetadata({ shareCard, locale })`
 côté du middleware (son `matcher` écarte les images) : ni nonce ni CSP pour un
 robot. Clé ou langue inconnue, extension absente : 404.
 
+**Texte de remplacement** (`og:image:alt`) : le titre de l'encart, sauf quand la
+carte ne le montre pas — `shareImageAlt` le remplace alors : `/classement`
+(« Classement des équipes BlueGenji », juste pour le podium comme pour son repli)
+et une section de `/bot/docs` (la carte ne nomme que la documentation). Le repli
+d'une fiche de tournoi illisible pose l'encart du site **en entier** : sans quoi
+la carte générique de `/tournois` (mise en page parente) y descendrait.
+
 **Registre** (`lib/shared/page-share-cards.ts`, pur) : `PAGE_SHARE_CARD_KEYS`, le
 style de chaque carte (`PAGE_SHARE_CARD_STYLES` : motif Lucide + teinte parmi les
 tons `.pill-*` — cyan, glacier, violet, rose, turquoise ; **jamais** l'ambre ni le
@@ -314,7 +321,7 @@ sans motif — la carte du site ne change pas.
 l'administration n'ont pas d'encart : rien à partager.
 
 **Rendu** (`lib/server/page-share-image.tsx`) : `ShareCard` avec `accent`,
-`motif` et `footer` (« Association loi 1901 » / « Nonprofit association »). Le
+`motif` et `footer` (« Association loi 1901 » / « French nonprofit (law of 1901) »). Le
 cadre commun (`ShareCardFrame` : fond, halos, filet, pied) est partagé avec la
 carte du podium. Le motif (`components/og/share-motifs.tsx`) est l'icône Lucide
 **redessinée en `<svg>` simple** : Satori ne déroule pas un `forwardRef` ; on lit
@@ -349,7 +356,7 @@ contraste du nom et du rang (4,5:1) sur le voile de chaque marche.
   refusé). Satori ne décode pas le WebP des imports : `sharp` les convertit en PNG
   152 px. Absent ou illisible : l'initiale du nom.
 - **Noms** : saisis, donc repassés par `visibleText` puis coupés sur un mot à
-  30 caractères (deux lignes de 30 px dans une marche de 336 px), ellipse
+  24 caractères (deux lignes de 30 px dans une marche de 336 px), ellipse
   comprise ; un nom sans caractère visible devient « ? ».
 - **Repli** : sous trois équipes classées (la page n'affiche alors pas de podium,
   `splitRankingPodium`) ou si la base ne répond pas, la carte `ranking`
