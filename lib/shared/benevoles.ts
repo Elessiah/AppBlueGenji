@@ -163,6 +163,21 @@ export function categoryEnglish(members: readonly Pick<Benevole, "categoryEn">[]
 }
 
 /**
+ * L'anglais du formulaire quand la catégorie française change : une saisie
+ * anglaise faite à la main reste ; l'anglais repris de l'ancienne catégorie
+ * cède la place à celui de la nouvelle, ou se vide si elle n'en a pas (une
+ * catégorie nouvelle ne garde pas l'anglais d'une autre).
+ */
+export function nextCategoryEnglish(
+  form: Readonly<{ category: string; categoryEn: string }>,
+  nextCategory: string,
+  englishOf: (category: string) => string | null,
+): string {
+  const typedByHand = form.categoryEn.trim() !== "" && form.categoryEn !== englishOf(form.category);
+  return typedByHand ? form.categoryEn : (englishOf(nextCategory) ?? "");
+}
+
+/**
  * Les catégories dans la langue de la page : intitulé traduit, et sous `/en`,
  * seulement celles qui ont leur anglais — jamais de français sur la page
  * anglaise (`staff-translation.ts`).

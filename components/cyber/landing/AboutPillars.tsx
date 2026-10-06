@@ -212,26 +212,31 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
           </div>
           {canManage(p) && (
             <div className={styles.pillarActions} lang={staffLang}>
-              <button
-                type="button"
-                className={`${styles.action} ${styles.moveAction}`}
-                onClick={() => move(index, -1)}
-                disabled={busy || index === 0}
-                aria-label={`Déplacer la carte ${p.title} vers le haut`}
-                title="Déplacer avant"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className={`${styles.action} ${styles.moveAction}`}
-                onClick={() => move(index, 1)}
-                disabled={busy || index === pillars.length - 1}
-                aria-label={`Déplacer la carte ${p.title} vers le bas`}
-                title="Déplacer après"
-              >
-                ↓
-              </button>
+              {/* Ordre réglé en français seulement : sous /en, des voisins sans anglais sont masqués. */}
+              {locale === DEFAULT_LOCALE && (
+                <>
+                  <button
+                    type="button"
+                    className={`${styles.action} ${styles.moveAction}`}
+                    onClick={() => move(index, -1)}
+                    disabled={busy || index === 0}
+                    aria-label={`Déplacer la carte ${p.title} vers le haut`}
+                    title="Déplacer avant"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.action} ${styles.moveAction}`}
+                    onClick={() => move(index, 1)}
+                    disabled={busy || index === pillars.length - 1}
+                    aria-label={`Déplacer la carte ${p.title} vers le bas`}
+                    title="Déplacer après"
+                  >
+                    ↓
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className={styles.action}
@@ -284,6 +289,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
               onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, title: value } : { ...f, titleEn: value }))}
               maxLength={ABOUT_PILLAR_TITLE_MAX}
               placeholders={{ fr: "Accessible", en: "Accessible" }}
+              enterKeyHint="next"
               enMissing={editing !== null && !aboutPillarHasEnglish(editing)}
               inputClassName={styles.modalInput}
               labelClassName={styles.modalLabel}

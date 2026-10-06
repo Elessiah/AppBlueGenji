@@ -65,7 +65,8 @@ export function RecruitmentAdEditor({
       errors,
       values: { fr: form[field], en: form[`${field}En`] },
       onChange: (lang: "fr" | "en", value: string) => onChange(lang === "fr" ? field : `${field}En`, value),
-      enMissing,
+      // L'aide du rattrapage ne vise qu'un champ qui a un français à traduire.
+      enMissing: enMissing && form[field].trim().length > 0,
       inputClassName: styles.modalInput,
       labelClassName: styles.modalLabel,
     }) as const;
@@ -145,16 +146,16 @@ export function RecruitmentAdEditor({
           }}
           {...bilingual("body")}
           inputClassName={`${styles.modalInput} ${styles.modalTextarea}`}
+          describedBy="recruitment-body-hint"
+          counter
+          counterClassName={(length) =>
+            `${styles.counter} ${length > RECRUITMENT_BODY_MAX * 0.9 ? styles.counterWarn : ""}`
+          }
         />
-        <span className={styles.modalHint}>
+        <span id="recruitment-body-hint" className={styles.modalHint}>
           Une ligne courte finissant par « : » devient un intertitre, une ligne commençant
           par un tiret devient une puce. Les cartes n&apos;affichent qu&apos;un aperçu :
           l&apos;annonce complète s&apos;ouvre en grand.
-        </span>
-        <span
-          className={`${styles.counter} ${form.body.length > RECRUITMENT_BODY_MAX * 0.9 ? styles.counterWarn : ""}`}
-        >
-          {form.body.length} / {RECRUITMENT_BODY_MAX}
         </span>
       </div>
 

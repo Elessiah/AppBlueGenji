@@ -253,26 +253,31 @@ export function BureauSection({
             </div>
             {canManage(b) && (
               <div className={styles.bureauCardActions} data-tap-zone lang={staffLang}>
-                <button
-                  type="button"
-                  className={`${styles.bureauAction} ${styles.moveAction}`}
-                  onClick={() => move(index, -1)}
-                  disabled={busy || index === 0}
-                  aria-label={`Déplacer ${b.name} vers le haut`}
-                  title="Monter"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.bureauAction} ${styles.moveAction}`}
-                  onClick={() => move(index, 1)}
-                  disabled={busy || index === members.length - 1}
-                  aria-label={`Déplacer ${b.name} vers le bas`}
-                  title="Descendre"
-                >
-                  ↓
-                </button>
+                {/* Ordre réglé en français seulement : sous /en, des voisins sans anglais sont masqués. */}
+                {locale === DEFAULT_LOCALE && (
+                  <>
+                    <button
+                      type="button"
+                      className={`${styles.bureauAction} ${styles.moveAction}`}
+                      onClick={() => move(index, -1)}
+                      disabled={busy || index === 0}
+                      aria-label={`Déplacer ${b.name} vers le haut`}
+                      title="Monter"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.bureauAction} ${styles.moveAction}`}
+                      onClick={() => move(index, 1)}
+                      disabled={busy || index === members.length - 1}
+                      aria-label={`Déplacer ${b.name} vers le bas`}
+                      title="Descendre"
+                    >
+                      ↓
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   className={styles.bureauAction}

@@ -30,6 +30,13 @@
   color: var(--ink-dim, var(--ink));
 }
 
+.counter {
+  align-self: flex-end;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim, var(--ink));
+}
+
 /* Ambre : un avertissement — le contenu manque à la page anglaise. */
 .hint {
   font-size: 12px;

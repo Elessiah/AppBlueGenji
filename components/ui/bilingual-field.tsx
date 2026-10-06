@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { ENGLISH_BACKFILL_HINT } from "@/lib/shared/staff-translation";
@@ -33,7 +33,23 @@ type BilingualFieldProps<F extends string> = {
   labelClassName?: string;
   /** `id` d'une `<datalist>` de suggestions pour le champ français. */
   listFr?: string;
+  /** `id` d'une aide commune aux deux langues (rendue par l'appelant), lue avec chaque contrôle. */
+  describedBy?: string;
+  /** Affiche « n / max » sous chaque langue, rattaché à son contrôle. */
+  counter?: boolean;
+  /** Classe de plus du compteur selon la longueur saisie (ex. alerte près du plafond). */
+  counterClassName?: (length: number) => string | undefined;
+  /** Touche « Entrée » du clavier virtuel (champ d'une ligne seulement). */
+  enterKeyHint?: "next" | "done";
+  /**
+   * Champ d'une ligne : Entrée dans le français passe à l'anglais, Entrée dans
+   * l'anglais appelle `onEnter` (enregistrer le formulaire).
+   */
+  onEnter?: () => void;
 };
+
+/** Avec `onEnter` : le français mène à l'anglais, l'anglais enregistre. */
+const ENTER_KEY_HINTS: Readonly<Record<BilingualLang, "next" | "done">> = { fr: "next", en: "done" };
 
 /**
  * Un texte saisi par le staff, en français **et** en anglais côte à côte —
@@ -58,9 +74,24 @@ export function BilingualField<F extends string>({
   inputClassName,
   labelClassName,
   listFr,
+  describedBy,
+  counter = false,
+  counterClassName,
+  enterKeyHint,
+  onEnter,
 }: Readonly<BilingualFieldProps<F>>) {
   const hintId = `${ids.en}-hint`;
   const enRequired = required || values.fr.trim().length > 0;
+  const counterId = (lang: BilingualLang) => `${ids[lang]}-count`;
+  const counterText = (lang: BilingualLang) =>
+    counter && (
+      <span
+        id={counterId(lang)}
+        className={[styles.counter, counterClassName?.(values[lang].length)].filter(Boolean).join(" ")}
+      >
+        {values[lang].length} / {maxLength}
+      </span>
+    );
 
   const control = (lang: BilingualLang) => {
     const common = {
@@ -71,7 +102,12 @@ export function BilingualField<F extends string>({
       maxLength,
       placeholder: placeholders?.[lang],
       required: lang === "fr" ? required : enRequired,
-      ...errors.aria(fields[lang], lang === "en" && enMissing && hintId),
+      ...errors.aria(
+        fields[lang],
+        describedBy,
+        counter && counterId(lang),
+        lang === "en" && enMissing && hintId,
+      ),
       onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         errors.clear(fields[lang]);
         onChange(lang, e.target.value);
@@ -80,7 +116,21 @@ export function BilingualField<F extends string>({
     return multiline ? (
       <textarea {...common} rows={rows} />
     ) : (
-      <input {...common} list={lang === "fr" ? listFr : undefined} />
+      <input
+        {...common}
+        list={lang === "fr" ? listFr : undefined}
+        enterKeyHint={onEnter ? ENTER_KEY_HINTS[lang] : enterKeyHint}
+        onKeyDown={
+          onEnter
+            ? (e: KeyboardEvent<HTMLInputElement>) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                if (lang === "fr") document.getElementById(ids.en)?.focus();
+                else onEnter();
+              }
+            : undefined
+        }
+      />
     );
   };
 
@@ -93,6 +143,7 @@ export function BilingualField<F extends string>({
             {required ? "Français (obligatoire)" : "Français"}
           </label>
           {control("fr")}
+          {counterText("fr")}
           <FieldErrorText fieldId={ids.fr} message={errors.message(fields.fr)} />
         </div>
         <div className={styles.column}>
@@ -100,6 +151,7 @@ export function BilingualField<F extends string>({
             {required ? "Anglais (obligatoire)" : "Anglais (obligatoire si le français est saisi)"}
           </label>
           {control("en")}
+          {counterText("en")}
           {enMissing && (
             <span id={hintId} className={styles.hint}>
               {ENGLISH_BACKFILL_HINT}

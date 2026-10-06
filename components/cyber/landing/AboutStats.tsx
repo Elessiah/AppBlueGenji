@@ -200,26 +200,31 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
             <div className="mono">{label}</div>
             {canManage(s) && (
               <div className={styles.statActions} lang={staffLang}>
-                <button
-                  type="button"
-                  className={`${styles.action} ${styles.moveAction}`}
-                  onClick={() => move(index, -1)}
-                  disabled={busy || index === 0}
-                  aria-label={`Déplacer la carte ${s.label} vers la gauche`}
-                  title="Déplacer avant"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.action} ${styles.moveAction}`}
-                  onClick={() => move(index, 1)}
-                  disabled={busy || index === stats.length - 1}
-                  aria-label={`Déplacer la carte ${s.label} vers la droite`}
-                  title="Déplacer après"
-                >
-                  ↓
-                </button>
+                {/* Ordre réglé en français seulement : sous /en, des voisins sans anglais sont masqués. */}
+                {locale === DEFAULT_LOCALE && (
+                  <>
+                    <button
+                      type="button"
+                      className={`${styles.action} ${styles.moveAction}`}
+                      onClick={() => move(index, -1)}
+                      disabled={busy || index === 0}
+                      aria-label={`Déplacer la carte ${s.label} vers la gauche`}
+                      title="Déplacer avant"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.action} ${styles.moveAction}`}
+                      onClick={() => move(index, 1)}
+                      disabled={busy || index === stats.length - 1}
+                      aria-label={`Déplacer la carte ${s.label} vers la droite`}
+                      title="Déplacer après"
+                    >
+                      ↓
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   className={styles.action}
@@ -290,6 +295,9 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
               onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, label: value } : { ...f, labelEn: value }))}
               maxLength={ABOUT_STAT_LABEL_MAX}
               placeholders={{ fr: "Bénévole", en: "Volunteer-run" }}
+              onEnter={() => {
+                if (!busy) void submit();
+              }}
               enMissing={editing !== null && !hasEnglish(editing.labelEn)}
               inputClassName={styles.modalInput}
               labelClassName={styles.modalLabel}

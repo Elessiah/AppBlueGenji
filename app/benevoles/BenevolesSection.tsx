@@ -14,6 +14,7 @@ import {
   BENEVOLE_FIELD_ERRORS,
   benevoleInitials,
   categoryEnglish,
+  nextCategoryEnglish,
   formatDisplayName,
   formatJoinedAt,
   localizedCategories,
@@ -155,19 +156,13 @@ export function BenevolesSection({
     return categoryEnglish(benevoles.filter((b) => b.category === category.trim()));
   }
 
-  // Changer de catégorie reprend son anglais s'il est connu, sans écraser une
-  // saisie en cours.
+  // Changer de catégorie reprend son anglais s'il est connu (`nextCategoryEnglish`).
   function setCategory(lang: "fr" | "en", value: string) {
     if (lang === "en") {
       set("categoryEn", value);
       return;
     }
-    setForm((f) => {
-      const known = categoryEnglishOf(value);
-      const previous = categoryEnglishOf(f.category);
-      const keepEn = f.categoryEn.trim() !== "" && f.categoryEn !== previous;
-      return { ...f, category: value, categoryEn: keepEn || known === null ? f.categoryEn : known };
-    });
+    setForm((f) => ({ ...f, category: value, categoryEn: nextCategoryEnglish(f, value, categoryEnglishOf) }));
   }
 
   function refuse(code: string | undefined, message: string) {

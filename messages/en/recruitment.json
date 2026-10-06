@@ -30,7 +30,7 @@
     "urgent": "Urgent"
   },
   "detail": {
-    "closeLabel": "Close the opening",
+    "closeLabel": "Close opening details",
     "closeTitle": "Close",
     "bodyLabel": "Description of the opening {title}",
     "noBody": "No description for this opening.",

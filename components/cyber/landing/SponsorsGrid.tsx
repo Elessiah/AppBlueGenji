@@ -531,12 +531,13 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                 en: "Discount video game store, partner of our cash prizes.",
               }}
               enMissing={editing !== null && sponsorEnglishMissing(editing)}
+              describedBy="sponsor-description-hint"
+              counter
               inputClassName={`${styles.modalInput} ${styles.modalTextarea}`}
               labelClassName={styles.modalLabel}
             />
-            <span className={styles.logoHint}>
-              Une ou deux phrases : qui est ce partenaire, et ce qu&apos;il apporte. {form.description.length} /{" "}
-              {SPONSOR_DESCRIPTION_MAX}
+            <span id="sponsor-description-hint" className={styles.logoHint}>
+              Une ou deux phrases : qui est ce partenaire, et ce qu&apos;il apporte.
             </span>
           </div>
 
