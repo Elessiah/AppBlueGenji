@@ -351,7 +351,7 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   retirée. Détail : `I18N.md` § Documents légaux du bot.
 - **Pas d'espace de messages propre** : les quatre textes d'interface (titres, descriptions,
   « SECTION ») vont dans `bot.legalPages` — le contenu légal, lui, reste dans
-  `bot-legal-content.ts`. Titres français gardés mot pour mot (« … / Privacy Policy »).
+  `bot-legal-content.ts`. Titres français sans leur moitié anglaise (« … / Privacy Policy » retiré : habillage, pas texte légal).
 - **Aucune redirection** : la bascule était un état client, sans adresse publique.
 - **Hors lot** : les copies anglaises du dépôt `blueGenjiBot` (`LegalTerms/PolicyPrivacy.md`,
   `TermsOfServices.md`, générées par `scripts/generate-legal-terms.py`) citent l'adresse française ;

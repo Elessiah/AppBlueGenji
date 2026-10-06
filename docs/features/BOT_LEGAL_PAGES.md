@@ -73,7 +73,8 @@ d'aperçu par langue
 (`/og/<langue>/botPrivacy.png`, `botTerms`).
 
 Sous `/en`, un lien vers une page encore française (`/rgpd`, `/mentions-legales`) porte
-`hrefLang="fr"`, et le lien vers l'hébergeur reçoit la mention « (in French) »
+`hrefLang="fr"` — comme un lien externe vers une page en `/fr/` (la CNIL) —, et le lien
+vers l'hébergeur reçoit la mention « (in French) », avant sa flèche
 (`legalPages.inFrench`, habillage hors texte légal). Le lien « legal notice » de la
 section Contact, lui, est dans le texte légal : il garde `hrefLang` sans mention ajoutée.
 
