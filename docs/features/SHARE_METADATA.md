@@ -299,7 +299,7 @@ la carte générique de `/tournois` (mise en page parente) y descendrait.
 style de chaque carte (`PAGE_SHARE_CARD_STYLES` : motif Lucide + teinte parmi les
 tons `.pill-*` — cyan, glacier, violet, rose, turquoise ; **jamais** l'ambre ni le
 rouge), puis une carte par mode de règles (`rules-<slug>` : nom et accroche du
-mode dans la langue, accroche coupée sur un mot à 100 caractères). Textes dans
+mode dans la langue, accroche bornée à 120 caractères — phrases entières de préférence (`shareTagline`), sinon coupée sur un mot). Textes dans
 l'espace de messages **`share`** (`messages/fr|en/share.json`) : toute carte
 existe dans les deux langues, même celles des pages encore françaises (seule la
 française y est désignée). L'accueil français est identique à `SITE_SHARE_CARD`,
@@ -356,7 +356,7 @@ contraste du nom et du rang (4,5:1) sur le voile de chaque marche.
   refusé). Satori ne décode pas le WebP des imports : `sharp` les convertit en PNG
   152 px. Absent ou illisible : l'initiale du nom.
 - **Noms** : saisis, donc repassés par `visibleText` puis coupés sur un mot à
-  24 caractères (deux lignes de 30 px dans une marche de 336 px), ellipse
+  32 caractères (deux lignes de 30 px dans une marche de 336 px), ellipse
   comprise ; un nom sans caractère visible devient « ? ».
 - **Repli** : sous trois équipes classées (la page n'affiche alors pas de podium,
   `splitRankingPodium`) ou si la base ne répond pas, la carte `ranking`
