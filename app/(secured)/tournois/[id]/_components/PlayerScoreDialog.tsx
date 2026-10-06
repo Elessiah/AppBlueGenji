@@ -112,6 +112,22 @@ function deadlineText(iso: string | null): string | null {
  * joueur vers ce geste. Il s'offre avant même le lancement — l'équipe qui ne
  * pourra pas se présenter le sait avant le coup d'envoi.
  */
+/**
+ * Les maps saisies confirment-elles la proposition adverse (à score égal) ?
+ * Mêmes maps, ou proposition sans détail (antérieure aux maps) : le serveur la
+ * compare alors au seul score (`reportsConcord`), et l'envoi garde le contrôle
+ * de péremption. Un détail encore en lecture n'est pas une absence de détail :
+ * l'envoi reste une proposition ordinaire (pas de faux `PROPOSAL_STALE`).
+ */
+function confirmsProposalMaps(
+  maps: ReadonlyArray<MatchMapInput>,
+  theirMaps: ReadonlyArray<MatchMapInput>,
+  detailLoading: boolean,
+): boolean {
+  if (theirMaps.length === 0) return !detailLoading;
+  return sameMapLists(maps, theirMaps);
+}
+
 /** Détail adverse en lecture — seulement pour qui peut le lire (`canReportScore`). */
 function proposalDetailLoading(
   canRead: boolean,
@@ -204,11 +220,7 @@ export function PlayerScoreDialog({
   const { confirmsTheirs } = relation;
   // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
   // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
-  // Proposition adverse sans détail (antérieure aux maps) : le serveur la
-  // compare au seul score (`reportsConcord`) — la saisir au même score la
-  // confirme, avec le contrôle de péremption.
-  const theirMaps = view?.theirs?.maps ?? [];
-  const confirmsAsIs = confirmsTheirs && (theirMaps.length === 0 || sameMapLists(maps, theirMaps));
+  const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? [], detailLoading);
 
   const forfeitMaps = forfeitMapCount(matchFormat);
   const deadline = deadlineText(match.scoreDeadlineAt);
