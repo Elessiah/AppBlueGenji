@@ -65,10 +65,10 @@ describe("carte d'une page", () => {
 
   it("colore la pastille de la teinte de la carte et écrit la mention de pied dans la langue", () => {
     const html = renderToStaticMarkup(
-      <ShareCard eyebrow="Recruitment" accent={SHARE_ACCENT_COLORS.teal} title="Join" footer="French nonprofit (law of 1901)" />,
+      <ShareCard eyebrow="Recruitment" accent={SHARE_ACCENT_COLORS.teal} title="Join" footer="Nonprofit association" />,
     );
     expect(html).toContain(`color:${SHARE_ACCENT_COLORS.teal}`);
-    expect(html).toContain("French nonprofit (law of 1901)");
+    expect(html).toContain("Nonprofit association");
     expect(html).not.toContain("loi 1901");
   });
 

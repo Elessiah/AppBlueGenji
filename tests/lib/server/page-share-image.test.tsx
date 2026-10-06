@@ -82,7 +82,7 @@ describe("renderPageShareImage", () => {
     expect(ranking!.html).toContain("1st");
     const mode = await render("rules-bluegenji-survie", "en");
     expect(mode!.html).toContain("BlueGenji&#x27;s Survival");
-    expect(mode!.html).toContain("French nonprofit (law of 1901)");
+    expect(mode!.html).toContain("Nonprofit association");
   });
 
   it.each(["team", "player", "teams", "players", "tournaments"])(

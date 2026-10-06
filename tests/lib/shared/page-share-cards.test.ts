@@ -137,7 +137,7 @@ describe("langues", () => {
   it("écrit l'anglais sous /en : nom du mode traduit selon le glossaire", () => {
     const card = resolvePageShareCard("rules-bluegenji-survie", enShare, modeTexts(enRules))!;
     expect(card.title).toBe("BlueGenji's Survival");
-    expect(card.footer).toBe("French nonprofit (law of 1901)");
+    expect(card.footer).toBe("Nonprofit association");
     expect(resolvePageShareCard("ranking", enShare, modeTexts(enRules))!.title).toBe("Team ranking");
   });
 
