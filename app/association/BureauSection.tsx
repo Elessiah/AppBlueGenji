@@ -222,6 +222,9 @@ export function BureauSection({
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  // Sous `/en`, un bureau dont aucun rôle n'est encore traduit : le dire,
+  // plutôt qu'une grille vide sous « 0 MEMBERS ».
+  const pendingTranslation = shown.length === 0 && members.length > 0;
 
   return (
     <section className={styles.section}>
@@ -231,7 +234,7 @@ export function BureauSection({
           <h2 className={styles.sectionTitle}>{t("title")}</h2>
         </div>
         <div className={styles.bureauHeadActions}>
-          <span className={styles.meta}>{t("meta", { count: shown.length })}</span>
+          {!pendingTranslation && <span className={styles.meta}>{t("meta", { count: shown.length })}</span>}
           {isAdmin && (
             <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
               + Ajouter
@@ -240,6 +243,7 @@ export function BureauSection({
         </div>
       </header>
 
+      {pendingTranslation && <p className={styles.bureauPending}>{t("pendingTranslation")}</p>}
       <div className={styles.bureauGrid}>
         {shown.map(({ member: b, role, index }) => (
           <CyberCard key={b.id} lift className={styles.bureauCard}>

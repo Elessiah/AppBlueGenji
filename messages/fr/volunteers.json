@@ -15,6 +15,7 @@
     "title": "Bénévoles",
     "meta": "{count, plural, one {# BÉNÉVOLE} other {# BÉNÉVOLES}} · {categories, plural, one {# CATÉGORIE} other {# CATÉGORIES}}",
     "empty": "Aucun bénévole pour le moment.",
+    "pendingTranslation": "La version anglaise de cette liste arrive bientôt.",
     "since": "Depuis le {date}"
   }
 }

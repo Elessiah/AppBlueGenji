@@ -36,7 +36,8 @@
   "bureau": {
     "eyebrow": "SECTION 05",
     "title": "Bureau",
-    "meta": "{count, plural, one {# MEMBRE} other {# MEMBRES}} · BÉNÉVOLES"
+    "meta": "{count, plural, one {# MEMBRE} other {# MEMBRES}} · BÉNÉVOLES",
+    "pendingTranslation": "La version anglaise du bureau arrive bientôt."
   },
   "membership": {
     "eyebrow": "SECTION 06",

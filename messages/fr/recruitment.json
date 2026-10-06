@@ -20,7 +20,9 @@
     "empty": "Aucun poste à pourvoir dans le staff pour le moment.",
     "noUrgent": "Aucun recrutement urgent en ce moment.",
     "others": "Autres recrutements",
-    "unavailable": "Cette annonce n'est plus disponible."
+    "unavailable": "Cette annonce n'est plus disponible.",
+    "pendingTranslation": "Nos annonces sont en cours de traduction en anglais.",
+    "untranslated": "Cette annonce n'est pas encore disponible en anglais."
   },
   "card": {
     "roles": "Missions : {roles}",

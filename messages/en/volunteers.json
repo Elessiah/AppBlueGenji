@@ -15,6 +15,7 @@
     "title": "Volunteers",
     "meta": "{count, plural, one {# VOLUNTEER} other {# VOLUNTEERS}} · {categories, plural, one {# CATEGORY} other {# CATEGORIES}}",
     "empty": "No volunteers yet.",
+    "pendingTranslation": "The English version of this list is on its way.",
     "since": "Since {date}"
   }
 }

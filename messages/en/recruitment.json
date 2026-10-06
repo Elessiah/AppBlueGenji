@@ -20,7 +20,9 @@
     "empty": "No open staff positions right now.",
     "noUrgent": "No urgent openings right now.",
     "others": "Other openings",
-    "unavailable": "This opening is no longer available."
+    "unavailable": "This opening is no longer available.",
+    "pendingTranslation": "Our openings are being translated into English.",
+    "untranslated": "This opening isn't available in English yet."
   },
   "card": {
     "roles": "Tasks: {roles}",

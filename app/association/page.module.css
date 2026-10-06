@@ -64,6 +64,13 @@
   gap: 4px;
 }
 
+.bureauPending {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+
 .bureauGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

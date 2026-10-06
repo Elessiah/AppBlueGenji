@@ -329,6 +329,8 @@ export function BenevolesSection({
 
   // Ce que la page montre : sous `/en`, les bénévoles des catégories traduites.
   const totalCount = groups.reduce((count, group) => count + group.members.length, 0);
+  // Sous `/en`, aucune catégorie encore traduite : ce n'est pas « aucun bénévole ».
+  const pendingTranslation = groups.length === 0 && benevoles.length > 0;
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
   const photoLabel = form.photoUrl ? "Changer la photo" : "Importer une image";
 
@@ -342,9 +344,11 @@ export function BenevolesSection({
             <h2 className={styles.sectionTitle}>{t("title")}</h2>
           </div>
           <div className={styles.headActions}>
-            <span className={styles.meta}>
-              {t("meta", { count: totalCount, categories: groups.length })}
-            </span>
+            {!pendingTranslation && (
+              <span className={styles.meta}>
+                {t("meta", { count: totalCount, categories: groups.length })}
+              </span>
+            )}
             {isAdmin && (
               <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 + Ajouter
@@ -355,8 +359,8 @@ export function BenevolesSection({
 
         {groups.length === 0 ? (
           <div className={styles.empty}>
-            <p>{t("empty")}</p>
-            {isAdmin && (
+            <p>{pendingTranslation ? t("pendingTranslation") : t("empty")}</p>
+            {isAdmin && !pendingTranslation && (
               <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 Ajouter le premier bénévole
               </CyberButton>

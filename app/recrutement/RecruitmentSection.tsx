@@ -88,6 +88,30 @@ function reorderErrorMessage(code: string | undefined): string {
   return code ? `Échec : ${code}` : "Échec du réordonnancement.";
 }
 
+
+/**
+ * Phrases d'une liste vide. Sous `/en`, des annonces encore sans anglais sont
+ * masquées : « aucun poste » ou « aucune urgence » serait faux, on dit qu'elles
+ * arrivent, sans compteur à zéro.
+ */
+function emptyMessageKeys(translationPending: boolean) {
+  return translationPending
+    ? ({
+        empty: "section.pendingTranslation",
+        noUrgent: "section.pendingTranslation",
+        showCount: (total: number) => total > 0,
+      } as const)
+    : ({ empty: "section.empty", noUrgent: "section.noUrgent", showCount: () => true } as const);
+}
+
+/** Lien vers une annonce absente de la page : supprimée, ou (sous `/en`) pas encore traduite. */
+function missingAdMessage(
+  ads: readonly RecruitmentAd[],
+  id: number,
+  messages: Readonly<{ unavailable: string; untranslated: string }>,
+): string {
+  return ads.some((a) => a.id === id) ? messages.untranslated : messages.unavailable;
+}
 export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
   const locale = useAppLocale();
   const { t } = useRecruitmentText();
@@ -141,11 +165,12 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
   // d'ouvrir une page muette avec un fragment qui ne mène nulle part.
   const showUnavailable = toast.showError;
   const unavailable = t("section.unavailable");
+  const untranslated = t("section.untranslated");
   useEffect(() => {
     if (detailId === null || shownAds.some((a) => a.id === detailId)) return;
-    showUnavailable(unavailable);
+    showUnavailable(missingAdMessage(ads, detailId, { unavailable, untranslated }));
     setDetailId(null);
-  }, [detailId, shownAds, showUnavailable, unavailable]);
+  }, [detailId, ads, shownAds, showUnavailable, unavailable, untranslated]);
 
   function openDetail(ad: RecruitmentAd) {
     setDetailId(ad.id);
@@ -464,6 +489,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
 
   const total = shownAds.length;
   const shown = visibleAds.length;
+  // Sous `/en`, des annonces encore sans anglais sont masquées (`emptyMessageKeys`).
+  const translationPending = shownAds.length < ads.length;
+  const emptyKeys = emptyMessageKeys(translationPending);
 
   return (
     <>
@@ -474,11 +502,13 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
             <h2 className={styles.sectionTitle}>{t("section.title")}</h2>
           </div>
           <div className={styles.headActions}>
-            <span className={styles.meta}>
-              {filterActive
-                ? t("section.countFiltered", { shown, count: total })
-                : t("section.count", { count: total })}
-            </span>
+            {emptyKeys.showCount(total) && (
+              <span className={styles.meta}>
+                {filterActive
+                  ? t("section.countFiltered", { shown, count: total })
+                  : t("section.count", { count: total })}
+              </span>
+            )}
             {isAdmin && (
               <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 + Nouvelle annonce
@@ -514,8 +544,8 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
 
         {total === 0 ? (
           <div className={styles.empty}>
-            <p>{t("section.empty")}</p>
-            {isAdmin && (
+            <p>{t(emptyKeys.empty)}</p>
+            {isAdmin && !translationPending && (
               <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 Publier la première annonce
               </CyberButton>
@@ -526,7 +556,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
             {featured.length > 0 ? (
               <div className={styles.list}>{featured.map(renderCard)}</div>
             ) : (
-              <p className={styles.groupEmpty}>{t("section.noUrgent")}</p>
+              <p className={styles.groupEmpty}>{t(emptyKeys.noUrgent)}</p>
             )}
 
             {others.length > 0 && (
