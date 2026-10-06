@@ -156,8 +156,9 @@ du module de la page) était trop discrète — la 2e se lisait blanche.
   brillant et animé en teintes froides est gardé, rendu nettement visible.
 - La marche est celle **de l'onglet affiché** : un onglet par jeu a son propre
   podium, que le reste du site ne connaît pas (le site suit le podium
-  « Général »). Le tableau qui suit le podium n'en porte aucune ; sans podium
-  (moins de trois équipes), ses rangs 1 à 3 portent la leur.
+  « Général »). Le tableau n'en porte jamais : il suit le podium, ou, sous
+  trois équipes, il n'y a pas de podium du tout (même règle que
+  `buildPodiumTiers`).
 - La même marche suit l'équipe **partout** ailleurs (tournois, annuaire,
   fiche…), et ses membres en portent une version adoucie — `PODIUM_TIERS.md`.
 

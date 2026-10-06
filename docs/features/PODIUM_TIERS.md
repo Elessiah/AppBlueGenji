@@ -67,7 +67,12 @@ Exceptions :
 
 - **Écrans d'administration sobres** : `PodiumTiersOff` sur le panneau des
   signalements (`app/(secured)/admin/signalements/layout.tsx`) et les contacts
-  d'arbitrage (`EntrantContactsPanel`) — des outils, pas une vitrine.
+  d'arbitrage (`EntrantContactsPanel`) et l'aperçu de l'étape suivante de
+  l'Endurance (`EnduranceNextRoundPanel`, enveloppé dans `EnduranceView`) —
+  des outils, pas une vitrine.
+- **Perdant d'un match** (`MatchRow`, ligne `.decided`) : la marche garde son
+  repère (couronne, losange) mais quitte dégradé, lueur, mouvement et graisse —
+  sinon le nom du perdant brillerait plus fort que celui du vainqueur.
 - **Lien-avatar sans texte** (roster des cartes `/equipes`) : `podiumTier={null}`
   — la peinture sur le texte effacerait l'initiale de repli ; le nom de
   l'équipe, au-dessus, porte déjà la marche.
