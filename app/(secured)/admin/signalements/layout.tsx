@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { PodiumTiersOff } from "@/components/podium-tiers";
 import { getCurrentUser } from "@/lib/server/auth";
 import { segmentTitle } from "@/lib/shared/page-metadata";
 import { can } from "@/lib/shared/permissions";
@@ -15,5 +16,6 @@ export const metadata: Metadata = { title: segmentTitle("Signalements") };
 export default async function ReportsAdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser();
   if (!can(user, "moderation")) notFound();
-  return <>{children}</>;
+  // Écran d'administration : les noms y restent sobres, sans marche du podium.
+  return <PodiumTiersOff>{children}</PodiumTiersOff>;
 }

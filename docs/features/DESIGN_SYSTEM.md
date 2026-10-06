@@ -88,6 +88,17 @@ Décision du 2026-10-05 : la défaite ne partage sa couleur avec **rien d'autre*
 
 Un podium à trois marches (`/classement`) distingue chaque place, sans teinte chaude : **1re** au dégradé de marque (`--grad-brand`) avec couronne cyan, **2e** `--cyan-400`, **3e** violet (`--violet-300` / `--violet-400`). Le rose (`--pink-400`) reste le repère commun « top 3 » des cartes d'annuaire `/equipes` (une grille, pas un podium). Détail : `RANKING_PAGE.md`.
 
+### Marches du podium — `.podium-tier` / `.podium-member` (2026-10-06)
+
+Famille de classes globales qui habille le **nom** d'une équipe du podium du site partout où il s'affiche (posée par `podiumTierClass()` via `TeamLink` / `EntrantLink` / `TeamPodiumName`), et en version adoucie celui de ses membres (`PlayerLink` / `PlayerPodiumName`) :
+
+- `.podium-tier.podium-tier-1` — irisé cyan → violet → rose balayé d'un reflet (`podium-shimmer`), lueur cyan + aura violette, couronne, gras ;
+- `.podium-tier.podium-tier-2` — chrome glacier bleu → cyan, reflet plus lent, lueur cyan, losange ;
+- `.podium-tier.podium-tier-3` — néon violet → rose immobile, lueur violette, losange ;
+- `.podium-member.podium-member-N` — même famille de teintes, sans lueur, repère, mouvement ni graisse.
+
+Teintes froides seulement (**décision de l'utilisateur du 2026-10-06 : ni or ni bronze**) ; chaque arrêt tient 4,5:1 **sous sa lueur** ; animation en pause par `--deco-anim-state` ; couleur pleine au survol, à l'impression et en couleurs forcées. Écrans d'administration : `PodiumTiersOff`. Détail : `PODIUM_TIERS.md`.
+
 ### Composants
 Primitives dans `components/cyber/` :
 - **CyberButton** — `variant="primary"|"ghost"`, support `asChild` (Radix Slot)

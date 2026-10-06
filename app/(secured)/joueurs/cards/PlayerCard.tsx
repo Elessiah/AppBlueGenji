@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { PlayerPodiumName } from "@/components/podium-tiers";
 import { UserX } from "lucide-react";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
@@ -71,7 +72,13 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
             )}
           </div>
         </div>
-        <div className={s.plPseudo}>{player.pseudo}</div>
+        <div className={s.plPseudo}>
+          {player.isDeleted ? (
+            player.pseudo
+          ) : (
+            <PlayerPodiumName userId={player.id}>{player.pseudo}</PlayerPodiumName>
+          )}
+        </div>
         {player.isDeleted && (
           <div className={s.plDeletedMark}>
             <UserX size={10} aria-hidden="true" />
@@ -85,8 +92,10 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
           {playerRosterStatus(player) === "ROSTER" && player.team ? (
             <>
               {PLAYER_ROSTER_STATUS_LABEL.ROSTER} ·{" "}
+              {/* Carte d'un compte supprimé : ligne d'équipe en retrait, sans marche. */}
               <TeamLink
                 teamId={player.team.id}
+                podiumTier={player.isDeleted ? null : undefined}
                 className={`${s.aboveOverlay} tap-target`}
                 title={`Voir la fiche de ${player.team.name}`}
               >

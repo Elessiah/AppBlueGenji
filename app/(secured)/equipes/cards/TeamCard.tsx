@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
+import { TeamPodiumName } from "@/components/podium-tiers";
 import { displayTeamTag } from "@/lib/shared/team-tag";
 import {
   isRankedTeam,
@@ -78,7 +79,7 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
         </div>
         <div className={s.headText}>
           <div className={s.name}>
-            {team.name}
+            <TeamPodiumName teamId={team.id}>{team.name}</TeamPodiumName>
             {team.isGhost && (
               <span className={s.ghostBadge} title="Équipe fantôme, créée par le staff">
                 FANTÔME
@@ -161,6 +162,9 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
             key={m.userId}
             userId={m.userId}
             className={s.rosterItem}
+            // Lien-avatar sans texte : la marche peinte sur le texte effacerait
+            // l'initiale de repli. Le nom de l'équipe, au-dessus, la porte déjà.
+            podiumTier={null}
             title={`Voir la fiche de ${m.pseudo}`}
             aria-label={`Voir la fiche de ${m.pseudo}`}
           >

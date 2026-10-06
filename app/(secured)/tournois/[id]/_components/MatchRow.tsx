@@ -125,6 +125,8 @@ export const MatchRow = memo(function MatchRow({
   const loserClass = hasWinner ? styles.decided : "";
   const rowClass = (win: boolean): string =>
     [styles.row, win ? styles.winner : loserClass].filter(Boolean).join(" ");
+  // Perdant : la marche du podium s'efface (`PODIUM_TIERS.md`), repère gardé.
+  const podiumMuted = (win: boolean): "" | undefined => (hasWinner && !win ? "" : undefined);
   // Score du perdant en teinte de défaite — jamais sur la case vide d'une
   // exemption (BYE, TBD) : personne n'y a perdu. Un forfait garde son ambre.
   const scoreClass = (forfeits: boolean, lost: boolean): string => {
@@ -186,7 +188,7 @@ export const MatchRow = memo(function MatchRow({
       // sur une ancre native, que le flux SSE nous empêche d'utiliser.
       tabIndex={-1}
     >
-      <div className={rowClass(team1Win)}>
+      <div className={rowClass(team1Win)} data-podium-muted={podiumMuted(team1Win)}>
         {/* Emblème compris : il garde sa case même sur une ligne vide (TBD,
             BYE), pour que les deux noms de la carte commencent au même endroit. */}
         <EntrantName
@@ -198,7 +200,7 @@ export const MatchRow = memo(function MatchRow({
         />
         <strong className={scoreClass(team1Forfeits, hasWinner && !team1Win && match.team1Id !== null)}>{team1Score}</strong>
       </div>
-      <div className={rowClass(team2Win)}>
+      <div className={rowClass(team2Win)} data-podium-muted={podiumMuted(team2Win)}>
         <EntrantName
           teamId={match.team2Id}
           name={team2Display}

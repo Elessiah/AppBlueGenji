@@ -44,6 +44,9 @@ import { DEFAULT_SHARE_IMAGE, SITE_TITLE_TEMPLATE } from "@/lib/shared/page-meta
 import { APP_THEME_COLOR } from "@/lib/shared/web-manifest";
 import { appleStartupImageLinks } from "@/lib/shared/apple-startup-images";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
+import { PodiumTiersProvider } from "@/components/podium-tiers";
+import { loadPodiumTiers } from "@/lib/server/podium-tiers";
+import { visiblePodiumTiers } from "@/lib/shared/podium-tiers";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { DEFAULT_LOCALE, LOCALE_HEADER, localeFromHeader } from "@/lib/shared/locales";
@@ -200,6 +203,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // page racine n'est pas re-rendue d'un lien à l'autre, et un joueur arrivé
   // par `/rgpd` parcourrait ensuite le site sans jamais avoir à répondre.
   const privacyChanges = await pendingChangesFor(user?.id);
+  // Marches du podium du site, lues par chaque lien d'équipe ou de joueur
+  // (`PODIUM_TIERS.md`) : posées une fois ici plutôt qu'une requête par lien.
+  // Mutualisées avec le classement, elles ne lèvent jamais ; les membres ne
+  // partent qu'à un visiteur connecté. Comme la mise en page racine n'est pas
+  // re-rendue d'un lien à l'autre, elles suivent au chargement suivant.
+  const podiumTiers = visiblePodiumTiers(await loadPodiumTiers(), user !== null);
   // L'annonce Discord des mêmes changements, entraînée par le trafic comme les
   // rappels de match : étranglée, à vol unique, jamais attendue — la page ne
   // doit ni ralentir ni tomber à cause du bot.
@@ -239,6 +248,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body style={FONT_VARIABLES}>
         <AppLocaleProvider locale={locale}>
         <ShellTextProvider locale={locale} messages={shellMessages}>
+        <PodiumTiersProvider tiers={podiumTiers}>
         <ToastProvider>
           {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
               réglages ne doit pas traverser toute la page pour les trouver. */}
@@ -282,6 +292,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}
           {children}
         </ToastProvider>
+        </PodiumTiersProvider>
         </ShellTextProvider>
         </AppLocaleProvider>
       </body>

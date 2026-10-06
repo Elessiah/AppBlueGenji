@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { LogoWithGlow } from "@/components/logo-with-glow";
+import { TeamPodiumName } from "@/components/podium-tiers";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { formatRate } from "@/lib/shared/stats";
 import { displayTeamTag } from "@/lib/shared/team-tag";
@@ -57,7 +58,7 @@ export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
             )}
             <div className={headerStyles.titles}>
               <h1 className={`ds-title purple ${headerStyles.name}`}>
-                {team.team.name}
+                <TeamPodiumName teamId={team.team.id}>{team.team.name}</TeamPodiumName>
                 {team.team.isGhost && (
                   <span className={`mono ${headerStyles.ghostBadge}`} title="Équipe fantôme, créée par le staff">
                     FANTÔME

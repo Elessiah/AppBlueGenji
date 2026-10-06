@@ -85,6 +85,12 @@
   font-weight: 600;
 }
 
+/* Vainqueur du podium : sans lueur sur le fond teinté de la ligne — elle y
+   ferait tomber violets et rose sous 4,5:1 (`podium-tiers-style.test.ts`). */
+.winner :global(.podium-tier) {
+  filter: none;
+}
+
 .name {
   flex: 1;
   min-width: 0;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DiscordTag } from "@/components/discord-tag";
+import { PodiumTiersOff } from "@/components/podium-tiers";
 import { useToast } from "@/components/ui/toast";
 import { contactsPanelView } from "../_lib/contacts-panel-view";
 import { mapError } from "../_lib/error-map";
@@ -187,9 +188,10 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
         {open ? "Masquer les contacts" : "Afficher les contacts"}
       </button>
 
+      {/* Outil d'arbitrage : les noms y restent sobres, sans marche du podium. */}
       {open && (
         <div id="entrant-contacts-list" className={styles.list}>
-          {renderContacts()}
+          <PodiumTiersOff>{renderContacts()}</PodiumTiersOff>
         </div>
       )}
     </div>

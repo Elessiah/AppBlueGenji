@@ -30,6 +30,7 @@ import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/pre
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";
+import { PodiumTiersOff } from "@/components/podium-tiers";
 import { BracketSections } from "./BracketSections";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
 import styles from "./EnduranceView.module.css";
@@ -184,6 +185,7 @@ function EnduranceHistory({
               ]
                 .filter(Boolean)
                 .join(" ")}
+              data-podium-muted={ROW_OPACITY[standing.status] < 1 ? "" : undefined}
               style={{ "--history-cols": columns } as React.CSSProperties}
             >
               {/* Même affordance que le classement au-dessus : un nom d'engagé
@@ -470,6 +472,7 @@ export function EnduranceView({
             <div
               key={standing.teamId}
               className={rowClassName}
+              data-podium-muted={ROW_OPACITY[standing.status] < 1 ? "" : undefined}
               style={{
                 opacity: ROW_OPACITY[standing.status],
                 background: isMine ? "rgba(89,212,255,0.06)" : undefined,
@@ -603,14 +606,16 @@ export function EnduranceView({
       {/*
         L'aperçu précède le plateau : c'est en regardant la manche en cours que
         l'arbitrage prépare la suivante, et le volet se replie pour qui n'en a
-        pas l'usage.
+        pas l'usage. Outil d'arbitrage : noms sobres, sans marche du podium.
       */}
       {nextRound && (
-        <EnduranceNextRoundPanel
-          preview={nextRound}
-          maxRounds={endurance.maxRounds}
-          teamNames={teamNames}
-        />
+        <PodiumTiersOff>
+          <EnduranceNextRoundPanel
+            preview={nextRound}
+            maxRounds={endurance.maxRounds}
+            teamNames={teamNames}
+          />
+        </PodiumTiersOff>
       )}
 
       {/*

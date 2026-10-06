@@ -95,3 +95,13 @@ describe("carte d'un compte anonymisé", () => {
     expect(mark).toContain("--ink-mute");
   });
 });
+
+describe("carte d'un compte supprimé — marches du podium (PODIUM_TIERS.md)", () => {
+  it("rend le pseudo sans marche de membre", () => {
+    expect(CARD).toMatch(/player\.isDeleted \? \(\s*player\.pseudo\s*\) : \(\s*<PlayerPodiumName/);
+  });
+
+  it("éteint la marche du lien d'équipe, que le retrait de couleur ne pourrait pas défaire", () => {
+    expect(CARD).toContain("podiumTier={player.isDeleted ? null : undefined}");
+  });
+});

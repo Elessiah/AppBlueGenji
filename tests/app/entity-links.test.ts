@@ -330,7 +330,7 @@ describe("Autres écrans — noms cliquables", () => {
     [
       "historique d'équipes d'un joueur",
       "app/(secured)/joueurs/[id]/page.tsx",
-      "<TeamLink teamId={entry.teamId}>{entry.teamName}</TeamLink>",
+      "<TeamLink teamId={entry.teamId} podiumTier={deleted ? null : undefined}>{entry.teamName}</TeamLink>",
     ],
     [
       "adversaire favori et bête noire",

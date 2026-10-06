@@ -143,6 +143,23 @@ l'antenne oppose des équipes ou des joueurs. Une place vide — bye, adversaire
 pas encore désigné — rend `null`, et le nom s'affiche alors sans lien plutôt
 qu'avec un lien mort.
 
+## Marche du podium (depuis le 2026-10-06)
+
+`TeamLink` et `EntrantLink` (donc `EntrantName`) portent la marche des trois
+premières équipes du classement « Général » (`.podium-tier-N`), `PlayerLink`
+la version adoucie de l'équipe du joueur (`.podium-member-N`, la plus haute
+s'il en a plusieurs). La marche est lue dans un contexte posé par la mise en
+page racine (`components/podium-tiers.tsx`) — aucune requête par lien.
+
+- `podiumTier` impose une marche (`/classement`, onglet affiché) ; `null`
+  n'en pose aucune (lien-avatar sans texte).
+- Un engagé **solo** porte la marche adoucie de son joueur, jamais celle
+  d'une équipe (une entrée solo n'est jamais classée).
+- `PodiumTiersOff` : écrans d'administration sobres.
+- Noms non cliquables : `TeamPodiumName`, `PlayerPodiumName`.
+
+Détail, données et apparence : `PODIUM_TIERS.md`.
+
 ## Ce qui reste volontairement hors du champ
 
 - **Les dialogues** (édition de score, programmation, diffusion, transfert de
@@ -160,6 +177,7 @@ qu'avec un lien mort.
 | Lien d'engagé (contexte tournoi) | `app/(secured)/tournois/[id]/_lib/entrant-link.tsx` |
 | Règle de chemin (pure) | `lib/shared/participants.ts` (`entrantHref`) |
 | Affordance | `app/globals.css` (`.entity-link`) |
+| Marche du podium | `components/podium-tiers.tsx`, `lib/shared/podium-tiers.ts`, `app/globals.css` (`.podium-tier`, `.podium-member`) |
 | Plaque des cartes | `app/(secured)/equipes/cards/TeamCard.module.css`, `app/(secured)/equipes/cards/HighlightStrip.module.css`, `app/(secured)/_shared/annuaire.module.css` |
 | Entrée solo → joueur | `lib/server/solo-entries-service.ts` (`findSoloEntryUser`), `app/api/teams/[id]/route.ts` |
 | Tests | `tests/app/entity-links.test.ts`, `tests/app/team-ranking-podium-links.test.tsx`, `tests/app/api/teams/solo-entry-detail.test.ts` |

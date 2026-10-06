@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { TeamLink } from "@/components/entity-link";
+import { PlayerPodiumName } from "@/components/podium-tiers";
 import { DiscordTag } from "@/components/discord-tag";
 import { useParams, useRouter } from "next/navigation";
 import { UserX } from "lucide-react";
@@ -116,7 +117,11 @@ export default function PlayerDetailPage() {
                   }
                   style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}
                 >
-                  {data.profile.pseudo}
+                  {deleted ? (
+                    data.profile.pseudo
+                  ) : (
+                    <PlayerPodiumName userId={data.profile.id}>{data.profile.pseudo}</PlayerPodiumName>
+                  )}
                 </h1>
                 <fieldset
                   // `<fieldset>` (rôle `group`) : un nom n'est admis que sur un
@@ -270,7 +275,7 @@ export default function PlayerDetailPage() {
           </div>
           {data.teamsTimeline.map((entry) => (
             <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
-              <TeamLink teamId={entry.teamId}>{entry.teamName}</TeamLink>
+              <TeamLink teamId={entry.teamId} podiumTier={deleted ? null : undefined}>{entry.teamName}</TeamLink>
               <span data-label="Rôles">{entry.roles.join(", ")}</span>
               <span data-label="Début">{formatLocalDate(entry.joinedAt)}</span>
               <span data-label="Fin">{entry.leftAt ? formatLocalDate(entry.leftAt) : "Actif"}</span>

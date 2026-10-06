@@ -184,6 +184,180 @@ a {
   }
 }
 
+/* ---------- Marches du podium (`PODIUM_TIERS.md`, `DESIGN_SYSTEM.md`) ----------
+   Les trois premières équipes du classement général portent leur marche sur
+   chaque nom rendu par les liens d'entité (`TeamLink`, `EntrantLink`,
+   `EntrantName`, `TeamPodiumName`) ; leurs membres, une version adoucie sur
+   `PlayerLink`. Posées par `podiumTierClass()` (`lib/shared/podium-tiers.ts`) :
+   `.podium-tier.podium-tier-N` (équipe), `.podium-member.podium-member-N`.
+   1re : dégradé irisé cyan → violet → rose, balayé d'un reflet clair, lueur
+         néon et couronne — la plus brillante.
+   2e  : chrome glacier (bleu → cyan, reflet plus lent), lueur froide, losange.
+   3e  : néon violet → rose, immobile, lueur violette, losange.
+   Teintes froides seulement (l'ambre est réservé aux avertissements, aucun or).
+   Chaque arrêt est un jeton de texte tenant 4,5:1 sur le fond le plus clair
+   **éclairé par la lueur** au bord des lettres (`podium-tiers-style.test.ts`).
+   Le texte reste du texte (dégradé par `background-clip`) ; arrêtée
+   (`--deco-anim-state`, mouvement réduit, menu d'accessibilité), chaque marche
+   garde sa peinture. Lueur par `drop-shadow` et non `text-shadow` : sous un
+   texte peint par son fond, une ombre de texte recouvrirait le dégradé. */
+.podium-tier,
+.podium-member {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  /* Soulignement visible malgré le texte transparent (« Liens soulignés »). */
+  text-decoration-color: var(--blue-300);
+}
+
+.podium-tier {
+  font-weight: 700;
+}
+
+.podium-tier-1 {
+  background-image: linear-gradient(
+    100deg,
+    var(--cyan-400) 0%,
+    var(--violet-300) 13%,
+    var(--pink-400) 25%,
+    var(--violet-300) 37%,
+    var(--cyan-400) 50%,
+    var(--blue-300) 60%,
+    var(--ink) 68%,
+    var(--blue-300) 76%,
+    var(--cyan-400) 100%
+  );
+  background-size: 200% 100%;
+  filter: drop-shadow(0 0 5px rgba(var(--cyan-400-rgb), 0.14)) drop-shadow(0 0 16px rgba(var(--violet-400-rgb), 0.26));
+  animation: podium-shimmer 3.6s linear infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+.podium-tier-2 {
+  background-image: linear-gradient(
+    105deg,
+    var(--blue-500) 0%,
+    var(--blue-300) 16%,
+    var(--cyan-400) 30%,
+    var(--blue-300) 42%,
+    var(--blue-500) 50%,
+    var(--blue-300) 62%,
+    var(--blue-100) 70%,
+    var(--blue-300) 78%,
+    var(--blue-500) 100%
+  );
+  background-size: 200% 100%;
+  filter: drop-shadow(0 0 6px rgba(var(--cyan-400-rgb), 0.35));
+  animation: podium-shimmer 6s linear infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+.podium-tier-3 {
+  background-image: linear-gradient(100deg, var(--violet-400) 0%, var(--pink-400) 50%, var(--violet-300) 100%);
+  filter: drop-shadow(0 0 6px rgba(var(--violet-400-rgb), 0.2));
+}
+
+/* Le reflet traverse le nom de gauche à droite. Fond de deux largeurs et motif
+   périodique (même couleur aux deux bouts) : la boucle ne saute pas. À l'arrêt,
+   la première moitié — la plus colorée — reste peinte. */
+@keyframes podium-shimmer {
+  from { background-position: 200% 50%; }
+  to { background-position: 0% 50%; }
+}
+
+/* Repère de la marche, peint avant le nom (aucun texte : le nom accessible ne
+   change pas). Couronne à la 1re, losange aux deux autres. */
+.podium-tier::before {
+  content: "";
+  display: inline-block;
+  margin-right: 0.35em;
+  pointer-events: none;
+}
+
+.podium-tier-1::before {
+  width: 0.95em;
+  height: 0.95em;
+  vertical-align: -0.12em;
+  background: linear-gradient(135deg, var(--cyan-400), var(--violet-300) 55%, var(--pink-400));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 7.5l5.2 4.2L12 4l4.8 7.7L22 7.5 19.8 18H4.2z'/%3E%3Crect x='4.2' y='19.4' width='15.6' height='2.6' rx='1'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 7.5l5.2 4.2L12 4l4.8 7.7L22 7.5 19.8 18H4.2z'/%3E%3Crect x='4.2' y='19.4' width='15.6' height='2.6' rx='1'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.podium-tier-2::before,
+.podium-tier-3::before {
+  width: 0.42em;
+  height: 0.42em;
+  vertical-align: 0.12em;
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.podium-tier-2::before {
+  background: linear-gradient(135deg, var(--blue-100), var(--cyan-400));
+}
+
+.podium-tier-3::before {
+  background: linear-gradient(135deg, var(--violet-300), var(--pink-400));
+}
+
+/* Membres d'une équipe du podium : la même famille de teintes, adoucie — ni
+   graisse, ni lueur, ni repère, ni mouvement. */
+.podium-member-1 {
+  background-image: linear-gradient(100deg, var(--cyan-400), var(--violet-300) 55%, var(--pink-400));
+}
+
+.podium-member-2 {
+  background-image: linear-gradient(100deg, var(--blue-300), var(--cyan-400) 55%, var(--blue-300));
+}
+
+.podium-member-3 {
+  background-image: linear-gradient(100deg, var(--violet-300), var(--pink-400));
+}
+
+/* Survol et focus : couleur pleine, comme tout lien d'entité (soulignement lisible). */
+.entity-link.podium-tier:hover,
+.entity-link.podium-tier:focus-visible,
+.entity-link.podium-member:hover,
+.entity-link.podium-member:focus-visible {
+  background-image: none;
+  color: var(--blue-100);
+  -webkit-text-fill-color: var(--blue-100);
+}
+
+/* Ligne en retrait (perdant d'un match, éliminée, forfait) : le repère reste,
+   l'éclat s'éteint — sinon le nom distancé brillerait plus fort que les autres. */
+[data-podium-muted] .podium-tier,
+[data-podium-muted] .podium-member {
+  background-image: none;
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
+  filter: none;
+  animation: none;
+  font-weight: inherit;
+}
+
+/* Contraste renforcé : la lueur s'efface, les lettres restent nettes. */
+:root[data-a11y~="contrast"] .podium-tier {
+  filter: none;
+}
+
+/* Imprimé : les fonds ne s'impriment pas, un nom peint par `background-clip`
+   sortirait vide — couleur pleine, comme `.text-gradient`. */
+@media print {
+  .podium-tier,
+  .podium-member {
+    background: none;
+    color: var(--blue-500);
+    -webkit-text-fill-color: currentColor;
+    filter: none;
+  }
+
+  .podium-tier::before {
+    display: none;
+  }
+}
+
 /* Carte de match visee par une ancre `#match-[id]` (lien profond depuis
    l'accueil). La page s'ouvre deja defilee au bon endroit : ce halo dit
    **laquelle** des cartes visibles on venait voir, puis s'efface.
@@ -2084,6 +2258,22 @@ input[type="radio"]:disabled:checked {
   input[type="radio"]:focus-visible {
     outline: 2px solid;
     outline-offset: 2px;
+  }
+}
+
+/* Marches du podium en couleurs forcées (voir « Marches du podium » plus haut) :
+   le fond disparaît, le texte reprend la couleur du système. */
+@media (forced-colors: active) {
+  .podium-tier,
+  .podium-member {
+    background-image: none;
+    color: inherit;
+    -webkit-text-fill-color: currentColor;
+    filter: none;
+  }
+
+  .podium-tier::before {
+    display: none;
   }
 }
 
