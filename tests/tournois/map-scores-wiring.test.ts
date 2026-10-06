@@ -191,7 +191,21 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
     ].map((line) => dialog.indexOf(line));
     expect(order.every((i) => i > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(dialog).toContain("mapRefusal: form.maps.some(isMapTouched) ? (form.mapsRefused.resolve ?? form.mapsRefused.save) : null,");
+    expect(dialog).toContain("mapRefusal: mapsTouched ? (form.mapsRefused.resolve ?? form.mapsRefused.save) : null,");
+    // Ligne vierge : aucune phrase, ni le refus de map, ni le 0 – 0 dérivé.
+    expect(dialog).toContain("blankMaps: form.maps.length > 0 && !mapsTouched && form.mapsRefused.resolve !== null,");
+    expect(dialog.indexOf("if (input.blankMaps) return null;")).toBeLessThan(dialog.indexOf("if (input.mapRefusal) return"));
+  });
+
+  it("une erreur sous un champ ne décale pas la ligne ; le bouton de détail est en retrait", () => {
+    const css = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.module.css");
+    expect(css).toContain("align-items: start;");
+    expect(css).not.toContain("align-items: end;");
+    expect(css).toMatch(/\.remove \{[^}]*margin-top: 20px;/);
+    const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.module.css");
+    expect(details).toMatch(/\.summary \{[^}]*margin: 0 12px;/);
+    expect(details).not.toContain("margin: 0 0 -6px;");
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toContain("{blockerText && <output");
   });
 });
