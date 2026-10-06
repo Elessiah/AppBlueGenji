@@ -16,7 +16,7 @@ import { SITE_DESCRIPTION, SITE_NAME } from "./share-metadata";
  * les deux. La couleur de thème, elle, est le néon de marque (`APP_THEME_COLOR`).
  */
 
-/** `--cyber-bg` — fond du site, écran de lancement et barre d'état. */
+/** `--cyber-bg` — fond du site et écran de lancement. */
 export const APP_BACKGROUND_COLOR = "#05060a";
 
 /**
