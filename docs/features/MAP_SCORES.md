@@ -170,6 +170,17 @@ La seconde équipe ne ressaisit rien :
   autre instant de dépôt, report retiré ou expiré, ou maps qui ne sont plus
   celles envoyées → `409 PROPOSAL_STALE`, rien d'écrit. La modale relit alors le
   contexte du lecteur et se réaligne sur la version à jour.
+- **Proposition sans détail** (antérieure aux maps, ou détail resté
+  introuvable après trois relectures) : la modale s'ouvre vide et la phrase
+  d'état dit de saisir les maps jouées et leurs codes pour confirmer, au lieu
+  de « Confirme-le ».
+
+**Lisibilité de la saisie.** Le compteur « Maps jouées (n/N) » annonce le format
+(BO3 → 3) ; les maps nulles rejouables au-delà sont dites dans l'aide et ne
+l'avancent que lorsqu'elles servent. La liste passe sur deux lignes selon **sa
+propre largeur** (requête de conteneur, 560 px), pour que le code de replay
+reste lisible dans la modale. Côté arbitrage, un bouton laissé actionnable sur
+une map refusée affiche ce refus en infobulle (`mapsRefused` porte le motif).
 
 **Qui voit le détail d'une proposition.** Jamais l'instantané diffusé : les
 propositions y gardent `maps: []`. Le détail voyage dans
