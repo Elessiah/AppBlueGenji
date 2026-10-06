@@ -76,7 +76,7 @@ Table clé/valeur `bg_settings`, une ligne par texte modifié **et par langue** 
 longue : 36 caractères, colonne `VARCHAR(80)`, aucun changement de schéma). Une
 clé absente **ou vide** retombe sur la valeur d'origine de sa langue : un texte
 ne peut donc pas disparaître de la page. Un enregistrement écrit les deux lignes
-dans **une** instruction ; « Rétablir l'original » supprime les deux.
+dans **une** instruction ; « Rétablir l'original » supprime les deux, après une confirmation (`ConfirmActionDialog`, en français sous `/en`) qui le dit.
 
 Base injoignable → `getSiteCopy()` / `getSiteCopyBundle()` renvoient les
 défauts, la page reste peuplée.
