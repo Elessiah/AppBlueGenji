@@ -71,9 +71,14 @@ function phrases(doc: LegalDoc): string[] {
   ].map(shown);
 }
 
-/** Le texte du document, dans l'ordre, sans les surtitres « SECTION nn » ajoutés au rendu. */
+/**
+ * Le texte du document, dans l'ordre, sans l'habillage ajouté au rendu : les
+ * surtitres « SECTION nn » et la mention « (in French) » du lien vers l'hébergeur.
+ */
 function documentText(html: string): string {
-  return visibleText(html).replace(/SECTION \d{2}/g, "");
+  return visibleText(html)
+    .replace(/SECTION \d{2}/g, "")
+    .replace(/ \(in French\)$/, "");
 }
 
 const sectionLangs = (html: string) =>
@@ -189,6 +194,25 @@ describe("liens internes dans la langue de la page", () => {
     const terms = await render(TermsPage, "fr");
     expect(terms).toContain('href="/privacy-policy-bot"');
     expect(terms).not.toContain('href="/en/');
+  });
+
+  it("sous /en, un lien vers une page encore française porte hrefLang=\"fr\", pas un lien anglais", async () => {
+    const privacy = await render(PrivacyPage, "en");
+    expect(privacy).toMatch(/<a[^>]*href="\/rgpd#exercer-vos-droits"[^>]*hrefLang="fr"|<a[^>]*hrefLang="fr"[^>]*href="\/rgpd#exercer-vos-droits"/);
+    expect(privacy).toMatch(/<a[^>]*hrefLang="fr"[^>]*href="\/mentions-legales#hebergement"|<a[^>]*href="\/mentions-legales#hebergement"[^>]*hrefLang="fr"/);
+    const english = [...privacy.matchAll(/<a[^>]*href="\/en\/[^"]*"[^>]*>/g)].map((m) => m[0]);
+    expect(english.length).toBeGreaterThan(0);
+    for (const tag of english) expect(tag).not.toContain("hrefLang");
+  });
+
+  it("sous /en, le lien vers l'hébergeur dit « (in French) » ; en français, rien n'est ajouté", async () => {
+    for (const page of [PrivacyPage, TermsPage]) {
+      const en = visibleText(await render(page, "en"));
+      expect(en).toContain(`See the Hosting section of the legal notice → ${enBot.legalPages.inFrench}`);
+      const fr = await render(page, "fr");
+      expect(fr).not.toContain("hrefLang");
+      expect(visibleText(fr)).not.toContain(frBot.legalPages.inFrench);
+    }
   });
 });
 
