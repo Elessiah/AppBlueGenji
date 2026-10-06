@@ -18,3 +18,23 @@
 .link:hover {
   color: var(--blue-300);
 }
+
+/* Nom complet (« English ») sur grand écran, code (« EN ») sur téléphone :
+   `display: none` retire aussi l'autre forme de l'arbre d'accessibilité. */
+.short {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .full {
+    display: none;
+  }
+
+  .short {
+    display: inline;
+  }
+
+  .link {
+    padding: 0 8px;
+  }
+}

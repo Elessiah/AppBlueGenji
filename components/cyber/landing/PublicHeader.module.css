@@ -149,6 +149,13 @@
   .actions > a {
     padding: 10px 12px;
   }
+
+  /* Sélecteur de langue (« EN ») : marges réduites, pour que le bouton et le
+     menu du compte tiennent sur la même ligne à 320–375 px. Sa cible reste de
+     44 px de haut. */
+  .actions > a[hreflang] {
+    padding: 10px 6px;
+  }
 }
 
 /* En paysage bas (téléphone couché, zoom 200 % d'un portable), l'en-tête

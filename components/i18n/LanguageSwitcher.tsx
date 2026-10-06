@@ -65,7 +65,15 @@ function SwitcherLink({
       onFocus={withAnchor}
       onClick={withAnchor}
     >
-      <span lang={target}>{LOCALE_NATIVE_NAME[target]}</span>
+      {/* Sur un écran étroit, le code (« EN ») remplace le nom : la ligne
+          d'actions de l'en-tête passait sinon à la ligne et poussait le menu du
+          compte sous le logo. Le nom accessible garde le code visible en tête. */}
+      <span lang={target} className={styles.full}>
+        {LOCALE_NATIVE_NAME[target]}
+      </span>
+      <span lang={target} className={styles.short}>
+        {target.toUpperCase()}
+      </span>
       <span className="sr-only"> — {label}</span>
     </a>
   );

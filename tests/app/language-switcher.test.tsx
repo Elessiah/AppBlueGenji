@@ -52,7 +52,7 @@ describe("LanguageSwitcher — même page, autre langue", () => {
     const html = renderSwitcher();
     expect(html).toContain('href="/en/regles/swiss"');
     expect(html).toContain('hrefLang="en"');
-    expect(html).toContain('<span lang="en">English</span>');
+    expect(html).toContain('<span lang="en" class="full">English</span>');
     expect(html).toContain("lire cette page en anglais");
   });
 
@@ -60,7 +60,7 @@ describe("LanguageSwitcher — même page, autre langue", () => {
     mockPathname = "/en/regles";
     const html = renderSwitcher("en");
     expect(html).toContain('href="/regles"');
-    expect(html).toContain('<span lang="fr">Français</span>');
+    expect(html).toContain('<span lang="fr" class="full">Français</span>');
     expect(html).toContain("read this page in French");
   });
 
