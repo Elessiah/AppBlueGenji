@@ -260,7 +260,10 @@ le tait.
   reste et la validation la refuse sur son champ (`MAP_AFTER_DECISION`) — rien
   ne se perd en silence. Ce qui se valide et part en retire la ligne vierge de
   fin (`trimTrailingBlankMaps`, jamais la seule ligne). Une ligne ajoutée
-  s'annonce poliment (`aria-live`) sans déplacer le focus. En confirmation,
+  s'annonce poliment (`aria-live`) sans déplacer le focus — seulement quand
+  l'affichage progressif l'ajoute, pas sur une liste reçue déjà remplie. Une
+  ligne vierge n'a pas de « Retirer » (elle reviendrait aussitôt), et le
+  compteur « Maps jouées » ne la compte pas. En confirmation,
   la modale montre exactement les lignes adverses, puis le même comportement si
   l'engagé les retouche. L'arbitrage partage la liste (`MapScoreList`) : sans
   ligne d'emblée (`minRows = 0`, score à la main), « Ajouter une map » ouvre la
