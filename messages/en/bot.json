@@ -100,7 +100,7 @@
     }
   },
   "feed": {
-    "title": "Live activity feed",
+    "title": "Real-time feed",
     "resume": "Resume the feed",
     "pause": "Pause the feed",
     "resumeChip": "▶ RESUME",

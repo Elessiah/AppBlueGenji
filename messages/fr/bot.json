@@ -61,7 +61,7 @@
     "range": "7 DERNIERS JOURS",
     "unavailable": "Données indisponibles",
     "relayBar": "{count} relais",
-    "scrimBar": "{count} scrims",
+    "scrimBar": "{count, plural, one {# scrim} other {# scrims}}",
     "legendRelays": "RELAIS INTER-SERVEUR",
     "legendScrims": "SCRIMS PROPOSÉS",
     "average": "MOY. {value} / JOUR"
