@@ -29,6 +29,8 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ConfirmActionDialog, runConfirmation } from "@/components/ui/confirm-action-dialog";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
 import { diffPlatformRoles, roleChangeNeedsConfirmation } from "@/lib/shared/permissions";
 import { readSource } from "../helpers/read-source";
 
@@ -124,6 +126,19 @@ describe("ConfirmActionDialog — balisage", () => {
     expect(html).toMatch(/<input[^>]*data-autofocus="true"/);
     expect(html).toMatch(/<button type="button" class="btn ghost">Annuler<\/button>/);
     expect(html).toMatch(/<button type="submit" class="btn danger" disabled="">Dissoudre<\/button>/);
+  });
+
+  it("libellés communs en anglais sous la coquille anglaise (le texte à recopier n'est pas traduit)", () => {
+    const html = render(
+      <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+        <ConfirmActionDialog title="T" confirmLabel="Disband" pendingLabel="…" requireText="Les Bleus" onClose={noop} onConfirm={resolved}>
+          <p>x</p>
+        </ConfirmActionDialog>
+      </ShellTextProvider>,
+    );
+    expect(html).toContain("Type <strong>Les Bleus</strong> to confirm");
+    expect(html).toMatch(/<button type="button" class="btn ghost">Cancel<\/button>/);
+    expect(html).not.toMatch(/Recopie|Annuler/);
   });
 
   it("champ requis du contenu : `disabled` désarme, `focusContent` laisse le focus au contenu", () => {

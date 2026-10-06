@@ -67,9 +67,9 @@ describe("pied de page — règles des tournois et règlement intérieur", () =>
   });
 
   it("range le règlement intérieur sous LÉGAL, nommé comme tel", () => {
-    const legal = footer.slice(footer.indexOf(">LÉGAL<"));
+    const legal = footer.slice(footer.indexOf('{t("headings.legal")}'));
     expect(legal).toContain("href={REGLEMENT_URL}");
-    expect(legal).toContain("Règlement intérieur");
+    expect(legal).toContain('{t("links.internalRules")}');
   });
 
   it("les conditions d'utilisation lient les règles qu'elles invoquent", () => {

@@ -307,7 +307,7 @@ describe("déclaration d'accessibilité", () => {
 
   it("s'atteint du pied de page public et du menu d'accessibilité", () => {
     expect(code("components/cyber/landing/PublicFooter.tsx")).toMatch(
-      /href="\/accessibilite">\{accessibilityFooterLabel\(\)\}/,
+      /href="\/accessibilite">\s*\{t\("accessibilityStatus", \{ status: t\(`conformity\.\$\{CONFORMITY_STATUS\}`\) \}\)\}/,
     );
     const menu = code("components/accessibility/AccessibilityMenu.tsx");
     expect(menu).toContain('href="/accessibilite"');

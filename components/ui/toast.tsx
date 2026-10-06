@@ -116,7 +116,7 @@ function isKeyboardFocus(element: Element): boolean {
  * souris laisse le focus sur le bouton cliqué, et le décompte ne reprendrait
  * jamais. La barre de progression lit le même état par `data-paused`.
  */
-function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
+export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
   const { t } = useShellText();
   const [override, setOverride] = useState<CountdownOverride>(null);
   const [hovered, setHovered] = useState(false);
