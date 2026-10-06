@@ -24,8 +24,8 @@ import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitem
 const PUBLIC = "https://bluegenji.test";
 
 describe("accueil traduit — liste blanche", () => {
-  it("l'accueil, et lui seul, est traduit au lot 2", () => {
-    expect(MIGRATED_ROUTES).toEqual(["/"]);
+  it("l'accueil est traduit au lot 2 (les règles l'ont rejoint au lot 3), pas ses pages voisines", () => {
+    expect(MIGRATED_ROUTES).toContain("/");
     expect(isMigratedRoute("/")).toBe(true);
     expect(isMigratedRoute("/association")).toBe(false);
     expect(isMigratedRoute("/classement")).toBe(false);
@@ -68,12 +68,14 @@ describe("accueil traduit — middleware", () => {
 });
 
 describe("accueil traduit — sitemap", () => {
-  it("annonce /en avec les mêmes hreflang que /, et aucune autre adresse anglaise", () => {
+  it("annonce /en avec les mêmes hreflang que /, et aucune adresse anglaise d'une route non traduite", () => {
     const entries = localizedSitemapEntries(publicSitemapRoutes());
-    const home = entries.filter((entry) => entry.languages);
+    const home = entries.filter((entry) => entry.path === "/" || entry.path === "/en");
     expect(home.map((entry) => entry.path).sort()).toEqual(["/", "/en"]);
     for (const entry of home) expect(entry.languages).toEqual({ fr: "/", en: "/en", "x-default": "/" });
-    expect(entries.filter((entry) => entry.path.startsWith("/en/"))).toEqual([]);
+    for (const entry of entries.filter((e) => e.path.startsWith("/en/"))) {
+      expect(isMigratedRoute(entry.path.slice(3))).toBe(true);
+    }
   });
 });
 
