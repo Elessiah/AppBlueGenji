@@ -48,6 +48,8 @@ export function useScoreForm(
   // Détail map par map (`docs/features/MAP_SCORES.md`) : quand l'arbitre en
   // saisit, il **fait** le score — les deux champs suivent le score dérivé.
   const [maps, setMaps] = useState<MatchMapInput[]>(() => initialAdminMaps(match));
+  // Score d'avant les maps (voir `updateMaps`), oublié à chaque réalignement.
+  const manualScores = useRef<{ score1: string; score2: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Le dialogue reste monté entre deux ouvertures : sans resynchronisation, il
@@ -85,6 +87,7 @@ export function useScoreForm(
     if (untouched) {
       setState(next);
       setMaps(nextMaps);
+      manualScores.current = null;
       setConflict(false);
     } else if (signature !== synced.signature && !submitting) {
       // Seul un résultat **enregistré** fait conflit : une proposition
@@ -105,6 +108,7 @@ export function useScoreForm(
     setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
     setState(next);
     setMaps(nextMaps);
+    manualScores.current = null;
     setConflict(false);
   };
 
@@ -131,7 +135,6 @@ export function useScoreForm(
   // aux champs quand la dernière map est retirée, sans quoi un « Enregistrer »
   // écrirait par-dessus le score dérivé des maps restantes, que personne n'a
   // saisi.
-  const manualScores = useRef<{ score1: string; score2: string } | null>(null);
   const updateMaps = (next: MatchMapInput[]) => {
     if (maps.length === 0 && next.length > 0) manualScores.current = { score1: state.score1, score2: state.score2 };
     setMaps(next);
