@@ -65,6 +65,18 @@ describe("RankingBoard", () => {
     expect(markup).toContain("Monte de 2 sur 7 jours");
   });
 
+  it("libelle visiblement la forme et la tendance du podium, sans les doubler à l'oral", () => {
+    const markup = render({ rows: [row(1), row(2), row(3)] });
+    expect(markup.match(/aria-hidden="true">Forme<\/span>/g) ?? []).toHaveLength(3);
+    expect(markup.match(/aria-hidden="true">7 j<\/span>/g) ?? []).toHaveLength(3);
+  });
+
+  it("ne libelle pas la forme du podium quand elle n'est pas affichée", () => {
+    const markup = render({ rows: [row(1), row(2), row(3)], forms: null });
+    expect(markup).not.toContain('aria-hidden="true">Forme</span>');
+    expect(markup.match(/aria-hidden="true">7 j<\/span>/g) ?? []).toHaveLength(3);
+  });
+
   it("n'affiche pas de podium sous trois équipes", () => {
     const markup = render({ rows: [row(1), row(2)] });
     expect(markup).not.toContain('aria-label="Podium"');
