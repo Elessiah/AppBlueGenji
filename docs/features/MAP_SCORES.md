@@ -253,7 +253,9 @@ le tait.
   proposition à la clôture. Une seule phrase sous les boutons, dans l'ordre de
   l'infobulle : détail en lecture, map refusée (une fois une map renseignée),
   puis blocage du score. Sous un forfait ou une saisie fermée, la liste masquée ne refuse plus rien
-  (ses maps ne partent pas) ; une ligne vierge ajoutée n'affiche aucune phrase.
+  (ses maps ne partent pas) ; un refus qui désigne une ligne vierge ajoutée
+  n'affiche aucune phrase (`refusalOnTouchedRow`, les deux modales), et toute
+  saisie dans la liste lève les refus affichés.
   Les champs d'une ligne s'alignent en haut : une erreur sous un champ n'allonge
   que sa colonne. Sur un résultat déjà validé, une map refusée se désigne
   **avant** la confirmation de correction, qui couvrirait sinon le champ.
