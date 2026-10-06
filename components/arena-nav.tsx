@@ -109,7 +109,7 @@ export function ArenaNav({
               {openReports > 0 && (
                 <span className={s.navBadge}>
                   {openReports}
-                  <span className="sr-only">{` ${t("nav.reportsPending")}`}</span>
+                  <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
                 </span>
               )}
             </LocaleLink>

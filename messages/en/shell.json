@@ -19,15 +19,15 @@
     "myTeam": "My team",
     "myTeamLabel": "My team: {team}",
     "reports": "Reports",
-    "reportsPending": "to review",
-    "openMenu": "Open the menu",
-    "closeMenu": "Close the menu",
+    "reportsPending": "{count, plural, other {to review}}",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
     "menuButton": "MENU"
   },
   "header": {
     "brandName": "BlueGenji",
     "brandTagline": "ESPORT",
-    "competitionFull": "Go to the competitive side →",
+    "competitionFull": "Go to competitions →",
     "competitionShort": "Compete →",
     "join": "Join →"
   },
@@ -36,7 +36,7 @@
     "profile": "My profile",
     "logout": "Log out",
     "loggingOut": "Logging out…",
-    "logoutFailed": "Logging out failed. Try again in a moment."
+    "logoutFailed": "Couldn't log you out. Try again in a moment."
   },
   "footer": {
     "brandName": "BlueGenji",
@@ -86,10 +86,10 @@
     "button": "Accessibility settings",
     "buttonActive": "Accessibility settings ({count, plural, one {# active} other {# active}})",
     "title": "Accessibility",
-    "close": "Close the accessibility menu",
+    "close": "Close accessibility menu",
     "intro": "All off by default. Your choice is saved in this browser.",
     "listLabel": "Accessibility settings",
-    "zoomHint": "To enlarge text, use your browser's zoom (Ctrl + or ⌘ + on Mac).",
+    "zoomHint": "To enlarge text, use your browser's zoom (press Ctrl and +, or ⌘ and + on a Mac).",
     "statement": "Accessibility statement",
     "resetAll": "Turn all off",
     "settings": {
@@ -123,11 +123,11 @@
     "regionLabel": "Notifications",
     "errorPrefix": "Error:",
     "successPrefix": "Success:",
-    "pause": "Pause the notification",
+    "pause": "Pause notification",
     "pauseTitle": "Pause",
-    "resume": "Resume the notification countdown",
+    "resume": "Resume notification countdown",
     "resumeTitle": "Resume",
-    "close": "Close the notification",
+    "close": "Close notification",
     "closeTitle": "Close"
   },
   "confirmDialog": {

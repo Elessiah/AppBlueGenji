@@ -19,7 +19,7 @@
     "myTeam": "Mon équipe",
     "myTeamLabel": "Mon équipe : {team}",
     "reports": "Signalements",
-    "reportsPending": "à traiter",
+    "reportsPending": "{count, plural, other {à traiter}}",
     "openMenu": "Ouvrir le menu",
     "closeMenu": "Fermer le menu",
     "menuButton": "MENU"
