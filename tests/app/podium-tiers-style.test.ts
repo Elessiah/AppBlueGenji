@@ -137,14 +137,31 @@ describe("marches du podium — accessibilité et impression", () => {
 });
 
 describe("marches du podium — écrans où elles s'effacent", () => {
-  it("éteint dégradé, lueur, mouvement et graisse du perdant d'un match, repère gardé", () => {
-    const matchRow = readSource("app/(secured)/tournois/[id]/_components/MatchRow.module.css");
-    const body = /\.decided :global\(\.podium-tier\),\s*\.decided :global\(\.podium-member\) \{([^}]*)\}/.exec(matchRow)?.[1];
+  it("éteint dégradé, lueur, mouvement et graisse d'une ligne en retrait, repère gardé", () => {
+    const body = /\[data-podium-muted\] \.podium-tier,\s*\[data-podium-muted\] \.podium-member \{([^}]*)\}/.exec(block)?.[1];
     expect(body).toBeDefined();
     for (const declaration of ["background-image: none", "-webkit-text-fill-color: currentColor", "filter: none", "animation: none", "font-weight: inherit"]) {
       expect(body).toContain(declaration);
     }
-    expect(matchRow).not.toMatch(/\.decided :global\(\.podium-tier\)::before/);
+    expect(block).not.toMatch(/\[data-podium-muted\][^{]*::before/);
+  });
+
+  it.each([
+    ["MatchRow.tsx", /data-podium-muted=\{podiumMuted\(team1Win\)\}/],
+    ["EnduranceView.tsx", /data-podium-muted=\{ROW_OPACITY\[standing\.status\] < 1/],
+    ["SurvivalView.tsx", /data-podium-muted=\{team\.status === "ELIMINATED"/],
+    ["SwissView.tsx", /data-podium-muted=\{team\.status === "FORFEIT"/],
+  ])("marque les lignes en retrait de %s", (file, pattern) => {
+    expect(readSource(`app/(secured)/tournois/[id]/_components/${file}`)).toMatch(pattern);
+  });
+
+  it("retire la lueur sur la ligne teintée du vainqueur, où elle ferait tomber le contraste", () => {
+    const winnerRow = blend(SURFACE, rgbOf("--teal-400-rgb"), 0.15);
+    // Sous la lueur, violets et rose y tombent sous 4,5:1 ; sans elle, chaque couleur tient.
+    expect(readSource("app/(secured)/tournois/[id]/_components/MatchRow.module.css")).toMatch(/\.winner :global\(\.podium-tier\) \{\s*filter: none;/);
+    for (const name of ["--cyan-400", "--violet-300", "--violet-400", "--pink-400", "--blue-300", "--blue-500", "--blue-100", "--ink"]) {
+      expect(contrastRatio(hexOf(name)!, winnerRow)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("garde sobre l'aperçu d'arbitrage de l'Endurance", () => {
