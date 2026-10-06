@@ -84,10 +84,10 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
             une victoire improbable, presque rien pour une victoire attendue.
           </li>
           <li>
-            <strong>Le score</strong> pèse aussi : une victoire sans perdre de map (3-0) transfère
-            jusqu'à {MARGIN_MAX_TEXT} fois les points d'une victoire arrachée (3-2) — autant de gagné
-            pour le vainqueur, autant de perdu pour le perdant. Un forfait compte comme une victoire
-            simple.
+            <strong>Le score</strong> pèse aussi : une victoire sans perdre de map (3-0, 2-0) transfère
+            jusqu'à {MARGIN_MAX_TEXT} fois les points d'une victoire arrachée (3-2, 2-1) — autant de
+            gagné pour le vainqueur, autant de perdu pour le perdant. Un match en une seule map et un
+            forfait comptent comme une victoire simple.
           </li>
           <li>
             <strong>Le rang final</strong> d'un tournoi redistribue aussi des points, d'autant plus que
