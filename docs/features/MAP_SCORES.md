@@ -190,6 +190,11 @@ La seconde équipe ne ressaisit rien :
   péremption compris) : le serveur la compare au seul score. Pas tant que le
   détail est en lecture : l'envoi reste alors une proposition ordinaire, sans
   faux `PROPOSAL_STALE`.
+- **Détail adverse à part** : en désaccord, et aussi quand le formulaire ne
+  reprend pas la proposition adverse (saisie commencée à son arrivée).
+- **Champs de map** : emblème de l'engagé devant chaque nom de colonne, pavé
+  numérique (`inputMode="numeric"`), état désactivé par les couleurs ;
+  `Entrée` dans un champ de map ne soumet pas le formulaire.
 - **Code de replay** saisi brut (majuscules par la CSS, normalisé à la
   validation et au serveur) : le curseur reste en place pendant une correction.
 
