@@ -81,10 +81,10 @@
     "ground": "Grounds",
     "groundText": "Terms of use (in French), <terms>“{clause}”</terms>. Decision made by a member of the moderation team, with no automated processing.",
     "appeal": "Appeal",
-    "appealText": "Use “Report a problem” at the bottom of any page of the site, category “Autre” (“Other”; no login needed), quoting decision {reference} and leaving a way to reply to you: the association will review its decision. You can then take the decision to the competent court.",
+    "appealText": "Use “Report a problem” at the bottom of any page of the site, category “<fr>Autre</fr>” (“Other”; no login needed), quoting decision {reference} and leaving a way to reply to you: the association will review its decision. You can then take the decision to the competent court.",
     "close": "Close",
-    "loginUntil": "This account is suspended until {end}. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Autre” (“Other”; no login needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
-    "loginIndefinite": "This account is suspended indefinitely. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Autre” (“Other”; no login needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
+    "loginUntil": "This account is suspended until {end}. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Other” (no login needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
+    "loginIndefinite": "This account is suspended indefinitely. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Other” (no login needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
     "clauses": {
       "BEHAVIOR": "Behavior",
       "CONTENT": "Content published by users",

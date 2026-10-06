@@ -81,7 +81,7 @@
     "ground": "Fondement",
     "groundText": "Conditions d'utilisation, <terms>« {clause} »</terms>. Décision prise par un membre de la modération, sans traitement automatisé.",
     "appeal": "Recours",
-    "appealText": "« Signaler un problème », en bas de chaque page du site, catégorie « Autre » (sans connexion), en citant la décision {reference} et en laissant un moyen de te répondre : l'association réexamine sa décision. Tu peux ensuite porter la décision devant le juge compétent.",
+    "appealText": "« Signaler un problème », en bas de chaque page du site, catégorie « <fr>Autre</fr> » (sans connexion), en citant la décision {reference} et en laissant un moyen de te répondre : l'association réexamine sa décision. Tu peux ensuite porter la décision devant le juge compétent.",
     "close": "Fermer",
     "loginUntil": "Ce compte est suspendu jusqu'au {end}. Le motif t'a été envoyé en message privé Discord si ton compte y est rattaché. Pour contester : « Signaler un problème », en bas de chaque page du site, catégorie « Autre » (sans connexion), en citant la décision reçue et en laissant un moyen de te répondre : l'association réexamine sa décision — puis, le cas échéant, le juge compétent.",
     "loginIndefinite": "Ce compte est suspendu pour une durée indéterminée. Le motif t'a été envoyé en message privé Discord si ton compte y est rattaché. Pour contester : « Signaler un problème », en bas de chaque page du site, catégorie « Autre » (sans connexion), en citant la décision reçue et en laissant un moyen de te répondre : l'association réexamine sa décision — puis, le cas échéant, le juge compétent.",
