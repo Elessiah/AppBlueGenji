@@ -19,6 +19,16 @@ describe("middleware — route non traduite sous /en", () => {
     expect(response.headers.get("location")).toBe("/route-jamais-traduite");
   });
 
+  it.each(["/en//evil.example/x", "/en/%5Cevil.example", "/fr//evil.example"])(
+    "ne sort jamais du site (%s)",
+    (path) => {
+      const location = middleware(new NextRequest(`https://localhost:3000${path}`)).headers.get("location") ?? "";
+      expect(location.startsWith("/")).toBe(true);
+      expect(location.startsWith("//")).toBe(false);
+      expect(location.startsWith("/\\")).toBe(false);
+    },
+  );
+
   it("redirige /fr/… en 308 vers l'adresse sans préfixe, relative", () => {
     const response = middleware(new NextRequest("https://localhost:3000/fr/regles"));
     expect(response.status).toBe(308);
