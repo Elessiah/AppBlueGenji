@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import { useToast } from "@/components/ui/toast";
@@ -33,6 +33,13 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [busy, setBusy] = useState(false);
+  // L'éditeur remplace le texte : à sa fermeture, le focus revient au crayon
+  // au lieu de retomber en haut de page.
+  const returnFocus = useRef(false);
+  const closeEditor = () => {
+    returnFocus.current = true;
+    setEditing(false);
+  };
 
   const field = siteCopyField(copyKey);
 
@@ -49,7 +56,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "SITE_COPY_UPDATE_FAILED");
       showSuccess("Texte mis à jour.");
-      setEditing(false);
+      closeEditor();
       router.refresh();
     } catch (e) {
       showError((e as Error).message);
@@ -67,7 +74,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "SITE_COPY_RESET_FAILED");
       showSuccess("Texte d'origine rétabli.");
-      setEditing(false);
+      closeEditor();
       router.refresh();
     } catch (e) {
       showError((e as Error).message);
@@ -112,7 +119,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             className="btn ghost"
             onClick={() => {
               setDraft(value);
-              setEditing(false);
+              closeEditor();
             }}
             disabled={busy}
           >
@@ -132,6 +139,12 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
       <button
         type="button"
         className={styles.pencil}
+        ref={(el) => {
+          if (el && returnFocus.current) {
+            returnFocus.current = false;
+            el.focus();
+          }
+        }}
         aria-label={`Modifier : ${field?.label ?? copyKey}`}
         title={`Modifier : ${field?.label ?? copyKey}`}
         onClick={() => {
