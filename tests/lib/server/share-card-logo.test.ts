@@ -30,8 +30,19 @@ describe("shareCardLogo", () => {
     expect(shareCardLogo()).toBe(shareCardLogo());
   });
 
-  it("rend null quand le fichier manque, sans lever", async () => {
+  it("rend null quand le fichier manque, sans lever, et le journalise", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
     jest.spyOn(process, "cwd").mockReturnValue(join(process.cwd(), "dossier-qui-n-existe-pas"));
     await expect(shareCardLogo()).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledWith("[share-card] logo illisible (ENOENT) : carte sans logo");
+  });
+
+  it("ne mémorise pas un échec : le rendu suivant relit le fichier", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const realRoot = process.cwd();
+    const cwd = jest.spyOn(process, "cwd").mockReturnValue(join(realRoot, "dossier-qui-n-existe-pas"));
+    await expect(shareCardLogo()).resolves.toBeNull();
+    cwd.mockReturnValue(realRoot);
+    await expect(shareCardLogo()).resolves.toMatch(/^data:image\/png;base64,/);
   });
 });
