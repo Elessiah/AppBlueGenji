@@ -275,7 +275,7 @@ export default function PlayerDetailPage() {
           </div>
           {data.teamsTimeline.map((entry) => (
             <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
-              <TeamLink teamId={entry.teamId}>{entry.teamName}</TeamLink>
+              <TeamLink teamId={entry.teamId} podiumTier={deleted ? null : undefined}>{entry.teamName}</TeamLink>
               <span data-label="Rôles">{entry.roles.join(", ")}</span>
               <span data-label="Début">{formatLocalDate(entry.joinedAt)}</span>
               <span data-label="Fin">{entry.leftAt ? formatLocalDate(entry.leftAt) : "Actif"}</span>

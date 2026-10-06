@@ -229,7 +229,7 @@ a {
     var(--cyan-400) 100%
   );
   background-size: 200% 100%;
-  filter: drop-shadow(0 0 5px rgba(var(--cyan-400-rgb), 0.16)) drop-shadow(0 0 16px rgba(var(--violet-400-rgb), 0.3));
+  filter: drop-shadow(0 0 5px rgba(var(--cyan-400-rgb), 0.14)) drop-shadow(0 0 16px rgba(var(--violet-400-rgb), 0.26));
   animation: podium-shimmer 3.6s linear infinite;
   animation-play-state: var(--deco-anim-state);
 }
@@ -255,7 +255,7 @@ a {
 
 .podium-tier-3 {
   background-image: linear-gradient(100deg, var(--violet-400) 0%, var(--pink-400) 50%, var(--violet-300) 100%);
-  filter: drop-shadow(0 0 6px rgba(var(--violet-400-rgb), 0.25));
+  filter: drop-shadow(0 0 6px rgba(var(--violet-400-rgb), 0.2));
 }
 
 /* Le reflet traverse le nom de gauche à droite. Fond de deux largeurs et motif

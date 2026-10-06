@@ -31,6 +31,11 @@ export function PodiumTiersOff({ children }: Readonly<{ children: ReactNode }>) 
   return <PodiumTiersContext.Provider value={EMPTY_PODIUM_TIERS}>{children}</PodiumTiersContext.Provider>;
 }
 
+/** `PodiumTiersOff` sous condition : un écran public qui passe en outil du staff. */
+export function PodiumTiersOffWhen({ off, children }: Readonly<{ off: boolean; children: ReactNode }>) {
+  return off ? <PodiumTiersOff>{children}</PodiumTiersOff> : <>{children}</>;
+}
+
 export function usePodiumTiers(): PodiumTiers {
   return useContext(PodiumTiersContext);
 }

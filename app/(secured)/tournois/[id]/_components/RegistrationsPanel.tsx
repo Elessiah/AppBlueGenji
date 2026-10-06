@@ -33,6 +33,7 @@ import {
   removalNotice,
   visibleRegistrationCount,
 } from "../_lib/registrations-list";
+import { PodiumTiersOffWhen } from "@/components/podium-tiers";
 import styles from "./RegistrationsPanel.module.css";
 
 interface RegistrationsPanelProps {
@@ -282,9 +283,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         </>
       )}
 
+      {/* Mode staff (têtes de série, retraits) : un outil, noms sans marche. */}
       {rows.length === 0 ? (
         <p className={styles.empty}>Aucune inscription pour le moment.</p>
       ) : (
+        <PodiumTiersOffWhen off={showActions}>
         <div className={styles.table}>
           <div className={`${styles.row} ${styles.header} ${gridClass}`}>
             <span>Rang</span>
@@ -361,6 +364,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
             </div>
           ))}
         </div>
+        </PodiumTiersOffWhen>
       )}
 
       {hiddenCount > 0 && (
