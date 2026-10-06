@@ -13,6 +13,8 @@ interface ScoreStepperProps {
   max: number;
   disabled: boolean;
   onChange: (value: string) => void;
+  /** Phrase qui dit pourquoi le champ est verrouillé (score dérivé des maps). */
+  describedBy?: string;
 }
 
 /**
@@ -21,7 +23,16 @@ interface ScoreStepperProps {
  * balises identiques recopiés l'un sous l'autre — une correction sur l'un se
  * perdait sur l'autre.
  */
-export function ScoreStepper({ id, teamId, teamName, value, max, disabled, onChange }: Readonly<ScoreStepperProps>) {
+export function ScoreStepper({
+  id,
+  teamId,
+  teamName,
+  value,
+  max,
+  disabled,
+  onChange,
+  describedBy,
+}: Readonly<ScoreStepperProps>) {
   const parsed = parseScoreInput(value);
   // Un champ vide n'est pas une erreur : c'est un score pas encore saisi. Seule
   // une valeur illisible ou hors plage se signale en rouge.
@@ -64,6 +75,7 @@ export function ScoreStepper({ id, teamId, teamName, value, max, disabled, onCha
           placeholder="—"
           aria-invalid={invalid}
           aria-label={`Manches gagnées par ${teamName}`}
+          aria-describedby={describedBy}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
         />

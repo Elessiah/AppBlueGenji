@@ -123,6 +123,13 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
 /** Lignes de maps adressables par `useFieldErrors` — au-delà de tout plafond. */
 const MAP_FIELD_ID_SLOTS = 32;
 
+const DERIVED_SCORE_HINT_ID = "admin-score-derived-hint";
+
+/** Steppers verrouillés sur le score dérivé des maps : l'`id` de la phrase qui le dit. */
+function derivedScoreHintId(mapCount: number, mapsSetAside: boolean): string | undefined {
+  return mapCount > 0 && !mapsSetAside ? DERIVED_SCORE_HINT_ID : undefined;
+}
+
 const AWAITING_DETAIL_MESSAGE =
   "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.";
 
@@ -231,6 +238,7 @@ export function AdminScoreDialog({
   // refusée (une fois une map renseignée — les steppers, verrouillés sur le
   // score dérivé, ne sont pas à corriger), puis blocage du score.
   const mapRefusal = form.mapsRefused.resolve ?? form.mapsRefused.save;
+  const derivedHintId = derivedScoreHintId(form.maps.length, anyForfeit || scoreEntryClosed);
   const blockerText = visibleBlocker({
     awaitingDetail,
     blankMaps: mapRefusal !== null && form.mapsRefused.onBlankRow,
@@ -398,6 +406,7 @@ export function AdminScoreDialog({
               max={maxScore}
               disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
               onChange={form.setScore1}
+              describedBy={derivedHintId}
             />
             <span className={styles.versus} aria-hidden="true">
               VS
@@ -410,8 +419,17 @@ export function AdminScoreDialog({
               max={maxScore}
               disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
               onChange={form.setScore2}
+              describedBy={derivedHintId}
             />
           </div>
+
+          {/* Steppers verrouillés par les maps : la raison est dite, et le
+              geste pour reprendre la main (saisie de secours, replay perdu). */}
+          {derivedHintId && (
+            <p id={derivedHintId} className={styles.formatHint}>
+              Score calculé à partir des maps ci-dessous : retire toutes les maps pour le saisir à la main.
+            </p>
+          )}
 
           {/* La règle chiffrée sous les champs plutôt qu'en `title` de la
               pastille : une infobulle sur un `<span>` ne s'atteint ni au clavier

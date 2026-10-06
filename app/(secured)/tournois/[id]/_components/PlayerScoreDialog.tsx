@@ -341,7 +341,9 @@ export function PlayerScoreDialog({
     }
   })();
 
-  const submitLabel = confirmsAsIs ? "Confirmer" : "Envoyer le score";
+  // « Confirmer le score », pas « Confirmer » seul : le forfait déclaré a son
+  // propre « Confirmer le forfait de … » dans la même modale.
+  const submitLabel = confirmsAsIs ? "Confirmer le score" : "Envoyer le score";
   let blocker: string | null = null;
   if (unchangedMine) blocker = `Score déjà envoyé : en attente de ${opponentName}.`;
   else if (check.error) blocker = mapListViolationMessage(check.error, matchFormat, game);
