@@ -9,6 +9,9 @@ import {
   rulesPageOutline,
 } from "@/lib/shared/rules-page-outline";
 import { TOURNAMENT_RULE_MODES, ruleModeBySlug } from "@/lib/shared/tournament-rules";
+import frRules from "@/messages/fr/rules.json";
+
+const labels = frRules.toc;
 
 describe("ruleAnchorSlug", () => {
   it("retire accents, apostrophes et ponctuation", () => {
@@ -29,22 +32,22 @@ describe("ruleAnchorSlug", () => {
 
 describe("ruleSectionAnchors", () => {
   it("préfixe chaque ancre pour ne jamais heurter une ancre fixe", () => {
-    expect(ruleSectionAnchors([{ title: "Classement final", body: [] }])).toEqual([
+    expect(ruleSectionAnchors([{ title: "Classement final" }])).toEqual([
       "regle-classement-final",
     ]);
   });
 
   it("départage deux titres identiques", () => {
     const anchors = ruleSectionAnchors([
-      { title: "Forfait", body: [] },
-      { title: "Forfait", body: [] },
-      { title: "Forfait !", body: [] },
+      { title: "Forfait" },
+      { title: "Forfait" },
+      { title: "Forfait !" },
     ]);
     expect(anchors).toEqual(["regle-forfait", "regle-forfait-2", "regle-forfait-3"]);
   });
 
   it("donne une ancre à un titre sans lettre", () => {
-    expect(ruleSectionAnchors([{ title: "—", body: [] }])).toEqual(["regle-section"]);
+    expect(ruleSectionAnchors([{ title: "—" }])).toEqual(["regle-section"]);
   });
 });
 
@@ -52,14 +55,14 @@ describe("rulesPageOutline", () => {
   const mode = ruleModeBySlug("bluegenji-survie")!;
 
   it("n'annonce les réglages du tournoi que s'ils sont affichés", () => {
-    const without = rulesPageOutline(mode, { hasTournamentSettings: false });
-    const withSettings = rulesPageOutline(mode, { hasTournamentSettings: true });
+    const without = rulesPageOutline(mode, { hasTournamentSettings: false, labels });
+    const withSettings = rulesPageOutline(mode, { hasTournamentSettings: true, labels });
     expect(without.map((e) => e.id)).not.toContain(RULES_PAGE_ANCHORS.tournament);
     expect(withSettings[0].id).toBe(RULES_PAGE_ANCHORS.tournament);
   });
 
   it("suit l'ordre de la page", () => {
-    expect(rulesPageOutline(mode, { hasTournamentSettings: true }).map((e) => e.id)).toEqual([
+    expect(rulesPageOutline(mode, { hasTournamentSettings: true, labels }).map((e) => e.id)).toEqual([
       RULES_PAGE_ANCHORS.tournament,
       RULES_PAGE_ANCHORS.essentials,
       RULES_PAGE_ANCHORS.details,
@@ -69,17 +72,30 @@ describe("rulesPageOutline", () => {
   });
 
   it("liste chaque règle du mode sous « Règles du mode », avec l'ancre de la page", () => {
-    const details = rulesPageOutline(mode, { hasTournamentSettings: false }).find(
+    const details = rulesPageOutline(mode, { hasTournamentSettings: false, labels }).find(
       (e) => e.id === RULES_PAGE_ANCHORS.details,
     )!;
     expect(details.children?.map((c) => c.label)).toEqual(mode.sections.map((s) => s.title));
     expect(details.children?.map((c) => c.id)).toEqual(ruleSectionAnchors(mode.sections));
   });
 
+  it("prend les libellés de la langue de la page et les ancres qu'on lui donne", () => {
+    const outline = rulesPageOutline(
+      { sections: [{ title: "Cuts", body: [] }] },
+      { hasTournamentSettings: true, labels: { ...labels, details: "Mode rules" }, anchors: ["regle-coupes"] },
+    );
+    expect(outline.find((e) => e.id === RULES_PAGE_ANCHORS.details)).toEqual({
+      id: RULES_PAGE_ANCHORS.details,
+      label: "Mode rules",
+      children: [{ id: "regle-coupes", label: "Cuts" }],
+    });
+    expect(outline[0].label).toBe(labels.tournament);
+  });
+
   it.each(TOURNAMENT_RULE_MODES.map((m) => [m.slug, m] as [string, typeof m]))(
     "%s : toutes les ancres sont uniques",
     (_slug, m) => {
-      const ids = outlineAnchorIds(rulesPageOutline(m, { hasTournamentSettings: true }));
+      const ids = outlineAnchorIds(rulesPageOutline(m, { hasTournamentSettings: true, labels }));
       expect(new Set(ids).size).toBe(ids.length);
     },
   );
@@ -99,8 +115,9 @@ describe("page /regles/[slug]", () => {
   });
 
   it("pose les ancres des règles par le même calcul que le sommaire", () => {
-    expect(source).toContain("ruleSectionAnchors(mode.sections)");
+    expect(source).toContain("ruleSectionAnchors(frenchMode.sections)");
+    expect(source).toContain("anchors: ruleAnchors");
     expect(source).toContain("id={ruleAnchors[i]}");
-    expect(source).toContain("<RulesToc entries={outline} />");
+    expect(source).toContain("<RulesToc entries={outline}");
   });
 });

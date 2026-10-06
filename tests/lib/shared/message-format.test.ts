@@ -108,6 +108,33 @@ describe("coquille — équivalence avec next-intl, message par message", () => 
   });
 });
 
+/**
+ * Les règles (`rules`, lot 3) passent aussi par ce formateur, côté serveur
+ * (`components/rules/RuleText.tsx`) : chaque message doit y donner le même
+ * texte que `next-intl`, gras compris.
+ */
+describe("règles — équivalence avec next-intl, message par message", () => {
+  type Leaf = { key: string; source: string };
+  const leaves = (tree: unknown, prefix = ""): Leaf[] =>
+    typeof tree === "string"
+      ? [{ key: prefix, source: tree }]
+      : Object.entries(tree as Record<string, unknown>).flatMap(([key, value]) => leaves(value, prefix ? `${prefix}.${key}` : key));
+
+  it.each(LOCALES.map((locale) => [locale]))("%s", (locale) => {
+    const messages = leaves(messagesFor(locale).rules);
+    expect(messages.length).toBeGreaterThan(300);
+    for (const { key, source } of messages) {
+      const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
+      for (const count of [0, 1, 2]) {
+        const values = sampleValues(source, count);
+        const expected = reference.markup("m", { ...values, b: (chunks: string) => `<b>${chunks}</b>` });
+        const actual = formatMessageParts<string>(locale, source, values, { b: (children) => `<b>${children.join("")}</b>` }).join("");
+        expect(`${key}: ${actual}`).toBe(`${key}: ${expected}`);
+      }
+    }
+  });
+});
+
 describe("coquille — le français reprend les textes de référence", () => {
   it("réglages d'accessibilité : mêmes intitulés que la déclaration", () => {
     for (const setting of A11Y_SETTINGS) {

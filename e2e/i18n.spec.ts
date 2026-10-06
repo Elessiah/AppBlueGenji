@@ -5,9 +5,9 @@ import { test, expect } from "./helpers/test";
  * navigateur — ce que les tests unitaires du middleware ne voient pas : la
  * réponse réellement servie par Next, nonce apposé sur les scripts compris.
  *
- * Au lot 0, aucune route n'est traduite : toute adresse `/en/…` renvoie vers la
- * française. Chaque lot qui traduit une route y ajoute son contrôle `lang="en"`
- * et `hreflang`.
+ * Une route pas encore traduite renvoie de `/en/…` vers la française ; les
+ * règles (lot 3) sont servies en anglais. Chaque lot qui traduit une route y
+ * ajoute son contrôle `lang="en"` et `hreflang`.
  */
 test.describe("Langues — adresses /en", () => {
   test("une route pas encore traduite renvoie vers la française, en français", async ({ page }) => {
@@ -27,6 +27,30 @@ test.describe("Langues — adresses /en", () => {
   test("aucune redirection selon Accept-Language", async ({ request }) => {
     const response = await request.get("/", { maxRedirects: 0, headers: { "accept-language": "en-US,en;q=0.9" } });
     expect(response.status()).toBe(200);
+  });
+
+  // Lot 3 : première route traduite.
+  test("/en/regles/<mode> : lang=en, canonique anglaise, hreflang réciproques, nonce", async ({ page }) => {
+    const response = await page.goto("/en/regles/ronde-suisse");
+    expect(response?.status()).toBe(200);
+    expect(new URL(page.url()).pathname).toBe("/en/regles/ronde-suisse");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("h1")).toHaveText("Swiss");
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/regles\/ronde-suisse$/);
+    await expect(page.locator('link[rel="alternate"][hreflang="fr"]')).toHaveAttribute("href", /[^n]\/regles\/ronde-suisse$/);
+    await expect(page.locator('link[rel="alternate"][hreflang="en"]')).toHaveAttribute("href", /\/en\/regles\/ronde-suisse$/);
+    await expect(page.locator('link[rel="alternate"][hreflang="x-default"]')).toHaveAttribute("href", /[^n]\/regles\/ronde-suisse$/);
+    const nonce = /'nonce-([^']+)'/.exec(response?.headers()["content-security-policy"] ?? "")?.[1];
+    expect(await response?.text()).toContain(`nonce="${nonce}"`);
+    // Le sélecteur mène à la même page en français.
+    await expect(page.locator('a[hreflang="fr"]').first()).toHaveAttribute("href", "/regles/ronde-suisse");
+  });
+
+  test("/regles : français, avec le sélecteur et les hreflang vers l'anglais", async ({ page }) => {
+    await page.goto("/regles");
+    await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+    await expect(page.locator('link[rel="alternate"][hreflang="en"]')).toHaveAttribute("href", /\/en\/regles$/);
+    await expect(page.locator('a[hreflang="en"]').first()).toHaveAttribute("href", "/en/regles");
   });
 
   test("la page française garde lang=fr, son nonce, et aucun sélecteur ni hreflang", async ({ page }) => {

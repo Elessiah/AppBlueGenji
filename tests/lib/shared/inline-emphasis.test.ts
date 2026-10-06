@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { parseEmphasis, stripEmphasis } from "@/lib/shared/inline-emphasis";
-import { COMMON_RULES, TOURNAMENT_RULE_MODES } from "@/lib/shared/tournament-rules";
+import { TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
 
 describe("parseEmphasis", () => {
   it("rend un texte sans marque en un seul segment", () => {
@@ -60,15 +60,12 @@ describe("parseEmphasis", () => {
 });
 
 /**
- * L'ancre : le registre des règles emploie bien la marque, et c'est ce qui
+ * L'ancre : les conditions d'utilisation emploient bien la marque, et c'est ce qui
  * justifie de la rendre. Si l'emphase en disparaissait un jour, ce test le
  * dirait avant que le module ne devienne du code mort.
  */
-describe("registre des règles", () => {
-  const texts = [
-    ...COMMON_RULES,
-    ...TOURNAMENT_RULE_MODES.flatMap((mode) => mode.sections),
-  ].flatMap((rule) => [...rule.body, ...(rule.bullets ?? [])]);
+describe("conditions d'utilisation", () => {
+  const texts = TERMS_SECTIONS.flatMap((section) => section.paragraphs);
 
   it("contient des passages en gras", () => {
     expect(texts.some((text) => parseEmphasis(text).some((s) => s.bold))).toBe(true);

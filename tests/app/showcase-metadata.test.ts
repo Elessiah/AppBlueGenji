@@ -1,4 +1,7 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
+
+// Les pages traduites lisent la langue de la requête (`x-bg-locale`) : français ici.
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
@@ -86,7 +89,8 @@ describe("association", () => {
 
 describe("règles", () => {
   it("annonce les six modes publiés, et pas seulement quatre", async () => {
-    const { metadata } = await import("@/app/regles/page");
+    const { generateMetadata } = await import("@/app/regles/page");
+    const metadata = await generateMetadata();
     const description = String(metadata.description);
 
     expect(description).toContain("BlueGenji Survie");

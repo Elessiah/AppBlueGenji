@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EmphasisText } from "@/components/rules/EmphasisText";
+import { RuleText } from "@/components/rules/RuleText";
 
 /**
  * Le registre des règles est rédigé avec le gras Markdown, mais `/regles`
@@ -43,12 +44,35 @@ describe("EmphasisText", () => {
   });
 });
 
+/**
+ * Depuis leur traduction, les textes des règles sont des messages ICU : le
+ * gras s'y écrit `<b>…</b>`, et `RuleText` le monte — même garantie.
+ */
+describe("RuleText", () => {
+  it("monte le gras en <strong> et remplit les arguments", () => {
+    const html = renderToStaticMarkup(
+      <RuleText text="Au bout de {delay} minutes, en <b>un seul match</b> ici." locale="fr" values={{ delay: 15 }} />,
+    );
+    expect(html).toBe("Au bout de 15 minutes, en <strong>un seul match</strong> ici.");
+  });
+
+  it("rend tel quel un texte sans balise, sans séparateur de nœuds", () => {
+    expect(renderToStaticMarkup(<RuleText text="Trois manches à gagner." locale="en" />)).toBe("Trois manches à gagner.");
+  });
+
+  it("échappe une valeur insérée plutôt que de l'interpréter", () => {
+    const html = renderToStaticMarkup(<RuleText text="Règle : {rule}" locale="fr" values={{ rule: "<script>alert(1)</script>" }} />);
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
+
 describe("pages de règles", () => {
   const pages = ["app/regles/page.tsx", "app/regles/[slug]/page.tsx"];
 
   it.each(pages)("%s rend l'emphase de ses règles", (file) => {
     const source = readFileSync(join(process.cwd(), file), "utf8");
-    expect(source).toContain("EmphasisText");
+    expect(source).toContain("<RuleText");
     // Plus aucun paragraphe ni point de liste rendu en texte brut.
     expect(source).not.toMatch(/>\s*\{paragraph\}\s*</);
     expect(source).not.toMatch(/>\s*\{bullet\}\s*</);
