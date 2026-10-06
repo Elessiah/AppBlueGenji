@@ -362,6 +362,38 @@ contraste du nom et du rang (4,5:1) sur le voile de chaque marche.
   `splitRankingPodium`) ou si la base ne répond pas, la carte `ranking`
   ordinaire (trophée) — jamais une erreur.
 
+### La carte d'une équipe (`/equipes/[id]`, décision du 2026-10-06)
+
+L'image d'une fiche d'équipe est **nominative** : `/og/<langue>/team-<id>.png`
+montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
+(`og:title`, `og:description`) reste celui, générique, de la fiche.
+
+- **Clé** : `team-<id>` (`teamShareCardKey`, `parseTeamShareCardKey`) — entier
+  positif, sans zéro de tête, dix chiffres au plus ; toute autre forme : 404.
+- **Aucune requête au rendu de la fiche** : la mise en page ne fait que
+  désigner l'image (`memberAreaShareMetadata("team", teamShareCardKey(id))`).
+  Seule la route d'image lit les données (`lib/server/share-team.ts`), une
+  **seule entrée** de cache pour toutes les équipes (`cachedRanking("share-teams")`,
+  60 s, vidée à chaque score) : un robot qui énumère des identifiants ne
+  remplit pas le cache, et le rejeu du classement est celui de la page.
+  Réponse en `max-age=300`, comme le podium.
+- **Le sous-ensemble du classement public**, rien d'autre : la ligne de l'équipe
+  dans `loadTeamRanking({ includeUnplayed: true })` (onglet « Général »), bornée
+  aux `RANKING_MAX_SHOWN` lignes que `/classement` peut afficher. Cote arrondie
+  et bilan écrits comme la page (« 12 V · 3 D », nuls seulement s'il y en a ;
+  « 12 W · 3 L » en anglais).
+- **Jamais nominative** pour une entrée solo (son « nom » est un pseudo) ni une
+  équipe dissoute — le classement les écarte déjà —, ni une équipe fantôme
+  (écartée ici, `is_ghost = 1`), ni une équipe inconnue : la carte générique
+  « Fiche d'équipe », en `max-age=300` elle aussi, qui ne dit pas si l'équipe
+  existe. Même repli si la base ne répond pas.
+- **Nom** : saisi, donc repassé par `visibleText` puis coupé sur un mot à 48
+  caractères (`TEAM_SHARE_NAME_MAX_LENGTH`) ; invisible : « ? ». **Logo** :
+  fichier du site seulement (`teamLogoDataUrl`, comme le podium), converti en
+  PNG 208 px ; absent ou illisible : l'initiale (`ShareTeamMark`).
+- **Aucun joueur** : ni pseudo, ni avatar, ni effectif. La fiche d'un joueur
+  reste générique.
+
 ### Vie privée : pourquoi les cartes de l'espace membre sont génériques
 
 Une image d'aperçu est servie **à n'importe qui, sans session** : elle ne doit
@@ -369,7 +401,13 @@ rien montrer qu'un visiteur anonyme ne voie déjà.
 
 - **Classement** : noms d'équipe, logos et cotes sont publics sur `/classement`
   (page ouverte à tous) — la carte n'en montre pas davantage. Aucun joueur.
-- **`/equipes/[id]`, `/joueurs/[id]`** : leur `<head>` anonyme ne porte que
+- **Carte d'une équipe** : nom, logo, cote et bilan sont **exactement** ce que
+  `/classement` montre déjà à un visiteur anonyme (même chargeur, mêmes lignes
+  affichables) ; l'effectif, le palmarès et les statistiques de la fiche, eux,
+  restent réservés aux membres. Rien de nouveau n'est exposé : pas d'entrée
+  dans `PRIVACY_CHANGES` ni dans le registre des traitements. Fantômes écartés
+  en plus, par prudence (décision de l'utilisateur).
+- **Texte des encarts `/equipes/[id]`, `/joueurs/[id]`** : leur `<head>` anonyme ne porte que
   « Équipe » / « Joueur » (`getCurrentUser()` d'abord, `entity-page-titles`) ;
   l'encart reste donc **générique** — « Fiche d'équipe », « Fiche de joueur »,
   « Connexion requise pour la consulter » —, **même pour un membre connecté** :
@@ -386,9 +424,8 @@ rien montrer qu'un visiteur anonyme ne voie déjà.
   page (`app/connexion/layout.tsx`), carte `login` comprise.
 - **`/profil`, `/signalements`, l'administration** n'ont pas d'encart propre :
   rien à y partager.
-- **Une carte nominative d'équipe** (nom, logo, palmarès) serait possible par le
-  même mécanisme, mais exposerait à tout robot ce que la fiche réserve aux
-  membres : décision à prendre avant de l'écrire.
+- **Une carte nominative de joueur** : non — la fiche d'un joueur reste
+  générique (pseudo et avatar ne sortent jamais vers un robot).
 
 ## Notes reprises de CLAUDE.md
 
