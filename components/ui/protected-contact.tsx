@@ -18,6 +18,11 @@ interface ProtectedContactProps {
   buttonClassName?: string;
   /** Classe du lien révélé. */
   linkClassName?: string;
+  /**
+   * Langue du bouton quand elle diffère de la page (`"fr"` sur une page
+   * anglaise tant que ce composant n'est pas traduit — WCAG 3.1.2).
+   */
+  lang?: string;
 }
 
 const VISIBLE_LABEL: Record<ContactKind, string> = {
@@ -40,7 +45,7 @@ const ACCESSIBLE_NOUN: Record<ContactKind, string> = {
  * commande vocale « Afficher l'adresse » atteint le bouton, et la suite dit
  * laquelle.
  */
-export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkClassName }: Readonly<ProtectedContactProps>) {
+export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkClassName, lang }: Readonly<ProtectedContactProps>) {
   const [plain, setPlain] = useState<string | null>(null);
   const linkRef = useRef<HTMLAnchorElement>(null);
   const focusOnReveal = useRef(false);
@@ -67,6 +72,7 @@ export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkCl
     <button
       type="button"
       className={`tap-target ${styles.reveal} ${buttonClassName ?? ""}`.trim()}
+      lang={lang}
       aria-label={`${visible} ${ACCESSIBLE_NOUN[kind]} ${owner}`}
       onClick={() => {
         const decoded = decodeContact(encoded);

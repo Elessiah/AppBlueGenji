@@ -22,6 +22,8 @@ interface LandingDialogProps {
    * sans pour autant bloquer la fermeture le précise ici.
    */
   ariaBusy?: boolean;
+  /** Langue de la modale quand elle diffère de la page (WCAG 3.1.2). */
+  lang?: string;
   children: ReactNode;
 }
 
@@ -50,6 +52,7 @@ export function LandingDialog({
   labelledBy,
   label,
   ariaBusy = busy,
+  lang,
   children,
 }: Readonly<LandingDialogProps>) {
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
@@ -65,6 +68,7 @@ export function LandingDialog({
         ref={dialogRef}
         className={`${styles.panel} ${className}`}
         role="dialog"
+        lang={lang}
         aria-modal="true"
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : label}

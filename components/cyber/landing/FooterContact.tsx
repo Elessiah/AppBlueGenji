@@ -31,7 +31,10 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
   const { showError, showSuccess } = useToast();
   // Textes lus par le visiteur ; la fenêtre d'édition (staff) reste en
   // français jusqu'au lot des éditeurs de la vitrine (I18N_MIGRATION_PLAN.md, lot 5).
-  const { t } = useShellText();
+  const { t, locale } = useShellText();
+  // Parties restées en français (édition staff → lot 5, `ProtectedContact` →
+  // lot 7b) : marquées comme telles sur une page d'une autre langue (WCAG 3.1.2).
+  const frenchPart = locale === "fr" ? undefined : "fr";
   const [contact, setContact] = useState<PublicContactInfo>(initialContact);
   const [form, setForm] = useState<ContactInfo>(() => editableContact(initialContact));
   const [open, setOpen] = useState(false);
@@ -92,6 +95,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               encoded={contact.emailEncoded}
               kind="email"
               owner="de l'association"
+              lang={frenchPart}
             />
           </li>
         )}
@@ -116,7 +120,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
         )}
         {isAdmin && (
           <li>
-            <button type="button" className={styles.edit} onClick={openEdit}>
+            <button type="button" className={styles.edit} onClick={openEdit} lang={frenchPart}>
               {/* Commande staff : reste en français jusqu'au lot 5, comme sa fenêtre. */}
               Modifier
             </button>
@@ -129,6 +133,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
           onClose={close}
           busy={busy}
           className={styles.modal}
+          lang={frenchPart}
           label="Modifier les coordonnées de contact"
         >
           <h3 className={styles.modalTitle}>Modifier le contact</h3>
