@@ -607,6 +607,16 @@ export const RANKING_PLACEMENT_ONLY_HINT =
  * fiche, sur la présence d'un rang : les deux disent la même chose.
  */
 export function rankingPointsHint(ranked: boolean, points: number): string {
-  if (ranked) return RANKING_POINTS_HINT;
-  return points === RANKING_BASE_POINTS ? RANKING_UNRANKED_HINT : RANKING_PLACEMENT_ONLY_HINT;
+  const kind = rankingPointsHintKind(ranked, points);
+  if (kind === "ranked") return RANKING_POINTS_HINT;
+  return kind === "unranked" ? RANKING_UNRANKED_HINT : RANKING_PLACEMENT_ONLY_HINT;
+}
+
+/**
+ * La même règle, rendue en **cas** plutôt qu'en phrase : un écran traduit
+ * (`StatsPanel`, messages `stats.ranking.*`) choisit son texte par ce cas.
+ */
+export function rankingPointsHintKind(ranked: boolean, points: number): "ranked" | "unranked" | "placementOnly" {
+  if (ranked) return "ranked";
+  return points === RANKING_BASE_POINTS ? "unranked" : "placementOnly";
 }

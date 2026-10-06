@@ -59,6 +59,9 @@ const I18N_MIGRATED_FILES = [
   "components/rules/RuleDiagram.tsx",
   "components/rules/RuleText.tsx",
   "components/rules/RulesToc.tsx",
+  // Classement (lot 4) — et le bloc de statistiques des fiches, prêt pour le lot 9.
+  "app/classement/**",
+  "components/stats/**",
   "components/ui/confirm-action-dialog.tsx",
   "components/ui/toast.tsx",
 ];

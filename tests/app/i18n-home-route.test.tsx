@@ -24,11 +24,11 @@ import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitem
 const PUBLIC = "https://bluegenji.test";
 
 describe("accueil traduit — liste blanche", () => {
-  it("l'accueil est traduit au lot 2 (les règles l'ont rejoint au lot 3), pas ses pages voisines", () => {
+  it("l'accueil est traduit au lot 2 (les règles et le classement l'ont rejoint aux lots 3 et 4), pas ses pages voisines", () => {
     expect(MIGRATED_ROUTES).toContain("/");
     expect(isMigratedRoute("/")).toBe(true);
     expect(isMigratedRoute("/association")).toBe(false);
-    expect(isMigratedRoute("/classement")).toBe(false);
+    expect(isMigratedRoute("/bot")).toBe(false);
   });
 
   it("un lien vers l'accueil prend /en sur une page anglaise, les autres restent français", () => {

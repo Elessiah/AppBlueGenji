@@ -4,6 +4,9 @@ import type { ReactNode } from "react";
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
 }));
+// La page lit sa langue dans la requête (`/classement` est traduit, lot 4) :
+// la page sans préfixe est française.
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn() }));
 jest.mock("@/lib/server/site-copy-service", () => ({ getSiteCopy: jest.fn(), getSiteCopyEditor: jest.fn() }));
 jest.mock("@/lib/server/landing-service", () => ({ loadLeaderboardRows: jest.fn() }));
@@ -14,7 +17,7 @@ jest.mock("@/components/cyber/landing/SessionPageShell", () => ({
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import ClassementPage, { metadata } from "@/app/classement/page";
+import ClassementPage, { generateMetadata } from "@/app/classement/page";
 import { ToastProvider } from "@/components/ui/toast";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getSiteCopy } from "@/lib/server/site-copy-service";
@@ -80,7 +83,8 @@ describe("/classement — en-tête éditable", () => {
     expect(markup).toContain('aria-labelledby="classement-title"');
   });
 
-  it("garde le titre de page figé, indépendant du texte éditable", () => {
+  it("garde le titre de page figé, indépendant du texte éditable", async () => {
+    const metadata = await generateMetadata();
     expect(String(metadata.title)).toContain("Classement des équipes");
   });
 });

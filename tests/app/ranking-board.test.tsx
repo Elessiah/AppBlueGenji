@@ -9,7 +9,9 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RankingBoard, podiumGapText } from "@/app/classement/RankingBoard";
 import { rankingAddedMessage } from "@/app/classement/RankingMore";
+import { messagesFor } from "@/lib/server/i18n-messages";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
+import { rankingMoreText } from "@/lib/shared/ranking-text";
 
 /**
  * Page `/classement` : podium, tableau complet, filtres en liens, couleur de
@@ -220,9 +222,17 @@ describe("RankingBoard — affichage progressif", () => {
   });
 
   it("annonce le nombre de lignes ajoutées, et la fin du classement", () => {
-    expect(rankingAddedMessage(50, "more")).toBe("50 équipes ajoutées.");
-    expect(rankingAddedMessage(1, "end")).toBe("1 équipe ajoutée. Fin du classement.");
-    expect(rankingAddedMessage(50, "capped")).toBe("50 équipes ajoutées. Affichage limité aux 1000 premières équipes.");
+    const fr = rankingMoreText("fr", messagesFor("fr").ranking.more);
+    expect(rankingAddedMessage(fr, 50, "more")).toBe("50 équipes ajoutées.");
+    expect(rankingAddedMessage(fr, 1, "end")).toBe("1 équipe ajoutée. Fin du classement.");
+    expect(rankingAddedMessage(fr, 50, "capped")).toBe("50 équipes ajoutées. Affichage limité aux 1000 premières équipes.");
+  });
+
+  it("annonce aussi en anglais, pluriel de la langue", () => {
+    const en = rankingMoreText("en", messagesFor("en").ranking.more);
+    expect(rankingAddedMessage(en, 1, "more")).toBe("1 team added.");
+    expect(rankingAddedMessage(en, 50, "end")).toBe("50 teams added. End of the ranking.");
+    expect(rankingAddedMessage(en, 50, "capped")).toBe("50 teams added. Showing the top 1000 teams only.");
   });
 
   it("au plafond, dit qu'il reste des équipes au lieu d'un faux « fin du classement »", () => {

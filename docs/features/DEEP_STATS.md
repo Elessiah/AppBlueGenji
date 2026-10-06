@@ -269,6 +269,16 @@ chacun) partagent en outre un plafond par compte, `DIRECTORY_READ_RULE`
 - `tests/lib/server/player-records.test.ts` — le chargeur de l'annuaire : mêmes
   nombres que la fiche, byes et matchs fantômes exclus, fenêtres d'appartenance
   respectées, trois requêtes quel que soit l'effectif.
+- `tests/components/stats-panel-i18n.test.tsx` — le bloc en anglais (prop
+  `i18n`) et en français inchangé par défaut.
+
+## Langues
+
+Les textes du bloc (`StatsPanel`) vivent dans `messages/<langue>/stats.json`
+(`lib/shared/stats-text.ts`) depuis le lot 4 de la traduction ; ses
+répartitions sont relues par code (`labels.formatShort`, `labels.game`). Sans
+prop `i18n`, il est en français, mot pour mot comme avant ; les fiches équipe et
+joueur lui passeront l'anglais au lot 9 (`I18N.md` § Classement).
 
 ## Notes reprises de CLAUDE.md
 

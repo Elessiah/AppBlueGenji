@@ -14,8 +14,11 @@ import type frCommon from "@/messages/fr/common.json";
 import type frLanding from "@/messages/fr/landing.json";
 import type frShell from "@/messages/fr/shell.json";
 import type frRules from "@/messages/fr/rules.json";
+import type frRanking from "@/messages/fr/ranking.json";
+import type frStats from "@/messages/fr/stats.json";
+import type frLabels from "@/messages/fr/labels.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -26,6 +29,12 @@ export type Messages = {
   shell: typeof frShell;
   /** Pages `/regles` et `/regles/[slug]` : registre des modes, schémas, sommaire — `lib/shared/tournament-rules.ts`. */
   rules: typeof frRules;
+  /** Page `/classement` (lot 4) — `lib/shared/ranking-text.ts`. */
+  ranking: typeof frRanking;
+  /** Bloc de statistiques des fiches équipe et joueur (lot 4) — `lib/shared/stats-text.ts`. */
+  stats: typeof frStats;
+  /** Libellés de domaine partagés : format, jeu, état d'un tournoi (lot 4) — `lib/shared/tournament-labels.ts`. */
+  labels: typeof frLabels;
 };
 
 /**

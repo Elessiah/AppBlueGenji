@@ -13,7 +13,7 @@
  * côté client, `useLandingText()` (`components/i18n/landing-text.tsx`).
  */
 import frLanding from "@/messages/fr/landing.json";
-import type { Locale } from "@/lib/shared/locales";
+import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
 
 export type LandingMessages = typeof frLanding;
@@ -54,4 +54,4 @@ export function landingClientMessages(messages: LandingMessages): LandingClientM
   return Object.fromEntries(LANDING_CLIENT_NAMESPACES.map((ns) => [ns, messages[ns]])) as LandingClientMessages;
 }
 
-export const LANDING_INTL_LOCALE: Readonly<Record<Locale, string>> = { fr: "fr-FR", en: "en-US" };
+export const LANDING_INTL_LOCALE: Readonly<Record<Locale, string>> = INTL_LOCALE;

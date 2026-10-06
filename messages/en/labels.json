@@ -1,0 +1,28 @@
+{
+  "format": {
+    "SINGLE": "Single elimination",
+    "DOUBLE": "Double elimination",
+    "SWISS": "Swiss",
+    "SURVIVAL": "Survival (cuts)",
+    "MULTI": "Multi-stage",
+    "BG_SURVIE": "BlueGenji's Survival"
+  },
+  "formatShort": {
+    "SINGLE": "Single elim.",
+    "DOUBLE": "Double elim.",
+    "SWISS": "Swiss",
+    "SURVIVAL": "Survival (cuts)",
+    "MULTI": "Multi-stage",
+    "BG_SURVIE": "BlueGenji's Survival"
+  },
+  "game": {
+    "OW": "Overwatch",
+    "MR": "Marvel Rivals"
+  },
+  "state": {
+    "UPCOMING": "Upcoming",
+    "REGISTRATION": "Registration open",
+    "RUNNING": "In progress",
+    "FINISHED": "Finished"
+  }
+}

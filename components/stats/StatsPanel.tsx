@@ -1,26 +1,30 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { TeamLink } from "@/components/entity-link";
-import { formatLocalDate } from "@/lib/shared/dates";
+import { formatLocalDate, shortMonthLabel } from "@/lib/shared/dates";
+import type { Locale } from "@/lib/shared/locales";
 import {
   formatDiff,
-  formatRate,
-  formatRecord,
-  formatStreak,
   type DeepStats,
   type StatsOpponent,
   type StatsSplit,
   type TeamRankingPosition,
 } from "@/lib/shared/stats";
 import {
-  RANKING_PLACEMENT_HINT,
-  RANKING_PLACEMENT_LABEL,
-  RANKING_POINTS_LABEL,
-  rankingPointsHint,
-} from "@/lib/shared/ranking";
+  FR_STATS_PANEL_MESSAGES,
+  statsPointsHint,
+  statsRate,
+  statsRecord,
+  statsSplitLabel,
+  statsStreak,
+  statsText,
+  type StatsKey,
+  type StatsPanelI18n,
+  type StatsPanelMessages,
+  type StatsText,
+} from "@/lib/shared/stats-text";
 import s from "./StatsPanel.module.css";
-import { plural } from "@/lib/shared/plural";
 
 interface StatsPanelProps {
   stats: DeepStats;
@@ -28,22 +32,22 @@ interface StatsPanelProps {
   accent?: "blue" | "violet";
   /** Place au classement du site — réservé aux équipes. */
   ranking?: TeamRankingPosition | null;
+  /**
+   * Langue et messages d'une page **traduite** (`statsPanelMessages`) ; absent,
+   * le bloc est en français, messages inclus dans le paquet.
+   */
+  i18n?: StatsPanelI18n;
 }
 
-const MONTH_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+/** Lecture d'une langue : phrases du bloc, libellés courts, langue des dates. */
+type PanelText = { locale: Locale; text: StatsText; labels: StatsPanelMessages["labels"] };
 
 /** Pastille de forme de chaque issue ; le nul porte « N », « D » étant la défaite. */
-const FORM_BADGES: Record<DeepStats["form"][number], { label: string; letter: string; tone: string | undefined }> = {
-  W: { label: "Victoire", letter: "V", tone: s.formWin },
-  L: { label: "Défaite", letter: "D", tone: s.formLoss },
-  D: { label: "Match nul", letter: "N", tone: s.formDraw },
+const FORM_BADGES: Record<DeepStats["form"][number], { label: StatsKey; letter: StatsKey; tone: string | undefined }> = {
+  W: { label: "form.win", letter: "form.winLetter", tone: s.formWin },
+  L: { label: "form.loss", letter: "form.lossLetter", tone: s.formLoss },
+  D: { label: "form.draw", letter: "form.drawLetter", tone: s.formDraw },
 };
-
-/** Libellé court d'une clé `YYYY-MM` (`"2026-03"` → `"mars"`). */
-function monthLabel(month: string): string {
-  const index = Number(month.slice(5, 7)) - 1;
-  return MONTH_SHORT[index] ?? month;
-}
 
 /** Groupe titré : le sous-titre visible sert d'étiquette accessible au bloc. */
 function Group({ id, title, children }: Readonly<{ id: string; title: string; children: ReactNode }>) {
@@ -72,26 +76,32 @@ function Tile({
   );
 }
 
-function SplitBars({ splits, emptyLabel }: Readonly<{ splits: StatsSplit[]; emptyLabel: string }>) {
-  if (splits.length === 0) return <p className={s.empty}>{emptyLabel}</p>;
+function SplitBars({
+  splits,
+  table,
+  panel,
+}: Readonly<{ splits: StatsSplit[]; table: "formatShort" | "game"; panel: PanelText }>) {
+  const { text } = panel;
+  if (splits.length === 0) return <p className={s.empty}>{text.t("noFinishedMatch")}</p>;
 
   return (
     <div className={s.splits}>
       {splits.map((split) => {
         const total = Math.max(1, split.played);
+        const label = statsSplitLabel(panel.labels, table, split);
         return (
           <div className={s.splitRow} key={split.key}>
-            <span className={s.splitLabel}>{split.label}</span>
+            <span className={s.splitLabel}>{label}</span>
             <span
               className={s.splitTrack}
               role="img"
-              aria-label={`${split.label} : ${split.won} victoires sur ${split.played} matchs`}
+              aria-label={text.t("splitLabel", { label, won: split.won, played: split.played })}
             >
               <span className={s.splitWin} style={{ width: `${(split.won / total) * 100}%` }} />
               <span className={s.splitLoss} style={{ width: `${(split.lost / total) * 100}%` }} />
             </span>
             <span className={s.splitValue}>
-              {formatRecord(split)} · {formatRate(split.winRate)}
+              {statsRecord(text, split)} · {statsRate(text, split.winRate)}
             </span>
           </div>
         );
@@ -104,10 +114,12 @@ function OpponentCard({
   title,
   opponent,
   emptyLabel,
+  text,
 }: Readonly<{
   title: string;
   opponent: StatsOpponent | null;
   emptyLabel: string;
+  text: StatsText;
 }>) {
   return (
     <div className={s.opponentCard}>
@@ -118,8 +130,7 @@ function OpponentCard({
             <TeamLink teamId={opponent.teamId}>{opponent.teamName}</TeamLink>
           </div>
           <div className={s.opponentMeta}>
-            {opponent.played} confrontation{opponent.played > 1 ? "s" : ""} ·{" "}
-            {formatRecord(opponent)}
+            {text.t("opponent.meetings", { count: opponent.played, record: statsRecord(text, opponent) })}
           </div>
         </>
       ) : (
@@ -131,7 +142,8 @@ function OpponentCard({
   );
 }
 
-function ActivityChart({ stats }: Readonly<{ stats: DeepStats }>) {
+function ActivityChart({ stats, panel }: Readonly<{ stats: DeepStats; panel: PanelText }>) {
+  const { text, locale } = panel;
   const points = stats.activity;
   const max = Math.max(1, ...points.map((point) => point.played));
   const width = 640;
@@ -146,19 +158,26 @@ function ActivityChart({ stats }: Readonly<{ stats: DeepStats }>) {
         className={s.chart}
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`Activité des ${points.length} derniers mois : ${stats.matchesPlayed} matchs joués au total`}
+        aria-label={text.t("activity.chartLabel", {
+          months: String(points.length),
+          played: stats.matchesPlayed,
+        })}
       >
         {points.map((point, index) => {
           const usable = height - paddingBottom;
           const playedHeight = (point.played / max) * usable;
           const wonHeight = (point.won / max) * usable;
           const x = index * slot + (slot - barWidth) / 2;
+          const month = shortMonthLabel(point.month, locale);
           return (
             <g key={point.month}>
               <title>
-                {`${monthLabel(point.month)} ${point.month.slice(0, 4)} : ${point.played} match${
-                  point.played > 1 ? "s" : ""
-                }, ${point.won} victoire${point.won > 1 ? "s" : ""}`}
+                {text.t("activity.barTitle", {
+                  month,
+                  year: point.month.slice(0, 4),
+                  played: point.played,
+                  won: point.won,
+                })}
               </title>
               <rect
                 x={x}
@@ -183,7 +202,7 @@ function ActivityChart({ stats }: Readonly<{ stats: DeepStats }>) {
                 fontSize={11}
                 style={{ fill: "var(--ink-quiet)" }}
               >
-                {monthLabel(point.month)}
+                {month}
               </text>
             </g>
           );
@@ -193,12 +212,12 @@ function ActivityChart({ stats }: Readonly<{ stats: DeepStats }>) {
         <span className={s.legendItem}>
           <span className={s.legendSwatch} style={{ background: "rgba(255,255,255,0.12)" }} />
           {/* NOSONAR S6772 — légende en flex avec `gap` */}
-          Matchs joués
+          {text.t("activity.legendPlayed")}
         </span>
         <span className={s.legendItem}>
           <span className={s.legendSwatch} style={{ background: "rgba(var(--green-rgb), 0.75)" }} />
           {/* NOSONAR S6772 — légende en flex avec `gap` */}
-          Victoires
+          {text.t("activity.legendWon")}
         </span>
       </div>
     </>
@@ -207,28 +226,36 @@ function ActivityChart({ stats }: Readonly<{ stats: DeepStats }>) {
 
 /**
  * Bloc de statistiques approfondies, partagé par la fiche équipe et la fiche
- * joueur : les deux exposent le même `DeepStats`, donc la même lecture.
+ * joueur : les deux exposent le même `DeepStats`, donc la même lecture. Textes
+ * par `messages/<langue>/stats.json` (`lib/shared/stats-text.ts`).
  */
-export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<StatsPanelProps>) {
+export function StatsPanel({ stats, accent = "blue", ranking = null, i18n }: Readonly<StatsPanelProps>) {
   const hasPlayed = stats.matchesPlayed > 0;
+  const panel = useMemo<PanelText>(() => {
+    const locale = i18n?.locale ?? "fr";
+    const messages = i18n?.messages ?? FR_STATS_PANEL_MESSAGES;
+    return { locale, text: statsText(locale, messages.stats), labels: messages.labels };
+  }, [i18n]);
+  const { text, locale } = panel;
+  const noFinishedMatch = text.t("noFinishedMatch");
 
   return (
     <div className={`${s.panel} ${accent === "violet" ? s.violet : ""}`}>
-      <Group id="stats-palmares" title="Palmarès">
+      <Group id="stats-palmares" title={text.t("group.record")}>
         <div className={s.grid}>
           <Tile
-            label="Tournois joués"
+            label={text.t("tile.tournamentsPlayed")}
             value={stats.tournamentsPlayed}
             hint={
               stats.tournamentsUpcoming > 0
-                ? `+ ${plural(stats.tournamentsUpcoming, "inscription")} à venir`
+                ? text.t("tile.upcomingEntries", { count: stats.tournamentsUpcoming })
                 : undefined
             }
           />
-          <Tile label="Tournois gagnés" value={stats.tournamentsWon} />
-          <Tile label="Podiums" value={stats.podiums} hint="Top 3" />
-          <Tile label="Meilleur rang" value={stats.bestRank ?? "—"} />
-          <Tile label="Rang moyen" value={stats.averageRank ?? "—"} />
+          <Tile label={text.t("tile.tournamentsWon")} value={stats.tournamentsWon} />
+          <Tile label={text.t("tile.podiums")} value={stats.podiums} hint={text.t("tile.podiumsHint")} />
+          <Tile label={text.t("tile.bestRank")} value={stats.bestRank ?? "—"} />
+          <Tile label={text.t("tile.averageRank")} value={stats.averageRank ?? "—"} />
           {/* La place et la cote qui la produit sortent du **même** objet :
               deux nombres d'une seule lecture, jamais deux calculs. Une fiche
               joueur ne les reçoit pas — le classement note des équipes, pas des
@@ -236,14 +263,16 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
           {ranking ? (
             <>
               <Tile
-                label="Classement du site"
-                value={ranking.position ? `#${ranking.position}` : "—"}
+                label={text.t("tile.sitePosition")}
+                value={ranking.position ? text.t("tile.sitePositionValue", { position: String(ranking.position) }) : "—"}
                 hint={
-                  ranking.position ? `sur ${ranking.total} équipes` : "Aucun match joué"
+                  ranking.position
+                    ? text.t("tile.sitePositionHint", { total: ranking.total, totalText: String(ranking.total) })
+                    : text.t("tile.noMatchPlayed")
                 }
               />
               <Tile
-                label={RANKING_POINTS_LABEL}
+                label={text.t("ranking.pointsLabel")}
                 value={ranking.points}
                 /* Le bilan des matchs, et non `position` : celui-ci est nul
                    pour trois situations distinctes — aucun match, entrée solo,
@@ -251,7 +280,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
                    « Matchs joués » juste à côté sort de la même assiette
                    (`PLAYED_MATCH_SQL`) que le classement : les deux ne peuvent
                    pas se contredire. */
-                hint={rankingPointsHint(stats.matchesPlayed > 0, ranking.points)}
+                hint={statsPointsHint(text, stats.matchesPlayed > 0, ranking.points)}
               />
               {/* La part de parcours ne s'affiche que si un tournoi clos l'a
                   fait bouger : une tuile à zéro sur la fiche d'une équipe qui
@@ -260,9 +289,9 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
                   **déjà** dans la cote au-dessus, d'où le signe explicite. */}
               {ranking.placementPoints !== 0 && (
                 <Tile
-                  label={RANKING_PLACEMENT_LABEL}
+                  label={text.t("ranking.placementLabel")}
                   value={formatDiff(ranking.placementPoints)}
-                  hint={RANKING_PLACEMENT_HINT}
+                  hint={text.t("ranking.placementHint")}
                 />
               )}
             </>
@@ -270,28 +299,28 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
         </div>
       </Group>
 
-      <Group id="stats-bilan" title="Bilan des matchs">
+      <Group id="stats-bilan" title={text.t("group.matches")}>
         <div className={s.grid}>
-          <Tile label="Matchs joués" value={stats.matchesPlayed} />
-          <Tile label="Victoires" value={stats.matchesWon} />
-          <Tile label="Défaites" value={stats.matchesLost} loss />
+          <Tile label={text.t("tile.matchesPlayed")} value={stats.matchesPlayed} />
+          <Tile label={text.t("tile.wins")} value={stats.matchesWon} />
+          <Tile label={text.t("tile.losses")} value={stats.matchesLost} loss />
           {/* Les nuls ne s'affichent que s'il y en a : ils n'existent que dans un
               mode et un seul, et une tuile à zéro sur toutes les autres fiches
               poserait une question que rien n'y répond. */}
           {stats.matchesDrawn > 0 && (
-            <Tile label="Nuls" value={stats.matchesDrawn} hint="aucun vainqueur" />
+            <Tile label={text.t("tile.draws")} value={stats.matchesDrawn} hint={text.t("tile.drawsHint")} />
           )}
-          <Tile label="Ratio de victoires" value={formatRate(stats.winRate)} />
+          <Tile label={text.t("tile.winRate")} value={statsRate(text, stats.winRate)} />
           <Tile
-            label="Maps"
+            label={text.t("tile.maps")}
             value={`${stats.mapsWon} / ${stats.mapsLost}`}
-            hint={`Diff. ${formatDiff(stats.mapDiff)} · ${formatRate(stats.mapWinRate)}`}
+            hint={text.t("tile.mapsHint", { diff: formatDiff(stats.mapDiff), rate: statsRate(text, stats.mapWinRate) })}
           />
         </div>
       </Group>
 
       <div className={s.columns}>
-        <Group id="stats-forme" title="Forme récente">
+        <Group id="stats-forme" title={text.t("group.form")}>
           {stats.form.length > 0 ? (
             <div className={s.formRow}>
               {/* `role="list"` n'est pas redondant : Safari retire le rôle d'une
@@ -299,75 +328,80 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
               <ul // NOSONAR S6822 — Safari retire le rôle d'une liste sans puces
                 className={`native-list ${s.form}`}
                 role="list"
-                aria-label={`${stats.form.length} derniers résultats, du plus récent au plus ancien`}
+                aria-label={text.t("form.listLabel", { count: stats.form.length })}
               >
                 {stats.form.map((result, index) => {
-                  // « D » désigne déjà la **défaite** sur ces pastilles : un nul
-                  // porte donc « N », faute de quoi les deux issues se liraient
-                  // sous la même lettre.
-                  const { label, letter, tone } = FORM_BADGES[result];
+                  // « D » désigne déjà la **défaite** sur ces pastilles en
+                  // français : un nul porte donc « N », faute de quoi les deux
+                  // issues se liraient sous la même lettre (en anglais : W / L / D).
+                  const badge = FORM_BADGES[result];
+                  const label = text.t(badge.label);
 
                   return (
                     <li
                       key={`${result}-${index}`}
-                      className={`${s.formBadge} ${tone}`}
+                      className={`${s.formBadge} ${badge.tone}`}
                       aria-label={label}
                       title={label}
                     >
-                      <span aria-hidden="true">{letter}</span>
+                      <span aria-hidden="true">{text.t(badge.letter)}</span>
                     </li>
                   );
                 })}
               </ul>
-              <span className={s.splitValue}>{formatStreak(stats.currentStreak)}</span>
+              <span className={s.splitValue}>{statsStreak(text, stats.currentStreak)}</span>
             </div>
           ) : (
-            <p className={s.empty}>Aucun match terminé pour le moment.</p>
+            <p className={s.empty}>{noFinishedMatch}</p>
           )}
           <div className={s.grid} style={{ marginTop: 14 }}>
-            <Tile label="Meilleure série" value={stats.bestWinStreak} hint="victoires consécutives" />
-            <Tile label="Pire série" value={stats.worstLossStreak} hint="défaites consécutives" />
+            <Tile label={text.t("tile.bestStreak")} value={stats.bestWinStreak} hint={text.t("tile.bestStreakHint")} />
+            <Tile label={text.t("tile.worstStreak")} value={stats.worstLossStreak} hint={text.t("tile.worstStreakHint")} />
             <Tile
-              label="Forfaits"
+              label={text.t("tile.forfeits")}
               value={`${stats.forfeitsGiven} / ${stats.forfeitsReceived}`}
-              hint="donnés / reçus"
+              hint={text.t("tile.forfeitsHint")}
             />
           </div>
         </Group>
 
         <div>
-          <Group id="stats-jeux" title="Répartition par jeu">
-            <SplitBars splits={stats.byGame} emptyLabel="Aucun match terminé pour le moment." />
+          <Group id="stats-jeux" title={text.t("group.byGame")}>
+            <SplitBars splits={stats.byGame} table="game" panel={panel} />
           </Group>
           <div style={{ marginTop: 22 }}>
-            <Group id="stats-formats" title="Répartition par format">
-              <SplitBars splits={stats.byFormat} emptyLabel="Aucun match terminé pour le moment." />
+            <Group id="stats-formats" title={text.t("group.byFormat")}>
+              <SplitBars splits={stats.byFormat} table="formatShort" panel={panel} />
             </Group>
           </div>
         </div>
       </div>
 
-      <Group id="stats-adversaires" title="Adversaires">
+      <Group id="stats-adversaires" title={text.t("group.opponents")}>
         <div className={s.opponents}>
           <OpponentCard
-            title="Adversaire favori"
+            title={text.t("opponent.favourite")}
             opponent={stats.favouriteOpponent}
-            emptyLabel="Aucune victoire enregistrée."
+            emptyLabel={text.t("opponent.favouriteEmpty")}
+            text={text}
           />
           <OpponentCard
-            title="Bête noire"
+            title={text.t("opponent.nemesis")}
             opponent={stats.nemesis}
-            emptyLabel="Aucune défaite enregistrée."
+            emptyLabel={text.t("opponent.nemesisEmpty")}
+            text={text}
           />
         </div>
       </Group>
 
-      <Group id="stats-activite" title="Activité des 12 derniers mois">
-        <ActivityChart stats={stats} />
+      <Group id="stats-activite" title={text.t("group.activity")}>
+        <ActivityChart stats={stats} panel={panel} />
         {hasPlayed && stats.firstMatchAt && stats.lastMatchAt ? (
           <p className={s.tileHint} style={{ marginTop: 10 }}>
-            Premier match le {formatLocalDate(stats.firstMatchAt)} · dernier match le{" "}
-            {formatLocalDate(stats.lastMatchAt)}
+            {text.t("activity.firstLast", {
+              first: formatLocalDate(stats.firstMatchAt, locale),
+              last: formatLocalDate(stats.lastMatchAt, locale),
+            })}
           </p>
         ) : null}
       </Group>

@@ -27,6 +27,12 @@ export const LOCALE_HEADER = "x-bg-locale";
 /** Fuseau de tout formatage de date (`next-intl`), quelle que soit la langue. */
 export const SITE_TIME_ZONE = "Europe/Paris";
 
+/**
+ * Étiquette BCP 47 des formats de date et de nombre (`Intl`, `toLocale*`) de
+ * chaque langue — orthographe américaine, comme {@link OPEN_GRAPH_LOCALE}.
+ */
+export const INTL_LOCALE: Readonly<Record<Locale, string>> = { fr: "fr-FR", en: "en-US" };
+
 /** Valeur `og:locale` de chaque langue. */
 export const OPEN_GRAPH_LOCALE: Readonly<Record<Locale, string>> = { fr: "fr_FR", en: "en_US" };
 

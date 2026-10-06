@@ -1,0 +1,28 @@
+{
+  "format": {
+    "SINGLE": "Simple élimination",
+    "DOUBLE": "Double élimination",
+    "SWISS": "Ronde suisse",
+    "SURVIVAL": "Survie par coupes",
+    "MULTI": "Multi-phases",
+    "BG_SURVIE": "BlueGenji Survie"
+  },
+  "formatShort": {
+    "SINGLE": "Simple élim.",
+    "DOUBLE": "Double élim.",
+    "SWISS": "Ronde suisse",
+    "SURVIVAL": "Survie par coupes",
+    "MULTI": "Multi-phases",
+    "BG_SURVIE": "BlueGenji Survie"
+  },
+  "game": {
+    "OW": "Overwatch",
+    "MR": "Marvel Rivals"
+  },
+  "state": {
+    "UPCOMING": "Prochainement",
+    "REGISTRATION": "Inscriptions ouvertes",
+    "RUNNING": "En cours",
+    "FINISHED": "Terminé"
+  }
+}

@@ -1,30 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useTransition, type MouseEvent } from "react";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import { useLocaleHref, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { RANKING_MAX_SHOWN, rankingRowId } from "@/lib/shared/ranking-page";
+import { rankingMoreText, type RankingMoreMessages, type RankingMoreText } from "@/lib/shared/ranking-text";
 import styles from "./page.module.css";
 
 type RankingMoreProps = {
   /** Lignes affichées (= rang de la dernière). */
   shown: number;
-  /** Page suivante (`?n=` + ancre), `null` quand tout est affiché ou le plafond atteint. */
+  /** Page suivante (`?n=` + ancre, sans préfixe de langue), `null` quand tout est affiché ou le plafond atteint. */
   href: string | null;
   /** Il reste des équipes au-delà des lignes affichées (même au plafond). */
   hasMore: boolean;
+  /**
+   * Textes du bouton, dans la langue de la page — seul espace de `ranking` qui
+   * voyage jusqu'au navigateur (`docs/features/I18N.md` § Classement).
+   */
+  messages: RankingMoreMessages;
 };
 
 /** Ce qui suit les lignes affichées : une page de plus, la fin, ou le plafond. */
 export type RankingMoreState = "more" | "end" | "capped";
 
 /** Le plafond atteint, dit à l'écran comme à la lecture vocale. */
-export const RANKING_CAP_NOTE = `Affichage limité aux ${RANKING_MAX_SHOWN} premières équipes.`;
+export function rankingCapNote(text: RankingMoreText): string {
+  // Chaîne, et non nombre : `{max}` reste « 1000 » dans les deux langues, comme avant.
+  return text.t("capped", { max: String(RANKING_MAX_SHOWN) });
+}
 
 /** Texte annoncé après un ajout — exporté pour les tests. */
-export function rankingAddedMessage(added: number, state: RankingMoreState): string {
-  const count = added === 1 ? "1 équipe ajoutée." : `${added} équipes ajoutées.`;
-  if (state === "end") return `${count} Fin du classement.`;
-  if (state === "capped") return `${count} ${RANKING_CAP_NOTE}`;
+export function rankingAddedMessage(text: RankingMoreText, added: number, state: RankingMoreState): string {
+  const count = text.t("added", { count: added });
+  if (state === "end") return `${count} ${text.t("end")}`;
+  if (state === "capped") return `${count} ${rankingCapNote(text)}`;
   return count;
 }
 
@@ -38,8 +48,11 @@ export function rankingAddedMessage(added: number, state: RankingMoreState): str
  * Toujours rendu sous le tableau, même sans page suivante : la région vivante
  * doit exister avant l'annonce, et l'état survit au rafraîchissement.
  */
-export function RankingMore({ shown, href, hasMore }: Readonly<RankingMoreProps>) {
-  const router = useRouter();
+export function RankingMore({ shown, href, hasMore, messages }: Readonly<RankingMoreProps>) {
+  const router = useLocaleRouter();
+  const locale = useAppLocale();
+  const toLocale = useLocaleHref();
+  const text = useMemo(() => rankingMoreText(locale, messages), [locale, messages]);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const from = useRef<number | null>(null);
@@ -52,8 +65,8 @@ export function RankingMore({ shown, href, hasMore }: Readonly<RankingMoreProps>
     if (start === null || shown <= start) return;
     from.current = null;
     document.getElementById(rankingRowId(start + 1))?.focus();
-    setMessage(rankingAddedMessage(shown - start, state));
-  }, [shown, state]);
+    setMessage(rankingAddedMessage(text, shown - start, state));
+  }, [shown, state, text]);
 
   function onClick(event: MouseEvent<HTMLAnchorElement>) {
     // Nouvel onglet, fenêtre, téléchargement : le navigateur s'en charge.
@@ -69,11 +82,11 @@ export function RankingMore({ shown, href, hasMore }: Readonly<RankingMoreProps>
     <div className={styles.more}>
       <output className="sr-only">{message}</output>
       {href ? (
-        <a href={href} className={styles.moreLink} onClick={onClick} aria-disabled={pending || undefined}>
-          {pending ? "Chargement…" : "Afficher plus"}
+        <a href={toLocale(href)} className={styles.moreLink} onClick={onClick} aria-disabled={pending || undefined}>
+          {pending ? text.t("loading") : text.t("showMore")}
         </a>
       ) : null}
-      {state === "capped" ? <p className={styles.moreNote}>{RANKING_CAP_NOTE}</p> : null}
+      {state === "capped" ? <p className={styles.moreNote}>{rankingCapNote(text)}</p> : null}
     </div>
   );
 }

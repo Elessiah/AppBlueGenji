@@ -1,0 +1,80 @@
+{
+  "group": {
+    "record": "Track record",
+    "matches": "Match record",
+    "form": "Recent form",
+    "byGame": "By game",
+    "byFormat": "By format",
+    "opponents": "Opponents",
+    "activity": "Activity over the last 12 months"
+  },
+  "tile": {
+    "tournamentsPlayed": "Tournaments played",
+    "upcomingEntries": "+ {count, plural, one {# upcoming entry} other {# upcoming entries}}",
+    "tournamentsWon": "Tournaments won",
+    "podiums": "Podiums",
+    "podiumsHint": "Top 3",
+    "bestRank": "Best placement",
+    "averageRank": "Average placement",
+    "sitePosition": "Site ranking",
+    "sitePositionValue": "#{position}",
+    "sitePositionHint": "{total, plural, one {out of {totalText} team} other {out of {totalText} teams}}",
+    "noMatchPlayed": "No matches played",
+    "matchesPlayed": "Matches played",
+    "wins": "Wins",
+    "losses": "Losses",
+    "draws": "Draws",
+    "drawsHint": "no winner",
+    "winRate": "Win rate",
+    "maps": "Maps",
+    "mapsHint": "Diff. {diff} · {rate}",
+    "bestStreak": "Best streak",
+    "bestStreakHint": "wins in a row",
+    "worstStreak": "Worst streak",
+    "worstStreakHint": "losses in a row",
+    "forfeits": "Forfeits",
+    "forfeitsHint": "given / received"
+  },
+  "ranking": {
+    "pointsLabel": "Ranking points",
+    "pointsHint": "Base {base} · the more unlikely the win, the more it pays · final tournament placements hand out points too (floor {floor})",
+    "placementLabel": "Placement points",
+    "placementHint": "included in the rating · final tournament placements",
+    "unrankedHint": "No matches played: starting rating",
+    "placementOnlyHint": "No matches played · rating from tournament placements"
+  },
+  "form": {
+    "listLabel": "{count, plural, one {Last result} other {Last # results}}, most recent first",
+    "win": "Win",
+    "loss": "Loss",
+    "draw": "Draw",
+    "winLetter": "W",
+    "lossLetter": "L",
+    "drawLetter": "D"
+  },
+  "streak": {
+    "none": "No streak",
+    "draw": "Streak broken by a draw",
+    "wins": "{count, plural, one {# win} other {# wins}} in a row",
+    "losses": "{count, plural, one {# loss} other {# losses}} in a row"
+  },
+  "rate": "{value}%",
+  "record": "{won}W / {lost}L",
+  "recordWithDraws": "{won}W / {drawn}D / {lost}L",
+  "noFinishedMatch": "No finished matches yet.",
+  "splitLabel": "{label}: won {won} of {played}",
+  "opponent": {
+    "favourite": "Favorite opponent",
+    "favouriteEmpty": "No wins recorded.",
+    "nemesis": "Nemesis",
+    "nemesisEmpty": "No losses recorded.",
+    "meetings": "{count, plural, one {# meeting} other {# meetings}} · {record}"
+  },
+  "activity": {
+    "chartLabel": "Activity over the last {months} months: {played, plural, one {# match} other {# matches}} played in total",
+    "barTitle": "{month} {year}: {played, plural, one {# match} other {# matches}}, {won, plural, one {# win} other {# wins}}",
+    "legendPlayed": "Matches played",
+    "legendWon": "Wins",
+    "firstLast": "First match on {first} · last match on {last}"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "meta": {
+    "title": "Team ranking",
+    "description": "The BlueGenji Esport team ranking: every team's rating, podium, record and recent form, overall or by game (Overwatch, Marvel Rivals).",
+    "shareDescription": "Who's on top? The team ranking of the BlueGenji scene."
+  },
+  "breadcrumb": {
+    "home": "Home",
+    "ranking": "Ranking"
+  },
+  "hero": {
+    "eyebrow": "COMPETITION · RANKING"
+  },
+  "board": {
+    "heading": "Team ranking",
+    "filtersLabel": "Filter by game",
+    "filter": {
+      "all": "Overall",
+      "ow": "Overwatch",
+      "mr": "Marvel Rivals"
+    },
+    "empty": "No ranked teams yet: the first match will kick things off.",
+    "unavailable": "The ranking is temporarily unavailable. Try again in a moment.",
+    "podiumLabel": "Podium",
+    "place": {
+      "first": "1st place",
+      "second": "2nd place",
+      "third": "3rd place"
+    },
+    "teamLinkTitle": "View {team}'s profile",
+    "pointsUnit": "pts",
+    "record": {
+      "wins": "{count} W",
+      "losses": "{count} L",
+      "draws": "{count} D"
+    },
+    "formLabel": "Form",
+    "trendLabel": "7-day",
+    "trend": {
+      "up": "Up {value} over 7 days",
+      "down": "Down {value} over 7 days",
+      "flat": "Steady over 7 days"
+    },
+    "formNone": "No recent results",
+    "formSpoken": "Recent form, most recent first: {results}",
+    "formLetter": {
+      "w": "W",
+      "l": "L",
+      "d": "D"
+    },
+    "gap": {
+      "leader": "Top of the ranking",
+      "tiedWithLeader": "Tied with the leader",
+      "behindLeader": "{leaderGap} pts behind the leader",
+      "behindLeaderTiedAbove": "{leaderGap} pts behind the leader · tied with the rank above",
+      "behindLeaderAndAbove": "{leaderGap} pts behind the leader · {gap} behind the rank above"
+    },
+    "tableLabel": "Team ranking table",
+    "tableLabelAfterPodium": "Team ranking table, from 4th place",
+    "column": {
+      "rank": "Rank",
+      "team": "Team",
+      "points": "Rating",
+      "wins": "W",
+      "losses": "L",
+      "draws": "D",
+      "form": "Form",
+      "trend": "7 days",
+      "trendShort": "7-day"
+    }
+  },
+  "more": {
+    "loading": "Loading…",
+    "showMore": "Show more",
+    "capped": "Showing the top {max} teams only.",
+    "added": "{count, plural, one {# team added.} other {# teams added.}}",
+    "end": "End of the ranking."
+  },
+  "how": {
+    "title": "How the rating works",
+    "base": "<b>{base} pts</b> to start, for every team: a team with no matches sits at this rating, neither ahead nor behind.",
+    "match": "<b>Every match</b> moves points from the loser to the winner — a lot for an unlikely win, almost nothing for an expected one.",
+    "score": "<b>The score</b> matters too: a win without dropping a map (3-0, 2-0) moves up to {marginMax} times the points of a hard-fought win (3-2, 2-1) — as much gained by the winner, as much lost by the loser. A single-map match and a forfeit count as a plain win.",
+    "placement": "<b>Final placement</b> in a tournament also hands out points, more so when the field was strong. Floor at {floor} pts."
+  },
+  "cta": {
+    "register": "Sign my team up for a tournament →",
+    "rules": "Read the rules"
+  }
+}
