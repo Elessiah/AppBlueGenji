@@ -276,3 +276,19 @@ describe("détail map par map — ligne vierge ajoutée et refus corrigé ailleu
     expect(update.slice(0, update.indexOf("};"))).toContain("fieldErrors.clear();");
   });
 });
+
+describe("détail map par map — steppers verrouillés et libellé de confirmation", () => {
+  it("les steppers verrouillés par les maps disent pourquoi, et comment reprendre la main", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    expect(dialog).toContain("return mapCount > 0 && !mapsSetAside ? DERIVED_SCORE_HINT_ID : undefined;");
+    expect(dialog.match(/describedBy=\{derivedHintId\}/g)).toHaveLength(2);
+    expect(dialog).toContain("retire toutes les maps pour le saisir à la main.");
+    const stepper = readSource("app/(secured)/tournois/[id]/_components/ScoreStepper.tsx");
+    expect(stepper).toContain("aria-describedby={describedBy}");
+  });
+
+  it("« Confirmer le score » ne se confond pas avec « Confirmer le forfait de … »", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog).toContain('const submitLabel = confirmsAsIs ? "Confirmer le score" : "Envoyer le score";');
+  });
+});
