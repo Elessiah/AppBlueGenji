@@ -116,10 +116,10 @@ describe("service worker du site", () => {
   });
 
   it("à l'activation, efface ses anciennes versions et elles seules", async () => {
-    const worker = loadWorker([], { cacheNames: ["bg-offline-v0", "bg-offline-v1", "autre-cache"] });
+    const worker = loadWorker([], { cacheNames: ["bg-offline-v0", "bg-offline-v1", "bg-offline-v2", "autre-cache"] });
     worker.fire("activate", {});
     await Promise.all(worker.waited);
-    expect(worker.caches.delete.mock.calls.map(([name]) => name)).toEqual(["bg-offline-v0"]);
+    expect(worker.caches.delete.mock.calls.map(([name]) => name)).toEqual(["bg-offline-v0", "bg-offline-v1"]);
     expect(worker.enablePreload).toHaveBeenCalled();
     expect(worker.self.clients.claim).toHaveBeenCalled();
   });
@@ -157,7 +157,7 @@ describe("service worker du site", () => {
     });
     worker.fire("fetch", { request: { mode: "navigate" } });
     expect(await worker.responded[0]).toBe(OFFLINE_PAGE);
-    expect(worker.caches.match).toHaveBeenCalledWith("/offline.html", { cacheName: "bg-offline-v1" });
+    expect(worker.caches.match).toHaveBeenCalledWith("/offline.html", { cacheName: "bg-offline-v2" });
   });
 
   it("sans réseau ni page en cache, rend l'échec d'origine", async () => {
