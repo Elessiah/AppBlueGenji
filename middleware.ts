@@ -239,6 +239,13 @@ function guardApiRequest(request: NextRequest) {
  * viserait une route inexistante (404 mis en cache, navigation client cassée).
  * Les `rewrites` passent **après** le middleware : c'est lui qui refuse
  * `/en/api/…` (404) avant qu'elles ne le voient.
+ *
+ * Elle couvre `/en` dans **toutes ses casses** (`/EN`, `/En`…) : le motif des
+ * `rewrites` ignore la casse, celui du `matcher` non. Écrite `/en/:path*`, un
+ * préchargement de `/EN/…` échappait aux trois entrées, gardait le
+ * `x-bg-locale: en` forgé par le client et était réécrit sans passer par
+ * {@link localeGate} (revue de sécurité de la PR #415). Vu ici, il est marqué
+ * `fr` — `/EN` n'est pas un préfixe de langue — et n'est pas réécrit.
  */
 export const config = {
   matcher: [
@@ -250,6 +257,6 @@ export const config = {
       ],
     },
     "/api/:path*",
-    "/en/:path*",
+    "/:prefix([eE][nN])/:path*",
   ],
 };
