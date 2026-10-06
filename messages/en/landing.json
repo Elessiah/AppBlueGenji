@@ -24,9 +24,9 @@
   "countdown": {
     "pending": "Loading countdown",
     "imminent": "Starting any moment",
-    "daysHours": "Starts in {d, plural, one {# day} other {# days}} {h, plural, one {# hour} other {# hours}}",
-    "hoursMinutes": "Starts in {h, plural, one {# hour} other {# hours}} {m, plural, one {# minute} other {# minutes}}",
-    "minutesSeconds": "Starts in {m, plural, one {# minute} other {# minutes}} {s, plural, one {# second} other {# seconds}}",
+    "daysHours": "Starts in {d, plural, one {# day} other {# days}} and {h, plural, one {# hour} other {# hours}}",
+    "hoursMinutes": "Starts in {h, plural, one {# hour} other {# hours}} and {m, plural, one {# minute} other {# minutes}}",
+    "minutesSeconds": "Starts in {m, plural, one {# minute} other {# minutes}} and {s, plural, one {# second} other {# seconds}}",
     "seconds": "Starts in {s, plural, one {# second} other {# seconds}}",
     "unit": {
       "d": "D",
@@ -136,7 +136,7 @@
     "winLoss": "W–L",
     "points": "PTS",
     "trend": "Trend",
-    "trendShort": "TR",
+    "trendShort": "±",
     "empty": "No ranked teams yet.",
     "fullRanking": "VIEW FULL RANKINGS →"
   },
