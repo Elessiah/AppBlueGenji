@@ -200,6 +200,12 @@ describe("détail map par map — saisie du code et confirmation sans détail", 
 
   it("saisir au même score une proposition sans détail la confirme, comme le serveur la compare", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain("const confirmsAsIs = confirmsTheirs && (theirMaps.length === 0 || sameMapLists(maps, theirMaps));");
+    expect(dialog).toContain("const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? [], detailLoading);");
+    expect(dialog).toContain("if (theirMaps.length === 0) return !detailLoading;");
+  });
+
+  it("un détail adverse encore en lecture ne fait pas de l'envoi une confirmation (pas de faux PROPOSAL_STALE)", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(dialog.indexOf("const detailLoading = ")).toBeLessThan(dialog.indexOf("const confirmsAsIs ="));
   });
 });
