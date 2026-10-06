@@ -6,7 +6,8 @@ import { readSource } from "../helpers/read-source";
  * Podium de `/equipes` : le numéro de rang (« 01 », « 02 », « 03 ») en police
  * d'affichage dépasse 44 px. Une largeur fixe le faisait déborder sur le nom,
  * et le premier rang, peint par `background-clip: text`, perdait son « 1 »
- * (le dégradé ne couvre que la boîte). La largeur est un plancher, jamais fixe.
+ * (le dégradé ne couvre que la boîte). La largeur est un plancher, jamais fixe,
+ * et ce plancher (60 px) aligne les noms des cartes empilées.
  */
 
 const SHEETS: Array<[file: string, selector: string]> = [
@@ -24,7 +25,7 @@ function ruleBody(file: string, selector: string): string {
 describe("numéro de rang du podium", () => {
   it.each(SHEETS)("%s %s : largeur plancher, sans retour à la ligne", (file, selector) => {
     const body = ruleBody(file, selector);
-    expect(body).toMatch(/(?:^|[;\s])min-width:\s*44px/);
+    expect(body).toMatch(/(?:^|[;\s])min-width:\s*60px/);
     expect(body).not.toMatch(/(?:^|[;\s])width:/);
     expect(body).toMatch(/white-space:\s*nowrap/);
   });
