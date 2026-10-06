@@ -21,6 +21,9 @@ rendu :
 
 Pour un visiteur, `EditableCopy` rend ses enfants **tels quels** — aucun
 wrapper, aucune classe en plus. Le crayon n'existe que pour un éditeur.
+À la fermeture de l'éditeur (enregistrer, rétablir, annuler), le focus revient
+au crayon ; crayon et éditeur sont `position: relative` pour passer au-dessus
+des calques décoratifs absolus d'un en-tête (trame, aurore).
 
 ## Stockage
 
