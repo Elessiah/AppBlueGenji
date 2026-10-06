@@ -31,11 +31,21 @@ describe("stockage map par map (bg_match_maps)", () => {
     expect(flat(execute.mock.calls[0][0])).toBe("SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE");
     expect(flat(execute.mock.calls[1][0])).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?");
     expect(execute.mock.calls[1][1]).toEqual([10, "TEAM2"]);
-    expect(flat(execute.mock.calls[2][0])).toMatch(/^INSERT INTO bg_match_maps .* VALUES \(\?, \?, \?, \?, \?, \?, \?\), \(\?, \?, \?, \?, \?, \?, \?\)$/);
+    expect(flat(execute.mock.calls[2][0])).toMatch(/^INSERT INTO bg_match_maps .* VALUES \(\?, \?, \?, \?, \?, \?, \?\), \(\?, \?, \?, \?, \?, \?, \?\) ON DUPLICATE KEY UPDATE /);
     expect(execute.mock.calls[2][1]).toEqual([
       10, "TEAM2", 1, "AAA111", 2, 1, 7,
       10, "TEAM2", 2, "BBB222", 0, 0, 7,
     ]);
+  });
+
+  it("premier report (jeu connu vide) : insertion seule, sans lecture verrouillante d'un intervalle vide", async () => {
+    const { execute, connection } = conn();
+    await replaceMatchMaps(connection, 10, "TEAM1", [{ replayCode: "AAA111", team1Score: 1, team2Score: 0 }], 7, {
+      knownEmpty: true,
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(flat(execute.mock.calls[0][0])).toMatch(/^INSERT INTO bg_match_maps .* ON DUPLICATE KEY UPDATE /);
+    expect(execute.mock.calls.some(([sql]) => /FOR UPDATE/.test(String(sql)))).toBe(false);
   });
 
   it("une liste vide efface seulement", async () => {

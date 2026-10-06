@@ -397,3 +397,11 @@ describe("détail map par map — formulaire vierge", () => {
     expect(dialog).not.toContain("disabled={maps.length === 0 ||");
   });
 });
+
+describe("détail map par map — premier report sans verrou d'intervalle", () => {
+  it("le report d'une engagée sans report antérieur n'efface rien avant d'insérer", () => {
+    const scoring = readSource("lib/server/tournaments/scoring.ts");
+    expect(scoring).toContain("const hadReport = (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;");
+    expect(scoring).toContain("await replaceMatchMaps(connection, matchId, reporterSource, maps, userId, { knownEmpty: !hadReport });");
+  });
+});
