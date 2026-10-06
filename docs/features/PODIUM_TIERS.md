@@ -28,7 +28,7 @@ Jamais deux podiums qui se contredisent.
 | Étape | Où |
 |---|---|
 | Règles pures (marches, membres, plus haute marche, classes) | `lib/shared/podium-tiers.ts` |
-| Chargement : classement « Général » + **une** requête (`bg_team_members` actifs des trois équipes, `left_at IS NULL`) | `lib/server/podium-tiers.ts` (`loadPodiumTiers`) |
+| Chargement : classement « Général » + **une** requête (`bg_team_members` actifs des trois équipes, `left_at IS NULL`, comptes supprimés exclus — une carte anonymisée de `/joueurs` reste sans marche, nom d'équipe compris) | `lib/server/podium-tiers.ts` (`loadPodiumTiers`) |
 | Cache | `cachedRanking("podium-tiers")` : même durée (60 s) et **même invalidation** que le classement — tout score qui tombe l'oublie (`invalidateTeamRanking`) |
 | Remise au client | `app/layout.tsx` → `<PodiumTiersProvider>` (`components/podium-tiers.tsx`) : aucune requête par lien |
 
