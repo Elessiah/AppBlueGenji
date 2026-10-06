@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   COMMON_RULES,
+  RULE_MODE_DEFINITIONS,
+  RULE_MODE_LABELS_FR,
   TOURNAMENT_RULE_MODES,
   availableRuleModes,
   ruleModeBySlug,
@@ -199,4 +201,25 @@ describe("tournament-rules — règle de seeding", () => {
       expect(bodies.map(plain)).toContain(seeding);
     }
   });
+});
+
+/**
+ * Le bouton d'aide des pages de tournoi est un composant client : il ne doit
+ * pas embarquer `messages/fr/rules.json` (≈ 38 Ko) pour un seul libellé.
+ */
+describe("bouton d'aide — structure sans texte", () => {
+  it("n'importe que le module de structure, pas le registre de textes", () => {
+    const fab = readFileSync(join(process.cwd(), "components/rules/RulesHelpFab.tsx"), "utf8");
+    expect(fab).toContain("@/lib/shared/rule-mode-definitions");
+    expect(fab).not.toContain("@/lib/shared/tournament-rules");
+    const definitions = readFileSync(join(process.cwd(), "lib/shared/rule-mode-definitions.ts"), "utf8");
+    expect(definitions).not.toMatch(/from\s+["'][^"']*\.json["']/);
+  });
+
+  it("garde les noms français du bouton identiques aux messages", () => {
+    for (const definition of RULE_MODE_DEFINITIONS) {
+      expect(RULE_MODE_LABELS_FR[definition.format]).toBe(frRules.modes[definition.format].label);
+    }
+  });
+
 });
