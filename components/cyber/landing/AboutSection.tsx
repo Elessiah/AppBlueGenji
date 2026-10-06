@@ -37,7 +37,7 @@ export function AboutSection({ stats, pillars, isAdmin, copy, locale = DEFAULT_L
             <h2 className={styles.sectionTitle}>{copy["home.about.title"]}</h2>
           </EditableCopy>
         </div>
-        <div className={styles.meta}>{t("about.meta", { year: String(ORGANIZATION_FOUNDING_YEAR) })}</div>
+        <div className={styles.meta}>{t("about.meta", { year: ORGANIZATION_FOUNDING_YEAR })}</div>
       </div>
 
       <div className={styles.grid}>

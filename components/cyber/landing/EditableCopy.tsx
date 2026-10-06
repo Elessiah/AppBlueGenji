@@ -46,6 +46,36 @@ interface EditableCopyProps {
 
 type CopyLang = "fr" | "en";
 
+export type SiteCopySubmitOutcome = { ok: true } | { ok: false; code: string; fallback: string };
+
+/**
+ * Envoi d'une édition bilingue. Un anglais vide est refusé **avant** l'envoi
+ * (`COPY_EN_EMPTY`, comme le serveur) ; un refus du serveur rend son code ; un
+ * échec réseau, aucun code (aucun champ n'y peut rien).
+ */
+export async function submitSiteCopy(
+  fetcher: typeof fetch,
+  key: SiteCopyKey,
+  fr: string,
+  en: string,
+): Promise<SiteCopySubmitOutcome> {
+  if (en.trim().length === 0) {
+    return { ok: false, code: "COPY_EN_EMPTY", fallback: SITE_COPY_ERROR_MESSAGES.COPY_EN_EMPTY };
+  }
+  try {
+    const res = await fetcher("/api/site-copy", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key, value: fr, valueEn: en }),
+    });
+    if (res.ok) return { ok: true };
+    const payload = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, code: payload.error ?? "", fallback: "Échec de l'enregistrement." };
+  } catch {
+    return { ok: false, code: "", fallback: "Erreur réseau, réessaye." };
+  }
+}
+
 /**
  * Texte de la vitrine éditable en place par le staff `showcase`.
  *
@@ -94,28 +124,16 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   };
 
   const save = async () => {
-    // Contrôle avant l'envoi : le serveur refuserait de même (`COPY_EN_EMPTY`).
-    if (draftEn.trim().length === 0) {
-      refuse("COPY_EN_EMPTY", SITE_COPY_ERROR_MESSAGES.COPY_EN_EMPTY);
-      return;
-    }
     setBusy(true);
     try {
-      const res = await fetch("/api/site-copy", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ key: copyKey, value: draft, valueEn: draftEn }),
-      });
-      const payload = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        refuse(payload.error ?? "", "Échec de l'enregistrement.");
+      const outcome = await submitSiteCopy(fetch, copyKey, draft, draftEn);
+      if (!outcome.ok) {
+        refuse(outcome.code, outcome.fallback);
         return;
       }
       showSuccess("Texte mis à jour.", staffLang ? { lang: staffLang } : undefined);
       closeEditor();
       router.refresh();
-    } catch {
-      refuse("", "Erreur réseau, réessaye.");
     } finally {
       setBusy(false);
     }
