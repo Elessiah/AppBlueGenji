@@ -50,7 +50,9 @@ function buildFormats(tag: string): BoardFormats {
     year: new Intl.DateTimeFormat(tag, { year: "numeric", timeZone: BOARD_TIME_ZONE }),
     day: new Intl.DateTimeFormat(tag, { day: "numeric", month: "short", timeZone: BOARD_TIME_ZONE }),
     dayYear: new Intl.DateTimeFormat(tag, { day: "numeric", month: "short", year: "numeric", timeZone: BOARD_TIME_ZONE }),
-    time: new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", timeZone: BOARD_TIME_ZONE }),
+    // 24 h dans les deux langues : « 09:00 PM » ne tient pas dans les colonnes
+    // étroites, et l'heure doit se lire comme celle du calendrier voisin.
+    time: new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: BOARD_TIME_ZONE }),
   };
 }
 

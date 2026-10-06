@@ -1,6 +1,7 @@
 import type { LandingCalendarEvent } from "@/lib/shared/landing";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import { landingServerText } from "@/lib/server/i18n-landing";
+import { BOARD_TIME_ZONE } from "@/lib/shared/landing-board";
 import { LANDING_INTL_LOCALE } from "@/lib/shared/landing-text";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import styles from "./CalendarCard.module.css";
@@ -12,11 +13,11 @@ type CalendarCardProps = {
 };
 
 function monthLabel(date: Date, tag: string): string {
-  return date.toLocaleDateString(tag, { month: "short" }).replace(".", "").toUpperCase();
+  return date.toLocaleDateString(tag, { month: "short", timeZone: BOARD_TIME_ZONE }).replace(".", "").toUpperCase();
 }
 
 function dayLabel(date: Date, tag: string): string {
-  return date.toLocaleDateString(tag, { day: "2-digit" });
+  return date.toLocaleDateString(tag, { day: "2-digit", timeZone: BOARD_TIME_ZONE });
 }
 
 // `getLandingCalendar` n'envoie plus jamais `RUNNING` ni `FINISHED` — le
@@ -65,13 +66,13 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<Calen
                     `::after` : la ligne entière mène à la fiche, et le nom
                     accessible du lien reste celui du tournoi — pas la date,
                     le jeu et l'état concaténés. */}
-                <div className={styles.title} title={date.toLocaleString(tag)}>
+                <div className={styles.title} title={date.toLocaleString(tag, { dateStyle: "medium", timeStyle: "short", hourCycle: "h23", timeZone: BOARD_TIME_ZONE })}>
                   <a className={styles.link} href={tournamentMatchHref(event.tournamentId)}>
                     {event.name}
                   </a>
                 </div>
               </div>
-              <div className={`num mono ${styles.time}`}>{date.toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</div>
+              <div className={`num mono ${styles.time}`}>{date.toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: BOARD_TIME_ZONE })}</div>
             </div>
           );
         })}

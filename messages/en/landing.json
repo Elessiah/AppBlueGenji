@@ -73,7 +73,7 @@
     "round": {
       "final": "Final",
       "semi": "Semifinal",
-      "quarter": "Quarterfinals",
+      "quarter": "Quarterfinal",
       "round": "Round {n}"
     }
   },
