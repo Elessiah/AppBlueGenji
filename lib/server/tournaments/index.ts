@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   FinishedTournamentTotals,
@@ -1199,6 +1200,9 @@ async function retryOnDeadlock(write: () => Promise<void>): Promise<void> {
       return;
     } catch (error) {
       if (!isTransactionAborted(error) || attempt >= REPORT_DEADLOCK_ATTEMPTS) throw error;
+      // Attente courte et aléatoire : deux transactions annulées ensemble ne
+      // repartent pas au même instant pour se heurter de nouveau.
+      await new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));
     }
   }
 }

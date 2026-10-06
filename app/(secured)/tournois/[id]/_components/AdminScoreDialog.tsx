@@ -125,6 +125,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const form = useScoreForm(match, {
     scoreEntryClosed,
     onMapRefusal: (field, message) => mapFieldErrors.flag(mapFieldKey(field.index, field.field), message),
+    onMapsReset: () => mapFieldErrors.clear(),
   });
   const matchFormat = useMatchFormat(match);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train

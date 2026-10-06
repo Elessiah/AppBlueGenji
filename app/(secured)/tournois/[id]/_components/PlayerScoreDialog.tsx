@@ -15,6 +15,7 @@ import {
 import {
   checkMapList,
   mapFieldKey,
+  isMapTouched,
   mapListViolationMessage,
   sameMapLists,
   type MatchMapInput,
@@ -265,7 +266,7 @@ export function PlayerScoreDialog({
   // Une saisie vide n'est pas un refus : la raison ne s'affiche qu'une fois
   // une map **renseignée** — une ligne vierge qu'on vient d'ajouter n'appelle
   // pas encore de reproche.
-  const touched = maps.some((m) => m.replayCode.trim() !== "" || m.team1Score !== 0 || m.team2Score !== 0);
+  const touched = maps.some(isMapTouched);
   const showBlocker = blocker !== null && (unchangedMine || touched);
 
   return createPortal(

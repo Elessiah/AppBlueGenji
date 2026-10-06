@@ -90,6 +90,8 @@ export function mapListLimit(format: MatchFormat | null): number {
 
 /** Vainqueur d'une map : `1`, `2`, ou `null` pour une map nulle. */
 export function mapWinnerSide(map: Pick<MatchMapInput, "team1Score" | "team2Score">): 1 | 2 | null {
+  // Un score encore vide ne désigne personne.
+  if (!Number.isFinite(map.team1Score) || !Number.isFinite(map.team2Score)) return null;
   if (map.team1Score === map.team2Score) return null;
   return map.team1Score > map.team2Score ? 1 : 2;
 }
@@ -275,7 +277,7 @@ export function mapListViolationMessage(error: MapListViolation, format: MatchFo
     case "MAP_REPLAY_CODE_DUPLICATE":
       return "Ce code de replay figure déjà sur une autre map.";
     case "MAP_SCORE_INVALID":
-      return `Score de map invalide : un entier entre 0 et ${MAP_SCORE_MAX}.`;
+      return `Score de map manquant ou invalide : un entier entre 0 et ${MAP_SCORE_MAX} (0 – 0 pour une map nulle).`;
     case "MAP_AFTER_DECISION":
       return "Cette map suit la fin du match : le résultat était déjà acquis.";
     case "DRAW_NOT_ALLOWED":
@@ -292,9 +294,18 @@ function incompleteMessage(wins: number): string {
   return `Score incomplet : le vainqueur doit gagner ${wins} map${plural}.`;
 }
 
-/** Une map vierge, à ajouter en fin de liste. */
+/**
+ * Une map vierge, à ajouter en fin de liste : scores **vides** (`NaN`, rendu
+ * vide par `<NumberInput>`), jamais un 0 – 0 inventé — une map oubliée
+ * partirait sinon comme une map nulle, et passerait la validation.
+ */
 export function emptyMap(): MatchMapInput {
-  return { replayCode: "", team1Score: 0, team2Score: 0 };
+  return { replayCode: "", team1Score: Number.NaN, team2Score: Number.NaN };
+}
+
+/** La ligne porte-t-elle une saisie (code ou score) ? */
+export function isMapTouched(map: MatchMapInput): boolean {
+  return map.replayCode.trim() !== "" || Number.isFinite(map.team1Score) || Number.isFinite(map.team2Score);
 }
 
 /**

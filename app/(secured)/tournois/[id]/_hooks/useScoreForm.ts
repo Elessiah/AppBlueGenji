@@ -39,6 +39,8 @@ export function useScoreForm(
      * notification — avant l'envoi comme après un refus du serveur.
      */
     onMapRefusal?: (field: { index: number; field: MapField }, message: string) => void;
+    /** Les maps viennent d'être remplacées de l'extérieur : leurs refus ne valent plus. */
+    onMapsReset?: () => void;
   } = {},
 ) {
   const { showError, showSuccess } = useToast();
@@ -88,6 +90,7 @@ export function useScoreForm(
       setState(next);
       setMaps(nextMaps);
       manualScores.current = null;
+      options.onMapsReset?.();
       setConflict(false);
     } else if (signature !== synced.signature && !submitting) {
       // Seul un résultat **enregistré** fait conflit : une proposition
@@ -109,6 +112,7 @@ export function useScoreForm(
     setState(next);
     setMaps(nextMaps);
     manualScores.current = null;
+    options.onMapsReset?.();
     setConflict(false);
   };
 

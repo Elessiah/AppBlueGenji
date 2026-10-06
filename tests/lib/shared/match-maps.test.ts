@@ -6,6 +6,7 @@ import {
   checkMapList,
   deriveMatchScore,
   emptyMap,
+  isMapTouched,
   isValidReplayCode,
   mapListLimit,
   mapListViolationMessage,
@@ -205,5 +206,25 @@ describe("saisie et affichage", () => {
       expect(mapListViolationMessage(code, BO5, "OW").length).toBeGreaterThan(5);
     }
     expect(mapListViolationMessage("SCORE_BELOW_MATCH_FORMAT", null)).toBe("Score incomplet.");
+  });
+});
+
+describe("ligne vierge : jamais un 0 – 0 inventé", () => {
+  it("s'ouvre sur des scores vides, qui ne désignent personne", () => {
+    const blank = emptyMap();
+    expect(Number.isNaN(blank.team1Score) && Number.isNaN(blank.team2Score)).toBe(true);
+    expect(mapWinnerSide(blank)).toBeNull();
+    expect(isMapTouched(blank)).toBe(false);
+    expect(isMapTouched({ ...blank, replayCode: "A" })).toBe(true);
+    expect(isMapTouched({ ...blank, team2Score: 0 })).toBe(true);
+  });
+
+  it("une map oubliée est refusée, rattachée à son score, et non comptée nulle", () => {
+    const won = mapsFor(2, 0);
+    const maps = [won[0], { ...emptyMap(), replayCode: "FORGOT" }, won[1]];
+    expect(checkMapList(BO3, null, maps, decisive)).toMatchObject({
+      error: "MAP_SCORE_INVALID",
+      field: { index: 1, field: "team1Score" },
+    });
   });
 });
