@@ -24,6 +24,22 @@ test.describe("Langues — adresses /en", () => {
     expect(post.status()).toBe(404);
   });
 
+  // Incident du 2026-10-06 : derrière nginx (`X-Forwarded-Proto: https`), la
+  // réécriture du middleware était relayée en HTTPS vers le serveur HTTP (500).
+  // Le serveur d'E2E écoute sur `localhost`, où l'écart d'hôte ne se produit
+  // pas (`tests/app/locale-rewrites.test.ts` couvre `127.0.0.1`) : ce contrôle
+  // tient les en-têtes du mandataire sur la réponse réellement servie.
+  test("/en sous les en-têtes du mandataire TLS : 200 et lang=en", async ({ request }) => {
+    for (const path of ["/en", "/en/regles"]) {
+      const response = await request.get(path, {
+        maxRedirects: 0,
+        headers: { "x-forwarded-proto": "https", "x-forwarded-for": "203.0.113.9" },
+      });
+      expect(response.status()).toBe(200);
+      expect(await response.text()).toContain('<html lang="en"');
+    }
+  });
+
   test("aucune redirection selon Accept-Language", async ({ request }) => {
     const response = await request.get("/", { maxRedirects: 0, headers: { "accept-language": "en-US,en;q=0.9" } });
     expect(response.status()).toBe(200);

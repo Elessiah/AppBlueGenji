@@ -77,10 +77,11 @@ describe("middleware — règles traduites (vraie liste)", () => {
     process.env.APP_URL = previousAppUrl;
   });
 
-  it.each(["/en/regles", "/en/regles/survie", "/en/regles/ronde-suisse?tournoi=4"])("réécrit %s en anglais", (path) => {
+  it.each(["/en/regles", "/en/regles/survie", "/en/regles/ronde-suisse?tournoi=4"])("laisse passer %s, marqué anglais", (path) => {
     const response = middleware(new NextRequest(`https://localhost:3000${path}`));
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-middleware-rewrite")).toBe(`https://localhost:3000${path.slice(3)}`);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
     expect(response.headers.get("x-middleware-request-x-bg-locale")).toBe("en");
   });
 
