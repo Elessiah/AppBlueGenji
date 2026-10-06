@@ -99,6 +99,10 @@ describe("PrivacyChangesModal — contrats du geste", () => {
     expect(source).toContain("await record(changes.map((change) => change.id));");
   });
 
+  it("garde l'écriture en vol quand un lien d'action charge un nouveau document (changement de langue)", () => {
+    expect(source).toMatch(/fetch\("\/api\/profile\/privacy-changes", \{[\s\S]*?keepalive: true,[\s\S]*?\}\)/);
+  });
+
   it("suivre un lien d'action vaut prise de connaissance et ferme la modale sans attendre", () => {
     expect(source).toContain("onClick={() => followLink(change.id)}");
     const body = source.slice(source.indexOf("const followLink = (changeId: string) => {"));
