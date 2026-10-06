@@ -156,7 +156,11 @@ describe("textes de l'accueil — retours de revue", () => {
   const messages = (lang: "fr" | "en") =>
     JSON.parse(readFileSync(join(__dirname, "..", "..", "..", "messages", lang, "landing.json"), "utf8"));
   const fr = messages("fr") as { board: { emptyEyebrow: string }; sponsors: { count: string } };
-  const en = messages("en") as { calendar: { heading: string } };
+  const en = messages("en") as {
+    calendar: { heading: string };
+    countdown: { daysHours: string };
+    leaderboard: { trendShort: string };
+  };
 
   it("écrit le surtitre du plateau vide en français sur la page française", () => {
     expect(fr.board.emptyEyebrow).toBe("TOURNOIS");
@@ -164,6 +168,14 @@ describe("textes de l'accueil — retours de revue", () => {
 
   it("accorde le nombre de partenaires", () => {
     expect(fr.sponsors.count).toBe("{count, plural, one {# PARTENAIRE} other {# PARTENAIRES}}");
+  });
+
+  it("relie les deux unités du compte à rebours par « and »", () => {
+    expect(en.countdown.daysHours).toContain("}} and {h,");
+  });
+
+  it("n’abrège pas la tendance en « TR », qui ne veut rien dire en anglais", () => {
+    expect(en.leaderboard.trendShort).toBe("±");
   });
 
   it("dit en anglais que les heures sont celles de Paris", () => {
