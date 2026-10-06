@@ -7,6 +7,7 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
+import { matchMaxMaps, matchWinsRequired } from "@/lib/shared/match-format";
 import { mapListLimit } from "@/lib/shared/match-maps";
 import type { ReportStateCounts, TournamentDef } from "./cases";
 
@@ -231,13 +232,22 @@ export async function applyMatchMapDetails(
   // Plafond le plus serré des deux phases possibles (format à égalités, où la
   // map nulle consomme une map) : la map nulle n'est ajoutée que s'il reste
   // de la place, si bien que la liste se resaisit telle quelle.
-  const limit = mapListLimit(
-    def.matchFormat ? { ...def.matchFormat, drawsAllowed: true } : null,
-  );
+  const drawFormat = def.matchFormat ? { ...def.matchFormat, drawsAllowed: true } : null;
+  const limit = mapListLimit(drawFormat);
   for (const row of rows) {
-    const maps = seedMapSequence(Number(row.team1_score), Number(row.team2_score));
+    const team1Wins = Number(row.team1_score);
+    const team2Wins = Number(row.team2_score);
+    const maps = seedMapSequence(team1Wins, team2Wins);
+    // Clos sans vainqueur (qualification à égalités) : la map nulle consomme une
+    // map du BO, la liste couvre donc toutes les maps (`MAP_LIST_INCOMPLETE`).
+    const unfinished =
+      def.matchFormatDraws === true && drawFormat !== null && Math.max(team1Wins, team2Wins) < matchWinsRequired(drawFormat);
+    if (unfinished) {
+      while (maps.length < matchMaxMaps(drawFormat)) maps.unshift([1, 1]);
+    } else if (maps.length > 0 && Number(row.id) % 3 === 0 && maps.length < limit) {
+      maps.unshift([1, 1]);
+    }
     if (maps.length === 0) continue;
-    if (Number(row.id) % 3 === 0 && maps.length < limit) maps.unshift([1, 1]);
     const values = maps.flatMap(([t1, t2], index) => [
       Number(row.id),
       index + 1,
