@@ -230,3 +230,11 @@ describe("détail map par map — saisie du code et confirmation sans détail", 
     expect(dialog.indexOf("const detailLoading = ")).toBeLessThan(dialog.indexOf("const confirmsAsIs ="));
   });
 });
+
+describe("détail map par map — refus d'un score de map en cours de correction", () => {
+  it("vider un score de map pour le ressaisir retire le refus qui le désigne", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list).toContain("onEdit={() => fieldErrors.clear(t1Key)}");
+    expect(list).toContain("onEdit={() => fieldErrors.clear(t2Key)}");
+  });
+});
