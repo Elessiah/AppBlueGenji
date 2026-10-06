@@ -101,11 +101,11 @@ export function playerReportView(
   const theirs = iAmTeam1 ? match.team2Report : match.team1Report;
 
   // Deux propositions concordantes tranchent le match dans la même
-  // transaction : on ne les voit donc jamais ensemble sur un match ouvert.
-  // Les lire comme un conflit serait pourtant faux si la course survenait —
-  // elles s'accordent, le flux apportera le résultat.
+  // transaction : deux propositions **ensemble** sur un match ouvert se
+  // contredisent donc toujours — par le score, ou, à score égal, par le détail
+  // des maps (`MAP_SCORES.md`), que l'instantané diffusé ne porte pas.
   let phase: PlayerReportPhase;
-  if (mine && theirs) phase = sameReportedScore(mine, theirs) ? "MINE_PENDING" : "CONFLICT";
+  if (mine && theirs) phase = "CONFLICT";
   else if (mine) phase = "MINE_PENDING";
   else if (theirs) phase = "THEIRS_PENDING";
   else phase = "NONE";
@@ -206,7 +206,9 @@ export function pendingReportNotice(
 ): string | null {
   if (isMatchPlayed(match)) return null;
   const { team1Report, team2Report } = match;
-  if (team1Report && team2Report && !sameReportedScore(team1Report, team2Report)) {
+  // Deux propositions sur un match ouvert se contredisent toujours (voir
+  // `playerReportView`) — à score égal, par leurs maps.
+  if (team1Report && team2Report) {
     return "Scores contradictoires · arbitrage alerté";
   }
   const report = team1Report ?? team2Report;
