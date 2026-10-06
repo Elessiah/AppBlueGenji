@@ -25,7 +25,6 @@
 import { cookies } from "next/headers";
 import type { OAuthIntent, OAuthProvider } from "@/lib/shared/oauth-providers";
 import { isOAuthProvider } from "@/lib/shared/oauth-providers";
-import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/shared/locales";
 
 const OAUTH_COOKIE = "bg_oauth";
 /** Dix minutes : le temps de l'écran de consentement, pas une seconde de plus. */
@@ -38,12 +37,6 @@ export type OAuthStatePayload = {
   intent: OAuthIntent;
   /** Conditions d'utilisation acceptées à l'aller (case de `/connexion`). */
   termsAccepted: boolean;
-  /**
-   * Langue de la page de connexion au départ (lot 6) : un refus revient sur
-   * `/en/connexion`, une réussite sur la destination dans cette langue. Un
-   * cookie émis avant le lot 6, ou une valeur inconnue, vaut le français.
-   */
-  locale: Locale;
 };
 
 function baseCookieOptions() {
@@ -90,7 +83,6 @@ export async function consumeOAuthState(): Promise<OAuthStatePayload | null> {
       redirectTo: parsed.redirectTo,
       intent,
       termsAccepted: parsed.termsAccepted === true,
-      locale: isLocale(parsed.locale) ? parsed.locale : DEFAULT_LOCALE,
     };
   } catch {
     return null;

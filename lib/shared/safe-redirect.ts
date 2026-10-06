@@ -21,7 +21,7 @@
  * ne fait pas foi).
  */
 
-import { localeHref, splitLocalePrefix, type Locale } from "./locales";
+import { DEFAULT_LOCALE, localeHref, splitLocalePrefix, type Locale } from "./locales";
 import { trimTrailingSlashes } from "./trim-trailing";
 
 /** Destination de repli : l'accueil de l'espace compétitif. */
@@ -98,6 +98,29 @@ function pathPart(href: string): string {
  */
 export function loginDestination(value: unknown, locale: Locale): string {
   return localeHref(safeRedirectPath(value), locale);
+}
+
+/**
+ * Destination **scellée** dans le cookie d'état OAuth (`bg_oauth`), avec la
+ * langue de la page de départ : l'adresse de la page dans cette langue, préfixe
+ * compris **même pour une route pas encore traduite** (`/en/tournois`, qui
+ * répondrait 307 vers `/tournois`). Le cookie ne porte ainsi rien de plus que
+ * « la page où vous ramener » (`/rgpd`) ; la langue s'y relit au retour
+ * ({@link sealedReturnLocale}) pour revenir sur `/en/connexion` après un refus.
+ */
+export function sealedReturnPath(value: unknown, locale: Locale): string {
+  const safe = safeRedirectPath(value);
+  const path = pathPart(safe);
+  const suffix = safe.slice(path.length);
+  const bare = splitLocalePrefix(path).path;
+  if (locale === DEFAULT_LOCALE) return `${bare}${suffix}`;
+  return `/${locale}${bare === "/" ? "" : bare}${suffix}`;
+}
+
+/** Langue scellée par {@link sealedReturnPath} ; le français pour tout le reste (cookie antérieur, valeur absente). */
+export function sealedReturnLocale(value: unknown): Locale {
+  if (typeof value !== "string") return DEFAULT_LOCALE;
+  return splitLocalePrefix(pathPart(safeRedirectPath(value))).locale;
 }
 
 /** Chemin de la page de connexion, exclu des destinations d'un visiteur déjà connecté. */

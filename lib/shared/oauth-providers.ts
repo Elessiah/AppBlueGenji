@@ -108,8 +108,8 @@ export function oauthStartPath(
 ): string {
   const params = new URLSearchParams();
   if (options.redirect) params.set("redirect", options.redirect);
-  // Langue de la page de départ, scellée dans le cookie d'état : un refus revient
-  // sur `/en/connexion` pour qui est parti de `/en/connexion`. Le rappel, lui,
+  // Langue de la page de départ, scellée dans le cookie d'état avec la destination
+  // (`sealedReturnPath`) : un refus revient sur `/en/connexion` pour qui en est parti. Le rappel, lui,
   // reste `/api/auth/<slug>/callback`, l'adresse enregistrée chez le
   // fournisseur — aucune langue n'y voyage. Le français, par défaut, ne s'écrit pas.
   if (options.locale && options.locale !== DEFAULT_LOCALE) params.set(OAUTH_LOCALE_PARAM, options.locale);
