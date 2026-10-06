@@ -71,6 +71,11 @@ describe("RankingBoard", () => {
     expect(markup.match(/aria-hidden="true">7 j<\/span>/g) ?? []).toHaveLength(3);
   });
 
+  it("dit à l'oral qu'une équipe sans résultat récent n'a pas de forme", () => {
+    const markup = render({ rows: [row(1), row(2), row(3)], forms: new Map() });
+    expect(markup).toContain("Aucun résultat récent");
+  });
+
   it("ne libelle pas la forme du podium quand elle n'est pas affichée", () => {
     const markup = render({ rows: [row(1), row(2), row(3)], forms: null });
     expect(markup).not.toContain('aria-hidden="true">Forme</span>');
