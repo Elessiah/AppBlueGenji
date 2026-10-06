@@ -29,6 +29,20 @@ describe("détail map par map — entretien de l'instantané", () => {
   });
 });
 
+describe("détail map par map — affichage", () => {
+  it("la carte ouvre le détail dans une modale, jamais dans un volet qui grandit le créneau", () => {
+    const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
+    expect(details).not.toContain("<details");
+    expect(details).toContain("createPortal(");
+    expect(details).toContain("useDialogBehavior({ open: true, onClose })");
+  });
+
+  it("l'arbitrage voit le détail des deux propositions en désaccord", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<MapResultList maps=\{report\.maps\}/);
+  });
+});
+
 describe("détail map par map — noms accessibles", () => {
   it("chaque champ nomme sa map, et la phrase d'erreur reste hors du label", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");

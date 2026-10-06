@@ -160,7 +160,7 @@ le tait.
   Un détail ne s'affiche que s'il **explique** le score qu'il accompagne
   (`mapsMatchStoredScore`) : un score corrigé à la main ne porte pas un détail
   qui le contredit.
-- Carte de match : « Détail des maps (N) » replié, score de chaque map et code
+- Carte de match : bouton « Détail des maps (N) » qui ouvre une **modale** (un volet déplié dans la carte grandissait chaque créneau de l'arbre), score de chaque map et code
   copiable. **Décision requise** : visible de tout membre connecté (les pages de
   tournoi exigent une session) — les codes de replay sont des données de jeu
   publiques, mais un replay montre les identifiants de jeu des joueurs. Les
@@ -179,6 +179,8 @@ le tait.
   qu'une map est saisie, les steppers suivent le score dérivé (désactivés) ;
   sans map, l'arbitre pose le score à la main comme avant (replay perdu). La
   confirmation de correction d'un résultat validé (#381) est inchangée.
+  En désaccord (deux propositions), le dialogue montre le détail des deux,
+  codes de replay compris (`MapResultList`).
 
 ## RGPD
 

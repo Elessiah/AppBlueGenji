@@ -1,14 +1,33 @@
 /* Détail map par map d'une carte de match (`docs/features/MAP_SCORES.md`). */
 
-.details {
-  margin-top: 6px;
-  font-size: 12px;
-}
-
 .summary {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
   cursor: pointer;
   color: var(--blue-400, #5ac8ff);
   font-weight: 600;
+  text-align: left;
+}
+
+.summary:hover {
+  text-decoration: underline;
+}
+
+.proposals {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 12px;
+}
+
+.proposalTitle {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-quiet, #9aa4b2);
 }
 
 .summary:focus-visible {

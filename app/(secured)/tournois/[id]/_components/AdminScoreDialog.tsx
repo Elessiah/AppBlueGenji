@@ -6,7 +6,7 @@ import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
+import { isMatchDoubleForfeit, isMatchDrawn, isMatchPlayed } from "@/lib/shared/match-outcome";
 import {
   forfeitMapCount,
   matchFormatDescription,
@@ -29,6 +29,8 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
+import { MapResultList } from "./MatchMapDetails";
+import mapStyles from "./MatchMapDetails.module.css";
 import { mapFieldKey } from "@/lib/shared/match-maps";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
@@ -272,6 +274,27 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
             <output className={`${styles.stored} ${styles.notice}`}>
               {proposalNotice}
             </output>
+          )}
+
+          {/* Désaccord : le détail des deux propositions, codes de replay
+              compris — c'est ce que l'arbitre vérifie, et le formulaire ne
+              s'ouvre sur aucune des deux (`pendingScoreProposal`). */}
+          {!isMatchPlayed(match) && match.team1Report && match.team2Report && (
+            <div className={mapStyles.proposals}>
+              {[
+                { report: match.team1Report, by: team1 },
+                { report: match.team2Report, by: team2 },
+              ].map(({ report, by }) => (
+                <section key={by} aria-label={`Proposition de ${by}`}>
+                  <p className={mapStyles.proposalTitle}>
+                    Proposition de {by} : {report.team1Score} – {report.team2Score}
+                  </p>
+                  {report.maps.length > 0 && (
+                    <MapResultList maps={report.maps} team1Name={team1} team2Name={team2} label={`Maps proposées par ${by}`} />
+                  )}
+                </section>
+              ))}
+            </div>
           )}
 
           {form.conflict && (
