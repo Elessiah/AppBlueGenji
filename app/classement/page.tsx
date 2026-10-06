@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { EditableCopy } from "@/components/cyber/landing/EditableCopy";
 import { SessionPageShell } from "@/components/cyber/landing/SessionPageShell";
+import { getCurrentUser } from "@/lib/server/auth";
 import { loadLeaderboardRows } from "@/lib/server/landing-service";
+import { getSiteCopy } from "@/lib/server/site-copy-service";
 import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
 import { pageMetadata } from "@/lib/shared/page-metadata";
+import { can } from "@/lib/shared/permissions";
 import { RANKING_BASE_POINTS, RANKING_FLOOR_POINTS, RANKING_MARGIN_MAX_BONUS } from "@/lib/shared/ranking";
 import { parseRankingFilter, parseRankingShown, rankingFilterGame } from "@/lib/shared/ranking-page";
 import { RankingBoard } from "./RankingBoard";
 import styles from "./page.module.css";
 
+// Métadonnées figées, comme à l'accueil et sur la page association : le titre
+// éditable de l'en-tête (`ranking.hero.title`) est une accroche, pas le nom de
+// la page — l'onglet et l'aperçu de partage gardent « Classement des équipes ».
 export const metadata: Metadata = pageMetadata({
   title: "Classement des équipes",
   description:
@@ -39,12 +46,18 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
   // coupe — le rang reste absolu d'une page à l'autre, le rendu borné.
   const shown = parseRankingShown(params.n);
 
-  // Les deux lectures sont indépendantes : en parallèle, chacune avec son repli.
-  // La forme couvre tous les jeux : elle n'accompagne que le classement général.
-  const [loaded, forms] = await Promise.all([
+  // Lectures indépendantes : en parallèle, chacune avec son repli. La forme
+  // couvre tous les jeux : elle n'accompagne que le classement général. Les
+  // textes de l'en-tête retombent d'eux-mêmes sur leurs défauts (`getSiteCopy`),
+  // la session est déjà lue par le layout (mémoïsée par requête).
+  const [loaded, forms, copy, user] = await Promise.all([
     loadLeaderboardRows(game).catch((): LandingLeaderboardRow[] | null => null),
     game === undefined ? loadCachedTeamForms().catch(() => null) : Promise.resolve(null),
+    getSiteCopy(),
+    getCurrentUser().catch(() => null),
   ]);
+  // Mêmes éditeurs que les textes de la vitrine : administrateurs + Community Managers.
+  const canEditCopy = can(user, "showcase");
   const unavailable = loaded === null;
   const rows = loaded?.slice(0, shown) ?? [];
   const hasMore = (loaded?.length ?? 0) > shown;
@@ -56,14 +69,20 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
         <div className="fabric" />
         <div className={styles.heroAurora} aria-hidden="true" />
         <span className="eyebrow">COMPÉTITION · CLASSEMENT</span>
-        <h1 id="classement-title" className={`display ${styles.heroTitle}`}>
-          Grimpe jusqu'au<br />
-          <span className="text-gradient">sommet.</span>
-        </h1>
-        <p className={styles.heroSub}>
-          Chaque match compte. Battre plus fort que soi rapporte gros, aller loin en tournoi aussi —
-          la cote de chaque équipe raconte sa saison.
-        </p>
+        <EditableCopy copyKey="ranking.hero.title" value={copy["ranking.hero.title"]} canEdit={canEditCopy}>
+          {/* Une ligne par retour à la ligne saisi, la dernière en dégradé. */}
+          <h1 id="classement-title" className={`display ${styles.heroTitle}`}>
+            {copy["ranking.hero.title"].split("\n").map((line, index, lines) => (
+              <span key={line + index} className={index > 0 && index === lines.length - 1 ? "text-gradient" : undefined}>
+                {line}
+                {index < lines.length - 1 ? <br /> : null}
+              </span>
+            ))}
+          </h1>
+        </EditableCopy>
+        <EditableCopy copyKey="ranking.hero.lede" value={copy["ranking.hero.lede"]} canEdit={canEditCopy}>
+          <p className={styles.heroSub}>{copy["ranking.hero.lede"]}</p>
+        </EditableCopy>
       </section>
 
       <section className={styles.section} aria-labelledby="classement-board">
