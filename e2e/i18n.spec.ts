@@ -5,9 +5,9 @@ import { test, expect } from "./helpers/test";
  * navigateur — ce que les tests unitaires du middleware ne voient pas : la
  * réponse réellement servie par Next, nonce apposé sur les scripts compris.
  *
- * Une route pas encore traduite renvoie de `/en/…` vers la française ; les
- * règles (lot 3) sont servies en anglais. Chaque lot qui traduit une route y
- * ajoute son contrôle `lang="en"` et `hreflang`.
+ * Une route pas encore traduite renvoie de `/en/…` vers la française ;
+ * l'accueil (lot 2) et les règles (lot 3) sont servis en anglais. Chaque lot
+ * qui traduit une route y ajoute son contrôle `lang="en"` et `hreflang`.
  */
 test.describe("Langues — adresses /en", () => {
   test("une route pas encore traduite renvoie vers la française, en français", async ({ page }) => {
@@ -53,8 +53,10 @@ test.describe("Langues — adresses /en", () => {
     await expect(page.locator('a[hreflang="en"]').first()).toHaveAttribute("href", "/en/regles");
   });
 
-  test("la page française garde lang=fr, son nonce, et aucun sélecteur ni hreflang", async ({ page }) => {
-    const response = await page.goto("/");
+  // `/connexion` n'est pas traduite : ni sélecteur ni `hreflang` (l'accueil,
+  // traduit au lot 2, en porte désormais — contrôle ci-dessous).
+  test("une page française non traduite garde lang=fr, son nonce, et aucun sélecteur ni hreflang", async ({ page }) => {
+    const response = await page.goto("/connexion");
     const csp = response?.headers()["content-security-policy"] ?? "";
     const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();
@@ -63,5 +65,21 @@ test.describe("Langues — adresses /en", () => {
     expect(await response?.text()).toContain(`nonce="${nonce}"`);
     await expect(page.locator('link[rel="alternate"][hreflang]')).toHaveCount(0);
     await expect(page.locator("a[hreflang]")).toHaveCount(0);
+  });
+
+  test("l'accueil traduit : /en en anglais, hreflang réciproques fr/en/x-default", async ({ page }) => {
+    for (const [path, lang] of [
+      ["/", "fr"],
+      ["/en", "en"],
+    ]) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+      expect(new URL(page.url()).pathname).toBe(path);
+      await expect(page.locator("html")).toHaveAttribute("lang", lang);
+      const alternates = page.locator('link[rel="alternate"][hreflang]');
+      await expect(alternates).toHaveCount(3);
+      const hreflangs = await alternates.evaluateAll((links) => links.map((l) => l.getAttribute("hreflang")).sort());
+      expect(hreflangs).toEqual(["en", "fr", "x-default"]);
+    }
   });
 });
