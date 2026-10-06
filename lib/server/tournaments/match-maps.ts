@@ -105,22 +105,20 @@ export async function promoteReportedMaps(
   connection: PoolConnection,
   matchId: number,
   from: "TEAM1" | "TEAM2",
-  options: { locking?: boolean } = {},
 ): Promise<void> {
-  const lock = options.locking === false ? "" : " FOR UPDATE";
   // Rien à promouvoir, rien à effacer : une clôture concurrente du même report
   // expiré (l'entretien tourne à chaque écriture et à chaque chargement) a déjà
   // promu la proposition puis l'a effacée. Sans cette garde, la seconde
   // effaçait le détail retenu par la première sans rien remettre.
   //
-  // La proposition est lue **en entier** puis réécrite par `VALUES` : un
-  // `INSERT … SELECT` sur la table elle-même verrouillerait les lignes lues et
-  // leurs intervalles, même en mode « sans verrou » (`locking: false`, celui
-  // de l'entretien, qui ne rejoue pas sa transaction).
+  // Lecture **verrouillante** : la version validée la plus récente de la
+  // proposition (codes corrigés compris), pas l'instantané de la transaction.
+  // Elle est lue en entier puis réécrite par `VALUES` — un `INSERT … SELECT`
+  // sur la table elle-même verrouillerait en plus les intervalles voisins.
   const pending = await connection.execute<MapRow[]>(
     `SELECT match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at
      FROM bg_match_maps WHERE match_id = ? AND source = ?
-     ORDER BY map_number${lock}`,
+     ORDER BY map_number FOR UPDATE`,
     [matchId, from],
   );
   const rows = Array.isArray(pending) && Array.isArray(pending[0]) ? pending[0] : [];

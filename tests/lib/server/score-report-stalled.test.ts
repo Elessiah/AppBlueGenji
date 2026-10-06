@@ -171,7 +171,7 @@ describe("resolveExpiredScoreReports", () => {
       }),
     );
 
-    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, expect.any(Number), "TEAM1", { locking: false });
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, expect.any(Number), "TEAM1");
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
@@ -221,7 +221,7 @@ describe("resolveExpiredScoreReports", () => {
     );
 
     // Le détail map par map du report qui fait foi devient le résultat retenu.
-    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, 32, "TEAM2", { locking: false });
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, 32, "TEAM2");
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });

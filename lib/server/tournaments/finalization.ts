@@ -530,10 +530,11 @@ export async function resolveExpiredScoreReports(
       // retenu (`docs/features/MAP_SCORES.md`), avant que la clôture n'efface
       // les propositions.
       const { promoteReportedMaps } = await import("./match-maps");
-      // Sans lecture verrouillante : l'entretien tourne aussi pendant la
-      // construction de l'instantané, qui ne rejoue pas sa transaction ; le
-      // match vient d'être verrouillé et relu, sa proposition ne bouge plus.
-      await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2", { locking: false });
+      // Lecture verrouillante de la proposition : une lecture cohérente verrait
+      // l'instantané de la transaction, pris avant le verrou du match, et
+      // promouvrait des codes de replay périmés par une correction. Les lignes existent
+      // (un report attend) : le verrou porte sur elles, pas sur un intervalle vide.
+      await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2");
       await finalizeMatch(connection, tournamentId, match, {
         team1Score,
         team2Score,
