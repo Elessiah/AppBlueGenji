@@ -188,6 +188,9 @@ export function MapScoreList({
                     max={MAP_SCORE_MAX}
                     value={map.team1Score}
                     onValueChange={(value) => update(index, { team1Score: value }, "team1Score")}
+                    // Un champ vidé pour être ressaisi n'émet pas de valeur :
+                    // le refus qui le désigne se retire dès la frappe.
+                    onEdit={() => fieldErrors.clear(t1Key)}
                     {...fieldErrors.aria(t1Key)}
                   />
                   <FieldErrorText fieldId={t1Id} message={fieldErrors.message(t1Key)} />
@@ -203,6 +206,9 @@ export function MapScoreList({
                     max={MAP_SCORE_MAX}
                     value={map.team2Score}
                     onValueChange={(value) => update(index, { team2Score: value }, "team2Score")}
+                    // Un champ vidé pour être ressaisi n'émet pas de valeur :
+                    // le refus qui le désigne se retire dès la frappe.
+                    onEdit={() => fieldErrors.clear(t2Key)}
                     {...fieldErrors.aria(t2Key)}
                   />
                   <FieldErrorText fieldId={t2Id} message={fieldErrors.message(t2Key)} />
