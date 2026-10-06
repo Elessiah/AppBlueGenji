@@ -108,7 +108,7 @@ il occupe la largeur du salon. La carte est rendue en PNG 1200×630 par Satori
 (`next/og`), côté serveur.
 
 **Ce n'est pas un composant de l'application** — il n'est jamais monté dans un
-navigateur. D'où trois contraintes qui ne sont pas des maladresses :
+navigateur. D'où quatre contraintes qui ne sont pas des maladresses :
 
 - tout est en `display: flex` : Satori n'implémente ni le flux normal ni la
   grille, et un `<div>` à plusieurs enfants sans `display` explicite lève ;
@@ -116,7 +116,73 @@ navigateur. D'où trois contraintes qui ne sont pas des maladresses :
   style du site n'est pas chargée pendant le rendu ;
 - la taille du titre est choisie d'après sa longueur, Satori ne sachant pas
   rétrécir un texte pour qu'il tienne — un nom de tournoi va de « OW Cup » à
-  soixante caractères.
+  soixante caractères ;
+- la police est celle que `next/og` embarque : celles du dépôt sont en WOFF2,
+  que Satori ne lit pas, et en télécharger une serait une requête réseau par
+  rendu. Elle n'a qu'une graisse : `fontWeight: 700` n'y change rien, la
+  hiérarchie tient par la taille.
+
+### Palette « néons froids » (décision du 2026-10-06)
+
+La carte était un aplat noir à deux halos bleu nuit : « tout noir, c'est très
+triste » au milieu d'un salon Discord. Elle reprend désormais la palette de la
+refonte (`DESIGN_SYSTEM.md`), chaque valeur recopiée d'un jeton de
+`app/globals.css` et citée dans `SHARE_CARD_COLORS` :
+
+- **filet de marque** de 10 px en tête et trait sous le titre au dégradé
+  `--grad-brand` (`--cyan-400` → `--blue-500` → `--violet-400`) ;
+- **trois halos** (cyan en haut à droite, violet en bas à gauche, rose en bas à
+  droite), chacun un `<div>` positionné portant un seul `radial-gradient` —
+  Satori place mal les centres d'un `background-image` à plusieurs dégradés
+  (vérifié au rendu : les halos glissaient au milieu des bords) ;
+- **pastilles** : le jeu en cyan, l'état au ton de sa variante `.pill-*`, les
+  mêmes que l'en-tête de la fiche (`STATE_META`) — violet « Prochainement »,
+  rose « Inscriptions ouvertes », glacier « Tournoi en cours », turquoise
+  « Tournoi terminé ». Ni rouge (une vraie diffusion seulement) ni ambre (un
+  avertissement seulement). `SHARE_STATE_TONES` porte la correspondance, un test
+  la tient alignée sur `STATE_META` ;
+- **faits** : un liseré néon par fait (cyan, violet, turquoise), l'intitulé en
+  `--ink-mute` — en néon, il reprenait le ton d'une pastille (« FORMAT » au cyan
+  du jeu, un fait au turquoise de « Tournoi terminé ») —, en 24 px
+  pour rester lisible dans la vignette Discord (la carte y est réduite de
+  moitié, voire au tiers ; les mêmes faits sont en texte dans la description), la valeur en `--ink` ;
+- **logo** BlueGenji en pied, lu sur le disque (`lib/server/share-card-logo.ts` :
+  `public/icons/icon-192.png` en URL `data:`). Satori ne décode pas le WebP de
+  la vitrine. Seule une lecture réussie est mémorisée par processus : un échec
+  rend `null`, la carte garde le seul nom « BLUEGENJI » plutôt que d'échouer, et
+  `console.warn` le signale (`[share-card] logo illisible (<code>)`) avant une
+  nouvelle lecture au rendu suivant — un avertissement répété à chaque rendu
+  veut dire que le fichier manque vraiment à la livraison.
+
+**Contraste.** Les cœurs des halos sont posés hors de la zone de texte, et
+`tests/components/og/share-card.test.tsx` recompose le fond tous les 8 px dans
+`SHARE_CARD_TEXT_BOX` : chaque couleur de texte (titre, sous-titre, intitulés,
+pastilles sur leur propre voile) y tient 4,5:1 au point le moins favorable.
+Monter l'opacité d'un halo ou du voile des pastilles fait échouer ce test — le
+halo cyan a dû redescendre à 0,4 pour que le rose des « Inscriptions ouvertes »
+tienne dans le coin haut-droit.
+
+**Noms saisis.** `tournamentShareCard` repasse le nom et la description par
+`visibleText` (`UNTRUSTED_NAMES.md`) avant de les borner : titre coupé sur un
+mot à 90 caractères (trois lignes à la plus petite taille), avec une ellipse ;
+un nom sans caractère visible devient « Tournoi ».
+
+**Hauteur bornée.** La colonne de texte n'a que 528 px : l'accroche n'a droit
+qu'à une ligne dès que le titre en prend plus d'une (`subtitleLineClamp`, deux
+lignes jusqu'à 16 caractères), et le bloc du haut cède avant le pied
+(`flex-shrink`, rogné plutôt que de chevaucher les faits). **Piège Satori :**
+`WebkitLineClamp` n'y est appliqué qu'avec `textOverflow: "ellipsis"` — sans
+elle, titre et accroche couraient sur autant de lignes qu'il en fallait.
+
+**Barre colorée de l'encart Discord — néon de marque (décision du 2026-10-06).**
+Discord colore le liseré gauche d'un encart d'après `<meta name="theme-color">`.
+Il est réglé à `APP_THEME_COLOR` = `--cyan-400` (`#3ee6ff`), le bleu le plus
+vif de la palette, dans `app/layout.tsx` (`viewport.themeColor`), le manifeste
+(`theme_color`) et la page hors ligne. Contrepartie acceptée : la barre
+d'adresse des navigateurs mobiles et la barre de l'application installée
+prennent ce néon sur tout le site, au-dessus d'un fond noir. Le fond
+(`APP_BACKGROUND_COLOR`, `#05060a`) reste celui du manifeste
+(`background_color`) et des écrans de lancement.
 
 Deux routes la servent :
 

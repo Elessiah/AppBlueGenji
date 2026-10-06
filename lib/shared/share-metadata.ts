@@ -21,6 +21,7 @@
 import { FORMAT_LABELS, GAME_LABELS } from "./tournament-labels";
 import { participantWording } from "./participants";
 import type { TournamentCard, TournamentState } from "./types";
+import { visibleText } from "./visible-text";
 
 /** Nom du site, tel qu'il doit apparaître dans un encart de partage. */
 export const SITE_NAME = "BlueGenji Esport";
@@ -78,6 +79,16 @@ const FREE_TEXT_MAX_LENGTH = 160;
 
 /** Ce que le sous-titre de l'image d'aperçu peut porter sans déborder. */
 const SHARE_CARD_SUBTITLE_MAX_LENGTH = 130;
+
+/**
+ * Ce que le titre de l'image d'aperçu peut porter : trois lignes à la plus
+ * petite taille de `titleFontSize`. Au-delà, le titre est coupé sur un mot avec
+ * une ellipse plutôt que tranché net par le bord de la carte.
+ */
+const SHARE_CARD_TITLE_MAX_LENGTH = 90;
+
+/** Titre de repli d'un tournoi dont le nom ne contient aucun caractère visible. */
+const SHARE_CARD_TITLE_FALLBACK = "Tournoi";
 
 /**
  * Coupe un texte sans couper un mot, et signale la coupe par une ellipse.
@@ -193,6 +204,22 @@ const STATE_SHARE_LABELS: Record<TournamentState, string> = {
   FINISHED: "Tournoi terminé",
 };
 
+/**
+ * Variante sémantique de la pastille d'état sur l'image d'aperçu — les mêmes
+ * tons que l'en-tête de la fiche (`STATE_META`, `_lib/header-meta.ts`) et les
+ * cartes de `/tournois` : violet à venir, rose inscriptions ouvertes, glacier en
+ * cours, turquoise terminé. Aucun n'est rouge (réservé à une vraie diffusion) ni
+ * ambre (réservé aux avertissements) — `DESIGN_SYSTEM.md`.
+ */
+export type ShareStateTone = "accent" | "highlight" | "info" | "success";
+
+export const SHARE_STATE_TONES: Record<TournamentState, ShareStateTone> = {
+  UPCOMING: "accent",
+  REGISTRATION: "highlight",
+  RUNNING: "info",
+  FINISHED: "success",
+};
+
 /** Libellé d'état tel qu'il apparaît dans un encart de partage. */
 export function tournamentShareState(card: TournamentCard): string {
   return STATE_SHARE_LABELS[card.state] ?? card.state;
@@ -213,16 +240,22 @@ export function tournamentShareTitle(card: TournamentCard): string {
  * Ce que l'image d'aperçu affiche, décidé ici plutôt que dans la route qui la
  * dessine : c'est de la rédaction, et la rédaction se teste.
  *
- * Le jeu remonte dans le surtitre, à côté de l'état — dans le titre il volait
- * la place au nom du tournoi, que l'image écrit en grand. La description de
- * l'organisateur prend alors le sous-titre : c'est elle qui remplit la carte,
- * et un tournoi qui n'en a pas n'affiche rien plutôt qu'une ligne bouche-trou.
+ * Le jeu remonte dans le surtitre (une pastille), l'état dans une seconde
+ * pastille colorée par son sens — dans le titre le jeu volait la place au nom
+ * du tournoi, que l'image écrit en grand. La description de l'organisateur
+ * prend alors le sous-titre : c'est elle qui remplit la carte, et un tournoi
+ * qui n'en a pas n'affiche rien plutôt qu'une ligne bouche-trou.
+ *
+ * Nom et description sont des saisies : ils repassent par `visibleText`
+ * (`UNTRUSTED_NAMES.md`) avant d'être bornés, pour qu'un caractère invisible ou
+ * de contrôle n'arrive pas jusqu'au PNG.
  */
 export function tournamentShareCard(
   card: TournamentCard,
   now: number = Date.now(),
 ): {
   eyebrow: string;
+  state: { label: string; tone: ShareStateTone };
   title: string;
   subtitle?: string;
   facts: { label: string; value: string }[];
@@ -243,12 +276,14 @@ export function tournamentShareCard(
   if (next && date) facts.push({ label: next.lead, value: date });
 
   const subtitle = card.description
-    ? truncateForShare(card.description, SHARE_CARD_SUBTITLE_MAX_LENGTH)
+    ? truncateForShare(visibleText(card.description), SHARE_CARD_SUBTITLE_MAX_LENGTH)
     : "";
+  const title = truncateForShare(visibleText(card.name), SHARE_CARD_TITLE_MAX_LENGTH);
 
   return {
-    eyebrow: `${game} · ${tournamentShareState(card)}`,
-    title: card.name,
+    eyebrow: game,
+    state: { label: tournamentShareState(card), tone: SHARE_STATE_TONES[card.state] ?? "info" },
+    title: title || SHARE_CARD_TITLE_FALLBACK,
     subtitle: subtitle || undefined,
     facts,
   };

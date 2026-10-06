@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { ShareCard, SHARE_CARD_SIZE, SHARE_CARD_CONTENT_TYPE } from "@/components/og/share-card";
+import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { SITE_NAME, SITE_SHARE_CARD } from "@/lib/shared/share-metadata";
 
 /**
@@ -16,6 +17,6 @@ export const alt = SITE_NAME; // NOSONAR typescript:S7763 — export de conventi
 export const size = SHARE_CARD_SIZE;
 export const contentType = SHARE_CARD_CONTENT_TYPE; // NOSONAR typescript:S7763 — export de convention de Next (`opengraph-image`), déclaré en constante du module
 
-export default function Image() {
-  return new ImageResponse(<ShareCard {...SITE_SHARE_CARD} />, size);
+export default async function Image() {
+  return new ImageResponse(<ShareCard {...SITE_SHARE_CARD} logoSrc={await shareCardLogo()} />, size);
 }
