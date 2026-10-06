@@ -13,7 +13,7 @@ import {
 import { MatchRow } from "./_internal";
 import { forfeitMatchScores, loadTournamentMatchFormat, loadTournamentMatchRules, reopenTournament } from "./repository";
 import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
-import { clearMapSets, replaceMatchMaps } from "./match-maps";
+import { clearMapSets, dropStaleFinalMaps, replaceMatchMaps } from "./match-maps";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
@@ -512,6 +512,8 @@ export async function adminSaveMatchScores(
     // Liste explicitement vide : l'arbitre a retiré toutes les maps, le
     // détail retenu ne décrit plus ce score posé à la main.
     if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", [], null);
+    // Sans `maps` du tout, un détail qui n'explique plus ce score s'en va aussi.
+    else await dropStaleFinalMaps(connection, matchId, team1Score, team2Score);
   } else {
     throw new Error("INVALID_REQUEST");
   }
@@ -601,12 +603,14 @@ export async function adminResolveMatch(
   // les maps de l'arbitre sur un score, **rien** sur un forfait — y compris
   // celui qu'une engagée déclare (`./player-forfeit`, sans `mapEntry`), dont
   // le score plein pourrait sinon coïncider avec un détail noté plus tôt.
-  // Sans `mapEntry` sur un score (moteur), le détail existant reste tel quel.
+  // Sans `mapEntry` sur un score, le détail existant ne reste que s'il explique
+  // encore le score retenu (`dropStaleFinalMaps`).
   const forfeited = forfeitTeamId !== undefined || doubleForfeit;
   // Lecture sans verrou (`clearMapSets`) : le forfait déclaré par une engagée
   // passe ici sans rejeu sur interblocage.
   if (forfeited) await clearMapSets(connection, [matchId], ["FINAL"]);
   else if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", mapEntry.maps, mapEntry.userId);
+  else await dropStaleFinalMaps(connection, matchId, resultTeam1Score, resultTeam2Score);
 
   await tryAutoResolveByes(connection, tournamentId);
 }

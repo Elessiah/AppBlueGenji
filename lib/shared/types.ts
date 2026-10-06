@@ -982,6 +982,21 @@ export type PersonalDataExport = {
    */
   connectionLogs: { event: string; ip: string | null; createdAt: string }[];
   /**
+   * Détail map par map que le titulaire a saisi (`bg_match_maps`) : match,
+   * jeu de lignes (proposition `TEAM1`/`TEAM2` ou résultat `FINAL`), code de
+   * replay et scores de chaque map.
+   */
+  mapEntries: {
+    matchId: number;
+    tournamentId: number;
+    source: string;
+    mapNumber: number;
+    replayCode: string;
+    team1Score: number;
+    team2Score: number;
+    submittedAt: string | null;
+  }[];
+  /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.
    */

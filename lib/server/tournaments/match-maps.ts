@@ -97,6 +97,24 @@ async function clearMatchMaps(connection: PoolConnection, matchId: number, sourc
 }
 
 /**
+ * Score posé sans détail : le résultat retenu (`FINAL`) qui ne l'explique plus
+ * est effacé — pas gardé, caché, pour un résultat qu'il ne décrit pas (durée
+ * de conservation annoncée sur `/rgpd` : « avec le résultat qu'ils documentent »).
+ * Un détail qui explique encore le score reste.
+ */
+export async function dropStaleFinalMaps(
+  connection: PoolConnection,
+  matchId: number,
+  team1Score: number | null,
+  team2Score: number | null,
+): Promise<void> {
+  const final = await loadMatchMaps(connection, matchId, "FINAL");
+  if (final.length > 0 && !mapsMatchStoredScore(final, team1Score, team2Score)) {
+    await replaceMatchMaps(connection, matchId, "FINAL", [], null);
+  }
+}
+
+/**
  * Maps d'un jeu précis, dans l'ordre joué. Lecture verrouillante : elle voit
  * la proposition qu'un report concurrent vient de valider (voir
  * `clearMatchMaps`), sans quoi la comparaison des deux propositions la
