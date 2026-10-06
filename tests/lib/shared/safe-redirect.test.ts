@@ -1,7 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_REDIRECT, safeRedirectPath, signedInLoginRedirect } from "@/lib/shared/safe-redirect";
+import {
+  DEFAULT_REDIRECT,
+  loginDestination,
+  safeRedirectPath,
+  sealedReturnLocale,
+  sealedReturnPath,
+  signedInLoginRedirect,
+} from "@/lib/shared/safe-redirect";
 
 /**
  * La destination d'après connexion, et pourquoi elle ne peut pas venir de l'URL
@@ -121,7 +128,8 @@ describe("câblage des trois portes", () => {
 
   it("la page de connexion filtre le paramètre d'URL", () => {
     const page = source(join("app", "connexion", "_components", "LoginForm.tsx"));
-    expect(page).toMatch(/setRedirect\(safeRedirectPath\(params\.get\("redirect"\)\)\)/);
+    // Filtrée, puis rendue dans la langue de la page (lot 6).
+    expect(page).toMatch(/setRedirect\(loginDestination\(params\.get\("redirect"\), text\.locale\)\)/);
     expect(page).not.toMatch(/params\.get\("redirect"\) \|\|/);
   });
 
@@ -131,12 +139,13 @@ describe("câblage des trois portes", () => {
   // fournisseur aurait justement pu oublier l'un des deux filtrages.
   it("l'aller OAuth filtre avant d'écrire le cookie d'état", () => {
     const flow = source(join("lib", "server", "oauth-flow.ts"));
-    expect(flow).toMatch(/safeRedirectPath\(req\.nextUrl\.searchParams\.get\("redirect"\)\)/);
+    // `sealedReturnPath` passe par `safeRedirectPath` (testé plus bas).
+    expect(flow).toMatch(/sealedReturnPath\(req\.nextUrl\.searchParams\.get\("redirect"\), locale\)/);
   });
 
   it("le retour OAuth filtre de nouveau ce qu'il lit du cookie", () => {
     const flow = source(join("lib", "server", "oauth-flow.ts"));
-    expect(flow).toMatch(/safeRedirectPath\(saved\.redirectTo/);
+    expect(flow).toMatch(/loginDestination\(saved\.redirectTo/);
     expect(flow).not.toMatch(/new URL\(saved\.redirectTo/);
   });
 });
@@ -183,7 +192,102 @@ describe("signedInLoginRedirect", () => {
   it("est appliquée par la page avant tout rendu du formulaire", () => {
     const page = readFileSync(join(__dirname, "..", "..", "..", "app", "connexion", "page.tsx"), "utf8");
     expect(page).toMatch(
-      /if \(user && params\.error === undefined\) redirect\(signedInLoginRedirect\(params\.redirect\)\)/,
+      /if \(user && params\.error === undefined\) redirect\(localeHref\(signedInLoginRedirect\(params\.redirect\), locale\)\)/,
     );
+  });
+});
+
+/**
+ * Lot 6 : la page de connexion existe aussi sous `/en/connexion`, et ses
+ * destinations portent un préfixe de langue. Le préfixe ne doit ouvrir aucune
+ * porte nouvelle : retiré puis reposé, il ne démasque jamais un autre hôte.
+ */
+describe("préfixe de langue — la garde reste aussi stricte", () => {
+  it.each([
+    "/en//exemple.invalid",
+    "/en//exemple.invalid/connexion",
+    "/en/\\exemple.invalid",
+    "/en\\/exemple.invalid",
+    "/fr//exemple.invalid",
+    "/regles//exemple.invalid",
+    "/en/%2F%2Fexemple.invalid",
+    "/en/%2fexemple.invalid",
+    "/en/%5Cexemple.invalid",
+    "/%2F%2Fexemple.invalid",
+    "/en/\t/exemple.invalid",
+  ])("refuse %j", (value) => {
+    expect(safeRedirectPath(value)).toBe(DEFAULT_REDIRECT);
+    expect(loginDestination(value, "en")).toBe(DEFAULT_REDIRECT);
+    expect(sealedReturnPath(value, "en")).toBe(`/en${DEFAULT_REDIRECT}`);
+  });
+
+  it("laisse passer une requête ou une ancre qui contient une adresse : seul le chemin compte", () => {
+    expect(safeRedirectPath("/tournois?retour=https://exemple.invalid//x")).toBe("/tournois?retour=https://exemple.invalid//x");
+    expect(safeRedirectPath("/regles#a//b")).toBe("/regles#a//b");
+  });
+
+  it("garde une destination anglaise du site", () => {
+    expect(safeRedirectPath("/en/regles/simple?x=1")).toBe("/en/regles/simple?x=1");
+  });
+});
+
+describe("loginDestination — la langue de la page de connexion", () => {
+  it("ramène un visiteur anglais sur la page anglaise", () => {
+    expect(loginDestination("/regles", "en")).toBe("/en/regles");
+    expect(loginDestination("/en/regles?x=1#y", "en")).toBe("/en/regles?x=1#y");
+    expect(loginDestination("/", "en")).toBe("/en");
+  });
+
+  it("laisse française une route pas encore traduite", () => {
+    expect(loginDestination("/tournois/12", "en")).toBe("/tournois/12");
+    expect(loginDestination(null, "en")).toBe(DEFAULT_REDIRECT);
+  });
+
+  it("garde un visiteur français en français", () => {
+    expect(loginDestination("/regles", "fr")).toBe("/regles");
+    expect(loginDestination("/en/regles", "fr")).toBe("/regles");
+  });
+});
+
+describe("sealedReturnPath / sealedReturnLocale — la langue scellée dans le cookie d'état", () => {
+  it("préfixe la destination, même d'une route pas encore traduite", () => {
+    expect(sealedReturnPath("/tournois/12?onglet=1", "en")).toBe("/en/tournois/12?onglet=1");
+    expect(sealedReturnPath("/en/regles", "en")).toBe("/en/regles");
+    expect(sealedReturnPath("/", "en")).toBe("/en");
+    expect(sealedReturnPath(undefined, "en")).toBe("/en/tournois");
+  });
+
+  it("n'écrit rien de plus en français, et retire un préfixe qui ne correspond pas", () => {
+    expect(sealedReturnPath("/tournois", "fr")).toBe("/tournois");
+    expect(sealedReturnPath("/en/regles", "fr")).toBe("/regles");
+  });
+
+  it("relit la langue au retour, le français pour tout le reste", () => {
+    expect(sealedReturnLocale("/en/tournois")).toBe("en");
+    expect(sealedReturnLocale("/en")).toBe("en");
+    expect(sealedReturnLocale("/tournois")).toBe("fr");
+    expect(sealedReturnLocale("/enquete")).toBe("fr");
+    expect(sealedReturnLocale("/en//exemple.invalid")).toBe("fr");
+    expect(sealedReturnLocale(undefined)).toBe("fr");
+    expect(sealedReturnLocale(42)).toBe("fr");
+  });
+
+  it("aller-retour : la destination scellée ressort dans la langue du départ", () => {
+    for (const value of ["/regles", "/tournois/3", "/en/classement?jeu=ow", "/"]) {
+      const sealed = sealedReturnPath(value, "en");
+      expect(loginDestination(sealed, sealedReturnLocale(sealed))).toBe(loginDestination(value, "en"));
+      const french = sealedReturnPath(value, "fr");
+      expect(loginDestination(french, sealedReturnLocale(french))).toBe(loginDestination(value, "fr"));
+    }
+  });
+});
+
+describe("signedInLoginRedirect — /en/connexion est la même page", () => {
+  it.each(["/en/connexion", "/en/connexion/", "/en/connexion?redirect=/x", "/en/%63onnexion"])("écarte %j", (value) => {
+    expect(signedInLoginRedirect(value)).toBe(DEFAULT_REDIRECT);
+  });
+
+  it("garde une autre page anglaise", () => {
+    expect(signedInLoginRedirect("/en/regles")).toBe("/en/regles");
   });
 });

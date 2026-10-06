@@ -135,9 +135,12 @@ describe("/rgpd — mesure d'audience", () => {
   });
 
   it("ne promet plus, sur la connexion, qu'aucune donnée n'est enregistrée", () => {
-    const modal = readFileSync(join(root, "components/cyber/RgpdConsentModal.tsx"), "utf8");
-    expect(modal).not.toContain("aucune donnée ne sera enregistrée");
-    expect(modal).toContain("mesure d&apos;audience");
+    // Textes de la modale dans les messages depuis le lot 6, dans les deux langues.
+    const fr = readFileSync(join(root, "messages/fr/login.json"), "utf8");
+    const en = readFileSync(join(root, "messages/en/login.json"), "utf8");
+    expect(fr).not.toContain("aucune donnée ne sera enregistrée");
+    expect(fr).toContain("mesure d'audience");
+    expect(en).toContain("audience measurement");
   });
 
   it("est annoncée par les mentions légales", () => {

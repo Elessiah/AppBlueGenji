@@ -98,6 +98,9 @@ describe("canReturnInSite", () => {
   it("ne rejoue jamais la connexion", () => {
     expect(canReturnInSite(input({ previousPath: "/connexion" }))).toBe(false);
     expect(canReturnInSite(input({ referrer: `${ORIGIN}/connexion` }))).toBe(false);
+    // La page anglaise est la même page (lot 6).
+    expect(canReturnInSite(input({ previousPath: "/en/connexion" }))).toBe(false);
+    expect(canReturnInSite(input({ referrer: `${ORIGIN}/en/connexion?redirect=%2Fen` }))).toBe(false);
     expect(canReturnInSite(input({ previousPath: "/connexion/autre" }))).toBe(false);
     // Un préfixe de mot n'est pas un segment : `/connexions` reste une page.
     expect(canReturnInSite(input({ previousPath: "/connexions" }))).toBe(true);

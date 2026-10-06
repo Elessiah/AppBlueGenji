@@ -59,18 +59,19 @@ describe("accueil", () => {
 });
 
 describe("connexion", () => {
+  // Métadonnées par langue depuis le lot 6 (`generateMetadata`), ici en français.
   it("ne se dispute plus le titre de l'accueil", async () => {
-    const { metadata } = await import("@/app/connexion/layout");
+    const metadata = await (await import("@/app/connexion/layout")).generateMetadata();
     expect(metadata.title).toBe("Connexion");
   });
 
   it("est retirée de l'index, mais laisse suivre ses liens", async () => {
-    const { metadata } = await import("@/app/connexion/layout");
+    const metadata = await (await import("@/app/connexion/layout")).generateMetadata();
     expect(metadata.robots).toEqual({ index: false, follow: true });
   });
 
   it("ramène ses variantes `?redirect=` à une seule adresse", async () => {
-    const { metadata } = await import("@/app/connexion/layout");
+    const metadata = await (await import("@/app/connexion/layout")).generateMetadata();
     expect(metadata.alternates?.canonical).toBe("/connexion");
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { formatMessage } from "@/lib/shared/message-format";
 import {
   ASSOCIATION_CONTACT_PATH,
   SITE_MINIMUM_AGE,
@@ -51,8 +53,12 @@ describe("conditions d'utilisation — âge minimum", () => {
 
   it("se déclare sur la case de la page de connexion, là où naît un compte", () => {
     expect(TERMS_AGE_DECLARATION).toBe("je déclare avoir au moins 15 ans");
+    // Texte de la case dans les messages depuis le lot 6 : le français reprend
+    // la déclaration mot pour mot, l'âge passé par la constante.
     const modal = read("components/cyber/RgpdConsentModal.tsx");
-    expect(modal).toContain("), et {TERMS_AGE_DECLARATION}.");
+    expect(modal).toContain('text.rich("consent.terms", { age: SITE_MINIMUM_AGE }');
+    const label = formatMessage("fr", messagesFor("fr").login.consent.terms, { age: SITE_MINIMUM_AGE });
+    expect(label).toContain(`), et ${TERMS_AGE_DECLARATION}.`);
     // Un navigateur qui a coché l'ancienne case, sans l'âge, doit la revoir.
     expect(read("app/connexion/_components/LoginForm.tsx")).toContain('const NOTICE_VERSION = "3";');
   });

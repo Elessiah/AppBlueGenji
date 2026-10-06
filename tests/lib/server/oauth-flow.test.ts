@@ -523,3 +523,110 @@ describe("completeOAuth — rattachement", () => {
     );
   });
 });
+
+/**
+ * Lot 6 : la page de connexion existe sous `/en/connexion`. La langue du départ
+ * (`?lang=en`, posé par les boutons) se scelle dans la destination du cookie
+ * d'état (`/en/…`) et se relit au retour — l'adresse de rappel, enregistrée
+ * chez le fournisseur, ne change pas.
+ */
+describe("aller-retour OAuth — la langue du départ", () => {
+  const callback = (provider: OAuthProvider, query = `?code=abc&state=${STATE}`) =>
+    completeOAuth(request(`http://localhost:3000/api/auth/x/callback${query}`), provider);
+  const sealed = (redirectTo: string, provider: OAuthProvider = "GOOGLE") =>
+    jest.mocked(consumeOAuthState).mockResolvedValue({ provider, state: STATE, redirectTo, intent: "LOGIN", termsAccepted: true });
+
+  it("scelle la destination dans la langue du départ, même vers une route pas encore traduite", async () => {
+    await startOAuth(request("http://localhost:3000/api/auth/x/start?redirect=%2Ftournois%2F4&lang=en"), "DISCORD");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/en/tournois/4" }));
+
+    await startOAuth(request("http://localhost:3000/api/auth/x/start?redirect=%2Fen%2Fregles&lang=en"), "DISCORD");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/en/regles" }));
+  });
+
+  it("ne scelle aucune langue pour un départ français, ni pour une langue inconnue", async () => {
+    await startOAuth(request("http://localhost:3000/api/auth/x/start?redirect=%2Fen%2Fregles"), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/regles" }));
+
+    await startOAuth(request("http://localhost:3000/api/auth/x/start?redirect=%2Fregles&lang=de"), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/regles" }));
+  });
+
+  it("n'ajoute aucun champ au cookie d'état", async () => {
+    await startOAuth(request("http://localhost:3000/api/auth/x/start?lang=en"), "GOOGLE");
+    expect(Object.keys(jest.mocked(saveOAuthState).mock.calls[0][0]).sort()).toEqual(
+      ["intent", "provider", "redirectTo", "state", "termsAccepted"],
+    );
+  });
+
+  it.each([
+    "https%3A%2F%2Fexemple.invalid",
+    "%2F%2Fexemple.invalid",
+    "%2Fen%2F%2Fexemple.invalid",
+    "%2Fen%2F%5Cexemple.invalid",
+  ])("garde la destination dans le site sous /en (%s)", async (redirect) => {
+    await startOAuth(request(`http://localhost:3000/api/auth/x/start?redirect=${redirect}&lang=en`), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/en/tournois" }));
+  });
+
+  it("ramène un refus au départ sur /en/connexion", async () => {
+    jest.mocked(buildGoogleAuthorizationUrl).mockImplementation(() => {
+      throw new Error("Missing GOOGLE_CLIENT_ID");
+    });
+    const response = await startOAuth(request("http://localhost:3000/api/auth/x/start?lang=en"), "GOOGLE");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/connexion?error=not_configured&provider=google");
+  });
+
+  it("ramène un rattachement sans session sur /en/connexion", async () => {
+    const response = await startOAuth(request("http://localhost:3000/api/auth/x/start?intent=link&lang=en"), "DISCORD");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/connexion?error=session&provider=discord");
+  });
+
+  it.each([
+    // Départ anglais vers une page traduite : la page anglaise.
+    ["/en/regles/simple?x=1", "/en/regles/simple?x=1"],
+    // Départ anglais vers une route pas encore traduite : la française.
+    ["/en/tournois/4", "/tournois/4"],
+    // Départ français : français.
+    ["/regles", "/regles"],
+    // Destination trafiquée dans le cookie : refiltrée.
+    ["/en//exemple.invalid", "/tournois"],
+  ])("ouvre la session et suit la destination scellée %s", async (redirectTo, expected) => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    sealed(redirectTo);
+    const response = await callback("GOOGLE");
+    expect(response.headers.get("location")).toBe(`http://localhost:3000${expected}`);
+  });
+
+  it.each([
+    ["params", "?state=x"],
+    ["state", "?code=abc&state=autre"],
+  ])("ramène un refus (%s) sur /en/connexion", async (kind, query) => {
+    sealed("/en/tournois");
+    const response = await callback("GOOGLE", query);
+    expect(response.headers.get("location")).toBe(`http://localhost:3000/en/connexion?error=${kind}&provider=google`);
+  });
+
+  it("ramène un échec de l'échange sur /en/connexion", async () => {
+    jest.mocked(fetchDiscordUser).mockRejectedValue(new Error("boom"));
+    sealed("/en/tournois", "DISCORD");
+    const response = await callback("DISCORD");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/connexion?error=oauth&provider=discord");
+  });
+
+  it("ramène un compte suspendu sur /en/connexion, l'exposé dans le même cookie", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    const notice = { reference: "S-3", reason: "Faits", ground: "ACCOUNT" as const, endsAt: null };
+    jest.mocked(createSession).mockRejectedValueOnce(new AccountSuspendedError(notice));
+    sealed("/en/tournois");
+    const response = await callback("GOOGLE");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/connexion?error=suspended&provider=google");
+    expect(response.cookies.get(SUSPENSION_NOTICE_COOKIE)?.path).toBe("/");
+  });
+
+  it("sans cookie d'état, la langue n'est plus connue : le français", async () => {
+    jest.mocked(consumeOAuthState).mockResolvedValue(null);
+    const response = await callback("GOOGLE");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/connexion?error=state&provider=google");
+  });
+});

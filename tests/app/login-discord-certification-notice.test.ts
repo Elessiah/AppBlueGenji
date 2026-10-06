@@ -6,6 +6,8 @@ import {
   DISCORD_LOGIN_TAG_NOTICE,
   DISCORD_TAG_AUDIENCE,
 } from "@/lib/shared/identity-sharing";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { formatMessage } from "@/lib/shared/message-format";
 
 /**
  * Ce que la connexion Discord fait du tag, dit avant le clic.
@@ -27,26 +29,31 @@ import {
  * choses différentes.
  */
 const SOURCE = readFileSync(join(process.cwd(), "app/connexion/_components/LoginForm.tsx"), "utf8");
+/** Textes de la page, dans les messages depuis le lot 6 (`messages/<langue>/login.json`). */
+const FR = messagesFor("fr").login;
 
 describe("connexion Discord — annonce de l'enregistrement du tag", () => {
   it("dit que se connecter enregistre le tag **sans le certifier**", () => {
     // Se connecter n'est pas consentir à l'exposition : la phrase ne doit plus
     // promettre une certification que la connexion ne fait plus.
-    expect(SOURCE).toMatch(/enregistre ce tag<\/strong>, sans le certifier/);
-    expect(SOURCE).not.toMatch(/certifie ce tag/i);
+    expect(FR.page.tagNotice).toMatch(/enregistre ce tag<\/strong>, sans le certifier/);
+    expect(FR.page.tagNotice).not.toMatch(/certifie ce tag/i);
+    expect(SOURCE).toContain('text.rich("page.tagNotice"');
   });
 
   it("dit que la certification se fait ensuite, dans le profil", () => {
-    expect(SOURCE).toMatch(/Si tu le certifies ensuite\s+dans « Mon profil »/);
+    expect(FR.page.tagNotice).toMatch(/Si tu le certifies ensuite\s+dans « Mon profil »/);
   });
 
   it("la note sous le bouton Discord dit la même chose, et qui lirait le tag", () => {
     expect(DISCORD_LOGIN_TAG_NOTICE).toMatch(/sans le certifier/);
     expect(DISCORD_LOGIN_TAG_NOTICE).toMatch(/invisible de tous, administrateurs compris/);
     expect(DISCORD_LOGIN_TAG_NOTICE).toContain(DISCORD_TAG_AUDIENCE);
+    // La note du bouton vient des messages : son français est mot pour mot la phrase partagée.
+    expect(formatMessage("fr", FR.oauth.discordNote, { audience: FR.oauth.tagAudience })).toBe(DISCORD_LOGIN_TAG_NOTICE);
     expect(
       readFileSync(join(process.cwd(), "app/connexion/_components/OAuthButtons.tsx"), "utf8"),
-    ).toContain("DISCORD: DISCORD_LOGIN_TAG_NOTICE");
+    ).toContain('DISCORD: "oauth.discordNote"');
   });
 
   it("nomme les deux publics, et eux seuls", () => {
@@ -56,7 +63,9 @@ describe("connexion Discord — annonce de l'enregistrement du tag", () => {
     // laisser deviner. Sans cela, « les administrateurs le voient » se lirait
     // comme un début de liste.
     expect(DISCORD_TAG_AUDIENCE).toMatch(/personne\s+d'autre/i);
-    expect(SOURCE).toContain("DISCORD_TAG_AUDIENCE");
+    // Le public est la phrase partagée, reprise telle quelle par les messages.
+    expect(FR.oauth.tagAudience).toBe(DISCORD_TAG_AUDIENCE);
+    expect(SOURCE).toContain('audience: t("oauth.tagAudience")');
   });
 
   it("garde un geste d'annulation nommé, celui qui existe à l'écran", () => {

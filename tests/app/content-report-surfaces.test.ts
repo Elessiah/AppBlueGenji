@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
-import { LOGO_RIGHTS_LABEL } from "@/lib/shared/terms-of-use";
+import { LOGO_RIGHTS_LABEL, TERMS_CHECKBOX_LABEL } from "@/lib/shared/terms-of-use";
+import { messagesFor } from "@/lib/server/i18n-messages";
 
 /**
  * Les écrans du signalement et des conditions d'utilisation. Le harnais tourne
@@ -45,7 +46,9 @@ describe("« Signaler un problème » sur toutes les pages", () => {
 describe("conditions d'utilisation à la création du compte", () => {
   it("la modale d'entrée de /connexion ne se valide qu'une fois la case cochée", () => {
     const modal = read("components/cyber/RgpdConsentModal.tsx");
-    expect(modal).toContain("TERMS_CHECKBOX_LABEL");
+    // Libellé dans les messages depuis le lot 6, qui reprennent la phrase partagée.
+    expect(modal).toContain('"consent.terms"');
+    expect(messagesFor("fr").login.consent.terms.startsWith(`${TERMS_CHECKBOX_LABEL} (`)).toBe(true);
     expect(modal).toMatch(/disabled=\{!termsChecked\}/);
   });
 
@@ -55,7 +58,7 @@ describe("conditions d'utilisation à la création du compte", () => {
     // Les trois portes transmettent l'acceptation.
     expect(login).toContain("termsAccepted={termsAccepted}");
     expect(login).toMatch(/termsAccepted,\s*\}\)/);
-    expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, termsAccepted })");
+    expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, termsAccepted, locale })");
   });
 
   it("les gérants d'équipe les acceptent depuis n'importe quelle page", () => {

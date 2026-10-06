@@ -98,4 +98,15 @@ test.describe("Langues — adresses /en", () => {
       expect(hreflangs).toEqual(["en", "fr", "x-default"]);
     }
   });
+
+  test("/en/connexion : lang=en, noindex, et les départs OAuth emportent la langue", async ({ page }) => {
+    const response = await page.goto("/en/connexion?redirect=%2Fen%2Fregles");
+    expect(response?.status()).toBe(200);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("h1")).toHaveText("Log in");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/connexion$/);
+    // Rappel inchangé (`/api/auth/<slug>/callback`) : seule la route de départ porte la langue.
+    await expect(page.locator('a[href^="/api/auth/google/start"]').first()).toHaveAttribute("href", /redirect=%2Fen%2Fregles&lang=en/);
+  });
 });
