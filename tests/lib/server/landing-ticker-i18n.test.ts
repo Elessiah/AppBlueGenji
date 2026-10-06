@@ -61,7 +61,7 @@ describe("getLandingTicker", () => {
       "WINNER · Gamma League · Team #9",
       "WINNER · Delta Cup · Unknown champion",
     ]);
-    expect(execute.mock.calls.length).toBe(calls);
+    expect(execute.mock.calls).toHaveLength(calls);
   });
 
   it("sans actualité ni base : le bandeau d'attente, dans la langue de la page", async () => {

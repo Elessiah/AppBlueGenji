@@ -27,7 +27,7 @@ describe("textes éditables — anglais d'origine", () => {
 
   it("garde les mêmes retours à la ligne qu'en français (titres multilignes)", () => {
     for (const field of SITE_COPY_FIELDS) {
-      expect(field.defaultValueEn.split("\n").length).toBe(field.defaultValue.split("\n").length);
+      expect(field.defaultValueEn.split("\n")).toHaveLength(field.defaultValue.split("\n").length);
     }
   });
 
