@@ -338,7 +338,8 @@ export function ShareCard({
                   >
                     <div
                       style={{
-                        // 24 px : la vignette Discord réduit la carte de moitié.
+                        // 24 px : la vignette Discord réduit la carte de moitié, voire au tiers ;
+                        // les mêmes faits figurent en texte sous l'encart.
                         fontSize: 24,
                         letterSpacing: 2,
                         textTransform: "uppercase",
