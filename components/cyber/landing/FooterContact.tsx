@@ -117,7 +117,8 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
         {isAdmin && (
           <li>
             <button type="button" className={styles.edit} onClick={openEdit}>
-              {t("footer.contact.edit")}
+              {/* Commande staff : reste en français jusqu'au lot 5, comme sa fenêtre. */}
+              Modifier
             </button>
           </li>
         )}

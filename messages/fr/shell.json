@@ -78,8 +78,7 @@
       "discord": "Discord",
       "server": "Serveur",
       "discordServer": "Serveur Discord",
-      "empty": "Non renseigné",
-      "edit": "Modifier"
+      "empty": "Non renseigné"
     }
   },
   "a11yMenu": {
