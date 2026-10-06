@@ -71,7 +71,11 @@
   font-size: 36px;
   color: var(--violet-300);
   line-height: 1;
-  width: 44px;
+  /* Largeur plancher, jamais fixe : « 01 » en police d'affichage dépasse
+     44 px, et le dégradé `background-clip: text` du premier rang ne peint
+     que la boîte — le chiffre qui déborde y devient transparent. */
+  min-width: 44px;
+  white-space: nowrap;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
