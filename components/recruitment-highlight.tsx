@@ -23,6 +23,7 @@ import {
   serializeRecruitmentSeen,
 } from "@/lib/shared/recruitment";
 import { FR_RECRUITMENT_TEXT, type RecruitmentText } from "@/lib/shared/recruitment-text";
+import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import styles from "./recruitment-highlight.module.css";
 
 /** Aperçu plus généreux qu'en carte : la modale a la place, mais pas un mur de texte. */
@@ -58,8 +59,14 @@ function isKeyboardFocus(target: EventTarget): boolean {
   }
 }
 
+/**
+ * Ligne de résumé d'une annonce. Le référent (`teamName`) est saisi en
+ * français et n'a pas d'anglais : hors français, il reste sur la carte et la
+ * lecture en grand (`lang="fr"`), pas dans ce résumé d'un seul tenant.
+ */
 function adMeta(ad: RecruitmentAd, text: RecruitmentText): string {
-  return [ad.teamName, text.t(`domains.${ad.domain}`), ad.roles].filter(Boolean).join(" · ");
+  const referent = text.locale === DEFAULT_LOCALE ? ad.teamName : null;
+  return [referent, text.t(`domains.${ad.domain}`), ad.roles].filter(Boolean).join(" · ");
 }
 
 /** Lien profond : la page de recrutement ouvre directement l'annonce en grand. */
@@ -102,8 +109,10 @@ export function RecruitmentHighlight({
   modalAds,
   modalSilenced,
   modalSeen,
+  modalSeenKept = [],
   bannerAds,
   bannerDismissed,
+  bannerSeenKept = [],
   onAdPage,
 }: Readonly<{
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
@@ -112,10 +121,14 @@ export function RecruitmentHighlight({
   modalSilenced: boolean;
   /** Prioritaires que ce visiteur a déjà vues (cookie) : elles le restent. */
   modalSeen: readonly number[];
+  /** Vues ailleurs mais masquées ici (sous `/en`, sans anglais) : gardées au cookie (`recruitmentSeenKept`). */
+  modalSeenKept?: readonly number[];
   /** Prioritaires puis importantes publiées : ce qui défile dans la banderole. */
   bannerAds: readonly RecruitmentAd[];
   /** Le cookie dit que ce visiteur a déjà fermé la banderole telle qu'elle est. */
   bannerDismissed: boolean;
+  /** Écartées ailleurs mais masquées ici : gardées au cookie de la banderole. */
+  bannerSeenKept?: readonly number[];
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
 }>) {
@@ -125,12 +138,13 @@ export function RecruitmentHighlight({
   return (
     <>
       {!bannerDismissed && bannerAds.length > 0 && (
-        <RecruitmentBanner ads={bannerAds} onAdPage={onAdPage} />
+        <RecruitmentBanner ads={bannerAds} keptIds={bannerSeenKept} onAdPage={onAdPage} />
       )}
       {showModal && (
         <RecruitmentArrivalModal
           ads={modalAds}
           seenIds={modalSeen}
+          keptIds={modalSeenKept}
           startIndex={modalStart}
         />
       )}
@@ -157,9 +171,11 @@ export function RecruitmentHighlight({
  */
 function RecruitmentBanner({
   ads,
+  keptIds,
   onAdPage,
 }: Readonly<{
   ads: readonly RecruitmentAd[];
+  keptIds: readonly number[];
   onAdPage: boolean;
 }>) {
   const [dismissed, setDismissed] = useState(false);
@@ -198,7 +214,7 @@ function RecruitmentBanner({
   const urgent = RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent;
 
   function dismiss() {
-    writeSeenCookie(RECRUITMENT_BANNER_COOKIE, serializeRecruitmentSeen(ads.map((a) => a.id)));
+    writeSeenCookie(RECRUITMENT_BANNER_COOKIE, serializeRecruitmentSeen([...keptIds, ...ads.map((a) => a.id)]));
     setDismissed(true);
   }
 
@@ -320,10 +336,12 @@ function RecruitmentBanner({
 function RecruitmentArrivalModal({
   ads,
   seenIds,
+  keptIds,
   startIndex,
 }: Readonly<{
   ads: readonly RecruitmentAd[];
   seenIds: readonly number[];
+  keptIds: readonly number[];
   startIndex: number;
 }>) {
   const [open, setOpen] = useState(true);
@@ -338,7 +356,7 @@ function RecruitmentArrivalModal({
   );
 
   // Valeur du cookie : les prioritaires vues, dans l'ordre de la modale.
-  const seenValue = serializeRecruitmentSeen(ads.filter((a) => viewed.has(a.id)).map((a) => a.id));
+  const seenValue = serializeRecruitmentSeen([...keptIds, ...ads.filter((a) => viewed.has(a.id)).map((a) => a.id)]);
 
   function go(direction: -1 | 1) {
     const next = (index + direction + ads.length) % ads.length;

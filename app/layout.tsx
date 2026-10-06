@@ -39,6 +39,7 @@ import {
   RECRUITMENT_MODAL_COOKIE,
   recruitmentDismissed,
   recruitmentSeenAmong,
+  recruitmentSeenKept,
 } from "@/lib/shared/recruitment";
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
@@ -190,14 +191,16 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const spotlight = await getRecruitmentSpotlight(pageLocale);
   const requestedPath = requestHeaders.get(PATHNAME_HEADER);
   const onRecruitmentPage = requestedPath === RECRUITMENT_PAGE;
-  const modalSeen = recruitmentSeenAmong(
-    cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value,
-    spotlight.modal.map((ad) => ad.id),
-  );
-  const bannerDismissed = recruitmentDismissed(
-    cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value,
-    spotlight.banner.map((ad) => ad.id),
-  );
+  const modalCookie = cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value;
+  const bannerCookie = cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value;
+  const adIds = (ads: readonly { id: number }[]) => ads.map((ad) => ad.id);
+  const modalSeen = recruitmentSeenAmong(modalCookie, adIds(spotlight.modal));
+  const bannerDismissed = recruitmentDismissed(bannerCookie, adIds(spotlight.banner));
+  // Sous `/en`, les annonces masquées (sans anglais) déjà vues en français le
+  // restent quand la banderole ou la modale réécrit son cookie (même cache).
+  const published = pageLocale === DEFAULT_LOCALE ? spotlight : await getRecruitmentSpotlight(DEFAULT_LOCALE);
+  const modalSeenKept = recruitmentSeenKept(modalCookie, adIds(published.modal), adIds(spotlight.modal));
+  const bannerSeenKept = recruitmentSeenKept(bannerCookie, adIds(published.banner), adIds(spotlight.banner));
 
   // `getCurrentUser` est mémoïsé par requête (`cache()` de React), donc cet
   // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
@@ -287,8 +290,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               pathname: requestedPath,
             })}
             modalSeen={modalSeen}
+            modalSeenKept={modalSeenKept}
             bannerAds={spotlight.banner}
             bannerDismissed={bannerDismissed}
+            bannerSeenKept={bannerSeenKept}
             onAdPage={onRecruitmentPage}
           />
           </RecruitmentTextProvider>

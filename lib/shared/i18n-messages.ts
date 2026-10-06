@@ -46,7 +46,7 @@ export type Messages = {
   login: typeof frLogin;
   /** Pages `/bot` et `/bot/docs` (lot 5a) — `lib/shared/bot-text.ts`. */
   bot: typeof frBot;
-  /** Page `/association` (lot 5b) — `lib/shared/association-text.ts`. */
+  /** Page `/association` (lot 5b). */
   association: typeof frAssociation;
   /** Page `/benevoles` (lot 5b). */
   volunteers: typeof frVolunteers;

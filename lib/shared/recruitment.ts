@@ -196,6 +196,26 @@ export function recruitmentSeenAmong(
 }
 
 /**
+ * Identifiants du cookie à **garder** quand la page n'en montre qu'une partie
+ * (sous `/en`, les annonces sans anglais sont masquées) : une annonce encore
+ * mise en avant, déjà vue ou écartée sur une page française, le reste — sinon
+ * la réécriture du cookie depuis `/en` l'oublierait, et elle reparaîtrait au
+ * retour en français. Une annonce dépubliée, elle, sort du cookie.
+ *
+ * @param publishedIds Toutes les annonces mises en avant (français).
+ * @param shownIds Celles que la page montre.
+ */
+export function recruitmentSeenKept(
+  cookieValue: string | undefined,
+  publishedIds: readonly number[],
+  shownIds: readonly number[],
+): number[] {
+  const seen = parseRecruitmentSeen(cookieValue);
+  const shown = new Set(shownIds);
+  return publishedIds.filter((id) => seen.has(id) && !shown.has(id));
+}
+
+/**
  * Page d'ouverture de la modale d'arrivée, ou `null` si elle doit se taire.
  *
  * La modale s'ouvre sur la **première annonce jamais vue** : un visiteur qui a

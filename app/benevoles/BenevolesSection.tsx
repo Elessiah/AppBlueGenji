@@ -547,13 +547,14 @@ export function BenevolesSection({
               inputClassName={styles.modalInput}
               labelClassName={styles.modalLabel}
               listFr="category-suggestions"
+              describedBy="benevole-category-hint"
             />
             <datalist id="category-suggestions">
               {[...new Set(benevoles.map((b) => b.category))].map((cat) => (
                 <option key={cat} value={cat} />
               ))}
             </datalist>
-            <span className={styles.photoHint}>
+            <span id="benevole-category-hint" className={styles.photoHint}>
               Une catégorie se traduit une fois pour toutes : l&apos;anglais vaut pour tous ses bénévoles.
             </span>
           </div>

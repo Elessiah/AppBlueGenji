@@ -32,7 +32,7 @@ interface AdDetailModalProps {
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
 export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
-  const { t } = useRecruitmentText();
+  const { t, locale } = useRecruitmentText();
   const dialogRef = useDialogBehavior({ open: true, onClose });
   const backdrop = useBackdropDismiss(onClose);
   const titleId = `annonce-titre-${ad.id}`;
@@ -72,7 +72,12 @@ export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
         <h2 id={titleId} className={styles.title}>
           {ad.title}
         </h2>
-        {ad.teamName && <p className={styles.team}>{ad.teamName}</p>}
+        {ad.teamName && (
+          // Référent saisi en français, sans anglais : annoncé comme tel hors français.
+          <p className={styles.team} lang={locale === "fr" ? undefined : "fr"}>
+            {ad.teamName}
+          </p>
+        )}
         {ad.roles && <p className={styles.roles}>{t("card.roles", { roles: ad.roles })}</p>}
 
         {hasBody ? (

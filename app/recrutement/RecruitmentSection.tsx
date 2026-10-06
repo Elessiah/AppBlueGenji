@@ -436,7 +436,12 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
             {ad.title}
           </button>
         </h3>
-        {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
+        {ad.teamName && (
+          // Référent saisi en français, sans anglais : annoncé comme tel sous `/en`.
+          <p className={styles.cardTeam} lang={staffLang}>
+            {ad.teamName}
+          </p>
+        )}
         {ad.roles && <p className={styles.cardRoles}>{t("card.roles", { roles: ad.roles })}</p>}
         {preview.text && <p className={styles.cardBody}>{preview.text}</p>}
         {preview.truncated && (
