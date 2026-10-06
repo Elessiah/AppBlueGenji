@@ -115,11 +115,11 @@
       "legendPlayIn": "Play-in"
     },
     "multi": {
-      "ariaLabel": "Multi-stage tournament: each stage narrows the field. Stage 1: Swiss 128→64, Stage 2: Survival 64→16, Stage 3: Double elimination 16→1.",
+      "ariaLabel": "Multi-stage tournament: each stage narrows the field. Stage 1: Swiss 128→64, Stage 2: Survival (cuts) 64→16, Stage 3: Double elimination 16→1.",
       "phase": "Stage {number}",
       "finalPhase": "Final stage",
       "swiss": "SWISS",
-      "survival": "SURVIVAL",
+      "survival": "SURVIVAL (CUTS)",
       "double": "DOUBLE ELIM.",
       "line1": "Each stage plays on its own and only passes",
       "line2": "its qualified teams to the next. Mix formats",
@@ -418,7 +418,7 @@
             "The team shown on top takes the left side, the one below the right side.",
             "A third-place match decides 3rd place, played alongside the final.",
             "The winner of match 1 faces the winner of match 2 in the semifinal, the winner of match 3 the winner of match 4.",
-            "The bracket doesn't allow draws: it's played in the playoffs' own format if it has one, otherwise in the tournament format, with ties closed."
+            "The bracket doesn't allow draws: it's played in the playoffs' own format if it has one, otherwise in the tournament format, with draws disabled."
           ]
         },
         {
@@ -635,12 +635,12 @@
         "Qualification can be fixed (a number of teams) or adaptive (a percentage of the actual field).",
         "The last stage decides the champion; the other teams are ranked by the furthest stage they reached, then by their rank in that stage."
       ],
-      "diagramCaption": "Example: Swiss (128 → 64), Survival (64 → 16), double elimination (16 → 1). Each stage refines the podium.",
+      "diagramCaption": "Example: Swiss (128 → 64), Survival (cuts) (64 → 16), double elimination (16 → 1). Each stage refines the podium.",
       "sections": [
         {
           "title": "Stage sequence",
           "body": [
-            "The tournament is split into a series of numbered stages. Each stage plays independently in its format (single elimination, double elimination, Swiss, Survival) and sets its own standings."
+            "The tournament is split into a series of numbered stages. Each stage plays independently in its format (single elimination, double elimination, Swiss, Survival (cuts)) and sets its own standings."
           ],
           "bullets": [
             "Only the qualified teams of stage N reach stage N+1.",
@@ -664,7 +664,7 @@
             "Swiss and Survival naturally trim the field and can start a cascade. Double elimination is only allowed as the final stage (it needs too many matches to be used earlier)."
           ],
           "bullets": [
-            "Workable example: Swiss → Survival → single elimination.",
+            "Workable example: Swiss → Survival (cuts) → single elimination.",
             "Workable example: single elimination → double elimination (last stage).",
             "Not workable: Swiss → double elimination (unless it's the last stage)."
           ]
