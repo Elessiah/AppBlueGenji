@@ -102,7 +102,7 @@
       },
       "links": {
         "label": "Underlined links",
-        "description": "All text links are underlined, not just coloured."
+        "description": "All text links are underlined, not just colored."
       },
       "font": {
         "label": "Simplified font",

@@ -54,7 +54,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
   async function submit() {
     const validation = validateContactInfo(form);
     if (!validation.ok) {
-      showError(ERROR_MESSAGES[validation.error] ?? "Coordonnées invalides.");
+      showError(ERROR_MESSAGES[validation.error] ?? "Coordonnées invalides.", { lang: frenchPart });
       return;
     }
 
@@ -67,14 +67,14 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
       });
       const data = (await res.json()) as { contact?: ContactInfo; error?: string };
       if (!res.ok || !data.contact) {
-        showError(data.error ? ERROR_MESSAGES[data.error] ?? `Échec : ${data.error}` : "Échec de l'enregistrement.");
+        showError(data.error ? ERROR_MESSAGES[data.error] ?? `Échec : ${data.error}` : "Échec de l'enregistrement.", { lang: frenchPart });
         return;
       }
       setContact(toPublicContact(data.contact));
       setOpen(false);
-      showSuccess("Coordonnées de contact mises à jour.");
+      showSuccess("Coordonnées de contact mises à jour.", { lang: frenchPart });
     } catch {
-      showError("Erreur réseau, réessaye.");
+      showError("Erreur réseau, réessaye.", { lang: frenchPart });
     } finally {
       setBusy(false);
     }

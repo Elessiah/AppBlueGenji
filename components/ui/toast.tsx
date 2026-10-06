@@ -15,15 +15,24 @@ import styles from "./toast.module.css";
 
 type ToastType = "error" | "success";
 
+/**
+ * `lang` : langue du message quand elle diffère de la page (un texte resté en
+ * français sur une page anglaise — WCAG 3.1.2). Absent, rien n'est ajouté.
+ */
+export interface ToastOptions {
+  lang?: string;
+}
+
 interface Toast {
   id: number;
   message: string;
   type: ToastType;
+  lang?: string;
 }
 
 interface ToastContextValue {
-  showError: (message: string) => void;
-  showSuccess: (message: string) => void;
+  showError: (message: string, options?: ToastOptions) => void;
+  showSuccess: (message: string, options?: ToastOptions) => void;
 }
 
 /** Durée d'affichage d'une notification, décompte suspendu exclu. */
@@ -48,17 +57,20 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
-  const add = useCallback((message: string, type: ToastType) => {
+  const add = useCallback((message: string, type: ToastType, lang?: string) => {
     const id = ++nextId.current;
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type, lang }]);
   }, []);
 
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const showError = useCallback((message: string) => add(message, "error"), [add]);
-  const showSuccess = useCallback((message: string) => add(message, "success"), [add]);
+  const showError = useCallback((message: string, options?: ToastOptions) => add(message, "error", options?.lang), [add]);
+  const showSuccess = useCallback(
+    (message: string, options?: ToastOptions) => add(message, "success", options?.lang),
+    [add],
+  );
   // Valeur stable : un objet neuf à chaque rendu du fournisseur — donc à chaque
   // notification ajoutée *et* retirée — re-rendait tous les consommateurs de
   // `useToast`, fiche d'un tournoi et tout son plateau compris.
@@ -71,14 +83,18 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
         {toasts
           .filter((toast) => toast.type === "success")
           .map((toast) => (
-            <p key={toast.id}>{toast.message}</p>
+            <p key={toast.id} lang={toast.lang}>
+              {toast.message}
+            </p>
           ))}
       </div>
       <div className="sr-only" role="alert" aria-live="assertive">
         {toasts
           .filter((toast) => toast.type === "error")
           .map((toast) => (
-            <p key={toast.id}>{toast.message}</p>
+            <p key={toast.id} lang={toast.lang}>
+              {toast.message}
+            </p>
           ))}
       </div>
       {toasts.length > 0 && (
@@ -185,7 +201,7 @@ export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismi
     >
       <p className={styles.message}>
         <span className="sr-only">{`${prefix} `}</span>
-        {toast.message}
+        {toast.lang ? <span lang={toast.lang}>{toast.message}</span> : toast.message}
       </p>
       <div className={styles.actions}>
         <button
