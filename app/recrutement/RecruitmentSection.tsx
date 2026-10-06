@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   type RecruiterContactDefaults,
+  type HiddenRecruitmentAd,
   type RecruitmentAd,
   type RecruitmentDomain,
   type RecruitmentField,
@@ -47,6 +48,12 @@ import styles from "./page.module.css";
 
 interface RecruitmentSectionProps {
   initialAds: RecruitmentAd[];
+  /**
+   * Vue d'un visiteur, rendue côté serveur (`publicRecruitmentAds`) : les
+   * annonces sont déjà dans la langue de la page, et voici celles que `/en`
+   * masque faute d'anglais. Absente pour le staff, qui reçoit les deux langues.
+   */
+  hiddenAds?: readonly HiddenRecruitmentAd[];
   isAdmin: boolean;
   contactDefaults?: RecruiterContactDefaults;
 }
@@ -96,7 +103,7 @@ function reorderErrorMessage(code: string | undefined): string {
  * « aucune urgence » quand une annonce urgente l'est — on dit alors qu'elles
  * arrivent, sans compteur à zéro.
  */
-function emptyMessageKeys(hidden: readonly RecruitmentAd[], domain: RecruitmentDomain | null) {
+function emptyMessageKeys(hidden: readonly HiddenRecruitmentAd[], domain: RecruitmentDomain | null) {
   const urgentHidden = splitRecruitmentAds(hidden.filter((ad) => domain === null || ad.domain === domain)).featured.length > 0;
   return {
     empty: hidden.length > 0 ? "section.pendingTranslation" : "section.empty",
@@ -105,15 +112,15 @@ function emptyMessageKeys(hidden: readonly RecruitmentAd[], domain: RecruitmentD
   } as const;
 }
 
-/** Lien vers une annonce absente de la page : supprimée, ou (sous `/en`) pas encore traduite. */
+/** Lien vers une annonce absente de la page : supprimée, ou (sous `/en`) pas encore traduite (`hidden`). */
 function missingAdMessage(
-  ads: readonly RecruitmentAd[],
+  hidden: readonly HiddenRecruitmentAd[],
   id: number,
   messages: Readonly<{ unavailable: string; untranslated: string }>,
 ): string {
-  return ads.some((a) => a.id === id) ? messages.untranslated : messages.unavailable;
+  return hidden.some((a) => a.id === id) ? messages.untranslated : messages.unavailable;
 }
-export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
+export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
   const locale = useAppLocale();
   const { t } = useRecruitmentText();
   // La gestion reste en français (D4) : sous `/en`, ses contrôles, sa fenêtre
@@ -157,7 +164,19 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
   // Ce que la page montre : les annonces dans la langue de la page. Sous `/en`,
   // une annonce sans anglais n'est pas rendue (`localizeRecruitmentAds`) — la
   // gestion la retrouve sur la page française, marquée **EN**.
-  const shownAds = useMemo(() => (locale === "fr" ? ads : localizeRecruitmentAds(ads, locale)), [ads, locale]);
+  // Déjà dans la langue de la page quand le serveur a fait la vue du visiteur.
+  const preLocalized = serverHidden !== undefined;
+  const shownAds = useMemo(
+    () => (preLocalized || locale === "fr" ? ads : localizeRecruitmentAds(ads, locale)),
+    [ads, locale, preLocalized],
+  );
+  // Sous `/en`, les annonces encore sans anglais, masquées (`emptyMessageKeys`).
+  const hiddenAds = useMemo<readonly HiddenRecruitmentAd[]>(() => {
+    if (serverHidden) return serverHidden;
+    if (shownAds.length === ads.length) return [];
+    const shownIds = new Set(shownAds.map((a) => a.id));
+    return ads.filter((ad) => !shownIds.has(ad.id));
+  }, [serverHidden, ads, shownAds]);
 
   // Annonce visée par le lien profond : `null` si elle n'existe pas (ou plus).
   const detailAd = detailId === null ? null : (shownAds.find((a) => a.id === detailId) ?? null);
@@ -169,9 +188,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
   const untranslated = t("section.untranslated");
   useEffect(() => {
     if (detailId === null || shownAds.some((a) => a.id === detailId)) return;
-    showUnavailable(missingAdMessage(ads, detailId, { unavailable, untranslated }));
+    showUnavailable(missingAdMessage(hiddenAds, detailId, { unavailable, untranslated }));
     setDetailId(null);
-  }, [detailId, ads, shownAds, showUnavailable, unavailable, untranslated]);
+  }, [detailId, hiddenAds, shownAds, showUnavailable, unavailable, untranslated]);
 
   function openDetail(ad: RecruitmentAd) {
     setDetailId(ad.id);
@@ -503,8 +522,6 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
 
   const total = shownAds.length;
   const shown = visibleAds.length;
-  // Sous `/en`, des annonces encore sans anglais sont masquées (`emptyMessageKeys`).
-  const hiddenAds = shownAds.length < ads.length ? ads.filter((ad) => !shownAds.some((a) => a.id === ad.id)) : [];
   const translationPending = hiddenAds.length > 0;
   const emptyKeys = emptyMessageKeys(hiddenAds, filterActive ? domainFilter : null);
 

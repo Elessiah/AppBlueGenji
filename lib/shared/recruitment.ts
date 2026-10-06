@@ -1,5 +1,5 @@
 import { type CountdownOverride, isCountdownHeld } from "./pausable-countdown";
-import type { Locale } from "./locales";
+import { DEFAULT_LOCALE, type Locale } from "./locales";
 import { checkEnglish, englishCodes, englishErrorMessage, optionalStaffText, staffText } from "./staff-translation";
 
 /**
@@ -839,6 +839,40 @@ export function localizeRecruitmentAds<T extends RecruitmentAd>(ads: readonly T[
     const localized = localizeRecruitmentAd(ad, locale);
     return localized === null ? [] : [localized];
   });
+}
+
+/**
+ * Une annonce sans ses colonnes anglaises : ce qu'un visiteur reçoit, une fois
+ * l'annonce rendue dans la langue de la page. Les `*En` ne servent qu'à la
+ * gestion ; envoyés à chaque page (mise en avant de la mise en page racine),
+ * ils doublaient le poids des annonces pour rien.
+ */
+export function withoutEnglish<T extends RecruitmentAd>(ad: T): T {
+  return { ...ad, titleEn: null, rolesEn: null, bodyEn: null };
+}
+
+/** Annonce masquée sous `/en` (pas encore traduite) : ce qu'en lit la page — son pôle et son statut. */
+export type HiddenRecruitmentAd = Pick<RecruitmentAd, "id" | "domain" | "priority">;
+
+/**
+ * Les annonces d'un visiteur, rendues côté serveur dans la langue de la page :
+ * français ou anglais seulement, jamais les deux ; sous `/en`, les annonces
+ * sans anglais réduites à leur pôle et leur statut (messages « en cours de
+ * traduction », lien profond « pas encore en anglais »).
+ */
+export function publicRecruitmentAds(
+  ads: readonly RecruitmentAd[],
+  locale: Locale,
+): { ads: RecruitmentAd[]; hidden: HiddenRecruitmentAd[] } {
+  if (locale === DEFAULT_LOCALE) return { ads: ads.map(withoutEnglish), hidden: [] };
+  const shown: RecruitmentAd[] = [];
+  const hidden: HiddenRecruitmentAd[] = [];
+  for (const ad of ads) {
+    const localized = localizeRecruitmentAd(ad, locale);
+    if (localized) shown.push(withoutEnglish(localized));
+    else hidden.push({ id: ad.id, domain: ad.domain, priority: ad.priority });
+  }
+  return { ads: shown, hidden };
 }
 
 /* ------------------------------------------------------------------ *

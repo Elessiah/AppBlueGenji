@@ -10,6 +10,7 @@ import {
   type RecruitmentSpotlight,
   recruitmentOrderMixesPriorities,
   localizeRecruitmentAds,
+  withoutEnglish,
   selectRecruitmentSpotlight,
   sortRecruitmentAds,
   validateRecruitmentAdInput,
@@ -114,10 +115,13 @@ const EMPTY_SPOTLIGHT: RecruitmentSpotlight<RecruitmentAd> = { modal: [], banner
  */
 export async function getRecruitmentSpotlight(locale: Locale = DEFAULT_LOCALE): Promise<RecruitmentSpotlight<RecruitmentAd>> {
   const spotlight = await loadRecruitmentSpotlight();
-  if (locale === DEFAULT_LOCALE) return spotlight;
-  // Sous `/en`, seulement les annonces traduites, dans leur anglais : la
-  // banderole et la modale se taisent plutôt que de parler français.
-  return { modal: localizeRecruitmentAds(spotlight.modal, locale), banner: localizeRecruitmentAds(spotlight.banner, locale) };
+  // Une seule langue part au navigateur (`withoutEnglish`) : la mise en avant
+  // est dans la mise en page racine, donc dans le HTML de chaque page. Sous
+  // `/en`, seulement les annonces traduites, dans leur anglais : la banderole
+  // et la modale se taisent plutôt que de parler français.
+  const inLocale = (ads: RecruitmentAd[]) =>
+    (locale === DEFAULT_LOCALE ? ads : localizeRecruitmentAds(ads, locale)).map(withoutEnglish);
+  return { modal: inLocale(spotlight.modal), banner: inLocale(spotlight.banner) };
 }
 
 async function loadRecruitmentSpotlight(): Promise<RecruitmentSpotlight<RecruitmentAd>> {

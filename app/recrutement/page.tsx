@@ -8,7 +8,7 @@ import { requestLocale } from "@/lib/server/request-locale";
 import { can } from "@/lib/shared/permissions";
 import { getRecruiterContactDefaults, listRecruitmentAds } from "@/lib/server/recruitment-service";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
-import type { RecruiterContactDefaults } from "@/lib/shared/recruitment";
+import { publicRecruitmentAds, type RecruiterContactDefaults } from "@/lib/shared/recruitment";
 import { recruitmentClientMessages } from "@/lib/shared/recruitment-text";
 import { RecruitmentSection } from "./RecruitmentSection";
 import styles from "./page.module.css";
@@ -37,9 +37,11 @@ export default async function RecrutementPage() {
   // Gestion du recrutement : administrateurs + Recruteurs.
   const isAdmin = can(user, "recruitment");
   // Les gestionnaires du recrutement voient aussi les brouillons (annonces inactives).
-  // La liste garde le français **et** l'anglais : la section montre la langue de
-  // la page, l'éditeur les deux (`localizeRecruitmentAds`).
+  // Leur liste garde le français **et** l'anglais : la section montre la langue
+  // de la page, l'éditeur les deux (`localizeRecruitmentAds`). Un visiteur ne
+  // reçoit que la langue de la page (`publicRecruitmentAds`).
   const ads = await listRecruitmentAds(isAdmin);
+  const publicView = isAdmin ? undefined : publicRecruitmentAds(ads, locale);
   // Coordonnées du recruteur pour pré-remplir le formulaire (édition libre).
   const contactDefaults: RecruiterContactDefaults =
     isAdmin && user
@@ -64,7 +66,12 @@ export default async function RecrutementPage() {
         locale={locale}
         messages={locale === DEFAULT_LOCALE ? undefined : recruitmentClientMessages(messages)}
       >
-        <RecruitmentSection initialAds={ads} isAdmin={isAdmin} contactDefaults={contactDefaults} />
+        <RecruitmentSection
+          initialAds={publicView?.ads ?? ads}
+          hiddenAds={publicView?.hidden}
+          isAdmin={isAdmin}
+          contactDefaults={contactDefaults}
+        />
       </RecruitmentTextProvider>
     </PublicPageShell>
   );
