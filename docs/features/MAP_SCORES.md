@@ -57,9 +57,16 @@ c'est ce comportement qui s'applique.
 | Vainqueur exigé | `matchMaxMaps + 2` — la map nulle se rejoue (`DRAWN_MAP_REPLAY_ALLOWANCE`) |
 | Score libre | 9 (`FREE_FORMAT_MAP_LIMIT`) |
 
-**Décision requise** : la marge de deux maps nulles rejouées sur un format qui
-exige un vainqueur est un choix par défaut ; au-delà, l'arbitrage pose le score
-à la main.
+**Décision de l'utilisateur (2026-10-06)** : la marge de deux maps nulles
+rejouées sur un format qui exige un vainqueur est gardée comme marge de sécurité
+(le cas ne devrait pas se produire) ; au-delà, l'arbitrage pose le score à la
+main.
+
+**Décision de l'utilisateur (2026-10-06)** : là où les égalités sont ouvertes,
+une map nulle **consomme** une map du BO. Un match clos sans vainqueur doit donc
+avoir joué toutes ses maps : un 2-2 en BO5 n'est accepté qu'avec une cinquième
+map nulle, sinon `MAP_LIST_INCOMPLETE` (contrôle décisif seulement — un
+enregistrement intermédiaire de l'arbitrage reste libre).
 
 Une ligne après la fin acquise (un camp a atteint l'objectif, ou toutes les maps
 d'un BO sans tiebreaker sont jouées) est refusée (`MAP_AFTER_DECISION`) : elle
@@ -87,6 +94,7 @@ Le jeu se lit avec le format, dans la même requête
 | `MAP_REPLAY_CODE_REQUIRED` / `_INVALID` / `_DUPLICATE` | code manquant, hors motif, en double |
 | `MAP_SCORE_INVALID` | score de map non entier, négatif ou > 99 |
 | `MAP_AFTER_DECISION` | map après la fin acquise |
+| `MAP_LIST_INCOMPLETE` | égalités ouvertes : match sans vainqueur clos avant d'avoir joué toutes ses maps |
 | `SCORE_EXCEEDS_MATCH_FORMAT`, `SCORE_BELOW_MATCH_FORMAT`, `DRAW_NOT_ALLOWED` | score dérivé refusé par les règles existantes |
 
 L'interface rejoue le même contrôle avant l'envoi et rattache le refus à son
@@ -148,8 +156,9 @@ vainqueur / perdant ne change pas. Une proposition d'avant les maps ne se
 compare que sur le score. La modale de l'adversaire s'ouvre sur la proposition
 (maps comprises) : confirmer d'un clic renvoie le même détail. Corriger un code
 à score égal reste une nouvelle proposition (le bouton ne se bloque pas sur
-« déjà envoyé »). **Décision requise** : faut-il plutôt clore sur le seul score
-et retenir le détail de l'une des deux ?
+« déjà envoyé »). **Décision de l'utilisateur (2026-10-06)** : un désaccord sur
+les maps à score égal est un conflit, tranché par l'arbitrage — on ne clôt pas
+sur le seul score.
 
 ### « Confirmer » la proposition adverse (demande du 2026-10-06)
 
@@ -210,11 +219,11 @@ le tait.
   (`mapsMatchStoredScore`) : un score corrigé à la main ne porte pas un détail
   qui le contredit.
 - Carte de match : bouton « Détail des maps (N) » qui ouvre une **modale** (un volet déplié dans la carte grandissait chaque créneau de l'arbre), score de chaque map et code
-  copiable. **Décision requise** : visible de tout membre connecté (les pages de
-  tournoi exigent une session) — les codes de replay sont des données de jeu
-  publiques, mais un replay montre les identifiants de jeu des joueurs. Les
-  réserver aux engagés et à l'arbitrage demanderait de les sortir de
-  l'instantané diffusé vers `TournamentViewerContext`.
+  copiable. **Décision de l'utilisateur (2026-10-06)** : les codes retenus
+  (`FINAL`) ou enregistrés par l'arbitrage sont visibles de tout membre connecté
+  (les pages de tournoi exigent une session), pour qu'un match diffusé en direct
+  et un match qui ne l'est pas offrent les mêmes informations ; les propositions
+  en attente restent réservées aux deux équipes et à l'arbitrage.
 - Discord : aucun code n'y part. Si un jour un code y est cité, il passe par
   `discordInline` (`UNTRUSTED_NAMES.md`).
 
@@ -229,7 +238,11 @@ le tait.
   sans map, l'arbitre pose le score à la main comme avant (replay perdu). La
   confirmation de correction d'un résultat validé (#381) est inchangée.
   En désaccord (deux propositions), le dialogue montre le détail des deux,
-  codes de replay compris (`MapResultList`).
+  codes de replay compris (`MapResultList`). Tant que le détail de la
+  proposition est en lecture (`proposalsNeedRefresh`, formulaire sans map ni
+  forfait), « Enregistrer » et « Valider » attendent, avec une phrase visible :
+  un score validé avant partirait avec `maps: []` et effacerait les codes de la
+  proposition à la clôture.
 
 ## RGPD
 

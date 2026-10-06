@@ -39,7 +39,8 @@ export const FREE_FORMAT_MAP_LIMIT = 9;
  * un vainqueur : une map nulle n'y consomme aucune manche décisive (le plafond
  * de `matchMaxMaps` porte sur la somme des scores), il faut donc de la place
  * pour la rejouer. Deux, et non un nombre illimité : au-delà, c'est à
- * l'arbitrage de trancher (décision requise, `MAP_SCORES.md`).
+ * l'arbitrage de trancher (décision de l'utilisateur du 2026-10-06 : marge de
+ * sécurité, `MAP_SCORES.md`).
  */
 export const DRAWN_MAP_REPLAY_ALLOWANCE = 2;
 

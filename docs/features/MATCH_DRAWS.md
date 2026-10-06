@@ -60,11 +60,17 @@ qui ont désigné un vainqueur. Une map nulle ne figure dans aucun des deux
 scores — les colonnes de `bg_matches` n'en gardent pas trace — elle allonge donc
 la rencontre sans consommer le plafond. « 5 maps » veut dire ici « au plus 5
 maps décisives », pas « exactement 5 maps jouées » : c'est la seule lecture que
-les données permettent de tenir, et elle est écrite en toutes lettres dans le
-module.
+les données permettent de tenir **sur les colonnes de score**.
+
+**Saisie map par map (décision de l'utilisateur, 2026-10-06).** Le détail des
+maps, lui, compte la map nulle : là où les égalités sont ouvertes, elle
+**consomme** une map du BO, et un match clos sans vainqueur doit avoir joué
+toutes ses maps — un 2-2 en BO5 n'est accepté qu'avec une cinquième map nulle
+(`MAP_LIST_INCOMPLETE` sinon, `MAP_SCORES.md`). Les colonnes et
+`checkMatchScores` sont inchangées.
 
 Avec `drawsAllowed`, **n'importe quel** score tenant dans le plafond est un
-résultat final : 2-2, 2-1 (une map nulle a consommé la cinquième), et jusqu'à
+résultat final : 2-2, 2-1 (deux maps nulles ont consommé les autres), et jusqu'à
 0-0. `checkMatchScores` reste l'unique implémentation, partagée par l'interface
 (qui borne les champs et active « Valider le résultat ») et le serveur (qui
 refuse en 400).
