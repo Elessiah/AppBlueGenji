@@ -71,6 +71,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ changeIds }),
+      // Un lien d'action qui change de langue charge un nouveau document
+      // (`LocaleLink`) : sans `keepalive`, ce départ annulerait l'écriture.
+      keepalive: true,
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
   };
