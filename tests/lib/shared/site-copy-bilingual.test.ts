@@ -1,9 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   SITE_COPY_ERROR_MESSAGES,
   SITE_COPY_FIELD_ERRORS,
   SITE_COPY_FIELDS,
   defaultSiteCopy,
+  isSiteCopyEnStale,
   resolveSiteCopy,
   siteCopyErrorMessage,
   siteCopySettingKey,
@@ -125,5 +128,45 @@ describe("resolveSiteCopy — règle de rattrapage", () => {
     expect(bundle.fr["home.hero.title"]).toBe(defaultSiteCopy("fr")["home.hero.title"]);
     expect(bundle.en["home.hero.title"]).toBe(defaultSiteCopy("en")["home.hero.title"]);
     expect(bundle.missingEn).toEqual([]);
+  });
+});
+
+describe("isSiteCopyEnStale — anglais à revoir après un français réécrit", () => {
+  const entry = { fr: "Bonjour", en: "Hello", enMissing: false };
+
+  it("signale un français changé sous un anglais intact", () => {
+    expect(isSiteCopyEnStale(entry, "Salut", "Hello")).toBe(true);
+  });
+
+  it("se tait quand rien n'a changé, ou seulement des espaces autour", () => {
+    expect(isSiteCopyEnStale(entry, "Bonjour", "Hello")).toBe(false);
+    expect(isSiteCopyEnStale(entry, "  Bonjour ", "Hello")).toBe(false);
+  });
+
+  it("se tait dès que l'anglais a été retouché", () => {
+    expect(isSiteCopyEnStale(entry, "Salut", "Hi")).toBe(false);
+  });
+
+  it("laisse un anglais encore vide à la marque « EN à rédiger »", () => {
+    expect(isSiteCopyEnStale({ fr: "Bonjour", en: "", enMissing: true }, "Salut", "")).toBe(false);
+  });
+});
+
+describe("textes de l'accueil — retours de revue", () => {
+  const messages = (lang: "fr" | "en") =>
+    JSON.parse(readFileSync(join(__dirname, "..", "..", "..", "messages", lang, "landing.json"), "utf8"));
+  const fr = messages("fr") as { board: { emptyEyebrow: string }; sponsors: { count: string } };
+  const en = messages("en") as { calendar: { heading: string } };
+
+  it("écrit le surtitre du plateau vide en français sur la page française", () => {
+    expect(fr.board.emptyEyebrow).toBe("TOURNOIS");
+  });
+
+  it("accorde le nombre de partenaires", () => {
+    expect(fr.sponsors.count).toBe("{count, plural, one {# PARTENAIRE} other {# PARTENAIRES}}");
+  });
+
+  it("dit en anglais que les heures sont celles de Paris", () => {
+    expect(en.calendar.heading).toBe("UPCOMING EVENTS · PARIS TIME");
   });
 });

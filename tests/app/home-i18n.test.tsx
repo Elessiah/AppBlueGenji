@@ -220,7 +220,7 @@ describe("accueil — français inchangé", () => {
       "Membres Discord",
       "367 en ligne",
       "Partenaires et soutiens",
-      "1 PARTENAIRES",
+      "1 PARTENAIRE",
       "LOI 1901 · JANVILLIERS",
       "Bénévole",
       "Un partenaire fidèle de la scène",
