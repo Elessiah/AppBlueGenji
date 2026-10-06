@@ -78,7 +78,7 @@ function phrases(doc: LegalDoc): string[] {
 function documentText(html: string): string {
   return visibleText(html)
     .replace(/SECTION \d{2}/g, "")
-    .replace(/ \(in French\)$/, "");
+    .replace(/ \(in French\)(?= →$)/, "");
 }
 
 const sectionLangs = (html: string) =>
@@ -203,12 +203,19 @@ describe("liens internes dans la langue de la page", () => {
     const english = [...privacy.matchAll(/<a[^>]*href="\/en\/[^"]*"[^>]*>/g)].map((m) => m[0]);
     expect(english.length).toBeGreaterThan(0);
     for (const tag of english) expect(tag).not.toContain("hrefLang");
+    // Lien externe vers une page française (la CNIL) : signalé lui aussi ; le dépôt GitHub, non.
+    expect(privacy).toMatch(/<a[^>]*href="https:\/\/www\.cnil\.fr\/fr\/[^"]*"[^>]*hrefLang="fr"/);
+    expect(await render(PrivacyPage, "fr")).not.toContain("hrefLang");
+    const terms = await render(TermsPage, "en");
+    const github = [...terms.matchAll(/<a[^>]*href="https:\/\/github\.com[^"]*"[^>]*>/g)].map((m) => m[0]);
+    expect(github.length).toBeGreaterThan(0);
+    for (const tag of github) expect(tag).not.toContain("hrefLang");
   });
 
   it("sous /en, le lien vers l'hébergeur dit « (in French) » ; en français, rien n'est ajouté", async () => {
     for (const page of [PrivacyPage, TermsPage]) {
       const en = visibleText(await render(page, "en"));
-      expect(en).toContain(`See the Hosting section of the legal notice → ${enBot.legalPages.inFrench}`);
+      expect(en).toContain(`See the Hosting section of the legal notice ${enBot.legalPages.inFrench} →`);
       const fr = await render(page, "fr");
       expect(fr).not.toContain("hrefLang");
       expect(visibleText(fr)).not.toContain(frBot.legalPages.inFrench);
