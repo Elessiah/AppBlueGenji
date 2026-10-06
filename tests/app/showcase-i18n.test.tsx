@@ -342,6 +342,15 @@ describe("rendu anglais — rien encore traduit : le dire, sans « 0 » ni « au
     expect(html).not.toContain("Modifier Referees for Sundays");
   });
 
+  it("/en/recrutement : le statut « Inactif » (vu du seul staff) reste en français, annoncé lang=fr", async () => {
+    mockUser = authUserForMock();
+    const all = await listRecruitmentAds();
+    jest.mocked(listRecruitmentAds).mockResolvedValueOnce(all.map((ad) => ({ ...ad, active: false })));
+    const html = await render(RecrutementPage, "en");
+    expect(html).toMatch(/lang="fr"[^>]*>Inactif</);
+    expect(readable(html)).not.toContain("Inactive");
+  });
+
   it("/en/recrutement : pas de flèches d'ordre pour le staff (une annonce masquée fausserait l'échange)", async () => {
     mockUser = authUserForMock();
     expect(await render(RecrutementPage, "en")).not.toMatch(/aria-label="(Monter|Descendre) l&#x27;annonce/);
