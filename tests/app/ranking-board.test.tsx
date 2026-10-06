@@ -228,6 +228,15 @@ describe("noms du podium — un effet par marche", () => {
     // Survol et focus rendent une couleur pleine (soulignement visible).
     expect(css).toMatch(/\.nameTier1 :global\(\.entity-link\):focus-visible[\s\S]*?\{\s*color: var\(--blue-100\)/);
   });
+
+  it("garde un soulignement visible et un nom imprimable malgré le texte transparent", () => {
+    for (const tier of [1, 2]) {
+      // « Liens soulignés » (menu d'accessibilité) : le trait ne suit pas `color: transparent`.
+      expect(linkRule(tier)).toMatch(/text-decoration-color: var\(--blue-300\)/);
+    }
+    // Imprimé : les fonds ne s'impriment pas — couleur pleine pour les deux noms peints.
+    expect(css).toMatch(/@media print \{\s*\.nameTier1 :global\(\.entity-link\),\s*\.nameTier2 :global\(\.entity-link\) \{\s*background: none;\s*color: var\(--blue-500\);/);
+  });
 });
 
 describe("RankingBoard — affichage progressif", () => {

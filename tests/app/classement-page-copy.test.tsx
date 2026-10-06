@@ -22,6 +22,7 @@ import { loadLeaderboardRows } from "@/lib/server/landing-service";
 import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import { defaultSiteCopy } from "@/lib/shared/site-copy";
 import { authUser } from "../helpers/auth-user";
+import { readSource } from "../helpers/read-source";
 
 /**
  * En-tête éditable de `/classement` (docs/features/EDITABLE_SITE_COPY.md,
@@ -81,5 +82,23 @@ describe("/classement — en-tête éditable", () => {
 
   it("garde le titre de page figé, indépendant du texte éditable", () => {
     expect(String(metadata.title)).toContain("Classement des équipes");
+  });
+});
+
+describe("EditableCopy — retour du focus et calques de l'en-tête", () => {
+  const source = readSource("components/cyber/landing/EditableCopy.tsx");
+  const css = readSource("components/cyber/landing/EditableCopy.module.css");
+
+  it("ferme l'éditeur par un seul chemin qui rend le focus au crayon", () => {
+    // Enregistrer, rétablir et annuler passent tous par `closeEditor`.
+    expect(source.match(/closeEditor\(\);/g)).toHaveLength(3);
+    expect(source.match(/setEditing\(false\)/g)).toHaveLength(1);
+    expect(source).toMatch(/returnFocus\.current = true;\s*setEditing\(false\);/);
+    expect(source).toMatch(/if \(el && returnFocus\.current\) \{\s*returnFocus\.current = false;\s*el\.focus\(\);/);
+  });
+
+  it("place crayon et éditeur au-dessus des calques décoratifs (trame, aurore)", () => {
+    expect(css).toMatch(/\.pencil \{\s*position: relative;/);
+    expect(css).toMatch(/\.editor \{\s*position: relative;/);
   });
 });
