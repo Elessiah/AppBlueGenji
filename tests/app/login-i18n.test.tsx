@@ -347,9 +347,8 @@ describe("exposé de suspension", () => {
     expect(suspendedLoginText(FR_TEXT, null)).toBe(suspendedLoginMessage(null));
     expect(suspendedLoginText(FR_TEXT, notice.endsAt)).toBe(suspendedLoginMessage(notice.endsAt));
     expect(suspendedLoginText(FR_TEXT, "pas une date")).toBe(suspendedLoginMessage("pas une date"));
-    // Le toast est d'une seule langue : l'anglais n'y cite pas « Autre ».
-    expect(suspendedLoginText(EN_TEXT, null)).toContain("category “Other” (no login needed)");
-    expect(suspendedLoginText(EN_TEXT, null)).not.toContain("Autre");
+    // Le toast cite l'intitulé réel du formulaire (encore français, lot 9), traduit à la suite.
+    expect(suspendedLoginText(EN_TEXT, null)).toContain("category “Autre” (“Other”; no login needed)");
     expect(suspensionSpanText(FR_TEXT, null, "S-1")).toBe(
       `Ce compte est suspendu ${suspensionSpan(null)} (décision S-1) : aucune connexion n'est possible tant que la suspension court.`,
     );
