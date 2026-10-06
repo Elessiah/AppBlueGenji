@@ -142,7 +142,7 @@ refonte (`DESIGN_SYSTEM.md`), chaque valeur recopiée d'un jeton de
   la tient alignée sur `STATE_META` ;
 - **faits** : chaque intitulé dans son néon (cyan, violet, turquoise), en 24 px
   pour rester lisible dans la vignette Discord (la carte y est réduite de
-  moitié), avec un liseré à gauche, la valeur en `--ink` ;
+  moitié, voire au tiers ; les mêmes faits sont en texte dans la description), avec un liseré à gauche, la valeur en `--ink` ;
 - **logo** BlueGenji en pied, lu sur le disque (`lib/server/share-card-logo.ts` :
   `public/icons/icon-192.png` en URL `data:`, mémorisé par processus). Satori ne
   décode pas le WebP de la vitrine ; un fichier absent rend `null` et la carte
