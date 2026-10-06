@@ -513,7 +513,7 @@ export async function resolveExpiredScoreReports(
       // écriture comme à chaque chargement. Deux clôtures concurrentes du même
       // report réécrivaient le même score sans dommage ; avec le détail map par
       // map, la seconde effaçait celui que la première venait de retenir.
-      if (!(await stillAwaitingConfirmation(connection, Number(match.id)))) continue;
+      if (!(await stillSingleReport(connection, Number(match.id), team1Reported))) continue;
       const { team1Score, team2Score } = singleReportScores(match);
 
       const format = await loadTournamentMatchFormat(
@@ -557,17 +557,29 @@ export async function resolveExpiredScoreReports(
 }
 
 /**
- * Le match attend-il toujours une confirmation, une fois sa ligne verrouillée
- * (table seule, sans jointure — MariaDB) ? Une ligne introuvable ne bloque
- * rien : la suite n'écrira rien de plus qu'avant.
+ * Le match attend-il toujours la confirmation d'un **seul** report — le même
+ * que celui lu sans verrou —, une fois sa ligne verrouillée (table seule, sans
+ * jointure — MariaDB) ? Une contestation arrivée entre-temps fait deux reports :
+ * la clôture d'office la trancherait au profit du premier, et effacerait la
+ * seconde avec son détail. Une ligne introuvable, ou un double de test qui ne
+ * la décrit pas, ne bloque rien : la suite n'écrira rien de plus qu'avant.
  */
-async function stillAwaitingConfirmation(connection: PoolConnection, matchId: number): Promise<boolean> {
-  const result = await connection.execute<(RowDataPacket & { status?: string })[]>(
-    `SELECT status FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
+async function stillSingleReport(
+  connection: PoolConnection,
+  matchId: number,
+  team1Reported: boolean,
+): Promise<boolean> {
+  const result = await connection.execute<(RowDataPacket & Partial<ExpiredMatchRow> & { status?: string })[]>(
+    `SELECT status, team1_report_score, team1_report_opponent_score,
+            team2_report_score, team2_report_opponent_score
+     FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
     [matchId],
   );
-  const status = Array.isArray(result) && Array.isArray(result[0]) ? result[0][0]?.status : undefined;
-  return status === undefined || status === "AWAITING_CONFIRMATION";
+  const fresh = Array.isArray(result) && Array.isArray(result[0]) ? result[0][0] : undefined;
+  if (fresh?.status === undefined) return true;
+  if (fresh.status !== "AWAITING_CONFIRMATION") return false;
+  const row = fresh as ExpiredMatchRow;
+  return hasTeam1Report(row) === team1Reported && hasTeam2Report(row) === !team1Reported;
 }
 
 /** L'engagé 1 a-t-il déposé son report (son score et celui de l'adversaire) ? */

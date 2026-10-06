@@ -64,7 +64,7 @@ describe("resolveExpiredScoreReports", () => {
     const connection = fakeConnection({
       seen,
       rows: (q) => {
-        if (q.startsWith("SELECT status FROM bg_matches WHERE id = ?")) return [{ status: "COMPLETED" }];
+        if (q.startsWith("SELECT status,")) return [{ status: "COMPLETED" }];
         if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
         return [];
       },
@@ -72,7 +72,30 @@ describe("resolveExpiredScoreReports", () => {
 
     await resolveExpiredScoreReports(connection, 12);
 
-    expect(seen).toContain("SELECT status FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE");
+    expect(seen.some((q) => q.startsWith("SELECT status,") && q.endsWith("FOR UPDATE"))).toBe(true);
+    expect(promoteReportedMaps).not.toHaveBeenCalled();
+    expect(finalizeMatch).not.toHaveBeenCalled();
+  });
+
+  it("ne tranche pas d'office un report contesté entre-temps (MAP_SCORES.md)", async () => {
+    const connection = fakeConnection({
+      rows: (q) => {
+        if (q.startsWith("SELECT status,")) {
+          return [{
+            status: "AWAITING_CONFIRMATION",
+            team1_report_score: 2,
+            team1_report_opponent_score: 1,
+            team2_report_score: 2,
+            team2_report_opponent_score: 1,
+          }];
+        }
+        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
+        return [];
+      },
+    });
+
+    await resolveExpiredScoreReports(connection, 12);
+
     expect(promoteReportedMaps).not.toHaveBeenCalled();
     expect(finalizeMatch).not.toHaveBeenCalled();
   });
