@@ -229,6 +229,16 @@ describe("noms du podium — un effet par marche", () => {
     expect(css).toMatch(/\.nameTier1 :global\(\.entity-link\):focus-visible[\s\S]*?\{\s*color: var\(--blue-100\)/);
   });
 
+  it("n'entoure les noms que d'un halo large et léger, qui n'éclaircit pas le bord des lettres", () => {
+    const nameRules = [1, 2].map((tier) => new RegExp(String.raw`\.nameTier${tier} \{([^}]*)\}`).exec(css)![1]).join(" ");
+    const shadows = [...nameRules.matchAll(/drop-shadow\(0 0 (\d+)px rgba\(var\(--[a-z0-9-]+-rgb\), ([\d.]+)\)\)/g)];
+    expect(shadows.length).toBeGreaterThan(0);
+    for (const [, blur, alpha] of shadows) {
+      expect(Number(blur)).toBeGreaterThanOrEqual(10);
+      expect(Number(alpha)).toBeLessThanOrEqual(0.3);
+    }
+  });
+
   it("garde un soulignement visible et un nom imprimable malgré le texte transparent", () => {
     for (const tier of [1, 2]) {
       // « Liens soulignés » (menu d'accessibilité) : le trait ne suit pas `color: transparent`.
