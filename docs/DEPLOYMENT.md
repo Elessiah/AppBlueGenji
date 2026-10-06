@@ -7,11 +7,34 @@ légales et le registre des traitements, qui le lisent tous deux dans
 `lib/shared/site-host.ts` : changer d'hébergement, c'est d'abord mettre ce
 module à jour.
 
+En production, on déploie **toujours** par le script du serveur, sans `sudo` :
+
+```bash
+~/apps/updateBlueGenji.sh              # bot + site, seulement ce qui a changé
+~/apps/updateBlueGenji.sh bot          # le bot seul
+~/apps/updateBlueGenji.sh site         # le site seul
+~/apps/updateBlueGenji.sh --force      # reconstruit même sans nouveau commit
+~/apps/updateBlueGenji.sh --dry-run    # montre ce qui arriverait, ne touche à rien
+```
+
+Il met à jour **le bot d'abord, puis le site** : le site appelle le bot, et une
+nouvelle version du site peut dépendre d'une route que seul le nouveau bot
+expose ; si le bot échoue, le site n'est pas touché. Un composant sans nouveau
+commit n'est ni reconstruit ni redémarré (relancer le bot pour rien le
+déconnecte de Discord). Avant de toucher quoi que ce soit, il contrôle les deux
+dépôts (branche `main`, aucun fichier suivi modifié sur le serveur, historique
+non divergé) et refuse une seconde mise à jour concurrente (verrou). Le journal
+complet de chaque passage est gardé dans `~/apps/logs/updates/` (20 derniers).
+
+Le site n'y est pas redéployé par une copie de la procédure : le script appelle
+le `./update.sh` de ce dépôt, qui fait foi — et qu'on ne lance plus directement
+en production :
+
 ```bash
 ./update.sh          # git pull --ff-only → npm ci --ignore-scripts → build → restart → contrôle HTTP
 ```
 
-Le script s'arrête à la première erreur et **vérifie que le site répond** avant
+`update.sh` s'arrête à la première erreur et **vérifie que le site répond** avant
 de se déclarer fini. Un déploiement qui ne contrôle rien annonce un succès
 qu'il n'a pas constaté : c'est ainsi qu'une panne reste invisible jusqu'au
 premier visiteur.
@@ -42,8 +65,9 @@ par `docs/features/BACKUP_DATA_PROTECTION.md`. Ce qui concerne le site, en bref 
    (`docs/features/BACKUP_DATA_PROTECTION.md`).
 6. **Démarrage** : la première fois, l'entrée pm2 se crée à la main (commande de
    « Se remettre d'une entrée perdue », plus bas) suivie de `pm2 save` —
-   `./update.sh` ne fait que `pm2 restart bluegenji`, il échoue sans entrée.
-   Les déploiements suivants passent par lui.
+   `./update.sh` (appelé par `~/apps/updateBlueGenji.sh`) ne fait que
+   `pm2 restart bluegenji`, il échoue sans entrée. Les déploiements suivants
+   passent par `~/apps/updateBlueGenji.sh`.
 7. **nginx** : la configuration n'est pas versionnée ; la reconstruire d'après
    les sections de ce document (plafonds de débit, `proxy_buffering off` sur
    `/api/`, `client_max_body_size 6m`, journaux d'accès à 14 jours), plus le

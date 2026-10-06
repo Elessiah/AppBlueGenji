@@ -23,7 +23,7 @@ NODE_ENV=production npm run replay:deletions  # après restauration d'une sauveg
 NODE_ENV=production npm run rotate:hidden-avatars  # une fois après déploiement : renomme les avatars déjà masqués
 npm run push:keys  # paire de clés VAPID, une fois pour toutes
 npm run sonar  # SonarQube local de la branche (Docker, aucun jeton) — voir Pipeline Git
-./update.sh  # Déploiement (docs/DEPLOYMENT.md — ne jamais effacer les journaux pm2)
+~/apps/updateBlueGenji.sh [bot|site] [--force|--dry-run]  # Déploiement prod, sans sudo (docs/DEPLOYMENT.md — ne jamais effacer les journaux pm2)
 npx jest tests/path/to/file.test.ts  # un seul fichier
 ```
 
