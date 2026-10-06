@@ -154,7 +154,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `DISCORD_COMMUNITY.md` — Invitation Discord unique et compteur de membres.
 - `RECRUITMENT.md` — Annonces de recrutement et statut d'importance.
 - `SEO.md` — `robots.txt`, sitemap, JSON-LD.
-- `SHARE_METADATA.md` — Aperçu des liens partagés (image néon : halos, pastille d'état, logo).
+- `SHARE_METADATA.md` — Aperçu des liens partagés (image néon : halos, pastille d'état, logo ; une carte par page et par langue, podium de `/classement`).
 - `WEB_APP_MANIFEST.md` — Manifeste, `minimal-ui`, écrans de lancement iOS.
 
 ## Bot, Discord et diffusion
