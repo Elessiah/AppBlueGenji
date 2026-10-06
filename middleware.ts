@@ -129,10 +129,13 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   if (prefixed === "en" && isMigratedRoute(path)) return null;
   // `Location` relative : derrière le mandataire, `request.nextUrl` porte
   // l'origine interne (`localhost:3000`), qu'une adresse absolue enverrait au
-  // visiteur.
+  // visiteur. Les barres de tête sont réduites à une seule : `/en//hote.tld`
+  // donnerait sinon `//hote.tld`, adresse relative au protocole qui sort du
+  // site (redirection ouverte) — `\` compte aussi, les navigateurs le lisant `/`.
+  const location = `/${path.replace(/^[/\\]+/, "")}${request.nextUrl.search}`;
   return new NextResponse(null, {
     status: prefixed === "en" ? 307 : 308,
-    headers: { location: `${path}${request.nextUrl.search}` },
+    headers: { location },
   });
 }
 
