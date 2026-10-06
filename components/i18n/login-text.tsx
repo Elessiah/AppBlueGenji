@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { FR_LOGIN_TEXT, loginText, type LoginMessages, type LoginText } from "@/lib/shared/login-text";
 import type { Locale } from "@/lib/shared/locales";
 
@@ -17,7 +17,11 @@ export function LoginTextProvider({
 }: Readonly<{ locale: Locale; messages?: LoginMessages; children: ReactNode }>) {
   // `messages` n'est passé que sous `/en` : une page française ne sérialise
   // aucun dictionnaire, son texte est déjà dans le paquet.
-  const value = useMemo(() => loginText(locale, messages), [locale, messages]);
+  // Indexé sur la **langue** seule : chaque rendu serveur (`router.refresh()`)
+  // renvoie un nouvel objet `messages`, au contenu identique — un nouveau
+  // `text` relancerait les effets qui en dépendent (toast du refus réaffiché).
+  const [value, setValue] = useState(() => loginText(locale, messages));
+  if (value.locale !== locale) setValue(loginText(locale, messages));
   return <LoginTextContext.Provider value={value}>{children}</LoginTextContext.Provider>;
 }
 
