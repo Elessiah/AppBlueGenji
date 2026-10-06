@@ -132,7 +132,7 @@ describe("la défaite ne sert qu'à la défaite", () => {
 
   it("habille chaque chiffre « Défaites » de la teinte", () => {
     expect(readSource(join(ROOT, "components", "stats", "StatsPanel.tsx"))).toMatch(
-      /<Tile label="Défaites" value=\{stats\.matchesLost\} loss \/>/,
+      /<Tile label=\{text\.t\("tile\.losses"\)\} value=\{stats\.matchesLost\} loss \/>/,
     );
     expect(readSource(join(ROOT, "app", "(secured)", "profil", "page.tsx"))).toMatch(
       /label: "Défaites", value: data\.stats\.matchesLost, tone: "loss"/,

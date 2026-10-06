@@ -4,6 +4,8 @@ import type { AuthUser } from "@/lib/server/auth";
 
 jest.mock("next/navigation", () => ({
   usePathname: () => "/classement",
+  // `/classement` est traduit (lot 4) : le sélecteur de langue lit la requête.
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
 }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn() }));
