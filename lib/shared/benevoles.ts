@@ -174,10 +174,22 @@ export function nextCategoryEnglish(
   form: Readonly<{ category: string; categoryEn: string }>,
   nextCategory: string,
   englishOf: (category: string) => string | null,
+  knownEnglish: ReadonlySet<string>,
 ): string {
-  const typedByHand = form.categoryEn.trim() !== "" && form.categoryEn !== englishOf(form.category);
+  // Faite à la main = l'anglais d'aucune catégorie existante. Un anglais repris
+  // (même gardé le temps de taper une catégorie inconnue) le reste, et cède la
+  // place à celui de la catégorie connue où l'on arrive.
+  const english = form.categoryEn.trim();
+  const typedByHand = english !== "" && !knownEnglish.has(english);
   if (typedByHand) return form.categoryEn;
   return englishOf(nextCategory) ?? form.categoryEn;
+}
+
+/** Les anglais déjà donnés aux catégories (pour reconnaître un anglais repris). */
+export function knownCategoryEnglish(benevoles: readonly Pick<Benevole, "categoryEn">[]): Set<string> {
+  const known = new Set<string>();
+  for (const b of benevoles) if (hasEnglish(b.categoryEn)) known.add(b.categoryEn.trim());
+  return known;
 }
 
 /**

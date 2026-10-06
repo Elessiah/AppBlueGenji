@@ -15,6 +15,7 @@ import {
   benevoleInitials,
   borrowedCategoryEnglish,
   categoryEnglish,
+  knownCategoryEnglish,
   nextCategoryEnglish,
   formatDisplayName,
   formatJoinedAt,
@@ -163,7 +164,8 @@ export function BenevolesSection({
       set("categoryEn", value);
       return;
     }
-    setForm((f) => ({ ...f, category: value, categoryEn: nextCategoryEnglish(f, value, categoryEnglishOf) }));
+    const known = knownCategoryEnglish(benevoles);
+    setForm((f) => ({ ...f, category: value, categoryEn: nextCategoryEnglish(f, value, categoryEnglishOf, known) }));
   }
 
   function refuse(code: string | undefined, message: string) {
