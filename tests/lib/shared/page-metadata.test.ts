@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { pageMetadata } from "@/lib/shared/page-metadata";
+import { pageMetadata, shareCardAlt } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
 
 /**
@@ -95,5 +95,42 @@ describe("pageMetadata — titre de la page racine", () => {
   it("écrit le même titre dans la page et dans l'encart", () => {
     const built = pageMetadata({ title: "Accueil", description: "…", path: "/", selfTitled: true });
     expect(built.title).toEqual({ absolute: built.openGraph?.title });
+  });
+});
+
+describe("pageMetadata — texte de remplacement de la carte", () => {
+  const base = { title: "Classement", description: "…", path: "/classement", shareCard: "ranking" };
+
+  it("dit par défaut ce que la carte montre : son titre, pas celui de l'encart", () => {
+    const built = pageMetadata(base);
+    expect(built.openGraph?.images).toEqual([
+      expect.objectContaining({ url: "/og/fr/ranking.png", alt: `Classement des équipes · ${SITE_NAME}` }),
+    ]);
+  });
+
+  it("écrit ce titre dans la langue de la page, mode de règles compris", () => {
+    expect(shareCardAlt("association", "fr")).toBe(`Une association par et pour les joueurs · ${SITE_NAME}`);
+    expect(shareCardAlt("ranking", "en")).toBe(`Team ranking · ${SITE_NAME}`);
+    expect(shareCardAlt("rules-bluegenji-survie", "en")).toBe(`BlueGenji's Survival · ${SITE_NAME}`);
+    expect(shareCardAlt("home", "fr")).toBe(SITE_NAME);
+    expect(shareCardAlt("nope", "fr")).toBeNull();
+  });
+
+  it("retombe sur le titre de l'encart pour une clé inconnue", () => {
+    const built = pageMetadata({ ...base, shareCard: "nope" });
+    expect(built.openGraph?.images).toEqual([expect.objectContaining({ alt: `Classement · ${SITE_NAME}` })]);
+  });
+
+  it("prend le texte fourni quand la carte montre autre chose (podium)", () => {
+    const built = pageMetadata({ ...base, locale: "en", shareImageAlt: "The BlueGenji podium" });
+    expect(built.openGraph?.images).toEqual([
+      expect.objectContaining({ url: "/og/en/ranking.png", alt: "The BlueGenji podium" }),
+    ]);
+  });
+
+  it("ignore le texte fourni sans carte propre (carte du site)", () => {
+    const { shareCard: _omit, ...noCard } = base;
+    const built = pageMetadata({ ...noCard, shareImageAlt: "Ignoré" });
+    expect(built.openGraph?.images).toEqual([expect.objectContaining({ alt: SITE_NAME })]);
   });
 });

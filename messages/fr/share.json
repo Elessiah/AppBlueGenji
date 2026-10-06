@@ -1,0 +1,128 @@
+{
+  "footer": "Association loi 1901",
+  "pages": {
+    "home": {
+      "eyebrow": "Overwatch · Marvel Rivals",
+      "title": "BlueGenji Esport",
+      "subtitle": "Tournois amateurs francophones, brackets en direct, classement des équipes et bot Discord."
+    },
+    "association": {
+      "eyebrow": "L'association",
+      "title": "Une association par et pour les joueurs",
+      "subtitle": "Tournois en ligne et en LAN, équipes fédérées, scène amateur francophone mise en avant."
+    },
+    "ranking": {
+      "eyebrow": "Classement",
+      "title": "Classement des équipes",
+      "subtitle": "Cote, bilan et forme récente de chaque équipe de la scène BlueGenji."
+    },
+    "rules": {
+      "eyebrow": "Règlement",
+      "title": "Règles des tournois",
+      "subtitle": "Chaque mode expliqué en schémas : élimination, survie, ronde suisse, multi-phases."
+    },
+    "recruitment": {
+      "eyebrow": "Recrutement",
+      "title": "Rejoins le staff BlueGenji",
+      "subtitle": "Arbitrage, casting, développement, communication, design, modération : l'association recrute."
+    },
+    "volunteers": {
+      "eyebrow": "Bénévoles",
+      "title": "Celles et ceux qui font BlueGenji",
+      "subtitle": "Les passionné·es qui organisent, animent et développent la scène esport francophone."
+    },
+    "login": {
+      "eyebrow": "Espace membre",
+      "title": "Connexion à BlueGenji",
+      "subtitle": "Sans mot de passe : Google, Discord ou Battle.net, ou un code reçu sur Discord."
+    },
+    "bot": {
+      "eyebrow": "Bot Discord",
+      "title": "BlueGenji Bot",
+      "subtitle": "Annonces synchronisées, statistiques et commandes de tournoi, directement dans Discord."
+    },
+    "botDocs": {
+      "eyebrow": "Bot Discord",
+      "title": "Documentation du bot",
+      "subtitle": "Commandes, réglages et fonctionnement du bot BlueGenji, pas à pas."
+    },
+    "legalNotice": {
+      "eyebrow": "Informations légales",
+      "title": "Mentions légales",
+      "subtitle": "Éditeur, hébergement, propriété intellectuelle et données personnelles."
+    },
+    "privacy": {
+      "eyebrow": "Vie privée",
+      "title": "Politique de confidentialité",
+      "subtitle": "Données collectées, durées de conservation, droits et contact RGPD."
+    },
+    "processingRegister": {
+      "eyebrow": "Vie privée",
+      "title": "Registre des traitements",
+      "subtitle": "Finalités, données, durées de conservation et destinataires de chaque traitement."
+    },
+    "terms": {
+      "eyebrow": "Informations légales",
+      "title": "Conditions d'utilisation",
+      "subtitle": "Ce que chacun s'engage à respecter sur BlueGenji Esport."
+    },
+    "accessibility": {
+      "eyebrow": "Accessibilité",
+      "title": "Déclaration d'accessibilité",
+      "subtitle": "État de conformité au RGAA, contenus non accessibles et aides proposées."
+    },
+    "botPrivacy": {
+      "eyebrow": "Bot Discord",
+      "title": "Confidentialité du bot",
+      "subtitle": "Ce que le bot BlueGenji lit, garde et supprime, en français et en anglais."
+    },
+    "botTerms": {
+      "eyebrow": "Bot Discord",
+      "title": "Conditions d'utilisation du bot",
+      "subtitle": "Les règles d'usage du bot BlueGenji, en français et en anglais."
+    },
+    "tournaments": {
+      "eyebrow": "Tournois",
+      "title": "Tournois amateurs",
+      "subtitle": "Inscriptions, brackets mis à jour en temps réel et résultats des tournois Overwatch et Marvel Rivals. Connexion requise."
+    },
+    "teams": {
+      "eyebrow": "Équipes",
+      "title": "Les équipes de la scène",
+      "subtitle": "Annuaire des équipes inscrites sur BlueGenji. Connexion requise pour le consulter."
+    },
+    "team": {
+      "eyebrow": "Équipes",
+      "title": "Fiche d'équipe",
+      "subtitle": "Effectif, palmarès et statistiques. Connexion requise pour la consulter."
+    },
+    "players": {
+      "eyebrow": "Joueurs",
+      "title": "Les joueurs de la scène",
+      "subtitle": "Annuaire des joueurs inscrits sur BlueGenji. Connexion requise pour le consulter."
+    },
+    "player": {
+      "eyebrow": "Joueurs",
+      "title": "Fiche de joueur",
+      "subtitle": "Équipes, rôles et statistiques. Connexion requise pour la consulter."
+    }
+  },
+  "teamProfile": {
+    "eyebrow": "Équipe",
+    "subtitle": "Une équipe de la scène amateur BlueGenji.",
+    "rating": "Cote",
+    "record": "Bilan",
+    "recordValue": "{wins} V · {losses} D",
+    "recordWithDraws": "{wins} V · {losses} D · {draws} N"
+  },
+  "ruleMode": {
+    "eyebrow": "Règles du mode"
+  },
+  "podium": {
+    "eyebrow": "Classement",
+    "title": "Le podium BlueGenji",
+    "alt": "Classement des équipes BlueGenji",
+    "points": "pts",
+    "places": ["1re", "2e", "3e"]
+  }
+}

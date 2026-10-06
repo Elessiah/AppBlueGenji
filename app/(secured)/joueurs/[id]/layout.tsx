@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { parseEntityPageId, playerPageTitle } from "@/lib/shared/entity-page-titles";
+import { memberAreaShareMetadata } from "@/lib/shared/page-metadata";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -21,13 +22,13 @@ type MetadataProps = {
 export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const { id } = await params;
   const userId = parseEntityPageId(id);
-  if (userId === null) return { title: playerPageTitle(null) };
+  if (userId === null) return { title: playerPageTitle(null), ...memberAreaShareMetadata("player") };
 
   const player = await getCurrentUser()
     .then((user) => (user ? getPlayerPageIdentity(userId) : null))
     .catch(() => null);
 
-  return { title: playerPageTitle(player) };
+  return { title: playerPageTitle(player), ...memberAreaShareMetadata("player") };
 }
 
 export default function PlayerDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -15,6 +15,7 @@ export const metadata: Metadata = pageMetadata({
   shareDescription:
     "L'association recrute ses bénévoles pour faire vivre la scène esport francophone.",
   path: "/recrutement",
+  shareCard: "recruitment",
 });
 
 export default async function RecrutementPage() {

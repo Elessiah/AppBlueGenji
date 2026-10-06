@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { segmentTitle } from "@/lib/shared/page-metadata";
+import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
 
 /**
  * Le titre de la page (WCAG 2.4.2) : la liste est une page cliente, qui ne peut
@@ -14,7 +14,9 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
  * d'équipe) ; la fiche d'un tournoi pose le sien. Il passe par
  * `segmentTitle()`, sans quoi les sous-pages perdraient le nom du site.
  */
-export const metadata: Metadata = { title: segmentTitle("Tournois") };
+// Encart générique (`memberAreaShareMetadata`) : le robot d'aperçu n'a pas de
+// session — ni nom ni pseudo, rien que le `<head>` anonyme ne montre déjà.
+export const metadata: Metadata = { title: segmentTitle("Tournois"), ...memberAreaShareMetadata("tournaments") };
 
 export default function TournamentsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;

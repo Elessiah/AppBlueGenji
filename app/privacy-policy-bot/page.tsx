@@ -9,6 +9,7 @@ export const metadata: Metadata = pageMetadata({
   description:
     "Politique de Confidentialité du bot Discord BlueGenji Bot, disponible en français et en anglais.",
   path: "/privacy-policy-bot",
+  shareCard: "botPrivacy",
 });
 
 export default function PrivacyPolicyBotPage() {

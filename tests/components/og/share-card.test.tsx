@@ -184,7 +184,13 @@ describe("rendu", () => {
 
   it("pose l'ellipse sans laquelle Satori ignore la limite de lignes", () => {
     const html = renderToStaticMarkup(
-      <ShareCard eyebrow="Overwatch" title={"Coupe ".repeat(10)} subtitle={"Accroche ".repeat(40)} logoSrc={null} />,
+      <ShareCard
+        eyebrow="Overwatch"
+        title={"Coupe ".repeat(10)}
+        subtitle={"Accroche ".repeat(40)}
+        facts={[{ label: "Format", value: "Double" }]}
+        logoSrc={null}
+      />,
     );
     expect(html).toContain("-webkit-line-clamp:3;text-overflow:ellipsis");
     expect(html).toContain("-webkit-line-clamp:1;text-overflow:ellipsis");

@@ -79,6 +79,7 @@ export const metadata: Metadata = pageMetadata({
   description:
     "Politique de confidentialité de BlueGenji : données collectées, droits des utilisateurs, durées de conservation et contact RGPD.",
   path: "/rgpd",
+  shareCard: "privacy",
 });
 
 /** Intitulés des colonnes du tableau des données, repris par chaque fiche mobile. */

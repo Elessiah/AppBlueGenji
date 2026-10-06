@@ -18,6 +18,7 @@ export const metadata: Metadata = pageMetadata({
     "Conditions générales d'utilisation de la plateforme BlueGenji Esport : compte, comportement, contenus publiés par les utilisateurs, signalement et modération.",
   shareDescription: "Ce que chacun s'engage à respecter sur BlueGenji Esport.",
   path: TERMS_PATH,
+  shareCard: "terms",
 });
 
 /**

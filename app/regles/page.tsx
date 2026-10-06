@@ -40,6 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: meta.indexDescription,
     shareDescription: meta.indexShareDescription,
     path: "/regles",
+    shareCard: "rules",
     locale,
   });
 }

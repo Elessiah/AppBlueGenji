@@ -18,6 +18,7 @@ export const metadata: Metadata = pageMetadata({
   description:
     "Registre des activités de traitement de BlueGenji (RGPD, article 30) : finalités, données, durées de conservation, destinataires et mesures de sécurité.",
   path: "/rgpd/registre",
+  shareCard: "processingRegister",
 });
 
 /** `2026-09-23` → `23/09/2026` : une date de document, pas un instant. */

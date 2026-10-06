@@ -9,6 +9,7 @@ export const metadata: Metadata = pageMetadata({
   description:
     "Conditions d'Utilisation du bot Discord BlueGenji Bot, disponibles en français et en anglais.",
   path: "/terms-of-service-bot",
+  shareCard: "botTerms",
 });
 
 export default function TermsOfServiceBotPage() {

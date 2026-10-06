@@ -13,6 +13,7 @@ export const metadata: Metadata = pageMetadata({
   shareDescription:
     "Les passionné·es qui organisent, animent et développent la scène esport francophone.",
   path: "/benevoles",
+  shareCard: "volunteers",
 });
 
 export default async function BenevolesPage() {

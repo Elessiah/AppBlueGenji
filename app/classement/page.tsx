@@ -31,12 +31,17 @@ import styles from "./page.module.css";
  */
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await requestLocale();
-  const { meta } = messagesFor(locale).ranking;
+  const messages = messagesFor(locale);
+  const { meta } = messages.ranking;
   return pageMetadata({
     title: meta.title,
     description: meta.description,
     shareDescription: meta.shareDescription,
     path: "/classement",
+    shareCard: "ranking",
+    // La carte montre le podium, ou la carte du classement sans trois équipes
+    // classées (ou base injoignable) : un texte juste pour les deux.
+    shareImageAlt: messages.share.podium.alt,
     locale,
   });
 }

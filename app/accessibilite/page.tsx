@@ -26,6 +26,7 @@ export const metadata: Metadata = pageMetadata({
   description:
     "État de conformité du site BlueGenji Esport au RGAA, contenus non accessibles, aides proposées et contact.",
   path: "/accessibilite",
+  shareCard: "accessibility",
 });
 
 /**

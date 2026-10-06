@@ -29,6 +29,7 @@ export const metadata: Metadata = pageMetadata({
   shareDescription:
     "Annonces synchronisées, statistiques et commandes de tournoi, directement dans Discord.",
   path: "/bot",
+  shareCard: "bot",
 });
 
 // Pas de `export const revalidate` : la mise en page racine lit `headers()`

@@ -17,8 +17,9 @@ import type frRules from "@/messages/fr/rules.json";
 import type frRanking from "@/messages/fr/ranking.json";
 import type frStats from "@/messages/fr/stats.json";
 import type frLabels from "@/messages/fr/labels.json";
+import type frShare from "@/messages/fr/share.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -35,6 +36,8 @@ export type Messages = {
   stats: typeof frStats;
   /** Libellés de domaine partagés : format, jeu, état d'un tournoi (lot 4) — `lib/shared/tournament-labels.ts`. */
   labels: typeof frLabels;
+  /** Cartes d'aperçu des liens partagés (images Open Graph) — `lib/shared/page-share-cards.ts`. */
+  share: typeof frShare;
 };
 
 /**

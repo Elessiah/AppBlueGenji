@@ -148,7 +148,11 @@ describe("generateMetadata de la fiche", () => {
 
     // Pas d'« accès refusé » : ce serait confirmer l'existence qu'on protège.
     expect(meta.title).toBe("Tournoi");
-    expect(meta.openGraph).toBeUndefined();
+    // Posé en entier : sinon la carte générique de `/tournois` descendrait ici.
+    expect(meta.openGraph).toMatchObject({ title: "BlueGenji Esport" });
+    expect(meta.openGraph).not.toHaveProperty("images");
+    expect(meta.twitter).toMatchObject({ card: "summary_large_image", title: "BlueGenji Esport" });
+    expect(meta.twitter).not.toHaveProperty("images");
   });
 
   it("n'interroge même pas la base sur un identifiant qui n'en est pas un", async () => {

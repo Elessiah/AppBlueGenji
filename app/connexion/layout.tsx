@@ -23,6 +23,7 @@ export const metadata: Metadata = {
     description:
       "Connexion à l'espace membre BlueGenji Esport, par compte Google ou par code Discord.",
     path: "/connexion",
+    shareCard: "login",
   }),
   robots: { index: false, follow: true },
 };

@@ -46,6 +46,7 @@ export const metadata: Metadata = pageMetadata({
     "Mentions légales de la plateforme BlueGenji Esport, éditée par l'association Bluegenji Esport (loi 1901).",
   shareDescription: "Éditeur, hébergement, propriété intellectuelle et données personnelles.",
   path: "/mentions-legales",
+  shareCard: "legalNotice",
 });
 
 export default function MentionsLegalesPage() {

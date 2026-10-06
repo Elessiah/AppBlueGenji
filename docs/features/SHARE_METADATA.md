@@ -184,12 +184,13 @@ prennent ce néon sur tout le site, au-dessus d'un fond noir. Le fond
 (`APP_BACKGROUND_COLOR`, `#05060a`) reste celui du manifeste
 (`background_color`) et des écrans de lancement.
 
-Deux routes la servent :
+Trois routes la servent :
 
 | Route | Portée |
 | --- | --- |
-| `app/opengraph-image.tsx` | La carte du site |
+| `app/opengraph-image.tsx` | La carte du site (repli de toute page sans carte propre) |
 | `app/(secured)/tournois/[id]/opengraph-image.tsx` | La carte d'un tournoi |
+| `app/og/[locale]/[card]/route.ts` | La carte de chaque page, par langue (voir « Une carte par page ») |
 
 **Piège vérifié : la convention `opengraph-image` ne vaut que pour son propre
 segment.** Contrairement à `icon`, celle de la racine n'habille que `/` — les
@@ -271,15 +272,185 @@ nomme les deux jeux, Overwatch en premier, et les deux introductions des textes
 légaux du bot (FR et EN) ne présentent plus le projet comme une communauté Marvel
 Rivals. Les sélecteurs de jeu de l'interface plaçaient déjà Overwatch en tête.
 
+## Une carte par page (décision du 2026-10-06)
+
+« Les aperçus comme pour tournois, mais pour toutes les pages » : chaque page
+partageable a désormais sa carte — titre, accroche, pastille et **motif** propres
+—, dans la même famille visuelle que celle du site.
+
+**Une route unique, la langue dans le chemin** : `/og/<langue>/<clé>.png`
+(`app/og/[locale]/[card]/route.ts`). Pas un `opengraph-image` par dossier : la
+convention de Next résout l'adresse de l'image sur le **segment** de la route, le
+même sous `/regles` et `/en/regles` (réécriture `beforeFiles`) — la page anglaise
+aurait affiché la carte française. Ici, `pageMetadata({ shareCard, locale })`
+écrit `/og/en/…` sous `/en` (vérifié sur `next dev` : `/en/classement` →
+`og:image` `/og/en/ranking.png`). L'extension `.png` fait aussi passer la requête à
+côté du middleware (son `matcher` écarte les images) : ni nonce ni CSP pour un
+robot. Clé ou langue inconnue, extension absente : 404.
+
+**Texte de remplacement** (`og:image:alt`) : ce que la carte montre — son titre
+dans la langue de la page, suivi du nom du site (`shareCardAlt`), et non le
+titre de l'encart. `shareImageAlt` le remplace quand le contenu varie : `/classement`
+(« Classement des équipes BlueGenji », juste pour le podium comme pour son repli).
+Une section de `/bot/docs` garde ainsi « Documentation du bot », que sa carte
+montre, et non le nom de la section. Le repli
+d'une fiche de tournoi illisible pose l'encart du site **en entier** : sans quoi
+la carte générique de `/tournois` (mise en page parente) y descendrait.
+
+**Registre** (`lib/shared/page-share-cards.ts`, pur) : `PAGE_SHARE_CARD_KEYS`, le
+style de chaque carte (`PAGE_SHARE_CARD_STYLES` : motif Lucide + teinte parmi les
+tons `.pill-*` — cyan, glacier, violet, rose, turquoise ; **jamais** l'ambre ni le
+rouge), puis une carte par mode de règles (`rules-<slug>` : nom et accroche du
+mode dans la langue, accroche bornée à 120 caractères — phrases entières de préférence (`shareTagline`), sinon coupée sur un mot). Textes dans
+l'espace de messages **`share`** (`messages/fr|en/share.json`) : toute carte
+existe dans les deux langues, même celles des pages encore françaises (seule la
+française y est désignée). L'accueil français est identique à `SITE_SHARE_CARD`,
+sans motif — la carte du site ne change pas.
+
+| Clé | Page(s) | Clé | Page(s) |
+| --- | --- | --- | --- |
+| `home` | `/`, `/en` | `privacy` | `/rgpd` |
+| `association` | `/association` | `processingRegister` | `/rgpd/registre` |
+| `ranking` | `/classement`, `/en/classement` (**podium**) | `terms` | `/conditions-utilisation` |
+| `rules` | `/regles`, `/en/regles` | `accessibility` | `/accessibilite` |
+| `rules-<slug>` | `/regles/<slug>` (+ `/en`) | `botPrivacy` / `botTerms` | textes légaux du bot |
+| `recruitment` | `/recrutement` | `tournaments` | `/tournois` et sous-pages |
+| `volunteers` | `/benevoles` | `teams` / `team` | `/equipes`, `/equipes/[id]` |
+| `login` | `/connexion` | `players` / `player` | `/joueurs`, `/joueurs/[id]` |
+| `bot` / `botDocs` | `/bot`, `/bot/docs/…` | | |
+
+`/partenaires` n'a pas de page (dossier vide) ; `/profil`, `/signalements` et
+l'administration n'ont pas d'encart : rien à partager.
+
+**Rendu** (`lib/server/page-share-image.tsx`) : `ShareCard` avec `accent`,
+`motif` et `footer` (« Association loi 1901 » / « Nonprofit association »). Le
+cadre commun (`ShareCardFrame` : fond, halos, filet, pied) est partagé avec la
+carte du podium. Le motif (`components/og/share-motifs.tsx`) est l'icône Lucide
+**redessinée en `<svg>` simple** : Satori ne déroule pas un `forwardRef` ; on lit
+le tracé (`iconNode`) en appelant une fois le rendu de l'icône — un test vérifie
+que chaque motif rend un tracé non vide, une montée de Lucide qui changerait
+cette forme se verrait là. Présent, le motif réserve sa colonne (texte borné à
+820 px, motif à partir de 920 px). Sans faits, l'accroche a deux lignes.
+**Piège Satori** : un style `maxWidth: undefined` fait échouer tout le rendu
+(« reading 'trim' ») — une clé absente doit être omise, pas laissée vide.
+
+**Cache annoncé** : un jour pour une carte fixe, cinq minutes pour le podium ;
+jamais l'`immutable` d'un an qu'`ImageResponse` pose par défaut (l'adresse d'une
+carte ne change pas quand son contenu change).
+
+### Le podium (`/classement`)
+
+La carte du classement dessine le **vrai podium** : les trois premières du
+classement général (`loadTeamRanking({ includeUnplayed: true })`, l'onglet
+« Général », le même que la page et que `PODIUM_TIERS.md`), ordre 2-1-3 avec la
+1re au centre et plus haute, logo, nom, cote (« 1240 pts », sans séparateur comme
+la page) et marche dans la langue (« 1re / 2e / 3e », « 1st / 2nd / 3rd »).
+Couleurs des marches reprises de la page : glacier (`--blue-500`), cyan, violet
+(`--violet-300`) — **ni or ni bronze** (décision du 2026-10-06). Un test tient le
+contraste du nom et du rang (4,5:1) sur le voile de chaque marche.
+
+- **Données** (`lib/server/share-podium.ts`) : mutualisées dans le cache du
+  classement (`cachedRanking("share-podium")`, 60 s, vidé à chaque score) — un
+  lien collé dans un gros salon fait venir plusieurs robots, aucun ne rejoue le
+  classement pour lui seul.
+- **Logos** : lus **sur le disque**, jamais par HTTP, et seulement un fichier
+  stocké par le site sous `public/uploads/teams/` (`isStoredUploadIn`, `..`
+  refusé). Satori ne décode pas le WebP des imports : `sharp` les convertit en PNG
+  152 px. Absent ou illisible : l'initiale du nom.
+- **Noms** : saisis, donc repassés par `visibleText` puis coupés sur un mot à
+  32 caractères (deux lignes de 30 px dans une marche de 336 px), ellipse
+  comprise ; un nom sans caractère visible devient « ? ».
+- **Repli** : sous trois équipes classées (la page n'affiche alors pas de podium,
+  `splitRankingPodium`) ou si la base ne répond pas, la carte `ranking`
+  ordinaire (trophée) — jamais une erreur.
+
+### La carte d'une équipe (`/equipes/[id]`, décision du 2026-10-06)
+
+L'image d'une fiche d'équipe est **nominative** : `/og/<langue>/team-<id>.png`
+montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
+(`og:title`, `og:description`) reste celui, générique, de la fiche.
+
+- **Clé** : `team-<id>` (`teamShareCardKey`, `parseTeamShareCardKey`) — entier
+  positif, sans zéro de tête, dix chiffres au plus ; toute autre forme : 404.
+- **Aucune requête au rendu de la fiche** : la mise en page ne fait que
+  désigner l'image (`memberAreaShareMetadata("team", teamShareCardKey(id))`).
+  Seule la route d'image lit les données (`lib/server/share-team.ts`), une
+  **seule entrée** de cache pour toutes les équipes (`cachedRanking("share-teams")`,
+  60 s, vidée à chaque score) : un robot qui énumère des identifiants ne
+  remplit pas le cache, et le rejeu du classement est celui de la page.
+  Réponse en `max-age=300`, comme le podium.
+- **Le sous-ensemble du classement public**, rien d'autre : la ligne de l'équipe
+  dans `loadTeamRanking({ includeUnplayed: true })` (onglet « Général »), bornée
+  aux `RANKING_MAX_SHOWN` lignes que `/classement` peut afficher. Cote arrondie
+  et bilan écrits comme la page (« 12 V · 3 D », nuls seulement s'il y en a ;
+  « 12 W · 3 L » en anglais).
+- **Jamais nominative** pour une entrée solo (son « nom » est un pseudo) ni une
+  équipe dissoute — le classement les écarte déjà —, ni une équipe fantôme
+  (écartée ici, `is_ghost = 1`), ni une équipe inconnue : la carte générique
+  « Fiche d'équipe », en `max-age=300` elle aussi, qui ne dit pas si l'équipe
+  existe. Même repli si la base ne répond pas.
+- **Nom** : saisi, donc repassé par `visibleText` puis coupé sur un mot à 48
+  caractères (`TEAM_SHARE_NAME_MAX_LENGTH`) ; invisible : « ? ». **Logo** :
+  fichier du site seulement (`teamLogoDataUrl`, comme le podium), converti en
+  PNG 208 px ; absent ou illisible : l'initiale (`ShareTeamMark`).
+- **Aucun joueur** : ni pseudo, ni avatar, ni effectif. La fiche d'un joueur
+  reste générique.
+
+### Coût d'un rendu (`lib/server/share-image-cache.ts`)
+
+La route `/og/…` est dynamique et un lien collé dans un gros salon fait venir
+plusieurs robots à la fois : chaque PNG rendu est **gardé en mémoire du
+processus** (`cachedShareImage`), avec vol unique (`cached` à durée nulle, hors
+du cache général que des PNG de 100 Ko chasseraient), dans **deux réserves
+LRU** (`SHARE_IMAGE_POOL_LIMITS`) : `fixed` (pages, modes, podium, carte
+générique d'équipe — en nombre fini) et `team` (cartes nominatives), pour
+qu'un robot qui fait tourner les équipes ne chasse jamais les cartes fixes. Et
+**`MAX_CONCURRENT_RENDERS` (2) rendus à la fois** au plus : au-delà de la
+réserve, un tel robot obtient des réponses plus lentes, pas un processeur saturé.
+
+- **Cartes fixes** : une heure en mémoire (elles ne changent qu'au déploiement),
+  `max-age=86400` pour les caches en aval.
+- **Podium et équipe nominative** : `RANKING_TTL_MS` (60 s), `max-age=300`. Le
+  logo d'une équipe n'est converti par `sharp` qu'au rendu, donc une fois par
+  fenêtre.
+- **Équipe hors classement** (`findShareTeam` → `null`, lecture du cache
+  `share-teams` seule) : toutes partagent **une** entrée, la carte générique
+  `team`, servie en `max-age=300`. Énumérer des identifiants ne coûte ni rendu
+  ni mémoire.
+- Un échec de rendu n'est jamais gardé.
+
+### Vie privée : pourquoi les cartes de l'espace membre sont génériques
+
+Une image d'aperçu est servie **à n'importe qui, sans session** : elle ne doit
+rien montrer qu'un visiteur anonyme ne voie déjà.
+
+- **Classement** : noms d'équipe, logos et cotes sont publics sur `/classement`
+  (page ouverte à tous) — la carte n'en montre pas davantage. Aucun joueur.
+- **Carte d'une équipe** : nom, logo, cote et bilan sont **exactement** ce que
+  `/classement` montre déjà à un visiteur anonyme (même chargeur, mêmes lignes
+  affichables) ; l'effectif, le palmarès et les statistiques de la fiche, eux,
+  restent réservés aux membres. Rien de nouveau n'est exposé : pas d'entrée
+  dans `PRIVACY_CHANGES` ni dans le registre des traitements. Fantômes écartés
+  en plus, par prudence (décision de l'utilisateur).
+- **Texte des encarts `/equipes/[id]`, `/joueurs/[id]`** : leur `<head>` anonyme ne porte que
+  « Équipe » / « Joueur » (`getCurrentUser()` d'abord, `entity-page-titles`) ;
+  l'encart reste donc **générique** — « Fiche d'équipe », « Fiche de joueur »,
+  « Connexion requise pour la consulter » —, **même pour un membre connecté** :
+  `memberAreaShareMetadata` ne prend aucune donnée, il ne lit que le registre.
+  Ni pseudo, ni nom d'équipe, ni avatar : rien de nouveau n'est exposé, d'où
+  aucune entrée dans `PRIVACY_CHANGES` ni dans le registre des traitements.
+- **Pas d'`og:url`** sur ces encarts : posés par la mise en page d'un segment,
+  ils habillent aussi ses sous-pages (`/equipes/creer`), qu'une adresse fixe
+  désignerait mal — la règle qui gardait ces mises en page à un seul titre.
+
 ## Ce qui n'est pas couvert
 
-- **`/connexion`** est une page cliente : elle ne peut pas exporter de
-  métadonnées. Elle garde celles de la racine.
-- **Les autres pages de l'espace sécurisé** (`/equipes`, `/joueurs`, `/profil`)
-  n'ont pas d'encart propre : leur contenu n'est pas public, et un aperçu qui
-  décrirait une page que le destinataire ne peut pas ouvrir n'apprend rien.
-- **Les fiches d'équipe et de joueur** n'ont pas encore d'encart. Même raison, et
-  le même mécanisme leur suffirait le jour où on le voudra.
+- **`/connexion`** est une page cliente : ses métadonnées viennent de sa mise en
+  page (`app/connexion/layout.tsx`), carte `login` comprise.
+- **`/profil`, `/signalements`, l'administration** n'ont pas d'encart propre :
+  rien à y partager.
+- **Une carte nominative de joueur** : non — la fiche d'un joueur reste
+  générique (pseudo et avatar ne sortent jamais vers un robot).
 
 ## Notes reprises de CLAUDE.md
 

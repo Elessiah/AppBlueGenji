@@ -53,31 +53,47 @@ describe("fiche d'équipe", () => {
     expect(execute).toHaveBeenCalledWith(expect.any(String), [12]);
   });
 
-  it("ne déclare qu'un titre : ni encart ni URL canonique", async () => {
+  it("ni URL canonique ni og:url, et un encart générique même quand le nom est connu", async () => {
     execute.mockResolvedValue([[{ name: "Dragon Squad" }]]);
-    expect(Object.keys(await teamMetadata(params("12")))).toEqual(["title"]);
+    const metadata = await teamMetadata(params("12"));
+    expect(Object.keys(metadata).sort((a, b) => a.localeCompare(b))).toEqual(["openGraph", "title", "twitter"]);
+    // Le nom est dans l'onglet d'un membre connecté, jamais dans l'encart.
+    expect(JSON.stringify([metadata.openGraph, metadata.twitter])).not.toContain("Dragon Squad");
+    expect((metadata.openGraph as { url?: unknown }).url).toBeUndefined();
   });
 
   it("ne nomme rien à un lecteur non connecté, et ne lit pas la base", async () => {
     mockedUser.mockResolvedValue(null);
-    expect(await teamMetadata(params("12"))).toEqual({ title: "Équipe" });
+    expect(await teamMetadata(params("12"))).toMatchObject({ title: "Équipe" });
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("désigne l'image nominative de l'équipe sans aucune lecture pour elle", async () => {
+    mockedUser.mockResolvedValue(null);
+    const metadata = await teamMetadata(params("12"));
+    expect(metadata.twitter).toMatchObject({ images: ["/og/fr/team-12.png"] });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("garde l'image générique pour un identifiant invalide", async () => {
+    const metadata = await teamMetadata(params("12abc"));
+    expect(metadata.twitter).toMatchObject({ images: ["/og/fr/team.png"] });
+  });
+
   it("retombe sur le titre générique pour un identifiant invalide, sans rien lire", async () => {
-    expect(await teamMetadata(params("12abc"))).toEqual({ title: "Équipe" });
+    expect(await teamMetadata(params("12abc"))).toMatchObject({ title: "Équipe" });
     expect(mockedUser).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("retombe sur le titre générique pour une équipe introuvable", async () => {
     execute.mockResolvedValue([[]]);
-    expect(await teamMetadata(params("12"))).toEqual({ title: "Équipe" });
+    expect(await teamMetadata(params("12"))).toMatchObject({ title: "Équipe" });
   });
 
   it("ne fait pas échouer la page quand la base est injoignable", async () => {
     execute.mockRejectedValue(new Error("ECONNREFUSED"));
-    expect(await teamMetadata(params("12"))).toEqual({ title: "Équipe" });
+    expect(await teamMetadata(params("12"))).toMatchObject({ title: "Équipe" });
   });
 });
 
@@ -88,26 +104,28 @@ describe("fiche de joueur", () => {
 
     expect(tabTitle(playersMetadata, metadata)).toBe(`Nova · Joueur · ${SITE_NAME}`);
     expect(execute).toHaveBeenCalledWith(expect.any(String), [5]);
+    // Le pseudo n'atteint jamais l'encart de partage (RGPD).
+    expect(JSON.stringify([metadata.openGraph, metadata.twitter])).not.toContain("Nova");
   });
 
   it("annonce un compte anonymisé sans son pseudo d'emprunt", async () => {
     execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1 }]]);
-    expect(await playerMetadata(params("5"))).toEqual({ title: "Compte supprimé · Joueur" });
+    expect(await playerMetadata(params("5"))).toMatchObject({ title: "Compte supprimé · Joueur" });
   });
 
   it("ne nomme personne à un lecteur non connecté, et ne lit pas la base", async () => {
     mockedUser.mockResolvedValue(null);
-    expect(await playerMetadata(params("5"))).toEqual({ title: "Joueur" });
+    expect(await playerMetadata(params("5"))).toMatchObject({ title: "Joueur" });
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("retombe sur le titre générique quand la session ne se lit pas", async () => {
     mockedUser.mockRejectedValue(new Error("ECONNREFUSED"));
-    expect(await playerMetadata(params("5"))).toEqual({ title: "Joueur" });
+    expect(await playerMetadata(params("5"))).toMatchObject({ title: "Joueur" });
   });
 
   it("retombe sur le titre générique pour un identifiant invalide", async () => {
-    expect(await playerMetadata(params("0"))).toEqual({ title: "Joueur" });
+    expect(await playerMetadata(params("0"))).toMatchObject({ title: "Joueur" });
     expect(execute).not.toHaveBeenCalled();
   });
 });
