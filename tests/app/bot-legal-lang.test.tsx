@@ -147,7 +147,7 @@ describe.each(PAGES)("%s", (route, shareCard, doc, page, metadata) => {
     expect(JSON.stringify(meta.openGraph)).toContain(`/og/en/${shareCard}.png`);
   });
 
-  it("français : titre et description inchangés, carte française", async () => {
+  it("français : titre et description du message, carte française", async () => {
     mockLocale = "fr";
     const meta = await metadata();
     const key = route === "/privacy-policy-bot" ? "privacy" : "terms";
@@ -159,15 +159,15 @@ describe.each(PAGES)("%s", (route, shareCard, doc, page, metadata) => {
   });
 });
 
-describe("titres français d'avant le lot 7a", () => {
-  it("garde mot pour mot titres et descriptions des deux pages", () => {
+describe("titres français, sans moitié anglaise depuis le lot 7a", () => {
+  it("titre purement français (la page n'affiche plus d'anglais), description d'avant gardée mot pour mot", () => {
     expect(frBot.legalPages.privacy.meta).toEqual({
-      title: "Bot — Politique de Confidentialité / Privacy Policy",
+      title: "Bot — Politique de Confidentialité",
       description:
         "Politique de Confidentialité du bot Discord BlueGenji Bot, disponible en français et en anglais.",
     });
     expect(frBot.legalPages.terms.meta).toEqual({
-      title: "Bot — Conditions d'Utilisation / Terms of Service",
+      title: "Bot — Conditions d'Utilisation",
       description:
         "Conditions d'Utilisation du bot Discord BlueGenji Bot, disponibles en français et en anglais.",
     });
