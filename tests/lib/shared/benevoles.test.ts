@@ -367,15 +367,22 @@ describe("formatJoinedAt — langue", () => {
 
 
 describe("nextCategoryEnglish", () => {
-  const known: Record<string, string> = { Arbitre: "Referee", Caster: "Caster", Developpeur: "Developer" };
-  const englishOf = (category: string) => known[category.trim()] ?? null;
-  const knownEn = new Set(Object.values(known));
-  const next = (form: { category: string; categoryEn: string }, category: string) =>
-    nextCategoryEnglish(form, category, englishOf, knownEn);
+  // « Staff » existe, encore sans anglais.
+  const known: Record<string, string | null> = { Arbitre: "Referee", Caster: "Caster", Developpeur: "Developer", Staff: null };
+  const lookup = {
+    englishOf: (category: string) => known[category.trim()] ?? null,
+    exists: (category: string) => category.trim() in known,
+    knownEnglish: new Set(["Referee", "Caster", "Developer"]),
+  };
+  const next = (form: { category: string; categoryEn: string }, category: string) => nextCategoryEnglish(form, category, lookup);
 
   it("reprend l'anglais connu de la nouvelle catégorie", () => {
     expect(next({ category: "", categoryEn: "" }, "Arbitre")).toBe("Referee");
     expect(next({ category: "Arbitre", categoryEn: "Referee" }, "Caster")).toBe("Caster");
+  });
+
+  it("vers une catégorie existante encore sans anglais, l'anglais repris se vide", () => {
+    expect(next({ category: "Arbitre", categoryEn: "Referee" }, "Staff")).toBe("");
   });
 
   it("vers une catégorie inconnue, l'anglais reste (une faute corrigée ne le vide pas)", () => {
@@ -384,14 +391,14 @@ describe("nextCategoryEnglish", () => {
   });
 
   it("un anglais repris, gardé le temps de taper une catégorie inconnue, cède à celui de la catégorie connue atteinte", () => {
-    // « Arbitre » → vidé → « C » → « Caster » (connue) : « Referee » ne colle pas.
+    // « Arbitre » → « C » → « Caster » (connue) : « Referee » ne colle pas.
     expect(next({ category: "Arbitre", categoryEn: "Referee" }, "C")).toBe("Referee");
     expect(next({ category: "C", categoryEn: "Referee" }, "Caster")).toBe("Caster");
   });
 
   it("une saisie anglaise faite à la main n'est jamais écrasée", () => {
     expect(next({ category: "Graphiste", categoryEn: "Designer" }, "Arbitre")).toBe("Designer");
-    expect(next({ category: "Arbitre", categoryEn: "Umpire" }, "Graphist")).toBe("Umpire");
+    expect(next({ category: "Arbitre", categoryEn: "Umpire" }, "Staff")).toBe("Umpire");
   });
 });
 
@@ -408,6 +415,8 @@ describe("borrowedCategoryEnglish", () => {
 
   it("rien à signaler : catégorie connue, anglais propre, ou champ vide", () => {
     expect(borrowedCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, benevoles)).toBeNull();
+    // Catégorie existante sans anglais qui reçoit celui d'une autre : signalé aussi.
+    expect(borrowedCategoryEnglish({ category: "Staff", categoryEn: "Referee" }, [...benevoles, { category: "Staff", categoryEn: null }])).toBe("Arbitre");
     expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "Caster" }, benevoles)).toBeNull();
     expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "" }, benevoles)).toBeNull();
     expect(borrowedCategoryEnglish({ category: "", categoryEn: "Referee" }, benevoles)).toBeNull();
