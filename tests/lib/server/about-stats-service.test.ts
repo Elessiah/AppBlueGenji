@@ -53,15 +53,15 @@ describe("about-stats-service", () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 42 }]);
       await mockDb(execute);
 
-      const stat = await createAboutStat({ value: "12", label: "Arbitres" });
-      expect(stat).toEqual({ id: 42, value: "12", label: "Arbitres" });
+      const stat = await createAboutStat({ labelEn: "EN", value: "12", label: "Arbitres" });
+      expect(stat).toEqual({ id: 42, value: "12", label: "Arbitres", labelEn: "EN" });
       expect(execute).toHaveBeenCalledTimes(1);
     });
 
     it("rejects invalid input before touching the database", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(createAboutStat({ value: "", label: "Arbitres" })).rejects.toThrow("VALUE_REQUIRED");
+      await expect(createAboutStat({ labelEn: "EN", value: "", label: "Arbitres" })).rejects.toThrow("VALUE_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
     });
   });
@@ -71,19 +71,19 @@ describe("about-stats-service", () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
       await mockDb(execute);
 
-      const stat = await updateAboutStat(7, { value: "0 €", label: "Frais d'inscription" });
-      expect(stat).toEqual({ id: 7, value: "0 €", label: "Frais d'inscription" });
+      const stat = await updateAboutStat(7, { labelEn: "EN", value: "0 €", label: "Frais d'inscription" });
+      expect(stat).toEqual({ id: 7, value: "0 €", label: "Frais d'inscription", labelEn: "EN" });
     });
 
     it("throws NOT_FOUND when no row matches", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
-      await expect(updateAboutStat(999, { value: "X", label: "Y" })).rejects.toThrow("ABOUT_STAT_NOT_FOUND");
+      await expect(updateAboutStat(999, { labelEn: "EN", value: "X", label: "Y" })).rejects.toThrow("ABOUT_STAT_NOT_FOUND");
     });
 
     it("rejects invalid input", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(updateAboutStat(1, { value: "X", label: "" })).rejects.toThrow("LABEL_REQUIRED");
+      await expect(updateAboutStat(1, { labelEn: "EN", value: "X", label: "" })).rejects.toThrow("LABEL_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
     });
   });

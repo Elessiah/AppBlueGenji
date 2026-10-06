@@ -20,8 +20,11 @@ import type frLabels from "@/messages/fr/labels.json";
 import type frShare from "@/messages/fr/share.json";
 import type frLogin from "@/messages/fr/login.json";
 import type frBot from "@/messages/fr/bot.json";
+import type frAssociation from "@/messages/fr/association.json";
+import type frVolunteers from "@/messages/fr/volunteers.json";
+import type frRecruitment from "@/messages/fr/recruitment.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -43,6 +46,12 @@ export type Messages = {
   login: typeof frLogin;
   /** Pages `/bot` et `/bot/docs` (lot 5a) — `lib/shared/bot-text.ts`. */
   bot: typeof frBot;
+  /** Page `/association` (lot 5b). */
+  association: typeof frAssociation;
+  /** Page `/benevoles` (lot 5b). */
+  volunteers: typeof frVolunteers;
+  /** Page `/recrutement` et mise en avant du recrutement (lot 5b) — `lib/shared/recruitment-text.ts`. */
+  recruitment: typeof frRecruitment;
 };
 
 /**

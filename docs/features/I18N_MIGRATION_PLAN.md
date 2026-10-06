@@ -324,6 +324,26 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **Données du bot restées françaises** : résumés du flux temps réel (`lang="fr"` sous `/en`) — les
   traduire demanderait au bot d'émettre des événements structurés (hors périmètre).
 
+### Ce que le lot 5b a établi (2026-10-06) — écarts au plan
+
+- **`/association`, `/benevoles`, `/recrutement` (et la redirection `/partenaires`) ouverts sous
+  `/en`**, espaces `association`, `volunteers`, `recruitment` ; mise en avant du recrutement
+  traduite. Détail : `I18N.md` § Association, bénévoles, recrutement.
+- **Schéma tranché** (D9 le laissait au lot 5) : une **colonne `_en`** à côté du français
+  (`role_en`, `label_en`, `title_en` / `text_en`, `description_en`, `category_en`, `title_en` /
+  `roles_en` / `body_en`), aux deux endroits (`CREATE TABLE` et `RECENT_SCHEMA_CHANGES`), `NULL` =
+  pas encore traduit. Pas de table de traductions : un contenu a deux langues, pas N.
+- **Rattrapage sans migration de données** (écart à D9, comme au lot 2) : le code ne connaît pas le
+  contenu de production. Un contenu sans anglais **n'est pas rendu** sous `/en` (décision du
+  2026-10-06) et son éditeur porte la marque **EN**. **Action requise en production** :
+  `EDITABLE_SITE_COPY.md` § Rattrapage. Les pages anglaises ouvrent donc **avant** la fin du
+  rattrapage, plus courtes mais sans français — écart assumé à « une page anglaise n'ouvre qu'une
+  fois tout son contenu traduit ».
+- **Catégories de bénévoles traduites en bloc** (une catégorie = un intitulé anglais, recopié sur
+  ses bénévoles) ; un partenaire sans description anglaise reste affiché, sans description.
+- **Hors lot** : titres d'actualité (`bg_news`, sans table ni éditeur ici) ; éditeur du contact du
+  pied de page (staff, D4).
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -356,7 +376,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 2 ✅ | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
 | 3 ✅ | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
 | 4 ✅ | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
-| 5 (5a ✅) | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
+| 5 ✅ (5a, 5b) | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
 | 6 ✅ | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
 | 7a | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
 | 7b | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |

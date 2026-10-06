@@ -49,7 +49,9 @@ describe("SponsorsGrid — logos servis depuis notre origine", () => {
 
   it("affiche le nom et la description du partenaire", () => {
     expect(publicGrid).toContain("{sponsor.name}");
-    expect(publicGrid).toContain("{sponsor.description}");
+    // Dans la langue de la page (lot 5b) : sous `/en`, l'anglais ou rien.
+    expect(publicGrid).toContain("{description}");
+    expect(source).toContain("sponsorDescription(sponsor, locale)");
   });
 
   it("rend le logo public avec next/image, jamais avec un <img> brut", () => {

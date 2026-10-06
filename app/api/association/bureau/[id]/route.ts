@@ -10,6 +10,7 @@ export const { PUT, DELETE } = itemRoutes({
     member: await updateBureauMember(id, {
       name: typeof body.name === "string" ? body.name : "",
       role: typeof body.role === "string" ? body.role : "",
+      roleEn: typeof body.roleEn === "string" ? body.roleEn : null,
       initials: typeof body.initials === "string" ? body.initials : undefined,
       color: typeof body.color === "string" ? body.color : undefined,
     }),

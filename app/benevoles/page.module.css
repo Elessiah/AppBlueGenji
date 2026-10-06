@@ -414,6 +414,13 @@
   color: var(--ink-dim);
 }
 
+/* Ambre : un avertissement — l'anglais vient d'une autre catégorie. */
+.borrowedHint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--amber);
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;

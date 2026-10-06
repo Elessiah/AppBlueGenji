@@ -1,5 +1,5 @@
-import type { AboutPillar } from "@/lib/shared/about-pillars";
-import type { AboutStat } from "@/lib/shared/about-stats";
+import { localizedAboutPillars, type AboutPillar } from "@/lib/shared/about-pillars";
+import { localizedAboutStats, type AboutStat } from "@/lib/shared/about-stats";
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import { ORGANIZATION_FOUNDING_YEAR } from "@/lib/shared/structured-data";
 import { landingServerText } from "@/lib/server/i18n-landing";
@@ -21,14 +21,17 @@ interface AboutSectionProps {
 /**
  * Section « L'association » de l'accueil (et de la page association).
  *
- * Sous `/en`, les chiffres et les cartes « À propos » ne sont **pas** rendus :
- * leur texte est saisi en français par le staff, et leur éditeur ne demande
- * l'anglais qu'au lot 5 (`docs/features/I18N_MIGRATION_PLAN.md`, D9). Mieux
- * vaut une section plus courte qu'une page anglaise semée de français.
+ * Sous `/en`, les chiffres et les cartes « À propos » ne sont rendus qu'avec
+ * leur anglais, saisi dans leur éditeur depuis le lot 5b (D9) ; ceux d'avant,
+ * sans anglais, attendent le rattrapage (`staff-translation.ts`). Mieux vaut
+ * une section plus courte qu'une page anglaise semée de français.
  */
 export function AboutSection({ stats, pillars, isAdmin, copy, locale = DEFAULT_LOCALE }: Readonly<AboutSectionProps>) {
   const { t } = landingServerText(locale);
-  const showStaffContent = locale === DEFAULT_LOCALE;
+  // Chaque colonne n'est posée que si elle a quelque chose à montrer dans la
+  // langue de la page — sauf pour la gestion, qui y ajoute ses cartes.
+  const showStats = isAdmin || localizedAboutStats(stats, locale).length > 0;
+  const showPillars = isAdmin || localizedAboutPillars(pillars, locale).length > 0;
   return (
     <section id="assoc" className={styles.root}>
       <div className={styles.head}>
@@ -40,20 +43,20 @@ export function AboutSection({ stats, pillars, isAdmin, copy, locale = DEFAULT_L
         <div className={styles.meta}>{t("about.meta", { year: ORGANIZATION_FOUNDING_YEAR })}</div>
       </div>
 
-      {/* Sans chiffres ni piliers (masqués sous `/en` jusqu'au lot 5), une seule
-          colonne : la seconde resterait vide. */}
-      <div className={showStaffContent ? styles.grid : `${styles.grid} ${styles.gridSingle}`}>
+      {/* Sans cartes « À propos » traduites, une seule colonne : la seconde
+          resterait vide. */}
+      <div className={showPillars ? styles.grid : `${styles.grid} ${styles.gridSingle}`}>
         <div className={styles.left}>
           <EditableCopy copyKey="home.about.lede" value={copy["home.about.lede"]} canEdit={isAdmin}>
             <p className={styles.lede}>{copy["home.about.lede"]}</p>
           </EditableCopy>
 
-          {showStaffContent && <AboutStats initialStats={stats} isAdmin={isAdmin} />}
+          {showStats && <AboutStats initialStats={stats} isAdmin={isAdmin} locale={locale} />}
         </div>
 
-        {showStaffContent && (
+        {showPillars && (
           <div className={styles.right}>
-            <AboutPillars initialPillars={pillars} isAdmin={isAdmin} />
+            <AboutPillars initialPillars={pillars} isAdmin={isAdmin} locale={locale} />
           </div>
         )}
       </div>

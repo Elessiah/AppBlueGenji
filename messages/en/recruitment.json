@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "title": "Recruitment",
+    "description": "Join BlueGenji Esport's volunteer staff: refereeing, casting, development, communication, design, moderation and more.",
+    "shareDescription": "The association is recruiting volunteers to keep the French-speaking esports scene alive."
+  },
+  "hero": {
+    "eyebrow": "ASSOCIATION · VOLUNTEERING",
+    "titleLead": "The association is",
+    "titleAccent": "building its staff.",
+    "sub": "Referees, casters, developers, community managers, graphic designers, moderators… the association runs on its volunteers. Find the role that suits you."
+  },
+  "section": {
+    "eyebrow": "OPENINGS",
+    "title": "Open positions",
+    "count": "{count, plural, one {# OPENING} other {# OPENINGS}}",
+    "countFiltered": "{shown} / {count, plural, one {# OPENING} other {# OPENINGS}}",
+    "filterLabel": "Filter by area",
+    "allDomains": "All areas",
+    "empty": "No open staff positions right now.",
+    "noUrgent": "No urgent openings right now.",
+    "others": "Other openings",
+    "unavailable": "This opening is no longer available.",
+    "pendingTranslation": "Our openings are being translated into English.",
+    "untranslated": "This opening isn't available in English yet."
+  },
+  "card": {
+    "roles": "Tasks: {roles}",
+    "readMore": "Read the full opening →",
+    "apply": "Apply →",
+    "inactive": "Inactive",
+    "urgent": "Urgent"
+  },
+  "detail": {
+    "closeLabel": "Close opening details",
+    "closeTitle": "Close",
+    "bodyLabel": "Description of the opening {title}",
+    "noBody": "No description for this opening.",
+    "close": "Close"
+  },
+  "contact": {
+    "label": "Contacts",
+    "discord": "Discord",
+    "join": "Join",
+    "copyTitle": "Copy the Discord username",
+    "copied": "Discord username copied: {value}",
+    "copyFailed": "Couldn't copy, copy it manually.",
+    "open": "Open",
+    "openTitle": "Open the Discord conversation"
+  },
+  "domains": {
+    "ARBITRAGE": "Refereeing",
+    "CASTING": "Casting / Commentary",
+    "DEV": "Development",
+    "COMMUNICATION": "Communication",
+    "DESIGN": "Design / Graphics",
+    "MODERATION": "Moderation",
+    "EVENEMENTIEL": "Events",
+    "ADMIN": "Administration",
+    "AUTRE": "Other"
+  },
+  "highlight": {
+    "bannerLabel": "Recruitment openings",
+    "tag": "Recruitment",
+    "view": "View",
+    "viewLabel": "View the opening: {title}",
+    "previous": "Previous opening",
+    "next": "Next opening",
+    "position": "Opening {position} of {count}",
+    "resume": "Resume scrolling through openings",
+    "pause": "Pause scrolling through openings",
+    "resumeTitle": "Resume",
+    "pauseTitle": "Pause",
+    "close": "Close the recruitment banner",
+    "eyebrow": "RECRUITMENT",
+    "previousPage": "← Previous",
+    "nextPage": "Next →",
+    "later": "Later",
+    "read": "Read the opening →",
+    "apply": "Apply →"
+  }
+}

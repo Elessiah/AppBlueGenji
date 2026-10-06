@@ -21,6 +21,9 @@ function ad(overrides: Partial<RecruitmentAd> = {}): RecruitmentAd {
   return {
     id: 42,
     title: "Cherche coach Overwatch",
+    titleEn: null,
+    rolesEn: null,
+    bodyEn: null,
     teamName: "Test - Eclipse",
     domain: "AUTRE",
     roles: "Coach",

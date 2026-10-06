@@ -33,7 +33,7 @@ describe("GET /api/association/bureau", () => {
   });
 
   it("returns the public list without auth", async () => {
-    const members = [{ id: 1, name: "Léo", role: "Président", initials: "LP", color: "c" }];
+    const members = [{ id: 1, name: "Léo", role: "Président", roleEn: null, initials: "LP", color: "c" }];
     jest.mocked(service.listBureauMembers).mockResolvedValue(members);
 
     const res = await GET();
@@ -64,7 +64,7 @@ describe("POST /api/association/bureau", () => {
 
   it("creates a member for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const member = { id: 5, name: "X", role: "Y", initials: "X", color: "c" };
+    const member = { id: 5, name: "X", role: "Y", roleEn: null, initials: "X", color: "c" };
     jest.mocked(service.createBureauMember).mockResolvedValue(member);
 
     const res = await POST(jsonReq("POST", { name: "X", role: "Y" }));
@@ -105,7 +105,7 @@ describe("PUT /api/association/bureau/[id]", () => {
 
   it("updates a member for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const member = { id: 3, name: "X", role: "Y", initials: "X", color: "c" };
+    const member = { id: 3, name: "X", role: "Y", roleEn: null, initials: "X", color: "c" };
     jest.mocked(service.updateBureauMember).mockResolvedValue(member);
 
     const res = await PUT(jsonReq("PUT", { name: "X", role: "Y" }), params("3"));

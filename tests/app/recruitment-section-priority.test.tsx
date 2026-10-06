@@ -16,6 +16,9 @@ function ad(id: number, priority: RecruitmentPriority, overrides: Partial<Recrui
   return {
     id,
     title: `Annonce ${id}`,
+    titleEn: null,
+    rolesEn: null,
+    bodyEn: null,
     teamName: null,
     domain: "AUTRE",
     roles: null,

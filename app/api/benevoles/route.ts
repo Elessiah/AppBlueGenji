@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     pseudo?: unknown;
     lastName?: unknown;
     category?: unknown;
+    categoryEn?: unknown;
     photoUrl?: unknown;
     joinedAt?: unknown;
   };
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
       pseudo: typeof body.pseudo === "string" ? body.pseudo : null,
       lastName: typeof body.lastName === "string" ? body.lastName : "",
       category: typeof body.category === "string" ? body.category : "",
+      categoryEn: typeof body.categoryEn === "string" ? body.categoryEn : null,
       photoUrl: typeof body.photoUrl === "string" ? body.photoUrl : null,
       joinedAt: typeof body.joinedAt === "string" ? body.joinedAt : "",
     });

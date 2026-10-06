@@ -8,6 +8,10 @@ import type {
 /** Champs du formulaire de gestion d'une annonce (`RecruitmentSection`). */
 export interface RecruitmentFormState {
   title: string;
+  /** Anglais (lot 5b) : obligatoire pour le titre, et pour missions / description dès que leur français est saisi. */
+  titleEn: string;
+  rolesEn: string;
+  bodyEn: string;
   teamName: string;
   domain: RecruitmentDomain;
   roles: string;
@@ -21,6 +25,9 @@ export interface RecruitmentFormState {
 
 export const EMPTY_RECRUITMENT_FORM: RecruitmentFormState = {
   title: "",
+  titleEn: "",
+  rolesEn: "",
+  bodyEn: "",
   teamName: "",
   domain: "AUTRE",
   roles: "",
@@ -36,6 +43,9 @@ export const EMPTY_RECRUITMENT_FORM: RecruitmentFormState = {
 export function recruitmentFormFromAd(ad: RecruitmentAd): RecruitmentFormState {
   return {
     title: ad.title,
+    titleEn: ad.titleEn ?? "",
+    rolesEn: ad.rolesEn ?? "",
+    bodyEn: ad.bodyEn ?? "",
     teamName: ad.teamName ?? "",
     domain: ad.domain,
     roles: ad.roles ?? "",
@@ -64,6 +74,9 @@ export function recruitmentRequestBody(form: RecruitmentFormState, snapshot: Dis
   const discord = form.contactDiscord.trim();
   return {
     title: form.title.trim(),
+    titleEn: form.titleEn.trim() || null,
+    rolesEn: form.rolesEn.trim() || null,
+    bodyEn: form.bodyEn.trim() || null,
     teamName: form.teamName.trim() || null,
     domain: form.domain,
     roles: form.roles.trim() || null,

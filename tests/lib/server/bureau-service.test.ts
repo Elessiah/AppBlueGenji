@@ -59,15 +59,15 @@ describe("bureau-service", () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 42 }]);
       await mockDb(execute);
 
-      const member = await createBureauMember({ name: "Sophie Martin", role: "Secrétaire", color: "rgb(9,9,9)" });
-      expect(member).toEqual({ id: 42, name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(9,9,9)" });
+      const member = await createBureauMember({ roleEn: "EN", name: "Sophie Martin", role: "Secrétaire", color: "rgb(9,9,9)" });
+      expect(member).toEqual({ id: 42, name: "Sophie Martin", role: "Secrétaire", roleEn: "EN", initials: "SM", color: "rgb(9,9,9)" });
       expect(execute).toHaveBeenCalledTimes(1);
     });
 
     it("rejects invalid input before touching the database", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(createBureauMember({ name: "", role: "Role" })).rejects.toThrow("NAME_REQUIRED");
+      await expect(createBureauMember({ roleEn: "EN", name: "", role: "Role" })).rejects.toThrow("NAME_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
     });
   });
@@ -77,19 +77,19 @@ describe("bureau-service", () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
       await mockDb(execute);
 
-      const member = await updateBureauMember(7, { name: "Jérôme Dubois", role: "Arbitre", initials: "JD", color: "rgb(1,1,1)" });
-      expect(member).toEqual({ id: 7, name: "Jérôme Dubois", role: "Arbitre", initials: "JD", color: "rgb(1,1,1)" });
+      const member = await updateBureauMember(7, { roleEn: "EN", name: "Jérôme Dubois", role: "Arbitre", initials: "JD", color: "rgb(1,1,1)" });
+      expect(member).toEqual({ id: 7, name: "Jérôme Dubois", role: "Arbitre", roleEn: "EN", initials: "JD", color: "rgb(1,1,1)" });
     });
 
     it("throws NOT_FOUND when no row matches", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
-      await expect(updateBureauMember(999, { name: "X", role: "Y" })).rejects.toThrow("BUREAU_MEMBER_NOT_FOUND");
+      await expect(updateBureauMember(999, { roleEn: "EN", name: "X", role: "Y" })).rejects.toThrow("BUREAU_MEMBER_NOT_FOUND");
     });
 
     it("rejects invalid input", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(updateBureauMember(1, { name: "X", role: "" })).rejects.toThrow("ROLE_REQUIRED");
+      await expect(updateBureauMember(1, { roleEn: "EN", name: "X", role: "" })).rejects.toThrow("ROLE_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
     });
   });
@@ -164,8 +164,8 @@ describe("bureau-service — mutualisation de la lecture", () => {
   });
 
   it.each([
-    ["createBureauMember", () => createBureauMember({ name: "A", role: "R", initials: "AB", color: "rgb(1,2,3)" })],
-    ["updateBureauMember", () => updateBureauMember(1, { name: "A", role: "R", initials: "AB", color: "rgb(1,2,3)" })],
+    ["createBureauMember", () => createBureauMember({ roleEn: "EN", name: "A", role: "R", initials: "AB", color: "rgb(1,2,3)" })],
+    ["updateBureauMember", () => updateBureauMember(1, { roleEn: "EN", name: "A", role: "R", initials: "AB", color: "rgb(1,2,3)" })],
     ["deleteBureauMember", () => deleteBureauMember(1)],
   ])("oublie la liste après %s", async (_name, write) => {
     const execute = jest.fn<any>().mockImplementation(async (sql: string) =>

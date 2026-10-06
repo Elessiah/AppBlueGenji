@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "title": "Recrutement",
+    "description": "Rejoins le staff bénévole de BlueGenji Esport : arbitrage, casting, développement, communication, design, modération et plus.",
+    "shareDescription": "L'association recrute ses bénévoles pour faire vivre la scène esport francophone."
+  },
+  "hero": {
+    "eyebrow": "ASSOCIATION · BÉNÉVOLAT",
+    "titleLead": "L'asso recrute",
+    "titleAccent": "son staff.",
+    "sub": "Arbitres, casters, développeurs, community managers, graphistes, modérateurs… l'association tourne grâce à ses bénévoles. Trouve la mission qui te correspond."
+  },
+  "section": {
+    "eyebrow": "ANNONCES",
+    "title": "Recrutement en cours",
+    "count": "{count, plural, one {# ANNONCE} other {# ANNONCES}}",
+    "countFiltered": "{shown} / {count, plural, one {# ANNONCE} other {# ANNONCES}}",
+    "filterLabel": "Filtrer par pôle",
+    "allDomains": "Tous les pôles",
+    "empty": "Aucun poste à pourvoir dans le staff pour le moment.",
+    "noUrgent": "Aucun recrutement urgent en ce moment.",
+    "others": "Autres recrutements",
+    "unavailable": "Cette annonce n'est plus disponible.",
+    "pendingTranslation": "Nos annonces sont en cours de traduction en anglais.",
+    "untranslated": "Cette annonce n'est pas encore disponible en anglais."
+  },
+  "card": {
+    "roles": "Missions : {roles}",
+    "readMore": "Lire l'annonce complète →",
+    "apply": "Postuler →",
+    "inactive": "Inactif",
+    "urgent": "Urgente"
+  },
+  "detail": {
+    "closeLabel": "Fermer l'annonce",
+    "closeTitle": "Fermer",
+    "bodyLabel": "Description de l'annonce {title}",
+    "noBody": "Pas de description pour cette annonce.",
+    "close": "Fermer"
+  },
+  "contact": {
+    "label": "Contacts",
+    "discord": "Discord",
+    "join": "Rejoindre",
+    "copyTitle": "Copier le pseudo Discord",
+    "copied": "Pseudo Discord copié : {value}",
+    "copyFailed": "Impossible de copier, copie manuellement.",
+    "open": "Ouvrir",
+    "openTitle": "Ouvrir la conversation Discord"
+  },
+  "domains": {
+    "ARBITRAGE": "Arbitrage",
+    "CASTING": "Casting / Commentaire",
+    "DEV": "Développement",
+    "COMMUNICATION": "Communication",
+    "DESIGN": "Design / Graphisme",
+    "MODERATION": "Modération",
+    "EVENEMENTIEL": "Événementiel",
+    "ADMIN": "Administration",
+    "AUTRE": "Autre"
+  },
+  "highlight": {
+    "bannerLabel": "Annonces de recrutement",
+    "tag": "Recrutement",
+    "view": "Voir",
+    "viewLabel": "Voir l'annonce : {title}",
+    "previous": "Annonce précédente",
+    "next": "Annonce suivante",
+    "position": "Annonce {position} sur {count}",
+    "resume": "Reprendre le défilement des annonces",
+    "pause": "Mettre en pause le défilement des annonces",
+    "resumeTitle": "Reprendre",
+    "pauseTitle": "Pause",
+    "close": "Fermer la banderole de recrutement",
+    "eyebrow": "RECRUTEMENT",
+    "previousPage": "← Précédente",
+    "nextPage": "Suivante →",
+    "later": "Plus tard",
+    "read": "Lire l'annonce →",
+    "apply": "Postuler →"
+  }
+}

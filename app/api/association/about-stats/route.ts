@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let body: { value?: unknown; label?: unknown };
+  let body: { value?: unknown; label?: unknown; labelEn?: unknown };
   try {
     body = (await readJsonBody(req)) as typeof body;
   } catch {
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     const stat = await createAboutStat({
       value: typeof body.value === "string" ? body.value : "",
       label: typeof body.label === "string" ? body.label : "",
+      labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
     });
     return ok({ stat }, 201);
   } catch (e) {

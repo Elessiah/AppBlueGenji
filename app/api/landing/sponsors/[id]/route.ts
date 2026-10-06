@@ -27,6 +27,7 @@ export const { PUT, DELETE } = itemRoutes({
       bannerUrl: typeof body.bannerUrl === "string" ? body.bannerUrl : null,
       websiteUrl: typeof body.websiteUrl === "string" ? body.websiteUrl : null,
       description: typeof body.description === "string" ? body.description : null,
+      descriptionEn: typeof body.descriptionEn === "string" ? body.descriptionEn : null,
       active: typeof body.active === "boolean" ? body.active : undefined,
     });
     await cleanupReplacedImage(previous.logoUrl, sponsor.logoUrl);

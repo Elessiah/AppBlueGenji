@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
-import { useAppLocale } from "@/components/i18n/locale-context";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 import { CyberButton } from "@/components/cyber";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -12,7 +12,6 @@ import type { CountdownOverride } from "@/lib/shared/pausable-countdown";
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_BANNER_ROTATION_MS,
-  RECRUITMENT_DOMAIN_LABELS,
   RECRUITMENT_MODAL_COOKIE,
   RECRUITMENT_MODAL_COOKIE_MAX_AGE,
   RECRUITMENT_PRIORITY_EXPOSURE,
@@ -23,6 +22,8 @@ import {
   recruitmentModalStart,
   serializeRecruitmentSeen,
 } from "@/lib/shared/recruitment";
+import { FR_RECRUITMENT_TEXT, type RecruitmentText } from "@/lib/shared/recruitment-text";
+import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import styles from "./recruitment-highlight.module.css";
 
 /** Aperçu plus généreux qu'en carte : la modale a la place, mais pas un mur de texte. */
@@ -58,8 +59,14 @@ function isKeyboardFocus(target: EventTarget): boolean {
   }
 }
 
-function adMeta(ad: RecruitmentAd): string {
-  return [ad.teamName, RECRUITMENT_DOMAIN_LABELS[ad.domain], ad.roles].filter(Boolean).join(" · ");
+/**
+ * Ligne de résumé d'une annonce. Le référent (`teamName`) est saisi en
+ * français et n'a pas d'anglais : hors français, il reste sur la carte et la
+ * lecture en grand (`lang="fr"`), pas dans ce résumé d'un seul tenant.
+ */
+function adMeta(ad: RecruitmentAd, text: RecruitmentText): string {
+  const referent = text.locale === DEFAULT_LOCALE ? ad.teamName : null;
+  return [referent, text.t(`domains.${ad.domain}`), ad.roles].filter(Boolean).join(" · ");
 }
 
 /** Lien profond : la page de recrutement ouvre directement l'annonce en grand. */
@@ -73,8 +80,8 @@ function adHref(ad: RecruitmentAd): string {
  * **commence** par le mot affiché, sans quoi la commande vocale « cliquer sur
  * Voir » ne le trouverait plus (WCAG 2.5.3).
  */
-export function bannerLinkLabel(ad: Pick<RecruitmentAd, "title">): string {
-  return `Voir l'annonce : ${ad.title}`;
+export function bannerLinkLabel(ad: Pick<RecruitmentAd, "title">, text: RecruitmentText = FR_RECRUITMENT_TEXT): string {
+  return text.t("highlight.viewLabel", { title: ad.title });
 }
 
 /**
@@ -102,8 +109,10 @@ export function RecruitmentHighlight({
   modalAds,
   modalSilenced,
   modalSeen,
+  modalSeenKept = [],
   bannerAds,
   bannerDismissed,
+  bannerSeenKept = [],
   onAdPage,
 }: Readonly<{
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
@@ -112,10 +121,14 @@ export function RecruitmentHighlight({
   modalSilenced: boolean;
   /** Prioritaires que ce visiteur a déjà vues (cookie) : elles le restent. */
   modalSeen: readonly number[];
+  /** Vues ailleurs mais masquées ici (sous `/en`, sans anglais) : gardées au cookie (`recruitmentSeenKept`). */
+  modalSeenKept?: readonly number[];
   /** Prioritaires puis importantes publiées : ce qui défile dans la banderole. */
   bannerAds: readonly RecruitmentAd[];
   /** Le cookie dit que ce visiteur a déjà fermé la banderole telle qu'elle est. */
   bannerDismissed: boolean;
+  /** Écartées ailleurs mais masquées ici : gardées au cookie de la banderole. */
+  bannerSeenKept?: readonly number[];
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
 }>) {
@@ -125,12 +138,13 @@ export function RecruitmentHighlight({
   return (
     <>
       {!bannerDismissed && bannerAds.length > 0 && (
-        <RecruitmentBanner ads={bannerAds} onAdPage={onAdPage} />
+        <RecruitmentBanner ads={bannerAds} keptIds={bannerSeenKept} onAdPage={onAdPage} />
       )}
       {showModal && (
         <RecruitmentArrivalModal
           ads={modalAds}
           seenIds={modalSeen}
+          keptIds={modalSeenKept}
           startIndex={modalStart}
         />
       )}
@@ -157,9 +171,11 @@ export function RecruitmentHighlight({
  */
 function RecruitmentBanner({
   ads,
+  keptIds,
   onAdPage,
 }: Readonly<{
   ads: readonly RecruitmentAd[];
+  keptIds: readonly number[];
   onAdPage: boolean;
 }>) {
   const [dismissed, setDismissed] = useState(false);
@@ -168,9 +184,10 @@ function RecruitmentBanner({
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const { decorativeMotion } = useClientPower();
-  // Annonces saisies en français (lot 5 pour leur anglais) : annoncées comme
-  // telles sur une page anglaise (WCAG 3.1.2, `docs/features/I18N.md`).
-  const contentLang = useAppLocale() === "fr" ? undefined : "fr";
+  // Sous `/en`, les annonces arrivent déjà dans leur anglais — celles qui n'en
+  // ont pas sont retirées côté serveur (`getRecruitmentSpotlight(locale)`).
+  const text = useRecruitmentText();
+  const { t } = text;
 
   const count = ads.length;
   const multiple = count > 1;
@@ -192,12 +209,12 @@ function RecruitmentBanner({
   // Modulo : la liste vient du serveur et peut raccourcir d'un rendu à l'autre.
   const position = index % count;
   const ad = ads[position];
-  const meta = adMeta(ad);
+  const meta = adMeta(ad, text);
   const anchor = recruitmentAdAnchor(ad.id);
   const urgent = RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent;
 
   function dismiss() {
-    writeSeenCookie(RECRUITMENT_BANNER_COOKIE, serializeRecruitmentSeen(ads.map((a) => a.id)));
+    writeSeenCookie(RECRUITMENT_BANNER_COOKIE, serializeRecruitmentSeen([...keptIds, ...ads.map((a) => a.id)]));
     setDismissed(true);
   }
 
@@ -227,8 +244,7 @@ function RecruitmentBanner({
   return (
     <section
       className={styles.banner}
-      aria-label="Annonces de recrutement"
-      lang={contentLang}
+      aria-label={t("highlight.bannerLabel")}
       onPointerEnter={onPointerEnter}
       onPointerLeave={() => setHovered(false)}
       onFocus={onFocus}
@@ -240,7 +256,7 @@ function RecruitmentBanner({
           couperait la parole à tout le reste de la page. */}
       <span className={styles.bannerText} aria-live={rotating ? "off" : "polite"}>
         <span key={ad.id} className={styles.bannerSlide}>
-          {urgent ? <UrgentPill /> : <span className={styles.bannerTag}>Recrutement</span>}
+          {urgent ? <UrgentPill /> : <span className={styles.bannerTag}>{t("highlight.tag")}</span>}
           <span className={styles.bannerTitle}>{ad.title}</span>
           {meta && <span className={styles.bannerMeta}>{meta}</span>}
         </span>
@@ -250,12 +266,12 @@ function RecruitmentBanner({
         // fragment que par `pushState`, qui n'émet aucun événement — la modale
         // de lecture ne s'ouvrirait pas. L'ancre native, elle, déclenche bien
         // `hashchange`.
-        <a href={`#${anchor}`} className={styles.bannerLink} aria-label={bannerLinkLabel(ad)}>
-          Voir <span aria-hidden="true">→</span>
+        <a href={`#${anchor}`} className={styles.bannerLink} aria-label={bannerLinkLabel(ad, text)}>
+          {t("highlight.view")} <span aria-hidden="true">→</span>
         </a>
       ) : (
-        <LocaleLink href={adHref(ad)} className={styles.bannerLink} aria-label={bannerLinkLabel(ad)}>
-          Voir <span aria-hidden="true">→</span>
+        <LocaleLink href={adHref(ad)} className={styles.bannerLink} aria-label={bannerLinkLabel(ad, text)}>
+          {t("highlight.view")} <span aria-hidden="true">→</span>
         </LocaleLink>
       )}
       {multiple && (
@@ -264,7 +280,7 @@ function RecruitmentBanner({
             type="button"
             className={styles.bannerButton}
             onClick={() => step(-1)}
-            aria-label="Annonce précédente"
+            aria-label={t("highlight.previous")}
           >
             ‹
           </button>
@@ -272,15 +288,13 @@ function RecruitmentBanner({
             <span aria-hidden="true">
               {position + 1}/{count}
             </span>
-            <span className="sr-only">
-              Annonce {position + 1} sur {count}
-            </span>
+            <span className="sr-only">{t("highlight.position", { position: position + 1, count })}</span>
           </span>
           <button
             type="button"
             className={styles.bannerButton}
             onClick={() => step(1)}
-            aria-label="Annonce suivante"
+            aria-label={t("highlight.next")}
           >
             ›
           </button>
@@ -292,8 +306,8 @@ function RecruitmentBanner({
               className={styles.bannerButton}
               onClick={() => setOverride(paused ? "RUNNING" : "PAUSED")}
               aria-pressed={paused}
-              aria-label={paused ? "Reprendre le défilement des annonces" : "Mettre en pause le défilement des annonces"}
-              title={paused ? "Reprendre" : "Pause"}
+              aria-label={paused ? t("highlight.resume") : t("highlight.pause")}
+              title={paused ? t("highlight.resumeTitle") : t("highlight.pauseTitle")}
             >
               {paused ? "▶" : "❚❚"}
             </button>
@@ -304,7 +318,7 @@ function RecruitmentBanner({
         type="button"
         className={styles.bannerClose}
         onClick={dismiss}
-        aria-label="Fermer la banderole de recrutement"
+        aria-label={t("highlight.close")}
       >
         ✕
       </button>
@@ -322,10 +336,12 @@ function RecruitmentBanner({
 function RecruitmentArrivalModal({
   ads,
   seenIds,
+  keptIds,
   startIndex,
 }: Readonly<{
   ads: readonly RecruitmentAd[];
   seenIds: readonly number[];
+  keptIds: readonly number[];
   startIndex: number;
 }>) {
   const [open, setOpen] = useState(true);
@@ -340,7 +356,7 @@ function RecruitmentArrivalModal({
   );
 
   // Valeur du cookie : les prioritaires vues, dans l'ordre de la modale.
-  const seenValue = serializeRecruitmentSeen(ads.filter((a) => viewed.has(a.id)).map((a) => a.id));
+  const seenValue = serializeRecruitmentSeen([...keptIds, ...ads.filter((a) => viewed.has(a.id)).map((a) => a.id)]);
 
   function go(direction: -1 | 1) {
     const next = (index + direction + ads.length) % ads.length;
@@ -355,7 +371,8 @@ function RecruitmentArrivalModal({
 
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open, onClose: dismiss });
-  const contentLang = useAppLocale() === "fr" ? undefined : "fr";
+  const text = useRecruitmentText();
+  const { t } = text;
   const backdrop = useBackdropDismiss(dismiss);
 
   // Une page « compte » comme vue dès qu'elle est affichée, même si le visiteur
@@ -372,7 +389,7 @@ function RecruitmentArrivalModal({
   const count = ads.length;
   const position = index % count;
   const ad = ads[position];
-  const meta = adMeta(ad);
+  const meta = adMeta(ad, text);
   const preview = buildRecruitmentPreview(ad.body, MODAL_PREVIEW_MAX);
   const titleId = `recruitment-arrival-title-${ad.id}`;
 
@@ -384,11 +401,10 @@ function RecruitmentArrivalModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        lang={contentLang}
         tabIndex={-1}
       >
         <div className={styles.modalEyebrow}>
-          <span className="eyebrow">RECRUTEMENT</span>
+          <span className="eyebrow">{t("highlight.eyebrow")}</span>
           <UrgentPill />
         </div>
         <h2 id={titleId} className={styles.modalTitle}>
@@ -404,41 +420,39 @@ function RecruitmentArrivalModal({
               className={styles.pagerButton}
               onClick={() => go(-1)}
             >
-              ← Précédente
+              {t("highlight.previousPage")}
             </button>
             <span className={styles.pagerCount} aria-live="polite">
               <span aria-hidden="true">
                 {position + 1} / {count}
               </span>
-              <span className="sr-only">
-                Annonce {position + 1} sur {count}
-              </span>
+              <span className="sr-only">{t("highlight.position", { position: position + 1, count })}</span>
             </span>
             <button
               type="button"
               className={styles.pagerButton}
               onClick={() => go(1)}
             >
-              Suivante →
+              {t("highlight.nextPage")}
             </button>
           </div>
         )}
 
         <div className={styles.modalActions}>
           <CyberButton variant="ghost" onClick={dismiss}>
-            Plus tard
+            {t("highlight.later")}
           </CyberButton>
           {/* La lecture complète se fait toujours sur la page de recrutement :
               la modale d'accueil reste un teaser, jamais un pavé de 2 000 signes. */}
           <CyberButton variant={ad.contactUrl ? "ghost" : "primary"} asChild>
             <LocaleLink href={adHref(ad)} onClick={dismiss}>
-              Lire l&apos;annonce →
+              {t("highlight.read")}
             </LocaleLink>
           </CyberButton>
           {ad.contactUrl && (
             <CyberButton variant="primary" asChild>
               <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer" onClick={dismiss}>
-                Postuler →
+                {t("highlight.apply")}
               </a>
             </CyberButton>
           )}

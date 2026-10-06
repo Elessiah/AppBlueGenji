@@ -16,10 +16,12 @@ interface AboutPillarRow extends RowDataPacket {
   id: number;
   title: string;
   text: string;
+  title_en: string | null;
+  text_en: string | null;
 }
 
 function fromRow(row: AboutPillarRow): AboutPillar {
-  return { id: Number(row.id), title: row.title, text: row.text };
+  return { id: Number(row.id), title: row.title, text: row.text, titleEn: row.title_en, textEn: row.text_en };
 }
 
 /**
@@ -48,7 +50,7 @@ export async function listAboutPillars(): Promise<AboutPillar[]> {
 async function loadListAboutPillars(): Promise<AboutPillar[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<AboutPillarRow[]>(
-    `SELECT id, title, text
+    `SELECT id, title, text, title_en, text_en
      FROM bg_about_pillars
      ORDER BY display_order ASC, id ASC`,
   );
@@ -60,36 +62,36 @@ async function loadListAboutPillars(): Promise<AboutPillar[]> {
 export async function createAboutPillar(input: AboutPillarInput): Promise<AboutPillar> {
   const validation = validateAboutPillarInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { title, text } = validation.value;
+  const { title, text, titleEn, textEn } = validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_about_pillars (title, text, display_order)
-     VALUES (?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_about_pillars AS p))`,
-    [title, text],
+    `INSERT INTO bg_about_pillars (title, text, title_en, text_en, display_order)
+     VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_about_pillars AS p))`,
+    [title, text, titleEn, textEn],
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id: Number(res.insertId), title, text };
+  return { id: Number(res.insertId), title, text, titleEn, textEn };
 }
 
 /** Met à jour un pilier existant et renvoie sa version mise à jour. */
 export async function updateAboutPillar(id: number, input: AboutPillarInput): Promise<AboutPillar> {
   const validation = validateAboutPillarInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { title, text } = validation.value;
+  const { title, text, titleEn, textEn } = validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_about_pillars SET title = ?, text = ? WHERE id = ?`,
-    [title, text, id],
+    `UPDATE bg_about_pillars SET title = ?, text = ?, title_en = ?, text_en = ? WHERE id = ?`,
+    [title, text, titleEn, textEn, id],
   );
   if (res.affectedRows === 0) throw new Error("ABOUT_PILLAR_NOT_FOUND");
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id, title, text };
+  return { id, title, text, titleEn, textEn };
 }
 
 /**

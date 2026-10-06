@@ -9,10 +9,13 @@ import {
   type RecruitmentPriority,
   type RecruitmentSpotlight,
   recruitmentOrderMixesPriorities,
+  localizeRecruitmentAds,
+  withoutEnglish,
   selectRecruitmentSpotlight,
   sortRecruitmentAds,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 
 export type {
   RecruiterContactDefaults,
@@ -24,6 +27,9 @@ export type {
 interface RecruitmentRow extends RowDataPacket {
   id: number;
   title: string;
+  title_en: string | null;
+  roles_en: string | null;
+  body_en: string | null;
   team_name: string | null;
   domain: RecruitmentAd["domain"];
   roles: string | null;
@@ -40,6 +46,9 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
   return {
     id: Number(row.id),
     title: row.title,
+    titleEn: row.title_en,
+    rolesEn: row.roles_en,
+    bodyEn: row.body_en,
     teamName: row.team_name,
     domain: row.domain,
     roles: row.roles,
@@ -53,7 +62,7 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
   };
 }
 
-const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, contact_discord, contact_discord_id, contact_preferred, priority, active`;
+const SELECT_COLUMNS = `id, title, title_en, roles_en, body_en, team_name, domain, roles, body, contact_url, contact_discord, contact_discord_id, contact_preferred, priority, active`;
 
 /** Lecture nue, sans cache : l'assiette dépend de `includeInactive`. */
 async function loadRecruitmentAds(includeInactive: boolean): Promise<RecruitmentAd[]> {
@@ -104,7 +113,18 @@ const EMPTY_SPOTLIGHT: RecruitmentSpotlight<RecruitmentAd> = { modal: [], banner
  * jour où l'un des deux tris change, la gestion annoncerait « dans la modale »
  * une annonce que le site ne montre pas.
  */
-export async function getRecruitmentSpotlight(): Promise<RecruitmentSpotlight<RecruitmentAd>> {
+export async function getRecruitmentSpotlight(locale: Locale = DEFAULT_LOCALE): Promise<RecruitmentSpotlight<RecruitmentAd>> {
+  const spotlight = await loadRecruitmentSpotlight();
+  // Une seule langue part au navigateur (`withoutEnglish`) : la mise en avant
+  // est dans la mise en page racine, donc dans le HTML de chaque page. Sous
+  // `/en`, seulement les annonces traduites, dans leur anglais : la banderole
+  // et la modale se taisent plutôt que de parler français.
+  const inLocale = (ads: RecruitmentAd[]) =>
+    (locale === DEFAULT_LOCALE ? ads : localizeRecruitmentAds(ads, locale)).map(withoutEnglish);
+  return { modal: inLocale(spotlight.modal), banner: inLocale(spotlight.banner) };
+}
+
+async function loadRecruitmentSpotlight(): Promise<RecruitmentSpotlight<RecruitmentAd>> {
   try {
     // La mise en avant est montée dans la **mise en page racine** : elle est
     // donc demandée à chaque arrivée sur le site, par chaque visiteur. Rien ne
@@ -154,6 +174,9 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
   if (!validation.ok) throw new Error(validation.error);
   const {
     title,
+    titleEn,
+    rolesEn,
+    bodyEn,
     teamName,
     domain,
     roles,
@@ -169,12 +192,15 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_recruitment_ads
-       (title, team_name, domain, roles, body, contact_url, contact_discord,
+       (title, title_en, roles_en, body_en, team_name, domain, roles, body, contact_url, contact_discord,
         contact_discord_id, contact_preferred, priority, active, display_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_recruitment_ads AS r))`,
     [
       title,
+      titleEn,
+      rolesEn,
+      bodyEn,
       teamName,
       domain,
       roles,
@@ -193,6 +219,9 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
   return {
     id: Number(res.insertId),
     title,
+    titleEn,
+    rolesEn,
+    bodyEn,
     teamName,
     domain,
     roles,
@@ -212,6 +241,9 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
   if (!validation.ok) throw new Error(validation.error);
   const {
     title,
+    titleEn,
+    rolesEn,
+    bodyEn,
     teamName,
     domain,
     roles,
@@ -256,12 +288,15 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
 
   await db.execute<ResultSetHeader>(
     `UPDATE bg_recruitment_ads
-     SET title = ?, team_name = ?, domain = ?, roles = ?, body = ?, contact_url = ?,
+     SET title = ?, title_en = ?, roles_en = ?, body_en = ?, team_name = ?, domain = ?, roles = ?, body = ?, contact_url = ?,
          contact_discord = ?, contact_discord_id = ?, contact_preferred = ?,
          priority = ?, active = ?, display_order = COALESCE(?, display_order)
      WHERE id = ?`,
     [
       title,
+      titleEn,
+      rolesEn,
+      bodyEn,
       teamName,
       domain,
       roles,
@@ -282,6 +317,9 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
   return {
     id,
     title,
+    titleEn,
+    rolesEn,
+    bodyEn,
     teamName,
     domain,
     roles,

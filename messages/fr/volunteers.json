@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "title": "Bénévoles",
+    "description": "Découvrez les bénévoles qui font vivre BlueGenji Esport au quotidien.",
+    "shareDescription": "Les passionné·es qui organisent, animent et développent la scène esport francophone."
+  },
+  "hero": {
+    "eyebrow": "L'ÉQUIPE · BÉNÉVOLES",
+    "titleLead": "Celles et ceux qui font",
+    "titleAccent": "vivre BlueGenji.",
+    "sub": "Organisateurs, développeurs, casters, arbitres… chaque tournoi existe grâce à eux."
+  },
+  "section": {
+    "eyebrow": "SECTION 01",
+    "title": "Bénévoles",
+    "meta": "{count, plural, one {# BÉNÉVOLE} other {# BÉNÉVOLES}} · {categories, plural, one {# CATÉGORIE} other {# CATÉGORIES}}",
+    "empty": "Aucun bénévole pour le moment.",
+    "pendingTranslation": "La version anglaise de cette liste arrive bientôt.",
+    "since": "Depuis le {date}"
+  }
+}

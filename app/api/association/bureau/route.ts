@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let body: { name?: unknown; role?: unknown; initials?: unknown; color?: unknown };
+  let body: { name?: unknown; role?: unknown; roleEn?: unknown; initials?: unknown; color?: unknown };
   try {
     body = (await readJsonBody(req)) as typeof body;
   } catch {
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     const member = await createBureauMember({
       name: typeof body.name === "string" ? body.name : "",
       role: typeof body.role === "string" ? body.role : "",
+      roleEn: typeof body.roleEn === "string" ? body.roleEn : null,
       initials: typeof body.initials === "string" ? body.initials : undefined,
       color: typeof body.color === "string" ? body.color : undefined,
     });

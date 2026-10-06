@@ -6,6 +6,9 @@ describe("recruitmentAdInputFromBody", () => {
   it("garde les champs du bon type", () => {
     const body = {
       title: "T",
+      titleEn: "T en",
+      rolesEn: "DPS en",
+      bodyEn: "B en",
       teamName: "E",
       domain: "ESPORT",
       roles: "DPS",
@@ -22,9 +25,12 @@ describe("recruitmentAdInputFromBody", () => {
 
   it("remplace un champ de type inattendu ou absent par son défaut", () => {
     expect(
-      recruitmentAdInputFromBody({ title: 3, teamName: 1, domain: [], roles: {}, active: "true", priority: 2 }),
+      recruitmentAdInputFromBody({ title: 3, titleEn: 4, teamName: 1, domain: [], roles: {}, active: "true", priority: 2 }),
     ).toEqual({
       title: "",
+      titleEn: null,
+      rolesEn: null,
+      bodyEn: null,
       teamName: null,
       domain: undefined,
       roles: null,

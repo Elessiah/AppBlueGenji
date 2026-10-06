@@ -1,4 +1,6 @@
 import { type CountdownOverride, isCountdownHeld } from "./pausable-countdown";
+import { DEFAULT_LOCALE, type Locale } from "./locales";
+import { checkEnglish, englishCodes, englishErrorMessage, optionalStaffText, staffText } from "./staff-translation";
 
 /**
  * Pôles de bénévolat de l'association : le recrutement vise le staff (arbitres,
@@ -194,6 +196,26 @@ export function recruitmentSeenAmong(
 }
 
 /**
+ * Identifiants du cookie à **garder** quand la page n'en montre qu'une partie
+ * (sous `/en`, les annonces sans anglais sont masquées) : une annonce encore
+ * mise en avant, déjà vue ou écartée sur une page française, le reste — sinon
+ * la réécriture du cookie depuis `/en` l'oublierait, et elle reparaîtrait au
+ * retour en français. Une annonce dépubliée, elle, sort du cookie.
+ *
+ * @param publishedIds Toutes les annonces mises en avant (français).
+ * @param shownIds Celles que la page montre.
+ */
+export function recruitmentSeenKept(
+  cookieValue: string | undefined,
+  publishedIds: readonly number[],
+  shownIds: readonly number[],
+): number[] {
+  const seen = parseRecruitmentSeen(cookieValue);
+  const shown = new Set(shownIds);
+  return publishedIds.filter((id) => seen.has(id) && !shown.has(id));
+}
+
+/**
  * Page d'ouverture de la modale d'arrivée, ou `null` si elle doit se taire.
  *
  * La modale s'ouvre sur la **première annonce jamais vue** : un visiteur qui a
@@ -266,6 +288,15 @@ export const RECRUITMENT_CONTACT_CHANNEL_LABELS: Record<RecruitmentContactChanne
 export type RecruitmentAd = {
   id: number;
   title: string;
+  /**
+   * Titre, missions et description en anglais (lot 5b) ; `null` tant qu'ils ne
+   * sont pas saisis. Une annonce sans anglais n'est **pas** rendue sous `/en`
+   * — ni sur la page, ni dans la banderole ou la modale
+   * ({@link localizeRecruitmentAd}).
+   */
+  titleEn: string | null;
+  rolesEn: string | null;
+  bodyEn: string | null;
   // Référent / contact de l'annonce (pôle ou personne). Historiquement nommé
   // `teamName` / `team_name` du temps du recrutement de joueurs — conservé tel
   // quel pour éviter une migration, mais l'UI l'affiche comme « Référent ».
@@ -301,6 +332,9 @@ export type RecruiterContactDefaults = {
 
 export type RecruitmentAdInput = {
   title: string;
+  titleEn?: string | null;
+  rolesEn?: string | null;
+  bodyEn?: string | null;
   teamName?: string | null;
   domain?: RecruitmentDomain | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une saisie brute, validée ensuite
   roles?: string | null;
@@ -327,6 +361,9 @@ function stringOr<T>(value: unknown, fallback: T): string | T {
 export function recruitmentAdInputFromBody(body: Record<string, unknown>): RecruitmentAdInput {
   return {
     title: stringOr(body.title, ""),
+    titleEn: stringOr(body.titleEn, null),
+    rolesEn: stringOr(body.rolesEn, null),
+    bodyEn: stringOr(body.bodyEn, null),
     teamName: stringOr(body.teamName, null),
     domain: stringOr(body.domain, undefined),
     roles: stringOr(body.roles, null),
@@ -394,6 +431,9 @@ export type RecruitmentValidationResult =
       ok: true;
       value: {
         title: string;
+        titleEn: string;
+        rolesEn: string | null;
+        bodyEn: string | null;
         teamName: string | null;
         domain: RecruitmentDomain;
         roles: string | null;
@@ -439,6 +479,15 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
   const teamName = normalizeOptional(input.teamName, RECRUITMENT_TEAM_MAX);
   const roles = normalizeOptional(input.roles, RECRUITMENT_ROLES_MAX);
   const body = normalizeOptional(input.body, RECRUITMENT_BODY_MAX);
+
+  // Anglais obligatoire (D9) : le titre toujours, les missions et la
+  // description dès que leur français est saisi.
+  const titleEn = checkEnglish(input.titleEn, true, RECRUITMENT_TITLE_MAX, englishCodes("TITLE"));
+  if (!titleEn.ok) return titleEn;
+  const rolesEn = checkEnglish(input.rolesEn, roles !== null, RECRUITMENT_ROLES_MAX, englishCodes("ROLES"));
+  if (!rolesEn.ok) return rolesEn;
+  const bodyEn = checkEnglish(input.bodyEn, body !== null, RECRUITMENT_BODY_MAX, englishCodes("BODY"));
+  if (!bodyEn.ok) return bodyEn;
   const contactUrl = normalizeOptional(input.contactUrl, RECRUITMENT_URL_MAX);
   const contactDiscord = normalizeOptional(input.contactDiscord, RECRUITMENT_DISCORD_MAX);
 
@@ -457,6 +506,9 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
     ok: true,
     value: {
       title,
+      titleEn: titleEn.value ?? "",
+      rolesEn: rolesEn.value,
+      bodyEn: bodyEn.value,
       teamName,
       domain,
       roles,
@@ -748,4 +800,106 @@ export function parseRecruitmentAdAnchor(hash: string | null | undefined): numbe
   if (!match) return null;
   const id = Number(match[1]);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Langue de la page (lot 5b)
+ * ------------------------------------------------------------------ */
+
+/** L'annonce a-t-elle tout son anglais (titre, et missions / description saisies) ? */
+export function recruitmentAdHasEnglish(ad: Pick<RecruitmentAd, "title" | "titleEn" | "roles" | "rolesEn" | "body" | "bodyEn">): boolean {
+  return localizedFields(ad, "en") !== null;
+}
+
+function localizedFields(
+  ad: Pick<RecruitmentAd, "title" | "titleEn" | "roles" | "rolesEn" | "body" | "bodyEn">,
+  locale: Locale,
+): { title: string; roles: string | null; body: string | null } | null {
+  const title = staffText(ad.title, ad.titleEn, locale);
+  const roles = optionalStaffText(ad.roles, ad.rolesEn, locale);
+  const body = optionalStaffText(ad.body, ad.bodyEn, locale);
+  if (title === null || roles === null || body === null) return null;
+  return { title, roles: roles || null, body: body || null };
+}
+
+/**
+ * L'annonce telle qu'elle se lit dans la langue de la page : titre, missions et
+ * description traduits. `null` sous `/en` pour une annonce dont l'anglais
+ * manque — elle n'est pas rendue (`staff-translation.ts`). Le référent
+ * (`teamName`), nom propre, ne se traduit pas.
+ */
+export function localizeRecruitmentAd<T extends RecruitmentAd>(ad: T, locale: Locale): T | null {
+  const fields = localizedFields(ad, locale);
+  return fields === null ? null : { ...ad, ...fields };
+}
+
+/** Les annonces d'une liste dans la langue de la page, sans celles qui n'y sont pas traduites. */
+export function localizeRecruitmentAds<T extends RecruitmentAd>(ads: readonly T[], locale: Locale): T[] {
+  return ads.flatMap((ad) => {
+    const localized = localizeRecruitmentAd(ad, locale);
+    return localized === null ? [] : [localized];
+  });
+}
+
+/**
+ * Une annonce sans ses colonnes anglaises : ce qu'un visiteur reçoit, une fois
+ * l'annonce rendue dans la langue de la page. Les `*En` ne servent qu'à la
+ * gestion ; envoyés à chaque page (mise en avant de la mise en page racine),
+ * ils doublaient le poids des annonces pour rien.
+ */
+export function withoutEnglish<T extends RecruitmentAd>(ad: T): T {
+  return { ...ad, titleEn: null, rolesEn: null, bodyEn: null };
+}
+
+/** Annonce masquée sous `/en` (pas encore traduite) : ce qu'en lit la page — son pôle et son statut. */
+export type HiddenRecruitmentAd = Pick<RecruitmentAd, "id" | "domain" | "priority">;
+
+/**
+ * Les annonces d'un visiteur, rendues côté serveur dans la langue de la page :
+ * français ou anglais seulement, jamais les deux ; sous `/en`, les annonces
+ * sans anglais réduites à leur pôle et leur statut (messages « en cours de
+ * traduction », lien profond « pas encore en anglais »).
+ */
+export function publicRecruitmentAds(
+  ads: readonly RecruitmentAd[],
+  locale: Locale,
+): { ads: RecruitmentAd[]; hidden: HiddenRecruitmentAd[] } {
+  if (locale === DEFAULT_LOCALE) return { ads: ads.map(withoutEnglish), hidden: [] };
+  const shown: RecruitmentAd[] = [];
+  const hidden: HiddenRecruitmentAd[] = [];
+  for (const ad of ads) {
+    const localized = localizeRecruitmentAd(ad, locale);
+    if (localized) shown.push(withoutEnglish(localized));
+    else hidden.push({ id: ad.id, domain: ad.domain, priority: ad.priority });
+  }
+  return { ads: shown, hidden };
+}
+
+/* ------------------------------------------------------------------ *
+ * Refus du formulaire de gestion (staff, en français — D4)
+ * ------------------------------------------------------------------ */
+
+/** Champ du formulaire que chaque refus désigne (`useFieldErrors`). */
+export const RECRUITMENT_FIELD_ERRORS = {
+  TITLE_REQUIRED: "title",
+  TITLE_TOO_LONG: "title",
+  TITLE_EN_REQUIRED: "titleEn",
+  TITLE_EN_TOO_LONG: "titleEn",
+  ROLES_EN_REQUIRED: "rolesEn",
+  ROLES_EN_TOO_LONG: "rolesEn",
+  BODY_EN_REQUIRED: "bodyEn",
+  BODY_EN_TOO_LONG: "bodyEn",
+} as const;
+export type RecruitmentField = "title" | "titleEn" | "roles" | "rolesEn" | "body" | "bodyEn";
+
+const RECRUITMENT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
+  TITLE_REQUIRED: "Le titre est requis.",
+  TITLE_TOO_LONG: `Titre trop long (${RECRUITMENT_TITLE_MAX} caractères maximum).`,
+};
+
+/** Phrase d'un refus ; un code inconnu garde sa forme d'origine (« Échec : CODE »). */
+export function recruitmentErrorMessage(code: string | null | undefined, fallback: string): string {
+  if (!code) return fallback;
+  if (Object.hasOwn(RECRUITMENT_ERROR_MESSAGES, code)) return RECRUITMENT_ERROR_MESSAGES[code];
+  return englishErrorMessage(code) ?? `Échec : ${code}`;
 }

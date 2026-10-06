@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
-import Link from "next/link";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -22,13 +24,12 @@ const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
 /**
- * Objet de l'association, tel qu'il figure dans ses statuts et sur cette page.
+ * Objet de l'association (`association.organizationDescription`), tel qu'il
+ * figure dans ses statuts et sur cette page.
  *
  * Distinct de la description de référencement : celle-ci est rédigée pour un
  * moteur et bornée en longueur, celui-là est ce que l'association dit d'elle.
  */
-const ASSOCIATION_DESCRIPTION =
-  "Association loi 1901, BlueGenji Esport organise des événements et tournois esport en ligne et en LAN, fédère les équipes participantes, et forme les acteurs de la scène amateur francophone pour les mettre en avant.";
 
 /**
  * La description était écrite en dur alors que la page, elle, se rédige depuis
@@ -38,24 +39,39 @@ const ASSOCIATION_DESCRIPTION =
  * événements « en ligne et en LAN », la fédération des équipes, la formation des
  * acteurs. Elle est recalée sur ce que la page dit réellement.
  */
-export const metadata: Metadata = pageMetadata({
-  title: "L'Association Esport",
-  description:
-    "Association loi 1901, BlueGenji organise des tournois esport en ligne et en LAN, fédère les équipes et met en avant la scène amateur française.",
-  shareDescription:
-    "Structure associative compétitive et inclusive pour la scène esport francophone.",
-  path: "/association",
-  shareCard: "association",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { meta } = messagesFor(locale).association;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    shareDescription: meta.shareDescription,
+    path: "/association",
+    shareCard: "association",
+    locale,
+  });
+}
 
+/** Les quatre principes du manifeste, dans l'ordre (`association.manifesto.<clé>`). */
+const MANIFESTO_KEYS = ["purpose", "values", "vision", "commitment"] as const;
+
+/**
+ * Page traduite (`/en/association`, lot 5b — `docs/features/I18N.md`
+ * § Association, bénévoles, recrutement). Les textes éditables servent
+ * l'anglais enregistré ou d'origine (`resolveSiteCopy`) ; le contenu du staff
+ * (bureau, chiffres, cartes « À propos ») n'est rendu sous `/en` qu'avec son
+ * anglais (`staff-translation.ts`).
+ */
 export default async function AssociationPage() {
+  const locale = await requestLocale();
   const [user, bureauMembers, aboutStats, aboutPillars, copy] = await Promise.all([
     getCurrentUser(),
     listBureauMembers(),
     listAboutStats(),
     listAboutPillars(),
-    getSiteCopy(),
+    getSiteCopy(locale),
   ]);
+  const messages = messagesFor(locale).association;
   // Gestion de l'association : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
   // Éditeur bilingue (FR + EN obligatoire) : ses textes ne voyagent que pour le staff.
@@ -69,7 +85,7 @@ export default async function AssociationPage() {
           parle de l'association, et un moteur doit y retrouver la structure
           qu'il connaît déjà plutôt qu'une seconde du même nom.
         */}
-        <JsonLd data={organizationJsonLd(siteCanonicalBase(), ASSOCIATION_DESCRIPTION)} />
+        <JsonLd data={organizationJsonLd(siteCanonicalBase(), messages.organizationDescription)} />
         {/* HERO */}
         <section className={`${styles.section} ${styles.heroSection}`}>
           <div className="fabric" />
@@ -104,37 +120,37 @@ export default async function AssociationPage() {
             <div className={styles.heroSide}>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
-                  FONDÉE EN
+                  {messages.hero.foundedIn}
                 </span>
                 <span className="num" style={{ fontSize: 28 }}>{ORGANIZATION_FOUNDING_YEAR}</span>
               </div>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
-                  SIÈGE
+                  {messages.hero.seat}
                 </span>
-                <span style={{ fontSize: 17 }}>Janvilliers</span>
+                <span style={{ fontSize: 17 }}>{messages.hero.seatValue}</span>
               </div>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
-                  STATUT
+                  {messages.hero.status}
                 </span>
-                <span style={{ fontSize: 17 }}>Association loi 1901</span>
+                <span style={{ fontSize: 17 }}>{messages.hero.statusValue}</span>
               </div>
             </div>
           </div>
         </section>
 
         {/* ABOUT SECTION */}
-        <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} />
+        <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} locale={locale} />
 
         {/* MANIFESTE */}
         <section id="manifeste" className={styles.section}>
           <header className={styles.head}>
             <div>
-              <span className="eyebrow">SECTION 04</span>
-              <h2 className={styles.sectionTitle}>Manifeste</h2>
+              <span className="eyebrow">{messages.manifesto.eyebrow}</span>
+              <h2 className={styles.sectionTitle}>{messages.manifesto.title}</h2>
             </div>
-            <span className={styles.meta}>CE QUI NOUS DÉFINIT</span>
+            <span className={styles.meta}>{messages.manifesto.meta}</span>
           </header>
           <div className={styles.manifesteGrid}>
             <EditableCopy
@@ -145,7 +161,7 @@ export default async function AssociationPage() {
               <p className={styles.lede}>{copy["association.manifesto.lede"]}</p>
             </EditableCopy>
             <ol className={styles.principles}>
-              {MANIFESTE.map((item, index) => (
+              {MANIFESTO_KEYS.map((key) => messages.manifesto[key]).map((item, index) => (
                 <li key={item.title} className={styles.principle}>
                   <span className={`mono ${styles.principleNum}`}>{String(index + 1).padStart(2, "0")}</span>
                   <div>
@@ -159,16 +175,16 @@ export default async function AssociationPage() {
         </section>
 
         {/* BUREAU */}
-        <BureauSection initialMembers={bureauMembers} isAdmin={isAdmin} />
+        <BureauSection initialMembers={bureauMembers} isAdmin={isAdmin} locale={locale} messages={messages.bureau} />
 
         {/* ADHÉRER */}
         <section className={styles.section}>
           <header className={styles.head}>
             <div>
-              <span className="eyebrow">SECTION 06</span>
-              <h2 className={styles.sectionTitle}>Adhérer</h2>
+              <span className="eyebrow">{messages.membership.eyebrow}</span>
+              <h2 className={styles.sectionTitle}>{messages.membership.title}</h2>
             </div>
-            <span className={styles.meta}>BULLETIN · AGRÉMENT DU BUREAU</span>
+            <span className={styles.meta}>{messages.membership.meta}</span>
           </header>
           <div className={styles.adhererGrid}>
             <div className={styles.adhererText}>
@@ -184,17 +200,15 @@ export default async function AssociationPage() {
                   bureau et à l'âge de 16 ans. La section les distingue plutôt
                   que de promettre qu'un compte fait un adhérent. */}
               <p className={styles.adhererBody}>
-                {user
-                  ? "Ton compte joueur te permet déjà de t'inscrire aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande."
-                  : "Un compte joueur, gratuit, suffit pour participer aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande."}
+                {user ? messages.membership.bodyMember : messages.membership.bodyGuest}
               </p>
             </div>
             <div className={styles.adhererSide}>
               <div className={styles.adhererPerks}>
                 {[
-                  ["16 ans", "Âge minimum"],
-                  ["1 an", "Durée de l'adhésion"],
-                  ["Bureau", "Agrément"],
+                  [messages.membership.ageValue, messages.membership.ageLabel],
+                  [messages.membership.durationValue, messages.membership.durationLabel],
+                  [messages.membership.approvalValue, messages.membership.approvalLabel],
                 ].map(([value, label]) => (
                   <div key={label} className={styles.adhererPerk}>
                     <span className={`num ${styles.adhererPerkValue}`}>{value}</span>
@@ -204,22 +218,22 @@ export default async function AssociationPage() {
               </div>
               <div className={styles.ctaRow}>
                 <CyberButton variant="primary" asChild>
-                  <a href="/bulletin_adhesion.docx" download>
-                    Télécharger le bulletin →
+                  <a href="/bulletin_adhesion.docx" download hrefLang="fr">
+                    {messages.membership.download}
                   </a>
                 </CyberButton>
                 {/* Le compte joueur reste proposé à côté, sous son nom : il
                     ouvre les tournois, pas l'adhésion. */}
                 <CyberButton variant="ghost" asChild>
                   {user ? (
-                    <Link href="/tournois">Voir les tournois</Link>
+                    <LocaleLink href="/tournois">{messages.membership.tournaments}</LocaleLink>
                   ) : (
-                    <Link href="/connexion">Créer un compte joueur</Link>
+                    <LocaleLink href="/connexion">{messages.membership.createAccount}</LocaleLink>
                   )}
                 </CyberButton>
                 <CyberButton variant="ghost" asChild>
                   <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
-                    Rejoindre le Discord
+                    {messages.membership.discord}
                   </a>
                 </CyberButton>
               </div>
@@ -231,28 +245,29 @@ export default async function AssociationPage() {
         <section className={styles.section}>
           <header className={styles.head}>
             <div>
-              <span className="eyebrow">SECTION 07</span>
-              <h2 className={styles.sectionTitle}>Documents</h2>
+              <span className="eyebrow">{messages.documents.eyebrow}</span>
+              <h2 className={styles.sectionTitle}>{messages.documents.title}</h2>
             </div>
-            <span className={styles.meta}>TÉLÉCHARGEABLES</span>
+            <span className={styles.meta}>{messages.documents.meta}</span>
           </header>
           <ul className={styles.docList}>
             <li>
-              <a href="/statuts.pdf" target="_blank" rel="noreferrer" className={styles.docItem}>
-                <span>Statuts de l'association</span>
-                <span className={styles.docMeta}>PDF →</span>
+              {/* Documents officiels, rédigés en français seulement. */}
+              <a href="/statuts.pdf" target="_blank" rel="noreferrer" hrefLang="fr" className={styles.docItem}>
+                <span>{messages.documents.statutes}</span>
+                <span className={styles.docMeta}>{messages.documents.pdf}</span>
               </a>
             </li>
             <li>
-              <a href={REGLEMENT_URL} target="_blank" rel="noreferrer" className={styles.docItem}>
-                <span>Règlement intérieur</span>
-                <span className={styles.docMeta}>DOC →</span>
+              <a href={REGLEMENT_URL} target="_blank" rel="noreferrer" hrefLang="fr" className={styles.docItem}>
+                <span>{messages.documents.rules}</span>
+                <span className={styles.docMeta}>{messages.documents.doc}</span>
               </a>
             </li>
             <li>
-              <a href="/bulletin_adhesion.docx" download className={styles.docItem}>
-                <span>Bulletin d&apos;adhésion</span>
-                <span className={styles.docMeta}>DOCX →</span>
+              <a href="/bulletin_adhesion.docx" download hrefLang="fr" className={styles.docItem}>
+                <span>{messages.documents.form}</span>
+                <span className={styles.docMeta}>{messages.documents.docx}</span>
               </a>
             </li>
           </ul>
@@ -261,22 +276,3 @@ export default async function AssociationPage() {
     </PublicPageShell>
   );
 }
-
-const MANIFESTE = [
-  {
-    title: "Raison d'être",
-    text: "Animer la scène esport amateur en créant des événements compétitifs ouverts à tous. Là où d'autres organisent pour une élite, nous bâtissons des rendez-vous réguliers où chacun peut jouer, progresser et se mesurer aux autres.",
-  },
-  {
-    title: "Valeurs",
-    text: "L'inclusivité et l'ouverture d'esprit. Nous ne jugeons les joueurs sur rien d'autre que leur respect et leurs qualités de jeu — origine, niveau ou profil ne ferment jamais une porte.",
-  },
-  {
-    title: "Vision",
-    text: "Une scène fiable, éthique et durable où tout le monde trouve sa place, à n'importe quel niveau : pour s'amuser dans un contexte plus sérieux, ou tenter l'ascension vers le monde professionnel.",
-  },
-  {
-    title: "Engagement",
-    text: "Un encadrement sérieux, une activité nourrie et la volonté sincère de construire un environnement à la fois sain et compétitif. Nous prenons cet engagement au sérieux à chaque tournoi.",
-  },
-];

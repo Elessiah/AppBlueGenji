@@ -4,23 +4,34 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard, Pill } from "@/components/cyber";
 import { ContactTags } from "@/components/recruitment/ContactTags";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import { useRecruitmentText } from "@/components/i18n/recruitment-text";
+import { FR_RECRUITMENT_TEXT } from "@/lib/shared/recruitment-text";
+import { EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   type RecruiterContactDefaults,
+  type HiddenRecruitmentAd,
   type RecruitmentAd,
   type RecruitmentDomain,
+  type RecruitmentField,
   type RecruitmentPriority,
   buildRecruitmentPreview,
   canMoveRecruitmentAd,
+  localizeRecruitmentAds,
   parseRecruitmentAdAnchor,
   placeRecruitmentAd,
   recruitmentAdAnchor,
+  recruitmentAdHasEnglish,
+  recruitmentErrorMessage,
   sortRecruitmentAds,
   splitRecruitmentAds,
+  validateRecruitmentAdInput,
   RECRUITMENT_DOMAINS,
-  RECRUITMENT_DOMAIN_LABELS,
   RECRUITMENT_DOMAIN_PILL,
+  RECRUITMENT_FIELD_ERRORS,
   RECRUITMENT_PRIORITY_DESCRIPTIONS,
   RECRUITMENT_PRIORITY_EXPOSURE,
   RECRUITMENT_PRIORITY_LABELS,
@@ -37,6 +48,12 @@ import styles from "./page.module.css";
 
 interface RecruitmentSectionProps {
   initialAds: RecruitmentAd[];
+  /**
+   * Vue d'un visiteur, rendue côté serveur (`publicRecruitmentAds`) : les
+   * annonces sont déjà dans la langue de la page, et voici celles que `/en`
+   * masque faute d'anglais. Absente pour le staff, qui reçoit les deux langues.
+   */
+  hiddenAds?: readonly HiddenRecruitmentAd[];
   isAdmin: boolean;
   contactDefaults?: RecruiterContactDefaults;
 }
@@ -61,6 +78,16 @@ const PRIORITY_BADGE_CLASS: Record<RecruitmentPriority, string> = {
   OPTIONAL: "",
 };
 
+/** `id` des champs bilingues du formulaire (`RecruitmentAdEditor`), cibles de `useFieldErrors`. */
+const RECRUITMENT_FIELD_IDS: Readonly<Record<RecruitmentField, string>> = {
+  title: "recruitment-title",
+  titleEn: "recruitment-title-en",
+  roles: "recruitment-roles",
+  rolesEn: "recruitment-roles-en",
+  body: "recruitment-body",
+  bodyEn: "recruitment-body-en",
+};
+
 /** Refus du réordonnancement, traduit quand il a un sens pour le lecteur. */
 function reorderErrorMessage(code: string | undefined): string {
   if (code === "RECRUITMENT_ORDER_MIXES_PRIORITIES") {
@@ -69,8 +96,41 @@ function reorderErrorMessage(code: string | undefined): string {
   return code ? `Échec : ${code}` : "Échec du réordonnancement.";
 }
 
-export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
-  const { showError, showSuccess } = useToast();
+
+/**
+ * Phrases d'une liste vide. Sous `/en`, des annonces encore sans anglais sont
+ * masquées : « aucun poste » serait faux quand il en reste à traduire, et
+ * « aucune urgence » quand une annonce urgente l'est — on dit alors qu'elles
+ * arrivent, sans compteur à zéro.
+ */
+function emptyMessageKeys(hidden: readonly HiddenRecruitmentAd[], domain: RecruitmentDomain | null) {
+  const urgentHidden = splitRecruitmentAds(hidden.filter((ad) => domain === null || ad.domain === domain)).featured.length > 0;
+  return {
+    empty: hidden.length > 0 ? "section.pendingTranslation" : "section.empty",
+    noUrgent: urgentHidden ? "section.pendingTranslation" : "section.noUrgent",
+    showCount: (total: number) => total > 0 || hidden.length === 0,
+  } as const;
+}
+
+/** Lien vers une annonce absente de la page : supprimée, ou (sous `/en`) pas encore traduite (`hidden`). */
+function missingAdMessage(
+  hidden: readonly HiddenRecruitmentAd[],
+  id: number,
+  messages: Readonly<{ unavailable: string; untranslated: string }>,
+): string {
+  return hidden.some((a) => a.id === id) ? messages.untranslated : messages.unavailable;
+}
+export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
+  const locale = useAppLocale();
+  const { t } = useRecruitmentText();
+  // La gestion reste en français (D4) : sous `/en`, ses contrôles, sa fenêtre
+  // et ses notifications le disent (`lang="fr"`).
+  const staffLang = locale === "fr" ? undefined : "fr";
+  const toast = useToast();
+  const staffToast = staffLang ? { lang: staffLang } : undefined;
+  const showError = (message: string) => toast.showError(message, staffToast);
+  const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const fieldErrors = useFieldErrors<RecruitmentField>(RECRUITMENT_FIELD_ERRORS, RECRUITMENT_FIELD_IDS);
   // Toujours rangée par statut : les flèches de réordonnancement ne se lisent
   // que sur cet ordre-là (voir `canMoveRecruitmentAd`).
   const [ads, setAds] = useState<RecruitmentAd[]>(() => sortRecruitmentAds(initialAds));
@@ -101,16 +161,36 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
     return () => window.removeEventListener("hashchange", syncFromHash);
   }, []);
 
+  // Ce que la page montre : les annonces dans la langue de la page. Sous `/en`,
+  // une annonce sans anglais n'est pas rendue (`localizeRecruitmentAds`) — la
+  // gestion la retrouve sur la page française, marquée **EN**.
+  // Déjà dans la langue de la page quand le serveur a fait la vue du visiteur.
+  const preLocalized = serverHidden !== undefined;
+  const shownAds = useMemo(
+    () => (preLocalized || locale === "fr" ? ads : localizeRecruitmentAds(ads, locale)),
+    [ads, locale, preLocalized],
+  );
+  // Sous `/en`, les annonces encore sans anglais, masquées (`emptyMessageKeys`).
+  const hiddenAds = useMemo<readonly HiddenRecruitmentAd[]>(() => {
+    if (serverHidden) return serverHidden;
+    if (shownAds.length === ads.length) return [];
+    const shownIds = new Set(shownAds.map((a) => a.id));
+    return ads.filter((ad) => !shownIds.has(ad.id));
+  }, [serverHidden, ads, shownAds]);
+
   // Annonce visée par le lien profond : `null` si elle n'existe pas (ou plus).
-  const detailAd = detailId === null ? null : (ads.find((a) => a.id === detailId) ?? null);
+  const detailAd = detailId === null ? null : (shownAds.find((a) => a.id === detailId) ?? null);
 
   // Lien partagé vers une annonce supprimée ou dépubliée : on le dit, plutôt que
   // d'ouvrir une page muette avec un fragment qui ne mène nulle part.
+  const showUnavailable = toast.showError;
+  const unavailable = t("section.unavailable");
+  const untranslated = t("section.untranslated");
   useEffect(() => {
-    if (detailId === null || ads.some((a) => a.id === detailId)) return;
-    showError("Cette annonce n'est plus disponible.");
+    if (detailId === null || shownAds.some((a) => a.id === detailId)) return;
+    showUnavailable(missingAdMessage(hiddenAds, detailId, { unavailable, untranslated }));
     setDetailId(null);
-  }, [detailId, ads, showError]);
+  }, [detailId, hiddenAds, shownAds, showUnavailable, unavailable, untranslated]);
 
   function openDetail(ad: RecruitmentAd) {
     setDetailId(ad.id);
@@ -134,6 +214,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
   }
 
   function openCreate() {
+    fieldErrors.clear();
     setEditing(null);
     const discord = contactDefaults?.discord ?? "";
     // Pré-remplissage du Discord depuis le profil du recruteur — modifiable / effaçable.
@@ -142,7 +223,10 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
     setOpen(true);
   }
 
-  function openEdit(ad: RecruitmentAd) {
+  function openEdit(shown: RecruitmentAd) {
+    // La carte montre l'annonce traduite : la gestion reprend l'enregistrement d'origine.
+    const ad = ads.find((a) => a.id === shown.id) ?? shown;
+    fieldErrors.clear();
     setEditing(ad);
     setForm(recruitmentFormFromAd(ad));
     // L'id enregistré reste valide tant que le pseudo n'est pas modifié.
@@ -161,16 +245,27 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  // Un refus désigne son champ quand il le peut (titre, anglais…) : rattaché
+  // à lui, focus ramené, et la même phrase en notification.
+  function refuse(code: string | undefined, fallback: string) {
+    const message = recruitmentErrorMessage(code, fallback);
+    fieldErrors.report(code, message);
+    showError(message);
+  }
+
   async function submit() {
-    if (!form.title.trim()) {
-      showError("Le titre est requis.");
+    // L'id de lien profond ne repart que si le pseudo est resté celui pour
+    // lequel il a été dérivé (profil du recruteur ou valeur enregistrée).
+    const payload = recruitmentRequestBody(form, discordSnapshot.current);
+    // Même validation que le serveur, avant l'envoi : l'anglais manquant est
+    // désigné sans aller-retour (D9).
+    const check = validateRecruitmentAdInput(payload);
+    if (!check.ok) {
+      refuse(check.error, "Formulaire invalide.");
       return;
     }
 
     setBusy(true);
-    // L'id de lien profond ne repart que si le pseudo est resté celui pour
-    // lequel il a été dérivé (profil du recruteur ou valeur enregistrée).
-    const payload = recruitmentRequestBody(form, discordSnapshot.current);
 
     try {
       const url = editing ? `/api/recruitment/${editing.id}` : "/api/recruitment";
@@ -181,7 +276,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
       });
       const data = (await res.json()) as { ad?: RecruitmentAd; error?: string };
       if (!res.ok || !data.ad) {
-        showError(data.error ? `Échec : ${data.error}` : "Échec de l'enregistrement.");
+        refuse(data.error, "Échec de l'enregistrement.");
         return;
       }
 
@@ -259,13 +354,13 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
   // dans l'ordre canonique du registre.
   const { presentDomains, domainCounts } = useMemo(() => {
     const counts = new Map<RecruitmentDomain, number>();
-    for (const ad of ads) counts.set(ad.domain, (counts.get(ad.domain) ?? 0) + 1);
+    for (const ad of shownAds) counts.set(ad.domain, (counts.get(ad.domain) ?? 0) + 1);
     return {
       presentDomains: RECRUITMENT_DOMAINS.filter((d) => counts.has(d)),
       domainCounts: counts,
     };
-  }, [ads]);
-  const showFilter = ads.length >= FILTER_MIN_ADS && presentDomains.length > 1;
+  }, [shownAds]);
+  const showFilter = shownAds.length >= FILTER_MIN_ADS && presentDomains.length > 1;
 
   // Un filtre sur un pôle vidé par une suppression laisserait une liste vide
   // sans raison visible : on retombe sur « Tous ».
@@ -276,7 +371,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
   }, [domainFilter, presentDomains]);
 
   const filterActive = showFilter && domainFilter !== ALL_DOMAINS;
-  const visibleAds = filterActive ? ads.filter((ad) => ad.domain === domainFilter) : ads;
+  const visibleAds = filterActive ? shownAds.filter((ad) => ad.domain === domainFilter) : shownAds;
 
   // Deux listes, jamais mêlées : prioritaires et importantes en tête, les
   // facultatives à part sous « Autres recrutements ».
@@ -284,8 +379,11 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
 
   function renderCard(ad: RecruitmentAd) {
     // Index dans la liste complète : le réordonnancement porte toujours
-    // sur l'ordre réel, jamais sur la vue filtrée.
-    const index = ads.indexOf(ad);
+    // sur l'ordre réel, jamais sur la vue filtrée (ni traduite).
+    const index = ads.findIndex((a) => a.id === ad.id);
+    // Enregistrement d'origine (français) : ce que nomment les contrôles du staff.
+    const saved = ads[index] ?? ad;
+    const enMissing = isAdmin && !recruitmentAdHasEnglish(saved);
     const preview = buildRecruitmentPreview(ad.body);
     const canUp = canMoveRecruitmentAd(ads, index, -1);
     const canDown = canMoveRecruitmentAd(ads, index, 1);
@@ -304,13 +402,19 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
       >
         <div className={styles.cardHead}>
           <div className={styles.cardTags}>
-            <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
+            <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{t(`domains.${ad.domain}`)}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
-            {!ad.active && <Pill variant="neutral">Inactif</Pill>}
+            {/* Statut du staff (seul à voir une annonce inactive) : en français, D4. */}
+            {!ad.active && (
+              <Pill variant="neutral" lang={staffLang}>
+                {FR_RECRUITMENT_TEXT.t("card.inactive")}
+              </Pill>
+            )}
             {/* Le statut ne se lit publiquement que par ses effets (pastille,
                 section) : la gestion, elle, a besoin de le voir nommé. */}
             {isAdmin && (
               <span
+                lang={staffLang}
                 className={`${styles.priorityBadge} ${PRIORITY_BADGE_CLASS[ad.priority]} ${ad.active ? "" : styles.priorityBadgeDraft}`}
                 title={
                   ad.active
@@ -322,14 +426,15 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
               </span>
             )}
           </div>
-          {isAdmin && (
-            <div className={styles.moveActions} data-tap-zone>
+          {/* Ordre réglé en français seulement : sous /en, une annonce sans anglais est masquée. */}
+          {isAdmin && locale === "fr" && (
+            <div className={styles.moveActions} data-tap-zone lang={staffLang}>
               <button
                 type="button"
                 className={styles.move}
                 onClick={() => move(index, -1)}
                 disabled={busy || filterActive || !canUp}
-                aria-label={`Monter l'annonce ${ad.title}`}
+                aria-label={`Monter l'annonce ${saved.title}`}
                 title={moveTitle(canUp, "Monter")}
               >
                 ↑
@@ -339,7 +444,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
                 className={styles.move}
                 onClick={() => move(index, 1)}
                 disabled={busy || filterActive || !canDown}
-                aria-label={`Descendre l'annonce ${ad.title}`}
+                aria-label={`Descendre l'annonce ${saved.title}`}
                 title={moveTitle(canDown, "Descendre")}
               >
                 ↓
@@ -358,8 +463,13 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
             {ad.title}
           </button>
         </h3>
-        {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
-        {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
+        {ad.teamName && (
+          // Référent saisi en français, sans anglais : annoncé comme tel sous `/en`.
+          <p className={styles.cardTeam} lang={staffLang}>
+            {ad.teamName}
+          </p>
+        )}
+        {ad.roles && <p className={styles.cardRoles}>{t("card.roles", { roles: ad.roles })}</p>}
         {preview.text && <p className={styles.cardBody}>{preview.text}</p>}
         {preview.truncated && (
           <button
@@ -368,7 +478,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
             onClick={() => openDetail(ad)}
             aria-haspopup="dialog"
           >
-            Lire l&apos;annonce complète →
+            {t("card.readMore")}
           </button>
         )}
 
@@ -378,27 +488,28 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
           {ad.contactUrl && (
             <CyberButton variant={ad.contactPreferred === "LINK" ? "primary" : "ghost"} asChild>
               <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
-                Postuler →
+                {t("card.apply")}
               </a>
             </CyberButton>
           )}
           {isAdmin && (
-            <div className={styles.cardActions}>
+            <div className={styles.cardActions} lang={staffLang}>
               <button
                 type="button"
                 className={styles.action}
-                onClick={() => openEdit(ad)}
+                onClick={() => openEdit(saved)}
                 disabled={busy}
-                aria-label={`Modifier ${ad.title}`}
+                aria-label={withEnglishMissing(`Modifier ${saved.title}`, enMissing)}
               >
                 Modifier
+                {enMissing && <EnglishMissingMark />}
               </button>
               <button
                 type="button"
                 className={`${styles.action} ${styles.actionDanger}`}
-                onClick={() => setPendingRemoval(ad)}
+                onClick={() => setPendingRemoval(saved)}
                 disabled={busy}
-                aria-label={`Supprimer ${ad.title}`}
+                aria-label={`Supprimer ${saved.title}`}
               >
                 Supprimer
               </button>
@@ -409,23 +520,29 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
     );
   }
 
-  const total = ads.length;
+  const total = shownAds.length;
   const shown = visibleAds.length;
+  const translationPending = hiddenAds.length > 0;
+  const emptyKeys = emptyMessageKeys(hiddenAds, filterActive ? domainFilter : null);
 
   return (
     <>
       <section className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">ANNONCES</span>
-            <h2 className={styles.sectionTitle}>Recrutement en cours</h2>
+            <span className="eyebrow">{t("section.eyebrow")}</span>
+            <h2 className={styles.sectionTitle}>{t("section.title")}</h2>
           </div>
           <div className={styles.headActions}>
-            <span className={styles.meta}>
-              {filterActive ? `${shown} / ${total}` : total} ANNONCE{total > 1 ? "S" : ""}
-            </span>
+            {emptyKeys.showCount(total) && (
+              <span className={styles.meta}>
+                {filterActive
+                  ? t("section.countFiltered", { shown, count: total })
+                  : t("section.count", { count: total })}
+              </span>
+            )}
             {isAdmin && (
-              <CyberButton variant="primary" onClick={openCreate}>
+              <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 + Nouvelle annonce
               </CyberButton>
             )}
@@ -433,14 +550,14 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
         </header>
 
         {showFilter && (
-          <fieldset className={`native-group ${styles.filters}`} aria-label="Filtrer par pôle">
+          <fieldset className={`native-group ${styles.filters}`} aria-label={t("section.filterLabel")}>
             <button
               type="button"
               className={`${styles.filter} ${domainFilter === ALL_DOMAINS ? styles.filterOn : ""}`}
               onClick={() => setDomainFilter(ALL_DOMAINS)}
               aria-pressed={domainFilter === ALL_DOMAINS}
             >
-              Tous les pôles
+              {t("section.allDomains")}
             </button>
             {presentDomains.map((d) => (
               <button
@@ -450,7 +567,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
                 onClick={() => setDomainFilter(d)}
                 aria-pressed={domainFilter === d}
               >
-                {RECRUITMENT_DOMAIN_LABELS[d]}
+                {t(`domains.${d}`)}
                 <span className={styles.filterCount}>{domainCounts.get(d) ?? 0}</span>
               </button>
             ))}
@@ -459,9 +576,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
 
         {total === 0 ? (
           <div className={styles.empty}>
-            <p>Aucun poste à pourvoir dans le staff pour le moment.</p>
-            {isAdmin && (
-              <CyberButton variant="primary" onClick={openCreate}>
+            <p>{t(emptyKeys.empty)}</p>
+            {isAdmin && !translationPending && (
+              <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
                 Publier la première annonce
               </CyberButton>
             )}
@@ -471,18 +588,16 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
             {featured.length > 0 ? (
               <div className={styles.list}>{featured.map(renderCard)}</div>
             ) : (
-              <p className={styles.groupEmpty}>Aucun recrutement urgent en ce moment.</p>
+              <p className={styles.groupEmpty}>{t(emptyKeys.noUrgent)}</p>
             )}
 
             {others.length > 0 && (
               <section className={styles.others} aria-labelledby="autres-recrutements">
                 <header className={styles.othersHead}>
                   <h2 id="autres-recrutements" className={styles.othersTitle}>
-                    Autres recrutements
+                    {t("section.others")}
                   </h2>
-                  <span className={styles.meta}>
-                    {others.length} ANNONCE{others.length > 1 ? "S" : ""}
-                  </span>
+                  <span className={styles.meta}>{t("section.count", { count: others.length })}</span>
                 </header>
                 <div className={styles.list}>{others.map(renderCard)}</div>
               </section>
@@ -502,6 +617,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
           prefilledDiscord={Boolean(contactDefaults?.discord)}
           onClose={close}
           onSubmit={submit}
+          errors={fieldErrors}
+          enMissing={editing !== null && !recruitmentAdHasEnglish(editing)}
+          staffLang={staffLang}
         />
       )}
       {pendingRemoval ? (
@@ -509,6 +627,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
           title={`Supprimer l'annonce « ${pendingRemoval.title} » ?`}
           confirmLabel="Supprimer l'annonce"
           pendingLabel="Suppression…"
+          contentLang={staffLang}
           onClose={() => setPendingRemoval(null)}
           onConfirm={() => remove(pendingRemoval)}
         >

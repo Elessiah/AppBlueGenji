@@ -168,8 +168,9 @@ describe("association", () => {
 describe("association (accueil) sous /en", () => {
   const aboutTsx = readSource("components/cyber/landing/AboutSection.tsx");
 
-  it("passe sur une colonne quand chiffres et piliers ne sont pas rendus", () => {
+  it("passe sur une colonne quand aucune carte « À propos » n'est traduite (lot 5b)", () => {
     expect(blockFor(/\.gridSingle\s*\{/, about)).toMatch(/grid-template-columns:\s*1fr\s*;/);
-    expect(aboutTsx).toContain("showStaffContent ? styles.grid : `${styles.grid} ${styles.gridSingle}`");
+    expect(aboutTsx).toContain("showPillars ? styles.grid : `${styles.grid} ${styles.gridSingle}`");
+    expect(aboutTsx).toContain("localizedAboutPillars(pillars, locale).length > 0");
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 import { useToast } from "@/components/ui/toast";
 import type { RecruitmentAd } from "@/lib/shared/recruitment";
 import { CopyGlyph, DiscordGlyph, OpenGlyph } from "./glyphs";
@@ -31,16 +32,17 @@ function toHref(value: string): string {
  */
 export function ContactTags({ ad }: Readonly<ContactTagsProps>) {
   const { showError, showSuccess } = useToast();
+  const { t } = useRecruitmentText();
 
   if (!ad.contactDiscord && !ad.contactDiscordId) return null;
 
   // Copie une valeur dans le presse-papiers. Toast de confirmation, jamais inline.
-  async function copyContact(value: string, label: string) {
+  async function copyContact(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      showSuccess(`${label} copié : ${value}`);
+      showSuccess(t("contact.copied", { value }));
     } catch {
-      showError("Impossible de copier, copie manuellement.");
+      showError(t("contact.copyFailed"));
     }
   }
 
@@ -48,7 +50,7 @@ export function ContactTags({ ad }: Readonly<ContactTagsProps>) {
 
   return (
     // `group` : sans rôle, le nom « Contacts » serait interdit (`aria-prohibited-attr`).
-    <fieldset className={`native-group ${styles.contactTags}`} aria-label="Contacts">
+    <fieldset className={`native-group ${styles.contactTags}`} aria-label={t("contact.label")}>
       {ad.contactDiscord &&
         (isUrl(ad.contactDiscord) ? (
           <a
@@ -58,19 +60,19 @@ export function ContactTags({ ad }: Readonly<ContactTagsProps>) {
             rel="noopener noreferrer"
           >
             <DiscordGlyph className={styles.contactTagIcon} />
-            <span className={styles.contactTagKey}>Discord</span>
-            <span className={styles.contactTagVal}>Rejoindre</span>
+            <span className={styles.contactTagKey}>{t("contact.discord")}</span>
+            <span className={styles.contactTagVal}>{t("contact.join")}</span>
             <OpenGlyph className={styles.contactTagIcon} />
           </a>
         ) : (
           <button
             type="button"
             className={`${styles.contactTag} ${primary}`}
-            onClick={() => copyContact(ad.contactDiscord!, "Pseudo Discord")}
-            title="Copier le pseudo Discord"
+            onClick={() => copyContact(ad.contactDiscord!)}
+            title={t("contact.copyTitle")}
           >
             <DiscordGlyph className={styles.contactTagIcon} />
-            <span className={styles.contactTagKey}>Discord</span>
+            <span className={styles.contactTagKey}>{t("contact.discord")}</span>
             <span className={styles.contactTagVal}>{ad.contactDiscord}</span>
             <CopyGlyph className={styles.contactTagIcon} />
           </button>
@@ -81,10 +83,10 @@ export function ContactTags({ ad }: Readonly<ContactTagsProps>) {
           href={`https://discord.com/users/${ad.contactDiscordId}`}
           target="_blank"
           rel="noopener noreferrer"
-          title="Ouvrir la conversation Discord"
+          title={t("contact.openTitle")}
         >
           <DiscordGlyph className={styles.contactTagIcon} />
-          <span className={styles.contactTagVal}>Ouvrir</span>
+          <span className={styles.contactTagVal}>{t("contact.open")}</span>
           <OpenGlyph className={styles.contactTagIcon} />
         </a>
       )}

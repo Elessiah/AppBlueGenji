@@ -24,11 +24,12 @@ import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitem
 const PUBLIC = "https://bluegenji.test";
 
 describe("accueil traduit — liste blanche", () => {
-  it("l'accueil est traduit au lot 2 (les règles, le classement et le bot l'ont rejoint aux lots 3, 4 et 5a), pas ses pages voisines", () => {
+  it("l'accueil est traduit au lot 2 (règles, classement, bot et vitrine l'ont rejoint aux lots 3 à 5), pas ses pages voisines", () => {
     expect(MIGRATED_ROUTES).toContain("/");
     expect(isMigratedRoute("/")).toBe(true);
-    expect(isMigratedRoute("/association")).toBe(false);
-    expect(isMigratedRoute("/benevoles")).toBe(false);
+    // Pages légales : lot 7b.
+    expect(isMigratedRoute("/mentions-legales")).toBe(false);
+    expect(isMigratedRoute("/rgpd")).toBe(false);
   });
 
   it("un lien vers l'accueil prend /en sur une page anglaise, les autres restent français", () => {
@@ -64,9 +65,9 @@ describe("accueil traduit — middleware", () => {
   });
 
   it("une page voisine pas encore traduite redirige toujours", () => {
-    const response = middleware(new NextRequest(`${PUBLIC}/en/association`));
+    const response = middleware(new NextRequest(`${PUBLIC}/en/mentions-legales`));
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(`${PUBLIC}/association`);
+    expect(response.headers.get("location")).toBe(`${PUBLIC}/mentions-legales`);
   });
 });
 
@@ -103,7 +104,7 @@ describe("sélecteur de langue — sur l'accueil, et sur mobile", () => {
   });
 
   it("muet sur une page non traduite", () => {
-    expect(render("fr", "/association")).toBe("");
+    expect(render("fr", "/mentions-legales")).toBe("");
   });
 
   it("sur un écran étroit, le code remplace le nom, et l'en-tête resserre le sélecteur", () => {

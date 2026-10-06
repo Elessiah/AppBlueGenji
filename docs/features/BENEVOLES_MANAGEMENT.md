@@ -87,3 +87,7 @@ Importable côté client et serveur :
 
 Toutes les routes d'écriture exigent `getCurrentUser()` **et** `isAdmin`
 (`401` si anonyme, `403` sinon).
+
+## Langues (lot 5b de l'i18n)
+
+La catégorie a son anglais (`category_en`, `categoryEn`), obligatoire à la saisie (`CATEGORY_EN_*`) et **recopié sur toute la catégorie** à l'enregistrement : traduire un bénévole traduit sa catégorie. Le formulaire reprend l'anglais déjà connu d'une catégorie choisie. Sous `/en`, une catégorie sans anglais n'est pas rendue ; l'ordre des catégories se règle sur la page française. Date d'arrivée en anglais : « Since Mar 15, 2024 ». Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.

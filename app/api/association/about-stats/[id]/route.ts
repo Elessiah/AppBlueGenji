@@ -10,6 +10,7 @@ export const { PUT, DELETE } = itemRoutes({
     stat: await updateAboutStat(id, {
       value: typeof body.value === "string" ? body.value : "",
       label: typeof body.label === "string" ? body.label : "",
+      labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
     }),
   }),
   remove: deleteAboutStat,

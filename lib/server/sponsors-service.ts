@@ -22,6 +22,7 @@ interface SponsorRow extends RowDataPacket {
   bannerUrl: string | null;
   websiteUrl: string | null;
   description: string | null;
+  descriptionEn: string | null;
 }
 
 function fromRow(row: SponsorRow): Sponsor {
@@ -34,6 +35,7 @@ function fromRow(row: SponsorRow): Sponsor {
     bannerUrl: row.bannerUrl ?? null,
     websiteUrl: row.websiteUrl,
     description: row.description,
+    descriptionEn: row.descriptionEn ?? null,
   };
 }
 
@@ -67,7 +69,8 @@ async function loadListSponsors(): Promise<Sponsor[]> {
     const db = await Promise.race([dbPromise, timeoutPromise]);
     const [rows] = await db.execute<SponsorRow[]>(
       `
-        SELECT id, name, slug, tier, logo_url as logoUrl, banner_url as bannerUrl, website_url as websiteUrl, description
+        SELECT id, name, slug, tier, logo_url as logoUrl, banner_url as bannerUrl, website_url as websiteUrl, description,
+               description_en as descriptionEn
         FROM bg_sponsors
         WHERE active = 1
         ORDER BY FIELD(tier, 'GOLD', 'SILVER', 'BRONZE', 'PARTNER'),
@@ -142,26 +145,26 @@ async function ensureUniqueSlug(base: string, excludeId?: number): Promise<strin
 export async function createSponsor(input: SponsorInput): Promise<Sponsor> {
   const validation = validateSponsorInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { name, tier, logoUrl, bannerUrl, websiteUrl, description, active } = validation.value;
+  const { name, tier, logoUrl, bannerUrl, websiteUrl, description, descriptionEn, active } = validation.value;
 
   const slug = await ensureUniqueSlug(slugifySponsor(name));
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_sponsors (name, slug, tier, logo_url, banner_url, website_url, description, display_order, active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_sponsors AS s), ?)`,
-    [name, slug, tier, logoUrl, bannerUrl, websiteUrl, description, active ? 1 : 0]
+    `INSERT INTO bg_sponsors (name, slug, tier, logo_url, banner_url, website_url, description, description_en, display_order, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_sponsors AS s), ?)`,
+    [name, slug, tier, logoUrl, bannerUrl, websiteUrl, description, descriptionEn, active ? 1 : 0]
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id: Number(res.insertId), name, slug, tier, logoUrl, bannerUrl, websiteUrl, description };
+  return { id: Number(res.insertId), name, slug, tier, logoUrl, bannerUrl, websiteUrl, description, descriptionEn };
 }
 
 /** Met à jour un sponsor existant et renvoie sa version mise à jour. */
 export async function updateSponsor(id: number, input: SponsorInput): Promise<Sponsor> {
   const validation = validateSponsorInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { name, tier, logoUrl, bannerUrl, websiteUrl, description, active } = validation.value;
+  const { name, tier, logoUrl, bannerUrl, websiteUrl, description, descriptionEn, active } = validation.value;
 
   const db = await getDatabase();
   const [existing] = await db.execute<SponsorRow[]>(
@@ -173,14 +176,14 @@ export async function updateSponsor(id: number, input: SponsorInput): Promise<Sp
 
   await db.execute<ResultSetHeader>(
     `UPDATE bg_sponsors
-     SET name = ?, tier = ?, logo_url = ?, banner_url = ?, website_url = ?, description = ?, active = ?
+     SET name = ?, tier = ?, logo_url = ?, banner_url = ?, website_url = ?, description = ?, description_en = ?, active = ?
      WHERE id = ?`,
-    [name, tier, logoUrl, bannerUrl, websiteUrl, description, active ? 1 : 0, id]
+    [name, tier, logoUrl, bannerUrl, websiteUrl, description, descriptionEn, active ? 1 : 0, id]
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id, name, slug, tier, logoUrl, bannerUrl, websiteUrl, description };
+  return { id, name, slug, tier, logoUrl, bannerUrl, websiteUrl, description, descriptionEn };
 }
 
 /**

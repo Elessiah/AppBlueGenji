@@ -70,6 +70,17 @@ const I18N_MIGRATED_FILES = [
   // Bot (lot 5a) — `/bot`, `/bot/docs`.
   "app/bot/**",
   "components/bot/**",
+  // Association, bénévoles, recrutement (lot 5b). Les sections à éditeur
+  // (`BureauSection`, `BenevolesSection`, `RecruitmentSection`,
+  // `RecruitmentAdEditor`) n'y sont pas : leurs contrôles de staff restent en
+  // français (D4), leurs textes visiteurs passent par les messages.
+  "app/association/page.tsx",
+  "app/benevoles/page.tsx",
+  "app/recrutement/page.tsx",
+  "app/recrutement/AdDetailModal.tsx",
+  "app/partenaires/page.tsx",
+  "components/recruitment/**",
+  "components/recruitment-highlight.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */

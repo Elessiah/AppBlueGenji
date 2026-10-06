@@ -1,0 +1,70 @@
+{
+  "meta": {
+    "title": "L'Association Esport",
+    "description": "Association loi 1901, BlueGenji organise des tournois esport en ligne et en LAN, fédère les équipes et met en avant la scène amateur française.",
+    "shareDescription": "Structure associative compétitive et inclusive pour la scène esport francophone."
+  },
+  "organizationDescription": "Association loi 1901, BlueGenji Esport organise des événements et tournois esport en ligne et en LAN, fédère les équipes participantes, et forme les acteurs de la scène amateur francophone pour les mettre en avant.",
+  "hero": {
+    "foundedIn": "FONDÉE EN",
+    "seat": "SIÈGE",
+    "seatValue": "Janvilliers",
+    "status": "STATUT",
+    "statusValue": "Association loi 1901"
+  },
+  "manifesto": {
+    "eyebrow": "SECTION 04",
+    "title": "Manifeste",
+    "meta": "CE QUI NOUS DÉFINIT",
+    "purpose": {
+      "title": "Raison d'être",
+      "text": "Animer la scène esport amateur en créant des événements compétitifs ouverts à tous. Là où d'autres organisent pour une élite, nous bâtissons des rendez-vous réguliers où chacun peut jouer, progresser et se mesurer aux autres."
+    },
+    "values": {
+      "title": "Valeurs",
+      "text": "L'inclusivité et l'ouverture d'esprit. Nous ne jugeons les joueurs sur rien d'autre que leur respect et leurs qualités de jeu — origine, niveau ou profil ne ferment jamais une porte."
+    },
+    "vision": {
+      "title": "Vision",
+      "text": "Une scène fiable, éthique et durable où tout le monde trouve sa place, à n'importe quel niveau : pour s'amuser dans un contexte plus sérieux, ou tenter l'ascension vers le monde professionnel."
+    },
+    "commitment": {
+      "title": "Engagement",
+      "text": "Un encadrement sérieux, une activité nourrie et la volonté sincère de construire un environnement à la fois sain et compétitif. Nous prenons cet engagement au sérieux à chaque tournoi."
+    }
+  },
+  "bureau": {
+    "eyebrow": "SECTION 05",
+    "title": "Bureau",
+    "meta": "{count, plural, one {# MEMBRE} other {# MEMBRES}} · BÉNÉVOLES",
+    "pendingTranslation": "La version anglaise du bureau arrive bientôt."
+  },
+  "membership": {
+    "eyebrow": "SECTION 06",
+    "title": "Adhérer",
+    "meta": "BULLETIN · AGRÉMENT DU BUREAU",
+    "bodyMember": "Ton compte joueur te permet déjà de t'inscrire aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande.",
+    "bodyGuest": "Un compte joueur, gratuit, suffit pour participer aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande.",
+    "ageValue": "16 ans",
+    "ageLabel": "Âge minimum",
+    "durationValue": "1 an",
+    "durationLabel": "Durée de l'adhésion",
+    "approvalValue": "Bureau",
+    "approvalLabel": "Agrément",
+    "download": "Télécharger le bulletin →",
+    "tournaments": "Voir les tournois",
+    "createAccount": "Créer un compte joueur",
+    "discord": "Rejoindre le Discord"
+  },
+  "documents": {
+    "eyebrow": "SECTION 07",
+    "title": "Documents",
+    "meta": "TÉLÉCHARGEABLES",
+    "statutes": "Statuts de l'association",
+    "rules": "Règlement intérieur",
+    "form": "Bulletin d'adhésion",
+    "pdf": "PDF →",
+    "doc": "DOC →",
+    "docx": "DOCX →"
+  }
+}

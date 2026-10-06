@@ -131,6 +131,12 @@ interface ImageCropDialogProps {
   title: string;
   onCancel: () => void;
   onConfirm: (crop: CropRect | null) => void;
+  /**
+   * Langue de la modale quand elle diffère de la page : `"fr"` pour un écran
+   * du staff (en français, D4) ouvert sous `/en` — portée dans `document.body`,
+   * elle n'hérite pas du `lang` de l'éditeur qui l'ouvre.
+   */
+  lang?: string;
 }
 
 type Drag =
@@ -166,7 +172,7 @@ function handleOf(target: EventTarget): CropHandle | null {
  * Portée dans `document.body`, pile commune de modales, voile fermé par
  * `useBackdropDismiss` — les trois règles de `docs/features/MODAL_DIALOGS.md`.
  */
-export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Readonly<ImageCropDialogProps>) {
+export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }: Readonly<ImageCropDialogProps>) {
   const titleId = useId();
   const hintId = useId();
   const aspect = IMAGE_CROP_ASPECTS[kind];
@@ -397,7 +403,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Read
 
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={s.backdrop} {...backdrop}>
-      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */ ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={s.dialog}>
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */ ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={s.dialog} lang={lang}>
         <h2 id={titleId} className={s.title}>
           {title}
         </h2>
@@ -443,7 +449,7 @@ interface CropRequest {
  * qu'une autre est ouverte annule la première : seule la dernière image
  * choisie peut partir.
  */
-export function useImageCropper(): {
+export function useImageCropper(options: Readonly<{ lang?: string }> = {}): {
   cropImage: (file: File, kind: ImageUploadKind, title: string) => Promise<CroppedImage | null>;
   cropDialog: ReactNode;
 } {
@@ -478,6 +484,7 @@ export function useImageCropper(): {
       title={request.title}
       onCancel={() => settle(null)}
       onConfirm={(crop) => settle({ file: request.file, crop })}
+      lang={options.lang}
     />
   ) : null;
 

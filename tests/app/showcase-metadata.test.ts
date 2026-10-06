@@ -78,7 +78,8 @@ describe("connexion", () => {
 
 describe("association", () => {
   it("décrit ce que la page dit vraiment, sans le jeu qu'elle ne mentionne plus", async () => {
-    const { metadata } = await import("@/app/association/page");
+    const { generateMetadata } = await import("@/app/association/page");
+    const metadata = await generateMetadata();
     const description = String(metadata.description);
 
     expect(description).toContain("loi 1901");

@@ -1,9 +1,16 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  nextCategoryEnglish,
+  borrowedCategoryEnglish,
+  knownCategoryEnglish,
+  BENEVOLE_CATEGORY_MAX,
+  BENEVOLE_FIELD_ERRORS,
   benevoleInitials,
+  categoryEnglish,
   formatDisplayName,
   formatJoinedAt,
   groupByCategory,
+  localizedCategories,
   validateBenevoleInput,
   validateCategoryReorder,
   type Benevole,
@@ -14,6 +21,7 @@ describe("validateBenevoleInput", () => {
     firstName: "Marie",
     lastName: "Dupont",
     category: "Développeur",
+    categoryEn: "Developer",
     joinedAt: "2024-03-15",
   };
 
@@ -36,6 +44,7 @@ describe("validateBenevoleInput", () => {
       lastName: "",
       pseudo: "MarieD",
       category: "Développeur",
+      categoryEn: "Developer",
       joinedAt: "2024-03-15",
     });
     expect(result.ok).toBe(true);
@@ -75,6 +84,7 @@ describe("validateBenevoleInput", () => {
       firstName: "  Marie  ",
       lastName: "  Dupont  ",
       category: "  Dev  ",
+      categoryEn: "  Dev EN ",
       joinedAt: "2024-03-15",
       pseudo: "  md  ",
     });
@@ -162,9 +172,9 @@ describe("validateBenevoleInput", () => {
 
 describe("groupByCategory", () => {
   const benevoles: Benevole[] = [
-    { id: 1, firstName: "A", pseudo: null, lastName: "AA", category: "Dev", photoUrl: null, joinedAt: "2024-01-01" },
-    { id: 2, firstName: "B", pseudo: null, lastName: "BB", category: "Arbitre", photoUrl: null, joinedAt: "2024-02-01" },
-    { id: 3, firstName: "C", pseudo: null, lastName: "CC", category: "Dev", photoUrl: null, joinedAt: "2024-03-01" },
+    { id: 1, firstName: "A", pseudo: null, lastName: "AA", category: "Dev", categoryEn: null, photoUrl: null, joinedAt: "2024-01-01" },
+    { id: 2, firstName: "B", pseudo: null, lastName: "BB", category: "Arbitre", categoryEn: null, photoUrl: null, joinedAt: "2024-02-01" },
+    { id: 3, firstName: "C", pseudo: null, lastName: "CC", category: "Dev", categoryEn: null, photoUrl: null, joinedAt: "2024-03-01" },
   ];
 
   it("groups members by category", () => {
@@ -288,7 +298,7 @@ describe("formatJoinedAt", () => {
 });
 
 describe("validateBenevoleInput — photo", () => {
-  const valid = { firstName: "Marie", lastName: "Dupont", category: "Développeur", joinedAt: "2024-03-15" };
+  const valid = { firstName: "Marie", lastName: "Dupont", category: "Développeur", categoryEn: "Developer", joinedAt: "2024-03-15" };
 
   it("accepte une photo importée, servie ou disque", () => {
     for (const photoUrl of ["/api/uploads/benevoles/1-a.webp", "/uploads/benevoles/1-a.webp"]) {
@@ -307,5 +317,114 @@ describe("validateBenevoleInput — photo", () => {
     "/uploads/sponsors/1-a.webp",
   ])("refuse l'adresse d'upload d'un autre dossier %s — le remplacement l'effacerait", (photoUrl) => {
     expect(validateBenevoleInput({ ...valid, photoUrl })).toEqual({ ok: false, error: "INVALID_PHOTO_URL" });
+  });
+});
+
+describe("validateBenevoleInput — anglais de la catégorie (lot 5b, D9)", () => {
+  const base = { firstName: "Marie", lastName: "Dupont", category: "Arbitre", joinedAt: "2024-03-15" };
+
+  it("demande l'anglais de la catégorie, juste après son français", () => {
+    expect(validateBenevoleInput(base)).toEqual({ ok: false, error: "CATEGORY_EN_REQUIRED" });
+    expect(validateBenevoleInput({ ...base, category: "" })).toEqual({ ok: false, error: "CATEGORY_REQUIRED" });
+    expect(validateBenevoleInput({ ...base, categoryEn: "r".repeat(BENEVOLE_CATEGORY_MAX + 1) })).toEqual({
+      ok: false,
+      error: "CATEGORY_EN_TOO_LONG",
+    });
+    expect(BENEVOLE_FIELD_ERRORS.CATEGORY_EN_REQUIRED).toBe("categoryEn");
+  });
+
+  it("garde l'anglais rogné", () => {
+    const result = validateBenevoleInput({ ...base, categoryEn: "  Referee " });
+    expect(result.ok && result.value.categoryEn).toBe("Referee");
+  });
+});
+
+describe("localizedCategories", () => {
+  const list: Benevole[] = [
+    { id: 1, firstName: "A", pseudo: null, lastName: "AA", category: "Dev", categoryEn: null, photoUrl: null, joinedAt: "2024-01-01" },
+    { id: 2, firstName: "B", pseudo: null, lastName: "BB", category: "Arbitre", categoryEn: null, photoUrl: null, joinedAt: "2024-02-01" },
+    { id: 3, firstName: "C", pseudo: null, lastName: "CC", category: "Dev", categoryEn: "Development", photoUrl: null, joinedAt: "2024-03-01" },
+  ];
+
+  it("français : toutes les catégories, intitulé français", () => {
+    expect(localizedCategories(list, "fr").map((g) => g.label)).toEqual(["Dev", "Arbitre"]);
+  });
+
+  it("anglais : une catégorie se traduit en bloc — un seul bénévole traduit suffit", () => {
+    const groups = localizedCategories(list, "en");
+    expect(groups.map((g) => [g.category, g.label, g.members.length])).toEqual([["Dev", "Development", 2]]);
+    expect(categoryEnglish(list.filter((b) => b.category === "Arbitre"))).toBeNull();
+  });
+});
+
+describe("formatJoinedAt — langue", () => {
+  it("français inchangé, anglais en toutes lettres", () => {
+    expect(formatJoinedAt("2024-03-15")).toBe("15/03/2024");
+    expect(formatJoinedAt("2024-03-15", "en")).toBe("Mar 15, 2024");
+    expect(formatJoinedAt("bad", "en")).toBe("bad");
+  });
+});
+
+
+describe("nextCategoryEnglish", () => {
+  // « Staff » existe, encore sans anglais.
+  const known: Record<string, string | null> = { Arbitre: "Referee", Caster: "Caster", Developpeur: "Developer", Staff: null };
+  const lookup = {
+    englishOf: (category: string) => known[category.trim()] ?? null,
+    exists: (category: string) => category.trim() in known,
+    knownEnglish: new Set(["Referee", "Caster", "Developer"]),
+  };
+  const next = (form: { category: string; categoryEn: string }, category: string) => nextCategoryEnglish(form, category, lookup);
+
+  it("reprend l'anglais connu de la nouvelle catégorie", () => {
+    expect(next({ category: "", categoryEn: "" }, "Arbitre")).toBe("Referee");
+    expect(next({ category: "Arbitre", categoryEn: "Referee" }, "Caster")).toBe("Caster");
+  });
+
+  it("vers une catégorie existante encore sans anglais, l'anglais repris se vide", () => {
+    expect(next({ category: "Arbitre", categoryEn: "Referee" }, "Staff")).toBe("");
+  });
+
+  it("vers une catégorie inconnue, l'anglais reste (une faute corrigée ne le vide pas)", () => {
+    expect(next({ category: "Developpeur", categoryEn: "Developer" }, "Dveloppeur")).toBe("Developer");
+    expect(next({ category: "Dveloppeur", categoryEn: "Developer" }, "Développeur")).toBe("Developer");
+  });
+
+  it("un anglais repris, gardé le temps de taper une catégorie inconnue, cède à celui de la catégorie connue atteinte", () => {
+    // « Arbitre » → « C » → « Caster » (connue) : « Referee » ne colle pas.
+    expect(next({ category: "Arbitre", categoryEn: "Referee" }, "C")).toBe("Referee");
+    expect(next({ category: "C", categoryEn: "Referee" }, "Caster")).toBe("Caster");
+  });
+
+  it("une saisie anglaise faite à la main n'est jamais écrasée", () => {
+    expect(next({ category: "Graphiste", categoryEn: "Designer" }, "Arbitre")).toBe("Designer");
+    expect(next({ category: "Arbitre", categoryEn: "Umpire" }, "Staff")).toBe("Umpire");
+  });
+});
+
+describe("borrowedCategoryEnglish", () => {
+  const benevoles = [
+    { category: "Arbitre", categoryEn: "Referee" },
+    { category: "Developpeur", categoryEn: "Developer" },
+  ];
+
+  it("catégorie nouvelle qui porte l'anglais d'une autre : la nomme, à vérifier", () => {
+    expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "Referee" }, benevoles)).toBe("Arbitre");
+    expect(borrowedCategoryEnglish({ category: "Développeur", categoryEn: "Developer" }, benevoles)).toBe("Developpeur");
+  });
+
+  it("rien à signaler : catégorie connue, anglais propre, ou champ vide", () => {
+    expect(borrowedCategoryEnglish({ category: "Arbitre", categoryEn: "Referee" }, benevoles)).toBeNull();
+    // Catégorie existante sans anglais qui reçoit celui d'une autre : signalé aussi.
+    expect(borrowedCategoryEnglish({ category: "Staff", categoryEn: "Referee" }, [...benevoles, { category: "Staff", categoryEn: null }])).toBe("Arbitre");
+    expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "Caster" }, benevoles)).toBeNull();
+    expect(borrowedCategoryEnglish({ category: "Caster", categoryEn: "" }, benevoles)).toBeNull();
+    expect(borrowedCategoryEnglish({ category: "", categoryEn: "Referee" }, benevoles)).toBeNull();
+  });
+});
+
+describe("knownCategoryEnglish", () => {
+  it("rassemble les anglais saisis, sans les vides", () => {
+    expect(knownCategoryEnglish([{ categoryEn: " Referee " }, { categoryEn: null }, { categoryEn: "" }])).toEqual(new Set(["Referee"]));
   });
 });

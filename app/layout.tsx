@@ -4,6 +4,8 @@ import "./globals.css";
 import { FONT_VARIABLES } from "./site-fonts";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
+import { RecruitmentTextProvider } from "@/components/i18n/recruitment-text";
+import { recruitmentClientMessages } from "@/lib/shared/recruitment-text";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { SiteNavigationTracker } from "@/components/site-navigation-tracker";
@@ -37,6 +39,7 @@ import {
   RECRUITMENT_MODAL_COOKIE,
   recruitmentDismissed,
   recruitmentSeenAmong,
+  recruitmentSeenKept,
 } from "@/lib/shared/recruitment";
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
@@ -182,17 +185,22 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // l'ont été ; la banderole se tait tant qu'aucune annonce qu'elle porte n'est
   // neuve pour ce visiteur.
   const cookieStore = await cookies();
-  const spotlight = await getRecruitmentSpotlight();
+  // Sous `/en`, seulement les annonces traduites, dans leur anglais (lot 5b) :
+  // la banderole et la modale se taisent plutôt que de parler français.
+  const pageLocale = localeFromHeader(requestHeaders.get(LOCALE_HEADER));
+  const spotlight = await getRecruitmentSpotlight(pageLocale);
   const requestedPath = requestHeaders.get(PATHNAME_HEADER);
   const onRecruitmentPage = requestedPath === RECRUITMENT_PAGE;
-  const modalSeen = recruitmentSeenAmong(
-    cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value,
-    spotlight.modal.map((ad) => ad.id),
-  );
-  const bannerDismissed = recruitmentDismissed(
-    cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value,
-    spotlight.banner.map((ad) => ad.id),
-  );
+  const modalCookie = cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value;
+  const bannerCookie = cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value;
+  const adIds = (ads: readonly { id: number }[]) => ads.map((ad) => ad.id);
+  const modalSeen = recruitmentSeenAmong(modalCookie, adIds(spotlight.modal));
+  const bannerDismissed = recruitmentDismissed(bannerCookie, adIds(spotlight.banner));
+  // Sous `/en`, les annonces masquées (sans anglais) déjà vues en français le
+  // restent quand la banderole ou la modale réécrit son cookie (même cache).
+  const published = pageLocale === DEFAULT_LOCALE ? spotlight : await getRecruitmentSpotlight(DEFAULT_LOCALE);
+  const modalSeenKept = recruitmentSeenKept(modalCookie, adIds(published.modal), adIds(spotlight.modal));
+  const bannerSeenKept = recruitmentSeenKept(bannerCookie, adIds(published.banner), adIds(spotlight.banner));
 
   // `getCurrentUser` est mémoïsé par requête (`cache()` de React), donc cet
   // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
@@ -240,8 +248,14 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // charge que sous un segment traduit, par son propre `IntlMessages`. Seuls
   // les textes de la coquille (menus, notifications…) suivent, formatés sans
   // `next-intl` — et seulement hors français, déjà inclus dans le paquet.
-  const locale = localeFromHeader(requestHeaders.get(LOCALE_HEADER));
+  const locale = pageLocale;
   const shellMessages = locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).shell;
+  // Textes de la mise en avant du recrutement : l'anglais ne voyage que sous
+  // `/en`, et seulement s'il y a une annonce à montrer.
+  const recruitmentMessages =
+    locale === DEFAULT_LOCALE || (spotlight.banner.length === 0 && spotlight.modal.length === 0)
+      ? undefined
+      : recruitmentClientMessages(messagesFor(locale).recruitment);
 
   return (
     <html lang={locale} data-a11y={a11yAttribute(a11ySettings)}>
@@ -267,6 +281,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               la connexion (sa modale de consentement passe d'abord), la mise
               en avant du recrutement se tait (la banderole, elle, reste).
               Voir `lib/shared/global-modals.ts`. */}
+          <RecruitmentTextProvider locale={locale} messages={recruitmentMessages}>
           <RecruitmentHighlight
             modalAds={spotlight.modal}
             modalSilenced={recruitmentModalSilenced({
@@ -275,10 +290,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               pathname: requestedPath,
             })}
             modalSeen={modalSeen}
+            modalSeenKept={modalSeenKept}
             bannerAds={spotlight.banner}
             bannerDismissed={bannerDismissed}
+            bannerSeenKept={bannerSeenKept}
             onAdPage={onRecruitmentPage}
           />
+          </RecruitmentTextProvider>
           <PrivacyChangesModal changes={privacyChanges} />
           {user && (
             <TermsAcceptanceModal

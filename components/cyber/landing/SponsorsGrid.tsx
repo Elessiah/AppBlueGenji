@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
+import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
@@ -11,9 +12,15 @@ import {
   type SponsorTier,
   FALLBACK_SPONSORS,
   SPONSOR_DESCRIPTION_MAX,
+  SPONSOR_FIELD_ERRORS,
   SPONSOR_TIERS,
   SPONSOR_TIER_LABELS,
+  sponsorDescription,
+  sponsorEnglishMissing,
+  validateSponsorInput,
 } from "@/lib/shared/sponsors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { englishErrorMessage } from "@/lib/shared/staff-translation";
 import {
   sponsorCardMedia,
   sponsorInitial,
@@ -41,6 +48,7 @@ interface FormState {
   logoUrl: string;
   bannerUrl: string;
   description: string;
+  descriptionEn: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -50,7 +58,11 @@ const EMPTY_FORM: FormState = {
   logoUrl: "",
   bannerUrl: "",
   description: "",
+  descriptionEn: "",
 };
+
+/** `id` des champs de la description, cibles de `useFieldErrors`. */
+const DESCRIPTION_FIELD_IDS = { description: "sponsor-description", descriptionEn: "sponsor-description-en" } as const;
 
 /** Traduction des refus de l'API partenaires, affichée en notification. */
 function sponsorErrorMessage(code: string | undefined, fallback: string): string {
@@ -69,7 +81,7 @@ function sponsorErrorMessage(code: string | undefined, fallback: string): string
     case "INVALID_LOGO_URL":
       return "Ce logo est une image d'une autre partie du site : importe-le ou colle une adresse externe.";
     default:
-      return `Échec : ${code}`;
+      return englishErrorMessage(code) ?? `Échec : ${code}`;
   }
 }
 
@@ -86,16 +98,18 @@ function sortByTier(list: Sponsor[]): Sponsor[] {
 export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<SponsorsGridProps>) {
   const { t, locale } = useLandingText();
   // L'administration reste en français (D4) : sous `/en`, ses contrôles le
-  // disent (`lang="fr"`). La description d'un partenaire, saisie en français,
-  // n'y est pas rendue tant que son éditeur ne demande pas l'anglais (lot 5).
+  // disent (`lang="fr"`). La description d'un partenaire s'y lit en anglais ;
+  // sans anglais (saisie avant le lot 5b), elle n'est pas rendue — le
+  // partenaire, lui, reste (`sponsorDescription`).
   const staffLang = locale === "fr" ? undefined : "fr";
-  const showStaffContent = locale === "fr";
   // Ses notifications sont du français d'administration, lues comme tel sous `/en`.
   const toast = useToast();
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
-  const { cropImage, cropDialog } = useImageCropper();
+  const fieldErrors = useFieldErrors(SPONSOR_FIELD_ERRORS, DESCRIPTION_FIELD_IDS);
+  // Modale portée dans body : sous `/en`, elle dit elle-même sa langue (D4).
+  const { cropImage, cropDialog } = useImageCropper({ lang: staffLang });
   const [items, setItems] = useState<Sponsor[]>(sponsors);
   const [editing, setEditing] = useState<Sponsor | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -113,12 +127,14 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   const displaySponsors = isAdmin ? items : items.slice(0, 6);
 
   function openCreate() {
+    fieldErrors.clear();
     setEditing(null);
     setForm(EMPTY_FORM);
     setOpen(true);
   }
 
   function openEdit(sponsor: Sponsor) {
+    fieldErrors.clear();
     setEditing(sponsor);
     setForm({
       name: sponsor.name,
@@ -127,6 +143,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
       logoUrl: sponsor.logoUrl ?? "",
       bannerUrl: sponsor.bannerUrl ?? "",
       description: sponsor.description ?? "",
+      descriptionEn: sponsor.descriptionEn ?? "",
     });
     setOpen(true);
   }
@@ -138,13 +155,20 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
     setForm(EMPTY_FORM);
   }
 
+  // Un refus désigne son champ quand il le peut (description, son anglais) :
+  // rattaché à lui, focus ramené, et la même phrase en notification.
+  function refuse(code: string | undefined, fallback: string) {
+    const message = sponsorErrorMessage(code, fallback);
+    fieldErrors.report(code, message);
+    showError(message);
+  }
+
   async function submit() {
     if (!form.name.trim()) {
       showError("Le nom est requis.");
       return;
     }
 
-    setBusy(true);
     const payload = {
       name: form.name.trim(),
       tier: form.tier,
@@ -152,7 +176,17 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
       logoUrl: form.logoUrl.trim() || null,
       bannerUrl: form.bannerUrl.trim() || null,
       description: form.description.trim() || null,
+      descriptionEn: form.descriptionEn.trim() || null,
     };
+    // Même validation que le serveur, avant l'envoi : une description saisie
+    // demande son anglais (D9), désigné sans aller-retour.
+    const check = validateSponsorInput(payload);
+    if (!check.ok) {
+      refuse(check.error, "Formulaire invalide.");
+      return;
+    }
+
+    setBusy(true);
 
     try {
       const url = editing ? `/api/landing/sponsors/${editing.id}` : "/api/landing/sponsors";
@@ -163,7 +197,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
       });
       const data = (await res.json()) as { sponsor?: Sponsor; error?: string };
       if (!res.ok || !data.sponsor) {
-        showError(sponsorErrorMessage(data.error, "Échec de l'enregistrement."));
+        refuse(data.error, "Échec de l'enregistrement.");
         return;
       }
 
@@ -333,6 +367,8 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
           const media = sponsorCardMedia(sponsor);
           const href = sponsorWebsiteHref(sponsor.websiteUrl);
           const domain = sponsorWebsiteLabel(sponsor.websiteUrl);
+          const description = sponsorDescription(sponsor, locale);
+          const enMissing = sponsorEnglishMissing(sponsor);
           return (
             <li key={sponsor.id} className={styles.slotWrap}>
               <article className={styles.card}>
@@ -400,7 +436,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                       sponsor.name
                     )}
                   </h3>
-                  {sponsor.description && showStaffContent && <p className={styles.description}>{sponsor.description}</p>}
+                  {description && <p className={styles.description}>{description}</p>}
                   {domain && (
                     <span className={styles.domain} aria-hidden="true">
                       {domain} ↗
@@ -435,9 +471,10 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                     className={styles.slotAction}
                     onClick={() => openEdit(sponsor)}
                     disabled={busy}
-                    aria-label={`Modifier ${sponsor.name}`}
+                    aria-label={withEnglishMissing(`Modifier ${sponsor.name}`, enMissing)}
                   >
                     Modifier
+                    {enMissing && <EnglishMissingMark />}
                   </button>
                   <button
                     type="button"
@@ -476,22 +513,34 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
             />
           </label>
 
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Brève description (optionnel)</span>
-            <textarea
-              className={`${styles.modalInput} ${styles.modalTextarea}`}
-              value={form.description}
+          <div className={styles.modalField}>
+            <BilingualField
+              label="Brève description (optionnel)"
+              ids={{ fr: DESCRIPTION_FIELD_IDS.description, en: DESCRIPTION_FIELD_IDS.descriptionEn }}
+              fields={{ fr: "description", en: "descriptionEn" }}
+              errors={fieldErrors}
+              values={{ fr: form.description, en: form.descriptionEn }}
+              onChange={(lang, value) =>
+                setForm((f) => (lang === "fr" ? { ...f, description: value } : { ...f, descriptionEn: value }))
+              }
               maxLength={SPONSOR_DESCRIPTION_MAX}
+              required={false}
+              multiline
               rows={3}
-              placeholder="Boutique de jeux vidéo à prix réduits, partenaire de nos cash prizes."
-              aria-describedby="sponsor-description-hint"
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholders={{
+                fr: "Boutique de jeux vidéo à prix réduits, partenaire de nos cash prizes.",
+                en: "Discount video game store, partner of our cash prizes.",
+              }}
+              enMissing={editing !== null && sponsorEnglishMissing(editing)}
+              describedBy="sponsor-description-hint"
+              counter
+              inputClassName={`${styles.modalInput} ${styles.modalTextarea}`}
+              labelClassName={styles.modalLabel}
             />
             <span id="sponsor-description-hint" className={styles.logoHint}>
-              Une ou deux phrases : qui est ce partenaire, et ce qu&apos;il apporte. {form.description.length} /{" "}
-              {SPONSOR_DESCRIPTION_MAX}
+              Une ou deux phrases : qui est ce partenaire, et ce qu&apos;il apporte.
             </span>
-          </label>
+          </div>
 
           <label className={styles.modalField}>
             <span className={styles.modalLabel}>Palier</span>

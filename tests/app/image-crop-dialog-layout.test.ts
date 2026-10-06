@@ -66,3 +66,16 @@ describe("modale de recadrage — petits écrans", () => {
     expect(tsx).toContain("Fais glisser le cadre");
   });
 });
+
+describe("modale de recadrage — langue d'un écran du staff sous /en", () => {
+  it("portée dans body, elle porte la langue que l'écran lui passe", () => {
+    expect(tsx).toMatch(/role="dialog"[^>]*lang=\{lang\}/);
+    expect(tsx).toMatch(/useImageCropper\(options: Readonly<\{ lang\?: string \}> = \{\}\)/);
+  });
+
+  it("les éditeurs de la vitrine (français, D4) la disent en français sous /en", () => {
+    for (const file of ["app/benevoles/BenevolesSection.tsx", "components/cyber/landing/SponsorsGrid.tsx"]) {
+      expect(readFileSync(join(ROOT, file), "utf8")).toContain("useImageCropper({ lang: staffLang })");
+    }
+  });
+});

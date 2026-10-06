@@ -130,6 +130,15 @@ describe("recruitment-service", () => {
       expect(sql).toContain("priority <> 'OPTIONAL'");
     });
 
+    it("n'envoie qu'une langue au navigateur : sans colonnes anglaises en français, l'anglais seul sous /en", async () => {
+      const row = { ...HIGHLIGHT_ROW, title_en: "URGENT EN", roles_en: null, body_en: null };
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[row]]));
+      const fr = await getRecruitmentSpotlight();
+      expect(fr.banner[0]).toMatchObject({ title: "URGENT", titleEn: null, rolesEn: null, bodyEn: null });
+      const en = await getRecruitmentSpotlight("en");
+      expect(en.banner[0]).toMatchObject({ title: "URGENT EN", titleEn: null });
+    });
+
     it("rend des listes vides quand rien n'est mis en avant", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await getRecruitmentSpotlight()).toEqual({ modal: [], banner: [] });
@@ -177,7 +186,7 @@ describe("recruitment-service", () => {
     it("inserts and returns the new ad", async () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 9 }]);
       await mockDb(execute);
-      const ad = await createRecruitmentAd({ title: "Recherche caster", domain: "CASTING" });
+      const ad = await createRecruitmentAd({ titleEn: "EN title", title: "Recherche caster", domain: "CASTING" });
       expect(ad.id).toBe(9);
       expect(ad.domain).toBe("CASTING");
       expect(ad.priority).toBe("OPTIONAL");
@@ -187,7 +196,7 @@ describe("recruitment-service", () => {
     it("persists the contact tags (Discord id, preferred channel)", async () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 10 }]);
       await mockDb(execute);
-      const ad = await createRecruitmentAd({
+      const ad = await createRecruitmentAd({ titleEn: "EN title",
         title: "Recherche arbitre",
         contactDiscord: "marie",
         contactDiscordId: "123456789012345678",
@@ -207,7 +216,7 @@ describe("recruitment-service", () => {
     it("écrit le statut demandé", async () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 11 }]);
       await mockDb(execute);
-      const ad = await createRecruitmentAd({ title: "Urgent", priority: "PRIORITY" });
+      const ad = await createRecruitmentAd({ titleEn: "EN title", title: "Urgent", priority: "PRIORITY" });
       expect(ad.priority).toBe("PRIORITY");
       const [sql, values] = execute.mock.calls[0];
       expect(sql).toContain("priority");
@@ -218,7 +227,7 @@ describe("recruitment-service", () => {
     it("rejects invalid input before touching the database", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(createRecruitmentAd({ title: "" })).rejects.toThrow("TITLE_REQUIRED");
+      await expect(createRecruitmentAd({ titleEn: "EN title", title: "" })).rejects.toThrow("TITLE_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
     });
   });
@@ -234,7 +243,7 @@ describe("recruitment-service", () => {
         .mockResolvedValueOnce([{ affectedRows: 0 }]); // UPDATE no-op
       await mockDb(execute);
 
-      const ad = await updateRecruitmentAd(3, { title: "Inchangé" });
+      const ad = await updateRecruitmentAd(3, { titleEn: "EN title", title: "Inchangé" });
       expect(ad.id).toBe(3);
       expect(ad.title).toBe("Inchangé");
       expect(execute).toHaveBeenCalledTimes(2);
@@ -247,7 +256,7 @@ describe("recruitment-service", () => {
         .mockResolvedValueOnce([{ affectedRows: 1 }]);
       await mockDb(execute);
 
-      await updateRecruitmentAd(3, { title: "Même statut", priority: "IMPORTANT" });
+      await updateRecruitmentAd(3, { titleEn: "EN title", title: "Même statut", priority: "IMPORTANT" });
 
       expect(execute).toHaveBeenCalledTimes(2);
       const [sql, values] = execute.mock.calls[1];
@@ -255,6 +264,10 @@ describe("recruitment-service", () => {
       // `null` : le COALESCE garde le rang en place.
       expect(values).toEqual([
         "Même statut",
+        // Anglais du titre, des missions et de la description (lot 5b).
+        "EN title",
+        null,
+        null,
         null,
         "AUTRE",
         null,
@@ -278,7 +291,7 @@ describe("recruitment-service", () => {
         .mockResolvedValueOnce([{ affectedRows: 1 }]);
       await mockDb(execute);
 
-      const ad = await updateRecruitmentAd(3, { title: "Promue", priority: "PRIORITY" });
+      const ad = await updateRecruitmentAd(3, { titleEn: "EN title", title: "Promue", priority: "PRIORITY" });
 
       expect(ad.priority).toBe("PRIORITY");
       expect(execute).toHaveBeenCalledTimes(3);
@@ -297,7 +310,7 @@ describe("recruitment-service", () => {
         .mockResolvedValueOnce([{ affectedRows: 1 }]);
       await mockDb(execute);
 
-      const ad = await updateRecruitmentAd(3, { title: "Sans statut" });
+      const ad = await updateRecruitmentAd(3, { titleEn: "EN title", title: "Sans statut" });
 
       expect(ad.priority).toBe("PRIORITY");
       // Pas de changement de groupe, donc pas de nouveau rang d'affichage.
@@ -309,7 +322,7 @@ describe("recruitment-service", () => {
 
     it("throws NOT_FOUND when the ad does not exist", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[]]));
-      await expect(updateRecruitmentAd(999, { title: "X" })).rejects.toThrow(
+      await expect(updateRecruitmentAd(999, { titleEn: "EN title", title: "X" })).rejects.toThrow(
         "RECRUITMENT_NOT_FOUND",
       );
     });
@@ -317,7 +330,7 @@ describe("recruitment-service", () => {
     it("rejects invalid input", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
-      await expect(updateRecruitmentAd(1, { title: "X", domain: "LOL" })).rejects.toThrow(
+      await expect(updateRecruitmentAd(1, { titleEn: "EN title", title: "X", domain: "LOL" })).rejects.toThrow(
         "INVALID_DOMAIN",
       );
       expect(execute).not.toHaveBeenCalled();
@@ -459,7 +472,7 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
     [
       "createRecruitmentAd",
       () =>
-        createRecruitmentAd({
+        createRecruitmentAd({ titleEn: "EN title",
           title: "Titre",
           teamName: null,
           domain: "AUTRE",

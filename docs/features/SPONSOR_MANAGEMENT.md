@@ -90,3 +90,7 @@ l'image est devenue locale, pas parce qu'on renonce à l'optimiser.
 - `tests/lib/server/sponsors-service.test.ts` — CRUD, unicité du slug, fallback.
 - `tests/app/api/landing/sponsors-admin.test.ts` — gardes d'auth, validation,
   codes HTTP.
+
+## Langues (lot 5b de l'i18n)
+
+La description a son anglais (`description_en`, `descriptionEn`), obligatoire dès qu'une description est saisie (`DESCRIPTION_EN_*`). Sous `/en`, un partenaire sans description anglaise reste affiché, **sans** sa description (`sponsorDescription`), et son bouton « Modifier » porte la marque **EN**. Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.
