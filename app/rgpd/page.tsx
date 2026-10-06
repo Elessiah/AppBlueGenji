@@ -354,20 +354,26 @@ export default async function RgpdPage() {
           <p>
             Depuis octobre 2026, un score se saisit <strong>map par map</strong> : chaque map
             porte le <strong>code de replay</strong> de la partie, qui permet de la revoir en
-            jeu — et donc d'y lire les identifiants de jeu des joueurs présents. Ces codes
+            jeu — et donc d'y lire les identifiants de jeu des joueurs présents, y compris un
+            BattleTag masqué sur le site. Ces codes
             sont visibles des membres connectés du site sur la fiche du tournoi une fois
             enregistrés par l'arbitrage ou retenus comme résultat, pour qu'un match diffusé en
             direct et un match qui ne l'est pas offrent les mêmes informations — tant qu'une proposition d'équipe attend, seules les deux équipes du match
             et l'arbitrage la lisent —, et gardés avec le
-            résultat qu'ils documentent ; le compte qui les a saisis n'est lié qu'en interne,
-            et ce lien disparaît à la suppression du compte.
+            résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le
+            compte qui les a saisis n'est lié qu'en interne, et ce lien disparaît à la
+            suppression du compte. La partie elle-même est conservée par l'éditeur du jeu :
+            supprimer votre compte ici n'efface pas vos identifiants de jeu d'un replay, et
+            les codes restent attachés au résultat qu'ils documentent. Les maps que vous avez
+            saisies figurent dans l'export de vos données.
           </p>
         </div>
         <div className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>Ce que cela signifie concrètement :</strong> les statistiques
           (nombre de tournois joués, scores, placements) ne sont pas effacées lors de
           la suppression du compte. En revanche, tout ce qui désigne la personne est effacé
-          (tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles) et le pseudo
+          (tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles — seule réserve,
+          les codes de replay décrits ci-dessus) et le pseudo
           est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
           subsiste sous ce faux nom, et la fiche du joueur indique que le compte a été supprimé.
           Un compte qui n'a jamais disputé de match n'a, lui, aucun palmarès à préserver : il est effacé
