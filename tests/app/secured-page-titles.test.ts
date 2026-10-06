@@ -68,10 +68,19 @@ describe("titres des espaces connectés (WCAG 2.4.2)", () => {
     expect(resolveChain(root, teamsMetadata.title, undefined)).toBe(`Équipes · ${SITE_NAME}`);
   });
 
-  it("ne déclare qu'un titre : l'URL canonique de la liste ne doit pas descendre sur les fiches", () => {
+  it("ne déclare ni canonique ni og:url : l'adresse de la liste ne doit pas descendre sur les fiches", () => {
     for (const metadata of [tournamentsMetadata, teamsMetadata, playersMetadata, profileMetadata]) {
-      expect(Object.keys(metadata)).toEqual(["title"]);
+      expect(metadata.alternates).toBeUndefined();
+      const openGraph = metadata.openGraph as { url?: unknown } | undefined;
+      expect(openGraph?.url).toBeUndefined();
     }
+  });
+
+  it("pose un encart générique aux listes, rien au profil", () => {
+    expect(Object.keys(profileMetadata)).toEqual(["title"]);
+    expect(Object.keys(tournamentsMetadata).sort((a, b) => a.localeCompare(b))).toEqual(["openGraph", "title", "twitter"]);
+    expect(JSON.stringify(teamsMetadata.openGraph)).toContain("/og/fr/teams.png");
+    expect(JSON.stringify(playersMetadata.openGraph)).toContain("/og/fr/players.png");
   });
 });
 
