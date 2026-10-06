@@ -175,17 +175,26 @@ describe("route pages wire the right documents", () => {
     expect(source).toContain("BotLegalDoc");
   });
 
-  it("the shared component is a client component with a language switch", () => {
+  it("the shared component renders one language, with no in-page switch (lot 7a)", () => {
     const source = read("components/legal/BotLegalDoc.tsx");
-    expect(source).toContain('"use client"');
-    expect(source).toContain("useState");
-    expect(source).toContain("aria-pressed");
+    expect(source).not.toContain('"use client"');
+    expect(source).not.toContain("useState");
+    expect(source).not.toContain("aria-pressed");
     expect(source).toContain("HEBERGEUR_HREF");
-    // Le composant client ne lit que les types : importer le contenu tirerait
-    // le registre des traitements dans le paquet du navigateur.
+    // Le rendu ne lit que la forme : le contenu arrive résolu par la page.
     expect(source).toContain('from "@/lib/shared/bot-legal-types"');
     expect(source).not.toContain("bot-legal-content");
   });
+
+  it.each(["app/privacy-policy-bot/page.tsx", "app/terms-of-service-bot/page.tsx"])(
+    "%s picks the document of the request's language",
+    (file) => {
+      const source = read(file);
+      expect(source).toContain("requestLocale()");
+      expect(source).toMatch(/doc=\{(PRIVACY_POLICY|TERMS_OF_SERVICE)\[locale\]\}/);
+      expect(source).toContain("locale,");
+    },
+  );
 });
 
 describe("bot legal content matches the bot's code and the association", () => {

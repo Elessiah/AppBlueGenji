@@ -2,11 +2,10 @@
  * Forme des documents légaux du bot, et l'ancre vers l'hébergeur — module pur,
  * **sans aucune importation**.
  *
- * Séparé du contenu (`lib/shared/bot-legal-content.ts`) parce que le rendu,
- * `components/legal/BotLegalDoc.tsx`, est un composant client : n'importer que
- * ce module lui évite d'embarquer dans le paquet du navigateur le registre des
- * traitements et tout ce que le contenu lit pour citer ses durées. Le contenu
- * arrive, lui, déjà résolu par la page serveur, en props.
+ * Séparé du contenu (`lib/shared/bot-legal-content.ts`) pour que le rendu,
+ * `components/legal/BotLegalDoc.tsx`, ne dépende que de la forme : le contenu
+ * arrive déjà résolu par la page serveur, en props, dans la langue de
+ * l'adresse (lot 7a).
  */
 
 export type Lang = "fr" | "en";

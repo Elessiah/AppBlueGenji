@@ -249,5 +249,21 @@
         "summary": "Rules for using the bot, eligibility and termination of access."
       }
     }
+  },
+  "legalPages": {
+    "section": "SECTION",
+    "inFrench": "(in French)",
+    "privacy": {
+      "meta": {
+        "title": "Bot — Privacy Policy",
+        "description": "Privacy Policy of the BlueGenji Bot Discord bot, available in English and French."
+      }
+    },
+    "terms": {
+      "meta": {
+        "title": "Bot — Terms of Service",
+        "description": "Terms of Service of the BlueGenji Bot Discord bot, available in English and French."
+      }
+    }
   }
 }

@@ -344,6 +344,19 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **Hors lot** : titres d'actualité (`bg_news`, sans table ni éditeur ici) ; éditeur du contact du
   pied de page (staff, D4).
 
+### Ce que le lot 7a a établi (2026-10-07) — écarts au plan
+
+- **`/privacy-policy-bot` et `/terms-of-service-bot` ouverts sous `/en`**, texte de `BilingualDoc`
+  repris **tel quel** (aucune phrase réécrite, `TERMS_VERSION` inchangé) ; bascule interne
+  retirée. Détail : `I18N.md` § Documents légaux du bot.
+- **Pas d'espace de messages propre** : les six textes d'interface (titre et description de chaque page,
+  « SECTION », « (in French) ») vont dans `bot.legalPages` — le contenu légal, lui, reste dans
+  `bot-legal-content.ts`. Titres français sans leur moitié anglaise (« … / Privacy Policy » retiré : habillage, pas texte légal).
+- **Aucune redirection** : la bascule était un état client, sans adresse publique.
+- **Hors lot** : les copies anglaises du dépôt `blueGenjiBot` (`LegalTerms/PolicyPrivacy.md`,
+  `TermsOfServices.md`, générées par `scripts/generate-legal-terms.py`) citent l'adresse française ;
+  les faire pointer vers `/en/…` se fait au dépôt du bot, à la prochaine régénération.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -378,7 +391,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 4 ✅ | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
 | 5 ✅ (5a, 5b) | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
 | 6 ✅ | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
-| 7a | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
+| 7a ✅ | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
 | 7b | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |

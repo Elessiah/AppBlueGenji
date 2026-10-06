@@ -249,5 +249,21 @@
         "summary": "Règles d'usage du bot, éligibilité et résiliation d'accès."
       }
     }
+  },
+  "legalPages": {
+    "section": "SECTION",
+    "inFrench": "(en français)",
+    "privacy": {
+      "meta": {
+        "title": "Bot — Politique de Confidentialité",
+        "description": "Politique de Confidentialité du bot Discord BlueGenji Bot, disponible en français et en anglais."
+      }
+    },
+    "terms": {
+      "meta": {
+        "title": "Bot — Conditions d'Utilisation",
+        "description": "Conditions d'Utilisation du bot Discord BlueGenji Bot, disponibles en français et en anglais."
+      }
+    }
   }
 }

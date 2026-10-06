@@ -135,8 +135,8 @@ describe("liste blanche — le bot est traduit", () => {
     for (const route of ["/bot", "/bot/docs", "/bot/docs/[slug]"]) expect(MIGRATED_ROUTES).toContain(route);
     expect(isMigratedRoute("/bot/docs/guide")).toBe(true);
     expect(localeHref("/bot/docs/guide", "en")).toBe("/en/bot/docs/guide");
-    // Les pages légales du bot restent à leur adresse (lot 7a).
-    expect(localeHref("/privacy-policy-bot", "en")).toBe("/privacy-policy-bot");
+    // Les pages légales du bot sont traduites depuis le lot 7a.
+    expect(localeHref("/privacy-policy-bot", "en")).toBe("/en/privacy-policy-bot");
   });
 
   it("donne à /bot et au guide leur entrée anglaise au sitemap, avec leurs hreflang", () => {
@@ -211,11 +211,12 @@ describe("rendu anglais — aucune phrase française sous /en/bot", () => {
     expect(text).toContain("Waiting for events...");
   });
 
-  it("liens dans la langue de la page ; les pages légales du bot restent à leur adresse", async () => {
+  it("liens dans la langue de la page, pages légales du bot comprises (lot 7a)", async () => {
     const html = await renderBotPage("en");
     expect(html).toContain('href="/en/bot/docs"');
     expect(html).toContain('href="/en/bot/docs/guide"');
-    expect(html).toContain('href="/privacy-policy-bot"');
+    expect(html).toContain('href="/en/privacy-policy-bot"');
+    expect(html).toContain('href="/en/terms-of-service-bot"');
     expect(html).not.toContain('href="/en/bot/docs/user-guide-en"');
   });
 
