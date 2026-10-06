@@ -162,27 +162,35 @@ export function categoryEnglish(members: readonly Pick<Benevole, "categoryEn">[]
   return null;
 }
 
+/** Ce que le formulaire sait des catégories existantes. */
+export type CategoryEnglishLookup = Readonly<{
+  /** L'anglais d'une catégorie existante, `null` si elle n'en a pas (ou n'existe pas). */
+  englishOf: (category: string) => string | null;
+  /** La catégorie existe-t-elle déjà ? */
+  exists: (category: string) => boolean;
+  /** Les anglais déjà donnés aux catégories ({@link knownCategoryEnglish}). */
+  knownEnglish: ReadonlySet<string>;
+}>;
+
 /**
- * L'anglais du formulaire quand la catégorie française change : une saisie
- * anglaise faite à la main reste ; l'anglais repris d'une catégorie connue
- * cède la place à celui de la nouvelle quand elle en a un. Vers une catégorie
- * inconnue (nouvelle, ou correction d'une faute de frappe), il **reste** —
- * l'effacer ferait retaper la traduction à chaque lettre corrigée ;
- * {@link borrowedCategoryEnglish} signale alors qu'il est à vérifier.
+ * L'anglais du formulaire quand la catégorie française change. Une saisie
+ * anglaise faite à la main (l'anglais d'aucune catégorie) reste. Un anglais
+ * repris d'une catégorie :
+ * - cède la place à celui de la catégorie **existante** atteinte, ou se vide
+ *   si elle n'en a pas encore (il la renommerait sinon pour tous ses bénévoles) ;
+ * - **reste** vers une catégorie inconnue (nouvelle, ou faute corrigée) —
+ *   l'effacer ferait retaper la traduction à chaque lettre ;
+ *   {@link borrowedCategoryEnglish} signale alors qu'il est à vérifier.
  */
 export function nextCategoryEnglish(
   form: Readonly<{ category: string; categoryEn: string }>,
   nextCategory: string,
-  englishOf: (category: string) => string | null,
-  knownEnglish: ReadonlySet<string>,
+  lookup: CategoryEnglishLookup,
 ): string {
-  // Faite à la main = l'anglais d'aucune catégorie existante. Un anglais repris
-  // (même gardé le temps de taper une catégorie inconnue) le reste, et cède la
-  // place à celui de la catégorie connue où l'on arrive.
   const english = form.categoryEn.trim();
-  const typedByHand = english !== "" && !knownEnglish.has(english);
-  if (typedByHand) return form.categoryEn;
-  return englishOf(nextCategory) ?? form.categoryEn;
+  if (english !== "" && !lookup.knownEnglish.has(english)) return form.categoryEn;
+  if (lookup.exists(nextCategory)) return lookup.englishOf(nextCategory) ?? "";
+  return form.categoryEn;
 }
 
 /** Les anglais déjà donnés aux catégories (pour reconnaître un anglais repris). */
@@ -193,9 +201,9 @@ export function knownCategoryEnglish(benevoles: readonly Pick<Benevole, "categor
 }
 
 /**
- * La catégorie dont le formulaire porte encore l'anglais, quand sa propre
- * catégorie est inconnue (nouvelle ou renommée) : l'anglais d'une autre
- * catégorie, à vérifier avant d'enregistrer. `null` sinon.
+ * La catégorie dont le formulaire porte l'anglais quand c'est celui d'une
+ * **autre** catégorie (catégorie nouvelle ou renommée qui l'a gardé, ou anglais
+ * recopié) : à vérifier avant d'enregistrer. `null` sinon.
  */
 export function borrowedCategoryEnglish(
   form: Readonly<{ category: string; categoryEn: string }>,
@@ -203,9 +211,10 @@ export function borrowedCategoryEnglish(
 ): string | null {
   const category = form.category.trim();
   const english = form.categoryEn.trim();
-  if (!category || !english || benevoles.some((b) => b.category === category)) return null;
-  const source = benevoles.find((b) => hasEnglish(b.categoryEn) && b.categoryEn.trim() === english);
-  return source ? source.category : null;
+  if (!category || !english) return null;
+  const carries = (b: Pick<Benevole, "categoryEn">) => hasEnglish(b.categoryEn) && b.categoryEn.trim() === english;
+  if (benevoles.some((b) => b.category === category && carries(b))) return null;
+  return benevoles.find(carries)?.category ?? null;
 }
 
 /**

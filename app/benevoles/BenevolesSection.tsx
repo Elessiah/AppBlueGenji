@@ -164,8 +164,12 @@ export function BenevolesSection({
       set("categoryEn", value);
       return;
     }
-    const known = knownCategoryEnglish(benevoles);
-    setForm((f) => ({ ...f, category: value, categoryEn: nextCategoryEnglish(f, value, categoryEnglishOf, known) }));
+    const lookup = {
+      englishOf: categoryEnglishOf,
+      exists: (category: string) => benevoles.some((b) => b.category === category.trim()),
+      knownEnglish: knownCategoryEnglish(benevoles),
+    };
+    setForm((f) => ({ ...f, category: value, categoryEn: nextCategoryEnglish(f, value, lookup) }));
   }
 
   function refuse(code: string | undefined, message: string) {
