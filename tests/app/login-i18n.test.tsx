@@ -181,6 +181,12 @@ describe("fournisseur des textes", () => {
     expect(provider).toContain("useState(() => loginText(locale, messages))");
     expect(provider).toContain("if (value.locale !== locale) setValue(loginText(locale, messages));");
   });
+
+  it("le refus de `?error=` ne se lit qu'une fois par montage (pas de toast rejoué au rafraîchissement)", () => {
+    const form = readSource("app/connexion/_components/LoginForm.tsx");
+    expect(form).toContain('if (typeof window === "undefined" || urlRead.current) return;');
+    expect(form).toContain("urlRead.current = true;");
+  });
 });
 
 describe("métadonnées par langue", () => {
