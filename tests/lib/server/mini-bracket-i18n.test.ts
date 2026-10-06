@@ -33,4 +33,13 @@ describe("loadMiniBracket", () => {
       { a: "TBD", b: "TBD", sa: 1, sb: 0 },
     ]);
   });
+
+  it("lit la base une seule fois pour les deux langues : seule la place vide change", async () => {
+    const { getDatabase } = await import("@/lib/server/database");
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([ROWS]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await loadMiniBracket(5);
+    await loadMiniBracket(5, "en");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
 });
