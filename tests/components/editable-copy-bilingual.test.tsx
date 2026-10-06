@@ -101,7 +101,7 @@ describe("EditableCopy — éditeur bilingue", () => {
 
   it("sous /en, l'éditeur du staff se déclare en français (D4)", () => {
     expect(render({ fr: "A", en: "B", enMissing: false }, { locale: "en" })).toMatch(/<button[^>]*lang="fr"/);
-    expect(render({ fr: "A", en: "B", enMissing: false }, { open: true, locale: "en" })).toMatch(/<div class="editor" lang="fr">/);
+    expect(render({ fr: "A", en: "B", enMissing: false }, { open: true, locale: "en" })).toContain('<fieldset class="editor" lang="fr"><legend class="label">Hero — titre</legend>');
     expect(render({ fr: "A", en: "B", enMissing: false })).not.toContain('lang="fr"');
   });
 });

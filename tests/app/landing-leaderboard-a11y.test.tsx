@@ -97,6 +97,13 @@ describe("CalendarCard — accessibilité", () => {
     expect(link?.[1]).toBe("Coupe d&#x27;automne");
     expect(link?.[0]).not.toContain("aria-label");
   });
+
+  it("écrit l'heure sur 24 h en anglais aussi : « 09:30 PM » débordait de sa colonne sur mobile", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[event]} locale="en" />);
+    const time = markup.match(/<div class="[^"]*time[^"]*">([^<]*)<\/div>/);
+    expect(time?.[1]).toMatch(/^\d{2}:\d{2}$/);
+    expect(markup).not.toMatch(/[AP]M/);
+  });
 });
 
 describe("JoinCTA — accessibilité", () => {
