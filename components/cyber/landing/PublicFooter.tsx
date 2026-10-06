@@ -1,4 +1,4 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import Image from "next/image";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -29,6 +29,9 @@ export async function PublicFooter() {
   // Même garde que `PUT /api/association/contact` (§1.4) : la permission, pas `isAdmin`.
   const canEditContact = can(user, "showcase");
   const t = await getTranslations("shell.footer");
+  // Statuts et règlement n'existent qu'en français : le lien le dit hors de
+  // la page française (« (in French) » dans les messages, `hrefLang`).
+  const frenchDocLang = (await getLocale()) === "fr" ? undefined : "fr";
 
   return (
     // `a11y-always-contrast` : le pied de page se lit toujours en contraste
@@ -73,8 +76,8 @@ export async function PublicFooter() {
               <li><LocaleLink className="tap-target" href="/mentions-legales">{t("links.legalNotice")}</LocaleLink></li>
               <li><LocaleLink className="tap-target" href={TERMS_PATH}>{t("links.terms")}</LocaleLink></li>
               <li><LocaleLink className="tap-target" href="/rgpd">{t("links.rgpd")}</LocaleLink></li>
-              <li><a className="tap-target" href="/statuts.pdf" target="_blank" rel="noreferrer">{t("links.statutes")}</a></li>
-              <li><a className="tap-target" href={REGLEMENT_URL} target="_blank" rel="noreferrer">{t("links.internalRules")}</a></li>
+              <li><a className="tap-target" href="/statuts.pdf" hrefLang={frenchDocLang} target="_blank" rel="noreferrer">{t("links.statutes")}</a></li>
+              <li><a className="tap-target" href={REGLEMENT_URL} hrefLang={frenchDocLang} target="_blank" rel="noreferrer">{t("links.internalRules")}</a></li>
               <li><LocaleLink className="tap-target" href="/rgpd#cookies">{t("links.cookies")}</LocaleLink></li>
               {/* AGPL, art. 13 : le code source s'offre à chaque utilisateur du service. */}
               <li><a className="tap-target" href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">{t("links.sourceCode")}</a></li>
