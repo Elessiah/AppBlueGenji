@@ -222,11 +222,12 @@ export function useScoreForm(
     /**
      * Une map est refusée (code manquant, score vide…) : le bouton reste
      * actionnable pour que l'envoi **désigne** le champ fautif, au lieu d'un
-     * bouton grisé sur « score incomplet » (`refuseMaps`).
+     * bouton grisé sur « score incomplet » (`refuseMaps`). Porte le motif,
+     * que l'infobulle du bouton affiche à la place du blocage de score.
      */
     mapsRefused: {
-      save: maps.length > 0 && checkMapList(matchFormat, game, maps, { decisive: false }).error !== null,
-      resolve: maps.length > 0 && checkMapList(matchFormat, game, maps, { decisive: true }).error !== null,
+      save: maps.length > 0 ? checkMapList(matchFormat, game, maps, { decisive: false }).error : null,
+      resolve: maps.length > 0 ? checkMapList(matchFormat, game, maps, { decisive: true }).error : null,
     },
     game,
     forfeitTeamId: state.forfeitTeamId,

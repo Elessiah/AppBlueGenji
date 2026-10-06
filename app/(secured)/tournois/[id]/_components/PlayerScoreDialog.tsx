@@ -276,6 +276,11 @@ export function PlayerScoreDialog({
           deadline ? ` — sans réponse, ce score sera validé à ${deadline}` : ""
         }.`;
       case "THEIRS_PENDING":
+        // Sans détail (proposition antérieure aux maps, ou détail introuvable),
+        // le formulaire s'ouvre vide : « Confirme-le » laisserait sans geste.
+        if ((view.theirs?.maps ?? []).length === 0) {
+          return `${opponentName} propose ${scoreText(view.theirs!)}, sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay : un désaccord alerte l'arbitrage.`;
+        }
         return `${opponentName} propose ${scoreText(view.theirs!)}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.`;
       case "CONFLICT":
         return conflictText(view.mine!, view.theirs!, opponentName);

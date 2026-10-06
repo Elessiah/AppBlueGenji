@@ -30,6 +30,9 @@
 }
 
 .rows {
+  /* Le passage à deux lignes suit la largeur de la liste, pas celle de la
+     fenêtre : la modale (460 px) laisserait sinon le code à ~110 px. */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -187,7 +190,7 @@
   color: var(--ink-quiet, #9aa4b2);
 }
 
-@media (max-width: 560px) {
+@container (max-width: 560px) {
   .row {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
   }

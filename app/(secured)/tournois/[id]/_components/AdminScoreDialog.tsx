@@ -23,6 +23,7 @@ import {
   forfeitParties,
   pendingScoreProposal,
   scoreBlockerMessage,
+  type ScoreFormBlocker,
   scoreCorrectionNeedsConfirmation,
   storedResultSignature,
 } from "../_lib/score-form";
@@ -32,7 +33,7 @@ import { ScoreStepper } from "./ScoreStepper";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
 import { MapResultList } from "./MatchMapDetails";
 import mapStyles from "./MatchMapDetails.module.css";
-import { mapFieldKey } from "@/lib/shared/match-maps";
+import { mapFieldKey, mapListViolationMessage, type MapListViolation } from "@/lib/shared/match-maps";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
 
@@ -145,6 +146,16 @@ export function AdminScoreDialog({
     onMapsReset: () => mapFieldErrors.clear(),
   });
   const matchFormat = useMatchFormat(match);
+  // Infobulle d'un bouton : une map refusée passe avant le score, puisque
+  // c'est elle que le clic désignera (`mapsRefused`).
+  const buttonTitle = (
+    mapRefusal: MapListViolation | null,
+    blocker: ScoreFormBlocker | null | undefined,
+    idle: string,
+  ): string => {
+    if (mapRefusal) return mapListViolationMessage(mapRefusal, matchFormat, form.game);
+    return blocker ? scoreBlockerMessage(blocker, matchFormat) : idle;
+  };
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });
@@ -490,11 +501,7 @@ export function AdminScoreDialog({
               className="btn ghost"
               onClick={() => void run("save")}
               disabled={(!form.decision.canSave && !form.mapsRefused.save) || form.submitting}
-              title={
-                form.decision.saveBlocker
-                  ? scoreBlockerMessage(form.decision.saveBlocker, matchFormat)
-                  : "Note l'avancement sans désigner de vainqueur."
-              }
+              title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, "Note l'avancement sans désigner de vainqueur.")}
             >
               {form.submitting ? "…" : "Enregistrer"}
             </button>
@@ -502,11 +509,7 @@ export function AdminScoreDialog({
               type="submit"
               className="btn"
               disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting}
-              title={
-                form.decision.resolveBlocker
-                  ? scoreBlockerMessage(form.decision.resolveBlocker, matchFormat)
-                  : "Désigne la gagnante et met le plateau à jour."
-              }
+              title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, "Désigne la gagnante et met le plateau à jour.")}
             >
               {form.submitting ? "…" : "Valider le résultat"}
             </button>

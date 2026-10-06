@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import type { MatchFormat } from "@/lib/shared/match-format";
+import { matchMaxMaps, type MatchFormat } from "@/lib/shared/match-format";
 import {
   MAP_SCORE_MAX,
   REPLAY_CODE_MAX_LENGTH,
@@ -69,6 +69,11 @@ export function MapScoreList({
   fieldErrors,
 }: Readonly<MapScoreListProps>) {
   const limit = mapListLimit(format);
+  // Le compteur annonce le format (BO3 → 3 maps) ; les maps nulles rejouées
+  // au-delà (`DRAWN_MAP_REPLAY_ALLOWANCE`) le font avancer quand elles servent.
+  const shownLimit = format ? matchMaxMaps(format) : limit;
+  const replayHint =
+    format && limit > shownLimit ? ` Une map nulle peut être rejouée (${limit - shownLimit} au plus).` : "";
   const score = deriveMatchScore(maps);
   const hintId = `${idPrefix}-map-hint`;
 
@@ -128,10 +133,10 @@ export function MapScoreList({
   return (
     <fieldset className={styles.list} disabled={disabled}>
       <legend className={styles.legend}>
-        Maps jouées <span className={styles.limit}>({maps.length}/{limit})</span>
+        Maps jouées <span className={styles.limit}>({maps.length}/{Math.max(shownLimit, maps.length)})</span>
       </legend>
       <p id={hintId} className={styles.hint}>
-        {replayCodeHint(game)} Une map nulle ne rapporte de point à personne.
+        {replayCodeHint(game)} Une map nulle ne rapporte de point à personne.{replayHint}
       </p>
 
       {maps.length > 0 && (
