@@ -29,9 +29,12 @@ async function computePodiumTiers(): Promise<PodiumTiers> {
 
   const db = await getDatabase();
   const [rows] = await db.execute<MembershipRow[]>(
-    `SELECT user_id, team_id
-     FROM bg_team_members
-     WHERE left_at IS NULL AND team_id IN (${top.map(() => "?").join(", ")})`,
+    // Un compte supprimé (anonymisé) garde son appartenance, pas son éclat.
+    `SELECT tm.user_id, tm.team_id
+     FROM bg_team_members tm
+     JOIN bg_users u ON u.id = tm.user_id
+     WHERE tm.left_at IS NULL AND u.is_deleted = 0
+       AND tm.team_id IN (${top.map(() => "?").join(", ")})`,
     top,
   );
   return buildPodiumTiers(

@@ -73,7 +73,11 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
           </div>
         </div>
         <div className={s.plPseudo}>
-          <PlayerPodiumName userId={player.id}>{player.pseudo}</PlayerPodiumName>
+          {player.isDeleted ? (
+            player.pseudo
+          ) : (
+            <PlayerPodiumName userId={player.id}>{player.pseudo}</PlayerPodiumName>
+          )}
         </div>
         {player.isDeleted && (
           <div className={s.plDeletedMark}>
@@ -88,8 +92,10 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
           {playerRosterStatus(player) === "ROSTER" && player.team ? (
             <>
               {PLAYER_ROSTER_STATUS_LABEL.ROSTER} ·{" "}
+              {/* Carte d'un compte supprimé : ligne d'équipe en retrait, sans marche. */}
               <TeamLink
                 teamId={player.team.id}
+                podiumTier={player.isDeleted ? null : undefined}
                 className={`${s.aboveOverlay} tap-target`}
                 title={`Voir la fiche de ${player.team.name}`}
               >
