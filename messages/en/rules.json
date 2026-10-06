@@ -230,7 +230,7 @@
       ],
       "principles": [
         "Every match eliminates a team: the field is halved each round.",
-        "The bracket is sized to the next power of 2 above the number of registered teams; missing spots become byes in the first round.",
+        "The bracket is sized to the smallest power of 2 that fits all registered teams; missing spots become byes in the first round.",
         "Optionally, the two semifinal losers play for 3rd place."
       ],
       "diagramCaption": "8-team bracket: quarterfinals, semifinals, final. Each arrow follows the winner.",
@@ -635,12 +635,12 @@
         "Qualification can be fixed (a number of teams) or adaptive (a percentage of the actual field).",
         "The last stage decides the champion; the other teams are ranked by the furthest stage they reached, then by their rank in that stage."
       ],
-      "diagramCaption": "Example: Swiss (128 → 64), Survival (cuts) (64 → 16), double elimination (16 → 1). Each stage refines the podium.",
+      "diagramCaption": "Example: Swiss 128 → 64, Survival (cuts) 64 → 16, double elimination 16 → 1. Each stage refines the podium.",
       "sections": [
         {
           "title": "Stage sequence",
           "body": [
-            "The tournament is split into a series of numbered stages. Each stage plays independently in its format (single elimination, double elimination, Swiss, Survival (cuts)) and sets its own standings."
+            "The tournament is split into a series of numbered stages. Each stage plays independently in its format — single elimination, double elimination, Swiss or Survival (cuts) — and sets its own standings."
           ],
           "bullets": [
             "Only the qualified teams of stage N reach stage N+1.",
