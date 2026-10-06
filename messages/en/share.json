@@ -107,6 +107,14 @@
       "subtitle": "Teams, roles and statistics. Sign in to view it."
     }
   },
+  "teamProfile": {
+    "eyebrow": "Team",
+    "subtitle": "A team of the BlueGenji amateur scene.",
+    "rating": "Rating",
+    "record": "Record",
+    "recordValue": "{wins} W · {losses} L",
+    "recordWithDraws": "{wins} W · {losses} L · {draws} D"
+  },
   "ruleMode": {
     "eyebrow": "Tournament mode rules"
   },

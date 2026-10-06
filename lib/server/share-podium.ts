@@ -29,15 +29,15 @@ import { isStoredUploadIn, toDiskUploadPath } from "@/lib/shared/uploads";
 /** Côté du logo converti : deux fois sa taille d'affichage (76 px). */
 const LOGO_SIZE = 152;
 
-/** Un logo d'équipe stocké par le site, en URL `data:` PNG — ou `null`. */
-export async function teamLogoDataUrl(logoUrl: string | null): Promise<string | null> {
+/** Un logo d'équipe stocké par le site, en URL `data:` PNG de `size` px — ou `null`. */
+export async function teamLogoDataUrl(logoUrl: string | null, size = LOGO_SIZE): Promise<string | null> {
   if (!isStoredUploadIn(logoUrl, "teams")) return null;
   const diskPath = toDiskUploadPath(logoUrl);
   if (!diskPath) return null;
   try {
     const bytes = await readFile(path.join(process.cwd(), "public", diskPath));
     const png = await sharp(bytes)
-      .resize(LOGO_SIZE, LOGO_SIZE, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png()
       .toBuffer();
     return `data:image/png;base64,${png.toString("base64")}`;

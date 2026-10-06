@@ -14,6 +14,7 @@ import type { ReactElement } from "react";
 import type { PodiumShareEntry } from "@/lib/shared/page-share-cards";
 import type { PodiumTier } from "@/lib/shared/podium-tiers";
 import { SHARE_CARD_COLORS, ShareCardBadges, ShareCardFrame } from "./share-card";
+import { ShareTeamMark, rgba } from "./share-team-mark";
 
 /** Couleur de chaque marche — celles de `.podiumCard[data-place]`. */
 export const PODIUM_PLACE_COLORS: Readonly<Record<PodiumTier, string>> = {
@@ -37,40 +38,6 @@ const DISPLAY_ORDER: readonly PodiumTier[] = [2, 1, 3];
 /** Largeur d'une marche ; trois marches et deux gouttières font 1056 px. */
 export const PODIUM_COLUMN_WIDTH = 336;
 
-function rgba(hex: string, alpha: number): string {
-  const [r, g, b] = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function TeamMark({ entry, color }: Readonly<{ entry: PodiumShareEntry; color: string }>): ReactElement {
-  if (entry.logoSrc) {
-    return (
-      // Satori exige une balise <img> : `next/image` n'existe pas ici.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={entry.logoSrc} width={76} height={76} alt="" style={{ borderRadius: 16 }} />
-    );
-  }
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 76,
-        height: 76,
-        borderRadius: 16,
-        border: `2px solid ${rgba(color, 0.6)}`,
-        backgroundColor: rgba(color, 0.12),
-        color: SHARE_CARD_COLORS.ink,
-        fontSize: 38,
-        fontWeight: 700,
-      }}
-    >
-      {entry.initial}
-    </div>
-  );
-}
-
 function PodiumStep({ entry }: Readonly<{ entry: PodiumShareEntry }>): ReactElement {
   const color = PODIUM_PLACE_COLORS[entry.place];
   const first = entry.place === 1;
@@ -93,7 +60,7 @@ function PodiumStep({ entry }: Readonly<{ entry: PodiumShareEntry }>): ReactElem
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <TeamMark entry={entry} color={color} />
+        <ShareTeamMark logoSrc={entry.logoSrc} initial={entry.initial} color={color} size={76} />
         <div
           style={{
             display: "flex",

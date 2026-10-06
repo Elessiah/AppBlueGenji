@@ -107,6 +107,14 @@
       "subtitle": "Équipes, rôles et statistiques. Connexion requise pour la consulter."
     }
   },
+  "teamProfile": {
+    "eyebrow": "Équipe",
+    "subtitle": "Une équipe de la scène amateur BlueGenji.",
+    "rating": "Cote",
+    "record": "Bilan",
+    "recordValue": "{wins} V · {losses} D",
+    "recordWithDraws": "{wins} V · {losses} D · {draws} N"
+  },
   "ruleMode": {
     "eyebrow": "Règles du mode"
   },

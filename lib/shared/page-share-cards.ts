@@ -169,6 +169,29 @@ export function pageShareImagePath(key: string, locale: Locale = DEFAULT_LOCALE)
   return `/og/${locale}/${key}.png`;
 }
 
+/** Préfixe de la carte nominative d'une équipe : `team-<id>`. */
+const TEAM_PREFIX = "team-";
+
+/**
+ * Identifiant entier strictement positif, sans zéro de tête ni signe, borné à
+ * dix chiffres : une seule écriture par équipe (pas de `team-007` à côté de
+ * `team-7` pour multiplier les rendus), rien qu'un robot puisse étirer.
+ */
+const TEAM_KEY_PATTERN = /^team-([1-9]\d{0,9})$/u;
+
+/** Clé de la carte nominative de l'équipe `teamId` (`/equipes/[id]`). */
+export function teamShareCardKey(teamId: number): string {
+  return `${TEAM_PREFIX}${teamId}`;
+}
+
+/** L'équipe désignée par une clé `team-<id>`, ou `null`. */
+export function parseTeamShareCardKey(key: string): number | null {
+  const match = TEAM_KEY_PATTERN.exec(key);
+  if (!match) return null;
+  const teamId = Number(match[1]);
+  return Number.isSafeInteger(teamId) ? teamId : null;
+}
+
 /**
  * Lit les segments d'une adresse d'image (`/og/<langue>/<fichier>`) : `null`
  * pour toute langue ou carte inconnue, extension `.png` exigée.
@@ -176,6 +199,7 @@ export function pageShareImagePath(key: string, locale: Locale = DEFAULT_LOCALE)
 export function parseShareImageSegments(locale: string, file: string): { locale: Locale; key: string } | null {
   if (!isLocale(locale) || !file.endsWith(".png")) return null;
   const key = file.slice(0, -".png".length);
+  if (parseTeamShareCardKey(key) !== null) return { locale, key };
   return allShareCardKeys().includes(key) ? { locale, key } : null;
 }
 
@@ -190,6 +214,11 @@ export function resolvePageShareCard(
 ): ResolvedPageShareCard | null {
   if (isPageShareCardKey(key)) {
     return { ...messages.pages[key], footer: messages.footer, ...PAGE_SHARE_CARD_STYLES[key] };
+  }
+  // Repli de la carte nominative (équipe inconnue, fantôme, base injoignable) :
+  // la carte générique de la fiche, qui ne dit pas si l'équipe existe.
+  if (parseTeamShareCardKey(key) !== null) {
+    return { ...messages.pages.team, footer: messages.footer, ...PAGE_SHARE_CARD_STYLES.team };
   }
   if (key.startsWith(RULE_MODE_PREFIX)) {
     const mode = modeTexts.get(key.slice(RULE_MODE_PREFIX.length));
@@ -258,4 +287,58 @@ export function podiumShareEntries(
       logoSrc: row.logoSrc,
     };
   });
+}
+
+/**
+ * Longueur maximale du nom sur la carte d'une équipe : coupé sur un mot avec
+ * une ellipse (`truncateForShare`) ; le titre rétrécit déjà avec sa longueur
+ * (`titleFontSize`).
+ */
+export const TEAM_SHARE_NAME_MAX_LENGTH = 48;
+
+/** Ce que la carte d'une équipe montre : le sous-ensemble du classement public. */
+export type TeamShareInput = {
+  teamName: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  points: number;
+};
+
+/** La carte d'une équipe telle que `ShareCard` la dessine (logo à part). */
+export type TeamShareCard = {
+  eyebrow: string;
+  title: string;
+  initial: string;
+  subtitle: string;
+  facts: { label: string; value: string }[];
+  footer: string;
+};
+
+function fill(template: string, values: Readonly<Record<string, number>>): string {
+  return template.replace(/\{(\w+)\}/gu, (whole, name: string) => (name in values ? String(values[name]) : whole));
+}
+
+/**
+ * Rédige la carte nominative d'une équipe : nom saisi repassé par
+ * `visibleText` puis borné, cote et bilan **tels que `/classement` les
+ * affiche** (cote arrondie, sans séparateur de milliers ; nuls seulement s'il
+ * y en a). Aucun joueur : ni pseudo ni avatar.
+ */
+export function teamShareCard(team: TeamShareInput, messages: ShareMessages): TeamShareCard {
+  const cleaned = visibleText(team.teamName).trim();
+  const title = cleaned === "" ? "?" : truncateForShare(cleaned, TEAM_SHARE_NAME_MAX_LENGTH);
+  const texts = messages.teamProfile;
+  const counts = { wins: team.wins, losses: team.losses, draws: team.draws };
+  return {
+    eyebrow: texts.eyebrow,
+    title,
+    initial: Array.from(title)[0]?.toUpperCase() ?? "?",
+    subtitle: texts.subtitle,
+    facts: [
+      { label: texts.rating, value: `${Math.round(team.points)} ${messages.podium.points}` },
+      { label: texts.record, value: fill(team.draws > 0 ? texts.recordWithDraws : texts.recordValue, counts) },
+    ],
+    footer: messages.footer,
+  };
 }

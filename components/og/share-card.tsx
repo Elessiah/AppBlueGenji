@@ -449,6 +449,11 @@ export function ShareCard({
             marginTop: 30,
             fontSize: titleFontSize(title),
             lineHeight: 1.08,
+            // La limite de lignes rogne la boîte à sa hauteur : sans cette
+            // marge intérieure, « g », « j », « p » perdaient leur jambage. La
+            // marge négative garde l'écart au filet d'avant.
+            paddingBottom: 16,
+            marginBottom: -16,
             fontWeight: 700,
             wordBreak: "break-word",
             // Satori ne coupe pas les mots : un nom d'équipe sans espace

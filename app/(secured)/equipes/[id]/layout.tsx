@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getTeamPageIdentity } from "@/lib/server/teams/detail";
 import { parseEntityPageId, teamPageTitle } from "@/lib/shared/entity-page-titles";
 import { memberAreaShareMetadata } from "@/lib/shared/page-metadata";
+import { teamShareCardKey } from "@/lib/shared/page-share-cards";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -13,8 +14,9 @@ type MetadataProps = {
  * hérité de l'annuaire — deux onglets sur deux équipes portaient le même.
  *
  * La fiche est une page cliente, d'où cette mise en page, qui n'existe que pour
- * ça. Un titre, **rien d'autre** : ni encart ni URL canonique, que la fiche
- * n'a jamais eus (voir `app/(secured)/tournois/layout.tsx`).
+ * ça. Un titre et l'encart de la fiche (texte générique, image nominative tirée
+ * du classement public — `docs/features/SHARE_METADATA.md` § « La carte d'une
+ * équipe ») ; ni URL canonique ni `og:url` (voir `app/(secured)/tournois/layout.tsx`).
  *
  * Le nom n'est lu que pour un lecteur connecté : la fiche est refusée aux
  * autres (`GET /api/teams/[id]` répond 401, la garde rend la carte « Connexion
@@ -31,7 +33,9 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
     .then((user) => (user ? getTeamPageIdentity(teamId) : null))
     .catch(() => null);
 
-  return { title: teamPageTitle(team), ...memberAreaShareMetadata("team") };
+  // L'image nominative (`/og/fr/team-<id>.png`) se lit dans sa route, pas ici :
+  // aucune requête de plus pour la fiche, et rien qui dépende du lecteur.
+  return { title: teamPageTitle(team), ...memberAreaShareMetadata("team", teamShareCardKey(teamId)) };
 }
 
 export default function TeamDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {

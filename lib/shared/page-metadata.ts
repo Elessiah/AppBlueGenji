@@ -145,11 +145,19 @@ export function pageMetadata({
  * session, et le `<head>` anonyme de ces pages n'en montre pas non plus. Pas
  * d'`og:url` : la mise en page habille aussi ses sous-pages (`/equipes/creer`),
  * qu'une adresse fixe désignerait mal. Pages non traduites : français seul.
+ *
+ * `imageKey` désigne une autre image que la carte générique : la carte
+ * nominative d'une équipe (`team-<id>`), dont seule la route d'image lit les
+ * données — le texte de l'encart, lui, reste générique et ne coûte aucune
+ * requête au rendu de la fiche.
  */
-export function memberAreaShareMetadata(key: PageShareCardKey): Pick<Metadata, "openGraph" | "twitter"> {
+export function memberAreaShareMetadata(
+  key: PageShareCardKey,
+  imageKey: string = key,
+): Pick<Metadata, "openGraph" | "twitter"> {
   const { title, subtitle } = frShare.pages[key];
   const shareTitle = siteTitle(title);
-  const image = pageShareImagePath(key, DEFAULT_LOCALE);
+  const image = pageShareImagePath(imageKey, DEFAULT_LOCALE);
   return {
     openGraph: {
       type: "website",
