@@ -91,17 +91,17 @@ function reorderErrorMessage(code: string | undefined): string {
 
 /**
  * Phrases d'une liste vide. Sous `/en`, des annonces encore sans anglais sont
- * masquées : « aucun poste » ou « aucune urgence » serait faux, on dit qu'elles
+ * masquées : « aucun poste » serait faux quand il en reste à traduire, et
+ * « aucune urgence » quand une annonce urgente l'est — on dit alors qu'elles
  * arrivent, sans compteur à zéro.
  */
-function emptyMessageKeys(translationPending: boolean) {
-  return translationPending
-    ? ({
-        empty: "section.pendingTranslation",
-        noUrgent: "section.pendingTranslation",
-        showCount: (total: number) => total > 0,
-      } as const)
-    : ({ empty: "section.empty", noUrgent: "section.noUrgent", showCount: () => true } as const);
+function emptyMessageKeys(hidden: readonly RecruitmentAd[], domain: RecruitmentDomain | null) {
+  const urgentHidden = splitRecruitmentAds(hidden.filter((ad) => domain === null || ad.domain === domain)).featured.length > 0;
+  return {
+    empty: hidden.length > 0 ? "section.pendingTranslation" : "section.empty",
+    noUrgent: urgentHidden ? "section.pendingTranslation" : "section.noUrgent",
+    showCount: (total: number) => total > 0 || hidden.length === 0,
+  } as const;
 }
 
 /** Lien vers une annonce absente de la page : supprimée, ou (sous `/en`) pas encore traduite. */
@@ -399,7 +399,8 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
               </span>
             )}
           </div>
-          {isAdmin && (
+          {/* Ordre réglé en français seulement : sous /en, une annonce sans anglais est masquée. */}
+          {isAdmin && locale === "fr" && (
             <div className={styles.moveActions} data-tap-zone lang={staffLang}>
               <button
                 type="button"
@@ -490,8 +491,9 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
   const total = shownAds.length;
   const shown = visibleAds.length;
   // Sous `/en`, des annonces encore sans anglais sont masquées (`emptyMessageKeys`).
-  const translationPending = shownAds.length < ads.length;
-  const emptyKeys = emptyMessageKeys(translationPending);
+  const hiddenAds = shownAds.length < ads.length ? ads.filter((ad) => !shownAds.some((a) => a.id === ad.id)) : [];
+  const translationPending = hiddenAds.length > 0;
+  const emptyKeys = emptyMessageKeys(hiddenAds, filterActive ? domainFilter : null);
 
   return (
     <>
