@@ -79,6 +79,19 @@ la mise en page, elle garde le texte d'une première acceptation.
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.
 
+## Traduction anglaise (lot 7b-1)
+
+`/en/conditions-utilisation` rend `TERMS_SECTIONS_EN` (`lib/shared/terms-of-use-en.ts`), traduction
+section par section de `TERMS_SECTIONS` — mêmes identifiants, même ordre, mêmes liens. **Le
+français fait foi et reste le texte accepté** : la page anglaise le dit en tête, et les fenêtres
+d'acceptation sous `/en` le rappellent sous leur case (`TERMS_TRANSLATION_NOTE`). Accepter sous
+`/en` enregistre la même `TERMS_VERSION` ; traduire n'avance jamais la version.
+
+**Règle** : toute modification de fond se fait **dans les deux langues, dans la même PR** (avec
+`TERMS_VERSION`), et met à jour la référence du français (`tests/fixtures/legal-fr/`), que
+`tests/app/site-legal-i18n.test.tsx` compare au rendu, au caractère près. Détail : `I18N.md`
+§ Textes légaux du site.
+
 ## Envoi d'un logo
 
 Case « Je certifie détenir les droits sur ce logo » (`LOGO_RIGHTS_FIELD`),

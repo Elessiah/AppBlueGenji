@@ -5,6 +5,7 @@ import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
 import { LOGO_RIGHTS_LABEL, TERMS_CHECKBOX_LABEL } from "@/lib/shared/terms-of-use";
 import { messagesFor } from "@/lib/server/i18n-messages";
+import frShell from "@/messages/fr/shell.json";
 
 /**
  * Les écrans du signalement et des conditions d'utilisation. Le harnais tourne
@@ -69,7 +70,9 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(layout).toContain("request={termsRequest}");
     const modal = read("components/legal/TermsAcceptanceModal.tsx");
     expect(modal).toContain('request === "UPDATED"');
-    expect(modal).toContain("Les conditions d'utilisation ont changé");
+    expect(modal).toContain('t("termsModal.titleUpdated")');
+    // Textes de la coquille depuis le lot 7b : le français n'a pas bougé.
+    expect(frShell.termsModal.titleUpdated).toBe("Les conditions d'utilisation ont changé");
   });
 
   it("la création d'une équipe et l'envoi d'un logo portent leur case", () => {

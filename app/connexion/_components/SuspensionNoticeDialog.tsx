@@ -82,7 +82,7 @@ export function SuspensionNoticeDialog({ notice, onClose }: Readonly<{ notice: S
             {richNodes(
               text.rich("suspension.groundText", { clause: t(`suspension.clauses.${notice.ground}`) }, {
                 terms: (children) => (
-                  <LocaleLink href={`${TERMS_PATH}#${ground.anchor}`} hrefLang={frenchContentLang}>
+                  <LocaleLink href={`${TERMS_PATH}#${ground.anchor}`}>
                     {richNodes(children)}
                   </LocaleLink>
                 ),

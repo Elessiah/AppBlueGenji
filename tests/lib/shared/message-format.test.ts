@@ -94,9 +94,14 @@ describe("coquille — équivalence avec next-intl, message par message", () => 
         const expected = reference.markup(key as Parameters<typeof reference.markup>[0], {
           ...values,
           strong: (chunks: string) => `<strong>${chunks}</strong>`,
+          // Lien des conditions (`termsModal.checkbox`, lot 7b).
+          terms: (chunks: string) => `<terms>${chunks}</terms>`,
         });
         const actual = ours
-          .rich<string>(key as ShellKey, values, { strong: (children) => `<strong>${children.join("")}</strong>` })
+          .rich<string>(key as ShellKey, values, {
+            strong: (children) => `<strong>${children.join("")}</strong>`,
+            terms: (children) => `<terms>${children.join("")}</terms>`,
+          })
           .join("");
         expect(`${key}: ${actual}`).toBe(`${key}: ${expected}`);
       }

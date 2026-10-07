@@ -27,9 +27,9 @@ describe("accueil traduit — liste blanche", () => {
   it("l'accueil est traduit au lot 2 (règles, classement, bot et vitrine l'ont rejoint aux lots 3 à 5), pas ses pages voisines", () => {
     expect(MIGRATED_ROUTES).toContain("/");
     expect(isMigratedRoute("/")).toBe(true);
-    // Pages légales : lot 7b.
-    expect(isMigratedRoute("/mentions-legales")).toBe(false);
-    expect(isMigratedRoute("/rgpd")).toBe(false);
+    // Espace joueur : lots 8–9.
+    expect(isMigratedRoute("/tournois")).toBe(false);
+    expect(isMigratedRoute("/profil")).toBe(false);
   });
 
   it("un lien vers l'accueil prend /en sur une page anglaise, les autres restent français", () => {
@@ -65,9 +65,9 @@ describe("accueil traduit — middleware", () => {
   });
 
   it("une page voisine pas encore traduite redirige toujours", () => {
-    const response = middleware(new NextRequest(`${PUBLIC}/en/mentions-legales`));
+    const response = middleware(new NextRequest(`${PUBLIC}/en/tournois`));
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(`${PUBLIC}/mentions-legales`);
+    expect(response.headers.get("location")).toBe(`${PUBLIC}/tournois`);
   });
 });
 
@@ -104,7 +104,7 @@ describe("sélecteur de langue — sur l'accueil, et sur mobile", () => {
   });
 
   it("muet sur une page non traduite", () => {
-    expect(render("fr", "/mentions-legales")).toBe("");
+    expect(render("fr", "/tournois")).toBe("");
   });
 
   it("sur un écran étroit, le code remplace le nom, et l'en-tête resserre le sélecteur", () => {

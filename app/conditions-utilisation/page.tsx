@@ -10,25 +10,45 @@ import {
   TERMS_VERSION,
   formatTermsDate,
 } from "@/lib/shared/terms-of-use";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { TermsOfUseEn } from "./TermsOfUseEn";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Conditions d'utilisation",
-  description:
-    "Conditions générales d'utilisation de la plateforme BlueGenji Esport : compte, comportement, contenus publiés par les utilisateurs, signalement et modération.",
-  shareDescription: "Ce que chacun s'engage à respecter sur BlueGenji Esport.",
-  path: TERMS_PATH,
-  shareCard: "terms",
-});
+/**
+ * Une langue par adresse (lot 7b) : `/conditions-utilisation` en français, le
+ * texte qui fait foi et que les comptes acceptent ; `/en/…` sa traduction.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const meta = messagesFor(locale).legal.pages.terms;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    shareDescription: meta.shareDescription,
+    path: TERMS_PATH,
+    shareCard: "terms",
+    locale,
+  });
+}
 
 /**
  * Conditions générales d'utilisation, rendues depuis leur registre
  * (`lib/shared/terms-of-use.ts`) : la page ne peut pas afficher un texte
  * différent de la version que les comptes acceptent.
  */
-export default function TermsOfUsePage() {
+export default async function TermsOfUsePage() {
+  const locale = await requestLocale();
+  return <PublicPageShell>{locale === "en" ? <TermsOfUseEn /> : <TermsOfUseFr />}</PublicPageShell>;
+}
+
+/**
+ * Le texte français, tel qu'il est accepté (`TERMS_VERSION`) : le lot 7b n'y a
+ * rien changé, à l'octet près (`tests/app/site-legal-i18n.test.tsx`).
+ */
+function TermsOfUseFr() {
   return (
-    <PublicPageShell>
+    <>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">LÉGAL · CONDITIONS GÉNÉRALES</span>
@@ -85,6 +105,6 @@ export default function TermsOfUsePage() {
           </div>
         </div>
       </section>
-    </PublicPageShell>
+    </>
   );
 }

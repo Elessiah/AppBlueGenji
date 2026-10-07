@@ -1,0 +1,34 @@
+.notice {
+  max-width: 720px;
+  margin: 24px 0 0;
+  padding: 14px 18px;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.45);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: var(--blue-glow);
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.title {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--blue-100);
+  font-weight: 600;
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.notice a:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+}

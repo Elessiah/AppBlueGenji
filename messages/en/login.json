@@ -79,14 +79,14 @@
     "end": "{day} at {time} (Paris time)",
     "facts": "Findings",
     "ground": "Grounds",
-    "groundText": "Terms of use (in French), <terms>“{clause}”</terms>. Decision made by a member of the moderation team, with no automated processing.",
+    "groundText": "Terms of use, <terms>“{clause}”</terms>. Decision made by a member of the moderation team, with no automated processing.",
     "appeal": "Appeal",
     "appealText": "Use “Report a problem” at the bottom of any page of the site, category “<fr>Autre</fr>” (“Other”; no login needed), quoting decision {reference} and leaving a way to reply to you: the association will review its decision. You can then take the decision to the competent court.",
     "close": "Close",
     "loginUntil": "This account is suspended until {end}. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Autre” (“Other”; no login needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
     "loginIndefinite": "This account is suspended indefinitely. The reason was sent to you by Discord direct message if your account is linked to Discord. To appeal: use “Report a problem” at the bottom of any page of the site, category “Autre” (“Other”; no login needed), quoting the decision you received and leaving a way to reply to you: the association will review its decision — then, if needed, the competent court.",
     "clauses": {
-      "BEHAVIOR": "Behavior",
+      "BEHAVIOR": "Conduct",
       "CONTENT": "Content published by users",
       "ACCOUNT": "Account"
     }
@@ -101,7 +101,7 @@
     "discordTag": "Logging in with Discord saves your Discord username <strong>without certifying it</strong>: nobody sees it until you certify it yourself in your profile.",
     "export": "You can export or delete your data from your profile at any time.",
     "policy": "Full details in our <policy>privacy policy (in French)</policy>. If you go back, no account is created; only the site's audience measurement may have counted your visit.",
-    "terms": "I have read and accept the terms of use (<terms>read the terms, in French</terms>), and I declare that I am at least {age} years old.",
+    "terms": "I have read and accept the terms of use (<terms>read the terms</terms>), and I declare that I am at least {age} years old.",
     "accept": "Continue",
     "refuse": "Go back"
   }

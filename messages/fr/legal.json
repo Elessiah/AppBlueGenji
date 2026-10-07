@@ -1,0 +1,19 @@
+{
+  "inFrench": "(en français)",
+  "pages": {
+    "terms": {
+      "title": "Conditions d'utilisation",
+      "description": "Conditions générales d'utilisation de la plateforme BlueGenji Esport : compte, comportement, contenus publiés par les utilisateurs, signalement et modération.",
+      "shareDescription": "Ce que chacun s'engage à respecter sur BlueGenji Esport."
+    },
+    "legalNotice": {
+      "title": "Mentions légales",
+      "description": "Mentions légales de la plateforme BlueGenji Esport, éditée par l'association Bluegenji Esport (loi 1901).",
+      "shareDescription": "Éditeur, hébergement, propriété intellectuelle et données personnelles."
+    },
+    "accessibility": {
+      "title": "Déclaration d'accessibilité",
+      "description": "État de conformité du site BlueGenji Esport au RGAA, contenus non accessibles, aides proposées et contact."
+    }
+  }
+}

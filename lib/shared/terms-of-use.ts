@@ -125,6 +125,21 @@ export function formatTermsDate(date: string = TERMS_UPDATED_AT): string {
   });
 }
 
+/**
+ * La date d'entrée en vigueur dans une langue : `formatTermsDate` en français
+ * (« 1 octobre 2026 »), « October 1, 2026 » en anglais (lot 7b).
+ */
+export function formatTermsDateIn(locale: "fr" | "en", date: string = TERMS_UPDATED_AT): string {
+  if (locale === "fr") return formatTermsDate(date);
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export interface TermsSection {
   id: string;
   title: string;

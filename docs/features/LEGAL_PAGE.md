@@ -9,6 +9,11 @@ bulletin d'adhésion) aux boutons qui les demandent à travers le site.
 La page suit le design system « Cyber minimal » : `PublicHeader` / `PublicFooter`,
 hero avec faits clés et sections numérotées (`SECTION 0X`).
 
+**En anglais** (`/en/mentions-legales`, lot 7b-1) : `MentionsLegalesEn`, traduction des mêmes
+sections et ancres, coordonnées toujours par `ProtectedContact`, avis « the French version
+prevails » en tête. Le français, qui fait foi, est inchangé. Toute modification se fait dans les
+deux langues (`I18N.md` § Textes légaux du site).
+
 ## Contenu de la page
 
 | Section | Source |

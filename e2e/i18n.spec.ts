@@ -69,10 +69,11 @@ test.describe("Langues — adresses /en", () => {
     await expect(page.locator('a[hreflang="en"]').first()).toHaveAttribute("href", "/en/regles");
   });
 
-  // `/mentions-legales` n'est pas traduite (lot 7b) : ni sélecteur ni `hreflang` (l'accueil,
+  // `/tournois` n'est pas traduite (lot 8) : ni sélecteur ni `hreflang` (l'accueil,
   // traduit au lot 2, et `/connexion`, au lot 6, en portent — contrôles ci-dessous).
+  // `/mentions-legales` servait d'exemple jusqu'à sa traduction (lot 7b-1).
   test("une page française non traduite garde lang=fr, son nonce, et aucun sélecteur ni hreflang", async ({ page }) => {
-    const response = await page.goto("/mentions-legales");
+    const response = await page.goto("/tournois");
     const csp = response?.headers()["content-security-policy"] ?? "";
     const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();
@@ -110,6 +111,18 @@ test.describe("Langues — adresses /en", () => {
       const hreflangs = await alternates.evaluateAll((links) => links.map((l) => l.getAttribute("hreflang")).sort());
       expect(hreflangs).toEqual(["en", "fr", "x-default"]);
     }
+  });
+
+  // Lot 7b-1 : documents légaux du site en anglais, avec l'avis « French version prevails ».
+  test("/en/mentions-legales : lang=en, hreflang réciproques et avis de primauté du français", async ({ page }) => {
+    const response = await page.goto("/en/mentions-legales");
+    expect(response?.status()).toBe(200);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator('link[rel="alternate"][hreflang="fr"]')).toHaveAttribute("href", /\/mentions-legales$/);
+    await expect(page.getByText("French version prevails", { exact: false }).first()).toBeVisible();
+    await page.goto("/mentions-legales");
+    await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+    await expect(page.getByText("French version prevails", { exact: false })).toHaveCount(0);
   });
 
   test("/en/connexion : lang=en, noindex, et les départs OAuth emportent la langue", async ({ page }) => {

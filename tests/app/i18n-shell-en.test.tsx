@@ -121,10 +121,11 @@ describe("coquille en anglais — composants client", () => {
     expect(html).not.toMatch(FRENCH_LEFTOVERS);
   });
 
-  it("coordonnées : parties restées en français marquées `lang=\"fr\"` (WCAG 3.1.2), muettes en français", () => {
+  it("coordonnées : bouton « Show email » en anglais (lot 7b) ; édition du staff marquée `lang=\"fr\"` (WCAG 3.1.2), muette en français", () => {
     const contact = { emailEncoded: encodeContact("asso@example.org"), discordTag: "", discordUrl: "" };
     const html = english(<FooterContact initialContact={contact} isAdmin />);
-    expect(html).toMatch(/<button[^>]*lang="fr"[^>]*>Afficher/);
+    expect(html).toContain('aria-label="Show email address of the association">Show email</button>');
+    expect(html).not.toContain("Afficher");
     expect(html).toMatch(/<button[^>]*lang="fr"[^>]*>Modifier<\/button>/);
     const french = renderToStaticMarkup(
       <ToastProvider>

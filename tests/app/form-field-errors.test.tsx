@@ -1,6 +1,9 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { beforeAll, describe, expect, it, jest } from "@jest/globals";
+
+let mockLocale: "fr" | "en" = "fr";
 
 jest.mock("next/navigation", () => ({ usePathname: () => "/accessibilite" }));
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/components/cyber/landing/PublicHeader", () => ({
   PublicHeader: () => <header>en-tête</header>,
 }));
@@ -280,7 +283,15 @@ describe("certification Discord — code refusé", () => {
 });
 
 describe("déclaration d'accessibilité", () => {
-  const html = renderToStaticMarkup(<AccessibilityStatementPage />);
+  let html = "";
+  let englishHtml = "";
+  beforeAll(async () => {
+    mockLocale = "fr";
+    html = renderToStaticMarkup(await AccessibilityStatementPage());
+    // Traduction anglaise (lot 7b-1) : mêmes exigences de forme.
+    mockLocale = "en";
+    englishHtml = renderToStaticMarkup(await AccessibilityStatementPage());
+  });
 
   it("porte un titre unique et l'état de conformité", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
@@ -303,6 +314,15 @@ describe("déclaration d'accessibilité", () => {
     const external = html.match(/<a [^>]*target="_blank"[^>]*>[^<]*<\/a>/g) ?? [];
     expect(external.length).toBeGreaterThan(0);
     for (const link of external) expect(link).toContain("(nouvel onglet)");
+    const englishExternal = englishHtml.match(/<a [^>]*target="_blank"[^>]*>[^<]*<\/a>/g) ?? [];
+    expect(englishExternal.length).toBeGreaterThan(0);
+    for (const link of englishExternal) expect(link).toContain("new tab)");
+  });
+
+  it("en anglais aussi : un titre unique, chaque limite, aucun courriel en clair", () => {
+    expect(englishHtml.match(/<h1\b/g)).toHaveLength(1);
+    expect(englishHtml).toContain("Accessibility statement");
+    expect(englishHtml).not.toContain("mailto:");
   });
 
   it("s'atteint du pied de page public et du menu d'accessibilité", () => {

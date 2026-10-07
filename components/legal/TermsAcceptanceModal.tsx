@@ -2,18 +2,19 @@
 
 import { useEffect, useId, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
+import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
+import type { TermsTranslationNote } from "@/lib/shared/french-version-prevails";
 import {
-  TERMS_CHECKBOX_LABEL,
   TERMS_PATH,
   TERMS_REQUIRED_EVENT,
   TERMS_VERSION,
-  formatTermsDate,
+  formatTermsDateIn,
   type TermsRequest,
 } from "@/lib/shared/terms-of-use";
 import {
@@ -53,6 +54,12 @@ interface TermsAcceptanceModalProps {
   request?: TermsRequest | null;
   /** Une modale de confidentialité attend une réponse : celle-ci passe après. */
   privacyPending: boolean;
+  /**
+   * Note « what you accept is the French text » (`TERMS_TRANSLATION_NOTE`),
+   * passée par la mise en page racine sous `/en` seulement : montée sur toutes
+   * les pages, la fenêtre ne l'importe pas, et une page française ne la charge pas.
+   */
+  translationNote?: TermsTranslationNote | null;
 }
 
 /**
@@ -69,9 +76,19 @@ interface TermsAcceptanceModalProps {
  *
  * Elle se tait sur la page des conditions elle-même, qu'elle invite à lire, et
  * sur la connexion, dont la modale de consentement doit rester seule.
+ *
+ * Textes de la coquille (`shell.termsModal`, lot 7b). Sous `/en`, elle lie les
+ * conditions anglaises et dit, sous la case, que c'est le texte français — la
+ * même `TERMS_VERSION` — que l'on accepte (`translationNote`).
  */
-export function TermsAcceptanceModal({ initiallyRequired, request = null, privacyPending }: Readonly<TermsAcceptanceModalProps>) {
+export function TermsAcceptanceModal({
+  initiallyRequired,
+  request = null,
+  privacyPending,
+  translationNote = null,
+}: Readonly<TermsAcceptanceModalProps>) {
   const updated = request === "UPDATED";
+  const { t, rich, locale } = useShellText();
   const { showError, showSuccess } = useToast();
   const titleId = useId();
   // Route sans préfixe de langue : `/en/rgpd` est la page de confidentialité.
@@ -120,9 +137,9 @@ export function TermsAcceptanceModal({ initiallyRequired, request = null, privac
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       writePostponedCookie(false);
       setRequested(false);
-      showSuccess("Merci, tu peux gérer ton équipe.");
+      showSuccess(t("termsModal.accepted"));
     } catch {
-      showError("Ton acceptation n'a pas pu être enregistrée. Recharge la page, puis réessaie.");
+      showError(t("termsModal.failed"));
     } finally {
       setBusy(false);
     }
@@ -138,45 +155,50 @@ export function TermsAcceptanceModal({ initiallyRequired, request = null, privac
         tabIndex={-1}
         className={styles.modal}
       >
-        <span className="eyebrow">CONDITIONS D&apos;UTILISATION</span>
+        <span className="eyebrow">{t("termsModal.eyebrow")}</span>
         <h2 id={titleId} className={styles.title}>
-          {updated ? "Les conditions d'utilisation ont changé" : "Tu gères désormais une équipe"}
+          {updated ? t("termsModal.titleUpdated") : t("termsModal.titleFirst")}
         </h2>
-        <ScrollArea orientation="y" className={styles.body} ariaLabel="Présentation des conditions">
+        <ScrollArea orientation="y" className={styles.body} ariaLabel={t("termsModal.bodyLabel")}>
           {updated ? (
             <p className={styles.text}>
-              Tu es propriétaire ou gérant d&apos;une équipe. Les conditions d&apos;utilisation du site ont été
-              mises à jour (version {TERMS_VERSION}, en vigueur depuis le {formatTermsDate()}) : accepte-les
-              pour continuer à gérer ton équipe — logo, membres, invitations.
+              {t("termsModal.textUpdated", { version: TERMS_VERSION, date: formatTermsDateIn(locale) })}
             </p>
           ) : (
-            <p className={styles.text}>
-              Tu es propriétaire ou gérant d&apos;une équipe. Avant de la gérer — logo, membres, invitations —,
-              accepte les conditions d&apos;utilisation du site.
-            </p>
+            <p className={styles.text}>{t("termsModal.textFirst")}</p>
           )}
           <p className={styles.text}>
-            Elles rappellent notamment que <strong>tu garantis détenir les droits</strong> sur le logo et les
-            contenus que tu publies pour ton équipe : un logo de club, de marque ou d&apos;éditeur de jeu ne se
-            reprend pas sans l&apos;accord de son titulaire.
+            {richNodes(rich("termsModal.rights", {}, { strong: (children) => <strong>{richNodes(children)}</strong> }))}
           </p>
         </ScrollArea>
         <label className={styles.check}>
           <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
           <span>
-            {TERMS_CHECKBOX_LABEL} (
-            <LocaleLink href={TERMS_PATH} target="_blank" rel="noreferrer">
-              lire les conditions
-            </LocaleLink>
-            ).
+            {richNodes(
+              rich("termsModal.checkbox", {}, {
+                terms: (children) => (
+                  <LocaleLink href={TERMS_PATH} target="_blank" rel="noreferrer">
+                    {richNodes(children)}
+                  </LocaleLink>
+                ),
+              }),
+            )}
           </span>
         </label>
+        {locale === "fr" || !translationNote ? null : (
+          <p className={styles.translationNote}>
+            {translationNote.text}{" "}
+            <a href={TERMS_PATH} target="_blank" rel="noreferrer" hrefLang="fr">
+              {translationNote.link}
+            </a>
+          </p>
+        )}
         <div className={styles.actions}>
           <CyberButton type="button" variant="ghost" onClick={later} disabled={busy}>
-            Plus tard
+            {t("termsModal.later")}
           </CyberButton>
           <CyberButton type="button" variant="primary" onClick={accept} disabled={busy || !checked}>
-            {busy ? "Enregistrement…" : "J'accepte"}
+            {busy ? t("termsModal.saving") : t("termsModal.accept")}
           </CyberButton>
         </div>
       </div>

@@ -20,6 +20,8 @@ export const SITE_HOST = {
    * pas, et la LCEN ne demande de lui que nom, adresse et téléphone.
    */
   status: "Particulier, bénévole de l'association",
+  /** Le même statut, pour les mentions légales anglaises (lot 7b-1) : à changer avec `status`. */
+  statusEn: "Private individual, volunteer of the association",
   address: "13 rue du Chemin Fourchue, 14000 Caen, France",
   phoneEncoded: SITE_HOST_PHONE_ENCODED,
   /**
