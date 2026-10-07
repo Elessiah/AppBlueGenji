@@ -17,7 +17,7 @@ import {
 } from "./RoundColumns";
 import styles from "./RankingViews.module.css";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
-import { FR_SWISS_TEXT } from "../_lib/swiss-text";
+import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { frenchBlockLang, type TournamentPageText } from "@/lib/shared/tournament-page-text";
 
 interface SwissViewProps {
@@ -66,7 +66,7 @@ export function SwissView({
   onForfeit,
   emptyLabel,
 }: Readonly<SwissViewProps>) {
-  const text = useTournamentViewText(FR_SWISS_TEXT);
+  const text = useTournamentViewText(FR_VIEWS_TEXT);
   const { t } = text;
   // L'abandon est un geste du lot 8b : resté français sous `/en`.
   const actionLang = frenchBlockLang(text);
@@ -371,7 +371,7 @@ export function SwissRounds({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<SwissRoundsProps>) {
-  const { t } = useTournamentViewText(FR_SWISS_TEXT);
+  const { t } = useTournamentViewText(FR_VIEWS_TEXT);
   return (
     <RoundColumns
       matches={matches}

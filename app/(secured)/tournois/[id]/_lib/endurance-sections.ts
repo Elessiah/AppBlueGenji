@@ -2,7 +2,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
-import { FR_ENDURANCE_TEXT } from "./endurance-text";
+import { FR_VIEWS_TEXT } from "./views-text";
 
 /**
  * Découpe du plateau « BlueGenji Survie » en volets, et reconstitution de
@@ -130,14 +130,14 @@ export function defaultOpenEnduranceRound(
  * chômer une équipe : à trois équipes en lice, la manche n'en porte **qu'une**,
  * et l'accord n'est pas une coquetterie — c'est un cas courant du mode.
  */
-export function enduranceMatchCountLabel(total: number, text: TournamentPageText = FR_ENDURANCE_TEXT): string {
+export function enduranceMatchCountLabel(total: number, text: TournamentPageText = FR_VIEWS_TEXT): string {
   return text.t("bracket.matchCount", { count: total });
 }
 
 /** Avancement d'une manche en cours, pour la pastille (« 0/1 jouée »). */
 export function enduranceProgressLabel(
   section: EnduranceRoundSection,
-  text: TournamentPageText = FR_ENDURANCE_TEXT,
+  text: TournamentPageText = FR_VIEWS_TEXT,
 ): string {
   return text.t("endurance.roundProgress", { played: String(section.playedCount), total: section.totalCount });
 }
@@ -152,7 +152,7 @@ export function enduranceProgressLabel(
  */
 export function enduranceRoundRegionLabel(
   section: EnduranceRoundSection,
-  text: TournamentPageText = FR_ENDURANCE_TEXT,
+  text: TournamentPageText = FR_VIEWS_TEXT,
 ): string {
   const progress = section.isComplete
     ? text.t("endurance.regionDone")
@@ -165,7 +165,7 @@ export function enduranceRoundRegionLabel(
 }
 
 /** Titre d'un volet (« Manche 3 »), dans la langue du texte. */
-export function enduranceRoundTitle(section: EnduranceRoundSection, text: TournamentPageText = FR_ENDURANCE_TEXT): string {
+export function enduranceRoundTitle(section: EnduranceRoundSection, text: TournamentPageText = FR_VIEWS_TEXT): string {
   return text.t("endurance.roundTitle", { round: String(section.round) });
 }
 

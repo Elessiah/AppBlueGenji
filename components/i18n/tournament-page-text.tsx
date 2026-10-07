@@ -41,7 +41,7 @@ export function useTournamentPageText(): TournamentPageText {
 /**
  * Texte d'une vue chargée à la demande (suisse, survie, endurance) : en
  * français, celui que la vue apporte dans son propre morceau (`frView`, construit
- * par `frTournamentViewText` dans `_lib/<vue>-text.ts`) ; sous `/en`, celui du
+ * par `frTournamentViewText` dans `_lib/views-text.ts`) ; sous `/en`, celui du
  * fournisseur, qui porte déjà tous les espaces.
  */
 export function useTournamentViewText(frView: TournamentPageText): TournamentPageText {

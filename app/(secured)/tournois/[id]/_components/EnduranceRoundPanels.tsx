@@ -17,7 +17,7 @@ import {
   type EnduranceRoundSection,
 } from "../_lib/endurance-sections";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
-import { FR_ENDURANCE_TEXT } from "../_lib/endurance-text";
+import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
 import styles from "./EnduranceRoundPanels.module.css";
 
@@ -62,7 +62,7 @@ export function EnduranceRoundPanels({
   onOpenAdminModal,
   format,
 }: Readonly<EnduranceRoundPanelsProps>) {
-  const text = useTournamentViewText(FR_ENDURANCE_TEXT);
+  const text = useTournamentViewText(FR_VIEWS_TEXT);
   const autoOpen = defaultOpenEnduranceRound(sections, myTeamId, playoffsStarted);
 
   const [openRounds, setOpenRounds] = useState<Set<number>>(

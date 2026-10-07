@@ -5,7 +5,7 @@
  *
  * Le français est inclus dans le paquet de la fiche (il remplace les chaînes
  * écrites en dur) — sauf celui des vues chargées à la demande (suisse, survie,
- * endurance), qui voyage avec la vue (`frTournamentViewText`, `_lib/*-text.ts`) ; l'anglais n'arrive que sous `/en`, sérialisé par la mise en
+ * endurance), qui voyage avec la vue (`frTournamentViewText`, `_lib/views-text.ts`) ; l'anglais n'arrive que sous `/en`, sérialisé par la mise en
  * page du segment (`TournamentPageTextProvider`). Les espaces lus côté serveur
  * seulement (`meta`, `settings`, `share`) ne voyagent pas.
  *
@@ -112,7 +112,7 @@ export function tournamentPageText(locale: Locale, messages: TournamentPageMessa
 /**
  * Le français du paquet, typé sur **toutes** les clés : une clé d'une vue
  * (`swiss.*`, `survival.*`, `endurance.*`) n'y est pas et se rend telle quelle —
- * une vue lit son texte par `useTournamentViewText(FR_<VUE>_TEXT)`.
+ * une vue lit son texte par `useTournamentViewText(FR_VIEWS_TEXT)`.
  */
 function frPageText(view: TournamentViewMessages): TournamentPageText {
   return scopedText(DEFAULT_LOCALE, { ...FR_TOURNAMENT_PAGE_MESSAGES, ...view } as TournamentPageMessages);
@@ -121,7 +121,7 @@ function frPageText(view: TournamentViewMessages): TournamentPageText {
 /** Le français, hors de tout fournisseur (tests, composant rendu ailleurs). */
 export const FR_TOURNAMENT_PAGE_TEXT: TournamentPageText = frPageText({});
 
-/** Le français complété de l'espace d'une vue — à construire dans le module de la vue. */
+/** Le français complété de l'espace d'une vue — à construire dans `_lib/views-text.ts`. */
 export function frTournamentViewText(view: TournamentViewMessages): TournamentPageText {
   return frPageText(view);
 }

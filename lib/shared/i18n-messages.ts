@@ -65,7 +65,7 @@ export type Messages = {
   /**
    * Vues de la fiche chargées à la demande (suisse, survie, endurance) : un
    * fichier à part, pour que leur français voyage avec leur morceau et non avec
-   * le premier chargement — `app/(secured)/tournois/[id]/_lib/*-text.ts`.
+   * le premier chargement — `app/(secured)/tournois/[id]/_lib/views-text.ts`.
    */
   tournamentViews: typeof frTournamentViews;
 };
