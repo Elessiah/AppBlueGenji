@@ -30,6 +30,7 @@ import { RunningCard } from "@/app/(secured)/tournois/cards/RunningCard";
 import { UpcomingCard } from "@/app/(secured)/tournois/cards/UpcomingCard";
 import { buildTickerItems } from "@/app/(secured)/tournois/_lib/ticker";
 import { formatCardDate, runningCardAction } from "@/app/(secured)/tournois/_lib/card-display";
+import { filterBuckets, filterTournamentsByQuery } from "@/app/(secured)/tournois/_lib/buckets";
 import { PAGE_SECTION_NAV_LABELS, PAGE_SECTION_TITLES, pageSections } from "@/app/(secured)/tournois/_lib/page-sections";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
@@ -201,9 +202,28 @@ describe("cartes — rendu anglais", () => {
     const iso = "2026-05-12T18:30:00.000Z";
     expect(formatCardDate(iso, true, "en")).not.toMatch(/AM|PM/);
     expect(formatCardDate(iso, true, "en")).toMatch(/May/);
+    // Jour sans zéro initial en anglais (« May 2 », jamais « May 02 »).
+    expect(formatCardDate("2026-05-02T12:00:00.000Z", false, "en")).toMatch(/May 2,/);
     expect(formatCardDate(iso, true)).toBe(
       new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
     );
+  });
+});
+
+describe("recherche par format", () => {
+  const cards = [tournamentCard({ id: 1, name: "Alpha", format: "SWISS" }), tournamentCard({ id: 2, name: "Beta", format: "SINGLE" })];
+  const enFormat = (format: string) => tournamentLabel(EN_TEXT, "format", format);
+
+  it("sous /en, trouve le format sous le nom affiché par la carte", () => {
+    const shown = enFormat("SWISS");
+    expect(filterTournamentsByQuery(cards, shown, enFormat).map((c) => c.name)).toEqual(["Alpha"]);
+    expect(filterTournamentsByQuery(cards, "ronde suisse", enFormat)).toEqual([]);
+    const buckets = filterBuckets({ running: [], registration: cards, upcoming: [], finished: [] }, shown, "all", enFormat);
+    expect(buckets.registration.map((c) => c.name)).toEqual(["Alpha"]);
+  });
+
+  it("français par défaut", () => {
+    expect(filterTournamentsByQuery(cards, "ronde suisse").map((c) => c.name)).toEqual(["Alpha"]);
   });
 });
 
@@ -218,7 +238,7 @@ describe("bandeau défilant", () => {
   it("anglais : accords et heure sur 24 h", () => {
     const items = buildTickerItems(buckets, EN_TEXT);
     expect(items[0]).toBe("IN PROGRESS · Cup · 1 team competing");
-    expect(items[1]).toBe("REGISTRATION · Open · 3/8 players");
+    expect(items[1]).toBe("REGISTRATION OPEN · Open · 3/8 players");
     expect(items[2]).toMatch(/^UPCOMING · Next · /);
     expect(items.join(" ")).not.toMatch(ACCENTED);
     expect(buildTickerItems({ running: [], registration: [], upcoming: [], finished: [] }, EN_TEXT)).toEqual([

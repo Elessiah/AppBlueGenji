@@ -39,7 +39,7 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("les pastilles comptent selon la recherche en cours, pas seulement le jeu", () => {
-    expect(page).toContain('filterBuckets(scheduledBuckets, query, "all")');
+    expect(page).toContain('filterBuckets(scheduledBuckets, query, "all", formatName)');
     expect(page).toContain("countByGame(queryFilteredBuckets, key)");
   });
 
