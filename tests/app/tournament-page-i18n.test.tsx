@@ -7,6 +7,8 @@
  * **hors** des blocs annoncés `lang="fr"` (gestes du lot 8b, outils du staff).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ReactElement } from "react";
 
 let mockLocale: "fr" | "en" = "en";
@@ -36,6 +38,7 @@ import { EnduranceView } from "@/app/(secured)/tournois/[id]/_components/Enduran
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
+import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
 import { EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { registrationConditionsText } from "@/app/(secured)/tournois/[id]/_lib/header-meta";
 import { phaseFormatLabel, phaseStateLabel } from "@/app/(secured)/tournois/[id]/_lib/phases";
@@ -453,6 +456,57 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
 
   it("chargement", () => {
     expectNoFrench(inLocale("en", <TournamentLoading />));
+  });
+
+  it("détail des maps : langue de la page, français dans une fenêtre de score", () => {
+    const maps = [{ mapNumber: 1, team1Score: 2, team2Score: 1, replayCode: "ABC123" }];
+    const page = inLocale("en", <MapResultList maps={maps} team1Name="Alpha" team2Name="Bravo" label="Match maps" />);
+    expect(page).toContain("Won by Alpha");
+    const dialog = inLocale("en", <MapResultList french maps={maps} team1Name="Alpha" team2Name="Bravo" label="Maps proposées" />);
+    expect(dialog).toContain("Gagnée par Alpha");
+    expect(dialog).toContain("Copier le code de replay de la map 1");
+    expect(dialog).not.toContain("Won by");
+  });
+});
+
+describe("blocs restés en français (lot 8b) sous /en", () => {
+  const COMPONENTS = "app/(secured)/tournois/[id]/_components";
+  const source = (file: string) => readFileSync(join(process.cwd(), COMPONENTS, file), "utf8");
+
+  it("leurs notifications passent par useFrenchBlockToast, jamais useToast nu", () => {
+    for (const file of [
+      "AdvanceTournamentDialog.tsx",
+      "DeleteTournamentDialog.tsx",
+      "EndurancePenaltyDialog.tsx",
+      "GhostRegistrationDialog.tsx",
+      "IssueReportDialog.tsx",
+      "MatchCardActions.tsx",
+      "MatchLiveDialog.tsx",
+      "MatchReplayDialog.tsx",
+      "MatchScheduleDialog.tsx",
+      "PlayerScoreDialog.tsx",
+      "RegistrationsPanel.tsx",
+      "RemoveEntrantDialog.tsx",
+      "RollbackRoundDialog.tsx",
+      "TournamentImageDialog.tsx",
+    ]) {
+      const code = source(file);
+      expect(`${file}: ${code.includes("useFrenchBlockToast()")}`).toBe(`${file}: true`);
+      expect(`${file}: ${code.includes("useToast()")}`).toBe(`${file}: false`);
+    }
+  });
+
+  it("le menu porté et les confirmations portées redisent lang=\"fr\"", () => {
+    const actions = source("MatchCardActions.tsx");
+    expect(actions).toMatch(/id=\{panelId\}[\s\S]{0,300}lang=\{lang\}/);
+    expect(actions).toMatch(/contentLang=\{lang\}\s+title=\{`Forcer le lancement/);
+    expect(source("AdminScoreDialog.tsx")).toMatch(/contentLang=\{dialogLang\}\s+title="Corriger un résultat/);
+  });
+
+  it("le pied d'action cite le match en français, libellés d'attente compris", () => {
+    const row = source("MatchRow.tsx");
+    expect(row).toContain("matchLabel={actionMatchLabel}");
+    expect(row).toMatch(/versusText\(\s*FR_TOURNAMENT_PAGE_TEXT,\s*teamLabel\(match\.team1Name, match\.team1Placeholder/);
   });
 });
 
