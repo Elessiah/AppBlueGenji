@@ -602,9 +602,9 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Kept until that deadline even after the account is deleted (GDPR, art. 17.3.b)",
     ],
     recipients: [
-      "Judicial authorities, upon request",
+      "Judicial authorities, upon a judicial requisition",
       "The player themselves, through the export of their data, as long as their account exists",
-      "The association's technical manager, who administers the database and answers requests",
+      "The association's technical manager, who administers the database and answers judicial requisitions",
     ],
     transfers: ["None"],
     security: [
