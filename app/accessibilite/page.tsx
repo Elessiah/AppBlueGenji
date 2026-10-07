@@ -19,15 +19,26 @@ import {
   accessibilityFeatures,
   accessibilityStatementDateLabel,
 } from "@/lib/shared/accessibility-statement";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { AccessibilityStatementEn } from "./AccessibilityStatementEn";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Déclaration d'accessibilité",
-  description:
-    "État de conformité du site BlueGenji Esport au RGAA, contenus non accessibles, aides proposées et contact.",
-  path: "/accessibilite",
-  shareCard: "accessibility",
-});
+/**
+ * Une langue par adresse (lot 7b) : `/accessibilite` en français, le texte qui
+ * fait foi ; `/en/…` sa traduction (`AccessibilityStatementEn`).
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const meta = messagesFor(locale).legal.pages.accessibility;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    path: "/accessibilite",
+    shareCard: "accessibility",
+    locale,
+  });
+}
 
 /**
  * Les moyens de nous joindre, repris là où une demande est proposée. Le courriel
@@ -62,12 +73,18 @@ function ContactList() {
  * en forme — le statut se déduit d'un taux d'audit, la liste des limites se
  * tient là-bas.
  */
-export default function AccessibilityStatementPage() {
+export default async function AccessibilityStatementPage() {
+  const locale = await requestLocale();
+  return <PublicPageShell>{locale === "en" ? <AccessibilityStatementEn /> : <AccessibilityStatementFr />}</PublicPageShell>;
+}
+
+/** Le texte français, qui fait foi : inchangé par le lot 7b (`tests/app/site-legal-i18n.test.tsx`). */
+function AccessibilityStatementFr() {
   const dateLabel = accessibilityStatementDateLabel();
   const statusLabel = CONFORMITY_LABELS[CONFORMITY_STATUS];
 
   return (
-    <PublicPageShell>
+    <>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">ACCESSIBILITÉ · RGAA 4.1.2</span>
@@ -254,6 +271,6 @@ export default function AccessibilityStatementPage() {
           </p>
         </div>
       </section>
-    </PublicPageShell>
+    </>
   );
 }

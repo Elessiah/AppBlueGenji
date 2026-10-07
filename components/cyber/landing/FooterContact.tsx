@@ -32,8 +32,9 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
   // Textes lus par le visiteur ; la fenêtre d'édition (staff) reste en
   // français jusqu'au lot des éditeurs de la vitrine (I18N_MIGRATION_PLAN.md, lot 5).
   const { t, locale } = useShellText();
-  // Parties restées en français (édition staff → lot 5, `ProtectedContact` →
-  // lot 7b) : marquées comme telles sur une page d'une autre langue (WCAG 3.1.2).
+  // Parties restées en français (édition staff → lot 5) : marquées comme
+  // telles sur une page d'une autre langue (WCAG 3.1.2). `ProtectedContact`
+  // suit la langue de la page depuis le lot 7b.
   const frenchPart = locale === "fr" ? undefined : "fr";
   const [contact, setContact] = useState<PublicContactInfo>(initialContact);
   const [form, setForm] = useState<ContactInfo>(() => editableContact(initialContact));
@@ -94,8 +95,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               key={contact.emailEncoded}
               encoded={contact.emailEncoded}
               kind="email"
-              owner="de l'association"
-              lang={frenchPart}
+              owner={t("protectedContact.ownerAssociation")}
             />
           </li>
         )}

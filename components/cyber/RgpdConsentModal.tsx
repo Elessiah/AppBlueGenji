@@ -5,6 +5,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber/CyberButton";
+import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -40,9 +41,12 @@ interface RgpdConsentModalProps {
  *
  * Textes du message `login.consent` (lot 6) : la modale s'ouvre aussi sous
  * `/en/connexion`. La case reprend `TERMS_CHECKBOX_LABEL` et
- * `TERMS_AGE_DECLARATION` (égalité du français testée) ; la politique et les
- * conditions liées restent françaises jusqu'au lot 7b — l'anglais le dit, et
- * leurs liens portent `hrefLang="fr"`.
+ * `TERMS_AGE_DECLARATION` (égalité du français testée). Les conditions sont
+ * traduites depuis le lot 7b-1 : sous `/en`, leur lien mène à l'anglais, et une
+ * note dit que c'est le texte français — la même `TERMS_VERSION` — que l'on
+ * accepte (`TERMS_TRANSLATION_NOTE`). La politique de confidentialité reste
+ * française jusqu'au lot 7b-2 : l'anglais le dit, et son lien porte
+ * `hrefLang="fr"`.
  */
 export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentModalProps>) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
@@ -167,7 +171,6 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
                     href={TERMS_PATH}
                     target="_blank"
                     rel="noreferrer"
-                    hrefLang={frenchDocumentLang}
                     style={{ color: "var(--blue-300)", textDecoration: "underline" }}
                   >
                     {richNodes(children)}
@@ -177,6 +180,20 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
             )}
           </span>
         </label>
+        {frenchDocumentLang ? (
+          <p style={{ color: "var(--ink-dim)", fontSize: 12.5, lineHeight: 1.6, margin: "-12px 0 20px 26px" }}>
+            {TERMS_TRANSLATION_NOTE.text}{" "}
+            <a
+              href={TERMS_PATH}
+              target="_blank"
+              rel="noreferrer"
+              hrefLang="fr"
+              style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+            >
+              {TERMS_TRANSLATION_NOTE.link}
+            </a>
+          </p>
+        ) : null}
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <CyberButton

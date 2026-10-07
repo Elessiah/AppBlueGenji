@@ -4,6 +4,9 @@ import Link from "next/link";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { MentionsLegalesEn } from "./MentionsLegalesEn";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import {
@@ -40,18 +43,32 @@ import {
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Mentions légales",
-  description:
-    "Mentions légales de la plateforme BlueGenji Esport, éditée par l'association Bluegenji Esport (loi 1901).",
-  shareDescription: "Éditeur, hébergement, propriété intellectuelle et données personnelles.",
-  path: "/mentions-legales",
-  shareCard: "legalNotice",
-});
+/**
+ * Une langue par adresse (lot 7b) : `/mentions-legales` en français, le texte
+ * qui fait foi ; `/en/…` sa traduction (`MentionsLegalesEn`).
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const meta = messagesFor(locale).legal.pages.legalNotice;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    shareDescription: meta.shareDescription,
+    path: "/mentions-legales",
+    shareCard: "legalNotice",
+    locale,
+  });
+}
 
-export default function MentionsLegalesPage() {
+export default async function MentionsLegalesPage() {
+  const locale = await requestLocale();
+  return <PublicPageShell>{locale === "en" ? <MentionsLegalesEn reglementUrl={REGLEMENT_URL} /> : <MentionsLegalesFr />}</PublicPageShell>;
+}
+
+/** Le texte français, qui fait foi : inchangé par le lot 7b (`tests/app/site-legal-i18n.test.tsx`). */
+function MentionsLegalesFr() {
   return (
-    <PublicPageShell>
+    <>
       {/* HERO */}
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
@@ -153,7 +170,7 @@ export default function MentionsLegalesPage() {
           Bluegenji Esport · Association loi 1901 · Siège social : 4 impasse des Cyprès, 51210 Janvilliers
         </div>
       </section>
-    </PublicPageShell>
+    </>
   );
 }
 

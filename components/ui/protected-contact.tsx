@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useShellText } from "@/components/i18n/shell-text";
 import { type ContactKind, contactHref, decodeContact } from "@/lib/shared/obfuscated-contact";
 import styles from "./protected-contact.module.css";
 
@@ -9,31 +10,17 @@ interface ProtectedContactProps {
   encoded: string;
   kind: ContactKind;
   /**
-   * À qui appartient la coordonnée, pour le nom accessible du bouton
-   * (« de l'association », « de l'hébergeur ») : plusieurs boutons « Afficher
-   * le numéro » sur une page se distinguent ainsi au lecteur d'écran.
+   * À qui appartient la coordonnée, pour le nom accessible du bouton, dans la
+   * langue de la page (« de l'association », « of the host ») : plusieurs
+   * boutons « Afficher le numéro » sur une page se distinguent ainsi au
+   * lecteur d'écran.
    */
   owner: string;
   /** Classe du bouton, pour l'accorder à son contexte (pied de page…). */
   buttonClassName?: string;
   /** Classe du lien révélé. */
   linkClassName?: string;
-  /**
-   * Langue du bouton quand elle diffère de la page (`"fr"` sur une page
-   * anglaise tant que ce composant n'est pas traduit — WCAG 3.1.2).
-   */
-  lang?: string;
 }
-
-const VISIBLE_LABEL: Record<ContactKind, string> = {
-  email: "Afficher l'adresse",
-  phone: "Afficher le numéro",
-};
-
-const ACCESSIBLE_NOUN: Record<ContactKind, string> = {
-  email: "électronique",
-  phone: "de téléphone",
-};
 
 /**
  * Courriel ou numéro révélé **au geste** (`lib/shared/obfuscated-contact.ts`) :
@@ -43,9 +30,11 @@ const ACCESSIBLE_NOUN: Record<ContactKind, string> = {
  *
  * Le nom accessible **commence par le texte visible** (WCAG 2.5.3) : la
  * commande vocale « Afficher l'adresse » atteint le bouton, et la suite dit
- * laquelle.
+ * laquelle. Textes de la coquille (`shell.protectedContact`) : français sans
+ * fournisseur, anglais sous `/en`.
  */
-export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkClassName, lang }: Readonly<ProtectedContactProps>) {
+export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkClassName }: Readonly<ProtectedContactProps>) {
+  const { t } = useShellText();
   const [plain, setPlain] = useState<string | null>(null);
   const linkRef = useRef<HTMLAnchorElement>(null);
   const focusOnReveal = useRef(false);
@@ -67,13 +56,12 @@ export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkCl
     );
   }
 
-  const visible = VISIBLE_LABEL[kind];
+  const visible = t(`protectedContact.${kind}.label`);
   return (
     <button
       type="button"
       className={`tap-target ${styles.reveal} ${buttonClassName ?? ""}`.trim()}
-      lang={lang}
-      aria-label={`${visible} ${ACCESSIBLE_NOUN[kind]} ${owner}`}
+      aria-label={t(`protectedContact.${kind}.name`, { owner })}
       onClick={() => {
         const decoded = decodeContact(encoded);
         if (!decoded) return;

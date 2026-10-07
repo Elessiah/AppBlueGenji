@@ -153,5 +153,31 @@
     "retry": "Try again",
     "reference": "Reference:",
     "documentTitle": "{title} · {site}"
+  },
+  "protectedContact": {
+    "email": {
+      "label": "Show email",
+      "name": "Show email address {owner}"
+    },
+    "phone": {
+      "label": "Show phone",
+      "name": "Show phone number {owner}"
+    },
+    "ownerAssociation": "of the association"
+  },
+  "termsModal": {
+    "eyebrow": "TERMS OF USE",
+    "titleUpdated": "The terms of use have changed",
+    "titleFirst": "You now manage a team",
+    "bodyLabel": "About the terms",
+    "textUpdated": "You own or manage a team. The site's terms of use have been updated (version {version}, in force since {date}): accept them to keep managing your team — logo, members, invitations.",
+    "textFirst": "You own or manage a team. Before managing it — logo, members, invitations —, accept the site's terms of use.",
+    "rights": "Among other things, they point out that <strong>you warrant that you hold the rights</strong> to the logo and content you publish for your team: a club's, brand's or game publisher's logo may not be used without its rights holder's agreement.",
+    "checkbox": "I have read and accept the terms of use (<terms>read the terms</terms>).",
+    "later": "Later",
+    "accept": "I accept",
+    "saving": "Saving…",
+    "accepted": "Thanks, you can manage your team.",
+    "failed": "Your acceptance couldn't be saved. Reload the page, then try again."
   }
 }

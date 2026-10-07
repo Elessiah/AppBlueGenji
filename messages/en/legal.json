@@ -1,0 +1,19 @@
+{
+  "inFrench": "(in French)",
+  "pages": {
+    "terms": {
+      "title": "Terms of use",
+      "description": "Terms of use of the BlueGenji Esport platform: account, conduct, content published by users, reporting and moderation.",
+      "shareDescription": "What everyone agrees to respect on BlueGenji Esport."
+    },
+    "legalNotice": {
+      "title": "Legal notice",
+      "description": "Legal notice of the BlueGenji Esport platform, published by the Bluegenji Esport association (French nonprofit, law of 1901).",
+      "shareDescription": "Publisher, hosting, intellectual property and personal data."
+    },
+    "accessibility": {
+      "title": "Accessibility statement",
+      "description": "Compliance status of the BlueGenji Esport site with the RGAA (French accessibility standard), inaccessible content, available help and contact."
+    }
+  }
+}

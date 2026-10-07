@@ -16,7 +16,8 @@
  * de pages y ajoute ses routes (lot 2 : l'accueil ; lot 3 : les règles ; lot 4 :
  * le classement ; lot 6 : la connexion ; lot 5a : le bot et sa documentation ;
  * lot 5b : l'association, les bénévoles, le recrutement ; lot 7a : les
- * documents légaux du bot).
+ * documents légaux du bot ; lot 7b-1 : conditions, mentions légales,
+ * déclaration d'accessibilité).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
@@ -52,4 +53,12 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // portail développeur de Discord, ne changent pas.
   "/privacy-policy-bot",
   "/terms-of-service-bot",
+  // Lot 7b-1 — textes légaux du site : conditions d'utilisation, mentions
+  // légales, déclaration d'accessibilité. Le français, qui fait foi, est
+  // inchangé ; l'anglais est une traduction qui le dit (`TranslationNotice`).
+  // `TERMS_VERSION` ne bouge pas : accepter sous `/en`, c'est accepter la même
+  // version.
+  "/conditions-utilisation",
+  "/mentions-legales",
+  "/accessibilite",
 ];

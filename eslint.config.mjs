@@ -81,6 +81,10 @@ const I18N_MIGRATED_FILES = [
   "app/partenaires/page.tsx",
   "components/recruitment/**",
   "components/recruitment-highlight.tsx",
+  // Textes légaux du site (lot 7b) : la fenêtre d'acceptation des conditions.
+  // Les documents eux-mêmes n'y sont pas — chaque langue est un document
+  // rédigé dans sa langue (`I18N.md` § Textes légaux du site).
+  "components/legal/TermsAcceptanceModal.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */
@@ -100,6 +104,14 @@ const I18N_LOCALE_LINK_FILES = [
   "components/legal/TermsAcceptanceModal.tsx",
   "components/match-launch/MatchLaunchCenter.tsx",
   "components/privacy/PrivacyChangesModal.tsx",
+  // Textes légaux du site (lot 7b) : chaque langue est un document à part,
+  // rédigé dans sa langue — d'où l'absence de la règle des textes littéraux —,
+  // mais les liens de l'anglais restent en anglais.
+  "app/conditions-utilisation/TermsOfUseEn.tsx",
+  "app/mentions-legales/MentionsLegalesEn.tsx",
+  "app/accessibilite/AccessibilityStatementEn.tsx",
+  "components/legal/EnglishLegalLink.tsx",
+  "components/legal/TranslationNotice.tsx",
 ];
 
 const eslintConfig = [

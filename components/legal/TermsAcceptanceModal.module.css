@@ -85,6 +85,25 @@
   outline-offset: 2px;
 }
 
+/* Sous `/en` seulement : c'est le texte français que l'on accepte (lot 7b). */
+.translationNote {
+  margin: 8px 0 0 26px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-mute);
+}
+
+.translationNote a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.translationNote a:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
