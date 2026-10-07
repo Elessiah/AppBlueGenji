@@ -577,6 +577,15 @@ describe("français inchangé — les messages égalent les tables d'origine", (
     expect(EN.t("endurance.penaltyBadgeTitle", { points: 3 })).toBe("3 points deducted by referee penalty");
   });
 
+  it("compteurs anglais à 1 : singulier (manches prévues, joueurs, maps, cadence)", () => {
+    expect(EN.t("endurance.outLegendRounds", { count: 1 })).toBe(" IN THE 1 PLANNED ROUND");
+    expect(EN.t("endurance.outLegendRounds", { count: 8 })).toBe(" IN THE 8 PLANNED ROUNDS");
+    expect(EN.t("header.filters.minPlayers", { count: 1 })).toBe("1 player minimum");
+    expect(EN.t("matchFormat.withMaps", { base: "BO3", maps: 1 })).toBe("BO3 · 1 map");
+    expect(EN.t("live.cadenceMinutes", { minutes: 1 })).toBe("at most every 1 minute");
+    expect(EN.t("live.cadenceMinutes", { minutes: 5 })).toBe("at most every 5 minutes");
+  });
+
   it("titres d'onglet d'appel : le français égale viewerAlertTitle", () => {
     for (const alert of VIEWER_ALERT_PRIORITY) {
       const message = FR_TOURNAMENT_PAGE_TEXT.t(`live.alerts.${alert}`);
