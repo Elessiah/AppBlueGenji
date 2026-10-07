@@ -139,6 +139,13 @@ describe("ce qui sonne, ce qui s'écrit", () => {
     expect(attentionDocumentTitle("ROUND_STARTED", "  ")).toBe("● Nouvelle manche");
   });
 
+  it("préfixe dans la langue de la page quand elle est fournie", () => {
+    expect(attentionDocumentTitle("MATCH_READY", "Autumn Cup · BlueGenji", "Your match is ready")).toBe(
+      "● Your match is ready · Autumn Cup · BlueGenji",
+    );
+    expect(attentionDocumentTitle("ROUND_STARTED", "", "New round")).toBe("● New round");
+  });
+
   it("a un titre pour chaque évènement", () => {
     for (const alert of VIEWER_ALERT_PRIORITY) expect(viewerAlertTitle(alert)).not.toBe("");
   });

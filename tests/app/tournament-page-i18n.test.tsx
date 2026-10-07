@@ -61,6 +61,7 @@ import {
   FR_TOURNAMENT_PAGE_TEXT,
   localizedPlaceholder,
   matchFormatDescriptionText,
+  pageDateTime,
   tournamentPageMessages,
   tournamentPageText,
 } from "@/lib/shared/tournament-page-text";
@@ -70,6 +71,7 @@ import { tournamentSettingsGroups, type TournamentSettingsInput } from "@/lib/sh
 import { tournamentShareDescription } from "@/lib/shared/share-metadata";
 import { localizedTournamentShareDescription } from "@/lib/shared/tournament-share-text";
 import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
+import { VIEWER_ALERT_PRIORITY, viewerAlertTitle } from "@/lib/shared/viewer-alerts";
 import type {
   BracketMatch,
   EnduranceMeta,
@@ -500,6 +502,14 @@ describe("blocs restés en français (lot 8b) sous /en", () => {
     expect(scoreForm).not.toContain("useToast()");
   });
 
+  it("annonce du réordonnancement et sélecteur d'image redisent leur langue", () => {
+    expect(source("RegistrationsPanel.tsx")).toContain('<p aria-live="polite" className="sr-only" lang={staffLang}>');
+    expect(source("TournamentImageDialog.tsx")).toContain("lang={dialogLang} />");
+    const picker = readFileSync(join(process.cwd(), "app/(secured)/tournois/_components/TournamentImagePicker.tsx"), "utf8");
+    expect(picker).toContain("useImageCropper({ lang })");
+    expect(picker).toContain("toast.showError(message, lang ? { lang } : undefined)");
+  });
+
   it("lien « Modifier » vers l'édition restée française : hrefLang", () => {
     expect(source("TournamentHeader.tsx")).toMatch(/href=\{`\/tournois\/\$\{card\.id\}\/modifier`\} hrefLang=\{actionLang\}/);
   });
@@ -550,6 +560,20 @@ describe("français inchangé — les messages égalent les tables d'origine", (
     expect(fr.t("planning.descriptionOn")).toBe(REFEREE_SCHEDULING_DESCRIPTION);
     expect(phaseFormatLabel("SINGLE")).toBe("Simple élimination");
     expect(phaseStateLabel("FINISHED")).toBe("Terminée");
+  });
+
+  it("dates de la fiche : jour sans zéro initial en anglais, inchangé en français", () => {
+    const iso = "2026-10-07T18:00:00.000Z";
+    const options = { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" } as const;
+    expect(pageDateTime(iso, "en", options)).toMatch(/^Oct 7, 2026/);
+    expect(pageDateTime(iso, "fr", options)).toMatch(/^07 oct\. 2026/);
+  });
+
+  it("titres d'onglet d'appel : le français égale viewerAlertTitle", () => {
+    for (const alert of VIEWER_ALERT_PRIORITY) {
+      const message = FR_TOURNAMENT_PAGE_TEXT.t(`live.alerts.${alert}`);
+      expect(`${alert}: ${message}`).toBe(`${alert}: ${viewerAlertTitle(alert)}`);
+    }
   });
 
   it("délais, formats de match, conditions d'inscription", () => {
