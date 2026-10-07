@@ -8,16 +8,19 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 // La page est un composant client sans rendu testable ici (mêmes contraintes
 // que la section « Tournois invisibles », cf. hidden-tournaments-section.test.ts) :
 // on vérifie le câblage au niveau source.
-const page = read("app/(secured)/tournois/page.tsx");
+const page = read("app/(secured)/tournois/TournamentsList.tsx");
+import frTournaments from "@/messages/fr/tournaments.json";
 
 describe("page tournois — barre de recherche et filtres", () => {
   it("le champ de recherche a un nom accessible, indépendant du placeholder", () => {
-    expect(page).toContain('aria-label="Rechercher un tournoi"');
+    expect(page).toContain('aria-label={t("list.searchLabel")}');
+    expect(frTournaments.list.searchLabel).toBe("Rechercher un tournoi");
   });
 
   it("le placeholder ne promet plus une recherche par équipe, non filtrable", () => {
-    expect(page).toContain('placeholder="Rechercher un tournoi, un format…"');
-    expect(page).not.toContain("une équipe");
+    expect(page).toContain('placeholder={t("list.searchPlaceholder")}');
+    expect(frTournaments.list.searchPlaceholder).toBe("Rechercher un tournoi, un format…");
+    expect(JSON.stringify(frTournaments.list)).not.toContain("une équipe");
   });
 
   it("le raccourci affiché suit la plateforme, plus un « ⌘K » figé", () => {
@@ -29,7 +32,8 @@ describe("page tournois — barre de recherche et filtres", () => {
 
   it("les pastilles de jeu annoncent leur état et leur compte au lecteur d'écran", () => {
     expect(page).toContain("aria-pressed={gameFilter === key}");
-    expect(page).toContain("aria-label={`${label} (${count})`}");
+    expect(page).toContain('aria-label={t("list.countLabel", { label, count: String(count) })}');
+    expect(frTournaments.list.countLabel).toBe("{label} ({count})");
     // Le nombre visible ne double pas ce que l'aria-label dit déjà.
     expect(page).toMatch(/<span className=\{s\.num\} aria-hidden="true">/);
   });
@@ -40,12 +44,13 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("une page vidée par un filtre le dit, distinctement d'une page réellement vide", () => {
-    expect(page).toContain('sectionEmptyMessage("Aucun tournoi publié pour le moment.", query, gameFilter)');
+    expect(page).toContain('sectionEmptyMessage(t("list.emptyUnfiltered"), query, gameFilter, t("list.emptyFiltered"))');
+    expect(frTournaments.list.emptyUnfiltered).toBe("Aucun tournoi publié pour le moment.");
   });
 
   it("« Créer un tournoi » est un seul contrôle interactif, pas un bouton dans un lien", () => {
-    expect(page).toMatch(/<CyberButton asChild variant="primary">\s*<Link href="\/tournois\/creer">/);
-    expect(page).not.toMatch(/<Link href="\/tournois\/creer">\s*<button/);
+    expect(page).toMatch(/<CyberButton asChild variant="primary">\s*<LocaleLink href="\/tournois\/creer">/);
+    expect(page).not.toMatch(/<LocaleLink href="\/tournois\/creer">\s*<button/);
   });
 
   it("la recherche (coûteuse) ne s'exécute qu'une fois par rendu, le filtre de jeu par-dessus", () => {
@@ -60,7 +65,7 @@ describe("page tournois — barre de recherche et filtres", () => {
 
 describe("page tournois — sommaire des sections", () => {
   it("le nom accessible d'un lien ne colle pas le libellé et le compte", () => {
-    expect(page).toContain("aria-label={`${entry.navLabel} (${entry.count})`}");
+    expect(page).toContain('aria-label={t("list.countLabel", { label: entry.navLabel, count: String(entry.count) })}');
     expect(page).toMatch(/<span className=\{s\.num\} aria-hidden="true">\s*\{entry\.count\}/);
   });
 
@@ -94,15 +99,8 @@ describe("page tournois — volume des sections", () => {
     // Jusqu'à quatre boutons « Voir moins » identiques cohabitent sur la
     // page : sans le nom de la section, une navigation par liste de contrôles
     // (lecteur d'écran) ne peut pas les distinguer.
-    const titles: Record<string, string> = {
-      mine: "MES TOURNOIS",
-      running: "EN COURS",
-      registration: "INSCRIPTIONS OUVERTES",
-      upcoming: "PROCHAINEMENT",
-      finished: "TERMINÉS",
-    };
-    for (const [key, title] of Object.entries(titles)) {
-      expect(page).toMatch(new RegExp(`sectionTitle="${title}"[\\s\\S]{0,80}total=\\{total${key[0].toUpperCase()}${key.slice(1)}\\}`));
+    for (const key of ["mine", "running", "registration", "upcoming", "finished"]) {
+      expect(page).toMatch(new RegExp(`sectionTitle=\\{sectionTitle\\("${key}"\\)\\}[\\s\\S]{0,80}total=\\{total${key[0].toUpperCase()}${key.slice(1)}\\}`));
     }
   });
 });

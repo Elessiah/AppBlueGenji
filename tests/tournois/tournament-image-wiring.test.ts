@@ -82,7 +82,7 @@ describe("écrans", () => {
   });
 
   it("la liste charge en priorité les premiers bandeaux, dans l'ordre d'affichage", () => {
-    const page = read("app/(secured)/tournois/page.tsx");
+    const page = read("app/(secured)/tournois/TournamentsList.tsx");
     expect(page).toMatch(/const priorityBanners = priorityBannerIds\(\[/);
     for (const card of ["StateCard t={t}", "RunningCard key={t.id} t={t}", "RegistrationCard key={t.id} t={t}", "UpcomingCard key={t.id} t={t}"]) {
       expect(page).toContain(`<${card} priority={priorityBanners.has(t.id)} />`);

@@ -134,12 +134,12 @@ describe("TeamCard — sens de lecture de la barre de forme", () => {
 
 describe("/tournois — section « Terminés »", () => {
   it("rend ses cartes comme items de la grille, sans enveloppe", () => {
-    const source = stripComments(read("app/(secured)/tournois/page.tsx"));
+    const source = stripComments(read("app/(secured)/tournois/TournamentsList.tsx"));
     // Une enveloppe empilait toutes les cartes dans une seule cellule, et
     // `.card { height: 100% }` étirait chacune à la hauteur de la pile.
     expect(source).not.toMatch(/<div>\s*\{visibleSlice\("finished"/);
     // `stripComments` laisse `{}` à la place du commentaire JSX qui précède.
-    expect(source).toMatch(/title="TERMINÉS"[\s\S]*?>\s*(?:\{\}\s*)?\{visibleSlice\("finished", filteredBuckets\.finished\)/);
+    expect(source).toMatch(/title=\{sectionTitle\("finished"\)\}[\s\S]*?>\s*(?:\{\}\s*)?\{visibleSlice\("finished", filteredBuckets\.finished\)/);
   });
 });
 

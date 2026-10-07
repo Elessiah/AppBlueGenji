@@ -169,7 +169,7 @@ describe("tournament-rules — câblage des pages", () => {
     // Et porte le tournoi, pour que les règles affichent ses réglages.
     expect(detailPage).toContain("tournamentId={detail.card.id}");
     expect(detailPage).toContain("visibleRulesFormat(detail.card, selectedPhase)");
-    expect(read("app/(secured)/tournois/page.tsx")).toContain("<RulesHelpFab />");
+    expect(read("app/(secured)/tournois/TournamentsList.tsx")).toContain("<RulesHelpFab />");
     expect(read("components/rules/RulesHelpFab.tsx")).toContain("cta-float-help");
   });
 

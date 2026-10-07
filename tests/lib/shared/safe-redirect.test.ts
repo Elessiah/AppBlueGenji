@@ -217,7 +217,7 @@ describe("préfixe de langue — la garde reste aussi stricte", () => {
     "/en/\t/exemple.invalid",
   ])("refuse %j", (value) => {
     expect(safeRedirectPath(value)).toBe(DEFAULT_REDIRECT);
-    expect(loginDestination(value, "en")).toBe(DEFAULT_REDIRECT);
+    expect(loginDestination(value, "en")).toBe(`/en${DEFAULT_REDIRECT}`);
     expect(sealedReturnPath(value, "en")).toBe(`/en${DEFAULT_REDIRECT}`);
   });
 
@@ -240,7 +240,7 @@ describe("loginDestination — la langue de la page de connexion", () => {
 
   it("laisse française une route pas encore traduite", () => {
     expect(loginDestination("/tournois/12", "en")).toBe("/tournois/12");
-    expect(loginDestination(null, "en")).toBe(DEFAULT_REDIRECT);
+    expect(loginDestination(null, "en")).toBe(`/en${DEFAULT_REDIRECT}`);
   });
 
   it("garde un visiteur français en français", () => {
