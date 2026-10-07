@@ -44,9 +44,6 @@ export function TournamentCardFrame({
         href={`/tournois/${t.id}`}
         className={s.cardOverlay}
         aria-label={text.t("cards.open", { name: t.name })}
-        // La fiche n'est pas encore traduite (lot 8a-2) : depuis `/en`, le lien
-        // mène à la page française et le dit aux technologies d'assistance.
-        hrefLang={text.locale === "en" ? "fr" : undefined}
       />
       <TournamentImageBanner
         image={t.image}
