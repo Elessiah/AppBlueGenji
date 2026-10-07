@@ -577,6 +577,13 @@ describe("français inchangé — les messages égalent les tables d'origine", (
     expect(EN.t("endurance.penaltyBadgeTitle", { points: 3 })).toBe("3 points deducted by referee penalty");
   });
 
+  it("tournoi devenu inaccessible : formulation neutre (masqué ou supprimé), filtres « all … »", () => {
+    expect(EN.t("live.fatal.TOURNAMENT_NOT_FOUND")).toMatch(/^This tournament is no longer available/);
+    expect(FR_TOURNAMENT_PAGE_TEXT.t("live.fatal.TOURNAMENT_NOT_FOUND")).toMatch(/^Ce tournoi n'est plus accessible/);
+    expect(EN.t("header.filters.discordAll")).toBe("all Discord accounts verified");
+    expect(EN.t("header.filters.blizzardAll")).toBe("all Blizzard accounts linked");
+  });
+
   it("compteurs anglais à 1 : singulier (manches prévues, joueurs, maps, cadence)", () => {
     expect(EN.t("endurance.outLegendRounds", { count: 1 })).toBe(" IN THE 1 PLANNED ROUND");
     expect(EN.t("endurance.outLegendRounds", { count: 8 })).toBe(" IN THE 8 PLANNED ROUNDS");
