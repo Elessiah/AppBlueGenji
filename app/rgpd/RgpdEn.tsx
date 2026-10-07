@@ -585,7 +585,7 @@ export function RgpdEn({
             <span lang="fr">« Autre »</span>) —, describe the problem and, when logged in, designate the players, teams or
             tournaments concerned. A <strong>copyright</strong> report states {copyrightNoticeElementsTextEn()}: this
             is what the EU Digital Services Act requires of a notice of illegal content (art. 16).{" "}
-            <EnglishLegalText text={NOTIFIER_FOLLOW_UP_EN} /> <strong>In-game behavior</strong> (insults, cheating, anti-play, dispute on
+            <EnglishLegalText text={NOTIFIER_FOLLOW_UP_EN} /> <strong>In-game behavior</strong> (insults, cheating, unsportsmanlike play, dispute on
             Discord) is not reported through this form but on the{" "}
             <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
               association&apos;s support portal
@@ -706,7 +706,7 @@ export function RgpdEn({
               invoked and the means of contesting it, by Discord direct message if their account is linked to it,
               and at each login attempt during the suspension. They contest it without logging in, through “
               {REPORT_FORM_NAME_EN}” (“Other” category, <span lang="fr">« Autre »</span>), quoting the reference of
-              the decision; the association reviews it, and the competent court can then be seized. The staff&apos;s
+              the decision; the association reviews it, and the matter can then be brought before the competent court. The staff&apos;s
               log on Discord carries neither their username nor the reason.
             </li>
             <li>

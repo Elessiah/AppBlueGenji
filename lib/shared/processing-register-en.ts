@@ -307,7 +307,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       `Counting visits (24 h, 7 days, 30 days, total) and unique visitors (24 h, 7 days, 30 days, ${SITE_VISITOR_RETENTION_MONTHS} months)`,
     ],
-    legalBasis: "Legitimate interest (art. 6.1.f GDPR: knowing how much the site is visited), without a measurement cookie or third-party tracker; right to object (art. 21) applied by the site itself — the browser's Global Privacy Control and Do Not Track signals, or the objection button of /rgpd#audience (bg_audience_optout cookie, without identifier): a refused visit is not recorded, as the server reads these signals itself, and is not even sent when the browser exposes them to the page. For visits already recorded, the right is exercised like the other rights: with the person to contact for requests regarding data, through the report form, “GDPR” category (« RGPD »), or with the association",
+    legalBasis: "Legitimate interest (art. 6.1.f GDPR: knowing how much the site is visited), without a measurement cookie or third-party tracker; right to object (art. 21) applied by the site itself — the browser's Global Privacy Control and Do Not Track signals, or the objection button of the privacy policy (“Audience measurement” section; bg_audience_optout cookie, without identifier): a refused visit is not recorded, as the server reads these signals itself, and is not even sent when the browser exposes them to the page. For visits already recorded, the right is exercised like the other rights: with the person to contact for requests regarding data, through the report form, “GDPR” category (« RGPD »), or with the association",
     dataSubjects: ["Visitors of the site"],
     dataCategories: [
       "Hash salted with a server secret (SHA-256), derived from the account or from the IP address and the browser: pseudonymized data — without the secret, it cannot be linked to anyone, but the association, which holds it, can recompute the hash of an account or of an IP address and browser pair",
@@ -428,7 +428,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     transfers: ["None"],
     security: [
-      `Encryption on the site's server before any upload (age for the archives, rclone crypt remote for the images, the hidden logos and the log — checked in production on September 30, 2026, maintained for storage with Hetzner): keys held only by the site's host, ${SITE_HOST.name}, and never sent to Hetzner`,
+      `Encryption on the site's server before any upload (the “age” encryption tool for the archives, an rclone crypt remote for the images, the hidden logos and the log — checked in production on September 30, 2026, maintained for storage with Hetzner): keys held only by the site's host, ${SITE_HOST.name}, and never sent to Hetzner`,
       "Upload encrypted in transit (HTTPS/TLS)",
       "Permanent deletion, without trash or version history at the storage provider",
       "Private key of the archives kept off the server; key of the images and the log on the server only, with a backup copy off the server",
