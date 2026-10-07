@@ -7,6 +7,8 @@
  * `next-intl` de chaque message des nouveaux espaces.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 jest.mock("react-dom", () => {
   const actual = jest.requireActual<typeof import("react-dom")>("react-dom");
@@ -79,7 +81,11 @@ import { formatMessage } from "@/lib/shared/message-format";
 import { PARTICIPANT_WORDING } from "@/lib/shared/participants";
 import { PLAYER_REQUIREMENT_LABELS, registrationFiltersSummary, type PlayerRequirement } from "@/lib/shared/registration-filters";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
-import { tournamentFormMessages } from "@/lib/shared/tournament-actions-text";
+import {
+  tournamentActionsMessages,
+  tournamentEditFormMessages,
+  tournamentFormMessages,
+} from "@/lib/shared/tournament-actions-text";
 import { TOURNAMENT_IMAGE_FIT_LABELS, tournamentImageErrorMessage } from "@/lib/shared/tournament-image";
 import { describePhasePlan, findPhaseIssue, resolvePhasePlan, type PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentFormat } from "@/lib/shared/types";
@@ -105,8 +111,21 @@ function render(locale: "fr" | "en", ui: ReactElement): string {
   if (locale === "fr") return renderToStaticMarkup(tree);
   return renderToStaticMarkup(
     <AppLocaleProvider locale="en">
-      <TournamentActionsTextProvider locale="en" messages={tournamentFormMessages(EN, true)}>
+      <TournamentActionsTextProvider locale="en" messages={tournamentFormMessages(EN)}>
         {tree}
+      </TournamentActionsTextProvider>
+    </AppLocaleProvider>,
+  );
+}
+
+/** L'arbre réel de l'édition : la fiche (refus, gestes, image), puis le formulaire seul. */
+function renderEdit(ui: ReactElement): string {
+  return renderToStaticMarkup(
+    <AppLocaleProvider locale="en">
+      <TournamentActionsTextProvider locale="en" messages={tournamentActionsMessages(EN)}>
+        <TournamentActionsTextProvider locale="en" messages={tournamentEditFormMessages(EN)}>
+          <ToastProvider>{ui}</ToastProvider>
+        </TournamentActionsTextProvider>
       </TournamentActionsTextProvider>
     </AppLocaleProvider>,
   );
@@ -241,10 +260,25 @@ describe("route et référencement", () => {
   it("les mises en page ne sérialisent l'anglais que sous /en", async () => {
     const en = await CreateLayout({ children: null });
     expect((en.props as { messages?: Record<string, unknown> }).messages).toHaveProperty("form");
+    // L'édition hérite des refus, des gestes et de l'image de la fiche : elle
+    // n'envoie que le formulaire (pas deux fois ~30 Ko d'anglais).
     const editEn = await EditLayout({ children: null });
-    expect((editEn.props as { messages?: Record<string, unknown> }).messages).toHaveProperty("actions");
+    expect(Object.keys((editEn.props as { messages?: Record<string, unknown> }).messages ?? {})).toEqual(["form"]);
     mockLocale = "fr";
     expect(((await CreateLayout({ children: null })).props as { messages?: unknown }).messages).toBeUndefined();
+    expect(((await EditLayout({ children: null })).props as { messages?: unknown }).messages).toBeUndefined();
+  });
+
+  it("le bouton « Créer » de la liste ne dit plus la page française (hrefLang)", () => {
+    const source = readFileSync(path.join(process.cwd(), "app/(secured)/tournois/TournamentsList.tsx"), "utf8");
+    const link = /<LocaleLink href="\/tournois\/creer"[^>]*>/.exec(source);
+    expect(link?.[0]).toBe('<LocaleLink href="/tournois/creer">');
+  });
+
+  it("l'édition lit refus et image du fournisseur de la fiche, le formulaire du sien", () => {
+    const html = renderEdit(<TournamentImagePicker existing={null} value={initialImagePickerValue(null)} onChange={noop} />);
+    expectNoFrench(html);
+    expect(html).toBe(render("en", <TournamentImagePicker existing={null} value={initialImagePickerValue(null)} onChange={noop} />));
   });
 });
 
@@ -273,8 +307,7 @@ describe("rendu anglais — aucun français dans les formulaires", () => {
   });
 
   it("édition restreinte (tournoi visible) et planification en cours", () => {
-    const html = render(
-      "en",
+    const html = renderEdit(
       <TournamentForm
         mode="edit"
         initialValues={{ ...defaultTournamentFormValues(), format: "MULTI" }}
