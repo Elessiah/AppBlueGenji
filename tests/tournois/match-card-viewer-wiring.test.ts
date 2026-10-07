@@ -89,7 +89,7 @@ describe("nom d'équipe — même repli sur la carte et dans la modale", () => {
   it("MatchRow et la modale passent par le même repli à trois niveaux", () => {
     // Le libellé d'attente passe d'abord par la langue de la page (lot 8a-2).
     expect(MATCH_ROW).toMatch(/teamLabel\(\s*match\.team1Name,\s*localizedPlaceholder\(text, match\.team1Placeholder\),/);
-    expect(PLAYER_DIALOG).toMatch(/teamLabel\(match\.team1Name, match\.team1Placeholder,/);
+    expect(PLAYER_DIALOG).toMatch(/teamLabel\(match\.team1Name, localizedPlaceholder\(pageText, match\.team1Placeholder\),/);
   });
 });
 

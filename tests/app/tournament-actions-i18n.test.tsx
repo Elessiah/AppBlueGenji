@@ -514,3 +514,26 @@ describe("charge de la mise en page sous /en", () => {
     expect(Object.keys(tournamentActionsMessages(EN)).sort()).toEqual(["actions", "errors"]);
   });
 });
+
+describe("libellés d'attente dans les fenêtres", () => {
+  const waiting = bracketMatch({
+    id: 8,
+    roundNumber: 2,
+    team1Id: null,
+    team1Name: null,
+    team1Placeholder: "Gagnant match 1 du tableau perdants, manche 2",
+    team2Id: 11,
+    team2Name: "Bravo",
+    status: "PENDING",
+  });
+
+  it("retour en arrière : le libellé du serveur est redit en anglais, gardé en français", () => {
+    const ui = () => (
+      <RollbackRoundDialog tournamentId={1} stageLabel="round 2" stageKey="0:1" matches={[waiting]} tournamentFinished={false} onClose={noop} onRolledBack={noop} />
+    );
+    const en = render("en", ui());
+    expect(en).toContain("Winner of lower bracket match 1, round 2");
+    expect(en).not.toContain("Gagnant match");
+    expect(render("fr", ui())).toContain("Gagnant match 1 du tableau perdants, manche 2");
+  });
+});
