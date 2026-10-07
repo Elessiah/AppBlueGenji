@@ -156,7 +156,7 @@ export function RgpdEn({
         </header>
         <div className={styles.prose}>
           <p>
-            The <strong>{ASSOCIATION_NAME}</strong> association — a French nonprofit association (law of 1901),
+            The <strong>{ASSOCIATION_NAME}</strong> association — a French nonprofit (law of 1901),
             registered office: <span lang="fr">{ASSOCIATION_SEAT}</span>.
           </p>
           <p>
@@ -597,7 +597,7 @@ export function RgpdEn({
           <ul>
             <li>
               <strong>Data</strong>: the category, the description, the items designated, the page the report comes
-              from, the reporter&apos;s account if they are logged in, and the name and address they provide.
+              from, the reporter&apos;s account if they are logged in, and the name and email address they provide.
             </li>
             <li>
               <strong>Legal basis</strong>: <strong>legal obligation</strong> for a request to exercise rights (GDPR
@@ -633,7 +633,7 @@ export function RgpdEn({
             The players designated and the members of the teams designated receive a{" "}
             <strong>Discord direct message</strong> (if they have linked their Discord account or certified their
             tag) that leads to the report&apos;s page. There they read the reason and the description —{" "}
-            <strong>never the reporter&apos;s identity</strong> (neither account, nor name, nor address) — and only
+            <strong>never the reporter&apos;s identity</strong> (neither account, nor name, nor email address) — and only
             the items that concern them. So that repeated sending does not make the bot write in a loop, a person
             already targeted by another report less than {REPORT_TARGET_NOTICE_COOLDOWN_HOURS} hours earlier is not
             notified a second time: the new report remains viewable and can be contested through the form (“Appeal”

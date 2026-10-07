@@ -100,7 +100,7 @@ export const RGPD_CONTACT_LINE_EN = `Requests regarding data: ${DATA_CONTACT_NAM
 export function registerControllerEn(): RegisterController {
   return {
     name: ASSOCIATION_NAME,
-    legalForm: "French nonprofit association (law of 1901)",
+    legalForm: "French nonprofit (law of 1901)",
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE_EN,
     dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE_EN}, appointed by the association to receive requests regarding data (contact details given with those of the data controller). He is not a data protection officer within the meaning of Article 37 of the GDPR; the association remains the data controller`,

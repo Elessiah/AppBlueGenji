@@ -126,7 +126,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     title: "Reports and appeals",
     summary: "You are notified of a report that targets you, and you can contest it.",
     details: [
-      `A report keeps its category, its description, the players, teams or tournaments designated, its author's account and, if they provide them, their name and address. It is read by the administrators, then erased ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} days after it is archived — later if a logo was hidden or deleted as a result, until the deadline for contesting.`,
+      `A report keeps its category, its description, the players, teams or tournaments designated, its author's account and, if they provide them, their name and email address. It is read by the administrators, then erased ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} days after it is archived — later if a logo was hidden or deleted as a result, until the deadline for contesting.`,
       "If a report targets you, or a team you are a member of, you receive a Discord direct message (if your Discord account is linked or your tag certified). You read what you are accused of — never who reported it — and you can contest it; an appeal reopens an archived report.",
       `A reported team logo may be hidden: it is no longer online, and it is permanently deleted after ${LOGO_QUARANTINE_MONTHS} months without a challenge, or restored if the challenge succeeds. You and your teammates are notified.`,
       "Acceptance of the terms of use (when creating the account or a team, or when receiving the management of a team) is recorded with its date and version; it appears in the export of your data.",
