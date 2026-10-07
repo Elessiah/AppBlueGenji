@@ -152,7 +152,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               </p>
             )}
 
-            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} />
+            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} lang={dialogLang} />
 
             <div
               style={{

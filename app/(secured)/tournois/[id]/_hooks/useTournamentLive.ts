@@ -127,12 +127,12 @@ export function useTournamentLive(tournamentId: number) {
       lastUpdateAtRef.current = Date.now();
 
       // Détecté sur ce qui est **reçu**, avant de décider du rendu.
-      if (next.detail) announceViewerChanges(previous.detail, next.detail);
+      if (next.detail) announceViewerChanges(previous.detail, next.detail, (alert) => t(`live.alerts.${alert}`));
       updateMatchFocus();
 
       renderGate.received(policyRef.current.snapshotRenderDelayMs, previous.detail, next.detail);
     },
-    [renderGate, updateMatchFocus],
+    [renderGate, updateMatchFocus, t],
   );
 
   useEffect(() => {

@@ -105,6 +105,12 @@
     "fatal": {
       "UNAUTHORIZED": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
       "TOURNAMENT_NOT_FOUND": "This tournament no longer exists: there's nothing left to follow."
+    },
+    "alerts": {
+      "SCORE_TO_CONFIRM": "Score to confirm",
+      "MATCH_READY": "Your match is ready",
+      "TOURNAMENT_STARTED": "Tournament starting",
+      "ROUND_STARTED": "New round"
     }
   },
   "loading": "Loading the tournament…",

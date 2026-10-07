@@ -134,15 +134,17 @@ export function matchFormatDescriptionText(text: TournamentPageText, format: Mat
 }
 
 /**
- * Date et heure d'un écran de la fiche : « 07 oct. 2026, 20:00 » / « Oct 07,
- * 2026, 20:00 », sur 24 h. Fuseau du lecteur, comme avant (le français reste
- * celui de `toLocaleString("fr-FR", …)`).
+ * Date et heure d'un écran de la fiche : « 07 oct. 2026, 20:00 » / « Oct 7,
+ * 2026, 20:00 », sur 24 h — l'anglais sans zéro initial au jour, comme les
+ * cartes de la liste (`formatCardDate`). Fuseau du lecteur, comme avant (le
+ * français reste celui de `toLocaleString("fr-FR", …)`).
  */
 export function pageDateTime(iso: string, locale: Locale, options: Intl.DateTimeFormatOptions): string {
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "—";
   const hour = options.hour === undefined ? {} : { hourCycle: "h23" as const };
-  return date.toLocaleString(INTL_LOCALE[locale], { ...options, ...hour });
+  const day = locale === "en" && options.day === "2-digit" ? { day: "numeric" as const } : {};
+  return date.toLocaleString(INTL_LOCALE[locale], { ...options, ...hour, ...day });
 }
 
 /**

@@ -105,6 +105,12 @@
     "fatal": {
       "UNAUTHORIZED": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
       "TOURNAMENT_NOT_FOUND": "Ce tournoi n'existe plus : il n'y a plus rien à suivre."
+    },
+    "alerts": {
+      "SCORE_TO_CONFIRM": "Score à confirmer",
+      "MATCH_READY": "Ton match est prêt",
+      "TOURNAMENT_STARTED": "Le tournoi commence",
+      "ROUND_STARTED": "Nouvelle manche"
     }
   },
   "loading": "Chargement du tournoi…",

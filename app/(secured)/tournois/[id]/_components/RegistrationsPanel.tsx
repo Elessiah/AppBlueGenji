@@ -394,7 +394,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
 
       {/* `sr-only` global (`app/globals.css`) : la ligne qui bouge est le seul
           retour visuel d'un réordonnancement, il faut le dire à l'oreille. */}
-      <p aria-live="polite" className="sr-only">
+      <p aria-live="polite" className="sr-only" lang={staffLang}>
         {announcement}
       </p>
 

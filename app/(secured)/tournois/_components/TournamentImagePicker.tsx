@@ -33,6 +33,12 @@ interface TournamentImagePickerProps {
   value: ImagePickerValue;
   onChange: (value: ImagePickerValue) => void;
   disabled?: boolean;
+  /**
+   * Langue du sélecteur quand elle diffère de la page (fenêtre restée en
+   * français sous `/en`) : la modale de recadrage et les refus, portés hors de
+   * son ancêtre, la redisent.
+   */
+  lang?: "fr";
 }
 
 /** Dimensions d'un fichier image ; `null` si le navigateur ne sait pas les lire. */
@@ -66,14 +72,15 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
  *
  * Le composant est contrôlé : il ne fait qu'un brouillon, que la page enregistre.
  */
-export function TournamentImagePicker({ existing, value, onChange, disabled }: Readonly<TournamentImagePickerProps>) {
-  const { showError } = useToast();
+export function TournamentImagePicker({ existing, value, onChange, disabled, lang }: Readonly<TournamentImagePickerProps>) {
+  const toast = useToast();
+  const showError = (message: string) => toast.showError(message, lang ? { lang } : undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draggingRef = useRef(false);
   // Un fichier survole la zone vide : on le dit avant qu'il soit lâché.
   const [dropping, setDropping] = useState(false);
   const baseId = useId();
-  const { cropImage, cropDialog } = useImageCropper();
+  const { cropImage, cropDialog } = useImageCropper({ lang });
   // L'aperçu montre la **zone gardée** : c'est dans elle que se choisit le
   // point focal, et c'est elle que le serveur enregistrera.
   const pending = useMemo(

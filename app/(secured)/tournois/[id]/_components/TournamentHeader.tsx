@@ -328,9 +328,10 @@ function MetaCell({ item, locale }: Readonly<{ item: HeaderMetaItem; locale: Loc
 function formatHeaderDate(iso: string, locale: Locale): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  // 24 h dans les deux langues (le français l'applique de lui-même).
+  // 24 h dans les deux langues (le français l'applique de lui-même) ; jour sans
+  // zéro initial en anglais (« Oct 7, 2026 »), comme `formatCardDate`.
   return date.toLocaleString(INTL_LOCALE[locale], {
-    day: "2-digit",
+    day: locale === "fr" ? "2-digit" : "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
