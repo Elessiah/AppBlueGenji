@@ -86,7 +86,7 @@ describe("hook temps réel — les garde-fous de dégradation", () => {
   // sur `openLiveConnection` : `live-connection.test.ts`. On ne tient ici que
   // ce que le hook lui confie.
   it("annonce l'échec définitif et sonde à la cadence du palier", () => {
-    expect(hook).toContain("showError(mapError(failure));");
+    expect(hook).toContain("showPageError(t(`live.fatal.${failure}`));");
     expect(hook).toContain("REFRESH_CADENCE[stateRef.current.tier].detailFallbackMs");
   });
 

@@ -494,6 +494,16 @@ describe("blocs restés en français (lot 8b) sous /en", () => {
       expect(`${file}: ${code.includes("useFrenchBlockToast()")}`).toBe(`${file}: true`);
       expect(`${file}: ${code.includes("useToast()")}`).toBe(`${file}: false`);
     }
+    // Les fenêtres de score notifient par leur hook commun.
+    const scoreForm = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
+    expect(scoreForm).toContain("useFrenchBlockToast()");
+    expect(scoreForm).not.toContain("useToast()");
+  });
+
+  it("échec définitif du flux : notification dans la langue de la page, comme le témoin", () => {
+    const live = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts"), "utf8");
+    expect(live).toContain("showPageError(t(`live.fatal.${failure}`));");
+    expect(live).not.toContain("showError(mapError(failure))");
   });
 
   it("le menu porté et les confirmations portées redisent lang=\"fr\"", () => {
