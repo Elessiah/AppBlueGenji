@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
-import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
+import type { TermsTranslationNote } from "@/lib/shared/french-version-prevails";
 import {
   TERMS_PATH,
   TERMS_REQUIRED_EVENT,
@@ -54,6 +54,12 @@ interface TermsAcceptanceModalProps {
   request?: TermsRequest | null;
   /** Une modale de confidentialité attend une réponse : celle-ci passe après. */
   privacyPending: boolean;
+  /**
+   * Note « what you accept is the French text » (`TERMS_TRANSLATION_NOTE`),
+   * passée par la mise en page racine sous `/en` seulement : montée sur toutes
+   * les pages, la fenêtre ne l'importe pas, et une page française ne la charge pas.
+   */
+  translationNote?: TermsTranslationNote | null;
 }
 
 /**
@@ -73,9 +79,14 @@ interface TermsAcceptanceModalProps {
  *
  * Textes de la coquille (`shell.termsModal`, lot 7b). Sous `/en`, elle lie les
  * conditions anglaises et dit, sous la case, que c'est le texte français — la
- * même `TERMS_VERSION` — que l'on accepte (`TERMS_TRANSLATION_NOTE`).
+ * même `TERMS_VERSION` — que l'on accepte (`translationNote`).
  */
-export function TermsAcceptanceModal({ initiallyRequired, request = null, privacyPending }: Readonly<TermsAcceptanceModalProps>) {
+export function TermsAcceptanceModal({
+  initiallyRequired,
+  request = null,
+  privacyPending,
+  translationNote = null,
+}: Readonly<TermsAcceptanceModalProps>) {
   const updated = request === "UPDATED";
   const { t, rich, locale } = useShellText();
   const { showError, showSuccess } = useToast();
@@ -174,11 +185,11 @@ export function TermsAcceptanceModal({ initiallyRequired, request = null, privac
             )}
           </span>
         </label>
-        {locale === "fr" ? null : (
+        {locale === "fr" || !translationNote ? null : (
           <p className={styles.translationNote}>
-            {TERMS_TRANSLATION_NOTE.text}{" "}
+            {translationNote.text}{" "}
             <a href={TERMS_PATH} target="_blank" rel="noreferrer" hrefLang="fr">
-              {TERMS_TRANSLATION_NOTE.link}
+              {translationNote.link}
             </a>
           </p>
         )}

@@ -17,6 +17,7 @@ import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu"
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
+import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { needsTermsForTeamManagement } from "@/lib/server/terms-acceptance";
 import type { TermsRequest } from "@/lib/shared/terms-of-use";
 import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deletion-journal";
@@ -303,6 +304,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               initiallyRequired={termsRequired && !termsPostponed}
               request={termsRequest}
               privacyPending={privacyChanges.length > 0}
+              translationNote={locale === DEFAULT_LOCALE ? null : TERMS_TRANSLATION_NOTE}
             />
           )}
           {/* Lancement des matchs du joueur, sur toutes les pages : la modale
