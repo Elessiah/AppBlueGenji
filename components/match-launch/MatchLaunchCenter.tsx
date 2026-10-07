@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
-import { useShellText } from "@/components/i18n/shell-text";
-import type { ShellKey, ShellText } from "@/lib/shared/shell-text";
+import { useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
@@ -42,7 +41,7 @@ const REFRESH_EVENT_COALESCE_MS = 300;
 const LAUNCH_ANNOUNCE_WINDOW_MS = 10 * 60_000;
 const DISMISSED_STORAGE_KEY = "bg_match_launch_dismissed";
 
-/** Rôles affichés sur un contact, dans l'ordre de la priorité de choix (`launchModal.roles.*`). */
+/** Rôles affichés sur un contact, dans l'ordre de la priorité de choix (`roles.*`). */
 const CONTACT_ROLES = ["CAPITAINE", "MANAGER", "OWNER"] as const satisfies readonly TeamRole[];
 
 function readDismissed(): Set<string> {
@@ -72,32 +71,32 @@ function formatTime(iso: string | null, locale: Locale): string | null {
 }
 
 /** Libellés qui dépendent de qui déclare « Prêt » : une équipe, ou le caster. */
-function viewerLaunchCopy(text: ShellText, role: MatchLaunchInfo["viewer"]["role"]): { partyWord: string; confirmQuestion: string } {
+function viewerLaunchCopy(text: LaunchText, role: MatchLaunchInfo["viewer"]["role"]): { partyWord: string; confirmQuestion: string } {
   const who = role === "CASTER" ? "caster" : "team";
-  return { partyWord: text.t(`launchModal.ready.${who}`), confirmQuestion: text.t(`launchModal.confirmQuestion.${who}`) };
+  return { partyWord: text.t(`ready.${who}`), confirmQuestion: text.t(`confirmQuestion.${who}`) };
 }
 
 /** Sur-titre de la modale. */
-function launchEyebrow(text: ShellText, phase: MatchLaunchInfo["phase"]): string {
-  return text.t(phase === "LAUNCHED" ? "launchModal.eyebrowLaunched" : "launchModal.eyebrowLobby");
+function launchEyebrow(text: LaunchText, phase: MatchLaunchInfo["phase"]): string {
+  return text.t(phase === "LAUNCHED" ? "eyebrowLaunched" : "eyebrowLobby");
 }
 
-/** Clés des refus du lancement (`launchModal.errors.*`). */
-type LaunchErrorKey = Extract<ShellKey, `launchModal.errors.${string}`>;
+/** Clés des refus du lancement (`errors.*`). */
+type LaunchErrorKey = Extract<LaunchKey, `errors.${string}`>;
 
 /**
  * Refus d'un geste du lancement (`launchErrorMessage`), dans la langue de la
  * page : la modale vit dans la mise en page racine, hors de la fiche et de sa
- * table des refus — elle porte les siens (`launchModal.errors.*`).
+ * table des refus — elle porte les siens (`errors.*`).
  */
-function launchErrorText(text: ShellText, code: string | null | undefined): string {
+function launchErrorText(text: LaunchText, code: string | null | undefined): string {
   // Lecture directe de la table des messages, et non de `LAUNCH_ERROR_MESSAGES`
   // (dont le français est le même, testé) : l'importer aurait mis ses phrases
   // une seconde fois dans le paquet de toutes les pages. Une clé absente se
   // rend telle quelle (`scopedText`) : c'est le signe d'un code inconnu.
-  const key = `launchModal.errors.${code ?? ""}`;
+  const key = `errors.${code ?? ""}`;
   const message = code ? text.t(key as LaunchErrorKey) : key;
-  return message === key ? text.t("launchModal.errors.fallback") : message;
+  return message === key ? text.t("errors.fallback") : message;
 }
 
 /** Libellé d'un bouton, remplacé par « … » le temps d'un envoi. */
@@ -131,7 +130,7 @@ function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
  */
 export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacyPending?: boolean }>) {
   const { showError, showSuccess } = useToast();
-  const text = useShellText();
+  const text = useLaunchText();
   const { t } = text;
   const { clocks } = useClientPower();
   // Un choix de confidentialité dû passe d'abord (`launchModalWaits`).
@@ -233,8 +232,8 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
         launched?: boolean;
       };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      const readyMessage = ready ? t("launchModal.readyNoted") : t("launchModal.readyCanceled");
-      showSuccess(payload.launched ? t("launchModal.launched") : readyMessage);
+      const readyMessage = ready ? t("readyNoted") : t("readyCanceled");
+      showSuccess(payload.launched ? t("launched") : readyMessage);
       setConfirming(false);
       pendingFocusRef.current = "ready";
       await refresh();
@@ -250,9 +249,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
   const copy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      showSuccess(t("launchModal.copied", { label }));
+      showSuccess(t("copied", { label }));
     } catch {
-      showError(t("launchModal.copyFailed"));
+      showError(t("copyFailed"));
     }
   };
 
@@ -311,7 +310,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
         tabIndex={-1}
         data-phase={current.phase}
       >
-        <ScrollArea orientation="y" className={styles.scroll} ariaLabel={t("launchModal.detailsAria")}>
+        <ScrollArea orientation="y" className={styles.scroll} ariaLabel={t("detailsAria")}>
           <header className={styles.head}>
             <span className="eyebrow">
               {launchEyebrow(text, current.phase)} ·{" "}
@@ -323,9 +322,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                   écran. Un `aria-label` sur ce `<span>` sans rôle serait interdit
                   (`aria-prohibited-attr`) — et c'est ce titre qui nomme la modale. */}
               <span className={styles.vs} aria-hidden="true">
-                {t("launchModal.vs")}
+                {t("vs")}
               </span>
-              <span className="sr-only"> {t("launchModal.versus")} </span>
+              <span className="sr-only"> {t("versus")} </span>
               <span className={styles.titleTeam}>{current.team2.name}</span>
             </h2>
             <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ id={statusId} className={styles.status} data-phase={current.phase} role="status">
@@ -337,7 +336,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             <div className={styles.sides}>
               <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} />
               <div className={styles.divider} aria-hidden="true">
-                {t("launchModal.vs")}
+                {t("vs")}
               </div>
               <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
             </div>
@@ -371,7 +370,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             tabIndex={-1}
           >
             <p id={confirmTextId} className={styles.confirmText}>
-              {confirmQuestion} {t("launchModal.startsWhenReady")}
+              {confirmQuestion} {t("startsWhenReady")}
             </p>
             <div className={styles.actions}>
               <button
@@ -383,7 +382,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                 }}
                 disabled={busy}
               >
-                {t("launchModal.back")}
+                {t("back")}
               </button>
               <button
                 type="button"
@@ -391,7 +390,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                 onClick={() => void setReady(true)}
                 disabled={busy}
               >
-                {busyLabel(busy, t("launchModal.confirmReady"))}
+                {busyLabel(busy, t("confirmReady"))}
               </button>
             </div>
           </fieldset>
@@ -406,9 +405,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                   onClick={() => void setReady(false)}
                   disabled={busy}
                   aria-pressed="true"
-                  title={t("launchModal.cancelReadyTitle")}
+                  title={t("cancelReadyTitle")}
                 >
-                  {busyLabel(busy, t("launchModal.cancelReady"))}
+                  {busyLabel(busy, t("cancelReady"))}
                 </button>
               ) : (
                 <button
@@ -434,7 +433,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             )}
             {current.phase === "LOBBY" && !current.viewer.canDeclareReady && (
               <p className={styles.hint}>
-                {t("launchModal.notLeader")}
+                {t("notLeader")}
               </p>
             )}
             <div className={styles.links}>
@@ -447,7 +446,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                     setOpenMatchId(nextMatchId);
                   }}
                 >
-                  {t("launchModal.otherMatch", { count: pending.filter((info) => info.matchId !== current.matchId).length })}
+                  {t("otherMatch", { count: pending.filter((info) => info.matchId !== current.matchId).length })}
                 </button>
               )}
               <LocaleLink
@@ -455,10 +454,10 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                 href={tournamentMatchHref(current.tournamentId, current.matchId)}
                 onClick={close}
               >
-                {t("launchModal.viewMatch")}
+                {t("viewMatch")}
               </LocaleLink>
               <button type="button" className="btn ghost" onClick={close}>
-                {t("launchModal.close")}
+                {t("close")}
               </button>
             </div>
           </footer>
@@ -567,7 +566,7 @@ function LaunchFab({
   pending,
   onOpen,
 }: Readonly<{ pending: readonly MatchLaunchInfo[]; onOpen: (matchId: number) => void }>) {
-  const { t } = useShellText();
+  const { t } = useLaunchText();
   const lobby = pending.find((info) => info.phase === "LOBBY");
   const target = lobby ?? pending[0];
   return (
@@ -578,9 +577,9 @@ function LaunchFab({
       onClick={() => onOpen(target.matchId)}
     >
       <span aria-hidden="true">{lobby ? "⏳" : "▶"}</span>
-      {lobby ? t("launchModal.fabLobby") : t("launchModal.fabMine")}
+      {lobby ? t("fabLobby") : t("fabMine")}
       <span className={styles.fabTeams}>
-        {t("launchModal.fabTeams", { team1: target.team1.name, team2: target.team2.name })}
+        {t("fabTeams", { team1: target.team1.name, team2: target.team2.name })}
       </span>
     </button>
   );
@@ -598,22 +597,22 @@ function LaunchStatus({
   autoAt: string | null;
   startAt: string | null;
 }>) {
-  const { t } = useShellText();
+  const { t } = useLaunchText();
   return (
     <>
       {phase === "LOBBY" && (
         <>
-          {t("launchModal.status.waiting")}{" "}
+          {t("status.waiting")}{" "}
           <strong className="num">
             {count.ready}/{count.expected}
           </strong>{" "}
-          {t("launchModal.status.ready")}
-          {autoAt && <> · {t("launchModal.status.autoAt")} <span className="num">{autoAt}</span></>}
+          {t("status.ready")}
+          {autoAt && <> · {t("status.autoAt")} <span className="num">{autoAt}</span></>}
         </>
       )}
-      {phase === "LAUNCHED" && <>{t("launchModal.status.launched")}</>}
+      {phase === "LAUNCHED" && <>{t("status.launched")}</>}
       {phase === "SCHEDULED" && (
-        <>{t("launchModal.status.startsAt")} <span className="num">{startAt ?? "—"}</span></>
+        <>{t("status.startsAt")} <span className="num">{startAt ?? "—"}</span></>
       )}
     </>
   );
@@ -622,11 +621,11 @@ function LaunchStatus({
 type CopyFn = (value: string, label: string) => Promise<void>;
 
 function ReadyChip({ ready, phase }: Readonly<{ ready: boolean; phase: MatchLaunchInfo["phase"] }>) {
-  const { t } = useShellText();
+  const { t } = useLaunchText();
   if (phase !== "LOBBY") return null;
   return (
     <span className={ready ? styles.chipReady : styles.chipWaiting}>
-      {ready ? t("launchModal.chipReady") : t("launchModal.chipWaiting")}
+      {ready ? t("chipReady") : t("chipWaiting")}
     </span>
   );
 }
@@ -642,7 +641,7 @@ function IdentityLine({
   verified: boolean;
   onCopy: CopyFn;
 }>) {
-  const { t } = useShellText();
+  const { t } = useLaunchText();
   return (
     <div className={styles.identity}>
       <span className={styles.identityKind}>{kind}</span>
@@ -650,19 +649,19 @@ function IdentityLine({
         <>
           <span className={`mono ${styles.identityValue}`}>{value}</span>
           {verified ? (
-            <span className={styles.verified} title={t("launchModal.verifiedTitle")}>
-              ✓<span className="sr-only"> {t("launchModal.verified")}</span>
+            <span className={styles.verified} title={t("verifiedTitle")}>
+              ✓<span className="sr-only"> {t("verified")}</span>
             </span>
           ) : (
-            <span className={styles.unverified}>{t("launchModal.unverified")}</span>
+            <span className={styles.unverified}>{t("unverified")}</span>
           )}
           <button
             type="button"
             className={`${styles.copy} tap-target`}
             onClick={() => void onCopy(value, kind)}
-            aria-label={t("launchModal.copyAria", { kind, value })}
+            aria-label={t("copyAria", { kind, value })}
           >
-            {t("launchModal.copy")}
+            {t("copy")}
           </button>
         </>
       ) : (
@@ -673,10 +672,10 @@ function IdentityLine({
 }
 
 function ContactRow({ contact, onCopy }: Readonly<{ contact: LaunchContact; onCopy: CopyFn }>) {
-  const { t } = useShellText();
+  const { t } = useLaunchText();
   // Dans l'ordre de la priorité de choix (capitaine, manager, propriétaire),
   // pas dans l'ordre de saisie : la pastille la plus parlante vient en tête.
-  const roles = CONTACT_ROLES.filter((role) => contact.roles.includes(role)).map((role) => t(`launchModal.roles.${role}`));
+  const roles = CONTACT_ROLES.filter((role) => contact.roles.includes(role)).map((role) => t(`roles.${role}`));
   return (
     <li className={styles.contact}>
       <div className={styles.contactHead}>
@@ -704,7 +703,7 @@ function SideCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
 }>) {
-  const { t } = useShellText();
+  const { t } = useLaunchText();
   return (
     <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={side.name}>
       <div className={styles.sideHead}>
@@ -721,7 +720,7 @@ function SideCard({
       </div>
       {isHost && (
         <p className={styles.hostBadge}>
-          <span aria-hidden="true">🏠</span> {t("launchModal.host")}
+          <span aria-hidden="true">🏠</span> {t("host")}
         </p>
       )}
       <SideContacts side={side} phase={phase} onCopy={onCopy} />
@@ -738,10 +737,10 @@ function SideContacts({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
 }>) {
-  const { t } = useShellText();
-  if (side.isGhost) return <p className={styles.note}>{t("launchModal.ghost")}</p>;
-  if (phase === "SCHEDULED") return <p className={styles.note}>{t("launchModal.contactsAtLaunch")}</p>;
-  if (side.contacts.length === 0) return <p className={styles.note}>{t("launchModal.noContact")}</p>;
+  const { t } = useLaunchText();
+  if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
+  if (phase === "SCHEDULED") return <p className={styles.note}>{t("contactsAtLaunch")}</p>;
+  if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (
     <ul className={styles.contacts}>
       {side.contacts.map((contact) => (
@@ -760,24 +759,24 @@ function CasterCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
 }>) {
-  const { t } = useShellText();
+  const { t } = useLaunchText();
   if (!caster) {
     return (
-      <section className={styles.caster} aria-label={t("launchModal.caster")}>
+      <section className={styles.caster} aria-label={t("caster")}>
         <p className={styles.note}>
-          <span aria-hidden="true">🎙</span> {t("launchModal.noCaster")}
+          <span aria-hidden="true">🎙</span> {t("noCaster")}
         </p>
       </section>
     );
   }
   return (
-    <section className={styles.caster} aria-label={t("launchModal.caster")}>
+    <section className={styles.caster} aria-label={t("caster")}>
       <div className={styles.sideHead}>
         <span className={styles.emblem} aria-hidden="true">
           🎙
         </span>
         <span className={styles.sideName}>
-          <span className={styles.casterLabel}>{t("launchModal.caster")}</span> {caster.pseudo}
+          <span className={styles.casterLabel}>{t("caster")}</span> {caster.pseudo}
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>

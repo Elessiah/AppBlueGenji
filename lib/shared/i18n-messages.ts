@@ -32,8 +32,9 @@ import type frTournamentActions from "@/messages/fr/tournamentActions.json";
 import type frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
 import type frTournamentImage from "@/messages/fr/tournamentImage.json";
 import type frTournamentForm from "@/messages/fr/tournamentForm.json";
+import type frLaunchModal from "@/messages/fr/launchModal.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -86,6 +87,12 @@ export type Messages = {
   tournamentImage: typeof frTournamentImage;
   /** Formulaires de création et d'édition d'un tournoi (lot 8b-2) — `_lib/form-text.ts`. */
   tournamentForm: typeof frTournamentForm;
+  /**
+   * Fenêtre de lancement d'un match (lot 8b-2), montée par la mise en page
+   * racine pour tout compte connecté mais chargée à la demande : ses deux
+   * langues voyagent avec son morceau — `components/match-launch/launch-text.ts`.
+   */
+  launchModal: typeof frLaunchModal;
 };
 
 /**

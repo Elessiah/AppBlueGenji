@@ -15,7 +15,7 @@ import { FloatingScrollWatcher } from "@/components/floating-scroll-watcher";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
-import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
+import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCenterLazy";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { needsTermsForTeamManagement } from "@/lib/server/terms-acceptance";
@@ -310,8 +310,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             />
           )}
           {/* Lancement des matchs du joueur, sur toutes les pages : la modale
-              s'ouvre à l'heure du match, où qu'il se trouve sur le site. */}
-          {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}
+              s'ouvre à l'heure du match, où qu'il se trouve sur le site. Chargée
+              à la demande : hors du premier chargement de chaque page. */}
+          {user && <MatchLaunchCenterLazy privacyPending={privacyChanges.length > 0} />}
           {children}
         </ToastProvider>
         </PodiumTiersProvider>
