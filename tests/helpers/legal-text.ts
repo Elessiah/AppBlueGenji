@@ -9,7 +9,7 @@ const BLOCK = /<(p|li|h1|h2|h3|h4|div|section|header|dd|dt|td|th|tr|ul|ol|nav|br
 export function legalPageText(html: string): string {
   return html
     .replace(BLOCK, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^<>]*>/g, "")
     .replace(/&#x27;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, "<")
