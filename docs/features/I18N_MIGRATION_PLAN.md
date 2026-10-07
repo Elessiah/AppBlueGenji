@@ -421,6 +421,24 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **Performance** : +6 kB au premier chargement de la fiche (209 → 215 kB) — les textes des vues
   chargées à la demande y arrivent avec la fiche. Découpe par vue possible si la revue le demande.
 
+### Ce que le lot 8b-1 a établi (2026-10-07) — écarts au plan
+
+- **Lot 8b coupé en deux** (volume : ~25 composants de gestes, ~500 messages) : **8b-1** gestes
+  de la fiche `/tournois/[id]` (inscription, abandon, score, forfait, signalement, lancement sur
+  la carte, outils du staff posés sur la page, notifications, confirmations) et la table des
+  refus **complète** (162 codes, création et édition comprises) ; **8b-2** formulaires de
+  création et d'édition (`/tournois/creer`, `/tournois/[id]/modifier`, ajout à
+  `MIGRATED_ROUTES`), sélecteur d'image, fenêtre de lancement globale (`MatchLaunchCenter`),
+  empilé sur 8b-1 (table des refus commune). Détail : `I18N.md` § Tournois — gestes.
+- **Outils du staff posés sur la fiche traduits** (écart à D4, qui ne visait que le
+  back-office `/admin`) : la demande du lot les range dans les actions de la page.
+- **Trois espaces** (`tournamentErrors`, `tournamentActions`, `tournamentDialogs`) plutôt que
+  `errors.<CODE>` dans un espace commun : la table des refus sert trois routes, les fenêtres
+  voyagent avec leur morceau `dynamic()`.
+- **Aperçu du tirage resté français** (`lang="fr"`) : ses lignes sont rédigées par le serveur
+  dans l'instantané commun ; les traduire changerait le contrat du flux.
+- **Performance** : `/tournois/[id]` 214 → 216 kB au premier chargement.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -458,7 +476,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 7a ✅ | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
 | 7b ✅ (7b-1, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a ✅ (8a-1, 8a-2) | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
-| 8b | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
+| 8b (8b-1 ✅, 8b-2) | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
 | 9 | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
 | ~~10~~ | ~~Admin~~ | **Abandonné** : l'admin reste en français (D4) | — | — | — |
 
