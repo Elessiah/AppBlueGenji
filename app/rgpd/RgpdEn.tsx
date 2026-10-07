@@ -579,8 +579,10 @@ export function RgpdEn({
           <h3>1. Reporting a problem</h3>
           <p>
             The <strong>“{REPORT_FORM_NAME_EN}”</strong> button, at the bottom of every page, is open to{" "}
-            <strong>everyone</strong>, with or without an account. You choose a category — copyright, moderation,
-            bug, GDPR, host, other —, describe the problem and, when logged in, designate the players, teams or
+            <strong>everyone</strong>, with or without an account. You choose a category — copyright (
+            <span lang="fr">« Droit d&apos;auteur »</span>), moderation (<span lang="fr">« Modération »</span>), bug,
+            GDPR (<span lang="fr">« RGPD »</span>), host (<span lang="fr">« Hébergeur »</span>), other (
+            <span lang="fr">« Autre »</span>) —, describe the problem and, when logged in, designate the players, teams or
             tournaments concerned. A <strong>copyright</strong> report states {copyrightNoticeElementsTextEn()}: this
             is what the EU Digital Services Act requires of a notice of illegal content (art. 16).{" "}
             <EnglishLegalText text={NOTIFIER_FOLLOW_UP_EN} /> <strong>In-game behavior</strong> (insults, cheating, anti-play, dispute on
@@ -865,7 +867,7 @@ export function RgpdEn({
                     {activity.ref} — {activity.name}
                   </strong>
                 </LocaleLink>
-                : {activity.purpose}. <em>Legal basis</em>: {activity.legalBasis}. <em>Retention</em>:{" "}
+                : {activity.purpose}. <em>Legal basis</em>: <EnglishLegalText text={activity.legalBasis} />. <em>Retention</em>:{" "}
                 <EnglishLegalText text={activity.retention.join("; ")} />.
               </li>
             ))}

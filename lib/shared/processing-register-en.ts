@@ -307,7 +307,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       `Counting visits (24 h, 7 days, 30 days, total) and unique visitors (24 h, 7 days, 30 days, ${SITE_VISITOR_RETENTION_MONTHS} months)`,
     ],
-    legalBasis: "Legitimate interest (art. 6.1.f GDPR: knowing how much the site is visited), without a measurement cookie or third-party tracker; right to object (art. 21) applied by the site itself — the browser's Global Privacy Control and Do Not Track signals, or the objection button of /rgpd#audience (bg_audience_optout cookie, without identifier): a refused visit is not recorded, as the server reads these signals itself, and is not even sent when the browser exposes them to the page. For visits already recorded, the right is exercised like the other rights: with the person to contact for requests regarding data, through the report form, GDPR category, or with the association",
+    legalBasis: "Legitimate interest (art. 6.1.f GDPR: knowing how much the site is visited), without a measurement cookie or third-party tracker; right to object (art. 21) applied by the site itself — the browser's Global Privacy Control and Do Not Track signals, or the objection button of /rgpd#audience (bg_audience_optout cookie, without identifier): a refused visit is not recorded, as the server reads these signals itself, and is not even sent when the browser exposes them to the page. For visits already recorded, the right is exercised like the other rights: with the person to contact for requests regarding data, through the report form, “GDPR” category (« RGPD »), or with the association",
     dataSubjects: ["Visitors of the site"],
     dataCategories: [
       "Hash salted with a server secret (SHA-256), derived from the account or from the IP address and the browser: pseudonymized data — without the secret, it cannot be linked to anyone, but the association, which holds it, can recompute the hash of an account or of an IP address and browser pair",
@@ -472,7 +472,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Alerting administrators on Discord, without personal data",
     ],
     legalBasis:
-      "Legitimate interest (GDPR, art. 6.1.f) of the association in enforcing its terms of use for the moderation of content and accounts contrary to them — review, hiding, removal of an image, suspension of an account, and keeping the decision while it can be contested; legal obligation (GDPR, art. 6.1.c) for requests to exercise rights (GDPR, art. 12), notices of illegal content, in copyright as in moderation (Regulation (EU) 2022/2065, art. 16), requests sent to the host (art. 11 and 16) and appeals (art. 20), without an agreement box; consent of the reporter (box when sending) for bug and other reports; by email or by phone as through the form (GDPR category), a request to exercise rights or a question about the processing of one's data — which falls under the right of access (GDPR, art. 15) — is based on the same legal obligation",
+      "Legitimate interest (GDPR, art. 6.1.f) of the association in enforcing its terms of use for the moderation of content and accounts contrary to them — review, hiding, removal of an image, suspension of an account, and keeping the decision while it can be contested; legal obligation (GDPR, art. 6.1.c) for requests to exercise rights (GDPR, art. 12), notices of illegal content, in copyright as in moderation (Regulation (EU) 2022/2065, art. 16), requests sent to the host (art. 11 and 16) and appeals (art. 20), without an agreement box; consent of the reporter (box when sending) for bug and other reports; by email or by phone as through the form (“GDPR” category, « RGPD »), a request to exercise rights or a question about the processing of one's data — which falls under the right of access (GDPR, art. 15) — is based on the same legal obligation",
     dataSubjects: [
       "Reporters, users or not (rights holders, representatives, visitors)",
       "Players and team members targeted by a report",
@@ -588,7 +588,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Disclosing this data to a judicial authority that requests it, and to it alone",
     ],
     legalBasis:
-      "Legal obligation (GDPR, art. 6.1.c) of the hosting provider of content: LCEN, art. 6; Decree No. 2021-1362",
+      "Legal obligation (GDPR, art. 6.1.c) of the hosting provider of content: French Act on Confidence in the Digital Economy (« loi pour la confiance dans l'économie numérique », LCEN), art. 6; Decree No. 2021-1362",
     dataSubjects: ["Players registered on the site"],
     dataCategories: [
       "Internal identifier of the account",

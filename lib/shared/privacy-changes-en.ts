@@ -237,7 +237,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
   },
   "2026-10-mesure-audience-opposition": {
     title: "Audience measurement: objection and limited period",
-    summary: `You can now object to audience measurement from the GDPR page, and the site respects your browser's Global Privacy Control and Do Not Track signals: a refused visit is not recorded (the server reads these signals itself). The hash kept to count unique visitors is erased ${SITE_VISITOR_RETENTION_MONTHS} months after your last visit, instead of being kept with no limit.`,
+    summary: `You can now object to audience measurement from the privacy policy, and the site respects your browser's Global Privacy Control and Do Not Track signals: a refused visit is not recorded (the server reads these signals itself). The hash kept to count unique visitors is erased ${SITE_VISITOR_RETENTION_MONTHS} months after your last visit, instead of being kept with no limit.`,
     details: [
       "Your choice is remembered in your browser by a cookie that only contains the value “1”, never an identifier; it is undone with the same button. A browser signal, for its part, is set in the browser.",
       `Hashes recorded before this change are dated from when it was introduced: their last visit had not been kept. The visit details are still erased after ${SITE_VISIT_DETAIL_RETENTION_DAYS} days, as before.`,

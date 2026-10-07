@@ -112,7 +112,7 @@ export const DONNEE_SAUVEGARDES_EN: DonneEntry = {
 export const DONNEE_CONNEXIONS_EN: DonneEntry = {
   donnee: "Connection data (IP address, date and time, means of logging in)",
   finalite:
-    "Obligation of the hosting provider of the content published by members (LCEN, art. 6; Decree No. 2021-1362): making it possible to identify the author of content, at the request of a judicial authority. No other use",
+    "Obligation of the hosting provider of the content published by members (French Act on Confidence in the Digital Economy, « loi pour la confiance dans l'économie numérique » or LCEN, art. 6; Decree No. 2021-1362): making it possible to identify the author of content, at the request of a judicial authority. No other use",
   base: "Obligation légale",
   duree: `${CONNECTION_LOG_RETENTION_DAYS} days (one year) after each login, including after the account is deleted`,
 };
