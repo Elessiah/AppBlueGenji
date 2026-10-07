@@ -147,9 +147,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
           ))}
         </ul>
         <div className={styles.cta}>
-          {/* `/tournois` n'est pas encore traduit : depuis `/en`, le lien mène à la page
-              française, et le dit (`hrefLang`) aux technologies d'assistance. */}
-          <LocaleLink href="/tournois" className={styles.ctaPrimary} hrefLang={locale === "en" ? "fr" : undefined}>
+          <LocaleLink href="/tournois" className={styles.ctaPrimary}>
             {messages.cta.register}
           </LocaleLink>
           <LocaleLink href="/regles" className={styles.ctaSecondary}>{messages.cta.rules}</LocaleLink>
