@@ -261,7 +261,7 @@ export function registrationConditionsText(
   const { t } = text;
   const parts: string[] = [];
   if (!soloEntry && filters.minPlayers > MIN_PLAYERS_BOUNDS.min) {
-    parts.push(t("header.filters.minPlayers", { count: String(filters.minPlayers) }));
+    parts.push(t("header.filters.minPlayers", { count: filters.minPlayers }));
   }
   if (filters.discordRequirement === "ANY_PLAYER") {
     parts.push(soloEntry ? t("header.filters.discordSolo") : t("header.filters.discordAny"));

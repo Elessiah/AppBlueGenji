@@ -123,7 +123,7 @@ export function matchFormatText(text: TournamentPageText, format: MatchFormat | 
   if (!format) return text.t("matchFormat.free");
   const base = matchFormatNotation(format);
   const maps = matchMaxMaps(format);
-  return maps === naturalMaxMaps(format) ? base : text.t("matchFormat.withMaps", { base, maps: String(maps) });
+  return maps === naturalMaxMaps(format) ? base : text.t("matchFormat.withMaps", { base, maps });
 }
 
 /** Phrase d'aide d'un format de match (`matchFormatDescription`), dans la langue du texte. */

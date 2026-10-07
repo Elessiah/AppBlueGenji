@@ -29,7 +29,7 @@ function matchFormatSetting(text: SettingsText, format: MatchFormat | null): str
   if (format) {
     const base = matchFormatNotation(format);
     const maps = matchMaxMaps(format);
-    label = maps === naturalMaxMaps(format) ? base : text.t("matchFormat.withMaps", { base, maps: String(maps) });
+    label = maps === naturalMaxMaps(format) ? base : text.t("matchFormat.withMaps", { base, maps });
   } else {
     label = text.t("matchFormat.free");
   }

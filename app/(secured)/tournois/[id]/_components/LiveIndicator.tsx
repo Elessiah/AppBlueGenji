@@ -23,7 +23,7 @@ function cadenceLabel(text: TournamentPageText, tier: RefreshTier): string {
   const seconds = Math.round(REFRESH_CADENCE[tier].pushCoalesceMs / 1000);
   if (seconds <= 1) return text.t("live.cadenceSecond");
   if (seconds < 60) return text.t("live.cadenceSeconds", { seconds: String(seconds) });
-  return text.t("live.cadenceMinutes", { minutes: String(Math.round(seconds / 60)) });
+  return text.t("live.cadenceMinutes", { minutes: Math.round(seconds / 60) });
 }
 
 /**

@@ -613,7 +613,7 @@ export function EnduranceView({
       {showOutLegend && (
         <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 24px" }}>
           {t("endurance.outLegend")}
-          {endurance.maxRounds === null ? "" : t("endurance.outLegendRounds", { count: String(endurance.maxRounds) })}
+          {endurance.maxRounds === null ? "" : t("endurance.outLegendRounds", { count: endurance.maxRounds })}
         </p>
       )}
 
