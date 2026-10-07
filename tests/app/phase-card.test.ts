@@ -66,15 +66,16 @@ describe("PhaseCard — en-tête d'une phase", () => {
     const toggleEnd = code.indexOf("</button>", toggleStart);
     const toggleMarkup = code.slice(toggleStart, toggleEnd);
 
-    expect(toggleMarkup).toContain("phaseFormatLabel(phase.format)");
+    expect(toggleMarkup).toContain("phaseFormatText(text, phase.format)");
     // La pastille est un `<span>` : elle tient dans le bouton, et y reste donc
     // cliquable comme lorsque tout le bandeau en était un. Muette, en revanche :
     // `phaseSummary` dit déjà « — phase finale ».
-    expect(toggleMarkup).toContain("Phase finale");
+    // Lot 8b-2 : libellés lus dans `tournamentForm.phases`, cités par clé.
+    expect(toggleMarkup).toContain('t("phases.finalBadge")');
     expect(toggleMarkup).toMatch(/<Pill[^>]*aria-hidden="true"/);
-    for (const action of ["Monter la phase", "Descendre la phase", "Supprimer la phase"]) {
-      expect(toggleMarkup).not.toContain(action);
-      expect(code).toContain(`aria-label={\`${action} \${phase.position}\`}`);
+    for (const action of ["moveUp", "moveDown", "remove"]) {
+      expect(toggleMarkup).not.toContain(`phases.${action}`);
+      expect(code).toContain(`aria-label={t("phases.${action}", { position: phase.position })}`);
     }
   });
 

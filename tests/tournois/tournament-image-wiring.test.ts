@@ -110,7 +110,8 @@ describe("écrans", () => {
     const form = read("app/(secured)/tournois/_components/TournamentForm.tsx");
     expect(form).toMatch(/\{mode === "create" && \([\s\S]{0,300}<TournamentImagePicker existing=\{null\}/);
     const create = read("app/(secured)/tournois/creer/page.tsx");
-    expect(create).toContain("await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop);");
+    // Lot 8b-2 : le refus d'image est rédigé dans la langue de la page.
+    expect(create).toContain("await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop, (code) =>");
     const upload = create.indexOf("applyImageChange(payload.id");
     expect(create.indexOf("router.push(`/tournois/${payload.id}`)")).toBeGreaterThan(upload);
     expect(create.slice(create.lastIndexOf("try {", upload), upload)).toContain("try {");

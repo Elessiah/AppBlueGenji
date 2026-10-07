@@ -92,7 +92,8 @@ describe("formulaires — erreurs rattachées aux champs", () => {
       expect(code(file)).toMatch(/throw new CodedError\(code, /);
     }
     // La création affichait le code brut (`INVALID_DATE_ORDER`) : elle traduit.
-    expect(code("app/(secured)/tournois/creer/page.tsx")).toContain("mapError(code)");
+    // Lot 8b-2 : dans la langue de la page (table des refus du fournisseur).
+    expect(code("app/(secured)/tournois/creer/page.tsx")).toContain("mapError(code, errorsText)");
   });
 
   it("la connexion associe ses étiquettes à leurs champs", () => {
