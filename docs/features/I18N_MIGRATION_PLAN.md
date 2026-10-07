@@ -439,6 +439,17 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   dans l'instantané commun ; les traduire changerait le contrat du flux.
 - **Performance** : `/tournois/[id]` 214 → 216 kB au premier chargement.
 
+### Ce que le lot 8b-2 a établi (2026-10-07) — écarts au plan
+
+- **`/tournois/creer` et `/tournois/[id]/modifier` ouverts sous `/en`**, empilé sur 8b-1 (table
+  des refus commune). Formulaire, plan de phases, sélecteur d'image et fenêtre de lancement
+  globale traduits. Détail : `I18N.md` § Tournois — création, édition, lancement.
+- **Fenêtre de lancement dans la coquille** (`shell.launchModal`) : montée sur toutes les pages
+  par la mise en page racine, elle suit les fenêtres des conditions et de la confidentialité —
+  +1 kB au premier chargement de chaque page.
+- **Restent français** (`lang="fr"`, lot 9) : modale de recadrage commune au site, réglage des
+  notifications dans la fenêtre de lancement. Aperçu du tirage : voir 8b-1.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -476,7 +487,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 7a ✅ | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
 | 7b ✅ (7b-1, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a ✅ (8a-1, 8a-2) | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
-| 8b (8b-1 ✅, 8b-2) | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
+| 8b ✅ (8b-1, 8b-2) | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
 | 9 | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
 | ~~10~~ | ~~Admin~~ | **Abandonné** : l'admin reste en français (D4) | — | — | — |
 
