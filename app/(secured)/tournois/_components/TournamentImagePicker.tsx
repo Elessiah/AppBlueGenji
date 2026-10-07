@@ -24,7 +24,7 @@ import {
   withNewFile,
   type ImagePickerValue,
 } from "../_lib/image-picker";
-import { imageErrorText, useImageText } from "../_lib/image-text";
+import { FR_IMAGE_TEXT, imageErrorText, useImageText } from "../_lib/image-text";
 import s from "./TournamentImagePicker.module.css";
 
 interface TournamentImagePickerProps {
@@ -66,6 +66,13 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
  *
  * Le composant est contrôlé : il ne fait qu'un brouillon, que la page enregistre.
  */
+/**
+ * Titre de la modale de recadrage — son nom accessible. Elle reste française
+ * jusqu'au lot 9 (`lang="fr"`) : un titre anglais y serait lu avec la
+ * prononciation française et jurerait avec le reste de la fenêtre.
+ */
+const CROP_TITLE = FR_IMAGE_TEXT.t("picker.cropTitle");
+
 export function TournamentImagePicker({ existing, value, onChange, disabled }: Readonly<TournamentImagePickerProps>) {
   const { showError } = useToast();
   const text = useImageText();
@@ -115,7 +122,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
       return;
     }
     const seq = ++pickSeqRef.current;
-    const cropped = await cropImage(file, "tournament-image", t("picker.cropTitle"));
+    const cropped = await cropImage(file, "tournament-image", CROP_TITLE);
     if (!cropped || seq !== pickSeqRef.current) return;
     const size = await readImageSize(file);
     if (seq !== pickSeqRef.current) return;
@@ -131,7 +138,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
   const onRecrop = async () => {
     if (!value.file) return;
     const seq = ++pickSeqRef.current;
-    const cropped = await cropImage(value.file, "tournament-image", t("picker.cropTitle"));
+    const cropped = await cropImage(value.file, "tournament-image", CROP_TITLE);
     if (!cropped || seq !== pickSeqRef.current) return;
     onChange(withNewFile(value.file, settings.fit, cropped.crop));
   };

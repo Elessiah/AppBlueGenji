@@ -355,6 +355,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             <PushNotificationsPanel
               variant="compact"
               topics={["MATCH_START"]}
+              toastLang={text.locale === "fr" ? undefined : "fr"}
               lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
             />
           </div>
