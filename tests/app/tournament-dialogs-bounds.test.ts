@@ -134,9 +134,9 @@ describe("modale de lancement sur un petit écran", () => {
     // Un Entrée égaré sur une modale ouverte d'office ne doit rien déclencher :
     // ni retrait du « Prêt » (sans confirmation), ni navigation.
     // Lot 8b-2 : les libellés viennent de `shell.launchModal`, cités par clé.
-    expect(openingOf('t("launchModal.cancelReady")')).not.toContain("data-autofocus");
-    expect(openingOf('{t("launchModal.viewMatch")}')).not.toContain("data-autofocus");
-    expect(openingOf('{t("launchModal.copy")}')).not.toContain("data-autofocus");
+    expect(openingOf('t("cancelReady")')).not.toContain("data-autofocus");
+    expect(openingOf('{t("viewMatch")}')).not.toContain("data-autofocus");
+    expect(openingOf('{t("copy")}')).not.toContain("data-autofocus");
     expect(tsx.match(/^\s*data-autofocus$/gm)).toHaveLength(1);
   });
 

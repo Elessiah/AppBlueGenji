@@ -1,6 +1,6 @@
 /**
  * Lot 8b-2 — création et édition d'un tournoi sous `/en`, sélecteur d'image,
- * fenêtre de lancement globale (`shell.launchModal`).
+ * fenêtre de lancement globale (espace `launchModal`, chargée à la demande).
  *
  * Trois gardes, comme le lot 8b-1 : le français ne bouge pas (messages égaux
  * aux tables et fonctions d'origine), rendu anglais sans français, équivalence
@@ -33,6 +33,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
 import frForm from "@/messages/fr/tournamentForm.json";
 import frImage from "@/messages/fr/tournamentImage.json";
+import frLaunchModal from "@/messages/fr/launchModal.json";
 import frShell from "@/messages/fr/shell.json";
 import CreateTournamentPage from "@/app/(secured)/tournois/creer/page";
 import CreateLayout, { generateMetadata as createMetadata } from "@/app/(secured)/tournois/creer/layout";
@@ -226,10 +227,22 @@ describe("français inchangé — les messages égalent les textes d'origine", (
   });
 
   it("fenêtre de lancement : refus du lancement et repli", () => {
-    const errors: Record<string, string> = frShell.launchModal.errors;
+    const errors: Record<string, string> = frLaunchModal.errors;
     for (const [code, message] of Object.entries(LAUNCH_ERROR_MESSAGES)) expect(`${code}: ${errors[code]}`).toBe(`${code}: ${message}`);
     expect(errors.fallback).toBe(launchErrorMessage(null));
-    expect(Object.keys(EN.shell.launchModal.errors)).toEqual(Object.keys(errors));
+    expect(Object.keys(EN.launchModal.errors)).toEqual(Object.keys(errors));
+  });
+
+  it("fenêtre de lancement : hors de la coquille, chargée à la demande", () => {
+    // Ses textes ne pèsent plus sur chaque page : ni dans le paquet de la
+    // coquille (français), ni dans ce que la mise en page sérialise sous /en.
+    expect(frShell).not.toHaveProperty("launchModal");
+    expect(EN.shell).not.toHaveProperty("launchModal");
+    const layout = readFileSync(path.join(process.cwd(), "app/layout.tsx"), "utf8");
+    expect(layout).toContain("<MatchLaunchCenterLazy ");
+    expect(layout).not.toMatch(/from "@\/components\/match-launch\/MatchLaunchCenter"/);
+    const lazy = readFileSync(path.join(process.cwd(), "components/match-launch/MatchLaunchCenterLazy.tsx"), "utf8");
+    expect(lazy).toContain("ssr: false");
   });
 });
 
@@ -365,7 +378,7 @@ describe("formulaires — équivalence avec next-intl, message par message", () 
     return values;
   };
 
-  it.each(LOCALES.flatMap((locale) => (["tournamentImage", "tournamentForm"] as const).map((ns) => [locale, ns] as const)))("%s — %s", (locale, namespace) => {
+  it.each(LOCALES.flatMap((locale) => (["tournamentImage", "tournamentForm", "launchModal"] as const).map((ns) => [locale, ns] as const)))("%s — %s", (locale, namespace) => {
     const messages = leaves(messagesFor(locale)[namespace]);
     expect(messages.length).toBeGreaterThan(30);
     for (const { key, source } of messages) {
