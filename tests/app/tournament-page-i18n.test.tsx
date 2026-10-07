@@ -39,9 +39,7 @@ import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/Re
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
-import { FR_SWISS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/swiss-text";
-import { FR_SURVIVAL_TEXT } from "@/app/(secured)/tournois/[id]/_lib/survival-text";
-import { FR_ENDURANCE_TEXT } from "@/app/(secured)/tournois/[id]/_lib/endurance-text";
+import { FR_VIEWS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/views-text";
 import { EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { registrationConditionsText } from "@/app/(secured)/tournois/[id]/_lib/header-meta";
 import { phaseFormatLabel, phaseStateLabel } from "@/app/(secured)/tournois/[id]/_lib/phases";
@@ -58,6 +56,7 @@ import { matchFormatDescription, type MatchFormat } from "@/lib/shared/match-for
 import { LAUNCH_PHASE_LABELS, REFEREE_SCHEDULING_DESCRIPTION } from "@/lib/shared/match-planning";
 import { MATCH_SECTION_LABELS } from "@/lib/shared/match-sections";
 import { formatMessage } from "@/lib/shared/message-format";
+import { messageAt } from "@/lib/shared/scoped-text";
 import { registrationFiltersSummary } from "@/lib/shared/registration-filters";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
 import {
@@ -698,22 +697,39 @@ describe("performance — le français des vues voyage avec la vue", () => {
 
   it("chaque vue apporte son français, égal au catalogue", () => {
     const fr = messagesFor("fr").tournamentViews;
-    expect(FR_SWISS_TEXT.t("swiss.summary", { round: "1", total: "3", count: 2 })).toBe(
+    expect(FR_VIEWS_TEXT.t("swiss.summary", { round: "1", total: "3", count: 2 })).toBe(
       formatMessage("fr", fr.swiss.summary, { round: "1", total: "3", count: 2 }),
     );
-    expect(FR_SURVIVAL_TEXT.t("survival.everyRound")).toBe(fr.survival.everyRound);
-    expect(FR_ENDURANCE_TEXT.t("endurance.regionDone")).toBe(fr.endurance.regionDone);
+    expect(FR_VIEWS_TEXT.t("survival.everyRound")).toBe(fr.survival.everyRound);
+    expect(FR_VIEWS_TEXT.t("endurance.regionDone")).toBe(fr.endurance.regionDone);
+    // Une vue lit aussi la clé d'une autre (colonne « Équipe » de l'endurance).
+    expect(FR_VIEWS_TEXT.t("swiss.team")).toBe(fr.swiss.team);
     // Le reste de la fiche reste lisible depuis une vue.
-    expect(FR_SWISS_TEXT.t("loading")).toBe(FR_TOURNAMENT_PAGE_TEXT.t("loading"));
+    expect(FR_VIEWS_TEXT.t("loading")).toBe(FR_TOURNAMENT_PAGE_TEXT.t("loading"));
+  });
+
+  it("toute clé littérale lue par une vue existe dans son texte français", () => {
+    const files = [
+      "_components/SwissView.tsx",
+      "_components/SurvivalView.tsx",
+      "_components/EnduranceView.tsx",
+      "_components/EnduranceRoundPanels.tsx",
+      "_lib/endurance-history.ts",
+      "_lib/endurance-sections.ts",
+    ];
+    const keys = files.flatMap((file) => [...read(file).matchAll(/\bt\("([a-zA-Z.]+)"/g)].map((m) => m[1]));
+    expect(keys.length).toBeGreaterThan(50);
+    const missing = keys.filter((key) => messageAt({ ...FR_TOURNAMENT_PAGE_MESSAGES, ...messagesFor("fr").tournamentViews }, key) === undefined);
+    expect(missing).toEqual([]);
   });
 
   it("les vues lisent leur texte par useTournamentViewText, la fiche ne les importe qu'à la demande", () => {
-    expect(read("_components/SwissView.tsx")).toContain("useTournamentViewText(FR_SWISS_TEXT)");
-    expect(read("_components/SurvivalView.tsx")).toContain("useTournamentViewText(FR_SURVIVAL_TEXT)");
-    expect(read("_components/EnduranceView.tsx")).toContain("useTournamentViewText(FR_ENDURANCE_TEXT)");
-    expect(read("_components/EnduranceRoundPanels.tsx")).toContain("useTournamentViewText(FR_ENDURANCE_TEXT)");
+    expect(read("_components/SwissView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
+    expect(read("_components/SurvivalView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
+    expect(read("_components/EnduranceView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
+    expect(read("_components/EnduranceRoundPanels.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
     const page = read("page.tsx");
-    expect(page).not.toMatch(/_lib\/(swiss|survival|endurance)-text"/);
+    expect(page).not.toContain("_lib/views-text");
     expect(page).not.toContain("tournamentViews.json");
   });
 });
