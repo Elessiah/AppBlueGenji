@@ -89,13 +89,15 @@ type LaunchErrorKey = Extract<LaunchKey, `errors.${string}`>;
  * page : la modale vit dans la mise en page racine, hors de la fiche et de sa
  * table des refus — elle porte les siens (`errors.*`).
  */
-function launchErrorText(text: LaunchText, code: string | null | undefined): string {
+export function launchErrorText(text: LaunchText, code: string | null | undefined): string {
   // Lecture directe de la table des messages, et non de `LAUNCH_ERROR_MESSAGES`
   // (dont le français est le même, testé) : l'importer aurait mis ses phrases
   // une seconde fois dans le paquet de toutes les pages. Une clé absente se
   // rend telle quelle (`scopedText`) : c'est le signe d'un code inconnu.
+  // Un code se limite à `A-Z0-9_` : autre chose (accolade, chevron) ferait
+  // échouer le formateur sur la clé rendue telle quelle — repli direct.
   const key = `errors.${code ?? ""}`;
-  const message = code ? text.t(key as LaunchErrorKey) : key;
+  const message = code && /^[A-Z0-9_]+$/.test(code) ? text.t(key as LaunchErrorKey) : key;
   return message === key ? text.t("errors.fallback") : message;
 }
 
