@@ -181,7 +181,9 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
 ## Interface
 
 - **Modale globale** — `components/match-launch/MatchLaunchCenter.tsx`, montée
-  par `app/layout.tsx` pour tout compte connecté. Interrogation à 8 s pendant un
+  par `app/layout.tsx` pour tout compte connecté, chargée à la demande
+  (`MatchLaunchCenterLazy`, sans rendu serveur : elle ne montre rien avant sa
+  première lecture) ; textes dans l'espace `launchModal` (`launch-text.ts`). Interrogation à 8 s pendant un
   lancement, 30 s pendant un match, 60 s sinon ; suspendue onglet caché
   (`useClientPower().clocks`). Sur la fiche d'un tournoi, elle n'attend pas sa
   relève : le flux signale chaque changement d'une rencontre du lecteur —

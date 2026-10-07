@@ -444,9 +444,9 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **`/tournois/creer` et `/tournois/[id]/modifier` ouverts sous `/en`**, empilé sur 8b-1 (table
   des refus commune). Formulaire, plan de phases, sélecteur d'image et fenêtre de lancement
   globale traduits. Détail : `I18N.md` § Tournois — création, édition, lancement.
-- **Fenêtre de lancement dans la coquille** (`shell.launchModal`) : montée sur toutes les pages
-  par la mise en page racine, elle suit les fenêtres des conditions et de la confidentialité —
-  +1 kB au premier chargement de chaque page.
+- **Fenêtre de lancement hors de la coquille** (espace `launchModal`) : montée par la mise en
+  page racine pour tout compte connecté, elle est chargée à la demande, ses deux langues avec
+  son morceau — rangée dans `shell`, elle coûtait +1 kB au premier chargement de chaque page.
 - **Restent français** (`lang="fr"`, lot 9) : modale de recadrage commune au site, réglage des
   notifications dans la fenêtre de lancement. Aperçu du tirage : voir 8b-1.
 
