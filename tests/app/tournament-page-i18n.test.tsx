@@ -500,6 +500,16 @@ describe("blocs restés en français (lot 8b) sous /en", () => {
     expect(scoreForm).not.toContain("useToast()");
   });
 
+  it("lien « Modifier » vers l'édition restée française : hrefLang", () => {
+    expect(source("TournamentHeader.tsx")).toMatch(/href=\{`\/tournois\/\$\{card\.id\}\/modifier`\} hrefLang=\{actionLang\}/);
+  });
+
+  it("textes de la fiche indexés sur la langue seule (un refresh ne rouvre pas le flux)", () => {
+    const provider = readFileSync(join(process.cwd(), "components/i18n/tournament-page-text.tsx"), "utf8");
+    expect(provider).toContain("const [value, setValue] = useState(build);");
+    expect(provider).toContain("if (value.locale !== locale) setValue(build());");
+  });
+
   it("échec définitif du flux : notification dans la langue de la page, comme le témoin", () => {
     const live = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts"), "utf8");
     expect(live).toContain("showPageError(t(`live.fatal.${failure}`));");
