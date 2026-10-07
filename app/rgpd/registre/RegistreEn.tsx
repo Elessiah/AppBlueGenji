@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { CyberButton } from "@/components/cyber";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { TranslationNotice } from "@/components/legal/TranslationNotice";
 import { REGISTER_UPDATED_AT, type ProcessingActivity } from "@/lib/shared/processing-register";
 import {
@@ -19,7 +20,7 @@ const FRENCH_ADDRESSES = [ASSOCIATION_SEAT, SITE_HOST.address];
 
 function withFrenchAddresses(text: string): ReactNode {
   const address = FRENCH_ADDRESSES.find((candidate) => text.includes(candidate));
-  if (!address) return text;
+  if (!address) return <EnglishLegalText text={text} />;
   const [before, ...rest] = text.split(address);
   return (
     <>

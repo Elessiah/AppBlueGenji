@@ -7,6 +7,7 @@ import { CyberButton, ScrollArea } from "@/components/cyber";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { crossesLocale } from "@/lib/shared/locales";
 import {
   formatPrivacyChangeDateIn,
   PRIVACY_CHANGES_ANSWERED_EVENT,
@@ -164,13 +165,22 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
                 )}
                 {change.links && change.links.length > 0 && (
                   <ul className={styles.changeLinks}>
-                    {change.links.map((link) => (
-                      <li key={link.href}>
-                        <LocaleLink href={link.href} onClick={() => followLink(change.id)}>
-                          {link.label}
-                        </LocaleLink>
-                      </li>
-                    ))}
+                    {change.links.map((link) => {
+                      // Vers une page encore française (profil), le lien le dit, comme `EnglishLegalLink`.
+                      const french = crossesLocale(link.href, locale);
+                      return (
+                        <li key={link.href}>
+                          <LocaleLink
+                            href={link.href}
+                            hrefLang={french ? "fr" : undefined}
+                            onClick={() => followLink(change.id)}
+                          >
+                            {link.label}
+                            {french && ` ${t("privacyModal.inFrench")}`}
+                          </LocaleLink>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </li>

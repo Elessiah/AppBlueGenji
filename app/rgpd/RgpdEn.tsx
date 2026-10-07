@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { CyberButton } from "@/components/cyber";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { TranslationNotice } from "@/components/legal/TranslationNotice";
+import { EnglishLegalLink } from "@/components/legal/EnglishLegalLink";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
@@ -733,7 +734,7 @@ export function RgpdEn({
             You can be notified on your phone or computer of the start of your matches, of a score to confirm, of a
             tournament&apos;s kick-off, of match reminders and of what concerns your account or your team.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
-            from <LocaleLink href="/profil#notifications">My profile</LocaleLink>, where you also choose the topics.
+            from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>
           <ul>
             <li>
@@ -865,7 +866,7 @@ export function RgpdEn({
                   </strong>
                 </LocaleLink>
                 : {activity.purpose}. <em>Legal basis</em>: {activity.legalBasis}. <em>Retention</em>:{" "}
-                {activity.retention.join("; ")}.
+                <EnglishLegalText text={activity.retention.join("; ")} />.
               </li>
             ))}
           </ul>
@@ -896,7 +897,7 @@ export function RgpdEn({
             To exercise one of your rights or ask a question about the processing of your data, write to or phone
             the person the association has appointed for these requests, <strong>{DATA_CONTACT_NAME}</strong>,{" "}
             {DATA_CONTACT_ROLE_EN} (contact details below). The “{REPORT_FORM_NAME_EN}” form, at the bottom of every
-            page, <strong>GDPR</strong> category, and the association&apos;s contact details (section&nbsp;01) also
+            page, <strong>GDPR</strong> category (<span lang="fr">« RGPD »</span>), and the association&apos;s contact details (section&nbsp;01) also
             remain open. We answer within <strong>one month</strong> at most (art. 12 GDPR).
           </p>
           <p>
@@ -924,7 +925,7 @@ export function RgpdEn({
             {" · "}Phone:{" "}
             <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`of ${DATA_CONTACT_NAME}`} />
           </span>
-          <span className={styles.contactSub}>Or the “{REPORT_FORM_NAME_EN}” form, GDPR category:</span>
+          <span className={styles.contactSub}>Or the “{REPORT_FORM_NAME_EN}” form, “GDPR” category (<span lang="fr">« RGPD »</span>):</span>
           <div style={{ marginTop: 12 }}>
             <ReportProblemButton authenticated={authenticated} initialCategory="RGPD" label="Make a GDPR request" cyber />
           </div>

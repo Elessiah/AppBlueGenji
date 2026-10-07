@@ -94,7 +94,7 @@ export const HOST_PROCESSING_AGREEMENT_EN =
   "processing agreement (GDPR, art. 28) drafted, awaiting signature by the association and the host";
 
 /** `RGPD_CONTACT_LINE` (`legal-contact.ts`). */
-export const RGPD_CONTACT_LINE_EN = `Requests regarding data: ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE_EN}, appointed by the association to receive them — email and phone (privacy policy and legal notice of the site) —, or the site's “${REPORT_FORM_NAME_EN}” form (footer), “GDPR” category; the association: email and phone (legal notice of the site)`;
+export const RGPD_CONTACT_LINE_EN = `Requests regarding data: ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE_EN}, appointed by the association to receive them — email and phone (privacy policy and legal notice of the site) —, or the site's “${REPORT_FORM_NAME_EN}” form (footer), “GDPR” category (« RGPD »); the association: email and phone (legal notice of the site)`;
 
 /** `registerController()`, in English. */
 export function registerControllerEn(): RegisterController {
@@ -664,7 +664,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     retention: [
       "Live: nothing kept by the site, which only keeps the link to the channel",
       "Replay link: kept with the match, like its results (T03); the video stays on the platform until it is deleted by the channel that published it",
-      `Right to object: on request (“${REPORT_FORM_NAME_EN}” form, GDPR category), the player appears under a neutral name in subsequent streams, the replay link is removed from the site, and a video published by the association's channel is hidden or deleted`,
+      `Right to object: on request (“${REPORT_FORM_NAME_EN}” form, “GDPR” category (« RGPD »)), the player appears under a neutral name in subsequent streams, the replay link is removed from the site, and a video published by the association's channel is hidden or deleted`,
     ],
     recipients: [
       "Public of the streaming platforms and of the site",

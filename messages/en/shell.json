@@ -191,6 +191,7 @@
     "saving": "Saving…",
     "saved": "Noted, thank you.",
     "failed": "Your reading couldn't be saved. Try again in a moment.",
-    "replay": "Your reading couldn't be saved: this information will be shown to you again."
+    "replay": "Your reading couldn't be saved: this information will be shown to you again.",
+    "inFrench": "(in French)"
   }
 }

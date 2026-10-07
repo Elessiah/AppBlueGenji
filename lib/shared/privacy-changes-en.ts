@@ -248,7 +248,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     title: "A person to contact about your data",
     summary: `To exercise your rights over your data or ask a question about it, you can now contact directly the person the association has appointed for these requests, the ${DATA_CONTACT_ROLE_EN}, by email or by phone. The site's form remains open.`,
     details: [
-      `This person is ${DATA_CONTACT_NAME}. Their contact details can be found in the privacy policy and the legal notice of the site. The “${REPORT_FORM_NAME_EN}” form, GDPR category, and the association's contact details remain open.`,
+      `This person is ${DATA_CONTACT_NAME}. Their contact details can be found in the privacy policy and the legal notice of the site. The “${REPORT_FORM_NAME_EN}” form, “GDPR” category (« RGPD »), and the association's contact details remain open.`,
       `An email you send them, and the reply they send you by email, go through their personal mailbox, hosted by Microsoft (Outlook.com, possible transfers to the United States), which can read them; a call, a text or a voice message goes through their telephone operator. Your request and the reply — email, text, voice message or call record — are kept for as long as it takes to handle it, then ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} days after it is closed, like a GDPR request made through the form.`,
       "This is not a data protection officer within the meaning of the GDPR: the association remains responsible for processing your data and for answering your requests.",
     ],
@@ -270,7 +270,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The privacy policy now describes the support portal, match streaming, the web server's technical logs and the association's email. It also specifies the minimum age to create an account.",
     details: [
       `Support portal (Spiceworks): a ticket is kept there for as long as it takes to handle it, then ${monthsEn(SUPPORT_TICKET_RETENTION_MONTHS)} after it is closed.`,
-      `Match streaming (YouTube, Twitch or Kick): your username and your team's name may appear on screen, and the replay link stays with the match. You can object through “${REPORT_FORM_NAME_EN}”, GDPR category.`,
+      `Match streaming (YouTube, Twitch or Kick): your username and your team's name may appear on screen, and the replay link stays with the match. You can object through “${REPORT_FORM_NAME_EN}”, “GDPR” category (« RGPD »).`,
       `Web server: each request (${WEB_ACCESS_LOG_FIELDS_EN}) is noted in a technical log kept for ${WEB_ACCESS_LOG_RETENTION_DAYS} days at most, for the site's security.`,
       `The association's email: it is a Gmail mailbox, which Google hosts and can read (possible transfers to the United States). A request received at this email or at the association's phone is kept for as long as it takes to handle it, then ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} days after it is closed.`,
       `Minimum age: you must be at least ${SITE_MINIMUM_AGE} years old to create an account. The site does not ask for a date of birth and does not check age.`,
