@@ -567,6 +567,14 @@ describe("français inchangé — les messages égalent les tables d'origine", (
     const options = { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" } as const;
     expect(pageDateTime(iso, "en", options)).toMatch(/^Oct 7, 2026/);
     expect(pageDateTime(iso, "fr", options)).toMatch(/^07 oct\. 2026/);
+    // Mois en chiffres : le jour garde son zéro (« 03/05 », comme le bandeau du match).
+    const numeric = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" } as const;
+    expect(pageDateTime("2026-03-05T12:00:00.000Z", "en", numeric)).toMatch(/^03\/05/);
+  });
+
+  it("pénalité d'endurance : pluriel ICU en anglais", () => {
+    expect(EN.t("endurance.penaltyBadgeSr", { points: 1 })).toBe(" (1 point deducted by penalty)");
+    expect(EN.t("endurance.penaltyBadgeTitle", { points: 3 })).toBe("3 points deducted by referee penalty");
   });
 
   it("titres d'onglet d'appel : le français égale viewerAlertTitle", () => {
