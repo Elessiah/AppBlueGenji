@@ -2,10 +2,10 @@
 
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
-import { LAUNCH_PHASE_LABELS } from "@/lib/shared/match-planning";
 import type { BracketMatch } from "@/lib/shared/types";
 import { hostTeamName } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
 /**
  * Bandeau de **lancement** d'un match (`lib/shared/match-launch.ts`) : ce
@@ -23,26 +23,25 @@ import styles from "./MatchLaunchStrip.module.css";
  * lancement (avec le décompte des « Prêt »), ou lancé.
  */
 function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phase: MatchLaunchPhase }>) {
+  // Libellés de `LAUNCH_PHASE_LABELS` (`match-planning.ts`, français égal testé).
+  const { t, locale } = useTournamentPageText();
   if (phase === "TO_PLAN") {
     return (
-      <span
-        className={styles.toPlan}
-        title="L'arbitrage doit fixer la date et l'heure de ce match avant son lancement."
-      >
-        <span aria-hidden="true">📅</span> {LAUNCH_PHASE_LABELS.TO_PLAN}
-        <span className="sr-only"> : l&apos;arbitrage doit fixer la date de ce match.</span>
+      <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
+        <span aria-hidden="true">📅</span> {t("launch.toPlan")}
+        <span className="sr-only">{t("launch.toPlanSr")}</span>
       </span>
     );
   }
   if (phase === "SCHEDULED") {
-    const startAtTitle = formatMatchStartAtFull(match.startAt);
+    const startAtTitle = formatMatchStartAtFull(match.startAt, locale);
     return (
       <span className={styles.scheduled} title={startAtTitle ?? undefined}>
-        <span aria-hidden="true">⏱</span> {LAUNCH_PHASE_LABELS.SCHEDULED}
+        <span aria-hidden="true">⏱</span> {t("launch.scheduled")}
         {/* L'heure est déjà dans le bandeau d'horaire juste au-dessus : on ne
             la répète que pour les lecteurs d'écran, qui lisent ce libellé
             seul. */}
-        {startAtTitle && <span className="sr-only"> — début le {startAtTitle}</span>}
+        {startAtTitle && <span className="sr-only">{t("launch.scheduledSr", { date: startAtTitle })}</span>}
       </span>
     );
   }
@@ -57,18 +56,18 @@ function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phas
     });
     return (
       <span className={styles.lobby}>
-        <span aria-hidden="true">⏳</span> {LAUNCH_PHASE_LABELS.LOBBY} ·{" "}
+        <span aria-hidden="true">⏳</span> {t("launch.lobby")} ·{" "}
         <span className="num">
           {count.ready}/{count.expected}
         </span>{" "}
-        prêts
+        {t("launch.ready")}
       </span>
     );
   }
   if (phase === "LAUNCHED" && match.status === "READY") {
     return (
       <span className={styles.launched}>
-        <span aria-hidden="true">▶</span> {LAUNCH_PHASE_LABELS.LAUNCHED}
+        <span aria-hidden="true">▶</span> {t("launch.launched")}
       </span>
     );
   }
@@ -83,6 +82,7 @@ export function MatchLaunchStrip({
   /** Phase de lancement, calculée par la carte (`MatchRow`). */
   phase: MatchLaunchPhase;
 }>) {
+  const { t } = useTournamentPageText();
   const showHost = phase !== "NONE";
   const hostName = hostTeamName(match);
   const badge = <LaunchPhaseBadge match={match} phase={phase} />;
@@ -95,21 +95,21 @@ export function MatchLaunchStrip({
       {badge}
 
       {showHost && hostName && (
-        <span className={styles.fact} title="Équipe qui crée le salon en jeu">
+        <span className={styles.fact} title={t("launch.hostTitle")}>
           <span aria-hidden="true">🏠</span>
-          <span className="sr-only">Équipe hôte : </span>
+          <span className="sr-only">{t("launch.hostSr")}</span>
           <span className={styles.name}>{hostName}</span>
         </span>
       )}
 
       {match.casterUserId !== null && (
-        <span className={styles.fact} title="Caster du match">
+        <span className={styles.fact} title={t("launch.casterTitle")}>
           <span aria-hidden="true">🎙</span>
-          <span className="sr-only">Caster : </span>
-          <span className={styles.name}>{match.casterPseudo ?? "Caster"}</span>
+          <span className="sr-only">{t("launch.casterSr")}</span>
+          <span className={styles.name}>{match.casterPseudo ?? t("launch.caster")}</span>
           {phase === "LOBBY" && (
             <span className={match.casterReady ? styles.ok : styles.wait}>
-              {match.casterReady ? "prêt" : "attendu"}
+              {match.casterReady ? t("launch.casterReady") : t("launch.casterWaiting")}
             </span>
           )}
         </span>

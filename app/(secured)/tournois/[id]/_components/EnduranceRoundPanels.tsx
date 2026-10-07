@@ -13,8 +13,10 @@ import {
   enduranceProgressLabel,
   enduranceRoundOfMatch,
   enduranceRoundRegionLabel,
+  enduranceRoundTitle,
   type EnduranceRoundSection,
 } from "../_lib/endurance-sections";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
 import styles from "./EnduranceRoundPanels.module.css";
 
@@ -59,6 +61,7 @@ export function EnduranceRoundPanels({
   onOpenAdminModal,
   format,
 }: Readonly<EnduranceRoundPanelsProps>) {
+  const text = useTournamentPageText();
   const autoOpen = defaultOpenEnduranceRound(sections, myTeamId, playoffsStarted);
 
   const [openRounds, setOpenRounds] = useState<Set<number>>(
@@ -104,21 +107,21 @@ export function EnduranceRoundPanels({
           <BoardPanel
             key={section.key}
             accent={accent}
-            title={section.title}
+            title={enduranceRoundTitle(section, text)}
             open={openRounds.has(section.round)}
             onToggle={() => toggle(section.round)}
             panelId={`endurance-${section.key}`}
-            ariaLabel={enduranceRoundRegionLabel(section)}
+            ariaLabel={enduranceRoundRegionLabel(section, text)}
             highlighted={mine}
-            flag={mine ? "Votre match" : null}
+            flag={mine ? text.t("bracket.yourMatch") : null}
             meta={
               <>
-                <PanelPill>{enduranceMatchCountLabel(section.totalCount)}</PanelPill>
+                <PanelPill>{enduranceMatchCountLabel(section.totalCount, text)}</PanelPill>
                 {/* Une manche close le dit d'un mot ; une manche en cours
                     montre son avancement, qui est justement ce qu'on vient
                     regarder. */}
                 <PanelPill done={section.isComplete}>
-                  {section.isComplete ? "Terminée" : enduranceProgressLabel(section)}
+                  {section.isComplete ? text.t("endurance.roundDone") : enduranceProgressLabel(section, text)}
                 </PanelPill>
               </>
             }

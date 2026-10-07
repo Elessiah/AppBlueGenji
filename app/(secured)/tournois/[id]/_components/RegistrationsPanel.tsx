@@ -35,6 +35,8 @@ import {
 } from "../_lib/registrations-list";
 import { PodiumTiersOffWhen } from "@/components/podium-tiers";
 import styles from "./RegistrationsPanel.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang, pageDateTime, participantText } from "@/lib/shared/tournament-page-text";
 
 interface RegistrationsPanelProps {
   detail: TournamentDetail;
@@ -80,6 +82,15 @@ function frozenSeedLabel(seed: number | null): string {
 export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<RegistrationsPanelProps>) {
   const { showError, showSuccess } = useToast();
   const wording = useParticipantWording();
+  const text = useTournamentPageText();
+  const { t } = text;
+  // L'ordre de départ et les retraits sont des outils du staff : restés
+  // français (D4), annoncés comme tels sous `/en`.
+  const staffLang = frenchBlockLang(text);
+  const registeredAt = (iso: string) =>
+    text.locale === "fr"
+      ? formatLocalDateTime(iso)
+      : pageDateTime(iso, text.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   const [busy, setBusy] = useState(false);
 
   // Ordre affiché en attendant que le flux rapporte l'écriture : sans lui, la
@@ -251,23 +262,23 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   return (
     <div className="ds-block">
       <div className="ds-section-title green" style={{ alignItems: "center" }}>
-        <h2>Inscriptions · ordre de départ</h2>
-        {staff && <Pill variant="accent">{SEEDING_SOURCE_LABELS[source]}</Pill>}
+        <h2>{t("registrations.title")}</h2>
+        {staff && <Pill variant="accent" lang={staffLang}>{SEEDING_SOURCE_LABELS[source]}</Pill>}
       </div>
 
       {staff && (
         <>
-          <p className={styles.hint}>
+          <p className={styles.hint} lang={staffLang}>
             {lockReason !== null ? LOCK_MESSAGES[lockReason] : seedingHint}
           </p>
           {removalNoticeReason !== null && rows.length > 0 && (
             /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit
                pourquoi : la phrase vient du module pur, celle-là même que le
                serveur renverrait sur une écriture tardive. */
-            <p className={styles.hint}>{entrantRemovalBlockMessage(removalNoticeReason)}</p>
+            <p className={styles.hint} lang={staffLang}>{entrantRemovalBlockMessage(removalNoticeReason)}</p>
           )}
           {followsRanking && rows.length > 0 && (
-            <p className={styles.hint}>
+            <p className={styles.hint} lang={staffLang}>
               Rangées selon le classement du site : chaque nouvelle inscription prend sa
               place de cote. L&apos;ordre peut encore bouger d&apos;ici le lancement si des
               cotes changent ; réordonnez la liste pour le figer — votre ordre fera alors
@@ -275,7 +286,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
             </p>
           )}
           {followsFrozenDraw && rows.length > 0 && (
-            <p className={styles.hint}>
+            <p className={styles.hint} lang={staffLang}>
               Rangs figés au coup d&apos;envoi selon le classement du site : ce sont ceux
               du tirage, même si les cotes ont bougé depuis.
             </p>
@@ -285,16 +296,16 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
 
       {/* Mode staff (têtes de série, retraits) : un outil, noms sans marche. */}
       {rows.length === 0 ? (
-        <p className={styles.empty}>Aucune inscription pour le moment.</p>
+        <p className={styles.empty}>{t("registrations.empty")}</p>
       ) : (
         <PodiumTiersOffWhen off={showActions}>
         <div className={styles.table}>
           <div className={`${styles.row} ${styles.header} ${gridClass}`}>
-            <span>Rang</span>
-            <span>{wording.oneCapitalized}</span>
-            <span>Inscription</span>
-            <span>Classement final</span>
-            {showActions && <span className={styles.actionsHead}>{actionsLabel}</span>}
+            <span>{t("registrations.rank")}</span>
+            <span>{participantText(text, detail.card.participantType, "oneCapitalized")}</span>
+            <span>{t("registrations.registeredAt")}</span>
+            <span>{t("registrations.finalRank")}</span>
+            {showActions && <span className={styles.actionsHead} lang={staffLang}>{actionsLabel}</span>}
           </div>
           {visibleRows.map((reg, index) => (
             <div key={reg.teamId} className={`${styles.row} ${gridClass}`}>
@@ -306,14 +317,14 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
                 name={reg.teamName}
                 textClassName={styles.name}
               />
-              <span className={styles.muted} data-label="Inscription">
-                {formatLocalDateTime(reg.registeredAt)}
+              <span className={styles.muted} data-label={t("registrations.registeredAt")}>
+                {registeredAt(reg.registeredAt)}
               </span>
-              <span className={styles.muted} data-label="Classement final">
+              <span className={styles.muted} data-label={t("registrations.finalRank")}>
                 {reg.finalRank ?? "-"}
               </span>
               {showActions && (
-                <span className={styles.actions} data-tap-zone>
+                <span className={styles.actions} data-tap-zone lang={staffLang}>
                   {reorderable && (
                     <>
                       <button
@@ -377,7 +388,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
             aria-expanded={expanded}
             onClick={() => setExpanded((open) => !open)}
           >
-            {expanded ? "Réduire la liste" : `Voir toute la liste (${hiddenCount} de plus)`}
+            {expanded ? t("registrations.collapse") : t("registrations.showAll", { count: String(hiddenCount) })}
           </button>
         </div>
       )}
@@ -392,6 +403,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
           disparaît avec les flèches au lieu d'offrir un 409 en boucle. */}
       {confirmingMove !== null && reorderable && (
         <ConfirmActionDialog
+          contentLang={staffLang}
           title="Fixer l'ordre de départ à la main ?"
           confirmLabel="Fixer l'ordre"
           pendingLabel="Enregistrement…"

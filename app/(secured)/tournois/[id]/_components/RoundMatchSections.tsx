@@ -2,11 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
-import {
-  nextSectionChangeAt,
-  sectionCountLabel,
-  sectionRoundMatches,
-} from "@/lib/shared/match-sections";
+import { nextSectionChangeAt, sectionRoundMatches } from "@/lib/shared/match-sections";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useLiveControls } from "../_lib/live-context";
 import { useEntrantSeeds } from "../_lib/entrant-link";
 import styles from "./RoundMatchSections.module.css";
@@ -30,6 +27,7 @@ export function RoundMatchSections({
   style,
   children,
 }: Readonly<RoundMatchSectionsProps>) {
+  const { t } = useTournamentPageText();
   const { refereeScheduling } = useLiveControls();
   const seeds = useEntrantSeeds();
   // Bascule « En attente » → « Lancement » à la seconde où la carte de match
@@ -85,8 +83,8 @@ export function RoundMatchSections({
         // volet, ni repère, ni élément focalisable.
         <p key={`section-${section.key}`} className={styles.divider} data-section={section.key}>
           <span className={styles.label}>
-            {section.label}
-            <span className="sr-only">, {sectionCountLabel(section.matches.length)}</span>
+            {t(`sections.${section.key}`)}
+            <span className="sr-only">, {t("sections.count", { count: section.matches.length })}</span>
           </span>
           <span className={styles.count} aria-hidden="true">
             {section.matches.length}

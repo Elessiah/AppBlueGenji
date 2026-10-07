@@ -24,7 +24,10 @@ import {
   splitEnduranceMatches,
   splitPlayoffBrackets,
 } from "../_lib/endurance-sections";
-import { useParticipantWording } from "../_lib/entrant-link";
+import { useEntrantParticipantType, useParticipantWording } from "../_lib/entrant-link";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { INTL_LOCALE } from "@/lib/shared/locales";
+import { frenchBlockLang, participantText } from "@/lib/shared/tournament-page-text";
 import { enduranceNextRoundInput } from "../_lib/endurance-next-round";
 import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/preview";
 import type { MatchFormat } from "@/lib/shared/match-format";
@@ -106,12 +109,12 @@ function rowClass(withActions: boolean, wide: boolean): string {
  * mais ne peut plus rejoindre les play-offs dans les manches restantes — sa
  * ligne montre encore des points, et « Éliminée » à côté ne se lirait pas.
  */
-const STATUS_LABELS: Record<EnduranceMeta["standings"][number]["status"], string> = {
-  ACTIVE: "En lice",
-  ELIMINATED: "Éliminée",
-  OUT_OF_CONTENTION: "Hors course",
-  FORFEIT: "Forfait",
-};
+const STATUS_KEYS = {
+  ACTIVE: "ranking.active",
+  ELIMINATED: "ranking.eliminated",
+  OUT_OF_CONTENTION: "ranking.outOfContention",
+  FORFEIT: "ranking.forfeit",
+} as const satisfies Record<EnduranceMeta["standings"][number]["status"], string>;
 
 /**
  * Une ligne sortie s'estompe, mais pas toutes au même degré : « Hors course »
@@ -153,6 +156,8 @@ function EnduranceHistory({
   endurance: EnduranceMeta;
   myTeamId: number | null;
 }>) {
+  const text = useTournamentPageText();
+  const { t } = text;
   if (endurance.rounds.length === 0) return null;
 
   const columns = enduranceHistoryColumns(endurance.rounds.length);
@@ -160,18 +165,18 @@ function EnduranceHistory({
   return (
     <div style={{ marginBottom: 24 }}>
       <div className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", marginBottom: 8 }}>
-        ENDURANCE MANCHE PAR MANCHE
+        {t("endurance.historyTitle")}
       </div>
-      <ScrollArea fade ariaLabel="Capital d'endurance manche par manche">
+      <ScrollArea fade ariaLabel={t("endurance.historyLabel")}>
         <div className={styles.historyTable}>
           <div
             className={`${styles.historyRow} ${styles.historyHead}`}
             style={{ "--history-cols": columns } as React.CSSProperties}
           >
-            <span className={styles.historyTeam}>Équipe</span>
+            <span className={styles.historyTeam}>{t("swiss.team")}</span>
             {endurance.rounds.map((round) => (
-              <span key={round} className={styles.historyCell} title={`Manche ${round}`}>
-                M{round}
+              <span key={round} className={styles.historyCell} title={t("endurance.historyRound", { round: String(round) })}>
+                {t("endurance.historyRoundShort", { round: String(round) })}
               </span>
             ))}
           </div>
@@ -210,7 +215,7 @@ function EnduranceHistory({
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  title={enduranceCellTitle(standing.teamName, cell)}
+                  title={enduranceCellTitle(standing.teamName, cell, text)}
                 >
                   {enduranceCellLabel(cell)}
                 </span>
@@ -223,7 +228,7 @@ function EnduranceHistory({
           la légende n'apparaît que s'il y a effectivement un forfait à lire. */}
       {endurance.standings.some((standing) => standing.status === "FORFEIT") && (
         <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
-          FF = FORFAIT SUR TOUT LE RESTE DU TOURNOI
+          {t("endurance.forfeitLegend")}
         </p>
       )}
       {/* Un soulignement ambre ne se devine pas davantage qu'une case rouge :
@@ -235,7 +240,7 @@ function EnduranceHistory({
         standing.rounds.some((cell) => enduranceCellPenalty(cell) > 0),
       ) && (
         <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
-          SOULIGNÉ EN AMBRE = PÉNALITÉ D&apos;ARBITRAGE SUR CETTE MANCHE
+          {t("endurance.penaltyLegend")}
         </p>
       )}
     </div>
@@ -262,6 +267,10 @@ function PenaltyLog({
   /** Retrait proposé, `undefined` pour un lecteur sans droit d'arbitrage. */
   onLift?: (penalty: EndurancePenaltyRow) => void;
 }>) {
+  const text = useTournamentPageText();
+  const { t } = text;
+  // Le retrait d'une sanction est un geste du staff : resté français (D4).
+  const staffLang = frenchBlockLang(text);
   if (penalties.length === 0) return null;
 
   return (
@@ -271,7 +280,7 @@ function PenaltyLog({
         className="mono"
         style={{ fontSize: 11, color: "var(--ink-quiet)", marginBottom: 8 }}
       >
-        PÉNALITÉS D&apos;ARBITRAGE
+        {t("endurance.penaltiesTitle")}
       </div>
       {/* La liste porte son intitulé : parcourue au lecteur d'écran, « liste de
           deux éléments » sans nom ne dit pas de quoi elle parle. */}
@@ -282,9 +291,10 @@ function PenaltyLog({
             className={styles.penaltyItem}
             title={
               penalty.createdAt
-                ? new Date(penalty.createdAt).toLocaleString("fr-FR", {
+                ? new Date(penalty.createdAt).toLocaleString(INTL_LOCALE[text.locale], {
                     dateStyle: "full",
                     timeStyle: "short",
+                    ...(text.locale === "fr" ? {} : { hourCycle: "h23" as const }),
                   })
                 : undefined
             }
@@ -293,7 +303,7 @@ function PenaltyLog({
             <EntrantName teamId={penalty.teamId} name={penalty.teamName} />
             <span className={styles.penaltyReason}>{penalty.reason}</span>
             <span className={styles.penaltyMeta}>
-              M{penalty.round}
+              {t("endurance.penaltyRound", { round: String(penalty.round) })}
               {/* Une sanction se conteste : elle porte le nom de qui l'a
                   prononcée, ou rien si le compte a depuis été supprimé. */}
               {penalty.authorPseudo ? ` · ${penalty.authorPseudo}` : ""}
@@ -306,6 +316,7 @@ function PenaltyLog({
             {onLift !== undefined && !penalty.removable && (
               <span
                 className={styles.penaltyMeta}
+                lang={staffLang}
                 title="Une manche a été jouée depuis : rendre ces points remettrait en lice une équipe qui ne l'a pas disputée."
               >
                 🔒 Figée
@@ -314,6 +325,7 @@ function PenaltyLog({
             {onLift !== undefined && penalty.removable && (
               <button
                 type="button"
+                lang={staffLang}
                 onClick={() => onLift(penalty)}
                 className="btn ghost"
                 title={`Retirer cette pénalité : ${penalty.teamName} récupère ${penalty.points} point(s)`}
@@ -353,11 +365,17 @@ export function EnduranceView({
   adminResolvable,
   onOpenAdminModal,
   format,
-  emptyLabel = "Aucun match pour l'instant.",
+  emptyLabel,
   showNextRound = false,
   qualificationFormat = null,
 }: Readonly<EnduranceViewProps>) {
   const wording = useParticipantWording();
+  const text = useTournamentPageText();
+  const { t } = text;
+  // Abandon et sanctions : gestes du lot 8b et du staff, restés français.
+  const actionLang = frenchBlockLang(text);
+  const participantType = useEntrantParticipantType();
+  const emptyText = emptyLabel ?? t("page.noMatchesShort");
 
   // Calculé ici, sur l'instantané que le flux pousse à chaque score : l'aperçu
   // suit le plateau sans requête de plus. Rien n'est calculé pour qui ne le
@@ -436,6 +454,8 @@ export function EnduranceView({
   // qu'en présence d'une telle ligne, comme celle du forfait plus bas.
   const showOutLegend = endurance.standings.some((s) => s.status === "OUT_OF_CONTENTION");
   const hasDraws = endurance.standings.some((s) => s.draws > 0);
+  const recordLabel = hasDraws ? t("endurance.recordDraws") : t("endurance.record");
+  const roundStatusKey = participantType === "SOLO" ? "endurance.roundStatusSolo" : "endurance.roundStatusTeam";
 
   return (
     <>
@@ -445,11 +465,19 @@ export function EnduranceView({
         même compte qui chiffre un forfait.
       */}
       <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 16px" }}>
-        ENDURANCE {endurance.startPoints} PTS · +{endurance.winDelta} PAR MAP GAGNÉE · −
-        {endurance.lossDelta} PAR MAP PERDUE · FORFAIT COMPTÉ {endurance.forfeitMaps}-0 ·{" "}
+        {t("endurance.summary", {
+          start: String(endurance.startPoints),
+          win: String(endurance.winDelta),
+          loss: String(endurance.lossDelta),
+          forfeit: String(endurance.forfeitMaps),
+        })}
         {endurance.playoffsStarted
-          ? `PLAY-OFFS À ${endurance.playoffSize}`
-          : `MANCHE ${roundLabel} · ${activeCount} ${wording.manyCapitalized.toUpperCase()} EN LICE → ${endurance.playoffSize}`}
+          ? t("endurance.playoffsAt", { size: String(endurance.playoffSize) })
+          : t(roundStatusKey, {
+              round: roundLabel,
+              count: activeCount,
+              size: String(endurance.playoffSize),
+            })}
       </p>
 
       <div className="table-like" style={{ marginBottom: showOutLegend ? 8 : 24 }}>
@@ -458,11 +486,11 @@ export function EnduranceView({
             classement une colonne de zéros, et la ligne est déjà dense. */}
         <div className={`${rowClassName} table-header`}>
           <span>#</span>
-          <span>{wording.oneCapitalized}</span>
-          <span>Endurance</span>
-          <span>{hasDraws ? "V / N / D" : "V / D"}</span>
-          <span>Statut</span>
-          {showActions && <span className="sr-only">Actions</span>}
+          <span>{participantText(text, participantType, "oneCapitalized")}</span>
+          <span>{t("endurance.endurance")}</span>
+          <span>{recordLabel}</span>
+          <span>{t("endurance.status")}</span>
+          {showActions && <span className="sr-only">{t("endurance.actions")}</span>}
         </div>
         {endurance.standings.map((standing) => {
           const isMine = myTeamId !== null && standing.teamId === myTeamId;
@@ -486,7 +514,7 @@ export function EnduranceView({
                 name={standing.teamName}
                 textStyle={{ fontWeight: isMine ? 700 : undefined, overflowWrap: "anywhere" }}
               />
-              <span className="num" data-label="Endurance">
+              <span className="num" data-label={t("endurance.endurance")}>
                 {standing.points}
                 {/*
                   Le cumul des pénalités se lit à côté du capital, pas à sa
@@ -496,7 +524,7 @@ export function EnduranceView({
                 {standing.penaltyPoints > 0 && (
                   <span
                     className={styles.penaltyBadge}
-                    title={`${standing.penaltyPoints} point(s) retiré(s) par pénalité d'arbitrage`}
+                    title={t("endurance.penaltyBadgeTitle", { points: String(standing.penaltyPoints) })}
                   >
                     {/*
                       « −3 » seul se lit « moins trois » sans dire de quoi : le
@@ -505,21 +533,21 @@ export function EnduranceView({
                     */}
                     <span aria-hidden="true">−{standing.penaltyPoints}</span>
                     <span className="sr-only">
-                      {` (${standing.penaltyPoints} point(s) retiré(s) par pénalité)`}
+                      {t("endurance.penaltyBadgeSr", { points: String(standing.penaltyPoints) })}
                     </span>
                   </span>
                 )}
               </span>
-              <span data-label={hasDraws ? "V / N / D" : "V / D"}>
+              <span data-label={recordLabel}>
                 {hasDraws ? `${standing.wins} / ${standing.draws} / ` : `${standing.wins} / `}
                 <span className="result-loss">{standing.losses}</span>
               </span>
-              <span data-label="Statut">
-                {STATUS_LABELS[standing.status]}
-                {standing.eliminatedRound ? ` (M${standing.eliminatedRound})` : ""}
+              <span data-label={t("endurance.status")}>
+                {t(STATUS_KEYS[standing.status])}
+                {standing.eliminatedRound ? t("endurance.eliminatedRound", { round: String(standing.eliminatedRound) }) : ""}
               </span>
               {showActions && (
-                <span className={styles.rowActions}>
+                <span className={styles.rowActions} lang={actionLang}>
                   {canPenalizeRow(standing.status) && onPenalize !== undefined && (
                     <button
                       type="button"
@@ -584,8 +612,8 @@ export function EnduranceView({
 
       {showOutLegend && (
         <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 24px" }}>
-          HORS COURSE = CAPITAL RESTANT, MAIS PLUS AUCUNE CHANCE D&apos;ATTEINDRE LES PLAY-OFFS
-          {endurance.maxRounds === null ? "" : ` DANS LES ${endurance.maxRounds} MANCHES PRÉVUES`}
+          {t("endurance.outLegend")}
+          {endurance.maxRounds === null ? "" : t("endurance.outLegendRounds", { count: String(endurance.maxRounds) })}
         </p>
       )}
 
@@ -631,10 +659,10 @@ export function EnduranceView({
       */}
       {decisive.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <BoardHeading>Play-offs</BoardHeading>
+          <BoardHeading>{t("endurance.playoffs")}</BoardHeading>
           <BracketSections
             bracketType="UPPER"
-            bracketLabel="Play-offs"
+            bracketLabel={t("endurance.playoffs")}
             showBracketLabel={false}
             matches={decisive}
             allTournamentMatches={matches}
@@ -649,7 +677,7 @@ export function EnduranceView({
             <div style={{ marginTop: 10 }}>
               <BracketSections
                 bracketType="THIRD_PLACE"
-                bracketLabel="Petite finale"
+                bracketLabel={t("endurance.thirdPlace")}
                 showBracketLabel={false}
                 matches={thirdPlace}
                 allTournamentMatches={matches}
@@ -665,7 +693,7 @@ export function EnduranceView({
 
       {roundSections.length > 0 ? (
         <>
-          {decisive.length > 0 && <BoardHeading>Manches qualificatives</BoardHeading>}
+          {decisive.length > 0 && <BoardHeading>{t("endurance.qualifying")}</BoardHeading>}
           <EnduranceRoundPanels
             sections={roundSections}
             accent={ACCENT.UPPER}
@@ -679,7 +707,7 @@ export function EnduranceView({
         </>
       ) : (
         decisive.length === 0 && (
-          <p style={{ color: "var(--ink-quiet)", margin: 0, fontSize: 14 }}>{emptyLabel}</p>
+          <p style={{ color: "var(--ink-quiet)", margin: 0, fontSize: 14 }}>{emptyText}</p>
         )
       )}
     </>

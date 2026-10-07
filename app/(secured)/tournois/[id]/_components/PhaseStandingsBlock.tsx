@@ -2,6 +2,7 @@
 
 import type { TournamentPhaseStanding } from "@/lib/shared/types";
 import { PhaseStandingsTable } from "./PhaseStandingsTable";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import styles from "./PhaseStandingsBlock.module.css";
 
 interface PhaseStandingsBlockProps {
@@ -19,10 +20,11 @@ interface PhaseStandingsBlockProps {
  * classement, d'où le titre.
  */
 export function PhaseStandingsBlock({ standings }: Readonly<PhaseStandingsBlockProps>) {
+  const { t } = useTournamentPageText();
   return (
     <section className={styles.block} aria-labelledby="phase-standings-title">
       <h3 id="phase-standings-title" className={styles.title}>
-        Classement de la phase
+        {t("phases.standingsTitle")}
       </h3>
       <PhaseStandingsTable standings={standings} />
     </section>

@@ -8,6 +8,7 @@ import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
 import { EntrantName } from "./EntrantName";
 import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
 /**
  * Pièces communes aux vues à classement par manches — survie (`SurvivalView`)
@@ -57,6 +58,7 @@ function RoundBadge({ children }: Readonly<{ children: ReactNode }>) {
 
 /** Bandeau de la championne d'un tournoi clos, nommée par un lien. */
 export function ChampionBanner({ champion }: Readonly<{ champion: { teamId: number; teamName: string } }>) {
+  const { t } = useTournamentPageText();
   return (
     <div
       style={{
@@ -67,7 +69,7 @@ export function ChampionBanner({ champion }: Readonly<{ champion: { teamId: numb
         fontSize: 15,
       }}
     >
-      🏆 Championne —{" "}
+      {t("match.champion")}{" "}
       <EntrantName teamId={champion.teamId} name={champion.teamName} logoSize={20}>
         <strong>{champion.teamName}</strong>
       </EntrantName>
@@ -109,6 +111,7 @@ export function RoundColumns({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<RoundColumnsProps>) {
+  const byeWin = useTournamentPageText().t("match.byeWin");
   // Matchs par manche, mémorisés sur la liste reçue : `RoundMatchSections`
   // trie et découpe sous `useMemo` sur l'identité de ce tableau.
   const matchesByRound = useMemo(() => {
@@ -193,9 +196,7 @@ export function RoundColumns({
                             style={{ display: "flex" }}
                             textStyle={{ color: "var(--ink)", fontWeight: 600 }}
                           />
-                          <span style={{ fontSize: 11, color: ACCENT }}>
-                            ✓ Victoire d&apos;office
-                          </span>
+                          <span style={{ fontSize: 11, color: ACCENT }}>{byeWin}</span>
                         </div>
                       );
                     }

@@ -7,6 +7,8 @@ import { useToast } from "@/components/ui/toast";
 import { contactsPanelView } from "../_lib/contacts-panel-view";
 import { mapError } from "../_lib/error-map";
 import { EntrantName } from "./EntrantName";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import styles from "./EntrantContactsPanel.module.css";
 
 /**
@@ -41,7 +43,9 @@ export type EntrantContactGroup = {
 };
 
 export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: number }>) {
-  const { showError } = useToast();
+  const staffLang = frenchBlockLang(useTournamentPageText());
+  const toast = useToast();
+  const showError = (message: string) => toast.showError(message, { lang: staffLang });
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [entrants, setEntrants] = useState<EntrantContactGroup[] | null>(null);
@@ -161,7 +165,8 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
   };
 
   return (
-    <div className="ds-block">
+    // Outil du staff : resté français (D4), annoncé comme tel sous `/en`.
+    <div className="ds-block" lang={staffLang}>
       <div className="ds-section-title blue" style={{ alignItems: "center" }}>
         <h2>Contacts Discord</h2>
       </div>

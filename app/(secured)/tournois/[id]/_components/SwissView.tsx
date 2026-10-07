@@ -16,6 +16,8 @@ import {
   RoundColumns,
 } from "./RoundColumns";
 import styles from "./RankingViews.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang, type TournamentPageText } from "@/lib/shared/tournament-page-text";
 
 interface SwissViewProps {
   swiss: SwissMeta;
@@ -46,17 +48,9 @@ const SUBGRID: CSSProperties = {
 const RIGHT: CSSProperties = { textAlign: "right" };
 const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--ink-quiet)" };
 
-const STATUS_META: Record<SwissStandingRow["status"], { label: string; color: string }> = {
-  ACTIVE: { label: "En lice", color: ACCENT },
-  FORFEIT: { label: "Forfait", color: AMBER },
-};
-
-/** Libellés courts des départages, dans l'ordre où ils sont appliqués. */
-const TIEBREAKER_LABELS: Record<SwissMeta["tiebreakers"][number], string> = {
-  buchholz: "Buchholz",
-  "sonneborn-berger": "Sonneborn-Berger",
-  "opponent-mwp": "% victoires adverses",
-  "head-to-head": "confrontation directe",
+const STATUS_META: Record<SwissStandingRow["status"], { key: "ranking.active" | "ranking.forfeit"; color: string }> = {
+  ACTIVE: { key: "ranking.active", color: ACCENT },
+  FORFEIT: { key: "ranking.forfeit", color: AMBER },
 };
 
 export function SwissView({
@@ -69,8 +63,13 @@ export function SwissView({
   onOpenAdminModal,
   canForfeit,
   onForfeit,
-  emptyLabel = "Aucun match pour l'instant.",
+  emptyLabel,
 }: Readonly<SwissViewProps>) {
+  const text = useTournamentPageText();
+  const { t } = text;
+  // L'abandon est un geste du lot 8b : resté français sous `/en`.
+  const actionLang = frenchBlockLang(text);
+  const emptyText = emptyLabel ?? t("page.noMatchesShort");
   // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
   const podiumTiers = usePodiumTiers();
   const activeCount = swiss.standings.filter((s) => s.status === "ACTIVE").length;
@@ -87,7 +86,11 @@ export function SwissView({
   // un en-tête « Action » au-dessus de cellules toutes vides n'annoncerait rien.
   const anyForfeitable = swiss.standings.some(isForfeitable);
 
-  const scoreLabel = `Victoire ${swiss.pointsForWin} pt${swiss.pointsForWin > 1 ? "s" : ""} · Nul ${swiss.pointsForDraw} · Défaite ${swiss.pointsForLoss}`;
+  const scoreLabel = t("swiss.scoring", {
+    win: swiss.pointsForWin,
+    draw: String(swiss.pointsForDraw),
+    loss: String(swiss.pointsForLoss),
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -96,15 +99,18 @@ export function SwissView({
       {/* Bandeau récap : où en est-on dans les rondes prévues. */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
-          Ronde {swiss.currentRound || "—"}/{swiss.totalRounds || "—"} ·{" "}
-          {activeCount} équipe{activeCount > 1 ? "s" : ""} en lice
+          {t("swiss.summary", {
+            round: swiss.currentRound ? String(swiss.currentRound) : "—",
+            total: swiss.totalRounds ? String(swiss.totalRounds) : "—",
+            count: activeCount,
+          })}
         </span>
         <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
           {scoreLabel}
         </span>
         {!isFinished && roundsLeft > 0 && (
           <span className="mono" style={{ fontSize: 13, color: "var(--pink-400)" }}>
-            {roundsLeft} ronde{roundsLeft > 1 ? "s" : ""} restante{roundsLeft > 1 ? "s" : ""}
+            {t("swiss.roundsLeft", { count: roundsLeft })}
           </span>
         )}
       </div>
@@ -122,7 +128,7 @@ export function SwissView({
               marginBottom: 10,
             }}
           >
-            Classement
+            {t("ranking.title")}
           </div>
 
           {/* Un **tableau**, et non une liste : l'en-tête de colonnes est ce qui
@@ -144,13 +150,13 @@ export function SwissView({
               redistribution (WCAG 1.4.10). */}
           {swiss.standings.length === 0 ? (
             <p style={{ margin: 0, fontSize: 13, color: "var(--ink-quiet)" }}>
-              {isFinished ? "Aucune équipe classée." : "Aucune équipe classée pour l'instant."}
+              {isFinished ? t("swiss.empty") : t("swiss.emptyYet")}
             </p>
           ) : (
-            <ScrollArea ariaLabel="Classement du tournoi — défilement horizontal">
+            <ScrollArea ariaLabel={t("swiss.scrollLabel")}>
               <div
                 role="table"
-                aria-label="Classement du tournoi"
+                aria-label={t("swiss.tableLabel")}
                 // Pistes dans la feuille : sous 720 px, l'action passe sous le
                 // nom et sa colonne disparaît — un style en ligne l'emporterait
                 // sur la requête média.
@@ -169,38 +175,38 @@ export function SwissView({
                       color: "var(--ink-quiet)",
                     }}
                   >
-                    <span role="columnheader" aria-label="Rang">
+                    <span role="columnheader" aria-label={t("swiss.rank")}>
                       #
                     </span>
-                    <span role="columnheader">Équipe</span>
-                    <span role="columnheader" aria-label="Points" style={RIGHT} title="Points">
-                      Pts
+                    <span role="columnheader">{t("swiss.team")}</span>
+                    <span role="columnheader" aria-label={t("swiss.points")} style={RIGHT} title={t("swiss.points")}>
+                      {t("swiss.pointsShort")}
                     </span>
                     <span
                       role="columnheader"
-                      aria-label="Victoires-Nuls-Défaites"
+                      aria-label={t("swiss.record")}
                       style={RIGHT}
-                      title="Victoires-Nuls-Défaites"
+                      title={t("swiss.record")}
                     >
-                      V-N-D
+                      {t("swiss.recordShort")}
                     </span>
                     <span
                       role="columnheader"
-                      aria-label="Buchholz"
+                      aria-label={t("swiss.tiebreakers.buchholz")}
                       style={RIGHT}
-                      title="Buchholz : somme des points des adversaires rencontrés"
+                      title={t("swiss.buchholzTitle")}
                     >
                       Bch
                     </span>
                     <span role="columnheader">
-                      <span className="sr-only">Victoire d&apos;office</span>
+                      <span className="sr-only">{t("swiss.bye")}</span>
                     </span>
                     <span role="columnheader" style={RIGHT}>
-                      Statut
+                      {t("swiss.status")}
                     </span>
                     {anyForfeitable && (
                       <span role="columnheader" className={styles.swissAction}>
-                        <span className="sr-only">Action</span>
+                        <span className="sr-only">{t("swiss.action")}</span>
                       </span>
                     )}
                   </div>
@@ -217,7 +223,7 @@ export function SwissView({
                 >
                   {swiss.standings.map((team, idx) => {
                     // Tournoi clos : la tête du classement est championne, pas « en lice ».
-                    const meta = standingMeta(team, isFinished);
+                    const meta = standingMeta(team, isFinished, text);
                     const isMine = team.teamId === myTeamId;
                     const forfeitable = isForfeitable(team);
                     return (
@@ -266,13 +272,13 @@ export function SwissView({
                             toutes lettres. */}
                         <span
                           role="cell"
-                          title={team.byes > 0 ? "Victoire d'office reçue (effectif impair)" : undefined}
+                          title={team.byes > 0 ? t("swiss.byeTitle") : undefined}
                           style={{ fontSize: 11, color: "var(--violet-300)" }}
                         >
                           {team.byes > 0 && (
                             <>
                               <span aria-hidden="true">✓</span>
-                              <span className="sr-only">Oui</span>
+                              <span className="sr-only">{t("swiss.yes")}</span>
                             </>
                           )}
                         </span>
@@ -289,7 +295,7 @@ export function SwissView({
                           {meta.label}
                         </span>
                         {anyForfeitable && (
-                          <span role="cell" className={styles.swissAction}>
+                          <span role="cell" className={styles.swissAction} lang={actionLang}>
                             {forfeitable && (
                               <button
                                 type="button"
@@ -321,8 +327,7 @@ export function SwissView({
           )}
 
           <p style={{ margin: "8px 2px 0", fontSize: 12, color: "var(--ink-quiet)" }}>
-            À points égaux :{" "}
-            {swiss.tiebreakers.map((t) => TIEBREAKER_LABELS[t]).join(", ")}.
+            {t("swiss.tiebreak", { list: swiss.tiebreakers.map((key) => t(`swiss.tiebreakers.${key}`)).join(", ") })}
           </p>
         </div>
 
@@ -332,7 +337,7 @@ export function SwissView({
           totalRounds={swiss.totalRounds}
           adminResolvable={adminResolvable}
           onOpenAdminModal={onOpenAdminModal}
-          emptyLabel={emptyLabel}
+          emptyLabel={emptyText}
         />
       </div>
     </div>
@@ -365,14 +370,15 @@ export function SwissRounds({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<SwissRoundsProps>) {
+  const { t } = useTournamentPageText();
   return (
     <RoundColumns
       matches={matches}
       allTournamentMatches={allTournamentMatches}
       format="SWISS"
-      ariaLabel="Rondes du tournoi — défilement horizontal"
-      roundNoun="Ronde"
-      roundMarks={(roundNum) => (roundNum === totalRounds ? ["⚑ Dernière"] : [])}
+      ariaLabel={t("swiss.roundsLabel")}
+      roundNoun={t("swiss.roundNoun")}
+      roundMarks={(roundNum) => (roundNum === totalRounds ? [t("swiss.lastRound")] : [])}
       adminResolvable={adminResolvable}
       onOpenAdminModal={onOpenAdminModal}
       emptyLabel={emptyLabel}
@@ -381,9 +387,16 @@ export function SwissRounds({
 }
 
 /** Pastille d'une ligne du classement ; tournoi clos, une équipe en lice est classée. */
-function standingMeta(team: SwissStandingRow, isFinished: boolean): { label: string; color: string } {
+function standingMeta(
+  team: SwissStandingRow,
+  isFinished: boolean,
+  text: TournamentPageText,
+): { label: string; color: string } {
   if (isFinished && team.status === "ACTIVE") {
-    return team.rank === 1 ? { label: "Championne", color: ACCENT } : { label: "Classée", color: "var(--ink-quiet)" };
+    return team.rank === 1
+      ? { label: text.t("ranking.champion"), color: ACCENT }
+      : { label: text.t("ranking.ranked"), color: "var(--ink-quiet)" };
   }
-  return STATUS_META[team.status];
+  const meta = STATUS_META[team.status];
+  return { label: text.t(meta.key), color: meta.color };
 }

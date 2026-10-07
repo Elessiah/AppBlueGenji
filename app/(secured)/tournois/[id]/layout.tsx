@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
-import {
-  SITE_DESCRIPTION,
-  SITE_NAME,
-  tournamentShareDescription,
-  tournamentShareTitle,
-} from "@/lib/shared/share-metadata";
+import { SITE_DESCRIPTION, SITE_NAME, tournamentShareTitle } from "@/lib/shared/share-metadata";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { localeAlternates, localeHref, OPEN_GRAPH_LOCALE } from "@/lib/shared/locales";
+import { localizedTournamentShareDescription } from "@/lib/shared/tournament-share-text";
+import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
+import { TournamentPageTextProvider } from "@/components/i18n/tournament-page-text";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -37,13 +38,19 @@ type MetadataProps = {
  * souvent une seconde fois pour le flux SSE, le cache ne durant que 3 s.
  */
 export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
+  // Lot 8a-2 : titre, description, `og:locale`, canonique et `hreflang` dans
+  // la langue de l'adresse (`/en/tournois/12`). La carte d'aperçu, dessinée
+  // par `opengraph-image.tsx` (même adresse pour les deux langues), reste
+  // française.
+  const locale = await requestLocale();
+  const messages = messagesFor(locale);
   // L'encart du site, posé en entier : sans lui, la fiche hériterait de la
   // carte générique de `/tournois` (mise en page parente), dont le texte ne
   // correspond pas à l'image du site que `opengraph-image.tsx` dessine ici.
   const fallback: Metadata = {
-    title: "Tournoi",
+    title: messages.tournament.meta.fallbackTitle,
     description: SITE_DESCRIPTION,
-    openGraph: { type: "website", siteName: SITE_NAME, locale: "fr_FR", title: SITE_NAME, description: SITE_DESCRIPTION },
+    openGraph: { type: "website", siteName: SITE_NAME, locale: OPEN_GRAPH_LOCALE[locale], title: SITE_NAME, description: SITE_DESCRIPTION },
     twitter: { card: "summary_large_image", title: SITE_NAME, description: SITE_DESCRIPTION },
   };
 
@@ -65,7 +72,10 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
   if (!card) return fallback;
 
   const title = tournamentShareTitle(card);
-  const description = tournamentShareDescription(card);
+  const description = localizedTournamentShareDescription(card, locale, messages);
+  const path = `/tournois/${tournamentId}`;
+  const canonical = localeHref(path, locale);
+  const languages = localeAlternates(path);
 
   return {
     // Le gabarit de la racine ajouterait « · BlueGenji Esport » derrière un
@@ -73,18 +83,29 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
     // le nom du site étant de toute façon annoncé par `og:site_name`.
     title: { absolute: title },
     description,
+    alternates: languages ? { canonical, languages } : { canonical },
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
-      locale: "fr_FR",
+      locale: OPEN_GRAPH_LOCALE[locale],
       title,
       description,
-      url: `/tournois/${tournamentId}`,
+      url: canonical,
     },
     twitter: { card: "summary_large_image", title, description },
   };
 }
 
-export default function TournamentDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}</>;
+/**
+ * Pose les textes de la fiche : rien en français (déjà dans le paquet),
+ * l'espace `tournament` (sans ses parties serveur) sous `/en` seulement.
+ */
+export default async function TournamentDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await requestLocale();
+  const messages = locale === "en" ? tournamentPageMessages(messagesFor(locale)) : undefined;
+  return (
+    <TournamentPageTextProvider locale={locale} messages={messages}>
+      {children}
+    </TournamentPageTextProvider>
+  );
 }

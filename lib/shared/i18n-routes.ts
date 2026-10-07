@@ -68,8 +68,11 @@ export const MIGRATED_ROUTES: readonly string[] = [
   "/rgpd",
   "/rgpd/registre",
   // Lot 8a-1 — liste des tournois (espace sécurisé : `noindex`, hors sitemap,
-  // comme en français). La carte « Connexion requise » suit la langue. Les
-  // fiches (`/tournois/[id]`) attendent le lot 8a-2 ; `/tournois/creer` reste
-  // français (lot 8b).
+  // comme en français). La carte « Connexion requise » suit la langue.
+  // `/tournois/creer` et `/tournois/[id]/modifier` restent français (lot 8b).
   "/tournois",
+  // Lot 8a-2 — fiche d'un tournoi (consultation). `[id]` n'accepte qu'un
+  // entier : `/tournois/creer` n'est pas une fiche. Les actions (inscription,
+  // score, litiges, gestes du staff) y restent françaises, `lang="fr"`.
+  "/tournois/[id]",
 ];

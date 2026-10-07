@@ -1,5 +1,7 @@
 "use client";
 
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -54,6 +56,8 @@ export function TournamentDialogFrame({
   onClose,
   children,
 }: Readonly<TournamentDialogFrameProps>) {
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
   const [mounted, setMounted] = useState(!deferMount);
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
@@ -79,6 +83,7 @@ export function TournamentDialogFrame({
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby={titleId}

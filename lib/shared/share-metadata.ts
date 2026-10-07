@@ -65,17 +65,17 @@ export const SITE_SHARE_CARD = {
 } as const;
 
 /** Fuseau de rédaction des dates partagées (voir l'en-tête du module). */
-const SHARE_TIME_ZONE = "Europe/Paris";
+export const SHARE_TIME_ZONE = "Europe/Paris";
 
 /**
  * Longueur au-delà de laquelle Discord coupe lui-même la description d'un
  * encart. On coupe avant lui, sur un mot, plutôt que de lui laisser trancher au
  * milieu d'un nom d'équipe.
  */
-const DESCRIPTION_MAX_LENGTH = 300;
+export const DESCRIPTION_MAX_LENGTH = 300;
 
 /** Part de {@link DESCRIPTION_MAX_LENGTH} laissée au texte libre de l'auteur. */
-const FREE_TEXT_MAX_LENGTH = 160;
+export const FREE_TEXT_MAX_LENGTH = 160;
 
 /** Ce que le sous-titre de l'image d'aperçu peut porter sans déborder. */
 const SHARE_CARD_SUBTITLE_MAX_LENGTH = 130;

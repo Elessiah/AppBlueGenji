@@ -1,7 +1,14 @@
-import { matchFormatLabel, matchFormatDescription } from "@/lib/shared/match-format";
 import { FORMAT_LABELS, GAME_LABELS } from "@/lib/shared/tournament-labels";
-import { isSoloTournament, participantWording } from "@/lib/shared/participants";
-import { registrationFiltersSummary } from "@/lib/shared/registration-filters";
+import { isSoloTournament } from "@/lib/shared/participants";
+import { MIN_PLAYERS_BOUNDS, type RegistrationFilters } from "@/lib/shared/registration-filters";
+import { FR_TOURNAMENTS_TEXT, tournamentLabel, type TournamentsText } from "@/lib/shared/tournaments-text";
+import {
+  FR_TOURNAMENT_PAGE_TEXT,
+  matchFormatDescriptionText,
+  matchFormatText,
+  participantText,
+  type TournamentPageText,
+} from "@/lib/shared/tournament-page-text";
 import type {
   TournamentCard,
   TournamentPhase,
@@ -80,14 +87,18 @@ export function headerMetaItems(
   phases: TournamentPhase[] | null,
   currentPhaseId: number | null,
   now: number = Date.now(),
+  /** Langue de la page (lot 8a-2) ; sans elle, le français. */
+  text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT,
+  /** Libellés de domaine (espace `labels`) dans la même langue. */
+  labels: TournamentsText = FR_TOURNAMENTS_TEXT,
 ): HeaderMetaItem[] {
-  const wording = participantWording(card.participantType);
+  const { t } = text;
   const items: HeaderMetaItem[] = [];
 
   items.push({
     key: "format",
-    label: "Format",
-    value: FORMAT_LABELS[card.format] ?? card.format,
+    label: t("header.meta.format"),
+    value: tournamentLabel(labels, "format", card.format),
     kind: "text",
   });
 
@@ -106,7 +117,7 @@ export function headerMetaItems(
     if (index >= 0) {
       items.push({
         key: "phase",
-        label: "Phase en cours",
+        label: t("header.meta.currentPhase"),
         value: `${index + 1}/${phases.length}`,
         kind: "count",
       });
@@ -129,28 +140,28 @@ export function headerMetaItems(
   if (card.matchFormat) {
     items.push({
       key: "match-format",
-      label: playoffFormat ? "Format des qualifications" : "Format des matchs",
-      value: matchFormatLabel(card.matchFormat),
+      label: playoffFormat ? t("header.meta.qualifierFormat") : t("header.meta.matchFormat"),
+      value: matchFormatText(text, card.matchFormat),
       kind: "text",
-      hint: matchFormatDescription(card.matchFormat),
+      hint: matchFormatDescriptionText(text, card.matchFormat),
     });
   }
 
   if (playoffFormat) {
     items.push({
       key: "playoff-match-format",
-      label: "Format des play-offs",
-      value: matchFormatLabel(playoffFormat),
+      label: t("header.meta.playoffFormat"),
+      value: matchFormatText(text, playoffFormat),
       kind: "text",
-      hint: matchFormatDescription(playoffFormat),
+      hint: matchFormatDescriptionText(text, playoffFormat),
     });
   }
 
   if (card.hasThirdPlaceMatch) {
     items.push({
       key: "third-place",
-      label: "Troisième place",
-      value: "Petite finale",
+      label: t("header.meta.thirdPlace"),
+      value: t("header.meta.thirdPlaceMatch"),
       kind: "text",
     });
   }
@@ -160,7 +171,7 @@ export function headerMetaItems(
   // infini traverserait toute la mise en page — on s'en garde.
   items.push({
     key: "entrants",
-    label: wording.manyParticipating,
+    label: participantText(text, card.participantType, "manyParticipating"),
     value: `${card.registeredTeams}/${card.maxTeams}`,
     kind: "count",
     ratio: card.maxTeams > 0 ? Math.min(1, card.registeredTeams / card.maxTeams) : 0,
@@ -172,27 +183,28 @@ export function headerMetaItems(
   // affichées sur un tournoi terminé transformerait une condition d'accès en
   // trait de palmarès.
   if (card.state === "UPCOMING" || card.state === "REGISTRATION") {
-    const conditions = registrationFiltersSummary(
+    const conditions = registrationConditionsText(
+      text,
       card.registrationFilters,
       isSoloTournament(card.participantType),
     );
     if (conditions) {
       items.push({
         key: "registration-conditions",
-        label: "Conditions d'inscription",
+        label: t("header.meta.conditions"),
         value: conditions,
         kind: "text",
-        hint: "Contrôlées à l'inscription d'un joueur ; les équipes invitées par le staff n'y sont pas soumises.",
+        hint: t("header.meta.conditionsHint"),
       });
     }
   }
 
-  const registration = registrationDateItem(card, now);
+  const registration = registrationDateItem(card, now, text);
   if (registration) items.push(registration);
 
   items.push({
     key: "start",
-    label: card.state === "FINISHED" ? "Joué le" : "Début du tournoi",
+    label: card.state === "FINISHED" ? t("header.meta.playedOn") : t("header.meta.start"),
     value: card.startAt,
     kind: "date",
   });
@@ -205,7 +217,7 @@ export function headerMetaItems(
  * à venir, la clôture ensuite. Une fois le tournoi lancé, plus aucune : elle
  * n'apprendrait rien et pousserait la date de début hors de vue.
  */
-function registrationDateItem(card: TournamentCard, now: number): HeaderMetaItem | null {
+function registrationDateItem(card: TournamentCard, now: number, text: TournamentPageText): HeaderMetaItem | null {
   if (card.state === "RUNNING" || card.state === "FINISHED") return null;
 
   const opensAt = Date.parse(card.registrationOpenAt);
@@ -213,7 +225,7 @@ function registrationDateItem(card: TournamentCard, now: number): HeaderMetaItem
   if (Number.isFinite(opensAt) && now < opensAt) {
     return {
       key: "registration-open",
-      label: "Inscriptions dès",
+      label: text.t("header.meta.registrationOpens"),
       value: card.registrationOpenAt,
       kind: "date",
     };
@@ -221,14 +233,47 @@ function registrationDateItem(card: TournamentCard, now: number): HeaderMetaItem
 
   return {
     key: "registration-close",
-    label: "Clôture des inscriptions",
+    label: text.t("header.meta.registrationCloses"),
     value: card.registrationCloseAt,
     kind: "date",
   };
 }
 
 /** Sous-titre d'identité : « Overwatch · Individuel ». */
-export function headerIdentityLine(card: TournamentCard): string {
-  const wording = participantWording(card.participantType);
-  return [GAME_LABELS[card.game] ?? card.game, wording.badge].filter(Boolean).join(" · ");
+export function headerIdentityLine(
+  card: TournamentCard,
+  text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT,
+  labels: TournamentsText = FR_TOURNAMENTS_TEXT,
+): string {
+  const badge = isSoloTournament(card.participantType) ? text.t("participants.soloBadge") : null;
+  return [tournamentLabel(labels, "game", card.game), badge].filter(Boolean).join(" · ");
+}
+
+/**
+ * Conditions d'inscription en une ligne (`registrationFiltersSummary`, dans la
+ * langue de la page ; le français l'égale mot pour mot, testé).
+ */
+export function registrationConditionsText(
+  text: TournamentPageText,
+  filters: RegistrationFilters,
+  soloEntry = false,
+): string | null {
+  const { t } = text;
+  const parts: string[] = [];
+  if (!soloEntry && filters.minPlayers > MIN_PLAYERS_BOUNDS.min) {
+    parts.push(t("header.filters.minPlayers", { count: String(filters.minPlayers) }));
+  }
+  if (filters.discordRequirement === "ANY_PLAYER") {
+    parts.push(soloEntry ? t("header.filters.discordSolo") : t("header.filters.discordAny"));
+  }
+  if (filters.discordRequirement === "ALL_PLAYERS") {
+    parts.push(soloEntry ? t("header.filters.discordSolo") : t("header.filters.discordAll"));
+  }
+  if (filters.blizzardRequirement === "ANY_PLAYER") {
+    parts.push(soloEntry ? t("header.filters.blizzardSolo") : t("header.filters.blizzardAny"));
+  }
+  if (filters.blizzardRequirement === "ALL_PLAYERS") {
+    parts.push(soloEntry ? t("header.filters.blizzardSolo") : t("header.filters.blizzardAll"));
+  }
+  return parts.length === 0 ? null : parts.join(" · ");
 }

@@ -11,6 +11,8 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
 import dialogStyles from "./ScoreDialog.module.css";
 import styles from "./MatchMapDetails.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { versusText } from "@/lib/shared/tournament-page-text";
 
 /**
  * Liste des maps d'un match ou d'une proposition (`docs/features/MAP_SCORES.md`) :
@@ -24,12 +26,13 @@ export function MapResultList({
   label,
 }: Readonly<{ maps: ReadonlyArray<MatchMapResult>; team1Name: string; team2Name: string; label: string }>) {
   const { showError, showSuccess } = useToast();
+  const { t } = useTournamentPageText();
   const copy = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
-      showSuccess(`Code de replay ${code} copié.`);
+      showSuccess(t("match.maps.copied", { code }));
     } catch {
-      showError("Copie impossible : sélectionne le code à la main.");
+      showError(t("match.maps.copyFailed"));
     }
   };
 
@@ -37,12 +40,12 @@ export function MapResultList({
     <ol className={styles.list} aria-label={label}>
       {maps.map((map) => {
         const side = mapWinnerSide(map);
-        let outcome = "Map nulle";
-        if (side === 1) outcome = `Gagnée par ${team1Name}`;
-        else if (side === 2) outcome = `Gagnée par ${team2Name}`;
+        let outcome = t("match.maps.drawn");
+        if (side === 1) outcome = t("match.maps.wonBy", { team: team1Name });
+        else if (side === 2) outcome = t("match.maps.wonBy", { team: team2Name });
         return (
           <li key={map.mapNumber} className={styles.item}>
-            <span className={styles.label}>Map {map.mapNumber}</span>
+            <span className={styles.label}>{t("match.maps.map", { number: String(map.mapNumber) })}</span>
             <span className={styles.score} title={outcome}>
               {map.team1Score} – {map.team2Score}
               <span className="sr-only"> : {outcome}</span>
@@ -52,8 +55,8 @@ export function MapResultList({
               type="button"
               className={styles.copy}
               onClick={() => void copy(map.replayCode)}
-              aria-label={`Copier le code de replay de la map ${map.mapNumber}`}
-              title="Copier le code de replay"
+              aria-label={t("match.maps.copyLabel", { number: String(map.mapNumber) })}
+              title={t("match.maps.copy")}
             >
               <Copy size={14} aria-hidden="true" />
             </button>
@@ -72,6 +75,7 @@ export function MapResultList({
  * exemption, match d'avant les maps).
  */
 export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name"> }>) {
+  const text = useTournamentPageText();
   const [open, setOpen] = useState(false);
   // Détail affiché tant que la modale est ouverte, même s'il disparaît de
   // l'instantané (score corrigé à la main, forfait, retour en arrière) : la
@@ -80,8 +84,8 @@ export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, 
   if (match.maps.length > 0) shown.current = match.maps;
   const hasMaps = match.maps.length > 0;
   if (!hasMaps && !open) return null;
-  const team1 = match.team1Name ?? "Équipe 1";
-  const team2 = match.team2Name ?? "Équipe 2";
+  const team1 = match.team1Name ?? text.t("match.team1");
+  const team2 = match.team2Name ?? text.t("match.team2");
 
   const close = () => {
     setOpen(false);
@@ -98,9 +102,9 @@ export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, 
           className={styles.summary}
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
-          aria-label={`Détail des maps (${match.maps.length}) : ${team1} contre ${team2}`}
+          aria-label={text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versusText(text, team1, team2) })}
         >
-          Détail des maps ({match.maps.length})
+          {text.t("match.maps.summary", { count: String(match.maps.length) })}
         </button>
       )}
       {open && (
@@ -132,6 +136,7 @@ function MapDetailsDialog({
   const dialogRef = useDialogBehavior({ open: true, onClose });
   const backdrop = useBackdropDismiss(onClose);
   const titleId = `map-details-${matchId}-title`;
+  const { t } = useTournamentPageText();
 
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={dialogStyles.backdrop} role="presentation" {...backdrop}>
@@ -146,17 +151,15 @@ function MapDetailsDialog({
         <div className={dialogStyles.head}>
           <div className={dialogStyles.headText}>
             <h3 id={titleId} className={dialogStyles.title}>
-              Détail des maps
+              {t("match.maps.title")}
             </h3>
-            <p className={dialogStyles.opponents}>
-              {team1Name} vs {team2Name}
-            </p>
+            <p className={dialogStyles.opponents}>{t("match.maps.vs", { team1: team1Name, team2: team2Name })}</p>
           </div>
         </div>
-        <MapResultList maps={maps} team1Name={team1Name} team2Name={team2Name} label="Maps du match" />
+        <MapResultList maps={maps} team1Name={team1Name} team2Name={team2Name} label={t("match.maps.listLabel")} />
         <div className={dialogStyles.actions}>
           <button type="button" className={`${dialogStyles.link} ${dialogStyles.close}`} onClick={onClose}>
-            Fermer
+            {t("match.maps.close")}
           </button>
         </div>
       </div>

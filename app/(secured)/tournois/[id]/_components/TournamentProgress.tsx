@@ -2,10 +2,10 @@
 
 import { useClock } from "@/lib/shared/hooks/useClock";
 import { ScrollArea } from "@/components/cyber";
-import {
-  computeTournamentProgress,
-  formatStageCountdown,
-} from "@/lib/shared/tournament-progress";
+import { computeTournamentProgress } from "@/lib/shared/tournament-progress";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { pageDateTime, type TournamentPageText } from "@/lib/shared/tournament-page-text";
+import type { Locale } from "@/lib/shared/locales";
 import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { EntrantName } from "./EntrantName";
@@ -19,15 +19,34 @@ interface TournamentProgressProps {
 const TICK_MS = 30_000;
 
 /** « 28/08 14:30 » — la frise n'a pas la place d'une date complète. */
-function shortDateTime(iso: string): string {
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return "";
-  return date.toLocaleString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function shortDateTime(iso: string, locale: Locale): string {
+  if (!Number.isFinite(new Date(iso).getTime())) return "";
+  return pageDateTime(iso, locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Délai avant l'étape suivante (`formatStageCountdown`, dans la langue de la
+ * page ; le français l'égale, testé). `null` quand l'instant est passé.
+ */
+export function stageCountdownText(text: TournamentPageText, from: number, to: number): string | null {
+  const delay = to - from;
+  if (!Number.isFinite(delay) || delay <= 0) return null;
+  const minutes = Math.floor(delay / 60_000);
+  if (minutes < 1) return text.t("progress.countdown.underMinute");
+  const days = String(Math.floor(minutes / 1440));
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days !== "0") {
+    return hours > 0
+      ? text.t("progress.countdown.daysHours", { days, hours: String(hours) })
+      : text.t("progress.countdown.days", { days });
+  }
+  if (hours > 0) {
+    return mins > 0
+      ? text.t("progress.countdown.hoursMinutes", { hours: String(hours), minutes: String(mins) })
+      : text.t("progress.countdown.hours", { hours: String(hours) });
+  }
+  return text.t("progress.countdown.minutes", { minutes: String(mins) });
 }
 
 /**
@@ -44,6 +63,8 @@ export function TournamentProgress({ detail }: Readonly<TournamentProgressProps>
   // ni matchs à rejouer. Laisser battre l'horloge y ferait re-parcourir tous les
   // matchs du plateau toutes les 30 s, indéfiniment, pour un affichage figé.
   // L'horloge s'arrête aussi onglet caché (`useClock`, régime de charge).
+  const text = useTournamentPageText();
+  const { t, locale } = text;
   const isFinished = detail.card.state === "FINISHED";
   const clock = useClock(TICK_MS, !isFinished);
   // Avant le montage, l'instant du rendu : la page est rendue côté client, et
@@ -64,8 +85,10 @@ export function TournamentProgress({ detail }: Readonly<TournamentProgressProps>
   const showsFinished = progress.current === "FINISHED";
   const percent = Math.round(progress.ratio * 100);
   const countdown = progress.next?.at
-    ? formatStageCountdown(now, new Date(progress.next.at).getTime())
+    ? stageCountdownText(text, now, new Date(progress.next.at).getTime())
     : null;
+  const stageLabel = (key: string) => t(`progress.stages.${key as typeof currentStage.key}.label`);
+  const stageHint = (key: string) => t(`progress.stages.${key as typeof currentStage.key}.hint`);
 
   const lastIndex = progress.stages.length - 1;
 
@@ -76,35 +99,35 @@ export function TournamentProgress({ detail }: Readonly<TournamentProgressProps>
   const champion = showsFinished ? detail.card.champion : null;
   const finishedFoot = champion ? (
     <>
-      <span>Vainqueur :</span>
+      <span>{t("progress.winner")}</span>
       <EntrantName teamId={champion.teamId} name={champion.name} textClassName={styles.footStrong} />
     </>
   ) : (
-    <span>Le tournoi est clos.</span>
+    <span>{t("progress.closed")}</span>
   );
   const upcomingFoot = progress.next?.at ? (
     <>
-      <span>Prochaine étape :</span>
-      <span className={styles.footStrong}>{progress.next.label}</span>
-      <span>· {shortDateTime(progress.next.at)}</span>
+      <span>{t("progress.next")}</span>
+      <span className={styles.footStrong}>{stageLabel(progress.next.key)}</span>
+      <span>· {shortDateTime(progress.next.at, locale)}</span>
       {countdown && <span>· {countdown}</span>}
     </>
   ) : (
     // Reste le seul jalon sans horaire annoncé : la fin, qui dépend du
     // dernier match joué.
-    <span>Le tournoi se clôturera une fois tous les matchs joués.</span>
+    <span>{t("progress.willClose")}</span>
   );
 
   return (
     <div className="ds-block">
       <div className="ds-section-title green">
-        <h2>Progression du tournoi</h2>
+        <h2>{t("progress.title")}</h2>
       </div>
 
       <div className={styles.head}>
         <div className={styles.headStage}>
-          <span className={styles.headLabel}>{currentStage.label}</span>
-          <span className={styles.headHint}>{currentStage.hint}</span>
+          <span className={styles.headLabel}>{stageLabel(currentStage.key)}</span>
+          <span className={styles.headHint}>{stageHint(currentStage.key)}</span>
         </div>
         {/* Doublon de l'`aria-valuetext` de la barre : muet au lecteur d'écran. */}
         <span className={styles.percent} aria-hidden="true">
@@ -116,7 +139,7 @@ export function TournamentProgress({ detail }: Readonly<TournamentProgressProps>
         orientation="x"
         subtle
         fade
-        ariaLabel="Frise de progression du tournoi — défilement horizontal"
+        ariaLabel={t("progress.railLabel")}
         // La frise (780 px) s'ouvrait sur son début : sur mobile, l'étape
         // courante était hors champ. Elle défile jusqu'à elle au montage, puis
         // à chaque changement d'étape — jamais entre deux.
@@ -132,18 +155,18 @@ export function TournamentProgress({ detail }: Readonly<TournamentProgressProps>
             <div /* NOSONAR S6819 — piste stylée sans enfant ; `<progress>` ne se stylise pas pareil */
               className={styles.track}
               role="progressbar"
-              aria-label="Avancement du tournoi"
+              aria-label={t("progress.barLabel")}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={percent}
-              aria-valuetext={`${currentStage.label} — ${percent}%`}
+              aria-valuetext={`${stageLabel(currentStage.key)} — ${percent}%`}
             />
             <div
               className={showsFinished ? styles.fill : `${styles.fill} ${styles.fillLive}`}
               style={{ width: `${percent}%` }}
             />
 
-            <ol className={styles.nodes} aria-label="Étapes du tournoi">
+            <ol className={styles.nodes} aria-label={t("progress.stepsLabel")}>
               {progress.stages.map((stage, index) => {
                 const dotClass = [
                   styles.dot,
@@ -168,13 +191,13 @@ export function TournamentProgress({ detail }: Readonly<TournamentProgressProps>
                     style={{ left: `${(index / lastIndex) * 100}%` }}
                     aria-current={stage.status === "CURRENT" ? "step" : undefined}
                     {...(stage.status === "CURRENT" ? { [SCROLL_REVEAL_ATTRIBUTE]: "" } : {})}
-                    title={stage.hint}
+                    title={stageHint(stage.key)}
                   >
                     <span className={dotClass} aria-hidden="true" />
                     <span className={styles.caption}>
-                      <span className={labelClass}>{stage.label}</span>
+                      <span className={labelClass}>{stageLabel(stage.key)}</span>
                       {stage.at && (
-                        <span className={styles.captionDate}>{shortDateTime(stage.at)}</span>
+                        <span className={styles.captionDate}>{shortDateTime(stage.at, locale)}</span>
                       )}
                     </span>
                   </li>

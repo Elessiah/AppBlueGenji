@@ -1,0 +1,472 @@
+{
+  "meta": {
+    "fallbackTitle": "Tournament"
+  },
+  "participants": {
+    "soloBadge": "Solo",
+    "TEAM": {
+      "one": "team",
+      "oneCapitalized": "Team",
+      "manyCapitalized": "Teams",
+      "manyParticipating": "Participating teams"
+    },
+    "SOLO": {
+      "one": "player",
+      "oneCapitalized": "Player",
+      "manyCapitalized": "Players",
+      "manyParticipating": "Participating players"
+    }
+  },
+  "page": {
+    "boardTitles": {
+      "SINGLE": "Tournament bracket",
+      "DOUBLE": "Tournament bracket",
+      "SWISS": "Standings and rounds",
+      "SURVIVAL": "Standings and rounds",
+      "MULTI": "Tournament stages",
+      "BG_SURVIE": "Endurance and rounds"
+    },
+    "preLaunch": {
+      "survival": "The starting seeding and the rounds will be generated when the tournament starts.",
+      "bgSurvieManual": "The starting seeding is the order set by the staff below; the endurance rounds will be generated when the tournament starts.",
+      "bgSurvieRanking": "The starting seeding is the site ranking, in the order of the registrations below; the endurance rounds will be generated when the tournament starts.",
+      "swiss": "The starting seeding and the first round will be generated when the tournament starts.",
+      "bracket": "The bracket will be generated automatically when the tournament starts."
+    },
+    "fatal": {
+      "expiredTitle": "Session expired",
+      "notFoundTitle": "Tournament not found",
+      "expiredText": "Your session has expired: live tracking has stopped. Log in again to resume it.",
+      "notFoundText": "This tournament isn't available. It may have been deleted, or isn't open to the public yet.",
+      "relogin": "Log in again",
+      "back": "Back to tournaments"
+    },
+    "noMatches": "No matches available yet.",
+    "noMatchesShort": "No matches yet.",
+    "unplayedTeam": "Tournament closed without being played: fewer than two teams were entered at kickoff.",
+    "unplayedSolo": "Tournament closed without being played: fewer than two players were entered at kickoff.",
+    "bracketLabels": {
+      "UPPER": "Upper bracket",
+      "LOWER": "Lower bracket",
+      "GRAND": "Grand final",
+      "THIRD_PLACE": "Third-place match"
+    },
+    "phaseContext": "Stage {position}",
+    "phaseContextNamed": "Stage {position} — {name}"
+  },
+  "header": {
+    "back": "Back",
+    "allTournaments": "All tournaments",
+    "admin": "⚙ Admin",
+    "adminTitle": "You have organizer rights on this tournament.",
+    "officialChannel": "Official channel",
+    "officialChannelOn": "Official channel · {platform}",
+    "meta": {
+      "format": "Format",
+      "currentPhase": "Current stage",
+      "qualifierFormat": "Qualifier format",
+      "matchFormat": "Match format",
+      "playoffFormat": "Playoff format",
+      "thirdPlace": "Third place",
+      "thirdPlaceMatch": "Third-place match",
+      "conditions": "Registration requirements",
+      "conditionsHint": "Checked when a player registers; teams added by the staff aren't subject to them.",
+      "registrationOpens": "Registration opens",
+      "registrationCloses": "Registration closes",
+      "playedOn": "Played on",
+      "start": "Tournament start"
+    },
+    "filters": {
+      "minPlayers": "{count} players minimum",
+      "discordSolo": "verified Discord",
+      "discordAny": "at least one verified Discord",
+      "discordAll": "every Discord verified",
+      "blizzardSolo": "linked Blizzard account",
+      "blizzardAny": "at least one linked Blizzard account",
+      "blizzardAll": "every Blizzard account linked"
+    }
+  },
+  "matchFormat": {
+    "free": "Free score",
+    "withMaps": "{base} · {maps} maps",
+    "noLimit": "No score limit.",
+    "race": "first to {wins, plural, one {# map won} other {# maps won}}, {maps} at most.",
+    "raceWithDraw": "first to {wins, plural, one {# map won} other {# maps won}}, {maps} at most. The match can end without a winner (drawn map)."
+  },
+  "live": {
+    "upToDate": "Up to date",
+    "reconnecting": "Reconnecting…",
+    "offline": "Offline",
+    "reconnectingTitle": "Connection to the real-time feed lost. The page reconnects on its own and keeps updating, more slowly.",
+    "upToDateTitle": "Automatic updates {cadence}. No need to reload the page.",
+    "cadenceSecond": "every second",
+    "cadenceSeconds": "at most every {seconds} seconds",
+    "cadenceMinutes": "at most every {minutes} minutes",
+    "fatal": {
+      "UNAUTHORIZED": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
+      "TOURNAMENT_NOT_FOUND": "This tournament no longer exists: there's nothing left to follow."
+    }
+  },
+  "loading": "Loading the tournament…",
+  "progress": {
+    "title": "Tournament progress",
+    "winner": "Winner:",
+    "closed": "The tournament is over.",
+    "next": "Next step:",
+    "willClose": "The tournament will close once every match has been played.",
+    "railLabel": "Tournament progress timeline — horizontal scroll",
+    "barLabel": "Tournament progress",
+    "stepsLabel": "Tournament steps",
+    "stages": {
+      "HIDDEN": {
+        "label": "Hidden",
+        "hint": "Visible to the tournament staff only"
+      },
+      "ANNOUNCED": {
+        "label": "Announced",
+        "hint": "Waiting for registration to open"
+      },
+      "REGISTRATION": {
+        "label": "Registration",
+        "hint": "Entries are open"
+      },
+      "LOCKED": {
+        "label": "Closed",
+        "hint": "Registration closed, waiting for kickoff"
+      },
+      "RUNNING": {
+        "label": "In progress",
+        "hint": "Matches are being played"
+      },
+      "FINISHED": {
+        "label": "Finished",
+        "hint": "The final standings are set"
+      }
+    },
+    "countdown": {
+      "underMinute": "in less than a minute",
+      "days": "in {days}d",
+      "daysHours": "in {days}d {hours}h",
+      "hours": "in {hours}h",
+      "hoursMinutes": "in {hours}h {minutes}min",
+      "minutes": "in {minutes}min"
+    }
+  },
+  "phases": {
+    "timelineLabel": "Tournament stages — horizontal scroll",
+    "formats": {
+      "SWISS": "Swiss",
+      "SURVIVAL": "Survival (cuts)",
+      "DOUBLE": "Double elimination",
+      "SINGLE": "Single elimination"
+    },
+    "states": {
+      "PENDING": "Upcoming",
+      "RUNNING": "In progress",
+      "FINISHED": "Finished",
+      "SKIPPED": "Skipped"
+    },
+    "skipped": "Skipped — not enough entrants",
+    "final": "Final stage",
+    "flow": "{entrants, plural, one {# team} other {# teams}} → {qualifiers, plural, one {# qualifies} other {# qualify}}",
+    "standingsTitle": "Stage standings",
+    "rank": "Rank",
+    "qualified": "Qualified"
+  },
+  "bracket": {
+    "stage": {
+      "grandFinal": "Grand final",
+      "thirdPlace": "Third-place match",
+      "lowerFinal": "Lower bracket final",
+      "final": "Final",
+      "semis": "Semifinals",
+      "quarters": "Quarterfinals",
+      "roundOf16": "Round of 16",
+      "early": "Early rounds"
+    },
+    "qualify": {
+      "grandFinal": "Through to the grand final",
+      "thirdPlace": "Through to the third-place match",
+      "lowerFinal": "Through to the lower bracket final",
+      "final": "Through to the final",
+      "semis": "Through to the semifinals",
+      "quarters": "Through to the quarterfinals",
+      "roundOf16": "Through to the round of 16",
+      "early": "Through to the next round"
+    },
+    "matchLabel": {
+      "final": "Final {number}",
+      "lowerFinal": "Lower bracket final {number}",
+      "semis": "Semifinal {number}",
+      "quarters": "Quarterfinal {number}",
+      "roundOf16": "Round of 16 {number}"
+    },
+    "roundN": "Round {number}",
+    "matchN": "Match {number}",
+    "roundsRange": "Rounds {from} to {to}",
+    "finalPhase": "Final phase",
+    "yourMatch": "Your match",
+    "matchCount": "{count, plural, one {# match} other {# matches}}",
+    "treeLabel": "Tournament bracket — horizontal scroll",
+    "goToMatchTitle": "{label} — go to the match",
+    "goToMatchLabel": "{label} — go to the next match"
+  },
+  "sections": {
+    "TO_PLAN": "To schedule",
+    "WAITING": "Scheduled",
+    "LOBBY": "Launching",
+    "PLAYING": "In progress",
+    "DONE": "Finished",
+    "count": "{count, plural, =1 {1 match} other {# matches}}"
+  },
+  "placeholders": {
+    "upperFinalWinner": "Upper bracket winner",
+    "lowerFinalWinner": "Lower bracket winner",
+    "upperLoser": "Loser of upper bracket match {match}, round {round}",
+    "lowerWinner": "Winner of lower bracket match {match}, round {round}",
+    "semiLoser": "Semifinal {slot} loser"
+  },
+  "match": {
+    "tbd": "TBD",
+    "bye": "BYE",
+    "team1": "Team 1",
+    "team2": "Team 2",
+    "versus": "{team1} vs {team2}",
+    "draw": "Draw",
+    "doubleForfeit": "Double forfeit",
+    "startAtSr": "Scheduled start: ",
+    "live": "Live",
+    "scheduled": "Scheduled",
+    "channel": "Channel",
+    "watch": "{link}: watch {match} (new tab)",
+    "watchOn": "{link}: watch {match} on {platform} (new tab)",
+    "replay": "Replay available",
+    "replayLabel": "Replay available — watch {match} again on YouTube (new tab)",
+    "maps": {
+      "summary": "Map details ({count})",
+      "summaryLabel": "Map details ({count}): {match}",
+      "title": "Map details",
+      "vs": "{team1} vs {team2}",
+      "listLabel": "Match maps",
+      "close": "Close",
+      "map": "Map {number}",
+      "drawn": "Drawn map",
+      "wonBy": "Won by {team}",
+      "copy": "Copy the replay code",
+      "copyLabel": "Copy the replay code of map {number}",
+      "copied": "Replay code {code} copied.",
+      "copyFailed": "Couldn't copy: select the code by hand."
+    },
+    "byeWin": "✓ Walkover",
+    "champion": "🏆 Champion —"
+  },
+  "launch": {
+    "toPlan": "To schedule",
+    "toPlanTitle": "The referees must set this match's date and time before it can be launched.",
+    "toPlanSr": ": the referees must set this match's date.",
+    "scheduled": "Waiting to start",
+    "scheduledSr": " — starts {date}",
+    "lobby": "Launching",
+    "ready": "ready",
+    "launched": "Launched",
+    "hostTitle": "Team that creates the in-game lobby",
+    "hostSr": "Host team: ",
+    "casterTitle": "Match caster",
+    "casterSr": "Caster: ",
+    "caster": "Caster",
+    "casterReady": "ready",
+    "casterWaiting": "awaited",
+    "missingDateTitle": "This match goes on air at its start time, but no date has been set.",
+    "missingDateSr": "Warning: ",
+    "missingDate": " no date"
+  },
+  "ranking": {
+    "title": "Standings",
+    "champion": "Champion",
+    "ranked": "Ranked",
+    "active": "In contention",
+    "eliminated": "Eliminated",
+    "forfeit": "Forfeit",
+    "outOfContention": "Out of contention"
+  },
+  "swiss": {
+    "summary": "Round {round}/{total} · {count, plural, one {# team} other {# teams}} in contention",
+    "scoring": "Win {win, plural, one {# pt} other {# pts}} · Draw {draw} · Loss {loss}",
+    "roundsLeft": "{count, plural, one {# round left} other {# rounds left}}",
+    "empty": "No team ranked.",
+    "emptyYet": "No team ranked yet.",
+    "scrollLabel": "Tournament standings — horizontal scroll",
+    "tableLabel": "Tournament standings",
+    "rank": "Rank",
+    "team": "Team",
+    "points": "Points",
+    "pointsShort": "Pts",
+    "record": "Wins-Draws-Losses",
+    "recordShort": "W-D-L",
+    "buchholzTitle": "Buchholz: sum of the points of the opponents faced",
+    "bye": "Walkover",
+    "byeTitle": "Walkover received (odd number of entrants)",
+    "yes": "Yes",
+    "status": "Status",
+    "action": "Action",
+    "tiebreak": "On equal points: {list}.",
+    "tiebreakers": {
+      "buchholz": "Buchholz",
+      "sonneborn-berger": "Sonneborn-Berger",
+      "opponent-mwp": "opponents' win %",
+      "head-to-head": "head-to-head"
+    },
+    "roundsLabel": "Tournament rounds — horizontal scroll",
+    "roundNoun": "Round",
+    "lastRound": "⚑ Last"
+  },
+  "survival": {
+    "summary": "Round {round} · {count, plural, one {# team} other {# teams}} in contention",
+    "everyRound": "every round",
+    "everyN": "every {count} rounds",
+    "cadence": "Cut {every}",
+    "cadenceFirst": "1st cut at round {round}, then {every}",
+    "nextCut": "Next cut: round {round}",
+    "playIn": "Balancing play-in in round 1",
+    "playInNote": "⚖ Play-in: the loser of the match is eliminated.",
+    "atRisk": "⚠ Danger zone: {count, plural, one {# team eliminated} other {# teams eliminated}} at the next cut.",
+    "roundsLabel": "Tournament rounds — horizontal scroll",
+    "roundNoun": "Round",
+    "playInMark": "⚖ Play-in",
+    "cutMark": "⚔ Cut"
+  },
+  "endurance": {
+    "summary": "ENDURANCE {start} PTS · +{win} PER MAP WON · −{loss} PER MAP LOST · FORFEIT COUNTED {forfeit}-0 · ",
+    "playoffsAt": "PLAYOFFS AT {size}",
+    "roundStatusTeam": "ROUND {round} · {count, plural, one {# TEAM} other {# TEAMS}} IN CONTENTION → {size}",
+    "roundStatusSolo": "ROUND {round} · {count, plural, one {# PLAYER} other {# PLAYERS}} IN CONTENTION → {size}",
+    "endurance": "Endurance",
+    "recordDraws": "W / D / L",
+    "record": "W / L",
+    "status": "Status",
+    "actions": "Actions",
+    "eliminatedRound": " (R{round})",
+    "penaltyBadgeTitle": "{points} point(s) deducted by referee penalty",
+    "penaltyBadgeSr": " ({points} point(s) deducted by penalty)",
+    "outLegend": "OUT OF CONTENTION = POOL LEFT, BUT NO CHANCE OF REACHING THE PLAYOFFS ANYMORE",
+    "outLegendRounds": " IN THE {count} PLANNED ROUNDS",
+    "historyTitle": "ENDURANCE ROUND BY ROUND",
+    "historyLabel": "Endurance pool round by round",
+    "historyRound": "Round {round}",
+    "historyRoundShort": "R{round}",
+    "forfeitLegend": "FF = FORFEIT FOR THE REST OF THE TOURNAMENT",
+    "penaltyLegend": "UNDERLINED IN AMBER = REFEREE PENALTY IN THIS ROUND",
+    "cellForfeit": "{prefix}: forfeit for the rest of the tournament",
+    "cellOut": "{prefix}: already out of the qualifying phase",
+    "cellPrefix": "{team} · round {round}",
+    "cellPoints": "{prefix}: {points, plural, one {# endurance point} other {# endurance points}}",
+    "cellPenalty": "{capital} (including −{penalty} penalty)",
+    "penaltiesTitle": "REFEREE PENALTIES",
+    "penaltyRound": "R{round}",
+    "playoffs": "Playoffs",
+    "thirdPlace": "Third-place match",
+    "qualifying": "Qualifying rounds",
+    "roundTitle": "Round {round}",
+    "roundDone": "Finished",
+    "roundProgress": "{played}/{total} played",
+    "regionProgress": "{played} of {total} played",
+    "regionDone": "finished",
+    "region": "{title}, {count}, {progress}"
+  },
+  "registrations": {
+    "title": "Registrations · starting order",
+    "empty": "No registrations yet.",
+    "rank": "Rank",
+    "registeredAt": "Registered",
+    "finalRank": "Final rank",
+    "collapse": "Show less",
+    "showAll": "Show the whole list ({count} more)"
+  },
+  "planning": {
+    "titleOn": "Matches scheduled by the referees",
+    "titleOff": "Match scheduling",
+    "descriptionOn": "Each match waits for a referee or an admin to set its date and time (“To schedule”), then shows “Waiting to start” until that time, when it moves to launch.",
+    "descriptionOff": "Off: a match without a date moves to launch as soon as both its entrants are known."
+  },
+  "settings": {
+    "groups": {
+      "tournament": "Tournament",
+      "conditions": "Registration requirements"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "none": "None",
+    "drawAllowed": "{label} · draws allowed",
+    "seeding": {
+      "MANUAL": "Set by the referees",
+      "RANKING": "Site ranking",
+      "REGISTRATION": "Registration order"
+    },
+    "requirement": {
+      "NONE": "No player",
+      "ANY_PLAYER": "At least one player",
+      "ALL_PLAYERS": "Every player"
+    },
+    "general": {
+      "game": "Game",
+      "mode": "Mode",
+      "participants": "Participants",
+      "participantsSolo": "Players (solo tournament)",
+      "participantsTeam": "Teams",
+      "maxTeam": "{count, plural, one {# team} other {# teams}}",
+      "maxSolo": "{count, plural, one {# player} other {# players}}",
+      "maxLabel": "Maximum entrants",
+      "matchFormat": "Match format",
+      "seeding": "Starting order"
+    },
+    "conditions": {
+      "minRoster": "Minimum roster size",
+      "minRosterValue": "{count, plural, one {# player} other {# players}}",
+      "discord": "Verified Discord tag",
+      "blizzard": "Linked Battle.net account"
+    },
+    "mode": {
+      "thirdPlace": "Third-place match",
+      "roundsBeforeFirstCut": "Rounds before the first cut",
+      "roundsPerCut": "Rounds between two cuts",
+      "swissRounds": "Number of rounds",
+      "swissRoundsAtLaunch": "Set at launch",
+      "scoring": "Scoring",
+      "swissScoring": "Win {win} · draw {draw} · loss {loss} · bye {bye}",
+      "startPoints": "Starting pool",
+      "startPointsValue": "{count, plural, one {# point} other {# points}}",
+      "enduranceScoring": "+{win} per map won · −{loss} per map lost",
+      "playoffSize": "Qualified for the playoffs",
+      "maxRounds": "Cap on qualifying rounds",
+      "playoffFormat": "Playoff format",
+      "phase": "Stage {position}",
+      "phaseNamed": "Stage {position} — {name}",
+      "phaseChampion": "Decides the champion",
+      "phasePercent": "{value}% qualify",
+      "phaseCount": "{count, plural, one {# qualifies} other {# qualify}}",
+      "phaseSwissRounds": "{count, plural, one {# round} other {# rounds}}",
+      "phaseFirstCut": "first cut after {count, plural, one {# round} other {# rounds}}",
+      "phaseEveryRound": "then every round",
+      "phaseEveryN": "then every {count} rounds",
+      "phaseThirdPlace": "third-place match"
+    }
+  },
+  "share": {
+    "states": {
+      "UPCOMING": "Upcoming",
+      "REGISTRATION": "Registration open",
+      "RUNNING": "Tournament in progress",
+      "FINISHED": "Tournament finished"
+    },
+    "engagedTeam": "{registered}/{max} teams entered",
+    "engagedSolo": "{registered}/{max} players entered",
+    "schedule": {
+      "FINISHED": "Played on {date}",
+      "RUNNING": "In progress since {date}",
+      "REGISTRATION": "Registration until {date}",
+      "OPENS": "Registration opens on {date}",
+      "KICKOFF": "Kickoff on {date}"
+    },
+    "date": "{day} at {hour}"
+  }
+}

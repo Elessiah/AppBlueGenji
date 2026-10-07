@@ -2,9 +2,11 @@
 
 import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang, type TournamentPageText } from "@/lib/shared/tournament-page-text";
 import type {
   BracketMatch,
   BracketType,
@@ -100,51 +102,38 @@ interface PendingConfirm {
   run: () => Promise<boolean>;
 }
 
-/** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
-const BOARD_TITLES: Record<TournamentFormat, string> = {
-  SINGLE: "Arbre du tournoi",
-  DOUBLE: "Arbre du tournoi",
-  SWISS: "Classement et rondes",
-  SURVIVAL: "Classement et rounds",
-  MULTI: "Phases du tournoi",
-  BG_SURVIE: "Endurance et manches",
-};
-
 /** Ce que le plateau deviendra au coup d'envoi, dit avant qu'il n'existe. */
-function preLaunchBoardText(formatForBracket: string, format: TournamentFormat, seedingSource: string): string {
-  if (formatForBracket === "SURVIVAL") {
-    return "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi.";
-  }
+function preLaunchBoardText(
+  text: TournamentPageText,
+  formatForBracket: string,
+  format: TournamentFormat,
+  seedingSource: string,
+): string {
+  if (formatForBracket === "SURVIVAL") return text.t("page.preLaunch.survival");
   if (format === "BG_SURVIE") {
-    return seedingSource === "MANUAL"
-      ? "Le classement de départ est l'ordre fixé par le staff ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
-      : "Le classement de départ est celui du site, dans l'ordre des inscriptions ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi.";
+    return seedingSource === "MANUAL" ? text.t("page.preLaunch.bgSurvieManual") : text.t("page.preLaunch.bgSurvieRanking");
   }
-  if (format === "SWISS") {
-    return "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi.";
-  }
-  return "Le bracket sera généré automatiquement au démarrage du tournoi.";
+  if (format === "SWISS") return text.t("page.preLaunch.swiss");
+  return text.t("page.preLaunch.bracket");
 }
 
 /** Page d'un tournoi inaccessible : session expirée, ou tournoi introuvable. */
 function TournamentFatal({ fatal }: Readonly<{ fatal: LiveFailure }>) {
+  const { t } = useTournamentPageText();
+  const expired = fatal === "UNAUTHORIZED";
   return (
     <section className={`ds-block ${styles.status}`} role="alert">
-      <h1 className={styles.fatalTitle}>
-        {fatal === "UNAUTHORIZED" ? "Session expirée" : "Tournoi introuvable"}
-      </h1>
+      <h1 className={styles.fatalTitle}>{expired ? t("page.fatal.expiredTitle") : t("page.fatal.notFoundTitle")}</h1>
       <p className={styles.fatalText}>
-        {fatal === "UNAUTHORIZED"
-          ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
-          : // Volontairement neutre : ce 404 recouvre le tournoi supprimé et
-            // le tournoi pas encore publié, que le serveur refuse sans dire
-            // lequel des deux (`docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`).
-            "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public."}
+        {/* Volontairement neutre : ce 404 recouvre le tournoi supprimé et le
+            tournoi pas encore publié, que le serveur refuse sans dire lequel
+            des deux (`docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`). */}
+        {expired ? t("page.fatal.expiredText") : t("page.fatal.notFoundText")}
       </p>
       <CyberButton asChild variant="primary">
-        <Link href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}>
-          {fatal === "UNAUTHORIZED" ? "Se reconnecter" : "Retour aux tournois"}
-        </Link>
+        <LocaleLink href={expired ? "/connexion" : "/tournois"}>
+          {expired ? t("page.fatal.relogin") : t("page.fatal.back")}
+        </LocaleLink>
       </CyberButton>
     </section>
   );
@@ -184,16 +173,18 @@ function rollbackView(detail: TournamentDetail, frozen: boolean) {
 type TournamentPhaseView = NonNullable<TournamentDetail["phases"]>[number];
 
 /** Phase consultée d'un multi-phases, et ce qu'elle restreint du plateau. */
-function selectedPhaseView(detail: TournamentDetail, selectedPhaseId: number | null) {
+function selectedPhaseView(detail: TournamentDetail, selectedPhaseId: number | null, text: TournamentPageText) {
   const isMulti = detail.card.format === "MULTI";
   const selectedPhase =
     isMulti && selectedPhaseId && detail.phases
       ? detail.phases.find((p) => p.id === selectedPhaseId) || null
       : null;
 
-  const phaseNameSuffix = selectedPhase?.name ? ` — ${selectedPhase.name}` : "";
-  const contextLabel =
-    isMulti && selectedPhase ? `Phase ${selectedPhase.position}${phaseNameSuffix}` : undefined;
+  const position = String(selectedPhase?.position ?? "");
+  const phaseLabel = selectedPhase?.name
+    ? text.t("page.phaseContextNamed", { position, name: selectedPhase.name })
+    : text.t("page.phaseContext", { position });
+  const contextLabel = isMulti && selectedPhase ? phaseLabel : undefined;
 
   const filteredMatches = isMulti && selectedPhase
     ? detail.matches.filter((m) => m.phaseId === selectedPhase.id)
@@ -262,8 +253,10 @@ function TournamentDangerZone({
   onRollback,
   onDelete,
 }: Readonly<TournamentDangerZoneProps>) {
+  // Outil du staff : reste français (D4), annoncé comme tel sous `/en`.
+  const text = useTournamentPageText();
   return (
-    <div className={`ds-block ${styles.danger}`}>
+    <div className={`ds-block ${styles.danger}`} lang={frenchBlockLang(text)}>
       <div className="ds-section-title">
         <h2 className={styles.dangerTitle}>Zone de danger</h2>
       </div>
@@ -320,9 +313,16 @@ function TournamentDangerZone({
 
 export default function TournamentDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const router = useLocaleRouter();
   const tournamentId = Number(params.id);
-  const { showError, showSuccess } = useToast();
+  const text = useTournamentPageText();
+  const { t } = text;
+  // Gestes et messages du lot 8b (inscription, abandon, sanctions) et du staff :
+  // restés français, annoncés comme tels sous `/en` (WCAG 3.1.2).
+  const actionLang = frenchBlockLang(text);
+  const toast = useToast();
+  const showError = useCallback((message: string) => toast.showError(message, { lang: actionLang }), [toast, actionLang]);
+  const showSuccess = useCallback((message: string) => toast.showSuccess(message, { lang: actionLang }), [toast, actionLang]);
 
   const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
   // Relecture du contexte du lecteur quand une proposition a changé sous la
@@ -701,6 +701,7 @@ export default function TournamentDetailPage() {
   const { isMulti, selectedPhase, contextLabel, filteredMatches, formatForBracket } = selectedPhaseView(
     detail,
     selectedPhaseId,
+    text,
   );
   const visibleFormat = visibleRulesFormat(detail.card, selectedPhase);
   const { rankingMetaIsSelectedPhase, phaseViewKey, bracketOrder } = phaseBoardLayout(
@@ -709,12 +710,7 @@ export default function TournamentDetailPage() {
     selectedPhase,
     formatForBracket,
   );
-  const bracketLabels: Record<BracketType, string> = {
-    UPPER: "Tableau principal",
-    LOWER: "Tableau perdants",
-    GRAND: "Grande Finale",
-    THIRD_PLACE: "Petite Finale",
-  };
+  const bracketLabel = (type: BracketType) => t(`page.bracketLabels.${type}`);
   // Résolu à chaque rendu depuis la liste fraîche : le dialogue de diffusion
   // travaille toujours sur l'état courant du match, et se ferme de lui-même si
   // le match disparaît (plateau régénéré).
@@ -737,17 +733,16 @@ export default function TournamentDetailPage() {
   // adversaires (moins de deux engagées au coup d'envoi, voir
   // docs/features/UNDERFILLED_TOURNAMENTS.md). Lui laisser le « pour l'instant »
   // d'un plateau encore à naître ferait espérer une suite qui ne viendra pas.
+  const unplayedKey = detail.card.participantType === "SOLO" ? "page.unplayedSolo" : "page.unplayedTeam";
   const noMatchesLabel =
-    detail.card.state === "FINISHED" && detail.matches.length === 0
-      ? `Tournoi clos sans être joué : moins de deux ${wording.manyEngaged} au coup d'envoi.`
-      : "Aucun match disponible pour l'instant.";
+    detail.card.state === "FINISHED" && detail.matches.length === 0 ? t(unplayedKey) : t("page.noMatches");
 
   // Aperçu du plateau avant lancement, réservé au staff et au cast : le serveur
   // le laisse à `null` pour les autres, à qui le tirage ne doit rien révéler
   // d'avance, et pour un tournoi déjà lancé. Il s'affiche sur tout l'avant-course
   // (`isPreLaunchState`), inscriptions closes comprises.
   const previewBlock = detail.preview ? (
-    <div className={styles.preview}>
+    <div className={styles.preview} lang={actionLang}>
       {/* Outil du staff (têtes de série) : noms sobres, sans marche du podium. */}
       <PodiumTiersOff>
         <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
@@ -771,7 +766,7 @@ export default function TournamentDetailPage() {
       return (
         <>
           <p className={styles.empty}>
-            {preLaunchBoardText(formatForBracket, detail.card.format, detail.seedingSource)}
+            {preLaunchBoardText(text, formatForBracket, detail.card.format, detail.seedingSource)}
           </p>
           {previewBlock}
         </>
@@ -908,7 +903,7 @@ export default function TournamentDetailPage() {
           <div key={type} className={styles.bracket}>
             <BracketSections
               bracketType={type}
-              bracketLabel={bracketLabels[type]}
+              bracketLabel={bracketLabel(type)}
               showBracketLabel={brackets.length > 1}
               matches={matches}
               allTournamentMatches={detail.matches}
@@ -1003,7 +998,7 @@ export default function TournamentDetailPage() {
           )}
 
           <div className="ds-section-title green">
-            <h2>{BOARD_TITLES[detail.card.format]}</h2>
+            <h2>{t(`page.boardTitles.${detail.card.format}`)}</h2>
           </div>
 
           {/* Tout l'avant-course, et pas seulement les inscriptions : un tournoi
@@ -1142,6 +1137,7 @@ export default function TournamentDetailPage() {
           partirait sur un état que la page ne montre plus. */}
       {pendingConfirm !== null && !frozen && (
         <ConfirmActionDialog
+          contentLang={actionLang}
           title={pendingConfirm.title}
           confirmLabel={pendingConfirm.confirmLabel}
           pendingLabel={pendingConfirm.pendingLabel}

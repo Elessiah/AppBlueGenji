@@ -6,6 +6,7 @@ import { BracketTree, ScrollRequest } from "./BracketTree";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
 interface BracketSectionsProps {
   bracketType: BracketType;
@@ -51,7 +52,8 @@ export function BracketSections({
   // Les stades se nomment à partir de la **fin** du tableau : sur un arbre qui
   // pousse un tour à la fois, ce repère ne peut pas venir des tours posés.
   const totalRounds = Math.max(plannedRounds ?? roundNums.length, roundNums.length);
-  const sections = buildSections(roundNums, bracketType, totalRounds);
+  const text = useTournamentPageText();
+  const sections = buildSections(roundNums, bracketType, totalRounds, text);
   const accent = ACCENT[bracketType];
   const myNext = findMyNextMatch(matches, myTeamId);
   const myNextMatchId = myNext?.id ?? null;
@@ -159,8 +161,8 @@ export function BracketSections({
               onToggle={() => toggle(section.key)}
               panelId={panelId}
               highlighted={hasMyMatch}
-              flag={hasMyMatch ? "Votre match" : null}
-              meta={<PanelPill>{matchCount} match{matchCount > 1 ? "s" : ""}</PanelPill>}
+              flag={hasMyMatch ? text.t("bracket.yourMatch") : null}
+              meta={<PanelPill>{text.t("bracket.matchCount", { count: matchCount })}</PanelPill>}
             >
               <BracketTree
                 matches={sectionMatches}

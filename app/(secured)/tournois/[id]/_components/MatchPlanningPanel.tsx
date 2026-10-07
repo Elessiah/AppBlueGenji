@@ -8,12 +8,13 @@ import {
   matchesToPlan,
   refereeSchedulingToggledMessage,
   refereeSchedulingToggleLabel,
-  REFEREE_SCHEDULING_DESCRIPTION,
   refereeSchedulingErrorMessage,
   toPlanCountLabel,
 } from "@/lib/shared/match-planning";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import styles from "./MatchPlanningPanel.module.css";
 
 interface MatchPlanningPanelProps {
@@ -39,7 +40,13 @@ interface MatchPlanningPanelProps {
  * lancement des matchs non lancés et sans date, qui repassent à planifier.
  */
 export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPlanningPanelProps>) {
-  const { showError, showSuccess } = useToast();
+  const text = useTournamentPageText();
+  // Ce que lit tout lecteur (titre, règle) suit la page ; le décompte et les
+  // commandes, outils du staff, restent français (D4).
+  const staffLang = frenchBlockLang(text);
+  const toast = useToast();
+  const showError = (message: string) => toast.showError(message, { lang: staffLang });
+  const showSuccess = (message: string) => toast.showSuccess(message, { lang: staffLang });
   const [busy, setBusy] = useState(false);
   const [confirmEnable, setConfirmEnable] = useState(false);
   const enabled = detail.card.refereeScheduling;
@@ -112,25 +119,23 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
       <div className={styles.text}>
         <h2 id="match-planning-title" className={styles.title}>
           <span aria-hidden="true">🗓 </span>
-          {enabled ? "Matchs planifiés par l'arbitrage" : "Planification des matchs"}
+          {enabled ? text.t("planning.titleOn") : text.t("planning.titleOff")}
         </h2>
         <p className={styles.description}>
-          {enabled
-            ? REFEREE_SCHEDULING_DESCRIPTION
-            : "Désactivée : un match sans date entre en lancement dès que ses deux engagés sont connus."}
+          {enabled ? text.t("planning.descriptionOn") : text.t("planning.descriptionOff")}
         </p>
         {/* Le décompte n'intéresse que ceux qui peuvent le résorber. Pas de
             région live : il change à chaque instantané du flux. */}
         {showCount && pending.length > 0 && (
-          <p className={styles.pending}>{toPlanCountLabel(pending.length)}</p>
+          <p className={styles.pending} lang={staffLang}>{toPlanCountLabel(pending.length)}</p>
         )}
         {showCount && pending.length === 0 && (
-          <p className={styles.done}>Tous les matchs jouables ont une date.</p>
+          <p className={styles.done} lang={staffLang}>Tous les matchs jouables ont une date.</p>
         )}
       </div>
 
       {canManage && (
-        <div className={styles.actions}>
+        <div className={styles.actions} lang={staffLang}>
           {enabled && first && (
             <button
               type="button"
@@ -156,6 +161,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
 
       {confirmEnable && !enabled && (
         <ConfirmActionDialog
+          contentLang={staffLang}
           title="Activer la planification par l'arbitrage ?"
           confirmLabel="Activer"
           pendingLabel="Activation…"

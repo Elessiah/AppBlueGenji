@@ -1,5 +1,7 @@
 "use client";
 
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
@@ -41,6 +43,8 @@ interface TournamentImageDialogProps {
  * gardé avec un bandeau qui dit le désaccord.
  */
 export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: Readonly<TournamentImageDialogProps>) {
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
   const { showError, showSuccess } = useToast();
   const [value, setValue] = useState<ImagePickerValue>(() => initialImagePickerValue(image));
   // Image sur laquelle le brouillon a été posé ; réalignée au rendu, sans effet,
@@ -101,6 +105,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby="tournament-image-title"

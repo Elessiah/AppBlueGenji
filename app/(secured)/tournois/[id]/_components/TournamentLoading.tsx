@@ -1,3 +1,6 @@
+"use client";
+
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import styles from "./TournamentLoading.module.css";
 
 /**
@@ -10,9 +13,10 @@ import styles from "./TournamentLoading.module.css";
  * technologies d'assistance.
  */
 export function TournamentLoading() {
+  const { t } = useTournamentPageText();
   return (
     <section /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.root} role="status" aria-busy="true">
-      <span className="sr-only">Chargement du tournoi…</span>
+      <span className="sr-only">{t("loading")}</span>
       <div className={styles.shapes} aria-hidden="true">
         <div className={`${styles.bar} ${styles.back}`} />
         <div className={`${styles.bar} ${styles.title}`} />
@@ -31,7 +35,7 @@ export function TournamentLoading() {
         </div>
       </div>
       <p className={styles.caption} aria-hidden="true">
-        Chargement du tournoi…
+        {t("loading")}
       </p>
     </section>
   );

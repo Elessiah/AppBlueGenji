@@ -1,5 +1,7 @@
 "use client";
 
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
@@ -178,6 +180,8 @@ export function AdminScoreDialog({
   onClose,
   onSubmitted,
 }: Readonly<AdminScoreDialogProps>) {
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
   // Propositions complétées de leur détail map par map : l'arbitre s'ouvre sur
   // les maps de la proposition unique, et voit celles des deux en désaccord.
   const match = useProposalMaps(liveMatch, proposals, onRefreshProposals);
@@ -341,6 +345,7 @@ export function AdminScoreDialog({
         ref={dialogRef}
         className={styles.dialog}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         aria-labelledby="admin-score-title"
         tabIndex={-1}

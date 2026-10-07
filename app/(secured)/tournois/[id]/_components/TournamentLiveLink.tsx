@@ -12,6 +12,8 @@ import {
   streamPlatform,
 } from "@/lib/shared/live-streams";
 import { mapError } from "../_lib/error-map";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 
 interface TournamentLiveLinkProps {
   tournamentId: number;
@@ -35,6 +37,9 @@ export function TournamentLiveLink({
   onSaved,
 }: Readonly<TournamentLiveLinkProps>) {
   const { showError, showSuccess } = useToast();
+  const text = useTournamentPageText();
+  // L'éditeur de la chaîne est un outil du staff : resté français (D4).
+  const staffLang = frenchBlockLang(text);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(liveUrl ?? "");
   const [busy, setBusy] = useState(false);
@@ -72,11 +77,11 @@ export function TournamentLiveLink({
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "TOURNAMENT_LIVE_UPDATE_FAILED");
-      showSuccess(draft.trim() ? "Chaîne officielle enregistrée." : "Chaîne officielle retirée.");
+      showSuccess(draft.trim() ? "Chaîne officielle enregistrée." : "Chaîne officielle retirée.", { lang: staffLang });
       setEditing(false);
       onSaved();
     } catch (error) {
-      showError(mapError((error as Error).message));
+      showError(mapError((error as Error).message), { lang: staffLang });
     } finally {
       setBusy(false);
     }
@@ -85,6 +90,7 @@ export function TournamentLiveLink({
   if (editing) {
     return (
       <form
+        lang={staffLang}
         onSubmit={submit}
         style={{
           display: "flex",
@@ -156,13 +162,16 @@ export function TournamentLiveLink({
             style={{ fontSize: 13, padding: "8px 18px" }}
           >
             <span aria-hidden="true">▶</span>
-            {platform ? `Chaîne officielle · ${PLATFORM_LABELS[platform]}` : "Chaîne officielle"}
+            {platform
+              ? text.t("header.officialChannelOn", { platform: PLATFORM_LABELS[platform] })
+              : text.t("header.officialChannel")}
           </a>
         </CyberButton>
       )}
       {canEdit && (
         <CyberButton
           variant="ghost"
+          lang={staffLang}
           onClick={openEditor}
           style={{ fontSize: 13, padding: "8px 18px" }}
         >

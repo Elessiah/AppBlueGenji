@@ -1,5 +1,7 @@
 "use client";
 
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -150,6 +152,8 @@ export function MatchScheduleDialog({
   onClose,
   onSaved,
 }: Readonly<MatchScheduleDialogProps>) {
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(MATCH_SCHEDULE_FIELD_ERRORS, FIELD_IDS);
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
@@ -286,6 +290,7 @@ export function MatchScheduleDialog({
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby="match-schedule-title"

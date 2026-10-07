@@ -1,5 +1,7 @@
 "use client";
 
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
@@ -194,6 +196,8 @@ export function PlayerScoreDialog({
   onSubmitted,
   onRefresh,
 }: Readonly<PlayerScoreDialogProps>) {
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
   // Les propositions complétées de leur détail : la modale s'ouvre sur les maps
   // de l'adversaire (codes et scores), à confirmer d'un clic.
   const match = useProposalMaps(liveMatch, proposals, onRefresh, canReportScore);
@@ -390,6 +394,7 @@ export function PlayerScoreDialog({
         ref={dialogRef}
         className={styles.dialog}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         aria-labelledby="player-score-title"
         tabIndex={-1}

@@ -169,7 +169,10 @@ export function MatchCardActions({
   onPlayerScore,
   onAdminScore,
   onReport,
+  lang,
 }: Readonly<{
+  /** `fr` sous une page anglaise : gestes du lot 8b, restés français. */
+  lang?: "fr";
   match: BracketMatch;
   phase: MatchLaunchPhase;
   actions: readonly MatchCardAction[];
@@ -414,7 +417,7 @@ export function MatchCardActions({
     });
 
   return (
-    <div ref={rootRef} className={styles.root} onBlur={onMenuBlur}>
+    <div ref={rootRef} className={styles.root} onBlur={onMenuBlur} lang={lang}>
       <div className={styles.bar}>
         {primary && renderButton(primary, false)}
         {more.length > 0 && (

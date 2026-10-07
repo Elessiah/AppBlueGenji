@@ -3,17 +3,12 @@
 import { Pill } from "@/components/cyber";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { LiveFailure } from "../_lib/live-state";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 
-/**
- * Ce que l'on dit quand la page a cessé de réessayer. Réessayer indéfiniment
- * laisserait « Reconnexion… » à l'écran pour l'éternité, sans jamais dire quoi
- * faire.
- */
-const FATAL_TITLES: Record<LiveFailure, string> = {
-  UNAUTHORIZED:
-    "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
-  TOURNAMENT_NOT_FOUND: "Ce tournoi n'existe plus : il n'y a plus rien à suivre.",
-};
+// Ce que l'on dit quand la page a cessé de réessayer (`live.fatal.*`) :
+// réessayer indéfiniment laisserait « Reconnexion… » à l'écran pour
+// l'éternité, sans jamais dire quoi faire.
 
 type LiveIndicatorProps = {
   /** Le flux temps réel est-il établi ? */
@@ -24,11 +19,11 @@ type LiveIndicatorProps = {
   fatal?: LiveFailure | null;
 };
 
-function cadenceLabel(tier: RefreshTier): string {
+function cadenceLabel(text: TournamentPageText, tier: RefreshTier): string {
   const seconds = Math.round(REFRESH_CADENCE[tier].pushCoalesceMs / 1000);
-  if (seconds <= 1) return "à la seconde";
-  if (seconds < 60) return `toutes les ${seconds} secondes au plus`;
-  return `toutes les ${Math.round(seconds / 60)} minutes au plus`;
+  if (seconds <= 1) return text.t("live.cadenceSecond");
+  if (seconds < 60) return text.t("live.cadenceSeconds", { seconds: String(seconds) });
+  return text.t("live.cadenceMinutes", { minutes: String(Math.round(seconds / 60)) });
 }
 
 /**
@@ -54,15 +49,19 @@ function cadenceLabel(tier: RefreshTier): string {
  * la moindre coupure réseau. L'explication vit dans `title`.
  */
 export function LiveIndicator({ isLive, tier, fatal = null }: Readonly<LiveIndicatorProps>) {
-  let label = "Reconnexion…";
-  let title =
-    "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.";
+  // Témoin de flux (glossaire) : « À jour / Reconnexion… / Hors ligne » →
+  // « Up to date / Reconnecting… / Offline ». L'état vient du flux, le texte
+  // de la page : rien de localisé ne passe par l'instantané.
+  const text = useTournamentPageText();
+  const { t } = text;
+  let label = t("live.reconnecting");
+  let title = t("live.reconnectingTitle");
   if (fatal) {
-    label = "Hors ligne";
-    title = FATAL_TITLES[fatal];
+    label = t("live.offline");
+    title = t(`live.fatal.${fatal}`);
   } else if (isLive) {
-    label = "À jour";
-    title = `Mise à jour automatique ${cadenceLabel(tier)}. Inutile de recharger la page.`;
+    label = t("live.upToDate");
+    title = t("live.upToDateTitle", { cadence: cadenceLabel(text, tier) });
   }
 
   return (

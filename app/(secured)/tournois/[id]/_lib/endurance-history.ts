@@ -1,4 +1,5 @@
 import type { EnduranceRoundCell } from "@/lib/shared/bg-survie/replay";
+import { FR_TOURNAMENT_PAGE_TEXT, type TournamentPageText } from "@/lib/shared/tournament-page-text";
 
 /**
  * Lecture du tableau d'endurance **manche par manche** — la vue « feuille de
@@ -43,23 +44,28 @@ export function enduranceCellLabel(cell: EnduranceRoundCell): string {
  * en-têtes lisibles au survol ne se relit pas, et « FF » seul ne se comprend
  * qu'une fois la légende trouvée.
  */
-export function enduranceCellTitle(teamName: string, cell: EnduranceRoundCell): string {
-  const prefix = `${teamName} · manche ${cell.round}`;
+export function enduranceCellTitle(
+  teamName: string,
+  cell: EnduranceRoundCell,
+  text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT,
+): string {
+  const { t } = text;
+  const prefix = t("endurance.cellPrefix", { team: teamName, round: String(cell.round) });
 
-  if (cell.kind === "FORFEIT") return `${prefix} : forfait sur le reste du tournoi`;
+  if (cell.kind === "FORFEIT") return t("endurance.cellForfeit", { prefix });
   // « Déjà sortie » et non « déjà éliminée » : la case couvre aussi une équipe
   // écartée faute de perspectives, qui gardait pourtant du capital.
-  if (cell.kind === "OUT") return `${prefix} : déjà sortie de la phase qualificative`;
+  if (cell.kind === "OUT") return t("endurance.cellOut", { prefix });
 
   const points = cell.points ?? 0;
-  const capital = `${prefix} : ${points} point${points > 1 ? "s" : ""} d'endurance`;
+  const capital = t("endurance.cellPoints", { prefix, points });
 
   // La pénalité s'ajoute à l'infobulle plutôt que d'y remplacer le capital :
   // c'est bien le capital que la case affiche, et la sanction explique
   // seulement pourquoi il a bougé sans qu'un score ne l'explique.
   const penalty = cell.penalty ?? 0;
   if (penalty === 0) return capital;
-  return `${capital} (dont −${penalty} de pénalité)`;
+  return t("endurance.cellPenalty", { capital, penalty: String(penalty) });
 }
 
 /**

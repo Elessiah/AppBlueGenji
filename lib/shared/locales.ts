@@ -71,13 +71,23 @@ export function splitLocalePrefix(pathname: string): { locale: Locale; path: str
   return { locale: DEFAULT_LOCALE, path: pathname, prefixed: null };
 }
 
-/** Un chemin sans préfixe correspond-il à un motif de la liste blanche ? */
+/**
+ * Un chemin sans préfixe correspond-il à un motif de la liste blanche ?
+ * `[id]` n'accepte qu'un entier (`/tournois/12`, pas `/tournois/creer`) ; tout
+ * autre segment entre crochets (`[slug]`), n'importe quel segment non vide.
+ */
 function matchesRoutePattern(path: string, pattern: string): boolean {
   if (pattern === path) return true;
   const want = pattern.split("/");
   const got = path.split("/");
   if (want.length !== got.length) return false;
-  return want.every((segment, index) => (segment.startsWith("[") && segment.endsWith("]") ? got[index] !== "" : segment === got[index]));
+  return want.every((segment, index) => matchesSegment(segment, got[index]));
+}
+
+function matchesSegment(segment: string, actual: string): boolean {
+  if (segment === "[id]") return /^\d+$/.test(actual);
+  if (segment.startsWith("[") && segment.endsWith("]")) return actual !== "";
+  return segment === actual;
 }
 
 /** Retire une barre oblique finale (`/regles/` → `/regles`), jamais celle de `/`. */

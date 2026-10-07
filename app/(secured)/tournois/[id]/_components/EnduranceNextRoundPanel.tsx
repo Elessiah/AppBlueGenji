@@ -10,6 +10,8 @@ import {
 } from "../_lib/endurance-next-round";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { EntrantName } from "./EntrantName";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import styles from "./EnduranceNextRoundPanel.module.css";
 
 interface EnduranceNextRoundPanelProps {
@@ -39,13 +41,15 @@ const PREVIEW_ACCENT = "var(--blue-300, #8fd5ff)";
  * horaires, et un couple annoncé à tort se paierait devant deux équipes.
  */
 export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Readonly<EnduranceNextRoundPanelProps>) {
+  const text = useTournamentPageText();
   const [open, setOpen] = useState(true);
   const panelId = useId();
   const title = nextRoundTitle(preview, maxRounds);
   const name = (teamId: number) => teamNames.get(teamId) ?? `#${teamId}`;
 
   return (
-    <div className={styles.wrapper}>
+    // Outil d'arbitrage : resté français (D4), annoncé comme tel sous `/en`.
+    <div className={styles.wrapper} lang={frenchBlockLang(text)}>
       <BoardPanel
         accent={PREVIEW_ACCENT}
         title={`Aperçu · ${title}`}
