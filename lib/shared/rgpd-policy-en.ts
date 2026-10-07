@@ -133,7 +133,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to restriction",
-    text: "You can request that your data be kept without being otherwise used while we check its accuracy or examine your objection, when its processing is unlawful and you prefer this restriction to its erasure, or when you need it to establish a legal claim although we would no longer have any use for it (art. 18).",
+    text: "You can request that your data be kept without being otherwise used while we check its accuracy or examine your objection, when its processing is unlawful and you prefer this restriction to its erasure, or when you need it for the establishment, exercise or defense of legal claims although we would no longer have any use for it (art. 18).",
   },
   {
     title: "Right to object",

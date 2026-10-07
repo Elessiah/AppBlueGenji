@@ -104,7 +104,7 @@ export function registerControllerEn(): RegisterController {
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE_EN,
     dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE_EN}, appointed by the association to receive requests regarding data (contact details given with those of the data controller). He is not a data protection officer within the meaning of Article 37 of the GDPR; the association remains the data controller`,
-    host: `${SITE_HOST.name} (private individual, volunteer of the association), ${SITE_HOST.address} — processor (${HOST_PROCESSING_AGREEMENT_EN}), data hosted in ${SITE_HOST.country} (site and Discord bot on ${SITE_HOST.machineEn})`,
+    host: `${SITE_HOST.name} (${SITE_HOST.statusEn.toLowerCase()}), ${SITE_HOST.address} — processor (${HOST_PROCESSING_AGREEMENT_EN}), data hosted in ${SITE_HOST.country} (site and Discord bot on ${SITE_HOST.machineEn})`,
   };
 }
 
