@@ -275,6 +275,17 @@ describe("route et référencement", () => {
     expect(link?.[0]).toBe('<LocaleLink href="/tournois/creer">');
   });
 
+  it("les fenêtres restées françaises (recadrage, notifications) le disent jusque dans leur titre et leurs notifications", () => {
+    const picker = readFileSync(path.join(process.cwd(), "app/(secured)/tournois/_components/TournamentImagePicker.tsx"), "utf8");
+    expect(picker).toContain('const CROP_TITLE = FR_IMAGE_TEXT.t("picker.cropTitle");');
+    expect(picker).not.toContain(', t("picker.cropTitle")');
+    const launch = readFileSync(path.join(process.cwd(), "components/match-launch/MatchLaunchCenter.tsx"), "utf8");
+    expect(launch).toContain('toastLang={text.locale === "fr" ? undefined : "fr"}');
+    const panel = readFileSync(path.join(process.cwd(), "components/notifications/PushNotificationsPanel.tsx"), "utf8");
+    expect(panel.match(/toastOptions\)/g)).toHaveLength(2);
+    expect(panel).toContain("toastLang ? { lang: toastLang } : undefined");
+  });
+
   it("l'édition lit refus et image du fournisseur de la fiche, le formulaire du sien", () => {
     const html = renderEdit(<TournamentImagePicker existing={null} value={initialImagePickerValue(null)} onChange={noop} />);
     expectNoFrench(html);
