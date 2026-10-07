@@ -40,6 +40,7 @@ import { TERMS_CHECKBOX_LABEL, TERMS_VERSION, formatTermsDate, formatTermsDateIn
 import enShell from "@/messages/en/shell.json";
 import frShell from "@/messages/fr/shell.json";
 import { legalPageText } from "../helpers/legal-text";
+import { readSource } from "../helpers/read-source";
 
 const globalWithDocument = globalThis as { document?: unknown };
 const hadDocument = "document" in globalWithDocument;
@@ -55,7 +56,12 @@ function render(locale: Locale, request: TermsRequest | null = null): string {
   return renderToStaticMarkup(
     <AppLocaleProvider locale={locale}>
       <ShellTextProvider locale={locale} messages={locale === "en" ? enShell : undefined}>
-        <TermsAcceptanceModal initiallyRequired request={request} privacyPending={false} />
+        <TermsAcceptanceModal
+          initiallyRequired
+          request={request}
+          privacyPending={false}
+          translationNote={locale === "en" ? TERMS_TRANSLATION_NOTE : null}
+        />
       </ShellTextProvider>
     </AppLocaleProvider>,
   );
@@ -91,6 +97,13 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(text).toContain(TERMS_TRANSLATION_NOTE.text);
     expect(html).toContain(`href="/conditions-utilisation" target="_blank" rel="noreferrer" hrefLang="fr">${TERMS_TRANSLATION_NOTE.link}</a>`);
     expect(text).not.toMatch(/\b(Tu|les|conditions|équipe)\b/);
+  });
+
+  it("la note anglaise n'est pas importée par la fenêtre : la mise en page la passe sous /en seulement", () => {
+    const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
+    expect(modal).toContain("import type { TermsTranslationNote }");
+    expect(modal).not.toMatch(/^import \{[^}]*\bTERMS_TRANSLATION_NOTE\b/m);
+    expect(readSource("app/layout.tsx")).toContain("translationNote={locale === DEFAULT_LOCALE ? null : TERMS_TRANSLATION_NOTE}");
   });
 
   it("première acceptation : le titre de qui reçoit la main sur une équipe", () => {
