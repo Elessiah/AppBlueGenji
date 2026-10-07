@@ -6,6 +6,7 @@ import {
   formatMatchStartEntryPreview,
   isMatchStartEntryInRange,
   localMatchTimeIfDifferent,
+  matchEntryMonths,
   matchEntryReference,
   matchEntryTimeOptions,
   matchEntryTimeValue,
@@ -400,5 +401,31 @@ describe("readMatchStartEntry", () => {
       kind: "ready",
       instant: at("2027-01-03T19:00:00Z"),
     });
+  });
+});
+
+describe("formateurs anglais (lot 8b) — construits une fois", () => {
+  const instant = Date.UTC(2027, 0, 3, 19, 0);
+
+  it("les mois anglais sont calculés une fois : même tableau d'un appel à l'autre", () => {
+    const months = matchEntryMonths("en");
+    expect(months).toHaveLength(12);
+    expect(months[0]).toBe("January");
+    expect(matchEntryMonths("en")).toBe(months);
+  });
+
+  it("aperçu et heure locale : rendu stable d'un appel à l'autre, sur 24 h", () => {
+    const first = formatMatchStartEntryPreview(instant, "en");
+    expect(formatMatchStartEntryPreview(instant, "en")).toBe(first);
+    expect(first).toContain("20:00");
+    const local = localMatchTimeIfDifferent(instant, "America/New_York", "en");
+    expect(local).toContain("14:00");
+    expect(localMatchTimeIfDifferent(instant, "America/New_York", "en")).toBe(local);
+    // Un autre fuseau n'hérite pas du formateur du premier.
+    expect(localMatchTimeIfDifferent(instant, "Asia/Tokyo", "en")).toContain("04:00");
+  });
+
+  it("fuseau inconnu : null, sans rien mettre en cache", () => {
+    expect(localMatchTimeIfDifferent(instant, "Nowhere/Void", "en")).toBeNull();
   });
 });
