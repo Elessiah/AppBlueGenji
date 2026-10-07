@@ -24,7 +24,7 @@ function withFrenchAddresses(text: string): ReactNode {
   const [before, ...rest] = text.split(address);
   return (
     <>
-      {before}
+      <EnglishLegalText text={before} />
       <span lang="fr">{address}</span>
       {withFrenchAddresses(rest.join(address))}
     </>
