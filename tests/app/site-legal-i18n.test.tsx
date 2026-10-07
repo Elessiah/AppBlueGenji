@@ -119,6 +119,12 @@ describe("anglais : une traduction, qui le dit", () => {
     expect(offending).toEqual([]);
   });
 
+  it.each(PAGES)("%s : chaque nom français cité « … » est annoncé lang=\"fr\" (WCAG 3.1.2)", async (_route, _name, _card, page) => {
+    const text = legalPageText(withoutFrenchPassages(await render(page, "en")));
+    const lines = text.split(/\n/);
+    expect(lines.filter((line) => line.includes("«"))).toEqual([]);
+  });
+
   it.each(PAGES)("%s : liens vers une page encore française signalés (hrefLang, « (in French) »)", async (_route, _name, _card, page) => {
     const html = await render(page, "en");
     for (const [, href] of html.matchAll(/<a href="(\/rgpd[^"]*)"([^>]*)>/g)) {
