@@ -49,8 +49,14 @@ import { WEB_ACCESS_LOG_FIELDS } from "@/lib/shared/legal-durations";
 import {
   privacyChangeDay,
   privacyPolicyUpdatedLabel,
+  privacyPolicyUpdatedLabelIn,
   publishedPrivacyChanges,
+  type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
+import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { RgpdEn } from "./RgpdEn";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
   NOTIFIER_FOLLOW_UP,
@@ -74,13 +80,21 @@ import { headers } from "next/headers";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Politique de confidentialité (RGPD)",
-  description:
-    "Politique de confidentialité de BlueGenji : données collectées, droits des utilisateurs, durées de conservation et contact RGPD.",
-  path: "/rgpd",
-  shareCard: "privacy",
-});
+/**
+ * Une langue par adresse (lot 7b-2) : `/rgpd` en français, le texte qui fait
+ * foi ; `/en/rgpd` sa traduction (`RgpdEn`).
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const meta = messagesFor(locale).legal.pages.privacy;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    path: "/rgpd",
+    shareCard: "privacy",
+    locale,
+  });
+}
 
 /** Intitulés des colonnes du tableau des données, repris par chaque fiche mobile. */
 const DATA_COLUMNS = ["Donnée", "Finalité", "Base légale", "Conservation"] as const;
@@ -108,6 +122,7 @@ function frenchDay(iso: string): string {
 }
 
 export default async function RgpdPage() {
+  const locale = await requestLocale();
   // Le formulaire laisse un membre connecté désigner son compte ; un visiteur
   // l'ouvre aussi, sans cela.
   const user = await getCurrentUser().catch(() => null);
@@ -125,9 +140,43 @@ export default async function RgpdPage() {
   // version de la politique : elle ne paraît pas dans l'historique public, ni
   // dans la date qui le coiffe — les deux lisent la même liste.
   const history = publishedPrivacyChanges(today).filter((change) => !change.audience);
+  if (locale === "en") {
+    return (
+      <PublicPageShell>
+        <RgpdEn
+          authenticated={Boolean(user)}
+          audienceOptOut={audienceOptOut}
+          updatedLabel={privacyPolicyUpdatedLabelIn(today, "en", history) ?? "September 2026"}
+          history={localizedPrivacyChanges(history, "en")}
+        />
+      </PublicPageShell>
+    );
+  }
   const updatedLabel = privacyPolicyUpdatedLabel(today, history) ?? "septembre 2026";
   return (
     <PublicPageShell>
+      <RgpdFr user={user} audienceOptOut={audienceOptOut} updatedLabel={updatedLabel} history={history} />
+    </PublicPageShell>
+  );
+}
+
+/**
+ * La politique en français, qui fait foi : inchangée par le lot 7b-2, à
+ * l'octet près (`tests/app/site-legal-i18n.test.tsx`).
+ */
+function RgpdFr({
+  user,
+  audienceOptOut,
+  updatedLabel,
+  history,
+}: Readonly<{
+  user: unknown;
+  audienceOptOut: ReturnType<typeof audienceOptOutFromHeaders>;
+  updatedLabel: string;
+  history: readonly PrivacyChange[];
+}>) {
+  return (
+    <>
       {/* HERO */}
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
@@ -1117,6 +1166,6 @@ export default async function RgpdPage() {
           </details>
         )}
       </section>
-    </PublicPageShell>
+    </>
   );
 }

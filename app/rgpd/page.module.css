@@ -296,6 +296,12 @@
     gap: 6px;
   }
 
+  /* Surtitre de droite : sur une ligne, l'anglais (« … FRENCH DATA PROTECTION
+     ACT ART. 85 ») dépassait d'un téléphone et faisait défiler la page en largeur. */
+  .meta {
+    white-space: normal;
+  }
+
   /* Fiches empilées : quatre colonnes ne tiennent pas en largeur (le document
      débordait à 439 px), et la colonne « Base légale » n'est plus masquée. */
   .dataTable,

@@ -179,5 +179,19 @@
     "saving": "Enregistrement…",
     "accepted": "Merci, tu peux gérer ton équipe.",
     "failed": "Ton acceptation n'a pas pu être enregistrée. Recharge la page, puis réessaie."
+  },
+  "privacyModal": {
+    "eyebrow": "PROTECTION DES DONNÉES · RGPD",
+    "heading": "{count, plural, one {Nos règles de confidentialité ont changé} other {# changements de nos règles de confidentialité}}",
+    "introOne": "La façon dont BlueGenji traite tes données a changé. Nous te devons cette information : aucun accord ne t'est demandé.",
+    "introMany": "Depuis ta dernière visite, la façon dont BlueGenji traite tes données a changé. Nous te devons cette information : aucun accord ne t'est demandé.",
+    "detailsLabel": "Détail des changements",
+    "policy": "Ce qui repose sur ton choix se règle dans « Mon profil », sans rien perdre d'autre. Tu peux t'opposer à un traitement ou exercer tes autres droits comme l'explique la <policy>politique de confidentialité</policy>.",
+    "acknowledge": "J'ai pris connaissance",
+    "saving": "Enregistrement…",
+    "saved": "C'est noté, merci.",
+    "failed": "Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.",
+    "replay": "Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.",
+    "inFrench": "(en français)"
   }
 }

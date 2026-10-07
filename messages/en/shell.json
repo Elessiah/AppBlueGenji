@@ -179,5 +179,19 @@
     "saving": "Saving…",
     "accepted": "Thanks, you can manage your team.",
     "failed": "Your acceptance couldn't be saved. Reload the page, then try again."
+  },
+  "privacyModal": {
+    "eyebrow": "DATA PROTECTION · GDPR",
+    "heading": "{count, plural, one {Our privacy rules have changed} other {# changes to our privacy rules}}",
+    "introOne": "The way BlueGenji processes your data has changed. We owe you this information: no agreement is asked of you.",
+    "introMany": "Since your last visit, the way BlueGenji processes your data has changed. We owe you this information: no agreement is asked of you.",
+    "detailsLabel": "Details of the changes",
+    "policy": "What depends on your choice is set in “My profile”, without losing anything else. You can object to a processing activity or exercise your other rights as explained in the <policy>privacy policy</policy>.",
+    "acknowledge": "I have read this",
+    "saving": "Saving…",
+    "saved": "Noted, thank you.",
+    "failed": "Your reading couldn't be saved. Try again in a moment.",
+    "replay": "Your reading couldn't be saved: this information will be shown to you again.",
+    "inFrench": "(in French)"
   }
 }

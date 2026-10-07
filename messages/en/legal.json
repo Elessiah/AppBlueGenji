@@ -14,6 +14,28 @@
     "accessibility": {
       "title": "Accessibility statement",
       "description": "Compliance status of the BlueGenji Esport site with the RGAA (French accessibility standard), inaccessible content, available help and contact."
+    },
+    "privacy": {
+      "title": "Privacy policy (GDPR)",
+      "description": "BlueGenji's privacy policy: data collected, users' rights, retention periods and GDPR contact."
+    },
+    "processingRegister": {
+      "title": "Record of processing activities",
+      "description": "BlueGenji's record of processing activities (GDPR, Article 30): purposes, data, retention periods, recipients and security measures."
     }
+  },
+  "audience": {
+    "status": {
+      "GPC": "Your browser sends the Global Privacy Control signal: your visits are not measured. This signal is set in your browser, not on the site.",
+      "DNT": "Your browser sends the Do Not Track signal: your visits are not measured. This signal is set in your browser, not on the site.",
+      "CHOICE": "You have objected to audience measurement: your visits are neither reported to the server nor recorded, from this browser.",
+      "measured": "Your visits are currently measured, as described above."
+    },
+    "fieldset": "Audience measurement",
+    "optOut": "Object to audience measurement",
+    "reactivate": "Turn audience measurement back on",
+    "optedOut": "Your visits will no longer be measured.",
+    "reactivated": "Audience measurement is back on.",
+    "blocked": "Your browser blocks cookies: your choice could not be saved."
   }
 }

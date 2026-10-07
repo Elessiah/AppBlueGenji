@@ -378,6 +378,17 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - Motif de suspension « Comportement » : *Conduct* (titre de l'article anglais) au lieu de
   *Behavior* (lot 6), pour que l'exposé cite l'article tel qu'il s'intitule.
 
+### Ce que le lot 7b-2 a établi (2026-10-07) — écarts au plan
+
+- **`/rgpd` et `/rgpd/registre` ouverts sous `/en`**, empilé sur 7b-1 (infrastructure commune :
+  avis, liens, `ProtectedContact`). Détail : `I18N.md` § Textes légaux du site.
+- **Historique `PRIVACY_CHANGES` traduit en entier** (25 entrées) : la fenêtre des changements
+  s'affiche aussi sous `/en`. Traduction par identifiant, appliquée côté serveur.
+- **Restent français** : export CSV du registre (document CNIL, signalé « in French »), formulaire
+  de signalement (lot 9), annonce Discord (D6).
+- **Écart au texte du bot repris tel quel (7a)** : « (in French) » retiré de deux phrases anglaises
+  de `bot-legal-content.ts` qui renvoient à la politique du site, devenue anglaise.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -413,7 +424,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 5 ✅ (5a, 5b) | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
 | 6 ✅ | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
 | 7a ✅ | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
-| 7b (7b-1 ✅, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
+| 7b ✅ (7b-1, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
 | 9 | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |

@@ -750,6 +750,44 @@ export function formatPrivacyChangeDate(day: string): string {
   return `${date} ${MONTHS[month - 1]} ${year}`;
 }
 
+const MONTHS_EN = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/**
+ * `formatPrivacyChangeDate` dans une langue (lot 7b-2) : le français inchangé,
+ * `2026-09-23` → `September 23, 2026` en anglais.
+ */
+export function formatPrivacyChangeDateIn(day: string, locale: "fr" | "en"): string {
+  if (locale === "fr") return formatPrivacyChangeDate(day);
+  const [year, month, date] = day.split("-").map(Number);
+  return `${MONTHS_EN[month - 1]} ${date}, ${year}`;
+}
+
+/** `privacyPolicyUpdatedLabel` dans une langue : « septembre 2026 » / « September 2026 ». */
+export function privacyPolicyUpdatedLabelIn(
+  today: string,
+  locale: "fr" | "en",
+  changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
+): string | null {
+  if (locale === "fr") return privacyPolicyUpdatedLabel(today, changes);
+  const last = publishedPrivacyChanges(today, changes).at(-1);
+  if (!last) return null;
+  const [year, month] = last.publishedAt.split("-").map(Number);
+  return `${MONTHS_EN[month - 1]} ${year}`;
+}
+
 /**
  * Le mois de la dernière mise à jour de la politique, pour `/rgpd`
  * (« septembre 2026 ») — dérivé du registre, pour que la page ne puisse plus

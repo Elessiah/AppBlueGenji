@@ -14,6 +14,28 @@
     "accessibility": {
       "title": "Déclaration d'accessibilité",
       "description": "État de conformité du site BlueGenji Esport au RGAA, contenus non accessibles, aides proposées et contact."
+    },
+    "privacy": {
+      "title": "Politique de confidentialité (RGPD)",
+      "description": "Politique de confidentialité de BlueGenji : données collectées, droits des utilisateurs, durées de conservation et contact RGPD."
+    },
+    "processingRegister": {
+      "title": "Registre des traitements",
+      "description": "Registre des activités de traitement de BlueGenji (RGPD, article 30) : finalités, données, durées de conservation, destinataires et mesures de sécurité."
     }
+  },
+  "audience": {
+    "status": {
+      "GPC": "Votre navigateur envoie le signal Global Privacy Control : vos visites ne sont pas mesurées. Ce signal se règle dans votre navigateur, pas sur le site.",
+      "DNT": "Votre navigateur envoie le signal Do Not Track : vos visites ne sont pas mesurées. Ce signal se règle dans votre navigateur, pas sur le site.",
+      "CHOICE": "Vous vous êtes opposé à la mesure d'audience : vos visites ne sont ni signalées au serveur, ni enregistrées, depuis ce navigateur.",
+      "measured": "Vos visites sont actuellement mesurées, comme décrit ci-dessus."
+    },
+    "fieldset": "Mesure d'audience",
+    "optOut": "M'opposer à la mesure d'audience",
+    "reactivate": "Réactiver la mesure d'audience",
+    "optedOut": "Vos visites ne seront plus mesurées.",
+    "reactivated": "La mesure d'audience est réactivée.",
+    "blocked": "Votre navigateur bloque les cookies : le choix n'a pas pu être retenu."
   }
 }

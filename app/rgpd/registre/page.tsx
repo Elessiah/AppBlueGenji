@@ -11,15 +11,27 @@ import {
   registerController,
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { RegistreEn } from "./RegistreEn";
 import styles from "../page.module.css";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Registre des traitements",
-  description:
-    "Registre des activités de traitement de BlueGenji (RGPD, article 30) : finalités, données, durées de conservation, destinataires et mesures de sécurité.",
-  path: "/rgpd/registre",
-  shareCard: "processingRegister",
-});
+/**
+ * Une langue par adresse (lot 7b-2) : `/rgpd/registre` en français, le texte
+ * qui fait foi ; `/en/rgpd/registre` sa traduction (`RegistreEn`). L'export
+ * CSV reste français.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const meta = messagesFor(locale).legal.pages.processingRegister;
+  return pageMetadata({
+    title: meta.title,
+    description: meta.description,
+    path: "/rgpd/registre",
+    shareCard: "processingRegister",
+    locale,
+  });
+}
 
 /** `2026-09-23` → `23/09/2026` : une date de document, pas un instant. */
 function frenchDate(iso: string): string {
@@ -73,10 +85,16 @@ function ActivityCard({ activity }: Readonly<{ activity: ProcessingActivity }>) 
   );
 }
 
-export default function RegistrePage() {
+export default async function RegistrePage() {
+  const locale = await requestLocale();
+  return <PublicPageShell>{locale === "en" ? <RegistreEn /> : <RegistreFr />}</PublicPageShell>;
+}
+
+/** Le registre en français, qui fait foi : inchangé par le lot 7b-2 (`tests/app/site-legal-i18n.test.tsx`). */
+function RegistreFr() {
   const controller = registerController();
   return (
-    <PublicPageShell>
+    <>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">RGPD · ARTICLE 30</span>
@@ -140,6 +158,6 @@ export default function RegistrePage() {
           ))}
         </div>
       </section>
-    </PublicPageShell>
+    </>
   );
 }

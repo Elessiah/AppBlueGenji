@@ -108,7 +108,7 @@ const PRIVACY_CONTACT_ITEMS_FR = [
   ...CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**")),
 ];
 const PRIVACY_CONTACT_ITEMS_EN = [
-  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}) (in French). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller. This processing (legal basis, data, retention period) is described in the website's privacy policy; its recipients and transfers are also listed in sections 04 and 05 of this policy`,
+  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller. This processing (legal basis, data, retention period) is described in the website's privacy policy; its recipients and transfers are also listed in sections 04 and 05 of this policy`,
   ...CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**")),
 ];
 
@@ -683,7 +683,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages from the BlueGenji website" },
           {
             kind: "p",
-            text: `The website sends the Bot a Discord ID or username and the message to deliver (login code, match reminder, referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, reminder, moderation notice, join request, data-protection notice) by direct message **without storing them**. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}) (in French).`,
+            text: `The website sends the Bot a Discord ID or username and the message to deliver (login code, match reminder, referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, reminder, moderation notice, join request, data-protection notice) by direct message **without storing them**. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}).`,
           },
           { kind: "subhead", text: "Logs" },
           {

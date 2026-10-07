@@ -180,7 +180,7 @@ describe("titres français, sans moitié anglaise depuis le lot 7a", () => {
 });
 
 describe("liens internes dans la langue de la page", () => {
-  it("sous /en, le renvoi d'un document à l'autre reste anglais ; une page encore française garde son adresse", async () => {
+  it("sous /en, le renvoi d'un document à l'autre reste anglais, comme vers les pages légales du site (lot 7b)", async () => {
     const terms = await render(TermsPage, "en");
     expect(terms).toContain('href="/en/privacy-policy-bot"');
     expect(terms).not.toContain('href="/privacy-policy-bot"');
@@ -188,7 +188,8 @@ describe("liens internes dans la langue de la page", () => {
     expect(terms).toContain('href="/en/mentions-legales#hebergement"');
     const privacy = await render(PrivacyPage, "en");
     expect(privacy).toContain('href="/en/terms-of-service-bot"');
-    expect(privacy).toContain('href="/rgpd#exercer-vos-droits"');
+    // Politique du site traduite depuis le lot 7b-2.
+    expect(privacy).toContain('href="/en/rgpd#exercer-vos-droits"');
   });
 
   it("en français, les adresses n'ont pas changé", async () => {
@@ -197,9 +198,10 @@ describe("liens internes dans la langue de la page", () => {
     expect(terms).not.toContain('href="/en/');
   });
 
-  it("sous /en, un lien vers une page encore française porte hrefLang=\"fr\", pas un lien anglais", async () => {
+  it("sous /en, un lien vers une page française porte hrefLang=\"fr\", pas un lien anglais", async () => {
     const privacy = await render(PrivacyPage, "en");
-    expect(privacy).toMatch(/<a[^>]*href="\/rgpd#exercer-vos-droits"[^>]*hrefLang="fr"|<a[^>]*hrefLang="fr"[^>]*href="\/rgpd#exercer-vos-droits"/);
+    // Plus aucune page interne citée n'est restée française (lot 7b) : aucun lien interne n'est signalé.
+    expect(privacy).not.toMatch(/<a[^>]*href="\/(rgpd|mentions-legales)[^"]*"[^>]*hrefLang/);
     expect(privacy).toMatch(/<a[^>]*href="\/en\/mentions-legales#hebergement"/);
     const english = [...privacy.matchAll(/<a[^>]*href="\/en\/[^"]*"[^>]*>/g)].map((m) => m[0]);
     expect(english.length).toBeGreaterThan(0);

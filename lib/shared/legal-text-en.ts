@@ -53,3 +53,8 @@ export const DATA_CONTACT_ROLE_EN = "technical host of the site";
 /** `WEB_ACCESS_LOG_FIELDS` (`legal-durations.ts`), same items in the same order. */
 export const WEB_ACCESS_LOG_FIELDS_EN =
   "IP address, date and time, page requested, response code, response size, referring page and browser";
+
+/** « 1 month », « 6 months » : a duration in months, singular or plural. */
+export function monthsEn(count: number): string {
+  return `${count} ${count === 1 ? "month" : "months"}`;
+}

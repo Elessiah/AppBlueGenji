@@ -17,7 +17,8 @@
  * le classement ; lot 6 : la connexion ; lot 5a : le bot et sa documentation ;
  * lot 5b : l'association, les bénévoles, le recrutement ; lot 7a : les
  * documents légaux du bot ; lot 7b-1 : conditions, mentions légales,
- * déclaration d'accessibilité).
+ * déclaration d'accessibilité ; lot 7b-2 : politique de confidentialité et
+ * registre des traitements).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
@@ -61,4 +62,9 @@ export const MIGRATED_ROUTES: readonly string[] = [
   "/conditions-utilisation",
   "/mentions-legales",
   "/accessibilite",
+  // Lot 7b-2 — politique de confidentialité (historique des changements
+  // compris) et registre des traitements. L'export CSV du registre
+  // (`/rgpd/registre.csv`) reste français : `/en/rgpd/registre.csv` répond 307.
+  "/rgpd",
+  "/rgpd/registre",
 ];

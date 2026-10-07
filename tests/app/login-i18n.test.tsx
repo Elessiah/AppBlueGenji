@@ -314,13 +314,13 @@ describe("modale d'entrée (information RGPD, conditions)", () => {
     expectNoFrench(text);
   });
 
-  it("sous /en (lot 7b-1) : conditions anglaises liées, note « French text prevails » ; politique encore française", () => {
+  it("sous /en (lot 7b) : conditions et politique anglaises liées, note « French text prevails »", () => {
     const html = render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} />, "en");
     expect(html).toContain('href="/en/conditions-utilisation"');
     expect(visibleText(html)).toContain(TERMS_TRANSLATION_NOTE.text);
     expect(html).toMatch(/<a href="\/conditions-utilisation"[^>]*hrefLang="fr"[^>]*>Read the French terms<\/a>/);
-    expect(html).toMatch(/<a href="\/rgpd"[^>]*hrefLang="fr"/);
-    expect(html).not.toMatch(/<a href="\/en\/conditions-utilisation"[^>]*hrefLang/);
+    expect(html).toContain('href="/en/rgpd"');
+    expect(html).not.toMatch(/<a href="\/en\/(conditions-utilisation|rgpd)"[^>]*hrefLang/);
   });
 
   it("en français : la case reprend les phrases partagées, aucun hreflang", () => {

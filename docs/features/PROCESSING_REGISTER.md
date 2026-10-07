@@ -112,7 +112,13 @@ contact lue dans la configuration.
 
 **Un traitement ajouté au site s'ajoute au registre dans la même PR** — une
 table qui garde une donnée personnelle, un envoi vers un tiers — et
-`REGISTER_UPDATED_AT` avance. Le registre ne contient aucune donnée personnelle :
+`REGISTER_UPDATED_AT` avance. **Avec sa traduction** (lot 7b-2) :
+`PROCESSING_ACTIVITIES_EN` (`lib/shared/processing-register-en.ts`), même
+référence, même rang, autant d'éléments par rubrique et les mêmes nombres
+(`tests/lib/shared/privacy-legal-en.test.ts`) ; `/en/rgpd/registre` la rend,
+avec un avis « the French version prevails ». L'export CSV reste **français** :
+c'est le document remis à la CNIL, au modèle et dans la langue de la CNIL — le
+bouton anglais le dit (« in French »). Le registre ne contient aucune donnée personnelle :
 le publier ne pose aucun problème, c'est même ce qui le rend vérifiable.
 
 ## Points à surveiller

@@ -26,3 +26,12 @@ export function legalPageText(html: string): string {
 export function withoutFrenchPassages(html: string): string {
   return html.replace(/<(span|a|p|li)\b[^>]*\blang="fr"[^>]*>[\s\S]*?<\/\1>/g, "");
 }
+
+/**
+ * `/rgpd` sans sa date de mise à jour ni son historique : tous deux se lisent
+ * de `PRIVACY_CHANGES`, qui grandit à chaque changement publié (et dont la
+ * parité FR/EN a son propre test) — la référence du texte n'a pas à suivre.
+ */
+export function withoutPrivacyHistory(html: string): string {
+  return html.replace(/<div class="updateLine">[\s\S]*?<\/details>/, "");
+}

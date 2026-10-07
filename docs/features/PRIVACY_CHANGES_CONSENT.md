@@ -73,6 +73,17 @@ portée du rejeu, lecture du tag certifié par l'arbitrage dès un tournoi non
 terminé, empreinte d'audience pseudonymisée et non anonyme). Penser aussi à
 mettre `/rgpd` à jour : la modale résume, la politique fait foi.
 
+**Et son anglais** (lot 7b-2) : chaque entrée a sa traduction dans
+`PRIVACY_CHANGES_EN` (`lib/shared/privacy-changes-en.ts`), sous le **même
+identifiant** — titre, résumé, détails, libellés des liens (mêmes cibles, même
+ordre). La mise en page la passe à la modale sous `/en`
+(`localizedPrivacyChanges`) ; `/en/rgpd` en liste les titres. Une entrée sans
+anglais fait échouer `tests/lib/shared/privacy-legal-en.test.ts` (mêmes
+nombres, mêmes nombres de détails et de liens). L'annonce Discord reste
+française (D6). La politique elle-même (`/rgpd`) se modifie dans les deux
+langues, dans la même PR (`app/rgpd/RgpdEn.tsx`, référence du français
+`tests/fixtures/legal-fr/rgpd.txt`).
+
 ## Qui voit quoi
 
 `pendingPrivacyChanges` : un changement est dû à un compte s'il n'en a pas pris

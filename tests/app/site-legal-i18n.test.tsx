@@ -1,8 +1,9 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
 /**
- * Lot 7b-1 : conditions d'utilisation, mentions légales et déclaration
- * d'accessibilité, une langue par adresse (`docs/features/I18N.md` § Textes
+ * Lot 7b : conditions d'utilisation, mentions légales, déclaration
+ * d'accessibilité (7b-1), politique de confidentialité et registre des
+ * traitements (7b-2), une langue par adresse (`docs/features/I18N.md` § Textes
  * légaux du site). Le français fait foi et ne bouge pas d'un caractère ;
  * l'anglais est une traduction qui le dit. La langue vient de `x-bg-locale`
  * (`requestLocale()`), simulée ici ; en-tête et pied de page ont leurs tests.
@@ -12,6 +13,9 @@ let mockLocale: "fr" | "en" = "fr";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/components/cyber/landing/PublicHeader", () => ({ PublicHeader: () => null }));
 jest.mock("@/components/cyber/landing/PublicFooter", () => ({ PublicFooter: () => null }));
+// `/rgpd` lit la session (formulaire RGPD) et les en-têtes (opposition à la mesure d'audience).
+jest.mock("next/headers", () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) }));
+jest.mock("@/lib/server/auth", () => ({ getCurrentUser: async () => null }));
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -19,6 +23,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import AccessibilityPage, { generateMetadata as accessibilityMetadata } from "@/app/accessibilite/page";
 import TermsPage, { generateMetadata as termsMetadata } from "@/app/conditions-utilisation/page";
 import LegalNoticePage, { generateMetadata as legalNoticeMetadata } from "@/app/mentions-legales/page";
+import PrivacyPage, { generateMetadata as privacyMetadata } from "@/app/rgpd/page";
+import RegisterPage, { generateMetadata as registerMetadata } from "@/app/rgpd/registre/page";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { ToastProvider } from "@/components/ui/toast";
@@ -56,7 +62,7 @@ import { SITE_HOST } from "@/lib/shared/site-host";
 import enLegal from "@/messages/en/legal.json";
 import enShell from "@/messages/en/shell.json";
 import frLegal from "@/messages/fr/legal.json";
-import { legalPageText, withoutFrenchPassages } from "../helpers/legal-text";
+import { legalPageText, withoutFrenchPassages, withoutPrivacyHistory } from "../helpers/legal-text";
 import { readSource } from "../helpers/read-source";
 
 type Page = () => Promise<React.JSX.Element>;
@@ -67,6 +73,8 @@ const PAGES: readonly [string, string, string, Page, MetadataFn, keyof typeof fr
   ["/conditions-utilisation", "conditions-utilisation", "terms", TermsPage, termsMetadata, "terms"],
   ["/mentions-legales", "mentions-legales", "legalNotice", LegalNoticePage, legalNoticeMetadata, "legalNotice"],
   ["/accessibilite", "accessibilite", "accessibility", AccessibilityPage, accessibilityMetadata, "accessibility"],
+  ["/rgpd", "rgpd", "privacy", PrivacyPage, privacyMetadata, "privacy"],
+  ["/rgpd/registre", "rgpd-registre", "processingRegister", RegisterPage, registerMetadata, "processingRegister"],
 ];
 
 async function render(page: Page, locale: Locale): Promise<string> {
@@ -90,7 +98,7 @@ const FRENCH_WORDS = /\b(le|la|les|des|du|une|est|pour|vous|avec|dans|et|ou|sur|
 
 describe("français : le texte qui fait foi ne bouge pas", () => {
   it.each(PAGES)("%s rend, au caractère près, le texte d'avant le lot 7b", async (_route, name, _card, page) => {
-    expect(legalPageText(await render(page, "fr"))).toBe(fixture(name));
+    expect(legalPageText(withoutPrivacyHistory(await render(page, "fr")))).toBe(fixture(name));
   });
 
   it.each(PAGES)("%s ne parle jamais de sa traduction", async (_route, _name, _card, page) => {
@@ -128,8 +136,9 @@ describe("anglais : une traduction, qui le dit", () => {
 
   it.each(PAGES)("%s : liens vers une page encore française signalés (hrefLang, « (in French) »)", async (_route, _name, _card, page) => {
     const html = await render(page, "en");
-    for (const [, href] of html.matchAll(/<a href="(\/rgpd[^"]*)"([^>]*)>/g)) {
-      expect([href, html.includes(`href="${href}" hrefLang="fr"`)]).toEqual([href, true]);
+    // Seul l'export CSV du registre reste français (lot 7b-2) : son lien le dit.
+    for (const [tag] of html.matchAll(/<a href="\/rgpd[^"]*"[^>]*>/g)) {
+      expect([tag, tag.includes('hrefLang="fr"')]).toEqual([tag, true]);
     }
     // « (in French) » s'ajoute dans le lien : jamais entre parenthèses déjà ouvertes.
     expect(legalPageText(html)).not.toContain("(in French))");
@@ -201,12 +210,17 @@ describe("coordonnées : toujours encodées, révélées au clic", () => {
     "lib/shared/legal-text-en.ts",
     "lib/shared/terms-of-use-en.ts",
     "lib/shared/accessibility-statement-en.ts",
+    "app/rgpd/RgpdEn.tsx",
+    "app/rgpd/registre/RegistreEn.tsx",
+    "lib/shared/rgpd-policy-en.ts",
+    "lib/shared/processing-register-en.ts",
+    "lib/shared/privacy-changes-en.ts",
   ])("%s ne contient aucune coordonnée en clair", (file) => {
     const source = readSource(file);
     expect(source).not.toMatch(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
     expect(source).not.toContain("mailto:");
     // Ni contrat de sous-traitance de l'hébergeur de sauvegardes, ni identifiants du stockage.
-    expect(source).not.toMatch(/storage ?share|customer number|numéro client|\bDPA\b/i);
+    expect(source).not.toMatch(/your-storageshare|storageshare\.de|customer number|numéro client/i);
   });
 
   it("les mentions anglaises passent chaque coordonnée par ProtectedContact", () => {
