@@ -357,6 +357,27 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   `TermsOfServices.md`, générées par `scripts/generate-legal-terms.py`) citent l'adresse française ;
   les faire pointer vers `/en/…` se fait au dépôt du bot, à la prochaine régénération.
 
+### Ce que le lot 7b-1 a établi (2026-10-07) — écarts au plan
+
+- **Lot 7b coupé en deux** (~23 000 mots, pour une relecture juridique tenable) : **7b-1**
+  conditions d'utilisation, mentions légales, déclaration d'accessibilité, fenêtre d'acceptation des
+  conditions, `ProtectedContact` ; **7b-2** `/rgpd` (et l'historique `PRIVACY_CHANGES`), le registre
+  `/rgpd/registre`, la fenêtre des changements de confidentialité. Branches indépendantes depuis
+  `main`. Détail : `I18N.md` § Textes légaux du site.
+- **Un document par langue** plutôt que des clés (comme 7a) : le français reste dans ses modules et
+  ses pages, **inchangé au caractère près** (testé contre une référence relevée avant le lot) ;
+  l'anglais vit dans des modules et composants frères.
+- **« The French version prevails »** sur les **trois** pages anglaises (le plan : CGU et
+  confidentialité au moins), anglais seulement ; sous la case des conditions des deux fenêtres
+  d'acceptation aussi.
+- **Aucune raison juridique de ne pas traduire** trouvée : noms de lois, d'autorités et adresses
+  gardés en français (`lang="fr"`) avec une glose. À signaler au cycle juridique : la mention RGAA
+  « non conforme » est rendue « non-compliant » (libellé du pied de page anglais depuis le lot 1).
+- `TERMS_VERSION`, `PRIVACY_CHANGES`, `REGISTER_UPDATED_AT`, `ACCESSIBILITY_STATEMENT_DATE`
+  **inchangés** : une traduction n'est pas un changement de fond.
+- Motif de suspension « Comportement » : *Conduct* (titre de l'article anglais) au lieu de
+  *Behavior* (lot 6), pour que l'exposé cite l'article tel qu'il s'intitule.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -392,7 +413,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 5 ✅ (5a, 5b) | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
 | 6 ✅ | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
 | 7a ✅ | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
-| 7b | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
+| 7b (7b-1 ✅, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
 | 9 | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |

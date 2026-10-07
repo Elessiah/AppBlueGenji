@@ -207,7 +207,8 @@ RGAA 4.1.
 - Au sitemap.
 
 **Règle pour la suite** : une PR qui règle un point de `KNOWN_ISSUES` le retire
-et avance `ACCESSIBILITY_STATEMENT_DATE` ; une limite laissée pour plus tard qui
+(et sa traduction de `KNOWN_ISSUES_EN`, `accessibility-statement-en.ts`, même rang —
+`/en/accessibilite` depuis le lot 7b-1, parité testée) et avance `ACCESSIBILITY_STATEMENT_DATE` ; une limite laissée pour plus tard qui
 gêne réellement un visiteur s'y ajoute. Les formulaires que cette PR ne câble
 pas encore (tâche 10, remise dans `ACCESSIBILITE.md` pour sa part restante) y
 figurent : la PR qui les règle retire l'entrée — ce qu'a fait celle de la
