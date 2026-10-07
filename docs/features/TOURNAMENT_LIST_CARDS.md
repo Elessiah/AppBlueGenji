@@ -46,7 +46,7 @@ La logique d'affichage est pure, dans `app/(secured)/tournois/_lib/card-display.
 
 ## Langues
 
-Textes des cartes, du sommaire et du bandeau dans l'espace `tournaments` (lot 8a-1) : `useTournamentsText()`, français hors fournisseur. Détail : `I18N.md` § Tournois — liste.
+Textes des cartes, du sommaire et du bandeau dans l'espace `tournaments` (lot 8a-1) : `useTournamentsText()`, français hors fournisseur. Dates : « 07 oct. 2026 » en français, « Oct 7, 2026 » en anglais (jour sans zéro initial). Détail : `I18N.md` § Tournois — liste.
 
 ## Couleurs d'état
 
