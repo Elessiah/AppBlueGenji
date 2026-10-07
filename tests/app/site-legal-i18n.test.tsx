@@ -52,6 +52,7 @@ import { STREAM_NOTICE_OBJECTION, STREAM_NOTICE_SHOWN } from "@/lib/shared/strea
 import { STREAM_NOTICE_OBJECTION_EN, STREAM_NOTICE_SHOWN_EN } from "@/lib/shared/legal-text-en";
 import { TERMS_SECTIONS, TERMS_VERSION, formatTermsDate, formatTermsDateIn } from "@/lib/shared/terms-of-use";
 import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
+import { SITE_HOST } from "@/lib/shared/site-host";
 import enLegal from "@/messages/en/legal.json";
 import enShell from "@/messages/en/shell.json";
 import frLegal from "@/messages/fr/legal.json";
@@ -157,6 +158,13 @@ describe("anglais : une traduction, qui le dit", () => {
       expect(text).toContain(`${setting.label} — ${setting.description}`);
     }
     expect(text).toContain(`“${enShell.skipLink.label}”`);
+  });
+
+  it("les mentions anglaises nomment l'hébergeur par les mêmes constantes que le français", async () => {
+    const text = legalPageText(await render(LegalNoticePage, "en"));
+    expect(text).toContain(`${SITE_HOST.name} — ${SITE_HOST.statusEn}`);
+    expect(text).toContain(SITE_HOST.address);
+    expect(readSource("app/mentions-legales/MentionsLegalesEn.tsx")).not.toContain("Private individual");
   });
 
   it("les mentions anglaises gardent leurs ancres (conditions, documents du bot)", async () => {
