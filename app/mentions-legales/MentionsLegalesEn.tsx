@@ -213,7 +213,7 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
           administered by its <strong>technical host</strong>:
         </p>
         <p>
-          <strong>{SITE_HOST.name}</strong> — Private individual, volunteer of the association
+          <strong>{SITE_HOST.name}</strong> — {SITE_HOST.statusEn}
           <br />
           <span lang="fr">{SITE_HOST.address}</span>
           <br />
