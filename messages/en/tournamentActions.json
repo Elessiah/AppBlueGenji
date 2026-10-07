@@ -165,7 +165,7 @@
     "confirm": "Lift the penalty",
     "pending": "Lifting…",
     "frozen": "Locked",
-    "frozenTitle": "A round has been played since: giving these points back would put back in contention a team that didn't play it.",
+    "frozenTitle": "A round has been played since: giving these points back would put a team that didn't play it back in contention.",
     "buttonTitle": "Lift this penalty: {name} gets back {points, plural, one {# point} other {# points}}",
     "buttonAria": "Lift the {points}-point penalty given to {name}",
     "button": "Lift"
@@ -280,7 +280,7 @@
     "pending": "{count, plural, one {# match left} other {# matches left}} to play",
     "empty": {
       "freeScore": "Free score: a remaining match can shift a pool without limit, nothing is settled before the end of the round.",
-      "underfilled": "Fewer than two qualified: the tournament will close without a final bracket.",
+      "underfilled": "Fewer than two qualified entrants: the tournament will close without a final bracket.",
       "none": "No matchup is settled yet: they all depend on the remaining matches."
     },
     "stageUncertain": "The qualifying stage may still end with the current round: these matchups will only be played if it continues.",
