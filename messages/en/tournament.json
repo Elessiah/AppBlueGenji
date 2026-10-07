@@ -80,10 +80,10 @@
       "minPlayers": "{count, plural, one {# player} other {# players}} minimum",
       "discordSolo": "verified Discord",
       "discordAny": "at least one verified Discord",
-      "discordAll": "every Discord verified",
+      "discordAll": "all Discord accounts verified",
       "blizzardSolo": "linked Blizzard account",
       "blizzardAny": "at least one linked Blizzard account",
-      "blizzardAll": "every Blizzard account linked"
+      "blizzardAll": "all Blizzard accounts linked"
     }
   },
   "matchFormat": {
@@ -104,7 +104,7 @@
     "cadenceMinutes": "at most every {minutes, plural, one {# minute} other {# minutes}}",
     "fatal": {
       "UNAUTHORIZED": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
-      "TOURNAMENT_NOT_FOUND": "This tournament no longer exists: there's nothing left to follow."
+      "TOURNAMENT_NOT_FOUND": "This tournament is no longer available: there's nothing left to follow."
     },
     "alerts": {
       "SCORE_TO_CONFIRM": "Score to confirm",
