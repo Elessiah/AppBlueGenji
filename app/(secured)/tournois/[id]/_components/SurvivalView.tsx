@@ -19,7 +19,8 @@ import {
   RoundColumns,
 } from "./RoundColumns";
 import styles from "./RankingViews.module.css";
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
+import { FR_SURVIVAL_TEXT } from "../_lib/survival-text";
 import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 
 interface SurvivalViewProps {
@@ -62,7 +63,7 @@ export function SurvivalView({
   onForfeit,
   emptyLabel,
 }: Readonly<SurvivalViewProps>) {
-  const text = useTournamentPageText();
+  const text = useTournamentViewText(FR_SURVIVAL_TEXT);
   const { t } = text;
   // L'abandon est un geste du lot 8b : resté français sous `/en`.
   const actionLang = frenchBlockLang(text);
@@ -285,7 +286,7 @@ export function SurvivalRounds({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<SurvivalRoundsProps>) {
-  const { t } = useTournamentPageText();
+  const { t } = useTournamentViewText(FR_SURVIVAL_TEXT);
   const barrageRounds = cutSchedule?.barrageRounds ?? 0;
   return (
     <RoundColumns

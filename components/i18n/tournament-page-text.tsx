@@ -39,6 +39,17 @@ export function useTournamentPageText(): TournamentPageText {
 }
 
 /**
+ * Texte d'une vue chargée à la demande (suisse, survie, endurance) : en
+ * français, celui que la vue apporte dans son propre morceau (`frView`, construit
+ * par `frTournamentViewText` dans `_lib/<vue>-text.ts`) ; sous `/en`, celui du
+ * fournisseur, qui porte déjà tous les espaces.
+ */
+export function useTournamentViewText(frView: TournamentPageText): TournamentPageText {
+  const text = useTournamentPageText();
+  return text.locale === "fr" ? frView : text;
+}
+
+/**
  * Notifications d'un bloc resté en français (gestes du lot 8b, outils du staff) :
  * sous `/en`, le message porte `lang="fr"` ; en français, rien ne change.
  */

@@ -25,7 +25,8 @@ import {
   splitPlayoffBrackets,
 } from "../_lib/endurance-sections";
 import { useEntrantParticipantType, useParticipantWording } from "../_lib/entrant-link";
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
+import { FR_ENDURANCE_TEXT } from "../_lib/endurance-text";
 import { INTL_LOCALE } from "@/lib/shared/locales";
 import { frenchBlockLang, participantText } from "@/lib/shared/tournament-page-text";
 import { enduranceNextRoundInput } from "../_lib/endurance-next-round";
@@ -156,7 +157,7 @@ function EnduranceHistory({
   endurance: EnduranceMeta;
   myTeamId: number | null;
 }>) {
-  const text = useTournamentPageText();
+  const text = useTournamentViewText(FR_ENDURANCE_TEXT);
   const { t } = text;
   if (endurance.rounds.length === 0) return null;
 
@@ -267,7 +268,7 @@ function PenaltyLog({
   /** Retrait proposé, `undefined` pour un lecteur sans droit d'arbitrage. */
   onLift?: (penalty: EndurancePenaltyRow) => void;
 }>) {
-  const text = useTournamentPageText();
+  const text = useTournamentViewText(FR_ENDURANCE_TEXT);
   const { t } = text;
   // Le retrait d'une sanction est un geste du staff : resté français (D4).
   const staffLang = frenchBlockLang(text);
@@ -370,7 +371,7 @@ export function EnduranceView({
   qualificationFormat = null,
 }: Readonly<EnduranceViewProps>) {
   const wording = useParticipantWording();
-  const text = useTournamentPageText();
+  const text = useTournamentViewText(FR_ENDURANCE_TEXT);
   const { t } = text;
   // Abandon et sanctions : gestes du lot 8b et du staff, restés français.
   const actionLang = frenchBlockLang(text);

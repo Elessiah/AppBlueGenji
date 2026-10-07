@@ -4,7 +4,8 @@
  * comme la liste (`tournaments-text.ts`).
  *
  * Le français est inclus dans le paquet de la fiche (il remplace les chaînes
- * écrites en dur) ; l'anglais n'arrive que sous `/en`, sérialisé par la mise en
+ * écrites en dur) — sauf celui des vues chargées à la demande (suisse, survie,
+ * endurance), qui voyage avec la vue (`frTournamentViewText`, `_lib/*-text.ts`) ; l'anglais n'arrive que sous `/en`, sérialisé par la mise en
  * page du segment (`TournamentPageTextProvider`). Les espaces lus côté serveur
  * seulement (`meta`, `settings`, `share`) ne voyagent pas.
  *
@@ -14,6 +15,7 @@
  * (`localizedPlaceholder`).
  */
 import frTournament from "@/messages/fr/tournament.json";
+import type frTournamentViews from "@/messages/fr/tournamentViews.json";
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
 import { matchAllowsDraw, matchFormatNotation, matchMaxMaps, matchWinsRequired, naturalMaxMaps, type MatchFormat } from "@/lib/shared/match-format";
@@ -27,7 +29,8 @@ type FrTournament = typeof frTournament;
 export const TOURNAMENT_SERVER_PARTS = ["meta", "settings", "share"] as const;
 type ServerPart = (typeof TOURNAMENT_SERVER_PARTS)[number];
 
-export type TournamentPageMessages = Omit<FrTournament, ServerPart>;
+/** Espaces client de `tournament`, plus ceux des vues (`tournamentViews`). */
+export type TournamentPageMessages = Omit<FrTournament, ServerPart> & typeof frTournamentViews;
 export type TournamentPageKey = Leaves<TournamentPageMessages>;
 export type TournamentPageText = ScopedText<TournamentPageKey>;
 
@@ -36,7 +39,7 @@ export type TournamentPageText = ScopedText<TournamentPageKey>;
  * du paquet les espaces serveur (`meta`, `settings`, `share`) — une
  * déstructuration `...reste` garderait le JSON entier.
  */
-function clientPart(messages: Messages["tournament"]): TournamentPageMessages {
+function clientPart(messages: Messages["tournament"], views: Messages["tournamentViews"]): TournamentPageMessages {
   return {
     participants: messages.participants,
     page: messages.page,
@@ -52,20 +55,33 @@ function clientPart(messages: Messages["tournament"]): TournamentPageMessages {
     match: messages.match,
     launch: messages.launch,
     ranking: messages.ranking,
-    swiss: messages.swiss,
-    survival: messages.survival,
-    endurance: messages.endurance,
+    swiss: views.swiss,
+    survival: views.survival,
+    endurance: views.endurance,
     registrations: messages.registrations,
     planning: messages.planning,
   };
 }
 
 /**
+ * Espaces des vues chargées à la demande (`dynamic()` dans `page.tsx`), rangés
+ * dans leur propre fichier (`messages/<langue>/tournamentViews.json`) : un JSON
+ * est un seul module pour le bundler, si bien qu'un espace lu à part dans le
+ * même fichier restait dans le premier chargement. Leur français est importé
+ * par la vue elle-même (`useTournamentViewText`) ; l'anglais, sérialisé par la
+ * mise en page, les porte tous.
+ */
+export const TOURNAMENT_VIEW_PARTS = ["swiss", "survival", "endurance"] as const;
+export type TournamentViewPart = (typeof TOURNAMENT_VIEW_PARTS)[number];
+export type TournamentViewMessages = Partial<Pick<TournamentPageMessages, TournamentViewPart>>;
+
+/**
  * Le français du paquet, propriété par propriété **sur l'import lui-même** :
  * passé entier à une fonction, le JSON ne se laisserait plus élaguer et les
- * espaces serveur entreraient dans le paquet de la fiche.
+ * espaces serveur entreraient dans le paquet de la fiche. Sans les espaces des
+ * vues (`TOURNAMENT_VIEW_PARTS`).
  */
-export const FR_TOURNAMENT_PAGE_MESSAGES: TournamentPageMessages = {
+export const FR_TOURNAMENT_PAGE_MESSAGES: Omit<TournamentPageMessages, TournamentViewPart> = {
   participants: frTournament.participants,
   page: frTournament.page,
   header: frTournament.header,
@@ -80,27 +96,35 @@ export const FR_TOURNAMENT_PAGE_MESSAGES: TournamentPageMessages = {
   match: frTournament.match,
   launch: frTournament.launch,
   ranking: frTournament.ranking,
-  swiss: frTournament.swiss,
-  survival: frTournament.survival,
-  endurance: frTournament.endurance,
   registrations: frTournament.registrations,
   planning: frTournament.planning,
 };
 
 /** Ce qui voyage vers le navigateur sous `/en`. */
-export function tournamentPageMessages(messages: Pick<Messages, "tournament">): TournamentPageMessages {
-  return clientPart(messages.tournament);
+export function tournamentPageMessages(messages: Pick<Messages, "tournament" | "tournamentViews">): TournamentPageMessages {
+  return clientPart(messages.tournament, messages.tournamentViews);
 }
 
-export function tournamentPageText(
-  locale: Locale = DEFAULT_LOCALE,
-  messages: TournamentPageMessages = FR_TOURNAMENT_PAGE_MESSAGES,
-): TournamentPageText {
+export function tournamentPageText(locale: Locale, messages: TournamentPageMessages): TournamentPageText {
   return scopedText(locale, messages);
 }
 
+/**
+ * Le français du paquet, typé sur **toutes** les clés : une clé d'une vue
+ * (`swiss.*`, `survival.*`, `endurance.*`) n'y est pas et se rend telle quelle —
+ * une vue lit son texte par `useTournamentViewText(FR_<VUE>_TEXT)`.
+ */
+function frPageText(view: TournamentViewMessages): TournamentPageText {
+  return scopedText(DEFAULT_LOCALE, { ...FR_TOURNAMENT_PAGE_MESSAGES, ...view } as TournamentPageMessages);
+}
+
 /** Le français, hors de tout fournisseur (tests, composant rendu ailleurs). */
-export const FR_TOURNAMENT_PAGE_TEXT: TournamentPageText = tournamentPageText();
+export const FR_TOURNAMENT_PAGE_TEXT: TournamentPageText = frPageText({});
+
+/** Le français complété de l'espace d'une vue — à construire dans le module de la vue. */
+export function frTournamentViewText(view: TournamentViewMessages): TournamentPageText {
+  return frPageText(view);
+}
 
 /** `lang` à poser sur un bloc resté français (staff, actions du lot 8b) : seulement sous une page anglaise. */
 export function frenchBlockLang(text: Pick<TournamentPageText, "locale">): "fr" | undefined {

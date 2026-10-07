@@ -1,5 +1,6 @@
 import type { EnduranceRoundCell } from "@/lib/shared/bg-survie/replay";
-import { FR_TOURNAMENT_PAGE_TEXT, type TournamentPageText } from "@/lib/shared/tournament-page-text";
+import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
+import { FR_ENDURANCE_TEXT } from "./endurance-text";
 
 /**
  * Lecture du tableau d'endurance **manche par manche** — la vue « feuille de
@@ -47,7 +48,7 @@ export function enduranceCellLabel(cell: EnduranceRoundCell): string {
 export function enduranceCellTitle(
   teamName: string,
   cell: EnduranceRoundCell,
-  text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT,
+  text: TournamentPageText = FR_ENDURANCE_TEXT,
 ): string {
   const { t } = text;
   const prefix = t("endurance.cellPrefix", { team: teamName, round: String(cell.round) });
