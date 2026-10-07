@@ -1,18 +1,22 @@
 import frTournamentImage from "@/messages/fr/tournamentImage.json";
+import enTournamentImage from "@/messages/en/tournamentImage.json";
 import { tournamentImageText, type TournamentImageText } from "@/lib/shared/tournament-actions-text";
-import { useTournamentImageTextFrom } from "@/components/i18n/tournament-actions-text";
+import { useTournamentActionsLocale } from "@/components/i18n/tournament-actions-text";
 import type { TournamentImageChange } from "@/lib/shared/tournament-image";
 
 /**
- * Français du sélecteur d'image d'un tournoi (lot 8b-2), partagé par la
- * fenêtre d'image de la fiche et le formulaire de création. L'anglais vient du
- * fournisseur, sous `/en` seulement.
+ * Textes du sélecteur d'image d'un tournoi (lot 8b-2), partagé par la fenêtre
+ * d'image de la fiche (chargée à la demande, staff seulement) et le formulaire
+ * de création. Ses **deux** langues voyagent avec ces morceaux, comme celles
+ * des fenêtres d'action : servi par la mise en page, l'anglais partirait avec
+ * chaque lecture de `/en/tournois/[id]`. Le fournisseur ne donne que la langue.
  */
 export const FR_IMAGE_TEXT: TournamentImageText = tournamentImageText("fr", frTournamentImage);
+const EN_IMAGE_TEXT: TournamentImageText = tournamentImageText("en", enTournamentImage);
 
 /** Textes du sélecteur d'image, dans la langue de la page. */
 export function useImageText(): TournamentImageText {
-  return useTournamentImageTextFrom(FR_IMAGE_TEXT);
+  return useTournamentActionsLocale() === "en" ? EN_IMAGE_TEXT : FR_IMAGE_TEXT;
 }
 
 /** Codes que la route d'image et le contrôle local formulent (`tournamentImageErrorMessage`). */

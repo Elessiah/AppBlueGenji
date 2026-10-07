@@ -6,12 +6,10 @@ import {
   tournamentActionsText,
   tournamentErrorsText,
   tournamentFormText,
-  tournamentImageText,
   type TournamentActionsClientMessages,
   type TournamentActionsText,
   type TournamentErrorsText,
   type TournamentFormText,
-  type TournamentImageText,
 } from "@/lib/shared/tournament-actions-text";
 
 /**
@@ -19,11 +17,11 @@ import {
  *
  * Le fournisseur ne porte que l'**anglais** : en français, chaque espace est
  * lu dans le paquet par son propre module (`_lib/error-map.ts`,
- * `_lib/actions-text.ts`, `_lib/dialogs-text.ts`, `_lib/image-text.ts`,
- * `_lib/form-text.ts`), qui passe son français en repli aux crochets
+ * `_lib/actions-text.ts`, `_lib/form-text.ts`), qui passe son français en repli aux crochets
  * ci-dessous. Hors fournisseur (tests, page française) : ce repli.
  *
- * Les fenêtres d'action (`tournamentDialogs`) ne passent **pas** par ici : leurs
+ * Les fenêtres d'action (`tournamentDialogs`) et le sélecteur d'image
+ * (`tournamentImage`) ne passent **pas** par ici : leurs
  * deux langues voyagent avec leurs morceaux chargés à la demande, et le
  * fournisseur ne leur donne que la langue (`useTournamentActionsLocale`) — sans
  * quoi tout lecteur de `/en` recevrait leur anglais à chaque chargement.
@@ -32,7 +30,6 @@ type ActionsTextValue = {
   readonly locale?: Locale;
   readonly errors?: TournamentErrorsText;
   readonly actions?: TournamentActionsText;
-  readonly image?: TournamentImageText;
   readonly form?: TournamentFormText;
 };
 
@@ -44,7 +41,6 @@ function buildValue(locale: Locale, messages: TournamentActionsClientMessages | 
     locale,
     errors: messages.errors ? tournamentErrorsText(locale, messages.errors) : undefined,
     actions: messages.actions ? tournamentActionsText(locale, messages.actions) : undefined,
-    image: messages.image ? tournamentImageText(locale, messages.image) : undefined,
     form: messages.form ? tournamentFormText(locale, messages.form) : undefined,
   };
 }
@@ -68,7 +64,6 @@ export function TournamentActionsTextProvider({
       locale: own.locale,
       errors: own.errors ?? parent.errors,
       actions: own.actions ?? parent.actions,
-      image: own.image ?? parent.image,
       form: own.form ?? parent.form,
     }),
     [own, parent],
@@ -89,11 +84,6 @@ export function useTournamentActionsTextFrom(fr: TournamentActionsText): Tournam
 /** Langue de la fiche ; `undefined` hors fournisseur (tests) — le français. */
 export function useTournamentActionsLocale(): Locale | undefined {
   return useContext(TournamentActionsTextContext).locale;
-}
-
-/** Textes du sélecteur d'image ; `fr` : ceux du paquet. */
-export function useTournamentImageTextFrom(fr: TournamentImageText): TournamentImageText {
-  return useContext(TournamentActionsTextContext).image ?? fr;
 }
 
 /** Textes des formulaires de création et d'édition ; `fr` : ceux du paquet. */

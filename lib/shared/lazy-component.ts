@@ -1,9 +1,10 @@
 import type { ComponentType } from "react";
 
 /**
- * Filet d'un composant chargé à la demande (`next/dynamic`) sur la fiche
- * tournoi. Le chargement peut survenir des heures après l'ouverture de la page
- * — c'est celle qu'on garde ouverte tout un tournoi — et un déploiement entre
+ * Filet d'un composant chargé à la demande (`next/dynamic`) : fiche tournoi,
+ * fenêtre de lancement de la mise en page racine (`MatchLaunchCenterLazy`).
+ * Le chargement peut survenir des heures après l'ouverture de la page
+ * — la fiche se garde ouverte tout un tournoi — et un déploiement entre
  * les deux supprime les anciens fichiers : le chargement rendrait 404, lèverait
  * un `ChunkLoadError` au rendu et, faute de frontière d'erreur, remplacerait
  * toute la page par l'écran d'erreur de Next.

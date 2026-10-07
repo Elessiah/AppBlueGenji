@@ -43,9 +43,9 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
 }
 
 /**
- * Pose le texte du formulaire — l'anglais sous `/en` seulement. Les refus et
- * l'image sont hérités du fournisseur de la fiche (`[id]/layout.tsx`), qui
- * enveloppe déjà cette page : les reposer ici les sérialiserait deux fois.
+ * Pose le texte du formulaire — l'anglais sous `/en` seulement. Les refus
+ * sont hérités du fournisseur de la fiche (`[id]/layout.tsx`), qui enveloppe
+ * déjà cette page : les reposer ici les sérialiserait deux fois.
  */
 export default async function EditTournamentLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();

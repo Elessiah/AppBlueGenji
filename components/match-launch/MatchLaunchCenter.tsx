@@ -128,7 +128,14 @@ function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
  * relire dès que son flux apprend un changement d'une rencontre du lecteur
  * (`viewerLaunchChanged`, `lib/shared/viewer-alerts.ts`).
  */
-export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacyPending?: boolean }>) {
+export function MatchLaunchCenter({
+  privacyPending = false,
+  requestedMatchId = null,
+}: Readonly<{
+  privacyPending?: boolean;
+  /** Ouverture demandée avant le chargement de ce morceau (`MatchLaunchCenterLazy`), lue au montage. */
+  requestedMatchId?: number | null;
+}>) {
   const { showError, showSuccess } = useToast();
   const text = useLaunchText();
   const { t } = text;
@@ -143,7 +150,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
     onPrivacyPage: pathname === PRIVACY_POLICY_PATH,
   });
   const { launches, refresh } = useMatchLaunchFeed(clocks);
-  const [openMatchId, setOpenMatchId] = useState<number | null>(null);
+  const [openMatchId, setOpenMatchId] = useState<number | null>(requestedMatchId);
   const [confirming, setConfirming] = useState(false);
   // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la
   // confirmation retirent chacun le bouton qui l'avait, et le focus sortait

@@ -10,15 +10,16 @@
  *   (`dynamic()`), dont le français voyage avec leur morceau
  *   (`_lib/dialogs-text.ts`) ;
  * - `tournamentImage` : sélecteur d'image, partagé par la fenêtre d'image de
- *   la fiche et le formulaire de création (lot 8b-2) ;
+ *   la fiche et le formulaire de création (lot 8b-2) — ses deux langues
+ *   voyagent avec eux (`_lib/image-text.ts`), comme celles des fenêtres ;
  * - `tournamentForm` : formulaires de création et d'édition (lot 8b-2).
  *
  * Aucun JSON n'est importé ici (types seulement) : chaque module importe le
  * français de **son** espace, pour que le bundler le range dans le bon morceau.
- * L'anglais des refus, des gestes, de l'image et des formulaires n'arrive que
+ * L'anglais des refus, des gestes et des formulaires n'arrive que
  * sous `/en`, sérialisé par la mise en page (`TournamentActionsTextProvider`) —
  * chaque route n'y met que les espaces qu'elle lit ; celui des fenêtres voyage
- * avec leurs morceaux (`_lib/dialogs-text.ts`).
+ * avec leurs morceaux (`_lib/dialogs-text.ts`, `_lib/image-text.ts`).
  */
 import type frErrors from "@/messages/fr/tournamentErrors.json";
 import type frActions from "@/messages/fr/tournamentActions.json";
@@ -50,37 +51,34 @@ export type TournamentFormText = ScopedText<Leaves<TournamentFormMessages>>;
 export type TournamentActionsClientMessages = {
   errors?: TournamentErrorMessages;
   actions?: TournamentActionMessages;
-  image?: TournamentImageMessages;
   form?: TournamentFormMessages;
 };
 
 type ActionsCatalog = Pick<
   Messages,
-  "tournamentErrors" | "tournamentActions" | "tournamentImage" | "tournamentForm"
+  "tournamentErrors" | "tournamentActions" | "tournamentForm"
 >;
 
-/** Les espaces rendus avec la fiche (`/tournois/[id]`) : refus, gestes, image (fenêtres : leur morceau). */
+/** Les espaces rendus avec la fiche (`/tournois/[id]`) : refus, gestes (fenêtres, image : leur morceau). */
 export function tournamentActionsMessages(messages: ActionsCatalog): TournamentActionsClientMessages {
   return {
     errors: messages.tournamentErrors,
     actions: messages.tournamentActions,
-    image: messages.tournamentImage,
   };
 }
 
-/** Les espaces du formulaire de création : refus, image, formulaire. */
+/** Les espaces du formulaire de création : refus, formulaire (image : son module). */
 export function tournamentFormMessages(messages: ActionsCatalog): TournamentActionsClientMessages {
   return {
     errors: messages.tournamentErrors,
-    image: messages.tournamentImage,
     form: messages.tournamentForm,
   };
 }
 
 /**
- * L'espace propre au formulaire d'édition : le formulaire seul. Les refus et
- * l'image viennent du fournisseur de la fiche (`[id]/layout.tsx`), qui
- * l'enveloppe déjà — les reposer enverrait deux fois ~30 Ko d'anglais.
+ * L'espace propre au formulaire d'édition : le formulaire seul. Les refus
+ * viennent du fournisseur de la fiche (`[id]/layout.tsx`), qui l'enveloppe
+ * déjà — les reposer (avec les gestes) enverrait deux fois ~30 Ko d'anglais.
  */
 export function tournamentEditFormMessages(messages: Pick<Messages, "tournamentForm">): TournamentActionsClientMessages {
   return { form: messages.tournamentForm };
