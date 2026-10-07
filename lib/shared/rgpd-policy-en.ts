@@ -9,6 +9,7 @@
 
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
+import { DONNEES_PROFIL } from "@/lib/shared/rgpd-policy";
 import type { DonneEntry, DroitEntry, LegalBase } from "@/lib/shared/rgpd-policy";
 
 /** The four legal bases (GDPR, art. 6.1), in English. */
@@ -19,80 +20,76 @@ export const LEGAL_BASE_EN: Record<LegalBase, string> = {
   "Obligation légale": "Legal obligation",
 };
 
-/** `DONNEES_PROFIL`, entry by entry. */
-export const DONNEES_PROFIL_EN: DonneEntry[] = [
-  {
-    donnee: "Site username",
-    finalite:
-      "Identification on the platform, profile URLs. Never taken from your name: an account created through Discord or Blizzard takes your Discord username or your BattleTag (without its number), an account created through Google gets a neutral username — you change it in My profile. An account created through Google before September 30, 2026 may have received the name of your Google account: if so, replace it in My profile",
-    base: "Exécution du contrat",
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Overwatch username",
-    finalite:
-      "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it remains readable by the players of your matches until the tournament is over, by the caster of your match from its launch to its end if you are one of the contacts presented, and by the referees while you are registered for a tournament that is not over",
-    base: "Consentement",
-    extraBases: [{ base: "Exécution du contrat", scope: "presentation to the players and caster of your match, at its launch" }],
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Discord username",
-    finalite:
-      "Discord authentication, bot notifications. Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
-    base: "Exécution du contrat",
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Certification of the Discord username",
-    finalite:
-      "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), players and caster of your match from its launch to its end; other logged-in players only if you tick “Discord tag”. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
-    base: "Consentement",
-    extraBases: [{ base: "Exécution du contrat", scope: "presentation to the players and caster of your match, at its launch" }],
-    duree: "Until the tag is removed or changed, or lifetime of the account",
-  },
-  {
-    donnee: "Discord ID",
-    finalite:
-      "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match reminders, request to join a team you manage). Removable from My profile as long as you have another one left",
-    base: "Exécution du contrat",
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Google identifier",
-    finalite:
-      "Means of logging in (Google button) — opaque technical identifier. No email address is requested or kept, and the name of your Google account is not used. Removable from My profile as long as you have another one left",
-    base: "Exécution du contrat",
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Blizzard identifier",
-    finalite:
-      "Means of logging in (Blizzard button) — opaque technical identifier. Fills in and keeps your BattleTag up to date. Removable from My profile as long as you have another one left",
-    base: "Exécution du contrat",
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Marvel Rivals username",
-    finalite: "Putting players in touch (adding each other in game) — no statistics",
-    base: "Consentement",
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Declared adulthood",
-    finalite:
-      "Yes, no or not specified, as you choose. Shown on your page only if you tick “Adulthood” in My profile",
-    base: "Consentement",
-    duree: "Lifetime of the account",
-  },
-  {
-    donnee: "Avatar",
-    finalite:
-      "Display on the profile and the brackets. Uploaded by you, or copied to our servers from Google or Discord at login — since September 30, 2026, the copied photo stays hidden until you tick “Avatar” in My profile (a photo copied before that date remains displayed: untick “Avatar” to hide it)",
-    base: "Consentement",
-    duree: "Lifetime of the account",
-  },
+/** French duration -> English, for the profile rows. */
+const PROFIL_DUREE_EN: Record<string, string> = {
+  "Durée du compte": "Lifetime of the account",
+  "Jusqu'au retrait ou au changement du tag, ou durée du compte":
+    "Until the tag is removed or changed, or lifetime of the account",
+};
+
+/** French scope of an additional legal basis -> English. */
+const SCOPE_EN: Record<string, string> = {
+  "présentation aux joueurs et au caster de ton match, à son lancement":
+    "presentation to the players and caster of your match, at its launch",
+};
+
+/** Data and purpose of each `DONNEES_PROFIL` row, same order. */
+const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] = [
+  [
+    "Site username",
+    "Identification on the platform, profile URLs. Never taken from your name: an account created through Discord or Blizzard takes your Discord username or your BattleTag (without its number), an account created through Google gets a neutral username — you change it in My profile. An account created through Google before September 30, 2026 may have received the name of your Google account: if so, replace it in My profile",
+  ],
+  [
+    "Overwatch username",
+    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it remains readable by the players of your matches until the tournament is over, by the caster of your match from its launch to its end if you are one of the contacts presented, and by the referees while you are registered for a tournament that is not over",
+  ],
+  [
+    "Discord username",
+    "Discord authentication, bot notifications. Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
+  ],
+  [
+    "Certification of the Discord username",
+    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), players and caster of your match from its launch to its end; other logged-in players only if you tick “Discord tag”. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
+  ],
+  [
+    "Discord ID",
+    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match reminders, request to join a team you manage). Removable from My profile as long as you have another one left",
+  ],
+  [
+    "Google identifier",
+    "Means of logging in (Google button) — opaque technical identifier. No email address is requested or kept, and the name of your Google account is not used. Removable from My profile as long as you have another one left",
+  ],
+  [
+    "Blizzard identifier",
+    "Means of logging in (Blizzard button) — opaque technical identifier. Fills in and keeps your BattleTag up to date. Removable from My profile as long as you have another one left",
+  ],
+  [
+    "Marvel Rivals username",
+    "Putting players in touch (adding each other in game) — no statistics",
+  ],
+  [
+    "Declared adulthood",
+    "Yes, no or not specified, as you choose. Shown on your page only if you tick “Adulthood” in My profile",
+  ],
+  [
+    "Avatar",
+    "Display on the profile and the brackets. Uploaded by you, or copied to our servers from Google or Discord at login — since September 30, 2026, the copied photo stays hidden until you tick “Avatar” in My profile (a photo copied before that date remains displayed: untick “Avatar” to hide it)",
+  ],
 ];
+
+/**
+ * `DONNEES_PROFIL`, entry by entry: the legal bases are taken from the French
+ * row itself, so the translation cannot drift from them.
+ */
+export const DONNEES_PROFIL_EN: DonneEntry[] = DONNEES_PROFIL.map((fr, index) => ({
+  donnee: PROFIL_TEXT_EN[index]?.[0] ?? fr.donnee,
+  finalite: PROFIL_TEXT_EN[index]?.[1] ?? fr.finalite,
+  base: fr.base,
+  ...(fr.extraBases && {
+    extraBases: fr.extraBases.map((extra) => ({ base: extra.base, scope: SCOPE_EN[extra.scope] ?? extra.scope })),
+  }),
+  duree: PROFIL_DUREE_EN[fr.duree] ?? fr.duree,
+}));
 
 /** `DONNEE_TOURNOIS`. */
 export const DONNEE_TOURNOIS_EN: DonneEntry = {
