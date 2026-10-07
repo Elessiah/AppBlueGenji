@@ -192,10 +192,10 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
   "2026-10-signalements-base-legale": {
     title: "Reports: no more agreement box to exercise a right",
     summary:
-      "A GDPR request, a copyright report, content reported for moderation, a request to the host or an appeal no longer requires ticking an agreement box: the association is required to handle them. For other reports, nothing changes.",
+      "A GDPR request, a copyright report, content reported for moderation, a request to the hosting provider or an appeal no longer requires ticking an agreement box: the association is required to handle them. For other reports, nothing changes.",
     details: [
       "These categories are now based on the association's legal obligation (GDPR, art. 12; EU Digital Services Act, art. 11, 16 and 20), and no longer on your consent: there is therefore no consent left to withdraw for them, but your request is always handled. You keep your rights of access and rectification; erasure waits until the request has been handled, as the association is required to handle it (GDPR, art. 17.3.b).",
-      "A GDPR request, a request to the host or an appeal asks for an email address if your Discord tag is not certified: the site sends no email, and without it the association could not answer you.",
+      "A GDPR request, a request to the hosting provider or an appeal asks for an email address if your Discord tag is not certified: the site sends no email, and without it the association could not answer you.",
       "The author of a copyright report receives an acknowledgment of receipt, then the decision taken and the means of redress, at the address they provide.",
     ],
     linkLabels: [READ_REPORTS],
@@ -205,7 +205,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary: `If you report content (copyright, moderation) from your account, you can now contest the decision taken, including a decision not to act. Your report is kept ${LOGO_QUARANTINE_MONTHS} months after it is resolved, instead of 30 days, for the length of that period.`,
     details: [
       `The appeal is made through the “Appeal” category (« Contestation ») of the “${REPORT_FORM_NAME_EN}” form, once the report has been archived. It is read by the association's administrators; the persons targeted are not informed of it.`,
-      `A bug report, a GDPR request or a request to the host, or a report sent without an account, is still erased ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} days after it is archived — later if a logo or avatar was hidden or deleted as a result.`,
+      `A bug report, a GDPR request or a request to the hosting provider, or a report sent without an account, is still erased ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} days after it is archived — later if a logo or avatar was hidden or deleted as a result.`,
     ],
     linkLabels: [READ_REPORTS],
   },

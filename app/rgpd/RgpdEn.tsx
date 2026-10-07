@@ -602,7 +602,7 @@ export function RgpdEn({
             <li>
               <strong>Legal basis</strong>: <strong>legal obligation</strong> for a request to exercise rights (GDPR
               category — GDPR, art. 6.1.c and 12), a notice of illegal content (copyright or moderation of content on
-              the site — EU Digital Services Act, art. 16), a request sent to the host (art. 11 and 16) and an appeal
+              the site — EU Digital Services Act, art. 16), a request sent to the hosting provider (art. 11 and 16) and an appeal
               (art. 20): no agreement box is asked for, the request is handled. For the other categories (bug,
               other), <strong>consent</strong>, collected by a box when sending and withdrawable through the GDPR
               category. The moderation decisions that follow on content or an account contrary to the terms of use
@@ -610,7 +610,7 @@ export function RgpdEn({
               <strong>legitimate interest</strong> in enforcing its rules.
             </li>
             <li>
-              <strong>Reply</strong>: a GDPR request, a request sent to the host, or an appeal requires an email
+              <strong>Reply</strong>: a GDPR request, a request sent to the hosting provider, or an appeal requires an email
               address, except from an account whose Discord tag is certified — the site sends no email, the reply
               comes from the association, to the address provided or on Discord.
             </li>
