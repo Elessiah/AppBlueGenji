@@ -8,6 +8,8 @@ import {
   refereeSchedulingToggledMessage,
 } from "@/lib/shared/match-planning";
 import type { TournamentCard } from "@/lib/shared/types";
+import type { TournamentFormText } from "@/lib/shared/tournament-actions-text";
+import { INTL_LOCALE } from "@/lib/shared/locales";
 
 /**
  * Le bouton « Modifier » n'est affiché que s'il mène quelque part : au staff
@@ -64,4 +66,47 @@ export function editSavedMessage(
   if (!planningChanged) return "Tournoi modifié.";
   const toggled = refereeSchedulingToggledMessage(planningEnabled, planning.movedToPlanning);
   return fieldsSent ? `Tournoi modifié. ${toggled}` : toggled;
+}
+
+/**
+ * Explication du verrou d'édition (`editLockNotice`), dans la langue du texte —
+ * le français reste celui d'`editLockNotice`, date comprise.
+ */
+export function editLockNoticeText(
+  text: TournamentFormText,
+  reason: EditLockReason,
+  startVisibilityAt: string,
+): string | null {
+  if (text.locale === "fr") return editLockNotice(reason, startVisibilityAt);
+  if (reason === null) return null;
+  if (reason === "STARTED") return text.t("edit.lockStarted");
+  // Formateur local plutôt que `pageDateTime` : celui-ci tirerait le JSON de
+  // la fiche dans le paquet de l'édition. Sur 24 h, comme le reste du site.
+  const date = new Date(startVisibilityAt).toLocaleString(INTL_LOCALE[text.locale], {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return text.t("edit.lockVisible", { date });
+}
+
+/** Confirmation d'un enregistrement (`editSavedMessage`), dans la langue du texte. */
+export function editSavedText(
+  text: TournamentFormText,
+  fieldsSent: boolean,
+  planning: PlanningSaveResult | null,
+  planningEnabled: boolean,
+): string {
+  const { t } = text;
+  const planningChanged = planning?.changed === true;
+  if (!fieldsSent && !planningChanged) return t("edit.savedNone");
+  if (!planningChanged) return t("edit.saved");
+  let toggled = t("edit.planningDisabled");
+  if (planningEnabled) {
+    toggled = planning.movedToPlanning > 0 ? t("edit.planningEnabledMoved", { count: planning.movedToPlanning }) : t("edit.planningEnabled");
+  }
+  return fieldsSent ? t("edit.savedWithPlanning", { planning: toggled }) : toggled;
 }

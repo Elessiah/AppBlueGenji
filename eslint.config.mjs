@@ -154,6 +154,12 @@ const I18N_MIGRATED_FILES = [
   "app/(secured)/tournois/[id]/_components/TournamentHeader.tsx",
   "app/(secured)/tournois/[id]/_components/TournamentImageDialog.tsx",
   "app/(secured)/tournois/[id]/_components/TournamentLiveLink.tsx",
+  // Lot 8b-2 — création et édition, sélecteur d'image, fenêtre de lancement
+  // (mise en page racine, textes dans `shell.launchModal`).
+  "app/(secured)/tournois/creer/**",
+  "app/(secured)/tournois/[id]/modifier/**",
+  "app/(secured)/tournois/_components/**",
+  "components/match-launch/MatchLaunchCenter.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */

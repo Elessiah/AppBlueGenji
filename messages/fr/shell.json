@@ -193,5 +193,81 @@
     "failed": "Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.",
     "replay": "Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.",
     "inFrench": "(en français)"
+  },
+  "launchModal": {
+    "roles": {
+      "CAPITAINE": "Capitaine",
+      "MANAGER": "Manager",
+      "OWNER": "Propriétaire"
+    },
+    "ready": {
+      "caster": "Je suis prêt",
+      "team": "Mon équipe est prête"
+    },
+    "confirmQuestion": {
+      "caster": "Confirmes-tu être prêt à caster ce match ?",
+      "team": "Confirmes-tu que ton équipe est au complet et prête à jouer ?"
+    },
+    "eyebrowLaunched": "MATCH LANCÉ",
+    "eyebrowLobby": "LANCEMENT DU MATCH",
+    "errors": {
+      "MATCH_NOT_FOUND": "Match introuvable.",
+      "MATCH_NOT_IN_LOBBY": "Ce match n'est pas en lancement.",
+      "MATCH_NOT_LAUNCHABLE": "Ce match ne peut pas être lancé : ses deux engagées ne sont pas connues ou il est terminé.",
+      "MATCH_ALREADY_LAUNCHED": "Ce match est déjà lancé.",
+      "MATCH_NOT_LAUNCHED": "Le match n'est pas encore lancé : toutes les parties doivent se déclarer prêtes.",
+      "MATCH_NOT_IN_LAUNCH": "Le score ne se saisit qu'à partir du lancement du match : planifie-le ou attends son heure de début. Un forfait reste possible.",
+      "NOT_MATCH_PARTY": "Tu ne joues ni ne castes ce match.",
+      "NOT_TEAM_READY_ROLE": "Seul le capitaine, un manager ou le propriétaire peut déclarer l'équipe prête.",
+      "NOT_CASTER": "Caster un match demande le rôle caster.",
+      "CASTER_IDENTITY_REQUIRED": "Pour caster un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+      "CASTER_IS_PLAYER": "Tu joues ce match : tu ne peux pas le caster.",
+      "MATCH_ALREADY_CASTED": "Ce match a déjà un caster.",
+      "MATCH_ALREADY_COMPLETED": "Ce match est terminé.",
+      "NOT_MATCH_CASTER": "Tu ne castes pas ce match.",
+      "INVALID_HOST_TEAM": "L'équipe hôte doit être l'une des deux engagées du match.",
+      "TOURNAMENT_NOT_RUNNING": "Le tournoi n'est pas en cours.",
+      "fallback": "L'action n'a pas pu aboutir. Réessaie dans un instant."
+    },
+    "readyNoted": "C'est noté, tu es prêt.",
+    "readyCanceled": "« Prêt » annulé.",
+    "launched": "Toutes les parties sont prêtes : le match est lancé !",
+    "copied": "{label} copié.",
+    "copyFailed": "Copie impossible : sélectionne le texte à la main.",
+    "detailsAria": "Détails du match",
+    "versus": "contre",
+    "startsWhenReady": "Le match démarre dès que toutes les parties sont prêtes.",
+    "back": "Retour",
+    "confirmReady": "Confirmer : prêt",
+    "cancelReadyTitle": "Cliquer pour annuler ton « Prêt »",
+    "cancelReady": "✓ Prêt — annuler",
+    "notLeader": "Le capitaine, un manager ou le propriétaire de ton équipe la déclare prête.",
+    "otherMatch": "Autre match ({count})",
+    "viewMatch": "Voir le match",
+    "close": "Fermer",
+    "fabLobby": "Match en lancement",
+    "fabMine": "Mon match",
+    "status": {
+      "waiting": "En attente des « Prêt » —",
+      "ready": "prêts",
+      "autoAt": "lancement automatique à",
+      "launched": "Le match est lancé — bonne partie !",
+      "startsAt": "Début prévu à"
+    },
+    "chipReady": "✓ Prêt",
+    "chipWaiting": "En attente",
+    "verifiedTitle": "Vérifié",
+    "verified": "vérifié",
+    "unverified": "non vérifié",
+    "copyAria": "Copier le {kind} {value}",
+    "copy": "Copier",
+    "host": "Héberge la partie — crée le salon",
+    "ghost": "Équipe invitée : pas de contact.",
+    "contactsAtLaunch": "Les contacts s'affichent au lancement.",
+    "noContact": "Aucun contact disponible.",
+    "caster": "Caster",
+    "noCaster": "Aucun caster inscrit : le match part dès que les deux équipes sont prêtes.",
+    "vs": "VS",
+    "fabTeams": "{team1} vs {team2}"
   }
 }

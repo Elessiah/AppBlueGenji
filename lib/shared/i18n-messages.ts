@@ -30,8 +30,10 @@ import type frTournamentViews from "@/messages/fr/tournamentViews.json";
 import type frTournamentErrors from "@/messages/fr/tournamentErrors.json";
 import type frTournamentActions from "@/messages/fr/tournamentActions.json";
 import type frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
+import type frTournamentImage from "@/messages/fr/tournamentImage.json";
+import type frTournamentForm from "@/messages/fr/tournamentForm.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -80,6 +82,10 @@ export type Messages = {
   tournamentActions: typeof frTournamentActions;
   /** Fenêtres d'action de la fiche, chargées à la demande (lot 8b) — `_lib/dialogs-text.ts`. */
   tournamentDialogs: typeof frTournamentDialogs;
+  /** Sélecteur d'image d'un tournoi (lot 8b-2), fiche et création — `_lib/image-text.ts`. */
+  tournamentImage: typeof frTournamentImage;
+  /** Formulaires de création et d'édition d'un tournoi (lot 8b-2) — `_lib/form-text.ts`. */
+  tournamentForm: typeof frTournamentForm;
 };
 
 /**

@@ -126,10 +126,6 @@ export function frTournamentViewText(view: TournamentViewMessages): TournamentPa
   return frPageText(view);
 }
 
-/** `lang` à poser sur un bloc resté français (staff, actions du lot 8b) : seulement sous une page anglaise. */
-export function frenchBlockLang(text: Pick<TournamentPageText, "locale">): "fr" | undefined {
-  return text.locale === "fr" ? undefined : "fr";
-}
 
 type ParticipantKey = keyof FrTournament["participants"]["TEAM"];
 

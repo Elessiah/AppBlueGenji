@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
 import { siteTitle } from "@/lib/shared/page-metadata";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { localeAlternates, localeHref } from "@/lib/shared/locales";
+import { tournamentFormMessages } from "@/lib/shared/tournament-actions-text";
+import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
+
+type MetadataProps = {
+  params: Promise<{ id: string }>;
+};
 
 /**
  * Le formulaire d'édition n'est pas la fiche du tournoi.
@@ -12,18 +21,39 @@ import { siteTitle } from "@/lib/shared/page-metadata";
  * dépareillé.
  *
  * `null` retire un champ hérité : cette page n'a pas d'encart, ce qui est la
- * bonne réponse pour un écran de travail réservé au staff.
+ * bonne réponse pour un écran de travail réservé au staff. Lot 8b-2 : titre,
+ * canonique et `hreflang` dans la langue de l'adresse.
  */
-export const metadata: Metadata = {
-  // Titre écrit en entier : la mise en page du tournoi pose un `title.absolute`,
-  // ce qui **retire** le gabarit de la racine pour ses enfants — un simple
-  // « Modifier le tournoi » se serait retrouvé seul dans l'onglet, sans le nom
-  // du site.
-  title: { absolute: siteTitle("Modifier le tournoi") },
-  openGraph: null,
-  twitter: null,
-};
+export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { id } = await params;
+  const path = `/tournois/${id}/modifier`;
+  const languages = localeAlternates(path);
+  const canonical = localeHref(path, locale);
+  return {
+    // Titre écrit en entier : la mise en page du tournoi pose un `title.absolute`,
+    // ce qui **retire** le gabarit de la racine pour ses enfants — un simple
+    // « Modifier le tournoi » se serait retrouvé seul dans l'onglet, sans le nom
+    // du site.
+    title: { absolute: siteTitle(messagesFor(locale).tournamentForm.meta.editTitle) },
+    alternates: languages ? { canonical, languages } : { canonical },
+    openGraph: null,
+    twitter: null,
+  };
+}
 
-export default function EditTournamentLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}</>;
+/**
+ * Pose les textes du formulaire : refus, gestes (planification par
+ * l'arbitrage), image et formulaire — l'anglais sous `/en` seulement. Le
+ * fournisseur remplace celui de la fiche (`[id]/layout.tsx`) : il porte donc
+ * tout ce que l'édition lit.
+ */
+export default async function EditTournamentLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await requestLocale();
+  const messages = locale === "en" ? tournamentFormMessages(messagesFor(locale), true) : undefined;
+  return (
+    <TournamentActionsTextProvider locale={locale} messages={messages}>
+      {children}
+    </TournamentActionsTextProvider>
+  );
 }

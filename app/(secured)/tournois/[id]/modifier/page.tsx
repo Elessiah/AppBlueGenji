@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
+import { useParams } from "next/navigation";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { richNodes } from "@/components/i18n/shell-text";
+import type { TournamentErrorsText, TournamentFormText } from "@/lib/shared/tournament-actions-text";
 import { useToast } from "@/components/ui/toast";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import {
@@ -18,18 +20,11 @@ import {
   type TournamentApiValues,
   type TournamentFormValues,
 } from "../../_components/TournamentForm";
-import {
-  editLockNotice,
-  editSavedMessage,
-  FINISHED_EDIT_NOTICE,
-  type PlanningSaveResult,
-} from "../_lib/edit-entry";
-import {
-  canToggleRefereeScheduling,
-  refereeSchedulingErrorMessage,
-} from "@/lib/shared/match-planning";
+import { editLockNoticeText, editSavedText, type PlanningSaveResult } from "../_lib/edit-entry";
+import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
 import type { TournamentState } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { mapError, useErrorsText } from "../_lib/error-map";
+import { useFormText } from "../../_lib/form-text";
 import { CodedError } from "@/lib/shared/field-errors";
 
 /**
@@ -40,37 +35,40 @@ import { CodedError } from "@/lib/shared/field-errors";
  * permission, chargement des valeurs et de la fenêtre d'édition, appel réseau.
  */
 
-/** Traduction française des noms de champ éditables. */
-const FIELD_LABELS: Partial<Record<TournamentField, string>> = {
-  name: "Nom du tournoi",
-  description: "Description",
-  game: "Jeu",
-  format: "Format de bracket",
-  participantType: "Type de participants",
-  maxTeams: "Nombre de places",
-  startVisibilityAt: "Début visibilité",
-  registrationOpenAt: "Début inscriptions",
-  registrationCloseAt: "Fin inscriptions",
-  startAt: "Début tournoi",
-  hasThirdPlaceMatch: "Petite finale",
-  survivalRoundsBeforeFirstCut: "Manches avant la première coupe",
-  survivalRoundsPerCut: "Manches entre les coupes",
-  swissTotalRounds: "Nombre de rondes",
-  swissPointsWin: "Points par victoire",
-  swissPointsDraw: "Points par nul",
-  swissPointsLoss: "Points par défaite",
-  endurancePoints: "Capital d'endurance",
-  enduranceWinDelta: "Points par victoire de map",
-  enduranceLossDelta: "Points par défaite de map",
-  endurancePlayoffSize: "Équipes en play-offs",
-  enduranceMaxRounds: "Manches maximum",
-  matchFormat: "Format de match",
-  endurancePlayoffFormat: "Format des play-offs",
-  registrationDiscordRequirement: "Discord vérifié à l'inscription",
-  registrationBlizzardRequirement: "Compte Blizzard à l'inscription",
-  registrationMinPlayers: "Joueurs minimum dans l'équipe",
-  phases: "Phases du tournoi",
-};
+/**
+ * Champs éditables qu'un refus peut nommer (`edit.fields.*`) : leur nom, dans
+ * la langue de la page, suit la phrase du refus entre parenthèses.
+ */
+const LABELED_FIELDS = [
+  "name",
+  "description",
+  "game",
+  "format",
+  "participantType",
+  "maxTeams",
+  "startVisibilityAt",
+  "registrationOpenAt",
+  "registrationCloseAt",
+  "startAt",
+  "hasThirdPlaceMatch",
+  "survivalRoundsBeforeFirstCut",
+  "survivalRoundsPerCut",
+  "swissTotalRounds",
+  "swissPointsWin",
+  "swissPointsDraw",
+  "swissPointsLoss",
+  "endurancePoints",
+  "enduranceWinDelta",
+  "enduranceLossDelta",
+  "endurancePlayoffSize",
+  "enduranceMaxRounds",
+  "matchFormat",
+  "endurancePlayoffFormat",
+  "registrationDiscordRequirement",
+  "registrationBlizzardRequirement",
+  "registrationMinPlayers",
+  "phases",
+] as const satisfies readonly TournamentField[];
 
 type EditLoadPayload = {
   window: EditWindow;
@@ -85,8 +83,32 @@ function lockReasonFor(window: EditWindow): EditLockReason {
   return window === "LOCKED" ? "STARTED" : "VISIBLE";
 }
 
+/** Refus d'une route d'édition, le champ en cause nommé entre parenthèses. */
+function refusalText(
+  text: TournamentFormText,
+  errors: TournamentErrorsText,
+  code: string,
+  field: string | undefined,
+): string {
+  const message = mapError(code, errors);
+  const labeled = LABELED_FIELDS.find((candidate) => candidate === field);
+  if (!labeled) return message;
+  return text.t("edit.fieldRefusal", { message, field: text.t(`edit.fields.${labeled}`) });
+}
+
+/** Refus de la bascule de planification (`refereeSchedulingErrorMessage`). */
+function planningErrorText(text: TournamentFormText, code: string): string {
+  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_REFEREE_SCHEDULING"] as const).find((c) => c === code);
+  return text.t(known ? `edit.planningErrors.${known}` : "edit.planningErrors.fallback");
+}
+
 /** Envoie les champs de la fenêtre d'édition ; un refus nomme le champ en cause. */
-async function saveEditableFields(tournamentId: number, body: Record<string, unknown>): Promise<void> {
+async function saveEditableFields(
+  tournamentId: number,
+  body: Record<string, unknown>,
+  text: TournamentFormText,
+  errors: TournamentErrorsText,
+): Promise<void> {
   const response = await fetch(`/api/tournaments/${tournamentId}/edit`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
@@ -95,14 +117,14 @@ async function saveEditableFields(tournamentId: number, body: Record<string, unk
   if (response.ok) return;
   const result = (await response.json().catch(() => ({}))) as { error?: string; field?: string };
   const code = result.error ?? "TOURNAMENT_UPDATE_FAILED";
-  let message = mapError(code);
-  if (result.field && FIELD_LABELS[result.field as TournamentField]) {
-    message += ` (${FIELD_LABELS[result.field as TournamentField]})`;
-  }
-  throw new CodedError(code, message);
+  throw new CodedError(code, refusalText(text, errors, code, result.field));
 }
 
-async function saveRefereeScheduling(tournamentId: number, enabled: boolean): Promise<PlanningSaveResult> {
+async function saveRefereeScheduling(
+  tournamentId: number,
+  enabled: boolean,
+  text: TournamentFormText,
+): Promise<PlanningSaveResult> {
   const response = await fetch(`/api/admin/tournaments/${tournamentId}/referee-scheduling`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
@@ -117,13 +139,17 @@ async function saveRefereeScheduling(tournamentId: number, enabled: boolean): Pr
     return { changed: result.changed === true, movedToPlanning: result.movedToPlanning ?? 0 };
   }
   const code = result.error ?? "UNKNOWN";
-  throw new CodedError(code, refereeSchedulingErrorMessage(code));
+  throw new CodedError(code, planningErrorText(text, code));
 }
 
 export default function EditTournamentPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const router = useLocaleRouter();
   const { showError, showSuccess } = useToast();
+  const text = useFormText();
+  const { t } = text;
+  const errorsText = useErrorsText();
+  const hl = (children: ReadonlyArray<ReactNode>) => <span className="text-gradient">{richNodes(children)}</span>;
   const tournamentId = Number(params.id);
 
   const [loaded, setLoaded] = useState<{
@@ -146,7 +172,7 @@ export default function EditTournamentPage() {
         : null;
       if (cancelled) return;
       if (!can(me?.user, "tournaments")) {
-        showError("Modification de tournoi réservée aux arbitres et administrateurs.");
+        showError(t("edit.forbidden"));
         router.replace("/tournois");
         return;
       }
@@ -158,11 +184,7 @@ export default function EditTournamentPage() {
       if (cancelled) return;
       if (!response.ok) {
         const errorPayload = payload as { error?: string; field?: string };
-        let message = mapError(errorPayload.error ?? "TOURNAMENT_NOT_FOUND");
-        if (errorPayload.field && FIELD_LABELS[errorPayload.field as TournamentField]) {
-          message += ` (${FIELD_LABELS[errorPayload.field as TournamentField]})`;
-        }
-        showError(message);
+        showError(refusalText(text, errorsText, errorPayload.error ?? "TOURNAMENT_NOT_FOUND", errorPayload.field));
         router.replace("/tournois");
         return;
       }
@@ -186,19 +208,19 @@ export default function EditTournamentPage() {
     // autres échecs de chargement, message réseau en plus.
     load().catch(() => {
       if (cancelled) return;
-      showError("Erreur réseau, réessaye.");
+      showError(t("edit.network"));
       router.replace("/tournois");
     });
 
     return () => {
       cancelled = true;
     };
-  }, [tournamentId, router, showError]);
+  }, [tournamentId, router, showError, t, text, errorsText]);
 
   if (!loaded) {
     return (
       <section className="fade-in container">
-        <p style={{ color: "var(--ink-mute)" }}>Chargement du tournoi...</p>
+        <p style={{ color: "var(--ink-mute)" }}>{t("edit.loading")}</p>
       </section>
     );
   }
@@ -210,10 +232,10 @@ export default function EditTournamentPage() {
   if (loaded.window === "LOCKED" && !planningEditable) {
     return (
       <section className="fade-in container">
-        <Link href={`/tournois/${tournamentId}`} style={{ fontSize: 13, color: "var(--ink-mute)" }}>
-          ← Retour au tournoi
-        </Link>
-        <p style={{ color: "var(--amber)", marginTop: 16 }}>{FINISHED_EDIT_NOTICE}</p>
+        <LocaleLink href={`/tournois/${tournamentId}`} style={{ fontSize: 13, color: "var(--ink-mute)" }}>
+          {t("edit.back")}
+        </LocaleLink>
+        <p style={{ color: "var(--amber)", marginTop: 16 }}>{t("edit.finished")}</p>
       </section>
     );
   }
@@ -221,17 +243,17 @@ export default function EditTournamentPage() {
   const editableFields: ReadonlySet<TournamentField> = editableFieldsForWindow(loaded.window);
   // Tournoi lancé : la fenêtre est fermée, seule la planification reste —
   // le formulaire est rendu entier mais grisé, sauf cette case.
-  const notice = editLockNotice(lockReasonFor(loaded.window), loaded.startVisibilityAt);
+  const notice = editLockNoticeText(text, lockReasonFor(loaded.window), loaded.startVisibilityAt);
   const explanationId = notice ? "tournament-lock-notice" : undefined;
 
   return (
     <section className="fade-in container">
       <div style={{ marginBottom: 28 }}>
-        <Link href={`/tournois/${tournamentId}`} style={{ fontSize: 13, color: "var(--ink-mute)" }}>
-          ← Retour au tournoi
-        </Link>
+        <LocaleLink href={`/tournois/${tournamentId}`} style={{ fontSize: 13, color: "var(--ink-mute)" }}>
+          {t("edit.back")}
+        </LocaleLink>
         <h1 className="display" style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px" }}>
-          Modifier <span className="text-gradient">le tournoi</span>
+          {richNodes(text.rich("edit.title", {}, { hl }))}
         </h1>
         {notice && <p id={explanationId} style={{ color: "var(--amber)", margin: 0, fontSize: 14 }}>{notice}</p>}
       </div>
@@ -240,7 +262,7 @@ export default function EditTournamentPage() {
         mode="edit"
         initialValues={loaded.values}
         editableFields={editableFields}
-        submitLabel="Enregistrer les modifications"
+        submitLabel={t("edit.submit")}
         explanationId={explanationId}
         refereeSchedulingEditable={planningEditable}
         tournamentState={loaded.state}
@@ -283,7 +305,7 @@ export default function EditTournamentPage() {
           // Fenêtre fermée (tournoi lancé) : aucun champ à envoyer, la route
           // d'édition refuserait — seule la planification part.
           const fieldsSent = Object.keys(body).length > 0;
-          if (fieldsSent) await saveEditableFields(tournamentId, body);
+          if (fieldsSent) await saveEditableFields(tournamentId, body, text, errorsText);
 
           // La planification a sa route : bascule tenue sous verrou du
           // tournoi, qui défait les lancements à défaire — et après l'édition,
@@ -293,10 +315,10 @@ export default function EditTournamentPage() {
           // l'enregistrement doit écrire ce que le formulaire montre. La route
           // est idempotente (rien n'est réécrit ni annoncé sans changement).
           const planning = planningEditable
-            ? await saveRefereeScheduling(tournamentId, values.refereeScheduling)
+            ? await saveRefereeScheduling(tournamentId, values.refereeScheduling, text)
             : null;
 
-          showSuccess(editSavedMessage(fieldsSent, planning, values.refereeScheduling));
+          showSuccess(editSavedText(text, fieldsSent, planning, values.refereeScheduling));
           router.push(`/tournois/${tournamentId}`);
           router.refresh();
         }}

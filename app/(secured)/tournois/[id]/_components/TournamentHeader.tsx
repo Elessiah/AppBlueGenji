@@ -111,9 +111,6 @@ export function TournamentHeader({
   const a = actionText.t;
   const errorsText = useErrorsText();
   const entrantType = toParticipantType(card.participantType);
-  // L'édition (`/tournois/[id]/modifier`) n'est pas encore traduite : le lien
-  // annonce la langue de sa cible sous `/en`.
-  const editLang = text.locale === "fr" ? undefined : "fr";
   const state = STATE_META[card.state] ?? { label: card.state, tone: "info" as HeaderTone };
   const stateLabel = tournamentLabel(labels, "state", card.state);
   const items = headerMetaItems(card, detail.phases, detail.currentPhaseId, Date.now(), text, labels);
@@ -195,7 +192,7 @@ export function TournamentHeader({
               )}
               {showEdit && (
                 <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
-                  <LocaleLink href={`/tournois/${card.id}/modifier`} hrefLang={editLang}>
+                  <LocaleLink href={`/tournois/${card.id}/modifier`}>
                     {a("header.edit")}
                   </LocaleLink>
                 </CyberButton>

@@ -1,12 +1,9 @@
 "use client";
 
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
-import {
-  DEFAULT_MATCH_FORMAT,
-  MATCH_FORMAT_BOUNDS,
-  matchFormatDescription,
-} from "@/lib/shared/match-format";
-import { participantWording } from "@/lib/shared/participants";
+import { DEFAULT_MATCH_FORMAT, MATCH_FORMAT_BOUNDS } from "@/lib/shared/match-format";
+import { toParticipantType } from "@/lib/shared/participants";
+import { formatDescriptionText, useFormText } from "../_lib/form-text";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { PhaseBuilder } from "../creer/PhaseBuilder";
 import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
@@ -49,7 +46,9 @@ export function FormatSettings({
   phaseFocusRequest,
 }: Readonly<FormatSettingsProps>) {
   const { format, maxTeams, phases } = values;
-  const wording = participantWording(values.participantType);
+  const text = useFormText();
+  const { t } = text;
+  const entrantType = toParticipantType(values.participantType);
   const recommendedRounds = computeRecommendedRounds(maxTeams);
 
   return (
@@ -69,7 +68,7 @@ export function FormatSettings({
       {format === "BG_SURVIE" && (
         <>
           <div className="field">
-            <label htmlFor="endurance-points">Capital d&apos;endurance</label>
+            <label htmlFor="endurance-points">{t("settings.endurancePoints")}</label>
             <NumberInput
               id="endurance-points"
               min={1}
@@ -80,12 +79,12 @@ export function FormatSettings({
               {...lockedAttr("endurancePoints")}
             />
             <p style={HINT}>
-              Points de départ de chaque équipe. À 0, elle est éliminée.
+              {t("settings.endurancePointsHint")}
             </p>
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-win">Points par victoire de map</label>
+            <label htmlFor="endurance-win">{t("settings.enduranceWin")}</label>
             <NumberInput
               id="endurance-win"
               min={1}
@@ -98,7 +97,7 @@ export function FormatSettings({
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-loss">Points par défaite de map</label>
+            <label htmlFor="endurance-loss">{t("settings.enduranceLoss")}</label>
             <NumberInput
               id="endurance-loss"
               min={1}
@@ -111,7 +110,7 @@ export function FormatSettings({
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-playoff">Équipes en play-offs</label>
+            <label htmlFor="endurance-playoff">{t("settings.endurancePlayoff")}</label>
             <NumberInput
               id="endurance-playoff"
               min={2}
@@ -122,13 +121,12 @@ export function FormatSettings({
               {...lockedAttr("endurancePlayoffSize")}
             />
             <p style={HINT}>
-              La phase d&apos;endurance s&apos;arrête à cet effectif. À 8, l&apos;arbre
-              suit le tableau du règlement (8v4, 6v2, 1v5, 3v7) avec petite finale.
+              {t("settings.endurancePlayoffHint")}
             </p>
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-max-rounds">Manches maximum</label>
+            <label htmlFor="endurance-max-rounds">{t("settings.enduranceMaxRounds")}</label>
             <NumberInput
               id="endurance-max-rounds"
               min={0}
@@ -139,10 +137,7 @@ export function FormatSettings({
               {...lockedAttr("enduranceMaxRounds")}
             />
             <p style={HINT}>
-              0 = aucune limite : la phase court jusqu&apos;à l&apos;effectif ci-dessus.
-              Sinon elle s&apos;arrête à cette manche et les meilleures du classement
-              sont qualifiées ; celles qui ne peuvent plus les rejoindre sortent
-              avant la fin.
+              {t("settings.enduranceMaxRoundsHint")}
             </p>
           </div>
 
@@ -168,17 +163,15 @@ export function FormatSettings({
                 }}
                 {...lockedAttr("matchFormat")}
               />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
-              Égalités autorisées en qualification
+              {t("settings.draws")}
             </label>
             <p style={HINT}>
-              {values.matchFormat === null
-                ? "Indisponible en saisie de score libre : il faut un format de match pour borner la rencontre."
-                : "Une map nulle peut arrêter la rencontre avant l’objectif : le match se clôt alors sur 2-2, ou sur 2-1 si une seule map a été partagée. Le capital d’endurance se comptant map par map, il l’encaisse sans règle supplémentaire. L’arbre final, lui, exige toujours un vainqueur. Cocher cette case ouvre aussi le réglage « Maps décisives au maximum », plus haut."}
+              {values.matchFormat === null ? t("settings.drawsUnavailable") : t("settings.drawsHint")}
             </p>
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-playoff-format-type">Format des play-offs</label>
+            <label htmlFor="endurance-playoff-format-type">{t("settings.playoffFormat")}</label>
             <select
               id="endurance-playoff-format-type"
               disabled={locked("endurancePlayoffFormat")}
@@ -198,23 +191,19 @@ export function FormatSettings({
               }}
               {...lockedAttr("endurancePlayoffFormat")}
             >
-              <option value="MEME">Le même qu’en qualification</option>
-              <option value="BO">Best of (BO)</option>
-              <option value="FT">First to (FT)</option>
+              <option value="MEME">{t("settings.playoffFormats.MEME")}</option>
+              <option value="BO">{t("settings.playoffFormats.BO")}</option>
+              <option value="FT">{t("settings.playoffFormats.FT")}</option>
             </select>
             <p style={HINT}>
-              L’arbre final n’accepte jamais d’égalité, quel que soit ce réglage : il lui faut savoir
-              qui joue le tour suivant. Le poser ici sert à jouer un vrai FT3 en play-offs quand la
-              qualification tolère le nul.
+              {t("settings.playoffFormatHint")}
             </p>
           </div>
 
           {values.endurancePlayoffFormat && (
             <div className="field">
               <label htmlFor="endurance-playoff-format-value">
-                {values.endurancePlayoffFormat.type === "BO"
-                  ? "Play-offs : manches jouées (impair)"
-                  : "Play-offs : manches à gagner"}
+                {t(`settings.playoffFormatValue.${values.endurancePlayoffFormat.type}`)}
               </label>
               <NumberInput
                 id="endurance-playoff-format-value"
@@ -238,7 +227,7 @@ export function FormatSettings({
                 }}
                 {...lockedAttr("endurancePlayoffFormat")}
               />
-              <p style={HINT}>{matchFormatDescription(values.endurancePlayoffFormat)}</p>
+              <p style={HINT}>{formatDescriptionText(text, values.endurancePlayoffFormat)}</p>
             </div>
           )}
         </>
@@ -247,7 +236,7 @@ export function FormatSettings({
       {format === "SURVIVAL" && (
         <>
           <div className="field">
-            <label htmlFor="survival-first-cut">Manches avant la première coupe</label>
+            <label htmlFor="survival-first-cut">{t("settings.survivalFirstCut")}</label>
             <NumberInput
               id="survival-first-cut"
               min={1}
@@ -260,12 +249,12 @@ export function FormatSettings({
               {...lockedAttr("survivalRoundsBeforeFirstCut")}
             />
             <p style={HINT}>
-              Laisse le classement se former avant la première élimination.
+              {t("settings.survivalFirstCutHint")}
             </p>
           </div>
 
           <div className="field">
-            <label htmlFor="survival-rounds">Manches entre les coupes suivantes</label>
+            <label htmlFor="survival-rounds">{t("settings.survivalRounds")}</label>
             <NumberInput
               id="survival-rounds"
               min={1}
@@ -276,16 +265,12 @@ export function FormatSettings({
               {...lockedAttr("survivalRoundsPerCut")}
             />
             <p style={HINT}>
-              Cadence appliquée après la première coupe.
+              {t("settings.survivalRoundsHint")}
             </p>
           </div>
 
           <p style={{ ...HINT, ...FULL_WIDTH }}>
-            Toutes les équipes s&apos;affrontent par paires selon leur classement. À
-            chaque coupe, les deux dernières équipes sont éliminées, jusqu&apos;à la
-            championne. Si le nombre d&apos;inscrites est impair, un barrage entre les
-            deux dernières ouvre le tournoi — aucune victoire d&apos;office n&apos;est
-            distribuée.
+            {t("settings.survivalExplain")}
           </p>
         </>
       )}
@@ -293,7 +278,7 @@ export function FormatSettings({
       {format === "SWISS" && (
         <>
           <div className="field">
-            <label htmlFor="swiss-rounds">Nombre de rondes</label>
+            <label htmlFor="swiss-rounds">{t("settings.swissRounds")}</label>
             <NumberInput
               id="swiss-rounds"
               min={1}
@@ -304,19 +289,18 @@ export function FormatSettings({
               {...lockedAttr("swissTotalRounds")}
             />
             <p style={HINT}>
-              Recommandé pour {maxTeams} {wording.many} : {recommendedRounds} ronde
-              {recommendedRounds > 1 ? "s" : ""}.
+              {t(`settings.swissRecommended.${entrantType}`, { count: maxTeams, rounds: recommendedRounds })}
             </p>
           </div>
 
           <div className="field">
-            <label htmlFor="swiss-points-win">Barème (victoire / nul / défaite)</label>
+            <label htmlFor="swiss-points-win">{t("settings.swissPoints")}</label>
             <div style={{ display: "flex", gap: 8 }}>
               <NumberInput
                 id="swiss-points-win"
                 min={0}
                 max={99}
-                aria-label="Points par victoire"
+                aria-label={t("settings.swissPointsWin")}
                 disabled={locked("swissPointsWin")}
                 value={values.swissPointsWin}
                 onValueChange={(next) => set("swissPointsWin", next)}
@@ -325,7 +309,7 @@ export function FormatSettings({
               <NumberInput
                 min={0}
                 max={99}
-                aria-label="Points par match nul"
+                aria-label={t("settings.swissPointsDraw")}
                 disabled={locked("swissPointsDraw")}
                 value={values.swissPointsDraw}
                 onValueChange={(next) => set("swissPointsDraw", next)}
@@ -334,7 +318,7 @@ export function FormatSettings({
               <NumberInput
                 min={0}
                 max={99}
-                aria-label="Points par défaite"
+                aria-label={t("settings.swissPointsLoss")}
                 disabled={locked("swissPointsLoss")}
                 value={values.swissPointsLoss}
                 onValueChange={(next) => set("swissPointsLoss", next)}
@@ -342,17 +326,12 @@ export function FormatSettings({
               />
             </div>
             <p style={HINT}>
-              Une victoire d&apos;office rapporte autant qu&apos;une victoire.
+              {t("settings.swissByeHint")}
             </p>
           </div>
 
           <p style={{ ...HINT, ...FULL_WIDTH }}>
-            Aucune élimination : toutes les équipes jouent les {values.swissTotalRounds}{" "}
-            rondes.
-            À chaque ronde, on affronte une équipe ayant un total de points proche du
-            sien, sans jamais rejouer le même adversaire tant que c&apos;est possible. À
-            égalité de points, le départage se fait au Buchholz (somme des points des
-            adversaires rencontrés).
+            {t("settings.swissExplain", { rounds: values.swissTotalRounds })}
           </p>
         </>
       )}
@@ -360,7 +339,7 @@ export function FormatSettings({
       {format === "SINGLE" && (
         <div className="field" style={FULL_WIDTH}>
           <label htmlFor="third-place" style={{ marginBottom: 6 }}>
-            Options supplémentaires
+            {t("settings.options")}
           </label>
           <div // NOSONAR S1082 — raccourci souris ; le clavier passe par la case native qu'elle contient
             className="checkbox-card"
@@ -413,7 +392,7 @@ export function FormatSettings({
                   color: locked("hasThirdPlaceMatch") ? "var(--ink-mute)" : "var(--ink)",
                 }}
               >
-                Petite finale
+                {t("settings.thirdPlace")}
               </label>
               <p
                 style={{
@@ -422,8 +401,7 @@ export function FormatSettings({
                   ...(locked("hasThirdPlaceMatch") ? { color: "var(--ink-dim)" } : {}),
                 }}
               >
-                Ajoute un match pour déterminer la 3ᵉ place entre les deux perdants des
-                demi-finales.
+                {t("settings.thirdPlaceHint")}
               </p>
             </div>
           </div>

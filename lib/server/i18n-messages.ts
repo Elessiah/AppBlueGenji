@@ -50,12 +50,16 @@ import enTournamentActions from "@/messages/en/tournamentActions.json";
 import frTournamentActions from "@/messages/fr/tournamentActions.json";
 import enTournamentDialogs from "@/messages/en/tournamentDialogs.json";
 import frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
+import enTournamentImage from "@/messages/en/tournamentImage.json";
+import frTournamentImage from "@/messages/fr/tournamentImage.json";
+import enTournamentForm from "@/messages/en/tournamentForm.json";
+import frTournamentForm from "@/messages/fr/tournamentForm.json";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 
 const CATALOG: Readonly<Record<Locale, Messages>> = {
-  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels, share: frShare, login: frLogin, bot: frBot, association: frAssociation, volunteers: frVolunteers, recruitment: frRecruitment, legal: frLegal, tournaments: frTournaments, tournament: frTournament, tournamentViews: frTournamentViews, tournamentErrors: frTournamentErrors, tournamentActions: frTournamentActions, tournamentDialogs: frTournamentDialogs },
-  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels, share: enShare, login: enLogin, bot: enBot, association: enAssociation, volunteers: enVolunteers, recruitment: enRecruitment, legal: enLegal, tournaments: enTournaments, tournament: enTournament, tournamentViews: enTournamentViews, tournamentErrors: enTournamentErrors, tournamentActions: enTournamentActions, tournamentDialogs: enTournamentDialogs },
+  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels, share: frShare, login: frLogin, bot: frBot, association: frAssociation, volunteers: frVolunteers, recruitment: frRecruitment, legal: frLegal, tournaments: frTournaments, tournament: frTournament, tournamentViews: frTournamentViews, tournamentErrors: frTournamentErrors, tournamentActions: frTournamentActions, tournamentDialogs: frTournamentDialogs, tournamentImage: frTournamentImage, tournamentForm: frTournamentForm },
+  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels, share: enShare, login: enLogin, bot: enBot, association: enAssociation, volunteers: enVolunteers, recruitment: enRecruitment, legal: enLegal, tournaments: enTournaments, tournament: enTournament, tournamentViews: enTournamentViews, tournamentErrors: enTournamentErrors, tournamentActions: enTournamentActions, tournamentDialogs: enTournamentDialogs, tournamentImage: enTournamentImage, tournamentForm: enTournamentForm },
 };
 
 export function messagesFor(locale: Locale): Messages {

@@ -12,7 +12,6 @@ import { useToast } from "@/components/ui/toast";
 import {
   TOURNAMENT_IMAGE_ACCEPT,
   TOURNAMENT_IMAGE_FITS,
-  TOURNAMENT_IMAGE_FIT_LABELS,
   focusFromKey,
   focusFromPoint,
   imageObjectPosition,
@@ -25,6 +24,7 @@ import {
   withNewFile,
   type ImagePickerValue,
 } from "../_lib/image-picker";
+import { imageErrorText, useImageText } from "../_lib/image-text";
 import s from "./TournamentImagePicker.module.css";
 
 interface TournamentImagePickerProps {
@@ -33,12 +33,6 @@ interface TournamentImagePickerProps {
   value: ImagePickerValue;
   onChange: (value: ImagePickerValue) => void;
   disabled?: boolean;
-  /**
-   * Langue du sélecteur quand elle diffère de la page (fenêtre restée en
-   * français sous `/en`) : la modale de recadrage et les refus, portés hors de
-   * son ancêtre, la redisent.
-   */
-  lang?: "fr";
 }
 
 /** Dimensions d'un fichier image ; `null` si le navigateur ne sait pas les lire. */
@@ -72,15 +66,19 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
  *
  * Le composant est contrôlé : il ne fait qu'un brouillon, que la page enregistre.
  */
-export function TournamentImagePicker({ existing, value, onChange, disabled, lang }: Readonly<TournamentImagePickerProps>) {
-  const toast = useToast();
-  const showError = (message: string) => toast.showError(message, lang ? { lang } : undefined);
+export function TournamentImagePicker({ existing, value, onChange, disabled }: Readonly<TournamentImagePickerProps>) {
+  const { showError } = useToast();
+  const text = useImageText();
+  const { t } = text;
+  // La modale de recadrage est commune au site (équipes, profil) : française
+  // jusqu'au lot 9, elle le redit sous `/en` — portée hors de cet arbre.
+  const cropLang = text.locale === "fr" ? undefined : "fr";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draggingRef = useRef(false);
   // Un fichier survole la zone vide : on le dit avant qu'il soit lâché.
   const [dropping, setDropping] = useState(false);
   const baseId = useId();
-  const { cropImage, cropDialog } = useImageCropper({ lang });
+  const { cropImage, cropDialog } = useImageCropper({ lang: cropLang });
   // L'aperçu montre la **zone gardée** : c'est dans elle que se choisit le
   // point focal, et c'est elle que le serveur enregistrera.
   const pending = useMemo(
@@ -111,13 +109,13 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
   const onFileChosen = async (file: File | undefined) => {
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
-    const refusal = rejectImageFile(file);
+    const refusal = rejectImageFile(file, (code) => imageErrorText(text, code));
     if (refusal) {
       showError(refusal);
       return;
     }
     const seq = ++pickSeqRef.current;
-    const cropped = await cropImage(file, "tournament-image", "Recadrer l'image du tournoi");
+    const cropped = await cropImage(file, "tournament-image", t("picker.cropTitle"));
     if (!cropped || seq !== pickSeqRef.current) return;
     const size = await readImageSize(file);
     if (seq !== pickSeqRef.current) return;
@@ -133,7 +131,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
   const onRecrop = async () => {
     if (!value.file) return;
     const seq = ++pickSeqRef.current;
-    const cropped = await cropImage(value.file, "tournament-image", "Recadrer l'image du tournoi");
+    const cropped = await cropImage(value.file, "tournament-image", t("picker.cropTitle"));
     if (!cropped || seq !== pickSeqRef.current) return;
     onChange(withNewFile(value.file, settings.fit, cropped.crop));
   };
@@ -194,17 +192,16 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
             +
           </span>
           <span className={s.emptyTitle}>
-            {dropping ? "Dépose l'image ici" : "Ajouter une illustration ou un logo"}
+            {dropping ? t("picker.drop") : t("picker.add")}
           </span>
           <span id={hintId} className={s.emptyHint}>
-            Facultatif · PNG, JPEG ou WebP, 5 Mo max · toutes dimensions acceptées, tu choisis la
-            zone gardée
+            {t("picker.hint")}
           </span>
         </button>
       ) : (
         <>
           <fieldset className={s.modes}>
-            <legend className="sr-only">Type d&apos;image</legend>
+            <legend className="sr-only">{t("picker.kind")}</legend>
             {TOURNAMENT_IMAGE_FITS.map((fit) => (
               <label // NOSONAR S6853 — label englobant : le bouton radio et son texte sont à l'intérieur
                 key={fit}
@@ -218,8 +215,8 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
                   onChange={() => setSettings({ fit })}
                 />
                 <span className={s.modeText}>
-                  <span className={s.modeLabel}>{TOURNAMENT_IMAGE_FIT_LABELS[fit].label}</span>
-                  <span className={s.modeHint}>{TOURNAMENT_IMAGE_FIT_LABELS[fit].hint}</span>
+                  <span className={s.modeLabel}>{t(`picker.fits.${fit}.label`)}</span>
+                  <span className={s.modeHint}>{t(`picker.fits.${fit}.hint`)}</span>
                 </span>
               </label>
             ))}
@@ -228,12 +225,12 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
           {displayUrl && isCover && (
             <div className={s.editor}>
               <div className={s.column}>
-                <p className={s.caption}>Point de cadrage</p>
+                <p className={s.caption}>{t("picker.focus")}</p>
                 <div
                   className={s.stage}
                   role="application"
-                  aria-roledescription="sélecteur de point de cadrage"
-                  aria-label={`Point de cadrage : ${settings.focusX} % depuis la gauche, ${settings.focusY} % depuis le haut`}
+                  aria-roledescription={t("picker.focusRole")}
+                  aria-label={t("picker.focusAria", { x: settings.focusX, y: settings.focusY })}
                   aria-describedby={focusHintId}
                   aria-disabled={disabled || undefined}
                   tabIndex={disabled ? -1 : 0}
@@ -267,13 +264,12 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
                   />
                 </div>
                 <p id={focusHintId} className={s.hint}>
-                  Clique ou fais glisser sur l&apos;image ; au clavier, flèches (Maj pour aller plus
-                  vite), Origine pour recentrer.
+                  {t("picker.focusHint")}
                 </p>
               </div>
 
               <div className={s.column}>
-                <p className={s.caption}>Aperçu</p>
+                <p className={s.caption}>{t("picker.preview")}</p>
                 <div className={s.previewStack}>
                   <figure className={s.previewFigure}>
                     <div className={`${s.previewFrame} ${s.previewWide}`}>
@@ -284,7 +280,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
                         style={{ objectPosition: imageObjectPosition(settings) }}
                       />
                     </div>
-                    <figcaption className={s.previewCaption}>Bandeau de la fiche</figcaption>
+                    <figcaption className={s.previewCaption}>{t("picker.previewBanner")}</figcaption>
                   </figure>
                   <figure className={s.previewFigure}>
                     <div className={`${s.previewFrame} ${s.previewCard}`}>
@@ -295,7 +291,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
                         style={{ objectPosition: imageObjectPosition(settings) }}
                       />
                     </div>
-                    <figcaption className={s.previewCaption}>Carte de la liste</figcaption>
+                    <figcaption className={s.previewCaption}>{t("picker.previewCard")}</figcaption>
                   </figure>
                 </div>
               </div>
@@ -308,8 +304,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
                 <img src={displayUrl} alt="" className={s.logoImage} />
               </div>
               <p className={s.hint}>
-                Le logo s&apos;affiche en entier à côté du nom du tournoi, sur la fiche comme sur les
-                cartes. Un fond transparent y rend le mieux.
+                {t("picker.logoHint")}
               </p>
             </div>
           )}
@@ -322,7 +317,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
               onClick={() => fileInputRef.current?.click()}
               style={{ padding: "8px 16px", fontSize: 13 }}
             >
-              Remplacer l&apos;image
+              {t("picker.replace")}
             </button>
             {value.file !== null && (
               <button
@@ -332,7 +327,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
                 onClick={() => void onRecrop()}
                 style={{ padding: "8px 16px", fontSize: 13 }}
               >
-                Recadrer
+                {t("picker.recrop")}
               </button>
             )}
             <button
@@ -347,7 +342,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled, lan
               }}
               style={{ padding: "8px 16px", fontSize: 13 }}
             >
-              Retirer l&apos;image
+              {t("picker.remove")}
             </button>
           </div>
         </>

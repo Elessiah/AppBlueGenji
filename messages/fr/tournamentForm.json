@@ -1,0 +1,276 @@
+{
+  "meta": {
+    "createTitle": "Créer un tournoi",
+    "editTitle": "Modifier le tournoi"
+  },
+  "create": {
+    "back": "← Tournois",
+    "title": "Créer <hl>un tournoi</hl>",
+    "lede": "Définis les phases temporelles, le jeu et le format de bracket.",
+    "submit": "Créer le tournoi",
+    "forbidden": "Création de tournoi réservée aux arbitres et administrateurs.",
+    "created": "Tournoi créé.",
+    "imageFailed": "Tournoi créé, mais son image n'a pas été enregistrée : {error} Ajoute-la depuis la fiche du tournoi."
+  },
+  "edit": {
+    "back": "← Retour au tournoi",
+    "title": "Modifier <hl>le tournoi</hl>",
+    "submit": "Enregistrer les modifications",
+    "forbidden": "Modification de tournoi réservée aux arbitres et administrateurs.",
+    "network": "Erreur réseau, réessaye.",
+    "loading": "Chargement du tournoi...",
+    "fieldRefusal": "{message} ({field})",
+    "finished": "Le tournoi est terminé : il n'est plus modifiable.",
+    "lockStarted": "Le tournoi est en cours : seule la planification des matchs par l'arbitrage reste modifiable.",
+    "lockVisible": "Le tournoi est visible depuis le {date} — le format, le jeu et les réglages ne sont plus modifiables.",
+    "savedNone": "Aucune modification à enregistrer.",
+    "saved": "Tournoi modifié.",
+    "savedWithPlanning": "Tournoi modifié. {planning}",
+    "planningDisabled": "Planification par l'arbitrage désactivée : les matchs sans date entrent en lancement.",
+    "planningEnabled": "Planification par l'arbitrage activée.",
+    "planningEnabledMoved": "Planification activée : {count, plural, =1 {1 match à planifier} other {# matchs à planifier}}.",
+    "planningErrors": {
+      "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
+      "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",
+      "INVALID_REFEREE_SCHEDULING": "Valeur invalide pour la planification par l'arbitrage.",
+      "fallback": "La planification n'a pas pu être modifiée. Réessaie dans un instant."
+    },
+    "fields": {
+      "name": "Nom du tournoi",
+      "description": "Description",
+      "game": "Jeu",
+      "format": "Format de bracket",
+      "participantType": "Type de participants",
+      "maxTeams": "Nombre de places",
+      "startVisibilityAt": "Début visibilité",
+      "registrationOpenAt": "Début inscriptions",
+      "registrationCloseAt": "Fin inscriptions",
+      "startAt": "Début tournoi",
+      "hasThirdPlaceMatch": "Petite finale",
+      "survivalRoundsBeforeFirstCut": "Manches avant la première coupe",
+      "survivalRoundsPerCut": "Manches entre les coupes",
+      "swissTotalRounds": "Nombre de rondes",
+      "swissPointsWin": "Points par victoire",
+      "swissPointsDraw": "Points par nul",
+      "swissPointsLoss": "Points par défaite",
+      "endurancePoints": "Capital d'endurance",
+      "enduranceWinDelta": "Points par victoire de map",
+      "enduranceLossDelta": "Points par défaite de map",
+      "endurancePlayoffSize": "Équipes en play-offs",
+      "enduranceMaxRounds": "Manches maximum",
+      "matchFormat": "Format de match",
+      "endurancePlayoffFormat": "Format des play-offs",
+      "registrationDiscordRequirement": "Discord vérifié à l'inscription",
+      "registrationBlizzardRequirement": "Compte Blizzard à l'inscription",
+      "registrationMinPlayers": "Joueurs minimum dans l'équipe",
+      "phases": "Phases du tournoi"
+    }
+  },
+  "form": {
+    "creating": "Création...",
+    "saving": "Enregistrement...",
+    "cancel": "Annuler",
+    "sections": {
+      "identity": "Identité",
+      "image": "Image",
+      "format": "Format",
+      "registration": "Conditions d'inscription",
+      "planning": "Planning"
+    },
+    "name": "Nom du tournoi",
+    "namePlaceholder": "Mon tournoi",
+    "game": "Jeu",
+    "description": "Description",
+    "descriptionPlaceholder": "Description du tournoi...",
+    "bracketFormat": "Format de bracket",
+    "formats": {
+      "SINGLE": "Simple élimination",
+      "DOUBLE": "Double élimination",
+      "SWISS": "Ronde suisse",
+      "SURVIVAL": "Survie par coupes",
+      "BG_SURVIE": "BlueGenji Survie (endurance)",
+      "MULTI": "Multi-phases"
+    },
+    "participantType": "Type de participants",
+    "participantTypes": {
+      "TEAM": "Équipes",
+      "SOLO": "Joueurs (individuel)"
+    },
+    "participantTypeHint": "En individuel, chaque joueur s'inscrit lui-même, sans passer par une équipe.",
+    "maxEntrants": {
+      "TEAM": "Nombre max d'équipes",
+      "SOLO": "Nombre max de joueurs"
+    },
+    "matchFormat": "Format de match",
+    "matchFormats": {
+      "BO": "Best of (BO)",
+      "FT": "First to (FT)",
+      "LIBRE": "Libre (aucune limite)"
+    },
+    "matchFormatValue": {
+      "BO": "Manches jouées (impair)",
+      "FT": "Manches à gagner"
+    },
+    "matchFormatValueHint": {
+      "BO": "Le score d'une équipe ne peut pas dépasser la moitié supérieure : 3 en BO5.",
+      "FT": "Objectif à atteindre pour remporter le match : 3 en FT3."
+    },
+    "formatHint": {
+      "free": "Les scores sont saisis sans contrainte.",
+      "valid": "{label} — {description}",
+      "invalidBo": "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…).",
+      "invalidFt": "Saisis le nombre de manches à gagner."
+    },
+    "invalidFormat": {
+      "BO": "Un Best of doit se jouer en nombre impair de manches (BO1, BO3, BO5…).",
+      "other": "Nombre de manches du format de match invalide."
+    },
+    "notation": {
+      "free": "Score libre",
+      "withMaps": "{base} · {maps} maps",
+      "noLimit": "Aucune limite de score.",
+      "race": "premier à {wins, plural, one {# manche gagnée} other {# manches gagnées}}, {maps} au maximum.",
+      "raceWithDraw": "premier à {wins, plural, one {# manche gagnée} other {# manches gagnées}}, {maps} au maximum. Le match peut se clore sans vainqueur (map nulle)."
+    },
+    "maxMaps": "Maps décisives au maximum",
+    "maxMapsHint": "Somme des deux scores au maximum. Une map nulle ne compte dans aucun des deux et n'entame donc pas ce plafond. L'abaisser sous {max} rend l'égalité possible.",
+    "registrationIntro": "Contrôlées à chaque inscription d'un joueur. Les <strong>équipes fantômes</strong> inscrites par le staff n'y sont pas soumises, et les engagés déjà inscrits ne sont jamais relus.",
+    "conditionsOpen": "En l'état, ce tournoi est ouvert à tous : aucune condition ne sera affichée.",
+    "conditionsRead": "Les participants liront : « {summary} ».",
+    "conditions": {
+      "minPlayers": "{count} joueurs minimum",
+      "discordSolo": "Discord vérifié",
+      "discordAny": "au moins un Discord vérifié",
+      "discordAll": "tous les Discord vérifiés",
+      "blizzardSolo": "compte Blizzard lié",
+      "blizzardAny": "au moins un compte Blizzard lié",
+      "blizzardAll": "tous les comptes Blizzard liés"
+    },
+    "requirements": {
+      "NONE": "Aucun joueur",
+      "ANY_PLAYER": "Au moins un joueur",
+      "ALL_PLAYERS": "Tous les joueurs"
+    },
+    "discord": "Discord vérifié",
+    "discordHint": {
+      "TEAM": "Un tag Discord <em>vérifié</em> est un tag dont le joueur a prouvé qu'il lui appartient : c'est la seule façon pour l'organisation de joindre l'équipe pendant le tournoi.",
+      "SOLO": "Un tag Discord <em>vérifié</em> est un tag dont le joueur a prouvé qu'il lui appartient : c'est la seule façon pour l'organisation de joindre le joueur pendant le tournoi."
+    },
+    "blizzard": "Compte Blizzard",
+    "blizzardHint": {
+      "TEAM": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag de chaque joueur : un tag simplement saisi ne prouve rien.",
+      "SOLO": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag du joueur : un tag simplement saisi ne prouve rien."
+    },
+    "blizzardMarvel": "Sans objet sur un tournoi Marvel Rivals : mieux vaut laisser « Aucun joueur ».",
+    "minPlayers": "Joueurs minimum dans l'équipe",
+    "minPlayersHint": "Membres actifs du roster, coach et manager compris. {min} = aucune exigence.",
+    "dates": {
+      "startVisibilityAt": "Début visibilité",
+      "registrationOpenAt": "Début inscriptions",
+      "registrationCloseAt": "Fin inscriptions",
+      "startAt": "Début tournoi"
+    },
+    "referee": {
+      "label": "Matchs planifiés par l'arbitrage",
+      "description": "Chaque match attend qu'un arbitre ou un admin fixe sa date et son heure (« À planifier »), puis « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.",
+      "finished": "Le tournoi est terminé : l'option n'est plus modifiable.",
+      "create": "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
+      "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
+      "warning": "À l'enregistrement, les matchs sans date et pas encore lancés quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire. Les matchs déjà lancés continuent."
+    },
+    "games": {
+      "OW": "Overwatch",
+      "MR": "Marvel Rivals"
+    }
+  },
+  "settings": {
+    "endurancePoints": "Capital d'endurance",
+    "endurancePointsHint": "Points de départ de chaque équipe. À 0, elle est éliminée.",
+    "enduranceWin": "Points par victoire de map",
+    "enduranceLoss": "Points par défaite de map",
+    "endurancePlayoff": "Équipes en play-offs",
+    "endurancePlayoffHint": "La phase d'endurance s'arrête à cet effectif. À 8, l'arbre suit le tableau du règlement (8v4, 6v2, 1v5, 3v7) avec petite finale.",
+    "enduranceMaxRounds": "Manches maximum",
+    "enduranceMaxRoundsHint": "0 = aucune limite : la phase court jusqu'à l'effectif ci-dessus. Sinon elle s'arrête à cette manche et les meilleures du classement sont qualifiées ; celles qui ne peuvent plus les rejoindre sortent avant la fin.",
+    "draws": "Égalités autorisées en qualification",
+    "drawsUnavailable": "Indisponible en saisie de score libre : il faut un format de match pour borner la rencontre.",
+    "drawsHint": "Une map nulle peut arrêter la rencontre avant l’objectif : le match se clôt alors sur 2-2, ou sur 2-1 si une seule map a été partagée. Le capital d’endurance se comptant map par map, il l’encaisse sans règle supplémentaire. L’arbre final, lui, exige toujours un vainqueur. Cocher cette case ouvre aussi le réglage « Maps décisives au maximum », plus haut.",
+    "playoffFormat": "Format des play-offs",
+    "playoffFormats": {
+      "MEME": "Le même qu’en qualification",
+      "BO": "Best of (BO)",
+      "FT": "First to (FT)"
+    },
+    "playoffFormatHint": "L’arbre final n’accepte jamais d’égalité, quel que soit ce réglage : il lui faut savoir qui joue le tour suivant. Le poser ici sert à jouer un vrai FT3 en play-offs quand la qualification tolère le nul.",
+    "playoffFormatValue": {
+      "BO": "Play-offs : manches jouées (impair)",
+      "FT": "Play-offs : manches à gagner"
+    },
+    "survivalFirstCut": "Manches avant la première coupe",
+    "survivalFirstCutHint": "Laisse le classement se former avant la première élimination.",
+    "survivalRounds": "Manches entre les coupes suivantes",
+    "survivalRoundsHint": "Cadence appliquée après la première coupe.",
+    "survivalExplain": "Toutes les équipes s'affrontent par paires selon leur classement. À chaque coupe, les deux dernières équipes sont éliminées, jusqu'à la championne. Si le nombre d'inscrites est impair, un barrage entre les deux dernières ouvre le tournoi — aucune victoire d'office n'est distribuée.",
+    "swissRounds": "Nombre de rondes",
+    "swissRecommended": {
+      "TEAM": "Recommandé pour {count} équipes : {rounds, plural, one {# ronde} other {# rondes}}.",
+      "SOLO": "Recommandé pour {count} joueurs : {rounds, plural, one {# ronde} other {# rondes}}."
+    },
+    "swissPoints": "Barème (victoire / nul / défaite)",
+    "swissPointsWin": "Points par victoire",
+    "swissPointsDraw": "Points par match nul",
+    "swissPointsLoss": "Points par défaite",
+    "swissByeHint": "Une victoire d'office rapporte autant qu'une victoire.",
+    "swissExplain": "Aucune élimination : toutes les équipes jouent les {rounds} rondes. À chaque ronde, on affronte une équipe ayant un total de points proche du sien, sans jamais rejouer le même adversaire tant que c'est possible. À égalité de points, le départage se fait au Buchholz (somme des points des adversaires rencontrés).",
+    "options": "Options supplémentaires",
+    "thirdPlace": "Petite finale",
+    "thirdPlaceHint": "Ajoute un match pour déterminer la 3ᵉ place entre les deux perdants des demi-finales."
+  },
+  "phases": {
+    "formats": {
+      "SINGLE": "Élimination simple",
+      "DOUBLE": "Double élimination",
+      "SWISS": "Ronde suisse",
+      "SURVIVAL": "Survie par coupes"
+    },
+    "summaryFinal": "{format} — phase finale",
+    "summaryCount": "{format} — {count, plural, one {# équipe} other {# équipes}}",
+    "summaryPercent": "{format} — {value} % qualifiées",
+    "issue": "Phase {index} — {message}",
+    "fallbackError": "Erreur de configuration des phases.",
+    "maxReached": "Maximum de phases atteint",
+    "add": "+ Ajouter une phase",
+    "maxReachedHint": "Maximum de {max} phases atteint.",
+    "previewTitle": "Aperçu du plan",
+    "modeHint": "Un nombre fixe fait sauter la phase si moins d'équipes se présentent ; un pourcentage s'adapte au nombre réel d'inscrites.",
+    "plan": {
+      "phase": "Phase {position}",
+      "teams": "{count, plural, one {# équipe} other {# équipes}}",
+      "qualifiers": "{count, plural, one {# qualifiée} other {# qualifiées}}",
+      "skipped": "{phase} — {format} : {teams} — ignorée ({reason})",
+      "reasonTooFew": "effectif insuffisant",
+      "reasonNoCut": "pas d'élimination",
+      "final": "{phase} — Finale — {format} : {teams}",
+      "qualify": "{phase} — {format} : {teams} → {qualifiers}"
+    },
+    "finalBadge": "Phase finale",
+    "moveUp": "Monter la phase {position}",
+    "moveDown": "Descendre la phase {position}",
+    "remove": "Supprimer la phase {position}",
+    "name": "Nom de la phase (optionnel)",
+    "namePlaceholder": "Phase {position}",
+    "format": "Format",
+    "mode": "Mode de qualification",
+    "modes": {
+      "COUNT": "Nombre d'équipes",
+      "PERCENT": "Pourcentage"
+    },
+    "qualifierValue": {
+      "COUNT": "Nombre d'équipes qualifiées",
+      "PERCENT": "Pourcentage qualifié"
+    },
+    "swissRounds": "Nombre de manches",
+    "auto": "Automatique",
+    "autoHint": "Laissez vide pour automatique."
+  }
+}
