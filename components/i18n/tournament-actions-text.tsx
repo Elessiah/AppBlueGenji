@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import type { Locale } from "@/lib/shared/locales";
 import {
   tournamentActionsText,
@@ -42,7 +42,7 @@ function buildValue(locale: Locale, messages: TournamentActionsClientMessages | 
   if (!messages) return { locale };
   return {
     locale,
-    errors: tournamentErrorsText(locale, messages.errors),
+    errors: messages.errors ? tournamentErrorsText(locale, messages.errors) : undefined,
     actions: messages.actions ? tournamentActionsText(locale, messages.actions) : undefined,
     image: messages.image ? tournamentImageText(locale, messages.image) : undefined,
     form: messages.form ? tournamentFormText(locale, messages.form) : undefined,
@@ -59,7 +59,21 @@ export function TournamentActionsTextProvider({
   // contenu identique, et un nouveau texte relancerait les effets qui le lisent.
   const [state, setState] = useState(() => ({ locale, value: buildValue(locale, messages) }));
   if (state.locale !== locale) setState({ locale, value: buildValue(locale, messages) });
-  return <TournamentActionsTextContext.Provider value={state.value}>{children}</TournamentActionsTextContext.Provider>;
+  // Un fournisseur imbriqué (l'édition sous la fiche) hérite des espaces qu'il
+  // ne porte pas : chaque mise en page n'envoie que les siens.
+  const parent = useContext(TournamentActionsTextContext);
+  const own = state.value;
+  const value = useMemo<ActionsTextValue>(
+    () => ({
+      locale: own.locale,
+      errors: own.errors ?? parent.errors,
+      actions: own.actions ?? parent.actions,
+      image: own.image ?? parent.image,
+      form: own.form ?? parent.form,
+    }),
+    [own, parent],
+  );
+  return <TournamentActionsTextContext.Provider value={value}>{children}</TournamentActionsTextContext.Provider>;
 }
 
 /** Table des refus de la page ; `fr` : celle du paquet. */

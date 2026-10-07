@@ -349,8 +349,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
               que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
               fois l'appareil abonné. */}
           {/* Réglage des notifications : français jusqu'au lot 9 (langue du
-              compte), annoncé comme tel sous `/en`. */}
-          <div lang={text.locale === "fr" ? undefined : "fr"}>
+              compte), annoncé comme tel sous `/en`. L'enveloppe ne fait pas de
+              boîte (`display: contents`) : panneau muet, aucun écart en plus. */}
+          <div className={styles.pushLang} lang={text.locale === "fr" ? undefined : "fr"}>
             <PushNotificationsPanel
               variant="compact"
               topics={["MATCH_START"]}

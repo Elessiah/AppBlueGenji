@@ -42,9 +42,13 @@ export type TournamentDialogsText = ScopedText<Leaves<TournamentDialogMessages>>
 export type TournamentImageText = ScopedText<Leaves<TournamentImageMessages>>;
 export type TournamentFormText = ScopedText<Leaves<TournamentFormMessages>>;
 
-/** Ce que la mise en page sérialise sous `/en` (rien en français). */
+/**
+ * Ce que la mise en page sérialise sous `/en` (rien en français). Un espace
+ * absent est hérité du fournisseur parent : l'édition, sous la fiche, n'ajoute
+ * que `form`.
+ */
 export type TournamentActionsClientMessages = {
-  errors: TournamentErrorMessages;
+  errors?: TournamentErrorMessages;
   actions?: TournamentActionMessages;
   image?: TournamentImageMessages;
   form?: TournamentFormMessages;
@@ -64,17 +68,22 @@ export function tournamentActionsMessages(messages: ActionsCatalog): TournamentA
   };
 }
 
-/**
- * Les espaces d'un formulaire de tournoi : refus, image, formulaire — et les
- * gestes pour l'édition (refus de la planification par l'arbitrage).
- */
-export function tournamentFormMessages(messages: ActionsCatalog, withActions = false): TournamentActionsClientMessages {
+/** Les espaces du formulaire de création : refus, image, formulaire. */
+export function tournamentFormMessages(messages: ActionsCatalog): TournamentActionsClientMessages {
   return {
     errors: messages.tournamentErrors,
     image: messages.tournamentImage,
     form: messages.tournamentForm,
-    ...(withActions ? { actions: messages.tournamentActions } : {}),
   };
+}
+
+/**
+ * L'espace propre au formulaire d'édition : le formulaire seul. Les refus et
+ * l'image viennent du fournisseur de la fiche (`[id]/layout.tsx`), qui
+ * l'enveloppe déjà — les reposer enverrait deux fois ~30 Ko d'anglais.
+ */
+export function tournamentEditFormMessages(messages: Pick<Messages, "tournamentForm">): TournamentActionsClientMessages {
+  return { form: messages.tournamentForm };
 }
 
 export function tournamentErrorsText(locale: Locale, messages: TournamentErrorMessages): TournamentErrorsText {

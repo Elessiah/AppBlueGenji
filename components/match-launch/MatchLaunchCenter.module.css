@@ -39,6 +39,12 @@
   padding: var(--modal-pad) var(--modal-pad) 18px;
 }
 
+/* Porte seulement la langue du réglage des notifications : sans boîte, un
+   panneau qui se tait (appareil abonné) ne laisse pas d'écart de 18 px. */
+.pushLang {
+  display: contents;
+}
+
 .modal[data-phase="LOBBY"] {
   border-color: rgba(255, 176, 92, 0.45);
 }

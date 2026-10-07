@@ -3,7 +3,7 @@ import { siteTitle } from "@/lib/shared/page-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
-import { tournamentFormMessages } from "@/lib/shared/tournament-actions-text";
+import { tournamentEditFormMessages } from "@/lib/shared/tournament-actions-text";
 import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
 
 type MetadataProps = {
@@ -43,14 +43,13 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
 }
 
 /**
- * Pose les textes du formulaire : refus, gestes (planification par
- * l'arbitrage), image et formulaire — l'anglais sous `/en` seulement. Le
- * fournisseur remplace celui de la fiche (`[id]/layout.tsx`) : il porte donc
- * tout ce que l'édition lit.
+ * Pose le texte du formulaire — l'anglais sous `/en` seulement. Les refus et
+ * l'image sont hérités du fournisseur de la fiche (`[id]/layout.tsx`), qui
+ * enveloppe déjà cette page : les reposer ici les sérialiserait deux fois.
  */
 export default async function EditTournamentLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? tournamentFormMessages(messagesFor(locale), true) : undefined;
+  const messages = locale === "en" ? tournamentEditFormMessages(messagesFor(locale)) : undefined;
   return (
     <TournamentActionsTextProvider locale={locale} messages={messages}>
       {children}
