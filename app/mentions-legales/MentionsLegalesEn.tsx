@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { CyberButton } from "@/components/cyber";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { EnglishLegalLink } from "@/components/legal/EnglishLegalLink";
+import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { TranslationNotice } from "@/components/legal/TranslationNotice";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
@@ -287,7 +288,8 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
         <p>
           <strong>Anyone</strong>, user or not, can report illegal content — copyright infringement in
           particular — with the <strong>“{REPORT_FORM_NAME_EN}”</strong> button at the bottom of
-          every page. A copyright notice states {copyrightNoticeElementsTextEn()}. {NOTIFIER_FOLLOW_UP_EN}
+          every page. A copyright notice states {copyrightNoticeElementsTextEn()}.{" "}
+          <EnglishLegalText text={NOTIFIER_FOLLOW_UP_EN} />
         </p>
         <p>
           A reported team logo or player avatar can be <strong>hidden</strong> without delay: it is no
@@ -346,8 +348,8 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
           activities. It is not reserved to the association: what the site publishes can be read by other
           players and the public, and some data is disclosed to third-party services — Discord, Google,
           Blizzard, your browser&apos;s push service, Hetzner (Germany) for encrypted backups,
-          Microsoft, without encryption of the association&apos;s own, for the mailbox of the person to
-          contact for your requests, Google (Gmail) for the association&apos;s email, as well as the
+          Microsoft for the mailbox of the person to contact for your requests (with no encryption added
+          by the association), Google (Gmail) for the association&apos;s email, as well as the
           telephone operators of that person and of the association if you call them or leave them a text
           or voice message, and Spiceworks for the support portal —, within the limits described in the{" "}
           <EnglishLegalLink href="/rgpd#destinataires">“Recipients and transfers”</EnglishLegalLink>{" "}

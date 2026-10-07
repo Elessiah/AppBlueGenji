@@ -1,6 +1,6 @@
 import { EnglishLegalLink } from "@/components/legal/EnglishLegalLink";
+import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { TranslationNotice } from "@/components/legal/TranslationNotice";
-import { EmphasisText } from "@/components/rules/EmphasisText";
 import { TERMS_PATH, TERMS_UPDATED_AT, TERMS_VERSION, formatTermsDateIn } from "@/lib/shared/terms-of-use";
 import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 import styles from "./page.module.css";
@@ -57,7 +57,7 @@ export function TermsOfUseEn() {
                 </h2>
                 {section.paragraphs.map((paragraph, paragraphIndex) => (
                   <p key={paragraphIndex} /* NOSONAR S6479 — paragraphes d'un texte constant, jamais réordonnés */>
-                    <EmphasisText text={paragraph} />
+                    <EnglishLegalText text={paragraph} />
                   </p>
                 ))}
                 {section.links?.map((link) => (
