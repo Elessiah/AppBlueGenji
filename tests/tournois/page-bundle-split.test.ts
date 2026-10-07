@@ -7,7 +7,7 @@ import {
   orReload,
   reloadAfterChunkError,
   type LazyReloadEnv,
-} from "@/app/(secured)/tournois/[id]/_lib/lazy-component";
+} from "@/lib/shared/lazy-component";
 
 /**
  * Découpage du paquet de la fiche tournoi. La panne est muette : un `import`

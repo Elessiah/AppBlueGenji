@@ -54,10 +54,11 @@ import {
   phaseIssueText,
   phasePlanText,
   phaseSummaryText,
+  useFormText,
 } from "@/app/(secured)/tournois/_lib/form-text";
 import { FR_IMAGE_TEXT, imageErrorText, imageSuccessText } from "@/app/(secured)/tournois/_lib/image-text";
 import { createDefaultPhase, phaseFormatLabel, phaseIssueMessage, phaseSummary } from "@/app/(secured)/tournois/creer/phase-form";
-import { FR_ERRORS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/error-map";
+import { FR_ERRORS_TEXT, mapError, useErrorsText } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 import {
   FINISHED_EDIT_NOTICE,
   editLockNotice,
@@ -243,6 +244,14 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     expect(layout).not.toMatch(/from "@\/components\/match-launch\/MatchLaunchCenter"/);
     const lazy = readFileSync(path.join(process.cwd(), "components/match-launch/MatchLaunchCenterLazy.tsx"), "utf8");
     expect(lazy).toContain("ssr: false");
+    // Un morceau disparu recharge la page (jamais l'écran d'erreur), et ce qui
+    // arrive avant lui (choix de confidentialité, ouverture demandée) est retenu.
+    expect(lazy).toContain('orReload(import("./MatchLaunchCenter")');
+    expect(lazy).toContain("addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT");
+    expect(lazy).toContain("addEventListener(MATCH_LAUNCH_OPEN_EVENT");
+    expect(lazy).toContain("privacyPending={privacyPending && !privacyAnswered} requestedMatchId={requestedMatchId}");
+    const center = readFileSync(path.join(process.cwd(), "components/match-launch/MatchLaunchCenter.tsx"), "utf8");
+    expect(center).toContain("useState<number | null>(requestedMatchId)");
   });
 });
 
@@ -299,10 +308,27 @@ describe("route et référencement", () => {
     expect(panel).toContain("toastLang ? { lang: toastLang } : undefined");
   });
 
-  it("l'édition lit refus et image du fournisseur de la fiche, le formulaire du sien", () => {
-    const html = renderEdit(<TournamentImagePicker existing={null} value={initialImagePickerValue(null)} onChange={noop} />);
+  it("l'édition lit les refus du fournisseur de la fiche, le formulaire du sien", () => {
+    function Probe() {
+      const errors = useErrorsText();
+      const { t } = useFormText();
+      return <p>{`${errors.locale}|${mapError("TOURNAMENT_NOT_FOUND", errors)}|${t("meta.editTitle")}`}</p>;
+    }
+    const html = renderEdit(<Probe />);
+    expect(html).toContain(`en|${mapError("TOURNAMENT_NOT_FOUND", { locale: "en", messages: EN.tournamentErrors })}|${EN.tournamentForm.meta.editTitle}`);
+  });
+
+  it("le sélecteur d'image porte ses deux langues : la langue seule suffit", () => {
+    const picker = <TournamentImagePicker existing={null} value={initialImagePickerValue(null)} onChange={noop} />;
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <TournamentActionsTextProvider locale="en">
+          <ToastProvider>{picker}</ToastProvider>
+        </TournamentActionsTextProvider>
+      </AppLocaleProvider>,
+    );
     expectNoFrench(html);
-    expect(html).toBe(render("en", <TournamentImagePicker existing={null} value={initialImagePickerValue(null)} onChange={noop} />));
+    expect(html).toBe(render("en", picker));
   });
 });
 
