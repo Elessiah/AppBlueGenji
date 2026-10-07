@@ -1,0 +1,594 @@
+RGPD · ARTICLE 30
+Registre des
+traitements
+Le registre décrit les traitements de données personnelles du site et du bot Discord de l'association, rubrique par rubrique selon le modèle de la CNIL. Il est public : chacun peut le consulter ou le télécharger, sans compte et sans demande.
+Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
+Télécharger le registre (tableur CSV)← Politique de confidentialité
+RESPONSABLE
+ActeursMIS À JOUR LE 06/10/2026
+Responsable du traitement
+Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
+Contact
+Demandes relatives aux données : Keryan Houssin, hébergeur technique du site, chargé par l'association de les recevoir — courriel et téléphone (politique de confidentialité et mentions légales du site) —, ou formulaire « Signaler un problème » du site (pied de page), catégorie « RGPD » ; l'association : courriel et téléphone (mentions légales du site)
+Personne à contacter pour les demandes relatives aux données
+Keryan Houssin, hébergeur technique du site, chargé par l'association de recevoir les demandes relatives aux données (coordonnées données avec celles du responsable du traitement). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement
+Hébergeur (sous-traitant)
+Keryan Houssin (particulier, bénévole de l'association), 13 rue du Chemin Fourchue, 14000 Caen, France — sous-traitant (contrat de sous-traitance (RGPD, art. 28) rédigé, en attente de signature par l'association et l'hébergeur), données hébergées en France (site et bot Discord sur un Raspberry Pi, à Caen)
+17 TRAITEMENTS
+Activités de traitement
+T01 Comptes joueurs et profilsT02 AuthentificationT03 Tournois, équipes et palmarèsT04 Contact des joueurs pendant un tournoiT05 Journal d'activité du staff sur DiscordT06 Mesure d'audience du siteT07 Présentation de l'association et recrutement de bénévolesT08 Bot Discord BlueGenjiT09 SauvegardesT10 Information des joueurs sur les changements de politiqueT11 Signalements, contestations et modération des contenus et des comptesT12 Notifications pushT13 Acceptation des conditions d'utilisationT14 Journal des données de connexionT15 Portail de support (Spiceworks)T16 Retransmission des matchsT17 Journaux d'accès du serveur web
+T01 Comptes joueurs et profils
+Finalité principale
+Permettre aux joueurs de disposer d'un compte sur la plateforme de tournois
+Sous-finalités
+Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)
+Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)
+Exporter ses données et supprimer son compte depuis « Mon profil »
+Base légale
+Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles
+Personnes concernées
+Joueurs inscrits sur le site
+Données
+Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)
+Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord
+Majorité déclarée (oui / non / non renseignée)
+Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme
+Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale
+Données sensibles
+Aucune
+Conservation
+Durée du compte
+À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seul le compte anonymisé reste, avec son historique de tournois et d'équipes ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, 30 jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, 60 jours) ; les signalements envoyés par le compte en sont détachés et suivent leur propre durée (T11), et les gestes d'arbitrage d'un membre du staff restent nommés dans les journaux du serveur, selon leur rotation (T05)
+Sessions de connexion : 30 jours après la connexion
+Destinataires
+Public du site (seules les données que le joueur rend visibles)
+Joueurs d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)
+Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible
+Staff de l'association selon son rôle (administration, arbitrage)
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Jetons de session stockés sous forme d'empreinte (SHA-256), cookie httpOnly
+Pas de mot de passe : connexion déléguée à Google, Discord ou Blizzard, ou code à usage unique
+T02 Authentification
+Finalité principale
+Connecter un joueur à son compte sans mot de passe
+Sous-finalités
+Connexion par Google, Discord ou Blizzard (OAuth)
+Connexion par code à six chiffres envoyé en message privé Discord par le bot
+Rattachement de plusieurs moyens de connexion à un même compte
+Base légale
+Exécution du service demandé par le joueur (contrat)
+Personnes concernées
+Joueurs inscrits sur le site
+Données
+Identifiants techniques opaques Google, Discord et Blizzard
+Identifiant Discord et pseudo Discord (connexion par code ou par bouton), enregistré sans être certifié — la certification, qui l'expose, est un geste distinct (T04)
+Porte de rattachement du compte Discord (bouton OAuth ou code en message privé)
+Code de connexion (conservé uniquement sous forme d'empreinte), nombre d'essais
+Adresse IP, en mémoire pour limiter les essais ; celle d'une connexion réussie est écrite au journal des données de connexion (T14), pour la seule obligation légale de l'hébergeur
+Données sensibles
+Aucune
+Conservation
+Identifiants de connexion : durée du compte, ou jusqu'au détachement du fournisseur ; effacés à la suppression du compte (seul le journal des données de connexion, T14, lui survit, hors les copies de sauvegarde chiffrées, T09, 30 jours au plus)
+Codes de connexion : valables 10 minutes, purgés un jour après expiration, effacés à la suppression du compte
+Destinataires
+Google, Discord et Blizzard, qui authentifient le joueur (responsables de leur propre traitement)
+Discord, qui achemine le message privé contenant le code
+Transferts hors UE
+Possibles vers les États-Unis, selon le fournisseur que le joueur choisit pour se connecter — Google et Discord, certifiés EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework) ; Blizzard : clauses contractuelles types de la Commission européenne (art. 46 RGPD), intégrées à ses conditions d'utilisation
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Jeton anti-CSRF et état scellé à l'aller pour chaque connexion OAuth
+Cinq essais par code, cinq codes par quart d'heure et par compte, plafonds de débit par adresse IP
+Seules les autorisations minimales sont demandées aux fournisseurs (ni adresse e-mail, ni liste de serveurs)
+T03 Tournois, équipes et palmarès
+Finalité principale
+Organiser des tournois amateurs et en conserver les résultats
+Sous-finalités
+Constituer des équipes (membres, rôles, invitations)
+Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)
+Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores
+Publier résultats, classements, statistiques et palmarès
+Base légale
+Intérêt légitime (organisation des compétitions, mémoire sportive de la scène)
+Personnes concernées
+Joueurs inscrits
+Membres d'équipe
+Staff d'arbitrage
+Données
+Appartenance à une équipe et rôles d'équipe
+Inscriptions, scores, forfaits, pénalités (avec motif et arbitre auteur), classements
+Détail map par map d'un match : score et code de replay de chaque map (le replay montre en jeu les identifiants des joueurs, BattleTag masqué compris), compte qui l'a saisi
+Données sensibles
+Aucune
+Conservation
+Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)
+Codes de replay : gardés avec le résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le lien vers le compte qui les a saisis est effacé à la suppression du compte, les codes restent (la partie est conservée par l'éditeur du jeu)
+Droit d'opposition ouvert sur demande
+Destinataires
+Public du site
+Staff d'arbitrage et d'administration
+Discord, qui achemine le message privé d'une demande d'adhésion
+Transferts hors UE
+États-Unis : Discord (acheminement des messages privés) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Modification d'un score verrouillée dès que la manche suivante est entamée
+T04 Contact des joueurs pendant un tournoi
+Finalité principale
+Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait)
+Sous-finalités
+Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé (dès la phase d'inscription)
+Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé
+Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match
+Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement
+Envoyer des rappels de match en message privé Discord (une semaine, 24 h et 1 h avant)
+Alerter le rôle arbitre (conflit de score, report expiré, signalement d'un joueur)
+Base légale
+Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour les rappels de match et les alertes d'arbitrage
+Personnes concernées
+Joueurs engagés dans un tournoi
+Arbitres
+Casters inscrits sur un match
+Données
+Pseudo et identifiant Discord
+BattleTag
+Date et adversaire du match
+Heure à laquelle chaque partie s'est déclarée prête, caster inscrit
+Motif d'un signalement
+Données sensibles
+Aucune
+Conservation
+Pseudo certifié : jusqu'à sa modification ou la suppression du compte
+Traces d'envoi des rappels et alertes (match et palier, sans contenu) : conservées avec le match, donc sans limite de durée
+« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués
+Destinataires
+Administrateurs et arbitres de l'association
+Joueurs et caster d'un même match, de son lancement à sa fin
+Discord, qui achemine les messages
+Transferts hors UE
+États-Unis : Discord (acheminement des messages privés) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Pseudo non certifié invisible de tous, administrateurs compris ; pseudo certifié jamais montré à un visiteur sans compte
+Contacts d'un match servis aux seules parties du match, jamais dans l'instantané public du tournoi
+T05 Journal d'activité du staff sur Discord
+Finalité principale
+Tenir le staff informé des faits marquants de la plateforme
+Sous-finalités
+Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures
+Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière), pour la modération
+Base légale
+Intérêt légitime (administration et contrôle de l'arbitrage)
+Personnes concernées
+Staff
+Données
+Sur Discord : noms d'équipe, scores, noms des tournois — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)
+Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage
+Données sensibles
+Aucune
+Conservation
+Messages Discord : conservés dans un salon réservé au staff, purgé à la main par l'association et par le bot au bout de 365 jours (un an), par lots — plusieurs nuits pour un arriéré important (traitement T08)
+Journaux du serveur : selon leur rotation automatique
+Destinataires
+Staff de l'association ayant accès au salon
+Discord (hébergement du salon)
+Responsable technique (journaux du serveur)
+Transferts hors UE
+États-Unis : Discord — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Salon privé, accès restreint par rôle Discord
+T06 Mesure d'audience du site
+Finalité principale
+Connaître la fréquentation du site
+Sous-finalités
+Compter visites (24 h, 7 jours, 30 jours, total) et visiteurs uniques (24 h, 7 jours, 30 jours, 25 mois)
+Base légale
+Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie de mesure ni traceur tiers ; droit d'opposition (art. 21) appliqué par le site lui-même — signaux Global Privacy Control et Do Not Track du navigateur, ou bouton d'opposition de /rgpd#audience (cookie bg_audience_optout, sans identifiant) : une visite refusée n'est pas enregistrée, le serveur relisant ces signaux, et n'est pas même transmise quand le navigateur les expose à la page. Pour les visites déjà enregistrées, le droit s'exerce comme les autres droits : auprès de la personne à contacter pour les demandes relatives aux données, par le formulaire de signalement, catégorie RGPD, ou auprès de l'association
+Personnes concernées
+Visiteurs du site
+Données
+Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : donnée pseudonymisée — sans le secret, elle ne se rattache à personne, mais l'association, qui le détient, peut recalculer l'empreinte d'un compte ou d'un couple IP et navigateur
+Page consultée (sans paramètres d'URL), date
+Indicateur « visiteur connecté » (oui / non), sans le compte concerné
+Plusieurs chargements d'un même visiteur en 30 minutes ne comptent qu'une visite
+Données sensibles
+Aucune
+Conservation
+Détail des visites (empreinte, page, date) effacé au bout de 31 jours, après report dans un compteur par jour qui ne garde que le nombre de visites
+Une empreinte par visiteur, sans page mais avec l'indicateur « visiteur connecté » et la date de la dernière visite, effacée 25 mois après cette dernière visite (y compris après la suppression du compte, qui ne l'efface pas plus tôt) ; les empreintes antérieures à cette règle sont datées de sa mise en place
+Adresse IP, navigateur et identifiant du compte jamais enregistrés tels quels
+Destinataires
+Staff de l'association
+Tout membre d'un serveur Discord où le bot est installé, pour les seuls totaux (visites et visiteurs), par la commande publique /stats-site
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Aucun cookie de mesure — une seule valeur de stockage de session (bg:last-visit-ping), jamais transmise, évite de signaler deux fois un même chargement ; le secret de salage n'est ni en base ni dans les sauvegardes, et sans lui aucune visite n'est comptée
+Opposition relue côté serveur (en-têtes Sec-GPC et DNT, cookie d'opposition) : une visite refusée n'est ni hachée, ni décomptée du plafond de débit, ni écrite
+T07 Présentation de l'association et recrutement de bénévoles
+Finalité principale
+Présenter le bureau et les bénévoles, et recruter
+Sous-finalités
+Page « Association » : membres du bureau et bénévoles
+Annonces de recrutement avec un contact Discord ou un lien
+Base légale
+Consentement des bénévoles et membres du bureau concernés
+Personnes concernées
+Membres du bureau
+Bénévoles
+Auteurs d'annonces de recrutement
+Données
+Nom, prénom et pseudo, catégorie ou fonction, date d'arrivée, photo
+Pseudo et identifiant Discord ou lien de contact d'une annonce
+Données sensibles
+Aucune
+Conservation
+Durée de l'engagement dans l'association, ou de publication de l'annonce
+Destinataires
+Public du site
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+T08 Bot Discord BlueGenji
+Finalité principale
+Fournir les services du bot sur les serveurs Discord partenaires
+Sous-finalités
+Relais des annonces entre les salons des serveurs partenaires, répercussion des modifications et suppressions, temps de recharge, compteur de messages de /stats, statistiques du tableau de bord, retrait des copies d'un utilisateur exclu
+Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur
+Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)
+Confirmation des adhésions à l'association et rappels programmés sur ses serveurs
+Remise des messages rédigés par le site : codes, rappels, avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un
+Base légale
+Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine
+Personnes concernées
+Utilisateurs Discord des serveurs où le bot est installé
+Administrateurs et modérateurs de ces serveurs
+Adhérents de l'association dont l'adhésion est confirmée par le bot
+Données
+Annonces relayées : identifiants du message d'origine et de son auteur, date, identifiants des copies et de leurs salons (contenu recopié dans les salons partenaires, jamais enregistré en base)
+Scrims et recrutement : identifiant de l'auteur, jeu, niveau ou rôle (choisi dans une liste fermée ; texte libre pour les annonces antérieures à cette règle, gardé aussi dans les nombres par jour), serveur, date ; au-delà de 30 jours, seulement des nombres par jour, serveur et niveau ou rôle
+Fil d'activité public de la page du bot : heure, type d'évènement (relais, scrim, recrutement, connexion), nom du serveur, niveau ou rôle — sans identifiant Discord
+Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list
+Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée
+Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée
+Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)
+Données sensibles
+Aucune
+Conservation
+Suivi des annonces relayées : 7 jours, effacé au relais suivant cette échéance et au plus tard dans la nuit ou au redémarrage du bot ; les copies publiées dans les salons partenaires restent sur Discord jusqu'à leur suppression (par l'auteur dans ce délai, ensuite par les administrateurs de chaque serveur)
+Scrims et recrutement : 30 jours ; ensuite, dans la nuit qui suit (ou à un redémarrage), identifiant de l'auteur effacé et lignes repliées en nombres par jour, serveur et niveau ou rôle, gardés sans limite de durée comme historique de l'activité du bot
+Exclusions : enregistrement jusqu'à la levée de l'exclusion ; son avis et son motif (salon de journal privé du staff, et motif copié en message privé au titulaire du bot) sont supprimés à la levée — pour une exclusion antérieure à cette règle, seul le motif publié au salon, le reste suivant la durée du salon de journal
+Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)
+Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)
+Fil d'activité : 30 jours, supprimé dans la nuit qui suit
+Salon de journal privé du staff, et messages privés du bot au titulaire : 365 jours (un an), puis supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée
+Journaux du serveur : selon leur rotation automatique
+Sauvegardes : 30 jours au plus (traitement T09)
+Destinataires
+Staff de l'association (modération, administration)
+Titulaire du bot (son hébergeur technique), pour les motifs d'exclusion reçus en message privé
+Utilisateur exclu, qui reçoit le motif de son exclusion en message privé quand il publie une annonce dans un salon relayé
+Membres du salon où /scrim ou /recrute est utilisée (réponse publique de la commande)
+Membres du rôle d'arbitrage de chaque serveur qui en a défini un (/set-referee-role), pour les alertes d'arbitrage du site
+Membres des serveurs partenaires, qui lisent les annonces relayées
+Administrateurs de tout serveur où le bot est installé (y compris un serveur créé pour l'y inviter) et titulaires du rôle d'administration du bot (/set-bot-admin), pour la liste des exclusions du réseau (/ban-list, réponse visible du seul demandeur) — l'exclusion vaut pour tout le réseau, chaque serveur doit savoir qui ne peut plus y publier
+Discord (plateforme d'exécution)
+Transferts hors UE
+États-Unis : Discord — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+T09 Sauvegardes
+Finalité principale
+Reprendre l'activité après une panne, une corruption ou une erreur de manipulation
+Sous-finalités
+Archive hebdomadaire des bases de données du site et du bot
+Copie horaire des images téléversées (avatars, logos, photos)
+Journal des suppressions de compte, rejoué après toute restauration
+Base légale
+Intérêt légitime (continuité du service)
+Personnes concernées
+Toutes les personnes des autres traitements du registre
+Données
+Copie de l'ensemble des données ci-dessus
+Journal des suppressions : identifiant et date de création du compte, date de suppression
+Données sensibles
+Aucune
+Conservation
+Archives : 30 jours au plus, puis suppression définitive
+Images : le temps de leur présence sur le site (retirées dans l'heure qui suit leur suppression)
+Journal des suppressions : 60 jours par entrée
+Copie de la base du bot écrite à côté d'elle avant une restauration (non chiffrée, sur la machine du bot) : supprimée à la restauration réussie suivante, au plus tard dans la nuit qui suit ses 30 jours
+Destinataires
+Keryan Houssin, responsable technique de l'association et hébergeur du site (sous-traitant — contrat de sous-traitance (RGPD, art. 28) rédigé, en attente de signature par l'association et l'hébergeur), seul détenteur des clés de déchiffrement
+Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant ultérieur de l'association par l'hébergeur du site, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen, qui stocke les copies chiffrées sans pouvoir les lire
+Transferts hors UE
+Aucun
+Sécurité
+Chiffrement sur le serveur du site avant tout envoi (age pour les archives, remote rclone de type crypt pour les images, les logos masqués et le journal — vérifié en production le 30 septembre 2026, maintenu pour le stockage chez Hetzner) : clés détenues par le seul hébergeur du site, Keryan Houssin, et jamais transmises à Hetzner
+Envoi chiffré en transit (HTTPS/TLS)
+Suppression définitive, sans corbeille ni historique de versions chez le fournisseur du stockage
+Clé privée des archives conservée hors du serveur ; clé des images et du journal sur le seul serveur, avec une copie de secours hors du serveur
+Suppressions de compte rejouées avant toute remise en service après restauration
+T10 Information des joueurs sur les changements de politique
+Finalité principale
+Informer chaque compte d'un changement du traitement de ses données
+Sous-finalités
+Présenter à la visite suivante les changements publiés dont le compte n'a pas encore pris connaissance (« J'ai pris connaissance » — aucun accord n'est demandé)
+Annoncer chaque changement une fois en message privé Discord aux comptes joignables qui n'en ont pas pris connaissance sur le site, une semaine après sa publication et au plus un message par mois
+Base légale
+Obligation légale d'information (RGPD, articles 12 à 14)
+Personnes concernées
+Joueurs inscrits sur le site
+Données
+Changements dont le compte a pris connaissance, avec la date
+Annonces Discord déjà envoyées au compte, avec leur date
+Identifiant Discord ou pseudo Discord certifié, pour adresser l'annonce
+Données sensibles
+Aucune
+Conservation
+Durée du compte (effacées avec lui)
+Destinataires
+Le joueur lui-même
+Discord, qui achemine le message privé
+Transferts hors UE
+États-Unis : Discord (acheminement des messages privés) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Une annonce réservée avant l'envoi, pour qu'aucun compte ne la reçoive deux fois
+T11 Signalements, contestations et modération des contenus et des comptes
+Finalité principale
+Recevoir et traiter les signalements adressés à l'association, dont les notifications de contenu illicite
+Sous-finalités
+Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, RGPD, hébergeur, autre)
+Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester ; permettre à l'auteur d'un signalement de contester la décision prise
+Masquer un logo d'équipe ou un avatar de joueur signalé, puis le rétablir ou le supprimer définitivement ; retirer une image hors de tout signalement, sur un motif saisi par la modération
+Suspendre un compte contraire aux conditions d'utilisation (sessions fermées, connexion refusée pendant la suspension), en exposer les motifs à son titulaire, puis la lever ou la laisser échoir
+Accuser réception d'une notification de contenu illicite, puis notifier à son auteur la décision et les voies de recours
+Répondre aux demandes d'exercice des droits et aux demandes adressées à l'hébergeur, dont celles des autorités
+Recevoir par courriel ou par téléphone, auprès de la personne à contacter pour les demandes relatives aux données, les demandes d'exercice des droits et les questions sur le traitement des données, et y répondre
+Recevoir les demandes adressées au courriel ou au téléphone de l'association elle-même (publiés, protégés, sur les mentions légales), et y répondre
+Alerter les administrateurs sur Discord, sans donnée nominative
+Base légale
+Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire respecter ses conditions d'utilisation pour la modération des contenus et des comptes qui y sont contraires — examen, masquage, retrait d'une image, suspension d'un compte, et conservation de la décision le temps de sa contestation ; obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres ; par courriel ou par téléphone comme par le formulaire (catégorie RGPD), une demande d'exercice des droits ou une question sur le traitement de ses données — qui relève du droit d'accès (RGPD, art. 15) — repose sur la même obligation légale
+Personnes concernées
+Signalants, utilisateurs ou non (titulaires de droits, représentants, visiteurs)
+Joueurs et membres des équipes visés par un signalement
+Personnes, membres ou non, qui adressent une demande relative à leurs données par courriel ou par téléphone
+Personnes qui écrivent ou téléphonent à l'association
+Données
+Catégorie, description, éléments désignés et page d'origine du signalement
+Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, le nom ou la raison sociale de son auteur, son adresse électronique, sa qualité (titulaire des droits, représentant ou tiers), le contenu visé et où le voir sur le site, la raison de la demande et une déclaration de bonne foi
+Contestations : texte, compte de leur auteur et adresse facultative
+Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance ; motif d'un retrait décidé hors signalement (transmis à l'équipe ou au joueur, non conservé par le site)
+Suspensions de compte : compte visé, faits retenus, clause invoquée, dates de début, d'échéance et de levée, membre de la modération qui l'a prononcée ou levée
+Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande et de la réponse, adresse électronique ou numéro de l'expéditeur, et souvent son nom
+Demandes reçues au courriel ou au téléphone de l'association : mêmes données
+Données sensibles
+Aucune
+Conservation
+Signalement et contestations : durée du traitement, puis 30 jours après l'archivage (6 mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (6 mois au plus après la décision)
+Demande reçue par courriel ou par téléphone : même règle qu'une demande RGPD faite depuis le formulaire — durée du traitement, puis 30 jours après la clôture de la demande (l'équivalent de l'archivage d'un signalement), avant suppression de la messagerie de la personne à contacter (courriel) ou de son téléphone (SMS reçus et envoyés, messagerie vocale, journal d'appels)
+Demande reçue au courriel ou au téléphone de l'association : même règle — durée du traitement, puis 30 jours après sa clôture, avant suppression de la messagerie ou du téléphone de l'association
+Logo ou avatar masqué : 6 mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision
+Suspension de compte : tant qu'elle court, puis 6 mois après sa levée ou son échéance (même délai de contestation), effacée lors de la première connexion au site qui suit ce délai ; effacée avec le compte, ou à son anonymisation
+Destinataires
+Administrateurs de l'association
+Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant
+Titulaire d'un compte suspendu : la décision, les faits retenus et la clause invoquée, jamais le nom du membre de la modération qui l'a prononcée
+Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)
+Keryan Houssin, hébergeur technique du site, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone
+Opérateur téléphonique de cette personne : demandes faites par téléphone (appel, SMS, messagerie vocale)
+Microsoft, qui héberge la messagerie de cette personne (compte Microsoft personnel (Outlook.com), régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft ; messages non chiffrés par l'association, lisibles par Microsoft) : demandes reçues et réponses envoyées par courriel
+Membres du bureau de l'association qui relèvent son courriel et son téléphone
+Google (messagerie Gmail de l'association, hébergée par Google ; messages non chiffrés par l'association, lisibles par Google) : demandes reçues et réponses envoyées par le courriel de l'association
+Opérateur téléphonique de la ligne de l'association : demandes faites à son téléphone
+Transferts hors UE
+États-Unis : Discord (acheminement des alertes et des messages privés) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Possibles vers les États-Unis : Microsoft (messagerie Outlook.com de la personne à contacter, demandes reçues et réponses envoyées par courriel) — Microsoft, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Possibles vers les États-Unis : Google (messagerie Gmail de l'association) — Google, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées
+Plafonds d'envoi par personne et par heure
+Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs
+Suspension réservée à la permission de modération, impossible sur son propre compte ou sur celui d'un administrateur ; le journal Discord du staff n'en porte ni le pseudo du joueur ni le motif
+Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft ou de Google (messageries), des opérateurs téléphoniques et des appareils qui les reçoivent
+T12 Notifications push
+Finalité principale
+Prévenir un joueur sur ses appareils, à sa demande, de ce qui le concerne sur le site
+Sous-finalités
+Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, rappels de match
+Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données
+Alertes d'arbitrage et de modération pour le staff qui détient ces rôles
+Base légale
+Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)
+Personnes concernées
+Joueurs inscrits qui activent les notifications sur un appareil
+Données
+Adresse d'abonnement de l'appareil, fournie par le navigateur, et ses clés de chiffrement
+Date d'abonnement et de la dernière notification remise
+Sujets de notification coupés par le compte
+Données sensibles
+Aucune
+Conservation
+Abonnement : jusqu'à sa désactivation, sa révocation par le navigateur, ou la suppression du compte
+Abonnement resté sans notification remise : 180 jours au plus
+Sujets coupés : durée du compte
+Destinataires
+Le joueur lui-même
+Le service de push de son navigateur (Google, Mozilla, Apple ou Microsoft), qui achemine un message chiffré qu'il ne peut pas lire
+Transferts hors UE
+États-Unis : service de push du navigateur choisi par le joueur, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — Google, Mozilla, Apple et Microsoft, certifiés EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Contenu chiffré pour le seul appareil abonné ; envois signés par la clé du site (VAPID)
+Aucun pseudo de joueur dans une notification
+Services de push acceptés limités à ceux des navigateurs du marché
+T13 Acceptation des conditions d'utilisation
+Finalité principale
+Garder la preuve que les conditions d'utilisation du site ont été acceptées, et laquelle de leurs versions
+Sous-finalités
+Recueillir l'acceptation à la création du compte, à la création d'une équipe et en recevant la gestion d'une équipe
+Redemander l'acceptation quand les conditions changent de version
+Base légale
+Exécution du service demandé par le joueur (contrat)
+Personnes concernées
+Joueurs inscrits sur le site
+Données
+Version acceptée, contexte de l'acceptation (création du compte, connexion, création ou gestion d'une équipe), date
+Données sensibles
+Aucune
+Conservation
+Durée du compte
+À la suppression : effacement complet, que le compte soit effacé ou anonymisé — le détail des acceptations comme la dernière version acceptée et sa date
+Destinataires
+Le joueur lui-même, par l'export de ses données
+Responsable technique de l'association, qui administre la base
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+T14 Journal des données de connexion
+Finalité principale
+Conserver les données permettant d'identifier l'auteur d'un contenu publié par un membre (logo, avatar, nom d'équipe), que l'association héberge
+Sous-finalités
+Consigner chaque ouverture de session (adresse IP, date et heure, moyen de connexion)
+Communiquer ces données à une autorité judiciaire qui les requiert, et à elle seule
+Base légale
+Obligation légale (RGPD, art. 6.1.c) de l'hébergeur de contenus : LCEN, art. 6 ; décret n° 2021-1362
+Personnes concernées
+Joueurs inscrits sur le site
+Données
+Identifiant interne du compte
+Adresse IP de connexion, telle que la retient le serveur mandataire du site
+Date et heure de la connexion, moyen de connexion (Google, Discord, Blizzard ou code en message privé)
+Ni port source de la connexion, ni journal de la création ou de la modification des contenus (seules les ouvertures de session sont consignées), ni informations fournies à la création du compte : celles-ci partent avec le compte (hors les copies de sauvegarde chiffrées et le journal des suppressions, T09)
+Données sensibles
+Aucune
+Conservation
+365 jours (un an) après chaque connexion, puis effacement automatique
+Gardé jusqu'à cette échéance même après la suppression du compte (RGPD, art. 17.3.b)
+Destinataires
+Autorités judiciaires, sur réquisition
+Le joueur lui-même, par l'export de ses données, tant que son compte existe
+Responsable technique de l'association, qui administre la base et répond aux réquisitions
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Aucun écran ni aucune route du site ne consulte ce journal ; il ne sert à aucune autre finalité
+T15 Portail de support (Spiceworks)
+Finalité principale
+Recevoir et traiter les demandes de support et de modération qui ne portent pas sur un contenu du site (comportement en match, insulte, triche, litige sur Discord)
+Sous-finalités
+Recevoir un ticket sur le portail de support de l'association, que le site ne fait que lier (aucune donnée n'y est transmise par le site)
+Échanger avec le demandeur, instruire la demande et la clore
+Base légale
+Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire respecter les règles de ses tournois et de sa communauté, et à répondre aux demandes qu'on lui adresse
+Personnes concernées
+Demandeurs (joueurs ou non)
+Personnes désignées dans un ticket
+Données
+Contenu du ticket et des échanges, pièces jointes éventuelles
+Coordonnées que le demandeur indique pour recevoir la réponse, pseudos cités
+Données sensibles
+Aucune
+Conservation
+Ticket : durée de son traitement, puis 1 mois après sa clôture, puis suppression par l'association
+Destinataires
+Membres du staff de l'association chargés du support et de la modération
+Spiceworks, qui héberge le portail (sous-traitant de l'association, dans le cadre de l'accord de traitement des données de Spiceworks (Data Processing Agreement))
+Transferts hors UE
+Possibles vers les États-Unis : Spiceworks — Spiceworks (Ziff Davis, Inc.), certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework) ; en repli, clauses contractuelles types de la Commission européenne (art. 46 RGPD) contenues dans l'accord de traitement des données de Spiceworks
+Sécurité
+Accès au portail réservé aux membres du staff chargés du support
+Suppression des tickets clos au terme de la durée de conservation
+T16 Retransmission des matchs
+Finalité principale
+Diffuser en direct les matchs des tournois et en garder la rediffusion
+Sous-finalités
+Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)
+Publier sur la fiche du match le lien de sa rediffusion YouTube
+Base légale
+Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur
+Personnes concernées
+Joueurs des matchs diffusés
+Casters
+Données
+Pseudos en jeu et du site, noms d'équipe, images de la partie, résultats et performances en jeu, tels qu'ils apparaissent à l'écran — ni webcam ni chat vocal des joueurs
+Voix et pseudo des casters
+Lien de la diffusion et de la rediffusion d'un match
+Données sensibles
+Aucune
+Conservation
+Direct : aucune conservation par le site, qui ne garde que le lien de la chaîne
+Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée
+Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée
+Destinataires
+Public des plateformes de diffusion et du site
+Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Liens de diffusion limités à une liste de plateformes, aucun lecteur intégré ; aucune donnée de contact affichée à l'écran par le site
+Aucune webcam ni chat vocal des joueurs à l'écran
+T17 Journaux d'accès du serveur web
+Finalité principale
+Assurer la sécurité du serveur et diagnostiquer les pannes
+Sous-finalités
+Consigner chaque requête reçue par le serveur mandataire (nginx) du site
+Détecter les attaques et les abus, comprendre une panne
+Base légale
+Intérêt légitime (RGPD, art. 6.1.f) : sécurité du service (art. 32)
+Personnes concernées
+Visiteurs du site
+Données
+Adresse IP, date et heure, page demandée, code de réponse, taille de la réponse, page d'origine et navigateur (format de journal par défaut de nginx)
+Données sensibles
+Aucune
+Conservation
+14 jours au plus, par rotation automatique, puis suppression
+Destinataires
+Responsable technique de l'association, qui est aussi l'hébergeur du site
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Journaux lisibles du seul administrateur du serveur, jamais exposés par le site

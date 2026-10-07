@@ -116,7 +116,7 @@ describe("PrivacyChangesModal — contrats du geste", () => {
     expect(body.indexOf("if (busy) {")).toBeLessThan(body.indexOf("record("));
     expect(body).toContain("leftByLink.current = true;");
     expect(source).toContain("if (!leftByLink.current) showSuccess(");
-    expect(source).toContain("showError(leftByLink.current ? REPLAY_NOTICE");
+    expect(source).toContain(`showError(leftByLink.current ? t("privacyModal.replay")`);
   });
 
   it("ne touche jamais au compte : ni aperçu ni route de suppression", () => {
@@ -140,7 +140,8 @@ describe("mise en page racine", () => {
   const layout = readFileSync(join(__dirname, "..", "..", "app", "layout.tsx"), "utf8");
 
   it("monte la modale et déclenche l'annonce Discord", () => {
-    expect(layout).toContain("<PrivacyChangesModal changes={privacyChanges} />");
+    // Entrées traduites par la mise en page (lot 7b-2), dans la langue de la page.
+    expect(layout).toContain("<PrivacyChangesModal changes={localizedPrivacyChanges(privacyChanges, locale)} />");
     expect(layout).toContain("void dispatchPrivacyChangeNotifications().catch(");
   });
 

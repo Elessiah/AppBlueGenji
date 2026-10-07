@@ -116,7 +116,9 @@ describe("bot legal content carries the contact details", () => {
     // …et renvoie à la politique du site, qui décrit ce traitement (base légale, durée).
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("est décrit dans la politique de confidentialité du site");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("is described in the website's privacy policy");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("(/rgpd#exercer-vos-droits) (in French)");
+    // La politique du site est traduite depuis le lot 7b-2 : le renvoi ne dit plus « (in French) ».
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("(/rgpd#exercer-vos-droits)");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).not.toContain("(in French)");
   });
 });
 
