@@ -1,11 +1,10 @@
 "use client";
 
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
-import { useToast } from "@/components/ui/toast";
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -202,7 +201,7 @@ export function PlayerScoreDialog({
   // de l'adversaire (codes et scores), à confirmer d'un clic.
   const match = useProposalMaps(liveMatch, proposals, onRefresh, canReportScore);
   const detailLoading = proposalDetailLoading(canReportScore, liveMatch, proposals);
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
   // saisissable (à planifier, en attente de départ, en lancement).
@@ -428,6 +427,7 @@ export function PlayerScoreDialog({
             <div className={mapStyles.proposals}>
               <p className={mapStyles.proposalTitle}>Proposition de {opponentName}</p>
               <MapResultList
+                french
                 maps={view.theirs.maps}
                 team1Name={team1}
                 team2Name={team2}

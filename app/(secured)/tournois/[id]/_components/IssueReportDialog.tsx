@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import {
   ISSUE_REPORT_MAX_LENGTH,
   ISSUE_REPORT_MIN_LENGTH,
@@ -29,7 +29,7 @@ interface IssueReportDialogProps {
  * refusera.
  */
 export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<IssueReportDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 

@@ -275,7 +275,7 @@
     "casterSr": "Caster: ",
     "caster": "Caster",
     "casterReady": "ready",
-    "casterWaiting": "awaited",
+    "casterWaiting": "not ready",
     "missingDateTitle": "This match goes on air at its start time, but no date has been set.",
     "missingDateSr": "Warning: ",
     "missingDate": " no date"

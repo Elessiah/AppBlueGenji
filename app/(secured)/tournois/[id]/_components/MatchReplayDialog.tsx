@@ -1,10 +1,9 @@
 "use client";
 
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
-import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { canHaveReplay, isValidReplayUrl } from "@/lib/shared/match-replay";
@@ -27,7 +26,7 @@ interface MatchReplayDialogProps {
 export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchReplayDialogProps>) {
   // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
   const dialogLang = frenchBlockLang(useTournamentPageText());
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });

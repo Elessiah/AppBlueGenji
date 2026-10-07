@@ -404,7 +404,7 @@ export function AdminScoreDialog({
                     Proposition de {by} : {report.team1Score} – {report.team2Score}
                   </p>
                   {report.maps.length > 0 && (
-                    <MapResultList maps={report.maps} team1Name={team1} team2Name={team2} label={`Maps proposées par ${by}`} />
+                    <MapResultList french maps={report.maps} team1Name={team1} team2Name={team2} label={`Maps proposées par ${by}`} />
                   )}
                 </section>
               ))}
@@ -611,6 +611,7 @@ export function AdminScoreDialog({
       </div>
       {confirmingCorrection !== null && (
         <ConfirmActionDialog
+          contentLang={dialogLang}
           title="Corriger un résultat déjà validé ?"
           confirmLabel="Corriger le résultat"
           pendingLabel="Correction…"

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatLocalDateTime } from "@/lib/shared/dates";
-import { useToast } from "@/components/ui/toast";
 import { Pill } from "@/components/cyber";
 import {
   moveInOrder,
@@ -35,7 +34,7 @@ import {
 } from "../_lib/registrations-list";
 import { PodiumTiersOffWhen } from "@/components/podium-tiers";
 import styles from "./RegistrationsPanel.module.css";
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { frenchBlockLang, pageDateTime, participantText } from "@/lib/shared/tournament-page-text";
 
 interface RegistrationsPanelProps {
@@ -80,7 +79,7 @@ function frozenSeedLabel(seed: number | null): string {
  * le serveur reste le juge, qui refuse en 409 une écriture devenue interdite.
  */
 export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<RegistrationsPanelProps>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const wording = useParticipantWording();
   const text = useTournamentPageText();
   const { t } = text;

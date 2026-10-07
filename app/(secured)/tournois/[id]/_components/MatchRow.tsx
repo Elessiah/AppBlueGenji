@@ -31,7 +31,12 @@ import { MatchCardActions } from "./MatchCardActions";
 import { EntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang, localizedPlaceholder, versusText } from "@/lib/shared/tournament-page-text";
+import {
+  FR_TOURNAMENT_PAGE_TEXT,
+  frenchBlockLang,
+  localizedPlaceholder,
+  versusText,
+} from "@/lib/shared/tournament-page-text";
 
 
 /**
@@ -154,7 +159,15 @@ export const MatchRow = memo(function MatchRow({
   // le pied d'action en tire le bouton d'antenne — une seule minuterie.
   const liveState = useMatchLiveState(match);
   const launch = launchStripControls(match, launchPhase, { canManage, canSchedule, viewerUserId, myTeamId });
-  const matchLabel = versusText(text, team1Display, team2Display);
+  // Le pied d'action reste en français (lot 8b) : il cite le match en français,
+  // libellés d'attente de l'instantané compris.
+  const actionMatchLabel = actionLang
+    ? versusText(
+        FR_TOURNAMENT_PAGE_TEXT,
+        teamLabel(match.team1Name, match.team1Placeholder, side1.emptyLabel),
+        teamLabel(match.team2Name, match.team2Placeholder, side2.emptyLabel),
+      )
+    : versusText(text, team1Display, team2Display);
   // Toutes les actions de la carte, rangées par `MatchCardActions` : une
   // principale visible, le reste derrière « Plus d'actions »
   // (`docs/features/MATCH_CARD_LAYOUT.md`). Chaque drapeau est celui qui
@@ -246,7 +259,7 @@ export const MatchRow = memo(function MatchRow({
         match={match}
         phase={launchPhase}
         actions={actions}
-        matchLabel={matchLabel}
+        matchLabel={actionMatchLabel}
         isCaster={launch.isCaster}
         onAir={liveState === "LIVE"}
         onPlayerScore={() => playerScore.open(match)}

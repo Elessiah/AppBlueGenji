@@ -18,7 +18,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
   CAST_IDENTITY_NOTICE,
@@ -186,7 +186,7 @@ export function MatchCardActions({
   onReport: () => void;
 }>) {
   const { openSchedule, openConfig, openReplay, castBlock } = useLiveControls();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
@@ -447,6 +447,8 @@ export function MatchCardActions({
             id={panelId}
             ref={panelRef}
             className={styles.panel}
+            // Hors de la racine une fois porté : il redit sa langue.
+            lang={lang}
             data-placement={placement?.up ? "top" : "bottom"}
             // Coordonnées calculées à l'ouverture (`panelPlacement`) : seule
             // valeur qu'une feuille de style ne peut pas connaître.
@@ -470,6 +472,7 @@ export function MatchCardActions({
           par un autre arbitre). */}
       {confirmForce && hasForce && (
         <ConfirmActionDialog
+          contentLang={lang}
           title={`Forcer le lancement de ${matchLabel} ?`}
           confirmLabel="Lancer le match"
           pendingLabel="Lancement…"

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import {
   MAX_ENDURANCE_PENALTY_POINTS,
   MAX_ENDURANCE_PENALTY_REASON,
@@ -42,7 +42,7 @@ export function EndurancePenaltyDialog({
   onClose,
   onApplied,
 }: Readonly<EndurancePenaltyDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [points, setPoints] = useState("1");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);

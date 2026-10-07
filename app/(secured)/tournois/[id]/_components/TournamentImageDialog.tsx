@@ -1,11 +1,10 @@
 "use client";
 
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
-import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
@@ -45,7 +44,7 @@ interface TournamentImageDialogProps {
 export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: Readonly<TournamentImageDialogProps>) {
   // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
   const dialogLang = frenchBlockLang(useTournamentPageText());
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [value, setValue] = useState<ImagePickerValue>(() => initialImagePickerValue(image));
   // Image sur laquelle le brouillon a été posé ; réalignée au rendu, sans effet,
   // pour qu'aucun rendu ne montre un brouillon périmé face à la nouvelle image.

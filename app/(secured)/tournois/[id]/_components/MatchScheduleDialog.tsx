@@ -1,11 +1,10 @@
 "use client";
 
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
-import { useToast } from "@/components/ui/toast";
 import { CodedError, MATCH_SCHEDULE_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -154,7 +153,7 @@ export function MatchScheduleDialog({
 }: Readonly<MatchScheduleDialogProps>) {
   // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
   const dialogLang = frenchBlockLang(useTournamentPageText());
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const fieldErrors = useFieldErrors(MATCH_SCHEDULE_FIELD_ERRORS, FIELD_IDS);
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
   const [day, setDay] = useState(initial ? String(initial.day) : "");
