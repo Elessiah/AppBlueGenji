@@ -55,7 +55,7 @@ const I18N_MIGRATED_FILES = [
   "components/cyber/landing/TournamentBoard.tsx",
   "components/error-page/**",
   "components/legal/SiteFooterBar.tsx",
-  // Règles (lot 3) — pas `RulesHelpFab`, bouton des pages de tournoi (lot 8a).
+  // Règles (lot 3) — `RulesHelpFab`, bouton des pages de tournoi, au lot 8a.
   "components/rules/RuleDiagram.tsx",
   "components/rules/RuleText.tsx",
   "components/rules/RulesToc.tsx",
@@ -89,6 +89,15 @@ const I18N_MIGRATED_FILES = [
   // d'opposition à la mesure d'audience.
   "components/privacy/PrivacyChangesModal.tsx",
   "components/privacy/AudienceOptOutControl.tsx",
+  // Tournois — consultation, lot 8a-1 : la liste, ses cartes, le bouton
+  // d'aide des règles et la carte « Connexion requise » de l'espace sécurisé.
+  "app/(secured)/_shared/AuthGate.tsx",
+  "app/(secured)/tournois/page.tsx",
+  "app/(secured)/tournois/layout.tsx",
+  "app/(secured)/tournois/TournamentsList.tsx",
+  "app/(secured)/tournois/Section.tsx",
+  "app/(secured)/tournois/cards/**",
+  "components/rules/RulesHelpFab.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */

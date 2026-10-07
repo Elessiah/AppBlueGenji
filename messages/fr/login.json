@@ -104,5 +104,13 @@
     "terms": "J'ai lu et j'accepte les conditions d'utilisation (<terms>lire les conditions</terms>), et je déclare avoir au moins {age} ans.",
     "accept": "Continuer",
     "refuse": "Revenir en arrière"
+  },
+  "authGate": {
+    "eyebrow": "BlueGenji · Accès membre",
+    "title": "Connexion requise",
+    "body": "Cette page fait partie de l'espace compétitif. Connecte-toi pour la consulter : tu reviendras ici automatiquement.",
+    "login": "Se connecter",
+    "home": "Retour à l'accueil",
+    "rules": "Découvrir les règles des tournois"
   }
 }

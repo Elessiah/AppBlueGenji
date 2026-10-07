@@ -1,7 +1,7 @@
 "use client";
 
-import { matchFormatLabel } from "@/lib/shared/match-format";
-import { participantWording } from "@/lib/shared/participants";
+import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
 import { formatCardDate, progressPercent, runningCardAction } from "../_lib/card-display";
 import { CardMetaItem, CardProgress, LiveRibbon, TournamentCardFrame } from "./CardParts";
@@ -20,7 +20,7 @@ interface RunningCardProps {
  * où en est le tournoi (`runningProgress`).
  */
 export function RunningCard({ t, priority }: Readonly<RunningCardProps>) {
-  const wording = participantWording(t.participantType);
+  const text = useTournamentsText();
   const percent = progressPercent(t.runningProgress);
 
   return (
@@ -29,26 +29,29 @@ export function RunningCard({ t, priority }: Readonly<RunningCardProps>) {
       priority={priority}
       state="running"
       ribbonClassName={s.cardRibbonRunning}
-      ribbon={<LiveRibbon label="En cours" />}
+      ribbon={<LiveRibbon label={text.t("cards.running")} />}
     >
       <div className={s.cardMeta}>
-        <CardMetaItem label="Début">{formatCardDate(t.startAt, true)}</CardMetaItem>
-        <CardMetaItem label={wording.manyParticipating} valueClassName={`${s.cardMetaVal} ${s.num}`}>
+        <CardMetaItem label={text.t("cards.start")}>{formatCardDate(t.startAt, true, text.locale)}</CardMetaItem>
+        <CardMetaItem
+          label={participantLabel(text, t.participantType, "manyParticipating")}
+          valueClassName={`${s.cardMetaVal} ${s.num}`}
+        >
           {t.registeredTeams}
         </CardMetaItem>
-        <CardMetaItem label="Matchs">{matchFormatLabel(t.matchFormat)}</CardMetaItem>
+        <CardMetaItem label={text.t("cards.matches")}>{localizedMatchFormatLabel(text, t.matchFormat)}</CardMetaItem>
       </div>
 
       {percent !== null ? <CardProgress percent={percent} /> : null}
 
       <div className={s.cardFoot}>
         <div>
-          <div className={s.cardFootLbl}>Déroulement</div>
+          <div className={s.cardFootLbl}>{text.t("cards.progress")}</div>
           <div className={`${s.cardFootVal} ${s.num}`}>
-            {percent !== null ? `${percent} %` : "—"}
+            {percent !== null ? text.t("cards.percent", { percent: String(percent) }) : "—"}
           </div>
         </div>
-        <span className={s.cardCta}>{runningCardAction(t.format)}</span>
+        <span className={s.cardCta}>{runningCardAction(t.format, text)}</span>
       </div>
     </TournamentCardFrame>
   );

@@ -79,7 +79,7 @@ afterEach(() => {
 describe("garde de l'espace sécurisé", () => {
   it("rend une carte au lieu de rediriger : un 307 n'a pas de <head>", () => {
     expect(SECURED_LAYOUT).toContain("getCurrentUser");
-    expect(SECURED_LAYOUT).toContain("<AuthGate />");
+    expect(SECURED_LAYOUT).toContain("<AuthGate text={authGate} />");
     expect(SECURED_LAYOUT).not.toContain("redirect(");
   });
 

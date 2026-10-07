@@ -8,7 +8,7 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 // La page est un composant client sans rendu testable ici (jsx: preserve, pas
 // de DOM en test) : on vérifie le câblage au niveau source, comme pour les
 // autres pages (cf. public-header.test.ts).
-const page = read("app/(secured)/tournois/page.tsx");
+const page = read("app/(secured)/tournois/TournamentsList.tsx");
 const stateCard = read("app/(secured)/tournois/cards/StateCard.tsx");
 const route = read("app/api/tournaments/route.ts");
 
@@ -48,7 +48,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     expect(page).toMatch(
       /const showHidden = isAdmin && hiddenTournaments\.length > 0/,
     );
-    expect(page).toMatch(/\{showHidden && totalHidden > 0 && \(\s*<Section[\s\S]*?TOURNOIS INVISIBLES/);
+    expect(page).toMatch(/\{showHidden && totalHidden > 0 && \(\s*<Section[\s\S]*?sectionTitle\("hidden"\)/);
   });
 
   it("aplatit les paniers reçus pour la section", () => {
@@ -61,7 +61,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
   it("applique la recherche et le filtre de jeu aux invisibles", () => {
     // La recherche (coûteuse) n'est faite qu'une fois, dans `queryFilteredHidden` ;
     // le filtre de jeu (une comparaison de chaîne) s'applique ensuite par-dessus.
-    expect(page).toContain("filterTournamentsByQuery(hiddenTournaments, query)");
+    expect(page).toContain("filterTournamentsByQuery(hiddenTournaments, query, formatName)");
     expect(page).toContain("filterTournamentsByGame(queryFilteredHidden, gameFilter)");
   });
 

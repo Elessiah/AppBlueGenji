@@ -67,4 +67,9 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // (`/rgpd/registre.csv`) reste français : `/en/rgpd/registre.csv` répond 307.
   "/rgpd",
   "/rgpd/registre",
+  // Lot 8a-1 — liste des tournois (espace sécurisé : `noindex`, hors sitemap,
+  // comme en français). La carte « Connexion requise » suit la langue. Les
+  // fiches (`/tournois/[id]`) attendent le lot 8a-2 ; `/tournois/creer` reste
+  // français (lot 8b).
+  "/tournois",
 ];

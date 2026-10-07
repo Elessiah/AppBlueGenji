@@ -1,23 +1,41 @@
 import type { Metadata } from "next";
 import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
+import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 
 /**
- * Le titre de la page (WCAG 2.4.2) : la liste est une page cliente, qui ne peut
- * pas exporter `metadata` — d'où cette mise en page, qui n'existe que pour ça.
- * Les quatre espaces connectés s'intitulaient tous « BlueGenji Esport ».
+ * Le titre du segment (WCAG 2.4.2) et l'encart générique des tournois.
  *
- * Un titre, et **rien d'autre** : pas de `pageMetadata()`. Une mise en page
- * transmet ses métadonnées à tout le segment, et l'URL canonique comme
- * l'`og:url` de la liste seraient descendues sur chaque fiche — un lien vers
- * `/equipes/12` se serait annoncé comme `/equipes`. Le titre, lui, reste
- * juste pour une sous-page qui n'en déclare pas (« Équipes » sur une fiche
- * d'équipe) ; la fiche d'un tournoi pose le sien. Il passe par
- * `segmentTitle()`, sans quoi les sous-pages perdraient le nom du site.
+ * Un titre et un encart, et **rien d'autre** : pas de `pageMetadata()`. Une
+ * mise en page transmet ses métadonnées à tout le segment, et l'URL canonique
+ * comme l'`og:url` de la liste seraient descendues sur chaque fiche — un lien
+ * vers `/equipes/12` se serait annoncé comme `/equipes`. Canonique et
+ * `hreflang` de la liste sont posés par sa page (`page.tsx`) ; la fiche d'un
+ * tournoi pose son titre. Le titre passe par `segmentTitle()`, sans quoi les
+ * sous-pages perdraient le nom du site.
+ *
+ * Encart générique (`memberAreaShareMetadata`) : le robot d'aperçu n'a pas de
+ * session — ni nom ni pseudo, rien que le `<head>` anonyme ne montre déjà. Il
+ * suit la langue de l'adresse (`/en/tournois`, lot 8a).
  */
-// Encart générique (`memberAreaShareMetadata`) : le robot d'aperçu n'a pas de
-// session — ni nom ni pseudo, rien que le `<head>` anonyme ne montre déjà.
-export const metadata: Metadata = { title: segmentTitle("Tournois"), ...memberAreaShareMetadata("tournaments") };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { meta } = messagesFor(locale).tournaments;
+  return { title: segmentTitle(meta.title), ...memberAreaShareMetadata("tournaments", "tournaments", locale) };
+}
 
-export default function TournamentsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}</>;
+/**
+ * Pose les textes client des tournois : rien en français (déjà dans le
+ * paquet), les espaces client de l'anglais sous `/en` seulement.
+ */
+export default async function TournamentsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await requestLocale();
+  const messages = locale === "en" ? tournamentsClientMessages(messagesFor(locale)) : undefined;
+  return (
+    <TournamentsTextProvider locale={locale} messages={messages}>
+      {children}
+    </TournamentsTextProvider>
+  );
 }

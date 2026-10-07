@@ -73,7 +73,8 @@ test.describe("Langues — adresses /en", () => {
   // traduit au lot 2, et `/connexion`, au lot 6, en portent — contrôles ci-dessous).
   // `/mentions-legales` servait d'exemple jusqu'à sa traduction (lot 7b-1).
   test("une page française non traduite garde lang=fr, son nonce, et aucun sélecteur ni hreflang", async ({ page }) => {
-    const response = await page.goto("/tournois");
+    // `/tournois` est traduite depuis le lot 8a-1 : `/equipes` reste française (lot 9).
+    const response = await page.goto("/equipes");
     const csp = response?.headers()["content-security-policy"] ?? "";
     const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();
@@ -138,5 +139,24 @@ test.describe("Langues — adresses /en", () => {
     expect(hreflangs).toEqual(["en", "fr", "x-default"]);
     // Rappel inchangé (`/api/auth/<slug>/callback`) : seule la route de départ porte la langue.
     await expect(page.locator('a[href^="/api/auth/google/start"]').first()).toHaveAttribute("href", /redirect=%2Fen%2Fregles&lang=en/);
+  });
+
+  // Lot 8a-1 : la liste des tournois. Sans session, la carte « Connexion
+  // requise » (200) dans la langue de l'adresse, métadonnées de la page comprises.
+  test("/en/tournois : lang=en, carte de connexion anglaise, hreflang réciproques, noindex", async ({ page }) => {
+    const response = await page.goto("/en/tournois");
+    expect(response?.status()).toBe(200);
+    expect(new URL(page.url()).pathname).toBe("/en/tournois");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
+    await expect(page.locator('a[href^="/en/connexion?redirect=%2Fen%2Ftournois"]')).toHaveCount(1);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/tournois$/);
+    await expect(page.locator('link[rel="alternate"][hreflang="fr"]')).toHaveAttribute("href", /[^n]\/tournois$/);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  });
+
+  test("/en/tournois/creer reste française (lot 8b)", async ({ page }) => {
+    await page.goto("/en/tournois/creer");
+    expect(new URL(page.url()).pathname).toBe("/tournois/creer");
   });
 });

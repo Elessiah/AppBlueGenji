@@ -28,14 +28,14 @@ describe("accueil traduit — liste blanche", () => {
     expect(MIGRATED_ROUTES).toContain("/");
     expect(isMigratedRoute("/")).toBe(true);
     // Espace joueur : lots 8–9.
-    expect(isMigratedRoute("/tournois")).toBe(false);
+    expect(isMigratedRoute("/equipes")).toBe(false);
     expect(isMigratedRoute("/profil")).toBe(false);
   });
 
   it("un lien vers l'accueil prend /en sur une page anglaise, les autres restent français", () => {
     expect(localeHref("/", "en")).toBe("/en");
     expect(localeHref("/", "fr")).toBe("/");
-    expect(localeHref("/tournois", "en")).toBe("/tournois");
+    expect(localeHref("/equipes", "en")).toBe("/equipes");
   });
 
   it("hreflang réciproques, x-default français", () => {
@@ -65,9 +65,9 @@ describe("accueil traduit — middleware", () => {
   });
 
   it("une page voisine pas encore traduite redirige toujours", () => {
-    const response = middleware(new NextRequest(`${PUBLIC}/en/tournois`));
+    const response = middleware(new NextRequest(`${PUBLIC}/en/equipes`));
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(`${PUBLIC}/tournois`);
+    expect(response.headers.get("location")).toBe(`${PUBLIC}/equipes`);
   });
 });
 
@@ -104,7 +104,7 @@ describe("sélecteur de langue — sur l'accueil, et sur mobile", () => {
   });
 
   it("muet sur une page non traduite", () => {
-    expect(render("fr", "/tournois")).toBe("");
+    expect(render("fr", "/equipes")).toBe("");
   });
 
   it("sur un écran étroit, le code remplace le nom, et l'en-tête resserre le sélecteur", () => {

@@ -63,7 +63,7 @@ describe("câblage des pages", () => {
   });
 
   it.each(MEMBER_AREA)("%s pose l'encart générique %s", (file, key) => {
-    expect(readSource(file)).toContain(`memberAreaShareMetadata("${key}")`);
+    expect(readSource(file)).toMatch(new RegExp(`memberAreaShareMetadata\\("${key}"[,)]`));
   });
 });
 

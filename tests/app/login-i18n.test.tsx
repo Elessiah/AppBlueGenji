@@ -159,7 +159,7 @@ describe("liste blanche — la connexion est traduite", () => {
 
   it("la carte « Connexion requise » mène à la connexion de la langue lue, destination préfixe compris", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
-    expect(gate).toContain("<LocaleLink href={loginHref}>");
+    expect(gate).toContain("<LocaleLink href={loginHref}>{text.login}</LocaleLink>");
     expect(gate).toMatch(/const destination = `\$\{pathname\}\$\{search\}`/);
     expect(gate).toContain("const pathname = usePathname();");
   });
@@ -251,8 +251,8 @@ describe("page — la langue de la requête", () => {
     mockUser.current = { id: 7 };
     mockLocale = "en";
     await expect(LoginPage({ searchParams: Promise.resolve({ redirect: "/regles" }) })).rejects.toThrow("NEXT_REDIRECT /en/regles");
-    await expect(LoginPage({ searchParams: Promise.resolve({ redirect: "/en/connexion" }) })).rejects.toThrow("NEXT_REDIRECT /tournois");
-    await expect(LoginPage({ searchParams: Promise.resolve({ redirect: "/en//exemple.invalid" }) })).rejects.toThrow("NEXT_REDIRECT /tournois");
+    await expect(LoginPage({ searchParams: Promise.resolve({ redirect: "/en/connexion" }) })).rejects.toThrow("NEXT_REDIRECT /en/tournois");
+    await expect(LoginPage({ searchParams: Promise.resolve({ redirect: "/en//exemple.invalid" }) })).rejects.toThrow("NEXT_REDIRECT /en/tournois");
     mockLocale = "fr";
     await expect(LoginPage({ searchParams: Promise.resolve({ redirect: "/en/regles" }) })).rejects.toThrow("NEXT_REDIRECT /regles");
   });

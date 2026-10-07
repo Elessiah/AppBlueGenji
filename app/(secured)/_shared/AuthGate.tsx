@@ -1,10 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CyberButton, CyberCard } from "@/components/cyber";
+import frLogin from "@/messages/fr/login.json";
 import styles from "./AuthGate.module.css";
+
+/** Textes de la carte (`login.authGate`), posés par la mise en page dans la langue de la page. */
+export type AuthGateText = typeof frLogin.authGate;
 
 /**
  * Ce qu'un visiteur non connecté voit à la place d'une page sécurisée.
@@ -27,8 +30,13 @@ import styles from "./AuthGate.module.css";
  * quand une mise en page de tête choisit de ne pas rendre ses enfants.
  *
  * Rien du contenu protégé ne fuit : les enfants ne sont pas rendus du tout.
+ *
+ * Textes dans la langue de la page (lot 8a) : la mise en page serveur les lit
+ * dans `login.authGate` et les passe en prop — une page anglaise n'existe que
+ * pour une route traduite (`/en/tournois`), les autres restent françaises.
+ * Sans prop (tests), le français.
  */
-export function AuthGate() {
+export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGateText }>) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -45,23 +53,20 @@ export function AuthGate() {
   return (
     <div className={styles.shell}>
       <CyberCard as="section" ticks className={styles.card}>
-        <span className="eyebrow">BlueGenji · Accès membre</span>
-        <h1 className={styles.title}>Connexion requise</h1>
-        <p className={styles.body}>
-          Cette page fait partie de l&apos;espace compétitif. Connecte-toi pour la consulter : tu
-          reviendras ici automatiquement.
-        </p>
+        <span className="eyebrow">{text.eyebrow}</span>
+        <h1 className={styles.title}>{text.title}</h1>
+        <p className={styles.body}>{text.body}</p>
         <div className={styles.actions}>
           <CyberButton asChild>
-            <LocaleLink href={loginHref}>Se connecter</LocaleLink>
+            <LocaleLink href={loginHref}>{text.login}</LocaleLink>
           </CyberButton>
           <CyberButton variant="ghost" asChild>
-            <Link href="/">Retour à l&apos;accueil</Link>
+            <LocaleLink href="/">{text.home}</LocaleLink>
           </CyberButton>
         </div>
-        <Link href="/regles" className={`${styles.back} entity-link`}>
-          Découvrir les règles des tournois
-        </Link>
+        <LocaleLink href="/regles" className={`${styles.back} entity-link`}>
+          {text.rules}
+        </LocaleLink>
       </CyberCard>
     </div>
   );

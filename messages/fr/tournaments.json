@@ -1,0 +1,110 @@
+{
+  "meta": {
+    "title": "Tournois",
+    "description": "Inscriptions, brackets mis à jour en temps réel et résultats des tournois Overwatch et Marvel Rivals de BlueGenji Esport."
+  },
+  "list": {
+    "eyebrow": "PLATEFORME · TOURNOIS",
+    "title": "Tournois <em>BlueGenji</em>",
+    "subtitle": "SUIVI TEMPS RÉEL · PHASES MULTIPLES · BRACKETS ARBITRÉS",
+    "create": "Créer un tournoi",
+    "searchLabel": "Rechercher un tournoi",
+    "searchPlaceholder": "Rechercher un tournoi, un format…",
+    "filters": {
+      "all": "Tous",
+      "ow": "Overwatch",
+      "mr": "Marvel Rivals"
+    },
+    "countLabel": "{label} ({count})",
+    "sectionsNav": "Sections de la page",
+    "navNone": "(aucun)",
+    "emptyTitle": "Aucun tournoi",
+    "emptyUnfiltered": "Aucun tournoi publié pour le moment.",
+    "emptyFiltered": "Aucun résultat pour cette recherche.",
+    "staffAccent": "· STAFF",
+    "showLess": "Voir moins",
+    "showLessLabel": "Voir moins · {section}",
+    "showMore": "Voir plus ({count})",
+    "showMoreLabel": "Voir plus ({count}) · {section}",
+    "finishedLoading": "Chargement des tournois terminés…",
+    "sections": {
+      "hidden": "TOURNOIS INVISIBLES",
+      "mine": "MES TOURNOIS",
+      "running": "EN COURS",
+      "registration": "INSCRIPTIONS OUVERTES",
+      "upcoming": "PROCHAINEMENT",
+      "finished": "TERMINÉS"
+    },
+    "sectionNav": {
+      "hidden": "Invisibles",
+      "mine": "Mes tournois",
+      "running": "En cours",
+      "registration": "Inscriptions",
+      "upcoming": "Prochainement",
+      "finished": "Terminés"
+    }
+  },
+  "ticker": {
+    "runningTeam": "EN COURS · {name} · {count} équipes engagées",
+    "runningSolo": "EN COURS · {name} · {count} joueurs engagés",
+    "registrationTeam": "INSCRIPTIONS · {name} · {registered}/{max} équipes",
+    "registrationSolo": "INSCRIPTIONS · {name} · {registered}/{max} joueurs",
+    "upcoming": "À VENIR · {name} · {date}",
+    "empty": "Aucune actualité tournoi pour le moment"
+  },
+  "cards": {
+    "open": "Voir le tournoi {name}",
+    "start": "Début",
+    "matches": "Matchs",
+    "percent": "{percent} %",
+    "running": "En cours",
+    "progress": "Déroulement",
+    "registrationOpen": "Inscriptions ouvertes",
+    "closing": "Clôture",
+    "fill": "Remplissage",
+    "full": "Complet",
+    "upcoming": "À venir",
+    "registrationClosed": "Inscriptions closes",
+    "closedOn": "Inscriptions closes le",
+    "opensOn": "Ouverture inscriptions",
+    "status": "Statut",
+    "awaitingKickoff": "En attente du coup d'envoi",
+    "registrationSoon": "Inscriptions bientôt",
+    "details": "Détails",
+    "finished": "Terminé · {date}",
+    "winner": "Vainqueur",
+    "results": "Voir les résultats",
+    "actions": {
+      "bracket": "Voir le bracket",
+      "standings": "Voir le classement",
+      "tournament": "Voir le tournoi"
+    }
+  },
+  "participants": {
+    "TEAM": {
+      "manyCapitalized": "Équipes",
+      "manyParticipating": "Équipes participantes"
+    },
+    "SOLO": {
+      "manyCapitalized": "Joueurs",
+      "manyParticipating": "Joueurs participants"
+    }
+  },
+  "matchFormat": {
+    "free": "Score libre",
+    "withMaps": "{base} · {maps} maps"
+  },
+  "rulesHelp": {
+    "index": "Règles des tournois",
+    "mode": "Règles du mode {mode}",
+    "withContext": "{label} — {context}",
+    "modes": {
+      "SINGLE": "Élimination simple",
+      "DOUBLE": "Double élimination",
+      "BG_SURVIE": "BlueGenji Survie",
+      "SURVIVAL": "Survie par coupes",
+      "SWISS": "Ronde suisse",
+      "MULTI": "Tournoi multi-phases"
+    }
+  }
+}

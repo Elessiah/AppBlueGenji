@@ -44,6 +44,10 @@ La logique d'affichage est pure, dans `app/(secured)/tournois/_lib/card-display.
 (`runningCardAction`, `upcomingCardFace`, `registrationFill`, `progressPercent`,
 `formatCardDate`).
 
+## Langues
+
+Textes des cartes, du sommaire et du bandeau dans l'espace `tournaments` (lot 8a-1) : `useTournamentsText()`, français hors fournisseur. Dates : « 07 oct. 2026 » en français, « Oct 7, 2026 » en anglais (jour sans zéro initial). Le lien d'une carte vers la fiche (encore française, lot 8a-2) et « Créer un tournoi » (lot 8b) portent `hrefLang="fr"` sous `/en`. Détail : `I18N.md` § Tournois — liste.
+
 ## Couleurs d'état
 
 Un état a **une seule teinte**, posée par `--tone` / `--tone-rgb` sur la carte

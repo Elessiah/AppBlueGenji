@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { formatLabel, gameLabel } from "@/lib/shared/tournament-labels";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { tournamentLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { CARD_IMAGE_SIZES } from "./card-image";
@@ -36,12 +37,16 @@ export function TournamentCardFrame({
   ribbon,
   children,
 }: Readonly<TournamentCardFrameProps>) {
+  const text = useTournamentsText();
   return (
     <article className={s.card} data-state={state}>
-      <Link
+      <LocaleLink
         href={`/tournois/${t.id}`}
         className={s.cardOverlay}
-        aria-label={`Voir le tournoi ${t.name}`}
+        aria-label={text.t("cards.open", { name: t.name })}
+        // La fiche n'est pas encore traduite (lot 8a-2) : depuis `/en`, le lien
+        // mène à la page française et le dit aux technologies d'assistance.
+        hrefLang={text.locale === "en" ? "fr" : undefined}
       />
       <TournamentImageBanner
         image={t.image}
@@ -53,9 +58,9 @@ export function TournamentCardFrame({
 
       <div className={s.cardHead}>
         <div className={s.cardGame}>
-          {gameLabel(t.game)}
+          {tournamentLabel(text, "game", t.game)}
           <span className={s.dot}>◆</span>
-          {formatLabel(t.format)}
+          {tournamentLabel(text, "format", t.format)}
         </div>
         <TournamentImageEmblem image={t.image} size={40} />
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { matchFormatLabel } from "@/lib/shared/match-format";
-import { participantWording } from "@/lib/shared/participants";
+import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
 import { formatCardDate } from "../_lib/card-display";
 import { CardMetaItem, TournamentCardFrame } from "./CardParts";
@@ -22,8 +22,8 @@ interface FinishedCardProps {
  * opacité : celle-ci faisait passer les textes atténués sous 4,5:1.
  */
 export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
-  const wording = participantWording(t.participantType);
-  const finishDate = formatCardDate(t.finishedAt ?? t.startAt, false);
+  const text = useTournamentsText();
+  const finishDate = formatCardDate(t.finishedAt ?? t.startAt, false, text.locale);
 
   return (
     <TournamentCardFrame
@@ -31,19 +31,22 @@ export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
       priority={priority}
       state="done"
       ribbonClassName={s.cardRibbonDone}
-      ribbon={<>Terminé · {finishDate}</>}
+      ribbon={text.t("cards.finished", { date: finishDate })}
     >
       <div className={s.cardMeta}>
-        <CardMetaItem label="Début">{formatCardDate(t.startAt, false)}</CardMetaItem>
-        <CardMetaItem label={wording.manyParticipating} valueClassName={`${s.cardMetaVal} ${s.num}`}>
+        <CardMetaItem label={text.t("cards.start")}>{formatCardDate(t.startAt, false, text.locale)}</CardMetaItem>
+        <CardMetaItem
+          label={participantLabel(text, t.participantType, "manyParticipating")}
+          valueClassName={`${s.cardMetaVal} ${s.num}`}
+        >
           {t.registeredTeams}
         </CardMetaItem>
-        <CardMetaItem label="Matchs">{matchFormatLabel(t.matchFormat)}</CardMetaItem>
+        <CardMetaItem label={text.t("cards.matches")}>{localizedMatchFormatLabel(text, t.matchFormat)}</CardMetaItem>
       </div>
 
       <div className={s.cardFoot}>
         <div className={s.cardFootMain}>
-          <div className={s.cardFootLbl}>Vainqueur</div>
+          <div className={s.cardFootLbl}>{text.t("cards.winner")}</div>
           {/* Le nom peut être coupé (ellipse) : il se déplie au survol de la
               carte et au focus de son lien (`.card:hover`/`:focus-within`). Un
               `title` natif ne servirait à rien — la plaque `.cardOverlay` le
@@ -59,7 +62,7 @@ export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
             )}
           </div>
         </div>
-        <span className={s.cardCta}>Voir les résultats</span>
+        <span className={s.cardCta}>{text.t("cards.results")}</span>
       </div>
     </TournamentCardFrame>
   );

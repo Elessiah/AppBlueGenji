@@ -29,7 +29,7 @@ const stream = read("app/api/tournaments/[id]/stream/route.ts");
 const hook = read("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 const detailPage = read("app/(secured)/tournois/[id]/page.tsx");
 const detailHeader = read("app/(secured)/tournois/[id]/_components/TournamentHeader.tsx");
-const listPage = read("app/(secured)/tournois/page.tsx");
+const listPage = read("app/(secured)/tournois/TournamentsList.tsx");
 const index = read("lib/server/tournaments/index.ts");
 const visitTracker = read("components/visit-tracker.tsx");
 
@@ -160,7 +160,7 @@ describe("liste des tournois — sans flux SSE", () => {
     // Une seule horloge, un seul minuteur : les deux jeux se recouvrent presque
     // entièrement.
     expect(listPage).toContain("useScheduledBuckets(buckets)");
-    expect(listPage).toContain("buildTickerItems(scheduledBuckets)");
+    expect(listPage).toContain("items={buildTickerItems(scheduledBuckets, text)}");
   });
 
   it("rafraîchit aussi la section des invisibles", () => {

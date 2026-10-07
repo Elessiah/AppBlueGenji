@@ -104,5 +104,13 @@
     "terms": "I have read and accept the terms of use (<terms>read the terms</terms>), and I declare that I am at least {age} years old.",
     "accept": "Continue",
     "refuse": "Go back"
+  },
+  "authGate": {
+    "eyebrow": "BlueGenji · Member access",
+    "title": "Login required",
+    "body": "This page is part of the competitive area. Log in to view it: you will come straight back here.",
+    "login": "Log in",
+    "home": "Back to home",
+    "rules": "Discover the tournament rules"
   }
 }

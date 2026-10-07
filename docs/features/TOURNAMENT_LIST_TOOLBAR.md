@@ -12,7 +12,10 @@ lit le nom, la description, et le **format** du tournoi (`FORMAT_LABELS`,
 « ronde suisse », « survie »… plutôt que le code `SWISS`) — c'est tout ce
 qu'une carte annonce sans requête à part. Les équipes engagées n'y figurent
 pas : `TournamentCard` ne porte qu'un compte de places, jamais les noms des
-inscrites, une recherche ne les couvre donc pas non plus. Le placeholder
+inscrites, une recherche ne les couvre donc pas non plus. Le format se cherche
+sous **le nom que la carte affiche** : la page passe `formatName`
+(`tournamentLabel(text, "format", …)`), « Swiss » sous `/en`, « Ronde suisse »
+en français (défaut `formatLabel`). Le placeholder
 (« Rechercher un tournoi, un format… ») dit exactement cela, plus rien
 d'autre.
 
@@ -44,7 +47,7 @@ un `aria-label` qui compose proprement le libellé et le compte
 Les compteurs suivent désormais la recherche en cours : une pastille dit
 « ce que donnerait CE filtre de jeu, la recherche déjà tapée gardée » — pas le
 total brut du site. `countGame` compte sur `queryFilteredBuckets`
-(`filterBuckets(scheduledBuckets, query, "all")`), jamais sur `buckets` :
+(`filterBuckets(scheduledBuckets, query, "all", formatName)`), jamais sur `buckets` :
 sinon la pastille annonçait un total figé pendant que les sections en dessous,
 elles, suivaient la recherche.
 

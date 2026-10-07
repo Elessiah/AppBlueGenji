@@ -261,10 +261,19 @@ export function forfeitMapCount(format: MatchFormat | null | undefined): number 
 export function matchFormatLabel(format: MatchFormat | null): string {
   if (!format) return "Score libre";
 
-  const base = `${format.type}${format.value}`;
+  const base = matchFormatNotation(format);
   const maps = matchMaxMaps(format);
 
   return maps === naturalMaxMaps(format) ? base : `${base} · ${maps} maps`;
+}
+
+/**
+ * La notation seule (« BO5 », « FT3 »), sans plafond de maps : commune aux deux
+ * langues (glossaire) — un écran traduit (`localizedMatchFormatLabel`,
+ * `lib/shared/tournaments-text.ts`) y ajoute le reste dans sa langue.
+ */
+export function matchFormatNotation(format: MatchFormat): string {
+  return `${format.type}${format.value}`;
 }
 
 /**

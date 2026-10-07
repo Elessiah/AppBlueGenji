@@ -1,7 +1,7 @@
-import { describe, expect, it } from "@jest/globals";
+import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import type { Metadata } from "next";
 import { resolveTitle } from "next/dist/lib/metadata/resolvers/resolve-title";
-import { metadata as tournamentsMetadata } from "@/app/(secured)/tournois/layout";
+import { generateMetadata as tournamentsLayoutMetadata } from "@/app/(secured)/tournois/layout";
 import { metadata as createTournamentMetadata } from "@/app/(secured)/tournois/creer/layout";
 import { metadata as teamsMetadata } from "@/app/(secured)/equipes/layout";
 import { metadata as createTeamMetadata } from "@/app/(secured)/equipes/creer/layout";
@@ -11,6 +11,15 @@ import { metadata as editTournamentMetadata } from "@/app/(secured)/tournois/[id
 import { SITE_TITLE_TEMPLATE, pageMetadata, segmentTitle, siteTitle } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
 import { readSource } from "../helpers/read-source";
+
+// `/tournois` est traduite (lot 8a) : sa mise en page lit la langue de la
+// requête. Le français ici, l'anglais dans `tournaments-list-i18n.test.tsx`.
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
+
+let tournamentsMetadata: Metadata;
+beforeAll(async () => {
+  tournamentsMetadata = await tournamentsLayoutMetadata();
+});
 
 /**
  * Rejoue la résolution de Next le long d'une chaîne de mises en page : chaque
@@ -40,13 +49,13 @@ function resolveChain(...chain: Metadata["title"][]): string {
 const root: Metadata["title"] = { default: SITE_NAME, template: SITE_TITLE_TEMPLATE };
 
 describe("titres des espaces connectés (WCAG 2.4.2)", () => {
-  it.each<[string, Metadata, string]>([
-    ["/tournois", tournamentsMetadata, "Tournois"],
-    ["/equipes", teamsMetadata, "Équipes"],
-    ["/joueurs", playersMetadata, "Joueurs"],
-    ["/profil", profileMetadata, "Mon profil"],
+  it.each<[string, () => Metadata, string]>([
+    ["/tournois", () => tournamentsMetadata, "Tournois"],
+    ["/equipes", () => teamsMetadata, "Équipes"],
+    ["/joueurs", () => playersMetadata, "Joueurs"],
+    ["/profil", () => profileMetadata, "Mon profil"],
   ])("%s s'intitule « %s · BlueGenji Esport »", (_path, metadata, title) => {
-    expect(resolveChain(root, metadata.title)).toBe(`${title} · ${SITE_NAME}`);
+    expect(resolveChain(root, metadata().title)).toBe(`${title} · ${SITE_NAME}`);
   });
 
   it("garde le nom du site sur les formulaires de création, sous-pages des listes", () => {

@@ -164,7 +164,8 @@ export function pageMetadata({
  * le nom d'une équipe ou le pseudo d'un joueur — le robot d'aperçu n'a pas de
  * session, et le `<head>` anonyme de ces pages n'en montre pas non plus. Pas
  * d'`og:url` : la mise en page habille aussi ses sous-pages (`/equipes/creer`),
- * qu'une adresse fixe désignerait mal. Pages non traduites : français seul.
+ * qu'une adresse fixe désignerait mal. Une page traduite (`/tournois`, lot 8a)
+ * passe sa langue ; les autres restent en français.
  *
  * `imageKey` désigne une autre image que la carte générique : la carte
  * nominative d'une équipe (`team-<id>`), dont seule la route d'image lit les
@@ -174,15 +175,16 @@ export function pageMetadata({
 export function memberAreaShareMetadata(
   key: PageShareCardKey,
   imageKey: string = key,
+  locale: Locale = DEFAULT_LOCALE,
 ): Pick<Metadata, "openGraph" | "twitter"> {
-  const { title, subtitle } = frShare.pages[key];
+  const { title, subtitle } = (locale === "en" ? enShare : frShare).pages[key];
   const shareTitle = siteTitle(title);
-  const image = pageShareImagePath(imageKey, DEFAULT_LOCALE);
+  const image = pageShareImagePath(imageKey, locale);
   return {
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
-      locale: OPEN_GRAPH_LOCALE[DEFAULT_LOCALE],
+      locale: OPEN_GRAPH_LOCALE[locale],
       title: shareTitle,
       description: subtitle,
       images: [{ url: image, width: 1200, height: 630, alt: shareTitle }],
