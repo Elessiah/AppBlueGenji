@@ -100,7 +100,7 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
     // s'appellent « Finale » tant qu'ils sont le seul tour posé.
     expect(VIEW).toContain("endurancePlayoffRoundCount(");
     expect(VIEW).toContain("plannedRounds={playoffRounds}");
-    expect(SECTIONS).toContain("buildSections(roundNums, bracketType, totalRounds)");
+    expect(SECTIONS).toContain("buildSections(roundNums, bracketType, totalRounds, text)");
   });
 
   it("garde une clé de volet stable quand un tour rejoint la section", () => {

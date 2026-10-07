@@ -1,3 +1,4 @@
+import frTournament from "@/messages/fr/tournament.json";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
@@ -170,12 +171,15 @@ describe("page du tournoi — ce que dit la zone des matchs vide", () => {
   it("distingue le tournoi clos sans match du plateau encore à venir", () => {
     expect(source).toContain("const noMatchesLabel =");
     expect(source).toMatch(/detail\.card\.state === "FINISHED" && detail\.matches\.length === 0/);
-    expect(source).toContain("Tournoi clos sans être joué");
+    expect(source).toContain('t(unplayedKey)');
+    expect(frTournament.page.unplayedTeam).toContain("Tournoi clos sans être joué");
   });
 
   it("emploie le vocabulaire du type de participant", () => {
     // « moins de deux équipes engagées » / « moins de deux joueurs engagés ».
-    expect(source).toContain("${wording.manyEngaged}");
+    expect(source).toContain('detail.card.participantType === "SOLO" ? "page.unplayedSolo" : "page.unplayedTeam"');
+    expect(frTournament.page.unplayedTeam).toContain("moins de deux équipes engagées");
+    expect(frTournament.page.unplayedSolo).toContain("moins de deux joueurs engagés");
   });
 
   it("ne laisse plus le libellé d'attente en dur dans le JSX", () => {
@@ -197,9 +201,10 @@ describe("page du tournoi — ce que dit la zone des matchs vide", () => {
         join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "_components", `${view}.tsx`),
         "utf8",
       );
-      // Le défaut garde le libellé d'origine pour tout autre appelant.
-      expect(component).toContain(`emptyLabel = "Aucun match pour l'instant."`);
-      expect(component).toContain("{emptyLabel}");
+      // Le défaut garde le libellé d'origine pour tout autre appelant
+      // (`page.noMatchesShort`, « Aucun match pour l'instant. »).
+      expect(component).toContain('const emptyText = emptyLabel ?? t("page.noMatchesShort");');
+      expect(component).toMatch(/\{emptyText\}|emptyLabel=\{emptyText\}/);
     }
   });
 });

@@ -94,7 +94,7 @@ const DATES = {
 };
 
 describe("route et référencement", () => {
-  it("ouvre /tournois sous /en, ni la création ni les fiches (lot 8a-2)", () => {
+  it("ouvre /tournois sous /en, pas la création ni l'édition (lot 8b)", () => {
     expect(isMigratedRoute("/tournois")).toBe(true);
     expect(isMigratedRoute("/tournois/creer")).toBe(false);
     expect(isMigratedRoute("/tournois/12/modifier")).toBe(false);
@@ -181,14 +181,9 @@ describe("cartes — rendu anglais", () => {
     const text = readable(html);
     expect(text).not.toMatch(FRENCH_WORDS);
     expect(text).not.toMatch(ACCENTED);
-    expect(html).toContain('href="/tournois/1"');
-    // La fiche reste française (lot 8a-2) : le lien le dit depuis `/en`.
-    expect(html).toMatch(/href="\/tournois\/1"[^>]*hrefLang="fr"|hrefLang="fr"[^>]*href="\/tournois\/1"/);
-  });
-
-  it("en français, le lien vers la fiche ne porte pas d'hrefLang", () => {
-    const html = renderToStaticMarkup(<RunningCard t={tournamentCard({ ...DATES, state: "RUNNING" })} />);
-    expect(html).not.toContain("hrefLang");
+    // La fiche est traduite (lot 8a-2) : lien sous `/en`, sans `hrefLang`.
+    expect(html).toContain('href="/en/tournois/1"');
+    expect(html).not.toContain('hrefLang="fr"');
   });
 
   it("parle le glossaire", () => {

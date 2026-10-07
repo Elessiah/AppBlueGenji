@@ -61,7 +61,7 @@ describe("détail map par map — focus et interblocages", () => {
     const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
     expect(details).toContain("if (!hasMaps && !open) return null;");
     expect(details).toContain("document.getElementById(matchAnchorId(match.id))?.focus()");
-    expect(details).toMatch(/aria-label=\{`Détail des maps \(\$\{match\.maps\.length\}\) : \$\{team1\} contre \$\{team2\}`\}/);
+    expect(details).toContain('aria-label={text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versusText(text, team1, team2) })}');
   });
 
   it("en désaccord, l'engagé voit le détail adverse", () => {

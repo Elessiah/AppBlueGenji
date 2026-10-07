@@ -159,4 +159,13 @@ test.describe("Langues — adresses /en", () => {
     await page.goto("/en/tournois/creer");
     expect(new URL(page.url()).pathname).toBe("/tournois/creer");
   });
+
+  // Lot 8a-2 : la fiche d'un tournoi. `[id]` n'accepte qu'un entier.
+  test("/en/tournois/<id> : lang=en, carte de connexion anglaise, hreflang de la fiche", async ({ page }) => {
+    const response = await page.goto("/en/tournois/1");
+    expect(response?.status()).toBe(200);
+    expect(new URL(page.url()).pathname).toBe("/en/tournois/1");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
+  });
 });

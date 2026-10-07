@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 jest.mock("@/lib/server/auth");
+// La fiche est traduite (lot 8a-2) : sa mise en page lit la langue de la
+// requête. Le français ici ; l'anglais dans `tournament-page-i18n.test.tsx`.
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 jest.mock("@/lib/server/tournaments-service");
 
 import { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";

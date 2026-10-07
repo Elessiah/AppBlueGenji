@@ -113,7 +113,7 @@ describe("classement d'une phase terminée — un seul bloc, un vrai titre", () 
   });
 
   it("porte un titre de section unique", () => {
-    expect(BLOCK).toMatch(/<h3[^>]*>\s*Classement de la phase\s*<\/h3>/);
+    expect(BLOCK).toMatch(/<h3[^>]*>\s*\{t\("phases\.standingsTitle"\)\}\s*<\/h3>/);
     expect(BLOCK).toContain('aria-labelledby="phase-standings-title"');
     expect(PAGE).not.toMatch(/>\s*Qualifiées\s*</);
   });

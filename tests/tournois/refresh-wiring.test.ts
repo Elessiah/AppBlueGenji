@@ -117,7 +117,7 @@ describe("page de tournoi — ce que voit le lecteur", () => {
     // Sans ce cas, la page resterait sur « Chargement… » pour toujours : le seul
     // état où il ne reste que le F5, et où il ne sert à rien.
     expect(detailPage).toContain("if (fatal && !detail) {");
-    expect(detailPage).toContain('href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}');
+    expect(detailPage).toContain('<LocaleLink href={expired ? "/connexion" : "/tournois"}>');
   });
 
   it("retire les actions quand le suivi est arrêté", () => {

@@ -70,12 +70,12 @@ describe("squelette de chargement", () => {
 
 describe("retour", () => {
   it("est un lien vers la liste, qui ne revient dans l'historique que sur le site", () => {
-    expect(header).toContain('<Link href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>');
+    expect(header).toContain('<LocaleLink href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>');
     expect(header).toContain(
       "if (!isPlainLeftClick(event) || !canReturnInSite(readSiteBackInput())) return;",
     );
     expect(header).toContain("router.back();");
-    expect(header).toContain('{backInSite ? "Retour" : "Tous les tournois"}');
+    expect(header).toContain('{backInSite ? t("header.back") : t("header.allTournaments")}');
   });
 
   it("n'est plus un bouton piloté par la page", () => {

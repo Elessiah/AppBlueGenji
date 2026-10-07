@@ -65,19 +65,19 @@ describe("stageName", () => {
 });
 
 describe("qualifyLabelFor", () => {
+  // Le stade suivant est désormais une **clé** (`stageKey`, lot 8a-2) : un
+  // stade inconnu n'existe plus, le typage le refuse.
   it("dérive le libellé au singulier du stade suivant", () => {
-    expect(qualifyLabelFor("8èmes de finale")).toBe("Qualifié en 8ème de finale");
-    expect(qualifyLabelFor("Quarts de finale")).toBe("Qualifié en quart de finale");
-    expect(qualifyLabelFor("Demi-finales")).toBe("Qualifié en demi-finale");
-    expect(qualifyLabelFor("Finale")).toBe("Qualifié en finale");
-  });
-
-  it("retombe sur un libellé générique minuscule pour un stade inconnu", () => {
-    expect(qualifyLabelFor("Phase de Poules")).toBe("Qualifié en phase de poules");
+    expect(qualifyLabelFor("roundOf16")).toBe("Qualifié en 8ème de finale");
+    expect(qualifyLabelFor("quarters")).toBe("Qualifié en quart de finale");
+    expect(qualifyLabelFor("semis")).toBe("Qualifié en demi-finale");
+    expect(qualifyLabelFor("final")).toBe("Qualifié en finale");
+    expect(qualifyLabelFor("lowerFinal")).toBe("Qualifié en finale perdants");
+    expect(qualifyLabelFor("grandFinal")).toBe("Qualifié en grande finale");
   });
 
   it("utilise un libellé générique entre deux paquets de premiers tours", () => {
-    expect(qualifyLabelFor("Premiers tours")).toBe("Qualifié au tour suivant");
+    expect(qualifyLabelFor("early")).toBe("Qualifié au tour suivant");
   });
 });
 

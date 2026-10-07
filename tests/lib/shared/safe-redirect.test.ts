@@ -239,7 +239,7 @@ describe("loginDestination — la langue de la page de connexion", () => {
   });
 
   it("laisse française une route pas encore traduite", () => {
-    expect(loginDestination("/tournois/12", "en")).toBe("/tournois/12");
+    expect(loginDestination("/equipes/12", "en")).toBe("/equipes/12");
     expect(loginDestination(null, "en")).toBe(`/en${DEFAULT_REDIRECT}`);
   });
 

@@ -131,7 +131,7 @@ describe("Page de tournoi — engagés cliquables", () => {
       expect(stripComments(read(path))).toContain("{champion && <ChampionBanner champion={champion} />}");
     }
     const code = stripComments(read("app/(secured)/tournois/[id]/_components/RoundColumns.tsx"));
-    const banner = code.slice(code.indexOf("Championne"));
+    const banner = code.slice(code.indexOf('t("match.champion")'));
     expect(banner.slice(0, 200)).toContain("<EntrantName teamId={champion.teamId}");
   });
 

@@ -1,3 +1,4 @@
+import frTournament from "@/messages/fr/tournament.json";
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -85,7 +86,8 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
 
 describe("nom d'équipe — même repli sur la carte et dans la modale", () => {
   it("MatchRow et la modale passent par le même repli à trois niveaux", () => {
-    expect(MATCH_ROW).toMatch(/teamLabel\(\s*match\.team1Name,\s*match\.team1Placeholder,/);
+    // Le libellé d'attente passe d'abord par la langue de la page (lot 8a-2).
+    expect(MATCH_ROW).toMatch(/teamLabel\(\s*match\.team1Name,\s*localizedPlaceholder\(text, match\.team1Placeholder\),/);
     expect(PLAYER_DIALOG).toMatch(/teamLabel\(match\.team1Name, match\.team1Placeholder,/);
   });
 });
@@ -101,7 +103,8 @@ describe("notification d'envoi — nomme les équipes, pas l'identifiant du matc
 
 describe("libellé d'un tour profond du tableau — français, comme l'accueil", () => {
   it("BracketTree replie sur « Manche N », pas « Round N »", () => {
-    expect(BRACKET_TREE).toContain("`Manche ${globalIdx + 1}`");
+    expect(BRACKET_TREE).toContain('t("bracket.roundN", { number: String(globalIdx + 1) })');
+    expect(frTournament.bracket.roundN).toBe("Manche {number}");
     expect(BRACKET_TREE).not.toMatch(/`Round \$\{/);
   });
 });
