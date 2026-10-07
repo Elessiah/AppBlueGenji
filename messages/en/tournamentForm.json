@@ -1,0 +1,276 @@
+{
+  "meta": {
+    "createTitle": "Create a tournament",
+    "editTitle": "Edit the tournament"
+  },
+  "create": {
+    "back": "← Tournaments",
+    "title": "Create <hl>a tournament</hl>",
+    "lede": "Set the timeline, the game and the bracket format.",
+    "submit": "Create the tournament",
+    "forbidden": "Only referees and administrators can create a tournament.",
+    "created": "Tournament created.",
+    "imageFailed": "Tournament created, but its image wasn't saved: {error} Add it from the tournament page."
+  },
+  "edit": {
+    "back": "← Back to the tournament",
+    "title": "Edit <hl>the tournament</hl>",
+    "submit": "Save changes",
+    "forbidden": "Only referees and administrators can edit a tournament.",
+    "network": "Network error, try again.",
+    "loading": "Loading the tournament...",
+    "fieldRefusal": "{message} ({field})",
+    "finished": "The tournament is finished: it can no longer be edited.",
+    "lockStarted": "The tournament is in progress: only referee match scheduling can still be changed.",
+    "lockVisible": "The tournament has been visible since {date} — the format, the game and the settings can no longer be changed.",
+    "savedNone": "No changes to save.",
+    "saved": "Tournament updated.",
+    "savedWithPlanning": "Tournament updated. {planning}",
+    "planningDisabled": "Referee scheduling turned off: matches without a date move into launch.",
+    "planningEnabled": "Referee scheduling turned on.",
+    "planningEnabledMoved": "Scheduling turned on: {count, plural, =1 {1 match to schedule} other {# matches to schedule}}.",
+    "planningErrors": {
+      "TOURNAMENT_NOT_FOUND": "Tournament not found.",
+      "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",
+      "INVALID_REFEREE_SCHEDULING": "Invalid value for referee scheduling.",
+      "fallback": "Scheduling couldn't be changed. Try again in a moment."
+    },
+    "fields": {
+      "name": "Tournament name",
+      "description": "Description",
+      "game": "Game",
+      "format": "Bracket format",
+      "participantType": "Participant type",
+      "maxTeams": "Number of slots",
+      "startVisibilityAt": "Visible from",
+      "registrationOpenAt": "Registration opens",
+      "registrationCloseAt": "Registration closes",
+      "startAt": "Tournament start",
+      "hasThirdPlaceMatch": "Third-place match",
+      "survivalRoundsBeforeFirstCut": "Rounds before the first cut",
+      "survivalRoundsPerCut": "Rounds between cuts",
+      "swissTotalRounds": "Number of rounds",
+      "swissPointsWin": "Points per win",
+      "swissPointsDraw": "Points per draw",
+      "swissPointsLoss": "Points per loss",
+      "endurancePoints": "Endurance pool",
+      "enduranceWinDelta": "Points per map won",
+      "enduranceLossDelta": "Points per map lost",
+      "endurancePlayoffSize": "Teams in the playoffs",
+      "enduranceMaxRounds": "Maximum rounds",
+      "matchFormat": "Match format",
+      "endurancePlayoffFormat": "Playoff format",
+      "registrationDiscordRequirement": "Verified Discord at registration",
+      "registrationBlizzardRequirement": "Blizzard account at registration",
+      "registrationMinPlayers": "Minimum players on the team",
+      "phases": "Tournament stages"
+    }
+  },
+  "form": {
+    "creating": "Creating...",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "sections": {
+      "identity": "Identity",
+      "image": "Image",
+      "format": "Format",
+      "registration": "Registration requirements",
+      "planning": "Schedule"
+    },
+    "name": "Tournament name",
+    "namePlaceholder": "My tournament",
+    "game": "Game",
+    "description": "Description",
+    "descriptionPlaceholder": "Tournament description...",
+    "bracketFormat": "Bracket format",
+    "formats": {
+      "SINGLE": "Single elimination",
+      "DOUBLE": "Double elimination",
+      "SWISS": "Swiss",
+      "SURVIVAL": "Survival (cuts)",
+      "BG_SURVIE": "BlueGenji's Survival (endurance)",
+      "MULTI": "Multi-stage"
+    },
+    "participantType": "Participant type",
+    "participantTypes": {
+      "TEAM": "Teams",
+      "SOLO": "Players (solo)"
+    },
+    "participantTypeHint": "In solo, each player registers themselves, without going through a team.",
+    "maxEntrants": {
+      "TEAM": "Maximum number of teams",
+      "SOLO": "Maximum number of players"
+    },
+    "matchFormat": "Match format",
+    "matchFormats": {
+      "BO": "Best of (BO)",
+      "FT": "First to (FT)",
+      "LIBRE": "Free (no limit)"
+    },
+    "matchFormatValue": {
+      "BO": "Maps played (odd)",
+      "FT": "Maps to win"
+    },
+    "matchFormatValueHint": {
+      "BO": "A team's score can't go past the upper half: 3 in BO5.",
+      "FT": "Target to reach to win the match: 3 in FT3."
+    },
+    "formatHint": {
+      "free": "Scores are entered without any constraint.",
+      "valid": "{label} — {description}",
+      "invalidBo": "A Best of is played over an odd number of maps (BO1, BO3, BO5…).",
+      "invalidFt": "Enter the number of maps to win."
+    },
+    "invalidFormat": {
+      "BO": "A Best of must be played over an odd number of maps (BO1, BO3, BO5…).",
+      "other": "Invalid number of maps for the match format."
+    },
+    "notation": {
+      "free": "Free score",
+      "withMaps": "{base} · {maps, plural, one {# map} other {# maps}}",
+      "noLimit": "No score limit.",
+      "race": "first to {wins, plural, one {# map won} other {# maps won}}, {maps} at most.",
+      "raceWithDraw": "first to {wins, plural, one {# map won} other {# maps won}}, {maps} at most. The match can end without a winner (drawn map)."
+    },
+    "maxMaps": "Maximum deciding maps",
+    "maxMapsHint": "Maximum sum of both scores. A drawn map counts for neither side and so doesn't eat into this cap. Lowering it below {max} makes a draw possible.",
+    "registrationIntro": "Checked each time a player registers. <strong>Ghost teams</strong> registered by the staff aren't subject to them, and entrants already registered are never rechecked.",
+    "conditionsOpen": "As it stands, this tournament is open to everyone: no requirement will be shown.",
+    "conditionsRead": "Participants will read: “{summary}”.",
+    "conditions": {
+      "minPlayers": "{count, plural, one {# player} other {# players}} minimum",
+      "discordSolo": "verified Discord",
+      "discordAny": "at least one verified Discord",
+      "discordAll": "all Discord accounts verified",
+      "blizzardSolo": "linked Blizzard account",
+      "blizzardAny": "at least one linked Blizzard account",
+      "blizzardAll": "all Blizzard accounts linked"
+    },
+    "requirements": {
+      "NONE": "No player",
+      "ANY_PLAYER": "At least one player",
+      "ALL_PLAYERS": "All players"
+    },
+    "discord": "Verified Discord",
+    "discordHint": {
+      "TEAM": "A <em>verified</em> Discord tag is one the player has proven is theirs: it's the only way for the organizers to reach the team during the tournament.",
+      "SOLO": "A <em>verified</em> Discord tag is one the player has proven is theirs: it's the only way for the organizers to reach the player during the tournament."
+    },
+    "blizzard": "Blizzard account",
+    "blizzardHint": {
+      "TEAM": "A Battle.net account <em>linked</em> from “My profile” vouches for each player's BattleTag: a tag that's simply typed in proves nothing.",
+      "SOLO": "A Battle.net account <em>linked</em> from “My profile” vouches for the player's BattleTag: a tag that's simply typed in proves nothing."
+    },
+    "blizzardMarvel": "Not relevant for a Marvel Rivals tournament: better leave “No player”.",
+    "minPlayers": "Minimum players on the team",
+    "minPlayersHint": "Active roster members, coach and manager included. {min} = no requirement.",
+    "dates": {
+      "startVisibilityAt": "Visible from",
+      "registrationOpenAt": "Registration opens",
+      "registrationCloseAt": "Registration closes",
+      "startAt": "Tournament start"
+    },
+    "referee": {
+      "label": "Matches scheduled by the referees",
+      "description": "Each match waits for a referee or an admin to set its date and time (“To schedule”), then shows “Waiting to start” until that time, when it moves to launch.",
+      "finished": "The tournament is finished: this option can no longer be changed.",
+      "create": "Can be changed later, until the tournament closes — even while it's in progress.",
+      "edit": "Can be changed until the tournament closes — even while it's in progress.",
+      "warning": "On saving, matches with no date that haven't launched yet leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time. Matches already launched carry on."
+    },
+    "games": {
+      "OW": "Overwatch",
+      "MR": "Marvel Rivals"
+    }
+  },
+  "settings": {
+    "endurancePoints": "Endurance pool",
+    "endurancePointsHint": "Each team's starting points. At 0, it's eliminated.",
+    "enduranceWin": "Points per map won",
+    "enduranceLoss": "Points per map lost",
+    "endurancePlayoff": "Teams in the playoffs",
+    "endurancePlayoffHint": "The endurance stage stops at this headcount. At 8, the bracket follows the rulebook table (8v4, 6v2, 1v5, 3v7) with a third-place match.",
+    "enduranceMaxRounds": "Maximum rounds",
+    "enduranceMaxRoundsHint": "0 = no limit: the stage runs until the headcount above. Otherwise it stops at this round and the top of the standings qualify; those who can no longer catch up go out before the end.",
+    "draws": "Draws allowed in qualifying",
+    "drawsUnavailable": "Unavailable with free score entry: a match format is needed to bound the match.",
+    "drawsHint": "A drawn map can end the match before the target: the match then closes at 2-2, or at 2-1 if only one map was shared. Since the endurance pool counts map by map, it takes this in without any extra rule. The final bracket always requires a winner. Ticking this box also opens the “Maximum deciding maps” setting, above.",
+    "playoffFormat": "Playoff format",
+    "playoffFormats": {
+      "MEME": "Same as in qualifying",
+      "BO": "Best of (BO)",
+      "FT": "First to (FT)"
+    },
+    "playoffFormatHint": "The final bracket never accepts a draw, whatever this setting: it needs to know who plays the next round. Setting it here lets you play a real FT3 in the playoffs when qualifying allows draws.",
+    "playoffFormatValue": {
+      "BO": "Playoffs: maps played (odd)",
+      "FT": "Playoffs: maps to win"
+    },
+    "survivalFirstCut": "Rounds before the first cut",
+    "survivalFirstCutHint": "Lets the standings take shape before the first elimination.",
+    "survivalRounds": "Rounds between the following cuts",
+    "survivalRoundsHint": "Pace applied after the first cut.",
+    "survivalExplain": "All teams face each other in pairs according to their standing. At each cut, the bottom two teams are eliminated, until the champion. If the number of entrants is odd, a play-in between the bottom two opens the tournament — no walkover is handed out.",
+    "swissRounds": "Number of rounds",
+    "swissRecommended": {
+      "TEAM": "Recommended for {count} teams: {rounds, plural, one {# round} other {# rounds}}.",
+      "SOLO": "Recommended for {count} players: {rounds, plural, one {# round} other {# rounds}}."
+    },
+    "swissPoints": "Scoring (win / draw / loss)",
+    "swissPointsWin": "Points per win",
+    "swissPointsDraw": "Points per draw",
+    "swissPointsLoss": "Points per loss",
+    "swissByeHint": "A walkover is worth as much as a win.",
+    "swissExplain": "No elimination: every team plays all {rounds} rounds. Each round, you face a team with a points total close to yours, never replaying the same opponent while that's possible. On equal points, the tiebreak is Buchholz (the sum of the points of the opponents faced).",
+    "options": "Extra options",
+    "thirdPlace": "Third-place match",
+    "thirdPlaceHint": "Adds a match to decide 3rd place between the two semifinal losers."
+  },
+  "phases": {
+    "formats": {
+      "SINGLE": "Single elimination",
+      "DOUBLE": "Double elimination",
+      "SWISS": "Swiss",
+      "SURVIVAL": "Survival (cuts)"
+    },
+    "summaryFinal": "{format} — final stage",
+    "summaryCount": "{format} — {count, plural, one {# team} other {# teams}}",
+    "summaryPercent": "{format} — {value}% qualify",
+    "issue": "Stage {index} — {message}",
+    "fallbackError": "Stage configuration error.",
+    "maxReached": "Maximum number of stages reached",
+    "add": "+ Add a stage",
+    "maxReachedHint": "Maximum of {max} stages reached.",
+    "previewTitle": "Plan preview",
+    "modeHint": "A fixed number skips the stage if fewer teams show up; a percentage adapts to the actual number of entrants.",
+    "plan": {
+      "phase": "Stage {position}",
+      "teams": "{count, plural, one {# team} other {# teams}}",
+      "qualifiers": "{count, plural, one {# qualifies} other {# qualify}}",
+      "skipped": "{phase} — {format}: {teams} — skipped ({reason})",
+      "reasonTooFew": "not enough entrants",
+      "reasonNoCut": "no elimination",
+      "final": "{phase} — Final — {format}: {teams}",
+      "qualify": "{phase} — {format}: {teams} → {qualifiers}"
+    },
+    "finalBadge": "Final stage",
+    "moveUp": "Move stage {position} up",
+    "moveDown": "Move stage {position} down",
+    "remove": "Delete stage {position}",
+    "name": "Stage name (optional)",
+    "namePlaceholder": "Stage {position}",
+    "format": "Format",
+    "mode": "Qualification mode",
+    "modes": {
+      "COUNT": "Number of teams",
+      "PERCENT": "Percentage"
+    },
+    "qualifierValue": {
+      "COUNT": "Number of qualified teams",
+      "PERCENT": "Qualifying percentage"
+    },
+    "swissRounds": "Number of rounds",
+    "auto": "Automatic",
+    "autoHint": "Leave empty for automatic."
+  }
+}

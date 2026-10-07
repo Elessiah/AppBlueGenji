@@ -37,15 +37,24 @@ export type PushNotificationsPanelProps = {
   topics?: readonly PushTopic[];
   /** Phrase d'accroche de la forme compacte. */
   lead?: string;
+  /**
+   * Langue des notifications du panneau (français) quand elle diffère de la
+   * page : rendues hors du panneau, elles n'héritent pas de son `lang`.
+   */
+  toastLang?: string;
 };
 
 export function PushNotificationsPanel({
   variant = "full",
   topics,
   lead,
+  toastLang,
 }: Readonly<PushNotificationsPanelProps>): React.ReactElement | null {
   const { showError } = useToast();
-  const onError = useCallback((code: string) => showError(pushErrorMessage(code)), [showError]);
+  const onError = useCallback(
+    (code: string) => showError(pushErrorMessage(code), toastLang ? { lang: toastLang } : undefined),
+    [showError, toastLang],
+  );
   const push = usePushNotifications(onError, {
     syncExisting: variant === "full",
     announceLoadFailure: variant === "full",
@@ -79,7 +88,7 @@ export function PushNotificationsPanel({
   // elle se tait plutôt que d'occuper la place d'un écran qui a autre chose à dire.
   if (variant === "compact" && (!push.checked || push.subscribed || !configured || blocked)) return null;
 
-  const deviceControl = <DeviceControl push={push} configured={configured} blocked={blocked} />;
+  const deviceControl = <DeviceControl push={push} configured={configured} blocked={blocked} toastLang={toastLang} />;
 
   if (variant === "compact") {
     return (
@@ -145,12 +154,15 @@ function DeviceControl({
   push,
   configured,
   blocked,
+  toastLang,
 }: Readonly<{
   push: ReturnType<typeof usePushNotifications>;
   configured: boolean;
   blocked: string | null;
+  toastLang?: string;
 }>): React.ReactElement {
   const { showSuccess } = useToast();
+  const toastOptions = toastLang ? { lang: toastLang } : undefined;
   if (!configured) {
     return <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>;
   }
@@ -178,7 +190,7 @@ function DeviceControl({
           variant="ghost"
           disabled={push.busy}
           onClick={async () => {
-            if (await push.disable()) showSuccess("Notifications désactivées sur cet appareil.");
+            if (await push.disable()) showSuccess("Notifications désactivées sur cet appareil.", toastOptions);
           }}
         >
           Désactiver sur cet appareil
@@ -193,7 +205,7 @@ function DeviceControl({
         aria-busy={push.busy}
         disabled={push.busy}
         onClick={async () => {
-          if (await push.enable()) showSuccess("Notifications activées sur cet appareil.");
+          if (await push.enable()) showSuccess("Notifications activées sur cet appareil.", toastOptions);
         }}
       >
         {push.busy ? "Activation…" : "Activer les notifications sur cet appareil"}

@@ -432,10 +432,9 @@ export default function TournamentsList() {
               <h1 className={s.title}>{richNodes(text.rich("list.title", {}, { em: titleEm }))}</h1>
               <div className={s.subtitle}>{t("list.subtitle")}</div>
             </div>
-            {/* La création reste en français (lot 8b) : `hrefLang` le dit depuis `/en`. */}
             {isAdmin && (
               <CyberButton asChild variant="primary">
-                <LocaleLink href="/tournois/creer" hrefLang={text.locale === "en" ? "fr" : undefined}>
+                <LocaleLink href="/tournois/creer">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
                       d="M8 3v10M3 8h10"

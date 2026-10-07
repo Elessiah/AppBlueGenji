@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import Link from "next/link";
+import { FormEvent, useState, type ReactNode } from "react";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { richNodes } from "@/components/i18n/shell-text";
 import type { TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
 import { findPhaseIssue } from "@/lib/shared/tournament-phases";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
@@ -17,18 +18,17 @@ import {
   type MatchFormat,
   type MatchFormatType,
 } from "@/lib/shared/match-format";
-import { participantWording, type ParticipantType } from "@/lib/shared/participants";
+import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import {
   MIN_PLAYERS_BOUNDS,
   PLAYER_REQUIREMENTS,
-  PLAYER_REQUIREMENT_LABELS,
-  registrationFiltersSummary,
   type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
-import { phaseIssueMessage } from "../creer/phase-form";
+import { conditionsText, formatHintText, invalidFormatText, phaseIssueText, useFormText } from "../_lib/form-text";
+import { useErrorsText } from "../[id]/_lib/error-map";
 import { FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
@@ -44,8 +44,6 @@ import {
 import {
   DEFAULT_QUALIFICATION_DRAWS,
   effectiveMatchFormat,
-  invalidMatchFormatMessage,
-  matchFormatHint,
   misplacedDateField,
   type TournamentFormValues,
 } from "../_lib/tournament-form-values";
@@ -123,6 +121,11 @@ export function TournamentForm({
   tournamentState,
 }: Readonly<TournamentFormProps>) {
   const { showError } = useToast();
+  const text = useFormText();
+  const { t } = text;
+  const errorsText = useErrorsText();
+  const em = (children: ReadonlyArray<ReactNode>) => <em>{richNodes(children)}</em>;
+  const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
   const fieldErrors = useFieldErrors(TOURNAMENT_FIELD_ERRORS, FIELD_IDS);
 
   const [values, setValues] = useState<TournamentFormValues>(initialValues);
@@ -156,9 +159,10 @@ export function TournamentForm({
   const [image, setImage] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
 
   const { format, maxTeams, phases } = values;
-  const wording = participantWording(values.participantType);
+  const entrantType = toParticipantType(values.participantType);
   const isSolo = values.participantType === "SOLO";
-  const conditionsSummary = registrationFiltersSummary(
+  const conditionsSummary = conditionsText(
+    text,
     {
       discordRequirement: values.registrationDiscordRequirement,
       blizzardRequirement: values.registrationBlizzardRequirement,
@@ -183,7 +187,7 @@ export function TournamentForm({
         drawsAllowed: values.matchFormat?.drawsAllowed ?? false,
       });
   const matchFormatValid = isLibre || isValidMatchFormat(matchFormatType, matchFormatValue);
-  const formatHint = matchFormatHint(matchFormatType, matchFormatValid, matchFormat);
+  const formatHint = formatHintText(text, matchFormatType, matchFormatValid, matchFormat);
 
   /**
    * Modifie le format de match **sans perdre ses réglages voisins**.
@@ -234,7 +238,7 @@ export function TournamentForm({
     setLoading(true);
     try {
       if (!matchFormatValid) {
-        const message = invalidMatchFormatMessage(matchFormatType);
+        const message = invalidFormatText(text, matchFormatType);
         fieldErrors.flag("matchFormatValue", message);
         showError(message);
         setLoading(false);
@@ -244,7 +248,7 @@ export function TournamentForm({
       // Validate phases for MULTI format
       const phaseIssue = format === "MULTI" ? findPhaseIssue(phases) : null;
       if (phaseIssue) {
-        showError(phaseIssueMessage(phaseIssue));
+        showError(phaseIssueText(text, errorsText, phaseIssue));
         // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
         // la phase et y porte le focus — sauf plan figé par la fenêtre
         // d'édition, dont les champs désactivés ne prennent pas le focus :
@@ -269,31 +273,31 @@ export function TournamentForm({
     }
   };
 
-  const loadingLabel = mode === "create" ? "Création..." : "Enregistrement...";
+  const loadingLabel = mode === "create" ? t("form.creating") : t("form.saving");
 
   return (
     <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
       <form onSubmit={handleSubmit} style={SECTION_STACK}>
         <section>
           <p className="eyebrow" style={sectionEyebrow("identity")}>
-            Identité
+            {t("form.sections.identity")}
           </p>
           <div className="form-grid" style={GRID}>
             <div className="field">
-              <label htmlFor="tournament-name">Nom du tournoi</label>
+              <label htmlFor="tournament-name">{t("form.name")}</label>
               <input
                 id="tournament-name"
                 required
                 disabled={locked("name")}
                 value={values.name}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="Mon tournoi"
+                placeholder={t("form.namePlaceholder")}
                 {...fieldAttrs("name")}
               />
               <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
             </div>
             <div className="field">
-              <label htmlFor="tournament-game">Jeu</label>
+              <label htmlFor="tournament-game">{t("form.game")}</label>
               <select
                 id="tournament-game"
                 disabled={locked("game")}
@@ -301,18 +305,18 @@ export function TournamentForm({
                 onChange={(e) => set("game", e.target.value as TournamentGame)}
                 {...lockedAttr("game")}
               >
-                <option value="OW">Overwatch</option>
-                <option value="MR">Marvel Rivals</option>
+                <option value="OW">{t("form.games.OW")}</option>
+                <option value="MR">{t("form.games.MR")}</option>
               </select>
             </div>
             <div className="field" style={FULL_WIDTH}>
-              <label htmlFor="tournament-description">Description</label>
+              <label htmlFor="tournament-description">{t("form.description")}</label>
               <textarea
                 id="tournament-description"
                 disabled={locked("description")}
                 value={values.description}
                 onChange={(e) => set("description", e.target.value)}
-                placeholder="Description du tournoi..."
+                placeholder={t("form.descriptionPlaceholder")}
                 {...lockedAttr("description")}
               />
             </div>
@@ -322,7 +326,7 @@ export function TournamentForm({
         {mode === "create" && (
           <section style={SECTION_SEPARATOR}>
             <p className="eyebrow" style={sectionEyebrow("image")}>
-              Image
+              {t("form.sections.image")}
             </p>
             <TournamentImagePicker existing={null} value={image} onChange={setImage} disabled={loading} />
           </section>
@@ -330,11 +334,11 @@ export function TournamentForm({
 
         <section style={SECTION_SEPARATOR}>
           <p className="eyebrow" style={sectionEyebrow("format")}>
-            Format
+            {t("form.sections.format")}
           </p>
           <div className="form-grid" style={GRID}>
             <div className="field">
-              <label htmlFor="tournament-format">Format de bracket</label>
+              <label htmlFor="tournament-format">{t("form.bracketFormat")}</label>
               <select
                 id="tournament-format"
                 disabled={locked("format")}
@@ -348,16 +352,15 @@ export function TournamentForm({
                 }
                 {...lockedAttr("format")}
               >
-                <option value="SINGLE">Simple élimination</option>
-                <option value="DOUBLE">Double élimination</option>
-                <option value="SWISS">Ronde suisse</option>
-                <option value="SURVIVAL">Survie par coupes</option>
-                <option value="BG_SURVIE">BlueGenji Survie (endurance)</option>
-                <option value="MULTI">Multi-phases</option>
+                {(["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "BG_SURVIE", "MULTI"] as const).map((value) => (
+                  <option key={value} value={value}>
+                    {t(`form.formats.${value}`)}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="field">
-              <label htmlFor="participant-type">Type de participants</label>
+              <label htmlFor="participant-type">{t("form.participantType")}</label>
               <select
                 id="participant-type"
                 aria-describedby={describedBy("participant-type-hint", locked("participantType") && explanationId)}
@@ -365,16 +368,15 @@ export function TournamentForm({
                 value={values.participantType}
                 onChange={(e) => set("participantType", e.target.value as ParticipantType)}
               >
-                <option value="TEAM">Équipes</option>
-                <option value="SOLO">Joueurs (individuel)</option>
+                <option value="TEAM">{t("form.participantTypes.TEAM")}</option>
+                <option value="SOLO">{t("form.participantTypes.SOLO")}</option>
               </select>
               <p id="participant-type-hint" style={HINT}>
-                En individuel, chaque joueur s&apos;inscrit lui-même, sans passer par une
-                équipe.
+                {t("form.participantTypeHint")}
               </p>
             </div>
             <div className="field">
-              <label htmlFor="max-teams">{wording.maxLabel}</label>
+              <label htmlFor="max-teams">{t(`form.maxEntrants.${entrantType}`)}</label>
               <NumberInput
                 id="max-teams"
                 min={2}
@@ -389,7 +391,7 @@ export function TournamentForm({
             </div>
 
             <div className="field">
-              <label htmlFor="match-format-type">Format de match</label>
+              <label htmlFor="match-format-type">{t("form.matchFormat")}</label>
               <select
                 id="match-format-type"
                 disabled={locked("matchFormat")}
@@ -412,9 +414,9 @@ export function TournamentForm({
                 }}
                 {...lockedAttr("matchFormat")}
               >
-                <option value="BO">Best of (BO)</option>
-                <option value="FT">First to (FT)</option>
-                <option value="LIBRE">Libre (aucune limite)</option>
+                <option value="BO">{t("form.matchFormats.BO")}</option>
+                <option value="FT">{t("form.matchFormats.FT")}</option>
+                <option value="LIBRE">{t("form.matchFormats.LIBRE")}</option>
               </select>
               <p style={HINT}>
                 {formatHint}
@@ -424,7 +426,7 @@ export function TournamentForm({
             {!isLibre && (
               <div className="field">
                 <label htmlFor="match-format-value">
-                  {matchFormatType === "BO" ? "Manches jouées (impair)" : "Manches à gagner"}
+                  {t(`form.matchFormatValue.${matchFormatType}`)}
                 </label>
                 <NumberInput
                   id="match-format-value"
@@ -449,9 +451,7 @@ export function TournamentForm({
                   message={fieldErrors.message("matchFormatValue")}
                 />
                 <p id="match-format-value-hint" style={HINT}>
-                  {matchFormatType === "BO"
-                    ? "Le score d'une équipe ne peut pas dépasser la moitié supérieure : 3 en BO5."
-                    : "Objectif à atteindre pour remporter le match : 3 en FT3."}
+                  {t(`form.matchFormatValueHint.${matchFormatType}`)}
                 </p>
               </div>
             )}
@@ -470,7 +470,7 @@ export function TournamentForm({
               matchAllowsDraw(matchFormat) &&
               naturalMaxMaps(matchFormat!) > matchWinsRequired(matchFormat!) && (
               <div className="field">
-                <label htmlFor="match-format-max-maps">Maps décisives au maximum</label>
+                <label htmlFor="match-format-max-maps">{t("form.maxMaps")}</label>
                 <NumberInput
                   id="match-format-max-maps"
                   min={matchWinsRequired(matchFormat!)}
@@ -489,9 +489,7 @@ export function TournamentForm({
                   {...lockedAttr("matchFormat")}
                 />
                 <p style={HINT}>
-                  Somme des deux scores au maximum. Une map nulle ne compte dans aucun des deux et
-                  n&apos;entame donc pas ce plafond. L&apos;abaisser sous {naturalMaxMaps(matchFormat!)}{" "}
-                  rend l&apos;égalité possible.
+                  {t("form.maxMapsHint", { max: naturalMaxMaps(matchFormat!) })}
                 </p>
               </div>
             )}
@@ -509,12 +507,10 @@ export function TournamentForm({
 
         <section style={SECTION_SEPARATOR}>
           <p className="eyebrow" style={sectionEyebrow("registration")}>
-            Conditions d&apos;inscription
+            {t("form.sections.registration")}
           </p>
           <p style={{ ...HINT, margin: "0 0 14px" }}>
-            Contrôlées à chaque inscription d&apos;un joueur. Les{" "}
-            <strong>équipes fantômes</strong> inscrites par le staff n&apos;y sont pas soumises, et
-            les engagés déjà inscrits ne sont jamais relus.
+            {richNodes(text.rich("form.registrationIntro", {}, { strong }))}
           </p>
           {/*
             La phrase que liront les engagés, telle quelle : c'est la même
@@ -527,12 +523,12 @@ export function TournamentForm({
             aria-live="polite"
           >
             {conditionsSummary === null
-              ? "En l'état, ce tournoi est ouvert à tous : aucune condition ne sera affichée."
-              : `Les participants liront : « ${conditionsSummary} ».`}
+              ? t("form.conditionsOpen")
+              : t("form.conditionsRead", { summary: conditionsSummary })}
           </p>
           <div className="form-grid" style={GRID}>
             <div className="field">
-              <label htmlFor="registration-discord">Discord vérifié</label>
+              <label htmlFor="registration-discord">{t("form.discord")}</label>
               <select
                 id="registration-discord"
                 disabled={locked("registrationDiscordRequirement")}
@@ -545,19 +541,17 @@ export function TournamentForm({
               >
                 {PLAYER_REQUIREMENTS.map((value) => (
                   <option key={value} value={value}>
-                    {PLAYER_REQUIREMENT_LABELS[value]}
+                    {t(`form.requirements.${value}`)}
                   </option>
                 ))}
               </select>
               <p id="registration-discord-hint" style={HINT}>
-                Un tag Discord <em>vérifié</em> est un tag dont le joueur a prouvé qu&apos;il lui
-                appartient : c&apos;est la seule façon pour l&apos;organisation de joindre
-                {isSolo ? " le joueur" : " l'équipe"} pendant le tournoi.
+                {richNodes(text.rich(`form.discordHint.${entrantType}`, {}, { em }))}
               </p>
             </div>
 
             <div className="field">
-              <label htmlFor="registration-blizzard">Compte Blizzard</label>
+              <label htmlFor="registration-blizzard">{t("form.blizzard")}</label>
               <select
                 id="registration-blizzard"
                 disabled={locked("registrationBlizzardRequirement")}
@@ -570,17 +564,13 @@ export function TournamentForm({
               >
                 {PLAYER_REQUIREMENTS.map((value) => (
                   <option key={value} value={value}>
-                    {PLAYER_REQUIREMENT_LABELS[value]}
+                    {t(`form.requirements.${value}`)}
                   </option>
                 ))}
               </select>
               <p id="registration-blizzard-hint" style={HINT}>
-                Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag
-                {isSolo ? " du joueur" : " de chaque joueur"} : un tag simplement saisi ne prouve
-                rien.
-                {values.game === "MR"
-                  ? " Sans objet sur un tournoi Marvel Rivals : mieux vaut laisser « Aucun joueur »."
-                  : ""}
+                {richNodes(text.rich(`form.blizzardHint.${entrantType}`, {}, { em }))}
+                {values.game === "MR" ? ` ${t("form.blizzardMarvel")}` : ""}
               </p>
             </div>
 
@@ -593,7 +583,7 @@ export function TournamentForm({
             */}
             {!isSolo && (
               <div className="field">
-                <label htmlFor="registration-min-players">Joueurs minimum dans l&apos;équipe</label>
+                <label htmlFor="registration-min-players">{t("form.minPlayers")}</label>
                 <NumberInput
                   id="registration-min-players"
                   min={MIN_PLAYERS_BOUNDS.min}
@@ -605,8 +595,7 @@ export function TournamentForm({
                   {...lockedAttr("registrationMinPlayers")}
                 />
                 <p id="registration-min-players-hint" style={HINT}>
-                  Membres actifs du roster, coach et manager compris. {MIN_PLAYERS_BOUNDS.min} =
-                  aucune exigence.
+                  {t("form.minPlayersHint", { min: MIN_PLAYERS_BOUNDS.min })}
                 </p>
               </div>
             )}
@@ -615,11 +604,11 @@ export function TournamentForm({
 
         <section style={SECTION_SEPARATOR}>
           <p className="eyebrow" style={sectionEyebrow("planning")}>
-            Planning
+            {t("form.sections.planning")}
           </p>
           <div className="form-grid" style={GRID}>
             <div className="field">
-              <label htmlFor="visibility-at">Début visibilité</label>
+              <label htmlFor="visibility-at">{t("form.dates.startVisibilityAt")}</label>
               <input
                 id="visibility-at"
                 type="datetime-local"
@@ -631,7 +620,7 @@ export function TournamentForm({
               <FieldErrorText fieldId={FIELD_IDS.startVisibilityAt} message={fieldErrors.message("startVisibilityAt")} />
             </div>
             <div className="field">
-              <label htmlFor="registration-open-at">Début inscriptions</label>
+              <label htmlFor="registration-open-at">{t("form.dates.registrationOpenAt")}</label>
               <input
                 id="registration-open-at"
                 type="datetime-local"
@@ -643,7 +632,7 @@ export function TournamentForm({
               <FieldErrorText fieldId={FIELD_IDS.registrationOpenAt} message={fieldErrors.message("registrationOpenAt")} />
             </div>
             <div className="field">
-              <label htmlFor="registration-close-at">Fin inscriptions</label>
+              <label htmlFor="registration-close-at">{t("form.dates.registrationCloseAt")}</label>
               <input
                 id="registration-close-at"
                 type="datetime-local"
@@ -655,7 +644,7 @@ export function TournamentForm({
               <FieldErrorText fieldId={FIELD_IDS.registrationCloseAt} message={fieldErrors.message("registrationCloseAt")} />
             </div>
             <div className="field">
-              <label htmlFor="start-at">Début tournoi</label>
+              <label htmlFor="start-at">{t("form.dates.startAt")}</label>
               <input
                 id="start-at"
                 type="datetime-local"
@@ -690,7 +679,7 @@ export function TournamentForm({
           }}
         >
           <CyberButton variant="ghost" asChild>
-            <Link href="/tournois">Annuler</Link>
+            <LocaleLink href="/tournois">{t("form.cancel")}</LocaleLink>
           </CyberButton>
           <CyberButton
             variant="primary"

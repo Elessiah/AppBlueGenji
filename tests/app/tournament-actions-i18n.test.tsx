@@ -510,7 +510,7 @@ describe("gestes — équivalence avec next-intl, message par message", () => {
 });
 
 describe("charge de la mise en page sous /en", () => {
-  it("les fenêtres ne voyagent pas avec la fiche : refus et gestes seulement", () => {
+  it("les fenêtres et l'image ne voyagent pas avec la fiche : refus et gestes seulement", () => {
     expect(Object.keys(tournamentActionsMessages(EN)).sort()).toEqual(["actions", "errors"]);
   });
 });

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useEffect, type ReactNode } from "react";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { richNodes } from "@/components/i18n/shell-text";
 import { ALL_TOURNAMENT_FIELDS } from "@/lib/shared/tournament-edit";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
@@ -12,7 +12,9 @@ import {
   toApiPayload,
 } from "../_components/TournamentForm";
 import { applyImageChange, imagePickerChange } from "../_lib/image-picker";
-import { mapError } from "../[id]/_lib/error-map";
+import { mapError, useErrorsText } from "../[id]/_lib/error-map";
+import { useFormText } from "../_lib/form-text";
+import { imageErrorText, useImageText } from "../_lib/image-text";
 import { CodedError } from "@/lib/shared/field-errors";
 
 /**
@@ -23,8 +25,13 @@ import { CodedError } from "@/lib/shared/field-errors";
  * permission, en-tête, appel réseau. À la création, tout est modifiable.
  */
 export default function CreateTournamentPage() {
-  const router = useRouter();
+  const router = useLocaleRouter();
   const { showError, showSuccess } = useToast();
+  const text = useFormText();
+  const { t } = text;
+  const errorsText = useErrorsText();
+  const imageText = useImageText();
+  const hl = (children: ReadonlyArray<ReactNode>) => <span className="text-gradient">{richNodes(children)}</span>;
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -33,17 +40,17 @@ export default function CreateTournamentPage() {
       )
       .then((p) => {
         if (!can(p?.user, "tournaments")) {
-          showError("Création de tournoi réservée aux arbitres et administrateurs.");
+          showError(t("create.forbidden"));
           router.replace("/tournois");
         }
       })
       .catch(() => undefined);
-  }, [router, showError]);
+  }, [router, showError, t]);
 
   return (
     <section className="fade-in container">
       <div style={{ marginBottom: 28 }}>
-        <Link
+        <LocaleLink
           href="/tournois"
           style={{
             display: "inline-flex",
@@ -53,16 +60,16 @@ export default function CreateTournamentPage() {
             color: "var(--blue-300)",
           }}
         >
-          ← Tournois
-        </Link>
+          {t("create.back")}
+        </LocaleLink>
         <h1
           className="display"
           style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px", lineHeight: 1.1 }}
         >
-          Créer <span className="text-gradient">un tournoi</span>
+          {richNodes(text.rich("create.title", {}, { hl }))}
         </h1>
         <p style={{ color: "var(--ink-mute)", margin: 0, fontSize: 14 }}>
-          Définis les phases temporelles, le jeu et le format de bracket.
+          {t("create.lede")}
         </p>
       </div>
 
@@ -70,7 +77,7 @@ export default function CreateTournamentPage() {
         mode="create"
         initialValues={defaultTournamentFormValues()}
         editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
-        submitLabel="Créer le tournoi"
+        submitLabel={t("create.submit")}
         onSubmit={async (values, image) => {
           const response = await fetch("/api/tournaments", {
             method: "POST",
@@ -82,18 +89,18 @@ export default function CreateTournamentPage() {
             // Le code voyage avec sa phrase : la notification lit la phrase,
             // le formulaire tire du code le champ à signaler.
             const code = payload.error || "TOURNAMENT_CREATE_FAILED";
-            throw new CodedError(code, mapError(code));
+            throw new CodedError(code, mapError(code, errorsText));
           }
           // L'image ne peut partir qu'une fois le tournoi né : elle se range sous
           // son identifiant. Son échec ne défait pas la création — le tournoi
           // existe, on le dit, et l'image s'ajoute ensuite depuis sa fiche.
           try {
-            await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop);
-            showSuccess("Tournoi créé.");
-          } catch (error) {
-            showError(
-              `Tournoi créé, mais son image n'a pas été enregistrée : ${(error as Error).message} Ajoute-la depuis la fiche du tournoi.`,
+            await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop, (code) =>
+              imageErrorText(imageText, code),
             );
+            showSuccess(t("create.created"));
+          } catch (error) {
+            showError(t("create.imageFailed", { error: (error as Error).message }));
           }
           router.push(`/tournois/${payload.id}`);
           router.refresh();

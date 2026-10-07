@@ -2,12 +2,7 @@
 
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
-import {
-  MAX_PHASES,
-  resolvePhasePlan,
-  describePhasePlan,
-  findPhaseIssue,
-} from "@/lib/shared/tournament-phases";
+import { MAX_PHASES, resolvePhasePlan, findPhaseIssue } from "@/lib/shared/tournament-phases";
 import { CyberButton } from "@/components/cyber";
 import { focusFlaggedField } from "@/lib/shared/field-errors";
 import { PhaseCard } from "./PhaseCard";
@@ -16,8 +11,9 @@ import {
   removePhase,
   addPhase,
   phaseFieldId,
-  phaseIssueMessage,
 } from "./phase-form";
+import { phaseIssueText, phasePlanText, useFormText } from "../_lib/form-text";
+import { useErrorsText } from "../[id]/_lib/error-map";
 
 const HINT: CSSProperties = {
   margin: "2px 0 0",
@@ -48,6 +44,9 @@ export function PhaseBuilder({
   focusRequest = 0,
   onChange,
 }: Readonly<PhaseBuilderProps>) {
+  const text = useFormText();
+  const { t } = text;
+  const errorsText = useErrorsText();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
@@ -78,9 +77,9 @@ export function PhaseBuilder({
   };
 
   const plan = resolvePhasePlan(maxTeams, phases);
-  const descriptions = describePhasePlan(plan);
+  const descriptions = phasePlanText(text, plan);
   const issue = findPhaseIssue(phases);
-  const issueMessage = issue ? phaseIssueMessage(issue) : null;
+  const issueMessage = issue ? phaseIssueText(text, errorsText, issue) : null;
 
   // Lu par une référence : l'effet ne doit répondre qu'à une **nouvelle**
   // demande, pas à chaque frappe qui change le défaut du plan.
@@ -151,17 +150,17 @@ export function PhaseBuilder({
           onClick={handleAddPhase}
           disabled={disabled || phases.length >= MAX_PHASES}
           title={
-            phases.length >= MAX_PHASES ? "Maximum de phases atteint" : undefined
+            phases.length >= MAX_PHASES ? t("phases.maxReached") : undefined
           }
           style={{
             opacity: disabled || phases.length >= MAX_PHASES ? 0.5 : 1,
             cursor: disabled || phases.length >= MAX_PHASES ? "not-allowed" : "pointer",
           }}
         >
-          + Ajouter une phase
+          {t("phases.add")}
         </CyberButton>
         {phases.length >= MAX_PHASES && (
-          <p style={HINT}>Maximum de {MAX_PHASES} phases atteint.</p>
+          <p style={HINT}>{t("phases.maxReachedHint", { max: MAX_PHASES })}</p>
         )}
       </div>
 
@@ -183,7 +182,7 @@ export function PhaseBuilder({
             color: "var(--ink)",
           }}
         >
-          Aperçu du plan
+          {t("phases.previewTitle")}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {descriptions.map((desc, idx) => {
@@ -212,8 +211,7 @@ export function PhaseBuilder({
             marginBottom: 0,
           }}
         >
-          Un nombre fixe fait sauter la phase si moins d'équipes se présentent ;
-          un pourcentage s'adapte au nombre réel d'inscrites.
+          {t("phases.modeHint")}
         </p>
       </div>
 

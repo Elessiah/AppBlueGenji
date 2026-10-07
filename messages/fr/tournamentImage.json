@@ -1,0 +1,48 @@
+{
+  "picker": {
+    "cropTitle": "Recadrer l'image du tournoi",
+    "drop": "Dépose l'image ici",
+    "add": "Ajouter une illustration ou un logo",
+    "hint": "Facultatif · PNG, JPEG ou WebP, 5 Mo max · toutes dimensions acceptées, tu choisis la zone gardée",
+    "kind": "Type d'image",
+    "fits": {
+      "COVER": {
+        "label": "Illustration",
+        "hint": "Remplit le bandeau du tournoi. Clique sur l'aperçu pour choisir le point qui doit rester visible."
+      },
+      "CONTAIN": {
+        "label": "Logo",
+        "hint": "Toujours affiché en entier, dans une pastille à côté du nom — idéal pour un fond transparent."
+      }
+    },
+    "focus": "Point de cadrage",
+    "focusRole": "sélecteur de point de cadrage",
+    "focusAria": "Point de cadrage : {x} % depuis la gauche, {y} % depuis le haut",
+    "focusHint": "Clique ou fais glisser sur l'image ; au clavier, flèches (Maj pour aller plus vite), Origine pour recentrer.",
+    "preview": "Aperçu",
+    "previewBanner": "Bandeau de la fiche",
+    "previewCard": "Carte de la liste",
+    "logoHint": "Le logo s'affiche en entier à côté du nom du tournoi, sur la fiche comme sur les cartes. Un fond transparent y rend le mieux.",
+    "replace": "Remplacer l'image",
+    "recrop": "Recadrer",
+    "remove": "Retirer l'image"
+  },
+  "errors": {
+    "FILE_MISSING": "Aucun fichier reçu.",
+    "IMAGE_TOO_LARGE": "Image trop lourde : 5 Mo maximum.",
+    "IMAGE_FORMAT_INVALID": "Format non pris en charge : PNG, JPEG ou WebP uniquement.",
+    "IMAGE_DIMENSIONS_INVALID": "Dimensions de l'image illisibles ou trop grandes (8000 px maximum par côté).",
+    "IMAGE_ANIMATED_NOT_SUPPORTED": "Les images animées ne sont pas prises en charge.",
+    "INVALID_IMAGE_FIT": "Mode d'affichage de l'image invalide.",
+    "INVALID_IMAGE_FOCUS": "Point de cadrage invalide.",
+    "TOURNAMENT_IMAGE_MISSING": "Ce tournoi n'a plus d'image : recharge la page.",
+    "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
+    "forbidden": "Action réservée aux arbitres et administrateurs.",
+    "fallback": "L'image n'a pas pu être enregistrée."
+  },
+  "success": {
+    "upload": "Image du tournoi enregistrée.",
+    "update": "Réglage de l'image enregistré.",
+    "delete": "Image du tournoi retirée."
+  }
+}

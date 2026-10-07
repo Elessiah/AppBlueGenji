@@ -54,7 +54,7 @@ import { TournamentProgress } from "./_components/TournamentProgress";
 import { TournamentLoading } from "./_components/TournamentLoading";
 import { TournamentHeader } from "./_components/TournamentHeader";
 import styles from "./page.module.css";
-import { orReload } from "./_lib/lazy-component";
+import { orReload } from "@/lib/shared/lazy-component";
 import { buildSeedMap } from "@/lib/shared/match-sections";
 
 // Découpage du paquet : un spectateur ne voit qu'un format et n'ouvre presque

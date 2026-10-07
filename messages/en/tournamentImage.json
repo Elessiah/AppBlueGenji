@@ -1,0 +1,48 @@
+{
+  "picker": {
+    "cropTitle": "Crop the tournament image",
+    "drop": "Drop the image here",
+    "add": "Add an illustration or a logo",
+    "hint": "Optional · PNG, JPEG or WebP, 5 MB max · any size accepted, you choose the area to keep",
+    "kind": "Image type",
+    "fits": {
+      "COVER": {
+        "label": "Illustration",
+        "hint": "Fills the tournament banner. Click the preview to choose the point that must stay visible."
+      },
+      "CONTAIN": {
+        "label": "Logo",
+        "hint": "Always shown in full, in a badge next to the name — ideal with a transparent background."
+      }
+    },
+    "focus": "Focal point",
+    "focusRole": "focal point picker",
+    "focusAria": "Focal point: {x}% from the left, {y}% from the top",
+    "focusHint": "Click or drag on the image; with the keyboard, arrows (Shift to go faster), Home to recenter.",
+    "preview": "Preview",
+    "previewBanner": "Tournament page banner",
+    "previewCard": "List card",
+    "logoHint": "The logo is shown in full next to the tournament name, on its page as on the cards. A transparent background works best.",
+    "replace": "Replace the image",
+    "recrop": "Crop again",
+    "remove": "Remove the image"
+  },
+  "errors": {
+    "FILE_MISSING": "No file received.",
+    "IMAGE_TOO_LARGE": "Image too heavy: 5 MB maximum.",
+    "IMAGE_FORMAT_INVALID": "Unsupported format: PNG, JPEG or WebP only.",
+    "IMAGE_DIMENSIONS_INVALID": "Image dimensions unreadable or too large (8000 px maximum per side).",
+    "IMAGE_ANIMATED_NOT_SUPPORTED": "Animated images aren't supported.",
+    "INVALID_IMAGE_FIT": "Invalid image display mode.",
+    "INVALID_IMAGE_FOCUS": "Invalid focal point.",
+    "TOURNAMENT_IMAGE_MISSING": "This tournament no longer has an image: reload the page.",
+    "TOURNAMENT_NOT_FOUND": "Tournament not found.",
+    "forbidden": "Only referees and administrators can do this.",
+    "fallback": "The image couldn't be saved."
+  },
+  "success": {
+    "upload": "Tournament image saved.",
+    "update": "Image settings saved.",
+    "delete": "Tournament image removed."
+  }
+}

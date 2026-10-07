@@ -271,12 +271,14 @@ const roundMatches: BracketMatch[] = [
 // ─── Route, référencement ────────────────────────────────────────────────────
 
 describe("route et référencement", () => {
-  it("ouvre la fiche, pas la création ni l'édition (lot 8b)", () => {
+  it("ouvre la fiche ; la création et l'édition à leur tour (lot 8b-2)", () => {
     expect(isMigratedRoute("/tournois/12")).toBe(true);
-    expect(isMigratedRoute("/tournois/creer")).toBe(false);
-    expect(isMigratedRoute("/tournois/12/modifier")).toBe(false);
+    // `creer` n'est pas un identifiant : c'est sa propre entrée qui l'ouvre.
+    expect(isMigratedRoute("/tournois/creer")).toBe(true);
+    expect(isMigratedRoute("/tournois/12/modifier")).toBe(true);
+    expect(isMigratedRoute("/tournois/abc/modifier")).toBe(false);
     expect(localeHref("/tournois/12#match-3", "en")).toBe("/en/tournois/12#match-3");
-    expect(localeHref("/tournois/creer", "en")).toBe("/tournois/creer");
+    expect(localeHref("/tournois/creer", "en")).toBe("/en/tournois/creer");
     // `[slug]` reste un segment quelconque.
     expect(isMigratedRoute("/regles/ronde-suisse")).toBe(true);
   });
@@ -483,7 +485,7 @@ describe("gestes traduits au lot 8b — plus de blocs français sur la fiche", (
   const COMPONENTS = "app/(secured)/tournois/[id]/_components";
   const source = (file: string) => readFileSync(join(process.cwd(), COMPONENTS, file), "utf8");
 
-  it("les notifications des gestes suivent la page (useToast), hors sélecteur d'image (lot 8b-2)", () => {
+  it("les notifications des gestes suivent la page (useToast), fenêtre d'image comprise", () => {
     for (const file of [
       "AdvanceTournamentDialog.tsx",
       "DeleteTournamentDialog.tsx",
@@ -498,6 +500,7 @@ describe("gestes traduits au lot 8b — plus de blocs français sur la fiche", (
       "RegistrationsPanel.tsx",
       "RemoveEntrantDialog.tsx",
       "RollbackRoundDialog.tsx",
+      "TournamentImageDialog.tsx",
     ]) {
       const code = source(file);
       expect(`${file}: ${code.includes("useFrenchBlockToast")}`).toBe(`${file}: false`);
@@ -505,15 +508,15 @@ describe("gestes traduits au lot 8b — plus de blocs français sur la fiche", (
     }
     const scoreForm = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
     expect(scoreForm).not.toContain("useFrenchBlockToast");
-    // Le sélecteur d'image (recadrage compris) est partagé avec la création :
-    // il reste français jusqu'au lot 8b-2, et le redit.
-    expect(source("TournamentImageDialog.tsx")).toContain("lang={pickerLang} />");
+    // Lot 8b-2 : le sélecteur d'image suit la page ; seule la modale de
+    // recadrage, commune au site (lot 9), reste française et le redit.
     const picker = readFileSync(join(process.cwd(), "app/(secured)/tournois/_components/TournamentImagePicker.tsx"), "utf8");
-    expect(picker).toContain("useImageCropper({ lang })");
+    expect(picker).toContain("useImageCropper({ lang: cropLang })");
   });
 
-  it("lien « Modifier » vers l'édition, pas encore traduite : hrefLang", () => {
-    expect(source("TournamentHeader.tsx")).toMatch(/href=\{`\/tournois\/\$\{card\.id\}\/modifier`\} hrefLang=\{editLang\}/);
+  it("lien « Modifier » vers l'édition, traduite au lot 8b-2 : même langue, sans hrefLang", () => {
+    expect(source("TournamentHeader.tsx")).toContain("<LocaleLink href={`/tournois/${card.id}/modifier`}>");
+    expect(isMigratedRoute("/tournois/12/modifier")).toBe(true);
   });
 
   it("textes de la fiche indexés sur la langue seule (un refresh ne rouvre pas le flux)", () => {

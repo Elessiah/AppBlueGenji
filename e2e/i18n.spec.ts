@@ -155,9 +155,17 @@ test.describe("Langues — adresses /en", () => {
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   });
 
-  test("/en/tournois/creer reste française (lot 8b)", async ({ page }) => {
-    await page.goto("/en/tournois/creer");
-    expect(new URL(page.url()).pathname).toBe("/tournois/creer");
+  // Lot 8b-2 : création et édition ouvertes sous `/en` (carte de connexion sans session).
+  test("/en/tournois/creer et /en/tournois/<id>/modifier : lang=en, hreflang, noindex", async ({ page }) => {
+    for (const path of ["/en/tournois/creer", "/en/tournois/1/modifier"]) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+      expect(new URL(page.url()).pathname).toBe(path);
+      await expect(page.locator("html")).toHaveAttribute("lang", "en");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
+      await expect(page.locator('link[rel="alternate"][hreflang="fr"]')).toHaveAttribute("href", new RegExp(`[^n]${path.slice(3)}$`));
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+    }
   });
 
   // Lot 8a-2 : la fiche d'un tournoi. `[id]` n'accepte qu'un entier.

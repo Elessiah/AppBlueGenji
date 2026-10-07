@@ -1,13 +1,15 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import type { Locale } from "@/lib/shared/locales";
 import {
   tournamentActionsText,
   tournamentErrorsText,
+  tournamentFormText,
   type TournamentActionsClientMessages,
   type TournamentActionsText,
   type TournamentErrorsText,
+  type TournamentFormText,
 } from "@/lib/shared/tournament-actions-text";
 
 /**
@@ -15,11 +17,11 @@ import {
  *
  * Le fournisseur ne porte que l'**anglais** : en français, chaque espace est
  * lu dans le paquet par son propre module (`_lib/error-map.ts`,
- * `_lib/actions-text.ts`, `_lib/dialogs-text.ts`), qui passe son français en
- * repli aux crochets ci-dessous. Hors fournisseur (tests, page française) : ce
- * repli.
+ * `_lib/actions-text.ts`, `_lib/form-text.ts`), qui passe son français en repli aux crochets
+ * ci-dessous. Hors fournisseur (tests, page française) : ce repli.
  *
- * Les fenêtres d'action (`tournamentDialogs`) ne passent **pas** par ici : leurs
+ * Les fenêtres d'action (`tournamentDialogs`) et le sélecteur d'image
+ * (`tournamentImage`) ne passent **pas** par ici : leurs
  * deux langues voyagent avec leurs morceaux chargés à la demande, et le
  * fournisseur ne leur donne que la langue (`useTournamentActionsLocale`) — sans
  * quoi tout lecteur de `/en` recevrait leur anglais à chaque chargement.
@@ -28,6 +30,7 @@ type ActionsTextValue = {
   readonly locale?: Locale;
   readonly errors?: TournamentErrorsText;
   readonly actions?: TournamentActionsText;
+  readonly form?: TournamentFormText;
 };
 
 const TournamentActionsTextContext = createContext<ActionsTextValue>({});
@@ -36,8 +39,9 @@ function buildValue(locale: Locale, messages: TournamentActionsClientMessages | 
   if (!messages) return { locale };
   return {
     locale,
-    errors: tournamentErrorsText(locale, messages.errors),
+    errors: messages.errors ? tournamentErrorsText(locale, messages.errors) : undefined,
     actions: messages.actions ? tournamentActionsText(locale, messages.actions) : undefined,
+    form: messages.form ? tournamentFormText(locale, messages.form) : undefined,
   };
 }
 
@@ -51,7 +55,20 @@ export function TournamentActionsTextProvider({
   // contenu identique, et un nouveau texte relancerait les effets qui le lisent.
   const [state, setState] = useState(() => ({ locale, value: buildValue(locale, messages) }));
   if (state.locale !== locale) setState({ locale, value: buildValue(locale, messages) });
-  return <TournamentActionsTextContext.Provider value={state.value}>{children}</TournamentActionsTextContext.Provider>;
+  // Un fournisseur imbriqué (l'édition sous la fiche) hérite des espaces qu'il
+  // ne porte pas : chaque mise en page n'envoie que les siens.
+  const parent = useContext(TournamentActionsTextContext);
+  const own = state.value;
+  const value = useMemo<ActionsTextValue>(
+    () => ({
+      locale: own.locale,
+      errors: own.errors ?? parent.errors,
+      actions: own.actions ?? parent.actions,
+      form: own.form ?? parent.form,
+    }),
+    [own, parent],
+  );
+  return <TournamentActionsTextContext.Provider value={value}>{children}</TournamentActionsTextContext.Provider>;
 }
 
 /** Table des refus de la page ; `fr` : celle du paquet. */
@@ -67,4 +84,9 @@ export function useTournamentActionsTextFrom(fr: TournamentActionsText): Tournam
 /** Langue de la fiche ; `undefined` hors fournisseur (tests) — le français. */
 export function useTournamentActionsLocale(): Locale | undefined {
   return useContext(TournamentActionsTextContext).locale;
+}
+
+/** Textes des formulaires de création et d'édition ; `fr` : ceux du paquet. */
+export function useTournamentFormTextFrom(fr: TournamentFormText): TournamentFormText {
+  return useContext(TournamentActionsTextContext).form ?? fr;
 }

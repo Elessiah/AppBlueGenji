@@ -1,17 +1,13 @@
 "use client";
 
-import {
-  ENABLE_PLANNING_WHILE_RUNNING_WARNING,
-  REFEREE_SCHEDULING_DESCRIPTION,
-} from "@/lib/shared/match-planning";
+import type { TournamentFormText } from "@/lib/shared/tournament-actions-text";
 import { checkboxCardChrome, HINT } from "../_lib/form-styles";
+import { useFormText } from "../_lib/form-text";
 
 /** Précision sous la description, selon l'écran. */
-function scopeHint(mode: "create" | "edit", editable: boolean): string {
-  if (!editable) return "Le tournoi est terminé : l'option n'est plus modifiable.";
-  return mode === "create"
-    ? "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours."
-    : "Modifiable jusqu'à la clôture du tournoi — même en cours.";
+function scopeHint(text: TournamentFormText, mode: "create" | "edit", editable: boolean): string {
+  if (!editable) return text.t("form.referee.finished");
+  return text.t(mode === "create" ? "form.referee.create" : "form.referee.edit");
 }
 
 /**
@@ -40,6 +36,8 @@ export function RefereeSchedulingField({
   warnUndoesLaunches: boolean;
   onChange: (checked: boolean) => void;
 }>) {
+  const text = useFormText();
+  const { t } = text;
   return (
     <>
       <label
@@ -84,10 +82,10 @@ export function RefereeSchedulingField({
               color: "var(--ink)",
             }}
           >
-            Matchs planifiés par l&apos;arbitrage
+            {t("form.referee.label")}
           </span>
           <span id="referee-scheduling-hint" style={{ ...HINT, display: "block", margin: 0 }}>
-            {REFEREE_SCHEDULING_DESCRIPTION} {scopeHint(mode, editable)}
+            {t("form.referee.description")} {scopeHint(text, mode, editable)}
           </span>
         </span>
       </label>
@@ -106,7 +104,7 @@ export function RefereeSchedulingField({
             color: "var(--ink-soft, #c3ccd8)",
           }}
         >
-          {ENABLE_PLANNING_WHILE_RUNNING_WARNING}
+          {t("form.referee.warning")}
         </output>
       )}
     </>

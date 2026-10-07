@@ -2,12 +2,12 @@ import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import type { Metadata } from "next";
 import { resolveTitle } from "next/dist/lib/metadata/resolvers/resolve-title";
 import { generateMetadata as tournamentsLayoutMetadata } from "@/app/(secured)/tournois/layout";
-import { metadata as createTournamentMetadata } from "@/app/(secured)/tournois/creer/layout";
+import { generateMetadata as createTournamentLayoutMetadata } from "@/app/(secured)/tournois/creer/layout";
 import { metadata as teamsMetadata } from "@/app/(secured)/equipes/layout";
 import { metadata as createTeamMetadata } from "@/app/(secured)/equipes/creer/layout";
 import { metadata as playersMetadata } from "@/app/(secured)/joueurs/layout";
 import { metadata as profileMetadata } from "@/app/(secured)/profil/layout";
-import { metadata as editTournamentMetadata } from "@/app/(secured)/tournois/[id]/modifier/layout";
+import { generateMetadata as editTournamentLayoutMetadata } from "@/app/(secured)/tournois/[id]/modifier/layout";
 import { SITE_TITLE_TEMPLATE, pageMetadata, segmentTitle, siteTitle } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
 import { readSource } from "../helpers/read-source";
@@ -17,8 +17,14 @@ import { readSource } from "../helpers/read-source";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 
 let tournamentsMetadata: Metadata;
+// Création et édition sont traduites (lot 8b-2) : titres lus dans la langue de
+// la requête, comme la liste.
+let createTournamentMetadata: Metadata;
+let editTournamentMetadata: Metadata;
 beforeAll(async () => {
   tournamentsMetadata = await tournamentsLayoutMetadata();
+  createTournamentMetadata = await createTournamentLayoutMetadata();
+  editTournamentMetadata = await editTournamentLayoutMetadata({ params: Promise.resolve({ id: "12" }) });
 });
 
 /**

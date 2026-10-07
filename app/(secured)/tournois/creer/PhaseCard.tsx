@@ -7,11 +7,8 @@ import { MIN_PHASES } from "@/lib/shared/tournament-phases";
 import { Pill } from "@/components/cyber";
 import { fieldAria } from "@/lib/shared/field-errors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
-import {
-  phaseFieldId,
-  phaseFormatLabel,
-  phaseSummary,
-} from "./phase-form";
+import { phaseFieldId } from "./phase-form";
+import { phaseFormatText, phaseSummaryText, useFormText } from "../_lib/form-text";
 import { checkboxCardChrome } from "../_lib/form-styles";
 import { NumberInput } from "@/components/ui/number-input";
 
@@ -105,6 +102,8 @@ export function PhaseCard({
   onRemove,
   onUpdate,
 }: Readonly<PhaseCardProps>) {
+  const text = useFormText();
+  const { t } = text;
   const canMoveUp = !disabled && phase.position > 1;
   const canMoveDown = !disabled && phase.position < totalPhases;
   const canRemove = !disabled && totalPhases > MIN_PHASES;
@@ -184,7 +183,7 @@ export function PhaseCard({
                 textOverflow: "ellipsis",
               }}
             >
-              {phase.name || phaseFormatLabel(phase.format)}
+              {phase.name || phaseFormatText(text, phase.format)}
             </div>
             <div
               style={{
@@ -195,7 +194,7 @@ export function PhaseCard({
                 textOverflow: "ellipsis",
               }}
             >
-              {phaseSummary(phase, isLast)}
+              {phaseSummaryText(text, phase, isLast)}
             </div>
           </div>
 
@@ -205,7 +204,7 @@ export function PhaseCard({
               l'entendre deux fois dans le nom du bouton. */}
           {isLast && (
             <Pill variant="blue" aria-hidden="true" style={{ flexShrink: 0 }}>
-              Phase finale
+              {t("phases.finalBadge")}
             </Pill>
           )}
         </button>
@@ -223,7 +222,7 @@ export function PhaseCard({
             type="button"
             onClick={onMoveUp}
             disabled={!canMoveUp}
-            aria-label={`Monter la phase ${phase.position}`}
+            aria-label={t("phases.moveUp", { position: phase.position })}
             style={{
               width: 32,
               height: 32,
@@ -255,7 +254,7 @@ export function PhaseCard({
             type="button"
             onClick={onMoveDown}
             disabled={!canMoveDown}
-            aria-label={`Descendre la phase ${phase.position}`}
+            aria-label={t("phases.moveDown", { position: phase.position })}
             style={{
               width: 32,
               height: 32,
@@ -287,7 +286,7 @@ export function PhaseCard({
             type="button"
             onClick={onRemove}
             disabled={!canRemove}
-            aria-label={`Supprimer la phase ${phase.position}`}
+            aria-label={t("phases.remove", { position: phase.position })}
             style={{
               width: 32,
               height: 32,
@@ -357,7 +356,7 @@ export function PhaseCard({
             {/* Phase name */}
             <div className="field">
               <label htmlFor={`phase-name-${phase.position}`}>
-                Nom de la phase (optionnel)
+                {t("phases.name")}
               </label>
               <input
                 id={`phase-name-${phase.position}`}
@@ -370,13 +369,13 @@ export function PhaseCard({
                     name: e.target.value || null,
                   })
                 }
-                placeholder={`Phase ${phase.position}`}
+                placeholder={t("phases.namePlaceholder", { position: phase.position })}
               />
             </div>
 
             {/* Format select */}
             <div className="field">
-              <label htmlFor={fieldId("format")}>Format</label>
+              <label htmlFor={fieldId("format")}>{t("phases.format")}</label>
               <select
                 id={fieldId("format")}
                 {...invalidAttrs("format")}
@@ -389,10 +388,11 @@ export function PhaseCard({
                   })
                 }
               >
-                <option value="SINGLE">Élimination simple</option>
-                <option value="DOUBLE">Double élimination</option>
-                <option value="SWISS">Ronde suisse</option>
-                <option value="SURVIVAL">Survie par coupes</option>
+                {(["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"] as const).map((value) => (
+                  <option key={value} value={value}>
+                    {phaseFormatText(text, value)}
+                  </option>
+                ))}
               </select>
               {errorText("format")}
             </div>
@@ -402,7 +402,7 @@ export function PhaseCard({
               <>
                 <div className="field">
                   <label htmlFor={`phase-mode-${phase.position}`}>
-                    Mode de qualification
+                    {t("phases.mode")}
                   </label>
                   <select
                     id={`phase-mode-${phase.position}`}
@@ -415,16 +415,14 @@ export function PhaseCard({
                       })
                     }
                   >
-                    <option value="COUNT">Nombre d'équipes</option>
-                    <option value="PERCENT">Pourcentage</option>
+                    <option value="COUNT">{t("phases.modes.COUNT")}</option>
+                    <option value="PERCENT">{t("phases.modes.PERCENT")}</option>
                   </select>
                 </div>
 
                 <div className="field">
                   <label htmlFor={fieldId("qualifierValue")}>
-                    {phase.qualifierMode === "COUNT"
-                      ? "Nombre d'équipes qualifiées"
-                      : "Pourcentage qualifié"}
+                    {t(`phases.qualifierValue.${phase.qualifierMode}`)}
                   </label>
                   <NumberInput
                     id={fieldId("qualifierValue")}
@@ -449,7 +447,7 @@ export function PhaseCard({
             {phase.format === "SWISS" && (
               <div className="field">
                 <label htmlFor={fieldId("swissTotalRounds")}>
-                  Nombre de manches
+                  {t("phases.swissRounds")}
                 </label>
                 <input
                   id={fieldId("swissTotalRounds")}
@@ -467,11 +465,11 @@ export function PhaseCard({
                       swissTotalRounds: e.target.value ? Number(e.target.value) : null,
                     })
                   }
-                  placeholder="Automatique"
+                  placeholder={t("phases.auto")}
                 />
                 {errorText("swissTotalRounds")}
                 <p id={helpId("swissTotalRounds")} style={HINT}>
-                  Laissez vide pour automatique.
+                  {t("phases.autoHint")}
                 </p>
               </div>
             )}
@@ -481,7 +479,7 @@ export function PhaseCard({
               <>
                 <div className="field">
                   <label htmlFor={fieldId("survivalRoundsBeforeFirstCut")}>
-                    Manches avant la première coupe
+                    {t("settings.survivalFirstCut")}
                   </label>
                   <NumberInput
                     id={fieldId("survivalRoundsBeforeFirstCut")}
@@ -501,13 +499,13 @@ export function PhaseCard({
                   />
                   {errorText("survivalRoundsBeforeFirstCut")}
                   <p id={helpId("survivalRoundsBeforeFirstCut")} style={HINT}>
-                    Laisse le classement se former avant la première élimination.
+                    {t("settings.survivalFirstCutHint")}
                   </p>
                 </div>
 
                 <div className="field">
                   <label htmlFor={fieldId("survivalRoundsPerCut")}>
-                    Manches entre les coupes suivantes
+                    {t("settings.survivalRounds")}
                   </label>
                   <NumberInput
                     id={fieldId("survivalRoundsPerCut")}
@@ -525,7 +523,7 @@ export function PhaseCard({
                   />
                   {errorText("survivalRoundsPerCut")}
                   <p id={helpId("survivalRoundsPerCut")} style={HINT}>
-                    Cadence appliquée après la première coupe.
+                    {t("settings.survivalRoundsHint")}
                   </p>
                 </div>
               </>
@@ -538,7 +536,7 @@ export function PhaseCard({
                   htmlFor={`phase-third-${phase.position}`}
                   style={{ marginBottom: 6 }}
                 >
-                  Options supplémentaires
+                  {t("settings.options")}
                 </label>
                 <div // NOSONAR S1082 — raccourci souris ; le clavier passe par la case native qu'elle contient
                   className="checkbox-card"
@@ -598,11 +596,10 @@ export function PhaseCard({
                         ...commandAvailability(!disabled),
                       }}
                     >
-                      Petite finale
+                      {t("settings.thirdPlace")}
                     </label>
                     <p style={{ ...HINT, margin: 0, ...(disabled ? { color: "var(--ink-dim)" } : {}) }}>
-                      Ajoute un match pour déterminer la 3ᵉ place entre les deux
-                      perdants des demi-finales.
+                      {t("settings.thirdPlaceHint")}
                     </p>
                   </div>
                 </div>

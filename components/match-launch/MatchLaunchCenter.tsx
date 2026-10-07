@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
+import { useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
+import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
@@ -10,7 +12,6 @@ import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
-  launchErrorMessage,
   launchModalKey,
   launchModalWaits,
   MATCH_LAUNCH_OPEN_EVENT,
@@ -40,11 +41,8 @@ const REFRESH_EVENT_COALESCE_MS = 300;
 const LAUNCH_ANNOUNCE_WINDOW_MS = 10 * 60_000;
 const DISMISSED_STORAGE_KEY = "bg_match_launch_dismissed";
 
-const ROLE_LABELS: Partial<Record<TeamRole, string>> = {
-  CAPITAINE: "Capitaine",
-  MANAGER: "Manager",
-  OWNER: "Propriétaire",
-};
+/** Rôles affichés sur un contact, dans l'ordre de la priorité de choix (`roles.*`). */
+const CONTACT_ROLES = ["CAPITAINE", "MANAGER", "OWNER"] as const satisfies readonly TeamRole[];
 
 function readDismissed(): Set<string> {
   try {
@@ -64,27 +62,43 @@ function writeDismissed(keys: Set<string>): void {
   }
 }
 
-function formatTime(iso: string | null): string | null {
+function formatTime(iso: string | null, locale: Locale): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  // 24 h dans les deux langues (le français l'applique de lui-même).
+  return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
 }
 
 /** Libellés qui dépendent de qui déclare « Prêt » : une équipe, ou le caster. */
-function viewerLaunchCopy(role: MatchLaunchInfo["viewer"]["role"]): { partyWord: string; confirmQuestion: string } {
-  if (role === "CASTER") {
-    return { partyWord: "Je suis prêt", confirmQuestion: "Confirmes-tu être prêt à caster ce match ?" };
-  }
-  return {
-    partyWord: "Mon équipe est prête",
-    confirmQuestion: "Confirmes-tu que ton équipe est au complet et prête à jouer ?",
-  };
+function viewerLaunchCopy(text: LaunchText, role: MatchLaunchInfo["viewer"]["role"]): { partyWord: string; confirmQuestion: string } {
+  const who = role === "CASTER" ? "caster" : "team";
+  return { partyWord: text.t(`ready.${who}`), confirmQuestion: text.t(`confirmQuestion.${who}`) };
 }
 
 /** Sur-titre de la modale. */
-function launchEyebrow(phase: MatchLaunchInfo["phase"]): string {
-  return phase === "LAUNCHED" ? "MATCH LANCÉ" : "LANCEMENT DU MATCH";
+function launchEyebrow(text: LaunchText, phase: MatchLaunchInfo["phase"]): string {
+  return text.t(phase === "LAUNCHED" ? "eyebrowLaunched" : "eyebrowLobby");
+}
+
+/** Clés des refus du lancement (`errors.*`). */
+type LaunchErrorKey = Extract<LaunchKey, `errors.${string}`>;
+
+/**
+ * Refus d'un geste du lancement (`launchErrorMessage`), dans la langue de la
+ * page : la modale vit dans la mise en page racine, hors de la fiche et de sa
+ * table des refus — elle porte les siens (`errors.*`).
+ */
+export function launchErrorText(text: LaunchText, code: string | null | undefined): string {
+  // Lecture directe de la table des messages, et non de `LAUNCH_ERROR_MESSAGES`
+  // (dont le français est le même, testé) : l'importer aurait mis ses phrases
+  // une seconde fois dans le paquet de toutes les pages. Une clé absente se
+  // rend telle quelle (`scopedText`) : c'est le signe d'un code inconnu.
+  // Un code se limite à `A-Z0-9_` : autre chose (accolade, chevron) ferait
+  // échouer le formateur sur la clé rendue telle quelle — repli direct.
+  const key = `errors.${code ?? ""}`;
+  const message = code && /^[A-Z0-9_]+$/.test(code) ? text.t(key as LaunchErrorKey) : key;
+  return message === key ? text.t("errors.fallback") : message;
 }
 
 /** Libellé d'un bouton, remplacé par « … » le temps d'un envoi. */
@@ -116,8 +130,17 @@ function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
  * relire dès que son flux apprend un changement d'une rencontre du lecteur
  * (`viewerLaunchChanged`, `lib/shared/viewer-alerts.ts`).
  */
-export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacyPending?: boolean }>) {
+export function MatchLaunchCenter({
+  privacyPending = false,
+  requestedMatchId = null,
+}: Readonly<{
+  privacyPending?: boolean;
+  /** Ouverture demandée avant le chargement de ce morceau (`MatchLaunchCenterLazy`), lue au montage. */
+  requestedMatchId?: number | null;
+}>) {
   const { showError, showSuccess } = useToast();
+  const text = useLaunchText();
+  const { t } = text;
   const { clocks } = useClientPower();
   // Un choix de confidentialité dû passe d'abord (`launchModalWaits`).
   const [privacyAnswered, setPrivacyAnswered] = useState(false);
@@ -129,7 +152,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
     onPrivacyPage: pathname === PRIVACY_POLICY_PATH,
   });
   const { launches, refresh } = useMatchLaunchFeed(clocks);
-  const [openMatchId, setOpenMatchId] = useState<number | null>(null);
+  const [openMatchId, setOpenMatchId] = useState<number | null>(requestedMatchId);
   const [confirming, setConfirming] = useState(false);
   // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la
   // confirmation retirent chacun le bouton qui l'avait, et le focus sortait
@@ -218,15 +241,15 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
         launched?: boolean;
       };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      const readyMessage = ready ? "C'est noté, tu es prêt." : "« Prêt » annulé.";
-      showSuccess(payload.launched ? "Toutes les parties sont prêtes : le match est lancé !" : readyMessage);
+      const readyMessage = ready ? t("readyNoted") : t("readyCanceled");
+      showSuccess(payload.launched ? t("launched") : readyMessage);
       setConfirming(false);
       pendingFocusRef.current = "ready";
       await refresh();
     } catch (error) {
       // Le bouton, désactivé le temps de l'envoi, a pu perdre le focus.
       pendingFocusRef.current = confirming ? "confirm" : "ready";
-      showError(launchErrorMessage((error as Error).message));
+      showError(launchErrorText(text, (error as Error).message));
     } finally {
       setBusy(false);
     }
@@ -235,9 +258,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
   const copy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      showSuccess(`${label} copié.`);
+      showSuccess(t("copied", { label }));
     } catch {
-      showError("Copie impossible : sélectionne le texte à la main.");
+      showError(t("copyFailed"));
     }
   };
 
@@ -272,8 +295,8 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
     casterRequired: current.caster !== null,
     casterReady: current.caster?.ready ?? false,
   });
-  const autoAt = formatTime(current.autoLaunchAt);
-  const startAt = formatTime(current.startAt);
+  const autoAt = formatTime(current.autoLaunchAt, text.locale);
+  const startAt = formatTime(current.startAt, text.locale);
   const titleId = `match-launch-title-${current.matchId}`;
   const statusId = `match-launch-status-${current.matchId}`;
   const confirmTextId = `match-launch-confirm-${current.matchId}`;
@@ -281,7 +304,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
     pending.map((info) => info.matchId),
     current.matchId,
   );
-  const { partyWord, confirmQuestion } = viewerLaunchCopy(current.viewer.role);
+  const { partyWord, confirmQuestion } = viewerLaunchCopy(text, current.viewer.role);
 
   return (
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation">
@@ -296,10 +319,10 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
         tabIndex={-1}
         data-phase={current.phase}
       >
-        <ScrollArea orientation="y" className={styles.scroll} ariaLabel="Détails du match">
+        <ScrollArea orientation="y" className={styles.scroll} ariaLabel={t("detailsAria")}>
           <header className={styles.head}>
             <span className="eyebrow">
-              {launchEyebrow(current.phase)} ·{" "}
+              {launchEyebrow(text, current.phase)} ·{" "}
               {current.tournamentName}
             </span>
             <h2 id={titleId} className={styles.title}>
@@ -308,9 +331,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                   écran. Un `aria-label` sur ce `<span>` sans rôle serait interdit
                   (`aria-prohibited-attr`) — et c'est ce titre qui nomme la modale. */}
               <span className={styles.vs} aria-hidden="true">
-                VS
+                {t("vs")}
               </span>
-              <span className="sr-only"> contre </span>
+              <span className="sr-only"> {t("versus")} </span>
               <span className={styles.titleTeam}>{current.team2.name}</span>
             </h2>
             <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ id={statusId} className={styles.status} data-phase={current.phase} role="status">
@@ -322,7 +345,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             <div className={styles.sides}>
               <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} />
               <div className={styles.divider} aria-hidden="true">
-                VS
+                {t("vs")}
               </div>
               <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
             </div>
@@ -333,11 +356,17 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
           {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici
               que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
               fois l'appareil abonné. */}
-          <PushNotificationsPanel
-            variant="compact"
-            topics={["MATCH_START"]}
-            lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
-          />
+          {/* Réglage des notifications : français jusqu'au lot 9 (langue du
+              compte), annoncé comme tel sous `/en`. L'enveloppe ne fait pas de
+              boîte (`display: contents`) : panneau muet, aucun écart en plus. */}
+          <div className={styles.pushLang} lang={text.locale === "fr" ? undefined : "fr"}>
+            <PushNotificationsPanel
+              variant="compact"
+              topics={["MATCH_START"]}
+              toastLang={text.locale === "fr" ? undefined : "fr"}
+              lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
+            />
+          </div>
         </ScrollArea>
 
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
@@ -350,8 +379,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             tabIndex={-1}
           >
             <p id={confirmTextId} className={styles.confirmText}>
-              {confirmQuestion}{" "}
-              Le match démarre dès que toutes les parties sont prêtes.
+              {confirmQuestion} {t("startsWhenReady")}
             </p>
             <div className={styles.actions}>
               <button
@@ -363,7 +391,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                 }}
                 disabled={busy}
               >
-                Retour
+                {t("back")}
               </button>
               <button
                 type="button"
@@ -371,7 +399,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                 onClick={() => void setReady(true)}
                 disabled={busy}
               >
-                {busyLabel(busy, "Confirmer : prêt")}
+                {busyLabel(busy, t("confirmReady"))}
               </button>
             </div>
           </fieldset>
@@ -386,9 +414,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                   onClick={() => void setReady(false)}
                   disabled={busy}
                   aria-pressed="true"
-                  title="Cliquer pour annuler ton « Prêt »"
+                  title={t("cancelReadyTitle")}
                 >
-                  {busyLabel(busy, "✓ Prêt — annuler")}
+                  {busyLabel(busy, t("cancelReady"))}
                 </button>
               ) : (
                 <button
@@ -414,7 +442,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             )}
             {current.phase === "LOBBY" && !current.viewer.canDeclareReady && (
               <p className={styles.hint}>
-                Le capitaine, un manager ou le propriétaire de ton équipe la déclare prête.
+                {t("notLeader")}
               </p>
             )}
             <div className={styles.links}>
@@ -427,7 +455,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                     setOpenMatchId(nextMatchId);
                   }}
                 >
-                  Autre match ({pending.filter((info) => info.matchId !== current.matchId).length})
+                  {t("otherMatch", { count: pending.filter((info) => info.matchId !== current.matchId).length })}
                 </button>
               )}
               <LocaleLink
@@ -435,10 +463,10 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                 href={tournamentMatchHref(current.tournamentId, current.matchId)}
                 onClick={close}
               >
-                Voir le match
+                {t("viewMatch")}
               </LocaleLink>
               <button type="button" className="btn ghost" onClick={close}>
-                Fermer
+                {t("close")}
               </button>
             </div>
           </footer>
@@ -547,6 +575,7 @@ function LaunchFab({
   pending,
   onOpen,
 }: Readonly<{ pending: readonly MatchLaunchInfo[]; onOpen: (matchId: number) => void }>) {
+  const { t } = useLaunchText();
   const lobby = pending.find((info) => info.phase === "LOBBY");
   const target = lobby ?? pending[0];
   return (
@@ -557,9 +586,9 @@ function LaunchFab({
       onClick={() => onOpen(target.matchId)}
     >
       <span aria-hidden="true">{lobby ? "⏳" : "▶"}</span>
-      {lobby ? "Match en lancement" : "Mon match"}
+      {lobby ? t("fabLobby") : t("fabMine")}
       <span className={styles.fabTeams}>
-        {target.team1.name} vs {target.team2.name}
+        {t("fabTeams", { team1: target.team1.name, team2: target.team2.name })}
       </span>
     </button>
   );
@@ -577,21 +606,22 @@ function LaunchStatus({
   autoAt: string | null;
   startAt: string | null;
 }>) {
+  const { t } = useLaunchText();
   return (
     <>
       {phase === "LOBBY" && (
         <>
-          En attente des « Prêt » —{" "}
+          {t("status.waiting")}{" "}
           <strong className="num">
             {count.ready}/{count.expected}
           </strong>{" "}
-          prêts
-          {autoAt && <> · lancement automatique à <span className="num">{autoAt}</span></>}
+          {t("status.ready")}
+          {autoAt && <> · {t("status.autoAt")} <span className="num">{autoAt}</span></>}
         </>
       )}
-      {phase === "LAUNCHED" && <>Le match est lancé — bonne partie !</>}
+      {phase === "LAUNCHED" && <>{t("status.launched")}</>}
       {phase === "SCHEDULED" && (
-        <>Début prévu à <span className="num">{startAt ?? "—"}</span></>
+        <>{t("status.startsAt")} <span className="num">{startAt ?? "—"}</span></>
       )}
     </>
   );
@@ -600,10 +630,11 @@ function LaunchStatus({
 type CopyFn = (value: string, label: string) => Promise<void>;
 
 function ReadyChip({ ready, phase }: Readonly<{ ready: boolean; phase: MatchLaunchInfo["phase"] }>) {
+  const { t } = useLaunchText();
   if (phase !== "LOBBY") return null;
   return (
     <span className={ready ? styles.chipReady : styles.chipWaiting}>
-      {ready ? "✓ Prêt" : "En attente"}
+      {ready ? t("chipReady") : t("chipWaiting")}
     </span>
   );
 }
@@ -619,6 +650,7 @@ function IdentityLine({
   verified: boolean;
   onCopy: CopyFn;
 }>) {
+  const { t } = useLaunchText();
   return (
     <div className={styles.identity}>
       <span className={styles.identityKind}>{kind}</span>
@@ -626,19 +658,19 @@ function IdentityLine({
         <>
           <span className={`mono ${styles.identityValue}`}>{value}</span>
           {verified ? (
-            <span className={styles.verified} title="Vérifié">
-              ✓<span className="sr-only"> vérifié</span>
+            <span className={styles.verified} title={t("verifiedTitle")}>
+              ✓<span className="sr-only"> {t("verified")}</span>
             </span>
           ) : (
-            <span className={styles.unverified}>non vérifié</span>
+            <span className={styles.unverified}>{t("unverified")}</span>
           )}
           <button
             type="button"
             className={`${styles.copy} tap-target`}
             onClick={() => void onCopy(value, kind)}
-            aria-label={`Copier le ${kind} ${value}`}
+            aria-label={t("copyAria", { kind, value })}
           >
-            Copier
+            {t("copy")}
           </button>
         </>
       ) : (
@@ -649,11 +681,10 @@ function IdentityLine({
 }
 
 function ContactRow({ contact, onCopy }: Readonly<{ contact: LaunchContact; onCopy: CopyFn }>) {
+  const { t } = useLaunchText();
   // Dans l'ordre de la priorité de choix (capitaine, manager, propriétaire),
   // pas dans l'ordre de saisie : la pastille la plus parlante vient en tête.
-  const roles = (Object.keys(ROLE_LABELS) as TeamRole[])
-    .filter((role) => contact.roles.includes(role))
-    .map((role) => ROLE_LABELS[role] as string);
+  const roles = CONTACT_ROLES.filter((role) => contact.roles.includes(role)).map((role) => t(`roles.${role}`));
   return (
     <li className={styles.contact}>
       <div className={styles.contactHead}>
@@ -681,6 +712,7 @@ function SideCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
 }>) {
+  const { t } = useLaunchText();
   return (
     <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={side.name}>
       <div className={styles.sideHead}>
@@ -697,7 +729,7 @@ function SideCard({
       </div>
       {isHost && (
         <p className={styles.hostBadge}>
-          <span aria-hidden="true">🏠</span> Héberge la partie — crée le salon
+          <span aria-hidden="true">🏠</span> {t("host")}
         </p>
       )}
       <SideContacts side={side} phase={phase} onCopy={onCopy} />
@@ -714,9 +746,10 @@ function SideContacts({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
 }>) {
-  if (side.isGhost) return <p className={styles.note}>Équipe invitée : pas de contact.</p>;
-  if (phase === "SCHEDULED") return <p className={styles.note}>Les contacts s&apos;affichent au lancement.</p>;
-  if (side.contacts.length === 0) return <p className={styles.note}>Aucun contact disponible.</p>;
+  const { t } = useLaunchText();
+  if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
+  if (phase === "SCHEDULED") return <p className={styles.note}>{t("contactsAtLaunch")}</p>;
+  if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (
     <ul className={styles.contacts}>
       {side.contacts.map((contact) => (
@@ -735,24 +768,24 @@ function CasterCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
 }>) {
+  const { t } = useLaunchText();
   if (!caster) {
     return (
-      <section className={styles.caster} aria-label="Caster">
+      <section className={styles.caster} aria-label={t("caster")}>
         <p className={styles.note}>
-          <span aria-hidden="true">🎙</span> Aucun caster inscrit : le match part dès que les deux
-          équipes sont prêtes.
+          <span aria-hidden="true">🎙</span> {t("noCaster")}
         </p>
       </section>
     );
   }
   return (
-    <section className={styles.caster} aria-label="Caster">
+    <section className={styles.caster} aria-label={t("caster")}>
       <div className={styles.sideHead}>
         <span className={styles.emblem} aria-hidden="true">
           🎙
         </span>
         <span className={styles.sideName}>
-          <span className={styles.casterLabel}>Caster</span> {caster.pseudo}
+          <span className={styles.casterLabel}>{t("caster")}</span> {caster.pseudo}
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>

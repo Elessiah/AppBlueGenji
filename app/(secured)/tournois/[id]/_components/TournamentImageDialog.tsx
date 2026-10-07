@@ -1,8 +1,8 @@
 "use client";
 
-import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
 import { useDialogsText } from "../_lib/dialogs-text";
+import { imageErrorText, imageSuccessText, useImageText } from "../../_lib/image-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
@@ -12,7 +12,6 @@ import type { TournamentImage } from "@/lib/shared/tournament-image";
 import { TournamentImagePicker } from "../../_components/TournamentImagePicker";
 import {
   applyImageChange,
-  imageChangeSuccessMessage,
   imageFingerprint,
   imagePickerChange,
   initialImagePickerValue,
@@ -45,11 +44,8 @@ interface TournamentImageDialogProps {
 export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: Readonly<TournamentImageDialogProps>) {
   // Textes de la fenêtre (espace `tournamentDialogs`).
   const { t } = useDialogsText();
-  // Le sélecteur d'image (recadrage compris) et ses messages sont partagés avec
-  // le formulaire de création, dont la traduction suit (lot 8b-2) : restés
-  // français, annoncés comme tels sous `/en`.
-  const pickerLang = frenchBlockLang(useTournamentPageText());
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const imageText = useImageText();
+  const { showError, showSuccess } = useToast();
   const [value, setValue] = useState<ImagePickerValue>(() => initialImagePickerValue(image));
   // Image sur laquelle le brouillon a été posé ; réalignée au rendu, sans effet,
   // pour qu'aucun rendu ne montre un brouillon périmé face à la nouvelle image.
@@ -79,8 +75,8 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
     }
     setBusy(true);
     try {
-      await applyImageChange(tournamentId, change, value.file, value.crop);
-      const message = imageChangeSuccessMessage(change);
+      await applyImageChange(tournamentId, change, value.file, value.crop, (code) => imageErrorText(imageText, code));
+      const message = imageSuccessText(imageText, change);
       if (message) showSuccess(message);
       onSaved();
       onClose();
@@ -154,10 +150,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               </p>
             )}
 
-            {/* Le sélecteur reste français jusqu'au lot 8b-2 : annoncé comme tel (WCAG 3.1.2). */}
-            <div lang={pickerLang}>
-              <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} lang={pickerLang} />
-            </div>
+            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} />
 
             <div
               style={{

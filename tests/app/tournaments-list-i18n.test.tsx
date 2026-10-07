@@ -94,10 +94,10 @@ const DATES = {
 };
 
 describe("route et référencement", () => {
-  it("ouvre /tournois sous /en, pas la création ni l'édition (lot 8b)", () => {
+  it("ouvre /tournois sous /en, la création et l'édition aussi (lot 8b-2)", () => {
     expect(isMigratedRoute("/tournois")).toBe(true);
-    expect(isMigratedRoute("/tournois/creer")).toBe(false);
-    expect(isMigratedRoute("/tournois/12/modifier")).toBe(false);
+    expect(isMigratedRoute("/tournois/creer")).toBe(true);
+    expect(isMigratedRoute("/tournois/12/modifier")).toBe(true);
   });
 
   it("reste hors du sitemap dans les deux langues (noindex)", () => {

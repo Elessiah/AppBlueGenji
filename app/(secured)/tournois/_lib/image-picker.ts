@@ -110,11 +110,12 @@ export function withNewFile(file: File, fit: TournamentImageFit, crop: CropRect 
  * Refus immédiat d'un fichier, avant tout envoi — le serveur relit les octets
  * et reste le juge. `null` = fichier recevable.
  */
-export function rejectImageFile(file: Pick<File, "size" | "type">): string | null {
-  if (!TOURNAMENT_IMAGE_ACCEPT.split(",").includes(file.type)) {
-    return tournamentImageErrorMessage("IMAGE_FORMAT_INVALID");
-  }
-  if (file.size > TOURNAMENT_IMAGE_MAX_BYTES) return tournamentImageErrorMessage("IMAGE_TOO_LARGE");
+export function rejectImageFile(
+  file: Pick<File, "size" | "type">,
+  message: (code: string) => string = tournamentImageErrorMessage,
+): string | null {
+  if (!TOURNAMENT_IMAGE_ACCEPT.split(",").includes(file.type)) return message("IMAGE_FORMAT_INVALID");
+  if (file.size > TOURNAMENT_IMAGE_MAX_BYTES) return message("IMAGE_TOO_LARGE");
   return null;
 }
 
@@ -123,20 +124,22 @@ export function rejectImageFile(file: Pick<File, "size" | "type">): string | nul
  *
  * @returns L'image enregistrée (`null` si retirée), ou `undefined` quand il n'y
  *   avait rien à écrire.
- * @throws Error dont le message est déjà rédigé en français.
+ * @throws Error dont le message est déjà rédigé — en français, ou par `message`
+ *   (langue de la page, `imageErrorText`).
  */
 export async function applyImageChange(
   tournamentId: number,
   change: TournamentImageChange,
   file: File | null,
   crop: CropRect | null = null,
+  message: (code: string) => string = tournamentImageErrorMessage,
 ): Promise<TournamentImage | null | undefined> {
   if (change.kind === "NONE") return undefined;
 
   const endpoint = `/api/admin/tournaments/${tournamentId}/image`;
   let response: Response;
   if (change.kind === "UPLOAD") {
-    if (file === null) throw new Error(tournamentImageErrorMessage("FILE_MISSING"));
+    if (file === null) throw new Error(message("FILE_MISSING"));
     const form = new FormData();
     form.append("file", file);
     if (crop) form.append(IMAGE_CROP_FIELD, serializeCropRect(crop));
@@ -158,7 +161,7 @@ export async function applyImageChange(
     error?: string;
     image?: TournamentImage | null;
   };
-  if (!response.ok) throw new Error(tournamentImageErrorMessage(payload.error ?? ""));
+  if (!response.ok) throw new Error(message(payload.error ?? ""));
   return payload.image ?? null;
 }
 
