@@ -34,6 +34,9 @@ import { createTranslator } from "next-intl";
 import frForm from "@/messages/fr/tournamentForm.json";
 import frImage from "@/messages/fr/tournamentImage.json";
 import frLaunchModal from "@/messages/fr/launchModal.json";
+import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
+import { launchErrorText } from "@/components/match-launch/MatchLaunchCenter";
+import { scopedText } from "@/lib/shared/scoped-text";
 import frShell from "@/messages/fr/shell.json";
 import CreateTournamentPage from "@/app/(secured)/tournois/creer/page";
 import CreateLayout, { generateMetadata as createMetadata } from "@/app/(secured)/tournois/creer/layout";
@@ -232,6 +235,17 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     for (const [code, message] of Object.entries(LAUNCH_ERROR_MESSAGES)) expect(`${code}: ${errors[code]}`).toBe(`${code}: ${message}`);
     expect(errors.fallback).toBe(launchErrorMessage(null));
     expect(Object.keys(EN.launchModal.errors)).toEqual(Object.keys(errors));
+  });
+
+  it("fenêtre de lancement : un code inconnu ou mal formé retombe sur le repli, dans les deux langues", () => {
+    const [known] = Object.keys(frLaunchModal.errors).filter((code) => code !== "fallback");
+    for (const text of [FR_LAUNCH_TEXT, scopedText("en", EN.launchModal)]) {
+      const fallback = text.t("errors.fallback");
+      expect(launchErrorText(text, known)).not.toBe(fallback);
+      for (const code of [null, undefined, "", "UNKNOWN_CODE", "__proto__", "constructor", "{oops}", "<b>", "fallback"]) {
+        expect(launchErrorText(text, code)).toBe(fallback);
+      }
+    }
   });
 
   it("fenêtre de lancement : hors de la coquille, chargée à la demande", () => {
