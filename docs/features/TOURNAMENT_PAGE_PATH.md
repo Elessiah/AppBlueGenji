@@ -92,7 +92,7 @@ Mesure `next build` : 61 → 38,2 Ko propres, **215 → 186 Ko** au premier
 chargement. `BracketSections` reste dans le paquet : il sert l'élimination (le
 cas le plus courant) et l'arbre de la BG Survie. Aucun rendu serveur n'est
 perdu : la page n'affiche rien de ces blocs avant le premier instantané du flux.
-Chaque chargement passe par `orReload` (`_lib/lazy-component.ts`) : la fiche
+Chaque chargement passe par `orReload` (`lib/shared/lazy-component.ts`) : la fiche
 reste ouverte tout un tournoi, et un déploiement survenu depuis supprime les
 anciens fichiers — sans filet, le 404 lèverait un `ChunkLoadError` au rendu et
 Next remplacerait toute la page par son écran d'erreur. L'échec recharge donc la
