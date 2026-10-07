@@ -1,0 +1,56 @@
+LÉGAL · LOI 1901
+Mentions légales
+ÉDITEURBluegenji Esport
+STATUTAssociation loi 1901
+MISE À JOURSeptembre 2026
+SECTION 01
+Éditeur du siteRESPONSABLE DE LA PUBLICATION
+La plateforme est éditée par l'association Bluegenji Esport, association à but non lucratif régie par la loi du 1er juillet 1901 et le décret du 16 août 1901.
+Siège social : 4 impasse des Cyprès, 51210 Janvilliers, France.
+Immatriculation : l'association ne dispose ni d'un numéro RNA ni d'un numéro SIREN.
+Objet : organisation d'événements et de tournois esport en ligne et en LAN, fédération des équipes participantes, formation et mise en avant des acteurs de la scène, ainsi que la retransmission en direct des événements et tournois.
+Courriel : Afficher l'adresse
+Téléphone : Afficher le numéro
+Discord : serveur de l'association (nouvel onglet)
+SECTION 02
+Directeur de la publicationPRÉSIDENT
+Le directeur de la publication est Léo Perreaut, en sa qualité de Président de l'association Bluegenji Esport.
+SECTION 03
+Hébergement techniqueHÉBERGEUR TECHNIQUE
+Le site et le bot Discord de l'association tournent sur un Raspberry Pi, à Caen, fourni et administré par son hébergeur technique :
+Keryan Houssin — Particulier, bénévole de l'association
+13 rue du Chemin Fourchue, 14000 Caen, France
+Téléphone : Afficher le numéro
+L'hébergeur technique fournit la machine. Il ne faut pas le confondre avec l'association, qui est l'hébergeur des contenus de ses utilisateurs au sens du règlement européen sur les services numériques.
+Pour écrire à l'hébergeur ou à l'éditeur : bouton « Signaler un problème » en bas de chaque page, catégorie « Hébergeur ».
+SECTION 04
+Propriété intellectuelleCODE SOUS AGPL-3.0-ONLY
+Code source. Le code du site est publié sous la licence libre GNU Affero General Public License, version 3 (nouvel onglet) (AGPL-3.0-only). Les droits d'auteur sur ce code appartiennent à Keryan Houssin. Chacun peut le consulter, le copier, le modifier et le redistribuer aux conditions de cette licence, qui imposent notamment, pour une version modifiée offerte en ligne, d'en proposer le code source à ses utilisateurs sous la même licence. Le code source est disponible sur GitHub (nouvel onglet). Il embarque des composants tiers — bibliothèques, polices — qui restent sous leurs propres licences.
+Autres éléments. Les textes éditoriaux, le nom, le logo et l'identité visuelle de l'association, ainsi que ses documents officiels, ne sont pas couverts par cette licence : leur reproduction, représentation, modification ou diffusion, totale ou partielle, suppose l'autorisation de leurs titulaires.
+N'appartiennent ni à l'association ni à l'auteur du code les contenus publiés par les utilisateurs (avatars, logos, noms et descriptions d'équipe, pseudos), qui restent la propriété de leurs auteurs ou de leurs titulaires, ni les marques et visuels des jeux Overwatch (Blizzard Entertainment) et Marvel Rivals (NetEase, Marvel), qui appartiennent à leurs titulaires. Le site n'est affilié à aucun de ces éditeurs.
+SECTION 05
+Contenus des utilisateurs et signalementHÉBERGEUR DES CONTENUS · DSA ART. 16
+Pour les contenus que publient ses utilisateurs, l'association agit en qualité d'hébergeur de ces contenus — distinct de l'hébergeur technique, qui fournit la machine (loi pour la confiance dans l'économie numérique, art. 6 ; règlement européen sur les services numériques, art. 6) : elle ne les contrôle pas avant publication, et chaque utilisateur garantit détenir les droits sur ce qu'il publie, comme le prévoient les conditions d'utilisation.
+Toute personne, utilisateur ou non, peut signaler un contenu illicite — une atteinte au droit d'auteur notamment — par le bouton « Signaler un problème » présent en bas de chaque page. Le signalement d'un droit d'auteur indique le nom ou la raison sociale de son auteur, son adresse électronique, sa qualité (titulaire des droits, représentant ou tiers), le contenu visé et où le voir sur le site, la raison de la demande et une déclaration de bonne foi. L'auteur d'une notification reçoit, à l'adresse qu'il indique (exigée en droit d'auteur, facultative ailleurs), un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes. S'il a signalé depuis son compte, il peut contester cette décision — y compris celle de ne pas agir — par la catégorie « Contestation » du même formulaire, une fois le signalement archivé.
+Un logo d'équipe ou un avatar de joueur signalé peut être masqué sans délai : il cesse d'être en ligne, et l'équipe ou le joueur en est prévenu. Il ou elle dispose alors de 6 mois pour contester depuis la page du signalement ; sans contestation, l'image est supprimée définitivement, et si la contestation aboutit, elle est rétablie. Le détail du traitement de vos données dans ce cadre figure dans la politique de confidentialité.
+En sa qualité d'hébergeur de ces contenus, l'association conserve 365 jours les données de connexion de ses utilisateurs (adresse IP, date et heure, moyen de connexion), y compris après la suppression d'un compte, afin de pouvoir identifier l'auteur d'un contenu sur réquisition d'une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Ce journal ne consigne que les ouvertures de session — ni le port source, ni la création ou la modification d'un contenu —, et les informations fournies à la création d'un compte ne sont pas gardées après sa suppression, hors les copies de sauvegarde chiffrées et le journal qui rejoue les suppressions (détail). Le serveur web tient en outre, 14 jours au plus et pour sa seule sécurité, un journal technique de chaque requête (adresse IP, date et heure, page demandée, code de réponse, taille de la réponse, page d'origine et navigateur), sans port source (registre, T17). Ces données ne sont communiquées qu'aux autorités qui les requièrent ; le détail figure dans la politique de confidentialité.
+SECTION 06
+Point de contact des autoritésDSA ART. 11
+Les autorités des États membres, la Commission européenne et le comité européen des services numériques joignent l'association, en sa qualité d'hébergeur des contenus de ses utilisateurs, par un point de contact unique : son courriel, Afficher l'adresse, ou le bouton « Signaler un problème » en bas de chaque page, catégorie « Hébergeur ».
+Langues acceptées : français et anglais.
+SECTION 07
+Données personnellesRGPD · RÈGLEMENT UE 2016/679
+Les informations recueillies lors de la création d'un compte et de l'utilisation du site sont traitées par l'association Bluegenji Esport, responsable du traitement, pour gérer votre participation à ses activités. Elles ne sont pas réservées à l'association : ce que le site publie se lit des autres joueurs et du public, et certaines données sont communiquées à des services tiers — Discord, Google, Blizzard, le service de push de votre navigateur, Hetzner (Allemagne) pour les sauvegardes chiffrées, Microsoft, sans chiffrement propre à l'association, pour la messagerie de la personne à contacter pour vos demandes, Google (Gmail) pour le courriel de l'association, ainsi que les opérateurs téléphoniques de cette personne et de l'association si vous les appelez ou leur laissez un SMS ou un message vocal, et Spiceworks pour le portail de support —, dans les limites décrites à la section « Destinataires et transferts » de la politique de confidentialité et, traitement par traitement, dans son registre.
+Conformément au Règlement Général sur la Protection des Données (RGPD — Règlement UE 2016/679), vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation et de portabilité des données vous concernant, ainsi que d'un droit d'opposition au traitement, et vous pouvez définir des directives relatives à leur sort après votre décès (art. 85 de la loi Informatique et Libertés).
+Personne à contacter pour vos demandes relatives à vos données : Keryan Houssin, hébergeur technique du site — courriel : Afficher l'adresse, téléphone : Afficher le numéro. Vos droits peuvent aussi être exercés par le bouton « Signaler un problème » en bas de chaque page, catégorie « RGPD », ou auprès de l'association, par les coordonnées données plus haut. Cette personne n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD : l'association reste responsable du traitement. Le détail des traitements, leurs durées et leur registre figurent dans la politique de confidentialité.
+SECTION 08
+CookiesCOOKIES TECHNIQUES
+Le site n'utilise que des cookies techniques : la session d'un utilisateur connecté, l'état d'une connexion en cours, vos réglages d'accessibilité et le souvenir des annonces de recrutement déjà vues. Aucun ne permet de suivi publicitaire. Leur liste complète, avec celle des autres données que le site garde dans votre navigateur (stockage local, stockage de session, cache de la page hors ligne) et leur durée, figure dans la politique de confidentialité.
+Aucun traceur publicitaire, outil de mesure d'audience externe ni cookie tiers n'est utilisé. La fréquentation du site est mesurée par le site lui-même, sans cookie : voir la mesure d'audience. La communication entre votre navigateur et le serveur est chiffrée (HTTPS).
+SECTION 09
+Documents officielsSTATUTS · ADHÉSION
+Statuts de l'associationPDF →
+Règlement intérieurDOC →
+Bulletin d'adhésionDOCX →
+En savoir plus sur l'association →
+Bluegenji Esport · Association loi 1901 · Siège social : 4 impasse des Cyprès, 51210 Janvilliers

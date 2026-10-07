@@ -184,7 +184,8 @@ describe("liens internes dans la langue de la page", () => {
     const terms = await render(TermsPage, "en");
     expect(terms).toContain('href="/en/privacy-policy-bot"');
     expect(terms).not.toContain('href="/privacy-policy-bot"');
-    expect(terms).toContain('href="/mentions-legales#hebergement"');
+    // Mentions légales traduites depuis le lot 7b-1 : le renvoi reste anglais.
+    expect(terms).toContain('href="/en/mentions-legales#hebergement"');
     const privacy = await render(PrivacyPage, "en");
     expect(privacy).toContain('href="/en/terms-of-service-bot"');
     expect(privacy).toContain('href="/rgpd#exercer-vos-droits"');
@@ -199,7 +200,7 @@ describe("liens internes dans la langue de la page", () => {
   it("sous /en, un lien vers une page encore française porte hrefLang=\"fr\", pas un lien anglais", async () => {
     const privacy = await render(PrivacyPage, "en");
     expect(privacy).toMatch(/<a[^>]*href="\/rgpd#exercer-vos-droits"[^>]*hrefLang="fr"|<a[^>]*hrefLang="fr"[^>]*href="\/rgpd#exercer-vos-droits"/);
-    expect(privacy).toMatch(/<a[^>]*hrefLang="fr"[^>]*href="\/mentions-legales#hebergement"|<a[^>]*href="\/mentions-legales#hebergement"[^>]*hrefLang="fr"/);
+    expect(privacy).toMatch(/<a[^>]*href="\/en\/mentions-legales#hebergement"/);
     const english = [...privacy.matchAll(/<a[^>]*href="\/en\/[^"]*"[^>]*>/g)].map((m) => m[0]);
     expect(english.length).toBeGreaterThan(0);
     for (const tag of english) expect(tag).not.toContain("hrefLang");
@@ -212,10 +213,11 @@ describe("liens internes dans la langue de la page", () => {
     for (const tag of github) expect(tag).not.toContain("hrefLang");
   });
 
-  it("sous /en, le lien vers l'hébergeur dit « (in French) » ; en français, rien n'est ajouté", async () => {
+  it("sous /en, le lien vers l'hébergeur mène aux mentions anglaises, sans « (in French) » (lot 7b-1) ; en français, rien n'est ajouté", async () => {
     for (const page of [PrivacyPage, TermsPage]) {
       const en = visibleText(await render(page, "en"));
-      expect(en).toContain(`See the Hosting section of the legal notice ${enBot.legalPages.inFrench} →`);
+      expect(en).toContain("See the Hosting section of the legal notice →");
+      expect(en).not.toContain(`legal notice ${enBot.legalPages.inFrench}`);
       const fr = await render(page, "fr");
       expect(fr).not.toContain("hrefLang");
       expect(visibleText(fr)).not.toContain(frBot.legalPages.inFrench);

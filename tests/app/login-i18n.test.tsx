@@ -75,6 +75,7 @@ import { formatMessage, formatMessageParts } from "@/lib/shared/message-format";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
 import { SITE_MINIMUM_AGE, TERMS_AGE_DECLARATION, TERMS_CHECKBOX_LABEL } from "@/lib/shared/terms-of-use";
+import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { readSource } from "../helpers/read-source";
 
 const FR = messagesFor("fr").login;
@@ -313,6 +314,15 @@ describe("modale d'entrée (information RGPD, conditions)", () => {
     expectNoFrench(text);
   });
 
+  it("sous /en (lot 7b-1) : conditions anglaises liées, note « French text prevails » ; politique encore française", () => {
+    const html = render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} />, "en");
+    expect(html).toContain('href="/en/conditions-utilisation"');
+    expect(visibleText(html)).toContain(TERMS_TRANSLATION_NOTE.text);
+    expect(html).toMatch(/<a href="\/conditions-utilisation"[^>]*hrefLang="fr"[^>]*>Read the French terms<\/a>/);
+    expect(html).toMatch(/<a href="\/rgpd"[^>]*hrefLang="fr"/);
+    expect(html).not.toMatch(/<a href="\/en\/conditions-utilisation"[^>]*hrefLang/);
+  });
+
   it("en français : la case reprend les phrases partagées, aucun hreflang", () => {
     const html = render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} />, "fr");
     const text = visibleText(html);
@@ -336,7 +346,7 @@ describe("exposé de suspension", () => {
     const text = visibleText(html);
     expect(text).toContain("Account suspended");
     expect(text).toContain("This account is suspended until October 15, 2026 at 10:00 (Paris time) (decision S-12)");
-    expect(text).toContain("“Behavior”");
+    expect(text).toContain("“Conduct”");
     expect(html).toContain('lang="fr">Triche avérée<');
     // « Autre » : intitulé encore français du formulaire de signalement (lot 9).
     expect(html).toContain('“<span lang="fr">Autre</span>” (“Other”; no login needed)');

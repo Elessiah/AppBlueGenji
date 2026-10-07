@@ -1,0 +1,58 @@
+ACCESSIBILITÉ · RGAA 4.1.2
+Déclaration d'accessibilité
+L'association BlueGenji Esport veut que chacun puisse s'inscrire, suivre un tournoi et reporter un score, quelle que soit sa façon de naviguer. À notre connaissance, l'association n'est pas soumise à l'obligation d'accessibilité (article 47 de la loi n° 2005-102 du 11 février 2005) : cette déclaration est publiée volontairement, et dit ce que nous savons — y compris ce qui ne va pas encore.
+État
+non conforme
+Référentiel
+RGAA 4.1.2 (critères WCAG 2.1 niveau AA)
+Établie le
+2 octobre 2026
+SECTION 01
+État de conformité
+Le site BlueGenji Esport est non conforme avec le RGAA 4.1.2 (critères WCAG 2.1 niveau AA).
+Aucun audit complet du référentiel n'a encore été mené : sans lui, la méthode RGAA classe le site « non conforme », quel que soit le travail accompli. Les limites connues sont listées ci-dessous, chacune avec ce qui permet de la contourner aujourd'hui.
+SECTION 02
+Contenus non accessibles
+Parcours au lecteur d'écran
+Ensemble du référentiel
+Aucun parcours complet n'a encore été mené avec NVDA ou VoiceOver (connexion, inscription d'une équipe, report de score) : des défauts qu'aucun outil automatique ne voit peuvent subsister.
+Documents de l'association
+RGAA 13.3
+Les statuts (PDF), le bulletin d'adhésion (DOCX) et le règlement intérieur (Google Docs) sont publiés sans contrôle d'accessibilité du document.
+En attendant : Une version accessible de ces documents peut être demandée :
+Par courriel : Afficher l'adresse
+Par le formulaire « Signaler un problème », en bas de chaque page (catégorie « Autre »)
+Sur Discord, en message privé : elessiah
+Sur le serveur Discord de l'association (nouvel onglet)
+SECTION 03
+Aides proposées sur chaque page
+Le bouton au bord gauche de chaque page (en bas à gauche sur téléphone) ouvre le menu d'accessibilité. Ses réglages sont désactivés par défaut et gardés dans votre navigateur :
+Contraste renforcé — Textes secondaires plus clairs, bordures et séparateurs plus marqués, texte indicatif lisible.
+Focus très visible — Un anneau épais autour de l'élément atteint au clavier.
+Liens soulignés — Tous les liens de texte sont soulignés, pas seulement colorés.
+Police simplifiée — Une seule police sans empattement, sans majuscules forcées ni lettres espacées.
+Espacement du texte — Plus d'air entre les lignes, les mots, les lettres et les paragraphes.
+Réduire les animations — Arrête les animations décoratives et les transitions, même si votre système ne le demande pas.
+Chaque page s'ouvre aussi sur un lien « Aller au contenu », accessible au clavier dès la première tabulation.
+SECTION 04
+Établissement de cette déclaration
+Technologies utilisées : HTML5, CSS, JavaScript, WAI-ARIA.
+Méthodes d'évaluation :
+Audit interne du 24 septembre 2026, outil axe et navigation au clavier
+Contrôles automatisés du dépôt à chaque modification (contrastes, focus, repères, modales, noms accessibles)
+Environnement de test : Aucun environnement de test (navigateurs et versions) n'est documenté pour l'audit interne, et aucune technologie d'assistance n'a été employée (voir « Parcours au lecteur d'écran »).
+Pages vérifiées : Aucun échantillon de pages au sens du RGAA n'a été constitué, faute d'audit complet.
+SECTION 05
+Retour d'information et contact
+Si vous n'arrivez pas à accéder à un contenu ou à un service, écrivez-nous : nous chercherons une alternative accessible, ou vous transmettrons l'information sous une autre forme.
+Par courriel : Afficher l'adresse
+Par le formulaire « Signaler un problème », en bas de chaque page (catégorie « Autre »)
+Sur Discord, en message privé : elessiah
+Sur le serveur Discord de l'association (nouvel onglet)
+SECTION 06
+Voies de recours
+Si vous nous avez signalé un défaut qui vous empêche d'accéder à un contenu ou à un service et que vous n'avez pas obtenu de réponse satisfaisante, vous pouvez saisir le Défenseur des droits :
+par le formulaire en ligne du Défenseur des droits (nouvel onglet);
+en contactant le délégué de votre région (nouvel onglet);
+par courrier, gratuitement et sans timbre : Défenseur des droits, Libre réponse 71120, 75342 Paris CEDEX 07.
+Voir aussi les mentions légales et la politique de confidentialité.
