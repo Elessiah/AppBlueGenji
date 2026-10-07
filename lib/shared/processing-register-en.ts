@@ -469,7 +469,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Answering requests to exercise rights and requests sent to the hosting provider, including those from authorities",
       "Receiving by email or by phone, through the person to contact for requests regarding data, requests to exercise rights and questions about data processing, and answering them",
       "Receiving the requests sent to the association's own email or phone (published, protected, in the legal notice), and answering them",
-      "Alerting administrators on Discord, without personal data",
+      "Alerting administrators on Discord, without naming anyone",
     ],
     legalBasis:
       "Legitimate interest (GDPR, art. 6.1.f) of the association in enforcing its terms of use for the moderation of content and accounts contrary to them — review, hiding, removal of an image, suspension of an account, and keeping the decision while it can be contested; legal obligation (GDPR, art. 6.1.c) for requests to exercise rights (GDPR, art. 12), notices of illegal content, in copyright as in moderation (Regulation (EU) 2022/2065, art. 16), requests sent to the hosting provider (art. 11 and 16) and appeals (art. 20), without an agreement box; consent of the reporter (box when sending) for bug and other reports; by email or by phone as through the form (“GDPR” category, « RGPD »), a request to exercise rights or a question about the processing of one's data — which falls under the right of access (GDPR, art. 15) — is based on the same legal obligation",
