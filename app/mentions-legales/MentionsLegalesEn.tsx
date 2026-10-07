@@ -307,11 +307,11 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
           authority (LCEN, art. 6; French Decree No. 2021-1362). This log only records logins — neither
           the source port, nor the creation or modification of content —, and the information provided
           when an account is created is not kept after it is deleted, apart from the encrypted backup
-          copies and the log that replays deletions (
-          <EnglishLegalLink href="/rgpd#donnees-connexion">details</EnglishLegalLink>). The web server
+          copies and the log that replays deletions — see the{" "}
+          <EnglishLegalLink href="/rgpd#donnees-connexion">details</EnglishLegalLink>. The web server
           also keeps, for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most and for its security only, a
-          technical log of each request ({WEB_ACCESS_LOG_FIELDS_EN}), without the source port (
-          <EnglishLegalLink href="/rgpd/registre#t17">register, T17</EnglishLegalLink>). This data is
+          technical log of each request ({WEB_ACCESS_LOG_FIELDS_EN}), without the source port — see{" "}
+          <EnglishLegalLink href="/rgpd/registre#t17">entry T17 of the register</EnglishLegalLink>. This data is
           only disclosed to the authorities that request it; details are given in the{" "}
           <EnglishLegalLink href="/rgpd#donnees-connexion">privacy policy</EnglishLegalLink>.
         </p>
