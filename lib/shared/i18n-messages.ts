@@ -27,8 +27,11 @@ import type frLegal from "@/messages/fr/legal.json";
 import type frTournaments from "@/messages/fr/tournaments.json";
 import type frTournament from "@/messages/fr/tournament.json";
 import type frTournamentViews from "@/messages/fr/tournamentViews.json";
+import type frTournamentErrors from "@/messages/fr/tournamentErrors.json";
+import type frTournamentActions from "@/messages/fr/tournamentActions.json";
+import type frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -68,6 +71,15 @@ export type Messages = {
    * le premier chargement — `app/(secured)/tournois/[id]/_lib/views-text.ts`.
    */
   tournamentViews: typeof frTournamentViews;
+  /**
+   * Refus des écrans de tournoi (lot 8b) : un code d'API → une phrase. Lu par
+   * la fiche, la création et l'édition — `app/(secured)/tournois/[id]/_lib/error-map.ts`.
+   */
+  tournamentErrors: typeof frTournamentErrors;
+  /** Gestes de la fiche d'un tournoi (lot 8b) rendus avec elle — `_lib/actions-text.ts`. */
+  tournamentActions: typeof frTournamentActions;
+  /** Fenêtres d'action de la fiche, chargées à la demande (lot 8b) — `_lib/dialogs-text.ts`. */
+  tournamentDialogs: typeof frTournamentDialogs;
 };
 
 /**

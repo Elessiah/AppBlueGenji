@@ -2,6 +2,7 @@
 
 import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
@@ -42,8 +43,12 @@ interface TournamentImageDialogProps {
  * gardé avec un bandeau qui dit le désaccord.
  */
 export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: Readonly<TournamentImageDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
-  const dialogLang = frenchBlockLang(useTournamentPageText());
+  // Textes de la fenêtre (espace `tournamentDialogs`).
+  const { t } = useDialogsText();
+  // Le sélecteur d'image (recadrage compris) et ses messages sont partagés avec
+  // le formulaire de création, dont la traduction suit (lot 8b-2) : restés
+  // français, annoncés comme tels sous `/en`.
+  const pickerLang = frenchBlockLang(useTournamentPageText());
   const { showError, showSuccess } = useFrenchBlockToast();
   const [value, setValue] = useState<ImagePickerValue>(() => initialImagePickerValue(image));
   // Image sur laquelle le brouillon a été posé ; réalignée au rendu, sans effet,
@@ -104,7 +109,6 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
-        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby="tournament-image-title"
@@ -124,14 +128,13 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
         {/* Le contenu défile dans la zone partagée du site (barre discrète,
             accessible au clavier) : la modale est haute, et sur un petit écran
             elle dépasse la hauteur visible. */}
-        <ScrollArea orientation="y" ariaLabel="Image du tournoi" style={{ flex: 1, minHeight: 0 }}>
+        <ScrollArea orientation="y" ariaLabel={t("image.title")} style={{ flex: 1, minHeight: 0 }}>
           <form onSubmit={submit} style={{ padding: 22 }}>
             <h3 id="tournament-image-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-              Image du tournoi
+              {t("image.title")}
             </h3>
             <p style={{ margin: "6px 0 18px", fontSize: 13, color: "var(--ink-mute)", lineHeight: 1.5 }}>
-              Facultative. Elle habille la fiche, les cartes de la liste et l&apos;accueil — un tournoi
-              sans image garde son apparence habituelle.
+              {t("image.intro")}
             </p>
 
             {conflict && (
@@ -147,12 +150,14 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
                   borderRadius: "var(--r-cy-sm, 8px)",
                 }}
               >
-                L&apos;image a été modifiée ailleurs pendant ton réglage. « Enregistrer » remplacera
-                ce changement par le tien ; « Annuler » le garde.
+                {t("image.conflict")}
               </p>
             )}
 
-            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} lang={dialogLang} />
+            {/* Le sélecteur reste français jusqu'au lot 8b-2 : annoncé comme tel (WCAG 3.1.2). */}
+            <div lang={pickerLang}>
+              <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} lang={pickerLang} />
+            </div>
 
             <div
               style={{
@@ -166,10 +171,10 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               }}
             >
               <CyberButton type="button" variant="ghost" onClick={onClose} disabled={busy}>
-                Annuler
+                {t("score.cancel")}
               </CyberButton>
               <CyberButton type="submit" variant="primary" disabled={busy || change.kind === "NONE"}>
-                {busy ? "Enregistrement…" : "Enregistrer"}
+                {busy ? t("schedule.saving") : t("schedule.save")}
               </CyberButton>
             </div>
           </form>

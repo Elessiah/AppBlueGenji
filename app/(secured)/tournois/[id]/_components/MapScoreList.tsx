@@ -15,13 +15,13 @@ import {
   mapFieldKey,
   mapListLimit,
   progressiveMapRows,
-  replayCodeHint,
   type MapField,
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
 import type { TournamentGame } from "@/lib/shared/types";
 import { EntrantLogo } from "./EntrantName";
 import styles from "./MapScoreList.module.css";
+import { replayCodeHintText, useDialogsText } from "../_lib/dialogs-text";
 
 // `Entrée` dans un champ de map ne soumet pas le formulaire : corriger un code
 // puis valider d'un même geste trancherait le match sans relecture.
@@ -88,12 +88,14 @@ export function MapScoreList({
   disabled,
   fieldErrors,
 }: Readonly<MapScoreListProps>) {
+  const text = useDialogsText();
+  const { t } = text;
   const limit = mapListLimit(format);
   // Le compteur annonce le format (BO3 → 3 maps) ; les maps nulles rejouées
   // au-delà (`DRAWN_MAP_REPLAY_ALLOWANCE`) le font avancer quand elles servent.
   const shownLimit = format ? matchMaxMaps(format) : limit;
   const replayHint =
-    format && limit > shownLimit ? ` Une map nulle peut être rejouée (${limit - shownLimit} au plus).` : "";
+    format && limit > shownLimit ? t("score.maps.replayAllowance", { count: limit - shownLimit }) : "";
   const score = deriveMatchScore(maps);
   // Le compteur ne compte que les maps renseignées, pas la ligne vierge ouverte.
   const played = maps.filter(isMapTouched).length;
@@ -129,12 +131,12 @@ export function MapScoreList({
   const [announcement, setAnnouncement] = useState("");
   const autoGrown = useRef(false);
   useEffect(() => {
-    if (autoGrown.current && !focusNewRow.current) setAnnouncement(`Map ${maps.length} ajoutée : à renseigner.`);
+    if (autoGrown.current && !focusNewRow.current) setAnnouncement(t("score.maps.added", { index: maps.length }));
     // Ligne retirée (un nul de passage pendant la frappe) : l'annonce se vide,
     // pour qu'une ligne qui revient soit annoncée de nouveau.
     else if (!autoGrown.current) setAnnouncement("");
     autoGrown.current = false;
-  }, [maps.length]);
+  }, [maps.length, t]);
 
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
     // Rien de changé (un champ de score vide quitté sans saisie rend `NaN`, et
@@ -187,14 +189,14 @@ export function MapScoreList({
   return (
     <fieldset className={styles.list} disabled={disabled}>
       <legend className={styles.legend}>
-        Maps jouées{" "}
+        {t("score.maps.legend")}{" "}
         <span className={styles.limit}>
           ({played}/{Math.max(shownLimit, played)})
         </span>
       </legend>
       <p id={hintId} className={styles.hint}>
-        {replayCodeHint(game)} Une map nulle ne rapporte de point à personne.
-        {replayHint}
+        {replayCodeHintText(text, game)} {t("score.maps.drawHint")}
+        {replayHint ? ` ${replayHint}` : ""}
       </p>
 
       {maps.length > 0 && (
@@ -209,7 +211,7 @@ export function MapScoreList({
             return (
               <li key={keys.current[index]} className={styles.row}>
                 <span className={styles.mapLabel} aria-hidden="true">
-                  Map {index + 1}
+                  {t("score.maps.map", { index: index + 1 })}
                 </span>
                 {/* Chaque nom de champ porte le numéro de map (masqué à l'œil) : sur
                     cinq lignes, « Code de replay » seul ne dirait pas laquelle. La
@@ -217,7 +219,7 @@ export function MapScoreList({
                     dans le nom du champ et serait lue deux fois. */}
                 <div className={styles.code}>
                   <label className={styles.fieldLabel} htmlFor={codeId}>
-                    <span className="sr-only">Map {index + 1}, </span>Code de replay
+                    <span className="sr-only">{t("score.maps.mapPrefix", { index: index + 1 })}</span>{t("score.maps.replayCode")}
                   </label>
                   <input
                     id={codeId}
@@ -242,7 +244,7 @@ export function MapScoreList({
                   <label className={styles.fieldLabel} htmlFor={t1Id} title={team1Name}>
                     {team1Id !== null && <EntrantLogo teamId={team1Id} name={team1Name} size={16} />}
                     <span className={styles.fieldLabelText}>
-                      <span className="sr-only">Map {index + 1}, score de </span>
+                      <span className="sr-only">{t("score.maps.scoreOf", { index: index + 1 })}</span>
                       {team1Name}
                     </span>
                   </label>
@@ -266,7 +268,7 @@ export function MapScoreList({
                   <label className={styles.fieldLabel} htmlFor={t2Id} title={team2Name}>
                     {team2Id !== null && <EntrantLogo teamId={team2Id} name={team2Name} size={16} />}
                     <span className={styles.fieldLabelText}>
-                      <span className="sr-only">Map {index + 1}, score de </span>
+                      <span className="sr-only">{t("score.maps.scoreOf", { index: index + 1 })}</span>
                       {team2Name}
                     </span>
                   </label>
@@ -295,8 +297,8 @@ export function MapScoreList({
                     type="button"
                     className={styles.remove}
                     onClick={() => remove(index)}
-                    aria-label={`Retirer la map ${index + 1}`}
-                    title={`Retirer la map ${index + 1}`}
+                    aria-label={t("score.maps.remove", { index: index + 1 })}
+                    title={t("score.maps.remove", { index: index + 1 })}
                   >
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
@@ -311,7 +313,7 @@ export function MapScoreList({
           les suivantes viennent d'elles-mêmes. */}
       {maps.length === 0 && (
         <button id={`${idPrefix}-map-add`} type="button" className={styles.add} onClick={add}>
-          <Plus size={16} aria-hidden="true" /> Ajouter une map
+          <Plus size={16} aria-hidden="true" /> {t("score.maps.add")}
         </button>
       )}
       <p className="sr-only" aria-live="polite">
@@ -322,7 +324,7 @@ export function MapScoreList({
           un « 0 – 0 » contredirait le score posé à la main au-dessus. */}
       {played > 0 && (
         <output className={styles.summary}>
-          <span className={styles.summaryLabel}>Score du match</span>
+          <span className={styles.summaryLabel}>{t("score.maps.summary")}</span>
           <span className={styles.summaryScore}>
             {team1Name} {score.team1} – {score.team2} {team2Name}
           </span>

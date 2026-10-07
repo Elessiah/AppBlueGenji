@@ -4,7 +4,6 @@ import { useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { tournamentLabel } from "@/lib/shared/tournaments-text";
 import type { Locale } from "@/lib/shared/locales";
 import { INTL_LOCALE } from "@/lib/shared/locales";
@@ -13,18 +12,15 @@ import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tourn
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
-import { isSoloTournament, participantWording } from "@/lib/shared/participants";
+import { toParticipantType } from "@/lib/shared/participants";
 import { canReturnInSite, isPlainLeftClick, previousSitePathname } from "@/lib/shared/site-back";
 import { advanceTarget } from "@/lib/shared/tournament-launch";
-import {
-  REGISTRATION_STREAM_NOTICE_LINK_LABEL,
-  STREAM_NOTICE_PRIVACY_PATH,
-  registrationStreamNotice,
-} from "@/lib/shared/stream-notice";
-import { TOURNAMENT_STAGE_META } from "@/lib/shared/tournament-progress";
+import { STREAM_NOTICE_PRIVACY_PATH } from "@/lib/shared/stream-notice";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
 import { registerBlockedNotice } from "../_lib/register-entry";
+import { useActionsText } from "../_lib/actions-text";
+import { useErrorsText } from "../_lib/error-map";
 import {
   headerIdentityLine,
   headerMetaItems,
@@ -110,14 +106,20 @@ export function TournamentHeader({
   const labels = useTournamentsText();
   const { t } = text;
   // Inscription, signalement et gestes du staff : lot 8b / D4, restés français.
-  const actionLang = frenchBlockLang(text);
-  const wording = participantWording(card.participantType);
+  // Gestes (lot 8b) : inscription, signalement, outils du staff de l'en-tête.
+  const actionText = useActionsText();
+  const a = actionText.t;
+  const errorsText = useErrorsText();
+  const entrantType = toParticipantType(card.participantType);
+  // L'édition (`/tournois/[id]/modifier`) n'est pas encore traduite : le lien
+  // annonce la langue de sa cible sous `/en`.
+  const editLang = text.locale === "fr" ? undefined : "fr";
   const state = STATE_META[card.state] ?? { label: card.state, tone: "info" as HeaderTone };
   const stateLabel = tournamentLabel(labels, "state", card.state);
   const items = headerMetaItems(card, detail.phases, detail.currentPhaseId, Date.now(), text, labels);
   // Le seul refus d'inscription qui ne se lise pas tout seul sur la page :
   // avoir une équipe sans en avoir la charge (`_lib/register-entry.ts`).
-  const registerNotice = frozen ? null : registerBlockedNotice(detail);
+  const registerNotice = frozen ? null : registerBlockedNotice(detail, errorsText, actionText);
   const nextStage = advanceTarget(card);
   const showEdit = canShowEditButton(card, detail.isAdmin);
   // L'image se règle dans tous les états, contrairement au formulaire : elle
@@ -177,24 +179,24 @@ export function TournamentHeader({
           </div>
 
           {(showEdit || showImageEdit) && (
-            <div className={s.identityActions} lang={actionLang}>
+            <div className={s.identityActions}>
               {showImageEdit && (
                 <CyberButton
                   variant="ghost"
                   onClick={onEditImage}
                   // « Image » seul ne dit pas de quoi, hors contexte ; le nom
                   // accessible commence par le texte affiché (WCAG 2.5.3).
-                  aria-label={card.image ? "Image du tournoi" : undefined}
+                  aria-label={card.image ? a("header.imageAria") : undefined}
                   aria-haspopup="dialog"
                   style={{ fontSize: 13, padding: "6px 16px" }}
                 >
-                  {card.image ? "Image" : "Ajouter une image"}
+                  {card.image ? a("header.image") : a("header.addImage")}
                 </CyberButton>
               )}
               {showEdit && (
                 <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
-                  <LocaleLink href={`/tournois/${card.id}/modifier`} hrefLang={actionLang}>
-                    Modifier
+                  <LocaleLink href={`/tournois/${card.id}/modifier`} hrefLang={editLang}>
+                    {a("header.edit")}
                   </LocaleLink>
                 </CyberButton>
               )}
@@ -220,33 +222,31 @@ export function TournamentHeader({
           {detail.canRegister && !frozen && (
             <CyberButton
               variant="primary"
-              lang={actionLang}
               onClick={onRegister}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
-              {wording.registerCta}
+              {a(`wording.${entrantType}.registerCta`)}
             </CyberButton>
           )}
           {/* Information sur la retransmission, à l'endroit où l'on s'engage —
               sans case à cocher : la base est l'intérêt légitime, le joueur
               garde son droit d'opposition (`lib/shared/stream-notice.ts`). */}
           {detail.canRegister && !frozen && (
-            <p className={s.registerNotice} lang={actionLang}>
-              {registrationStreamNotice(isSoloTournament(card.participantType))}{" "}
-              <LocaleLink href={STREAM_NOTICE_PRIVACY_PATH}>{REGISTRATION_STREAM_NOTICE_LINK_LABEL}</LocaleLink>
+            <p className={s.registerNotice}>
+              {a(`register.streamNotice.${entrantType}`)}{" "}
+              <LocaleLink href={STREAM_NOTICE_PRIVACY_PATH}>{a("register.streamNoticeLink")}</LocaleLink>
             </p>
           )}
           {/* À la place du bouton, et non à côté : le lecteur cherche là où
               l'action devrait être. */}
-          {registerNotice && <p className={s.registerNotice} lang={actionLang}>{registerNotice}</p>}
+          {registerNotice && <p className={s.registerNotice}>{registerNotice}</p>}
           {detail.isAdmin && !frozen && card.state === "REGISTRATION" && (
             <CyberButton
               variant="ghost"
-              lang={actionLang}
               onClick={onGuestRegister}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
-              {wording.guestCta}
+              {a(`wording.${entrantType}.guestCta`)}
             </CyberButton>
           )}
           {/* Avancée anticipée : fait franchir l'étape suivante (inscriptions,
@@ -257,15 +257,14 @@ export function TournamentHeader({
           {detail.isAdmin && !frozen && nextStage !== null && (
             <CyberButton
               variant="ghost"
-              lang={actionLang}
               onClick={onAdvance}
-              title={`Passer à l'étape suivante : ${TOURNAMENT_STAGE_META[nextStage].label}.`}
+              title={a("header.advanceTitle", { stage: t(`progress.stages.${nextStage}.label`) })}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
               {/* Le chevron est décoratif : le lecteur d'écran doit entendre
                   l'action, pas « triangle pointant vers la droite ». Même
                   traitement que la flèche du bouton « Retour ». */}
-              <span aria-hidden="true">▶</span> Avancer le tournoi
+              <span aria-hidden="true">▶</span> {a("header.advance")}
             </CyberButton>
           )}
           {/* Signalement : ouvert aux seuls engagés (inscrits, pas seulement dotés
@@ -275,11 +274,10 @@ export function TournamentHeader({
           {isViewerEntrant(detail.myTeamId, detail.registrations) && (
             <CyberButton
               variant="ghost"
-              lang={actionLang}
               onClick={onReportIssue}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
-              ⚠ Signaler un problème
+              ⚠ {a("header.reportIssue")}
             </CyberButton>
           )}
         </div>

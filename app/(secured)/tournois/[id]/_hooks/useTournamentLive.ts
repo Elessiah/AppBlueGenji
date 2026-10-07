@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
-import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
-import { mapError } from "../_lib/error-map";
+import { mapError, useErrorsText } from "../_lib/error-map";
 import { clearAttention } from "../_lib/attention";
 import {
   nextViewerMatchFocusChangeAt,
@@ -58,10 +58,10 @@ const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: f
  *   d'onglet, modale de lancement.
  */
 export function useTournamentLive(tournamentId: number) {
-  // Refus d'une relecture : phrase de `mapError`, française (`lang="fr"` sous
-  // `/en`). Échec définitif : dit dans la langue de la page, comme le témoin.
-  const { showError } = useFrenchBlockToast();
-  const { showError: showPageError } = useToast();
+  // Refus d'une relecture : phrase de `mapError`. Échec définitif : dit avec
+  // les mots du témoin. Les deux dans la langue de la page.
+  const { showError, showError: showPageError } = useToast();
+  const errorsText = useErrorsText();
   const { t } = useTournamentPageText();
   /** État **rendu** — peut retarder sur `stateRef`, qui est l'état reçu. */
   const [state, setState] = useState<LiveState>(INITIAL_LIVE_STATE);
@@ -194,11 +194,11 @@ export function useTournamentLive(tournamentId: number) {
         commit({ tier: stateRef.current.tier, detail });
         return null;
       } catch (e) {
-        if (!silent) showError(mapError((e as Error).message));
+        if (!silent) showError(mapError((e as Error).message, errorsText));
         return null;
       }
     },
-    [tournamentId, commit, showError],
+    [tournamentId, commit, showError, errorsText],
   );
 
   /**

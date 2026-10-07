@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { DiscordTag } from "@/components/discord-tag";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { useToast } from "@/components/ui/toast";
 import { contactsPanelView } from "../_lib/contacts-panel-view";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
+import { richNodes } from "@/components/i18n/shell-text";
 import { EntrantName } from "./EntrantName";
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import styles from "./EntrantContactsPanel.module.css";
 
 /**
@@ -43,9 +43,11 @@ export type EntrantContactGroup = {
 };
 
 export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: number }>) {
-  const staffLang = frenchBlockLang(useTournamentPageText());
-  const toast = useToast();
-  const showError = (message: string) => toast.showError(message, { lang: staffLang });
+  // Panneau chargé à la demande (`dynamic()`) : ses textes voyagent avec les fenêtres.
+  const text = useDialogsText();
+  const { t } = text;
+  const mapError = useMapError();
+  const { showError } = useToast();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [entrants, setEntrants] = useState<EntrantContactGroup[] | null>(null);
@@ -96,7 +98,7 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
         /* `aria-live` : le contenu arrive après un aller-retour, et rien ne
            le dirait autrement à qui ne voit pas la page. */
         <p className={styles.hint} aria-live="polite">
-          Chargement…
+          {t("contacts.loading")}
         </p>
       );
     }
@@ -114,14 +116,14 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
             disabled={loading}
             style={{ padding: "6px 14px", fontSize: 12 }}
           >
-            Réessayer
+            {t("contacts.retry")}
           </button>
         </div>
       );
     }
     if (view === "EMPTY") {
       return (
-        <p className={styles.hint}>Aucun engagé pour le moment.</p>
+        <p className={styles.hint}>{t("contacts.empty")}</p>
       );
     }
     return (
@@ -135,7 +137,7 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
               textClassName={styles.teamName}
             />
             {!entrant.reachable && (
-              <span className={styles.unreachable}>Aucun contact certifié</span>
+              <span className={styles.unreachable}>{t("contacts.unreachable")}</span>
             )}
           </div>
           {entrant.members.length === 0 ? (
@@ -143,7 +145,7 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
               {/* Tournure neutre : « équipe » et « joueur » n'ont pas le même
                   genre, et l'engagé sans joueur est une fantôme dans les deux
                   cas. */}
-              Aucun joueur rattaché : engagé invité par le staff.
+              {t("contacts.noPlayer")}
             </p>
           ) : (
             <ul className={styles.members}>
@@ -153,7 +155,8 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
                   <DiscordTag
                     tag={member.discordTag}
                     verified={member.discordTag !== null}
-                    fallback="Non certifié"
+                    fallback={t("contacts.notVerified")}
+                    badgeLabels={{ alt: t("contacts.badgeAlt"), title: t("contacts.badgeTitle") }}
                   />
                 </li>
               ))}
@@ -165,15 +168,14 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
   };
 
   return (
-    // Outil du staff : resté français (D4), annoncé comme tel sous `/en`.
-    <div className="ds-block" lang={staffLang}>
+    // Outil du staff posé sur la fiche (lot 8b).
+    <div className="ds-block">
       <div className="ds-section-title blue" style={{ alignItems: "center" }}>
-        <h2>Contacts Discord</h2>
+        <h2>{t("contacts.title")}</h2>
       </div>
 
       <p className={styles.hint}>
-        Réservé à l&apos;arbitrage. Seuls apparaissent les tags <strong>certifiés</strong> : un
-        joueur qui n&apos;a pas prouvé le sien n&apos;est pas joignable par le site.
+        {richNodes(text.rich("contacts.intro", {}, { strong: (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong> }))}
       </p>
 
       {/*
@@ -190,7 +192,7 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
         aria-controls="entrant-contacts-list"
         style={{ padding: "8px 16px", fontSize: 13 }}
       >
-        {open ? "Masquer les contacts" : "Afficher les contacts"}
+        {open ? t("contacts.hide") : t("contacts.show")}
       </button>
 
       {/* Outil d'arbitrage : les noms y restent sobres, sans marche du podium. */}

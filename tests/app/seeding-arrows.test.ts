@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
+import frActions from "@/messages/fr/tournamentActions.json";
 
 /**
  * Ordre de départ réglé aux flèches seules (docs/features/SEEDING_ORDER.md).
@@ -41,8 +42,11 @@ describe("Ordre de départ — flèches seules", () => {
   });
 
   it("garde deux vrais boutons, nommés d'après l'engagé", () => {
-    expect(panel).toMatch(/aria-label=\{`Monter \$\{reg\.teamName\} d'un rang`\}/);
-    expect(panel).toMatch(/aria-label=\{`Descendre \$\{reg\.teamName\} d'un rang`\}/);
+    // Lot 8b : le nom entre par argument dans la phrase des messages.
+    expect(panel).toMatch(/aria-label=\{a\("registrations\.moveUpAria", \{ name: reg\.teamName \}\)\}/);
+    expect(panel).toMatch(/aria-label=\{a\("registrations\.moveDownAria", \{ name: reg\.teamName \}\)\}/);
+    expect(frActions.registrations.moveUpAria).toBe("Monter {name} d'un rang");
+    expect(frActions.registrations.moveDownAria).toBe("Descendre {name} d'un rang");
     expect(panel.match(/className=\{styles\.arrow\}/g)).toHaveLength(2);
     // De vrais `<button>` : focusables, actionnés à Entrée et à l'espace.
     expect(
@@ -78,7 +82,8 @@ describe("Ordre de départ — flèches seules", () => {
     expect(panel).toMatch(
       /const reorderable = staff && lockReason === null && detail\.registrations\.length > 1;/,
     );
-    expect(panel).toMatch(/STARTED: "Le tournoi a commencé : l'ordre de départ est désormais figé\."/);
+    expect(panel).toMatch(/STARTED: "registrations\.lock\.STARTED"/);
+    expect(frActions.registrations.lock.STARTED).toBe("Le tournoi a commencé : l'ordre de départ est désormais figé.");
   });
 });
 
@@ -93,6 +98,7 @@ describe("Refus d'un réordonnancement après le coup d'envoi", () => {
     expect(ERROR_MESSAGES.SEEDING_LOCKED_FINISHED).toBeDefined();
     expect(mapError("SEEDING_LOCKED_FINISHED")).toMatch(/^Tournoi terminé/);
     expect(mapError("SEEDING_LOCKED_FINISHED")).not.toMatch(/score/);
-    expect(stripComments(read(PANEL))).toMatch(/FINISHED: "Tournoi terminé : l'ordre n'a plus d'effet\."/);
+    expect(stripComments(read(PANEL))).toMatch(/FINISHED: "registrations\.lock\.FINISHED"/);
+    expect(frActions.registrations.lock.FINISHED).toBe("Tournoi terminé : l'ordre n'a plus d'effet.");
   });
 });

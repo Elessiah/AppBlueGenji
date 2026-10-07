@@ -31,7 +31,9 @@ describe("confirmation d'inscription", () => {
 
   it("annonce la retransmission près du bouton d'inscription, avec le lien vers /rgpd", () => {
     const header = read("app/(secured)/tournois/[id]/_components/TournamentHeader.tsx");
-    expect(header).toMatch(/registrationStreamNotice\(isSoloTournament\(card\.participantType\)\)/);
+    // Lot 8b : la mention vient des messages, par type d'engagés — son
+    // français égale `registrationStreamNotice` (tournament-actions-i18n.test).
+    expect(header).toContain("{a(`register.streamNotice.${entrantType}`)}");
     expect(header).toContain("<LocaleLink href={STREAM_NOTICE_PRIVACY_PATH}>");
     // Information, pas consentement : aucune case à cocher.
     expect(header).not.toMatch(/type="checkbox"/);

@@ -1,18 +1,17 @@
 "use client";
 
-import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
+import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
+import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
+import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import {
-  forfeitMapCount,
-  matchFormatDescription,
-  matchFormatLabel,
-} from "@/lib/shared/match-format";
+import { forfeitMapCount } from "@/lib/shared/match-format";
 import {
   checkMapList,
   mapFieldKey,
@@ -22,12 +21,11 @@ import {
   trimTrailingBlankMaps,
   refusalOnTouchedRow,
   type MapListCheck,
-  mapListViolationMessage,
   sameMapLists,
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { isMyTeamTeam1, scoreSubmittedMessage, teamLabel } from "@/lib/shared/match-card-viewer";
+import { isMyTeamTeam1, teamLabel } from "@/lib/shared/match-card-viewer";
 import {
   playerReportInitialMaps,
   enteredScoreRelation,
@@ -39,9 +37,10 @@ import { useProposalMaps } from "../_hooks/useProposalMaps";
 import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
-import { playerScoreClosedNotice } from "@/lib/shared/match-planning";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { mapViolationText, useDialogsText } from "../_lib/dialogs-text";
+import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
 import { MapResultList } from "./MatchMapDetails";
 import mapStyles from "./MatchMapDetails.module.css";
@@ -85,20 +84,28 @@ function scoreText(report: MatchScoreReport): string {
  * replay ou scores de map, `MAP_SCORES.md`) : le dire, sans quoi « toi : 2 – 1,
  * eux : 2 – 1 » n'expliquerait rien.
  */
-function conflictText(mine: MatchScoreReport, theirs: MatchScoreReport, opponentName: string): string {
-  const what =
-    mine.team1Score === theirs.team1Score && mine.team2Score === theirs.team2Score
-      ? `Même score (${scoreText(mine)}), mais le détail des maps diffère de celui de ${opponentName} : codes de replay ou scores de map.`
-      : `Les scores se contredisent — toi : ${scoreText(mine)}, ${opponentName} : ${scoreText(theirs)}.`;
-  return `${what} L'arbitrage est alerté ; tu peux encore corriger ta proposition.`;
+function conflictText(text: TournamentDialogsText, mine: MatchScoreReport, theirs: MatchScoreReport, opponentName: string): string {
+  const sameScore = mine.team1Score === theirs.team1Score && mine.team2Score === theirs.team2Score;
+  return sameScore
+    ? text.t("score.player.conflictMaps", { score: scoreText(mine), opponent: opponentName })
+    : text.t("score.player.conflictScores", { mine: scoreText(mine), opponent: opponentName, theirs: scoreText(theirs) });
 }
 
-/** Heure d'échéance du délai de confirmation, dans le fuseau du lecteur. */
-function deadlineText(iso: string | null): string | null {
+/** Heure d'échéance du délai de confirmation, dans le fuseau du lecteur (24 h). */
+function deadlineText(iso: string | null, locale: Locale): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
+}
+
+/** Pourquoi le score ne se saisit pas encore (`playerScoreClosedNotice`), dans la langue du texte. */
+function closedNoticeText(text: TournamentDialogsText, phase: MatchLaunchPhase, startAtFull: string | null): string {
+  if (phase === "TO_PLAN") return text.t("score.player.closed.toPlan");
+  if (phase === "SCHEDULED") {
+    return startAtFull ? text.t("score.player.closed.scheduledAt", { date: startAtFull }) : text.t("score.player.closed.scheduled");
+  }
+  return text.t("score.player.closed.lobby");
 }
 
 /**
@@ -165,23 +172,22 @@ function proposalDetailLoading(
 
 /** Phrase d'état quand l'adversaire a proposé un score, selon le détail reçu. */
 function theirsPendingStatus(
+  text: TournamentDialogsText,
   names: { opponentName: string; myName: string },
   theirs: MatchScoreReport,
   reader: { canReport: boolean; detailLoading: boolean },
 ): string {
-  const proposed = `${names.opponentName} propose ${scoreText(theirs)}`;
+  const values = { opponent: names.opponentName, score: scoreText(theirs), mine: names.myName };
   // Qui ne peut pas reporter ne reçoit jamais le détail (`matchProposals`) :
   // rien à confirmer ni à ressaisir de son côté, et rien à dire du détail.
-  if (!reader.canReport) return `${proposed}. En attente de la confirmation d'un responsable de ${names.myName}.`;
-  if ((theirs.maps ?? []).length > 0) {
-    return `${proposed}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.`;
-  }
+  if (!reader.canReport) return text.t("score.player.theirs.readOnly", values);
+  if ((theirs.maps ?? []).length > 0) return text.t("score.player.theirs.withMaps", values);
   // Détail encore en lecture (proposition arrivée par le flux) : ne pas
   // inviter à ressaisir ce qui va pré-remplir le formulaire.
-  if (reader.detailLoading) return `${proposed}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas.`;
+  if (reader.detailLoading) return text.t("score.player.theirs.loading", values);
   // Sans détail (proposition antérieure aux maps, ou détail introuvable), le
   // formulaire s'ouvre vide : « Confirme-le » laisserait sans geste.
-  return `${proposed}, sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay : un désaccord alerte l'arbitrage.`;
+  return text.t("score.player.theirs.withoutMaps", values);
 }
 
 export function PlayerScoreDialog({
@@ -195,13 +201,15 @@ export function PlayerScoreDialog({
   onSubmitted,
   onRefresh,
 }: Readonly<PlayerScoreDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
-  const dialogLang = frenchBlockLang(useTournamentPageText());
+  const pageText = useTournamentPageText();
+  const text = useDialogsText();
+  const { t } = text;
+  const mapError = useMapError();
   // Les propositions complétées de leur détail : la modale s'ouvre sur les maps
   // de l'adversaire (codes et scores), à confirmer d'un clic.
   const match = useProposalMaps(liveMatch, proposals, onRefresh, canReportScore);
   const detailLoading = proposalDetailLoading(canReportScore, liveMatch, proposals);
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
   // saisissable (à planifier, en attente de départ, en lancement).
@@ -214,8 +222,8 @@ export function PlayerScoreDialog({
 
   const view = playerReportView(match, myTeamId);
   const myTeamIsTeam1 = isMyTeamTeam1(myTeamId, match.team1Id);
-  const team1 = teamLabel(match.team1Name, match.team1Placeholder, "Équipe 1");
-  const team2 = teamLabel(match.team2Name, match.team2Placeholder, "Équipe 2");
+  const team1 = teamLabel(match.team1Name, localizedPlaceholder(pageText, match.team1Placeholder), t("score.team", { side: 1 }));
+  const team2 = teamLabel(match.team2Name, localizedPlaceholder(pageText, match.team2Placeholder), t("score.team", { side: 2 }));
   const [myName, opponentName] = myTeamIsTeam1 ? [team1, team2] : [team2, team1];
 
   const game = useTournamentGame();
@@ -273,7 +281,7 @@ export function PlayerScoreDialog({
   const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], { missedProposal, confirmsAsIs });
 
   const forfeitMaps = forfeitMapCount(matchFormat);
-  const deadline = deadlineText(match.scoreDeadlineAt);
+  const deadline = deadlineText(match.scoreDeadlineAt, text.locale);
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
@@ -282,7 +290,7 @@ export function PlayerScoreDialog({
     const local = checkMapList(matchFormat, game, maps, { decisive: true });
     const target = refusalFieldOnRows(local, rows);
     if (!target || local.error !== code) return false;
-    fieldErrors.flag(mapFieldKey(target.index, target.field), mapListViolationMessage(local.error, matchFormat, game));
+    fieldErrors.flag(mapFieldKey(target.index, target.field), mapViolationText(text, local.error, matchFormat, game));
     return true;
   };
 
@@ -290,7 +298,7 @@ export function PlayerScoreDialog({
     if (submitting || unchangedMine) return;
     if (check.error) {
       flagRefusal(check.error);
-      showError(mapListViolationMessage(check.error, matchFormat, game));
+      showError(mapViolationText(text, check.error, matchFormat, game));
       return;
     }
     const entered1 = check.score.team1;
@@ -314,8 +322,13 @@ export function PlayerScoreDialog({
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       showSuccess(
         confirmsAsIs
-          ? `Score confirmé : ${team1} ${entered1} – ${entered2} ${team2}`
-          : scoreSubmittedMessage(myTeamIsTeam1, body.myScore, body.opponentScore, team1, team2),
+          ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
+          : t("score.player.submitted", {
+              team1,
+              team2,
+              score1: myTeamIsTeam1 ? body.myScore : body.opponentScore,
+              score2: myTeamIsTeam1 ? body.opponentScore : body.myScore,
+            }),
       );
       onSubmitted();
       onClose();
@@ -340,7 +353,7 @@ export function PlayerScoreDialog({
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "MATCH_FORFEIT_FAILED");
-      showSuccess(`Forfait enregistré : ${opponentName} remporte le match.`);
+      showSuccess(t("score.player.forfeitRecorded", { opponent: opponentName }));
       onSubmitted();
       onClose();
     } catch (error) {
@@ -361,26 +374,26 @@ export function PlayerScoreDialog({
     if (!view) return null;
     switch (view.phase) {
       case "MINE_PENDING":
-        return `Tu as proposé ${scoreText(view.mine!)}. En attente de la confirmation de ${opponentName}${
-          deadline ? ` — sans réponse, ce score sera validé à ${deadline}` : ""
-        }.`;
+        return deadline
+          ? t("score.player.minePendingDeadline", { score: scoreText(view.mine!), opponent: opponentName, deadline })
+          : t("score.player.minePending", { score: scoreText(view.mine!), opponent: opponentName });
       case "THEIRS_PENDING":
-        return theirsPendingStatus({ opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
+        return theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
       case "CONFLICT":
-        return conflictText(view.mine!, view.theirs!, opponentName);
+        return conflictText(text, view.mine!, view.theirs!, opponentName);
       default:
         return canReportScore
-          ? `${opponentName} devra confirmer le score que tu envoies.`
+          ? t("score.player.willConfirm", { opponent: opponentName })
           : null;
     }
   })();
 
   // « Confirmer le score », pas « Confirmer » seul : le forfait déclaré a son
   // propre « Confirmer le forfait de … » dans la même modale.
-  const submitLabel = confirmsAsIs ? "Confirmer le score" : "Envoyer le score";
+  const submitLabel = confirmsAsIs ? t("score.player.confirm") : t("score.player.send");
   let blocker: string | null = null;
-  if (unchangedMine) blocker = `Score déjà envoyé : en attente de ${opponentName}.`;
-  else if (check.error) blocker = mapListViolationMessage(check.error, matchFormat, game);
+  if (unchangedMine) blocker = t("score.player.alreadySent", { opponent: opponentName });
+  else if (check.error) blocker = mapViolationText(text, check.error, matchFormat, game);
   // Une saisie vide n'est pas un refus : la raison ne s'affiche qu'une fois
   // une map **renseignée** — une ligne vierge qu'on vient d'ajouter n'appelle
   // pas encore de reproche.
@@ -393,7 +406,6 @@ export function PlayerScoreDialog({
         ref={dialogRef}
         className={styles.dialog}
         role="dialog"
-        lang={dialogLang}
         aria-modal="true"
         aria-labelledby="player-score-title"
         tabIndex={-1}
@@ -402,13 +414,13 @@ export function PlayerScoreDialog({
           <div className={styles.head}>
             <div className={styles.headText}>
               <h3 id="player-score-title" className={styles.title}>
-                Score de mon match
+                {t("score.player.title")}
               </h3>
               <p className={styles.opponents}>
-                Manche {match.roundNumber} · {team1} vs {team2}
+                {t("score.opponents", { round: match.roundNumber, team1, team2 })}
               </p>
             </div>
-            {matchFormat && <Pill variant="blue">{matchFormatLabel(matchFormat)}</Pill>}
+            {matchFormat && <Pill variant="blue">{matchFormatText(pageText, matchFormat)}</Pill>}
           </div>
 
           {/* `<output>` (région d'état native) : l'adversaire peut répondre pendant que la modale
@@ -425,13 +437,12 @@ export function PlayerScoreDialog({
               pas, et « Confirme-le » n'aurait rien à montrer. */}
           {showTheirMaps && view?.theirs && (
             <div className={mapStyles.proposals}>
-              <p className={mapStyles.proposalTitle}>Proposition de {opponentName}</p>
+              <p className={mapStyles.proposalTitle}>{t("score.admin.proposalOf", { name: opponentName })}</p>
               <MapResultList
-                french
                 maps={view.theirs.maps}
                 team1Name={team1}
                 team2Name={team2}
-                label={`Maps proposées par ${opponentName}`}
+                label={t("score.admin.proposalMaps", { name: opponentName })}
               />
             </div>
           )}
@@ -453,12 +464,12 @@ export function PlayerScoreDialog({
                 fieldErrors={fieldErrors}
               />
               {matchFormat && (
-                <p className={styles.formatHint}>{matchFormatDescription(matchFormat)}</p>
+                <p className={styles.formatHint}>{matchFormatDescriptionText(pageText, matchFormat)}</p>
               )}
             </>
           ) : (
             <p className={styles.formatHint}>
-              {playerScoreClosedNotice(launchPhase, formatMatchStartAtFull(match.startAt))}
+              {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale))}
             </p>
           )}
 
@@ -472,14 +483,12 @@ export function PlayerScoreDialog({
                 aria-controls="player-score-forfeit"
                 disabled={submitting}
               >
-                {forfeitOpen ? "Ne pas déclarer forfait" : "Déclarer forfait sur ce match"}
+                {forfeitOpen ? t("score.player.forfeit.close") : t("score.player.forfeit.open")}
               </button>
               {forfeitOpen && (
                 <div id="player-score-forfeit" className={styles.forfeitPanel}>
                   <p id="player-score-forfeit-hint" className={styles.forfeitHint}>
-                    {myName} déclare forfait sur ce match : {opponentName} l&apos;emporte{" "}
-                    {forfeitMaps}-0, sans manche jouée. Le résultat est immédiat — seul
-                    l&apos;arbitrage peut revenir dessus.
+                    {t("score.player.forfeit.hint", { mine: myName, opponent: opponentName, maps: forfeitMaps })}
                   </p>
                   <div className={styles.forfeitRow}>
                     <button
@@ -489,7 +498,7 @@ export function PlayerScoreDialog({
                       onClick={() => void submitForfeit()}
                       disabled={submitting}
                     >
-                      {submitting ? "…" : `Confirmer le forfait de ${myName}`}
+                      {submitting ? "…" : t("score.player.forfeit.confirm", { name: myName })}
                     </button>
                   </div>
                 </div>
@@ -497,7 +506,7 @@ export function PlayerScoreDialog({
             </div>
           ) : (
             <p className={styles.formatHint}>
-              Un forfait se déclare par le propriétaire ou un manager de l&apos;équipe.
+              {t("score.player.forfeit.notAllowed")}
             </p>
           )}
 
@@ -514,7 +523,7 @@ export function PlayerScoreDialog({
               onClick={onClose}
               disabled={submitting}
             >
-              Fermer
+              {t("score.close")}
             </button>
             {canReportScore && (
               <button

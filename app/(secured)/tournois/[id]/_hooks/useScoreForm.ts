@@ -1,19 +1,19 @@
 import { useRef, useState } from "react";
 import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
 import {
   decideScoreForm,
   initialAdminMaps,
   isUntouched,
   pendingProposalSignature,
-  scoreBlockerMessage,
   scoreFormStateFor,
   storedResultSignature,
   type ScoreFormBlocker,
   type ScoreFormDecision,
   type ScoreFormState,
 } from "../_lib/score-form";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
 import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
 import {
   checkMapList,
@@ -22,7 +22,6 @@ import {
   refusalFieldOnRows,
   trimTrailingBlankMaps,
   refusalOnTouchedRow,
-  mapListViolationMessage,
   type MapField,
   type MapListViolation,
   type MatchMapInput,
@@ -51,7 +50,9 @@ export function useScoreForm(
     onMapsReset?: () => void;
   } = {},
 ) {
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
+  const dialogText = useDialogsText();
   const matchFormat = useMatchFormat(match);
   const game = useTournamentGame();
   const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
@@ -135,7 +136,7 @@ export function useScoreForm(
     const local = checkMapList(matchFormat, game, sentMaps, { decisive });
     const target = refusalFieldOnRows(local, maps);
     if (!target || local.error !== code || !options.onMapRefusal) return;
-    options.onMapRefusal(target, mapListViolationMessage(local.error, matchFormat, game));
+    options.onMapRefusal(target, mapViolationText(dialogText, local.error, matchFormat, game));
   };
 
   /** Contrôle des maps avant l'envoi ; `true` (refus signalé) bloque l'envoi. */
@@ -143,7 +144,7 @@ export function useScoreForm(
     const mapCheck = checkMapList(matchFormat, game, sentMaps, { decisive });
     if (!mapCheck.error) return false;
     flagMapRefusal(mapCheck.error, decisive);
-    showError(mapListViolationMessage(mapCheck.error, matchFormat, game));
+    showError(mapViolationText(dialogText, mapCheck.error, matchFormat, game));
     return true;
   };
 
@@ -192,7 +193,7 @@ export function useScoreForm(
     if (sendMaps && refuseMaps(decisive)) return false;
     const blocker = action === "save" ? decision.saveBlocker : decision.resolveBlocker;
     if (blocker) {
-      showError(scoreBlockerMessage(blocker, matchFormat));
+      showError(scoreBlockerText(dialogText, blocker, matchFormat));
       return false;
     }
 
@@ -206,7 +207,7 @@ export function useScoreForm(
 
       const body = adminScoreBody(state, sendMaps ? sentMaps : null, decision.scores);
       if (!body) {
-        showError(scoreBlockerMessage("INCOMPLETE", matchFormat));
+        showError(scoreBlockerText(dialogText, "INCOMPLETE", matchFormat));
         return false;
       }
 
@@ -221,8 +222,8 @@ export function useScoreForm(
 
       showSuccess(
         action === "save"
-          ? "Score enregistré : le match reste en cours."
-          : "Résultat validé : le plateau est à jour.",
+          ? dialogText.t("score.admin.saved")
+          : dialogText.t("score.admin.resolved"),
       );
       return true;
     } catch (e) {

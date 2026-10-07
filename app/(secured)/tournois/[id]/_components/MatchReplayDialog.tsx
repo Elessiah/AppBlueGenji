@@ -1,14 +1,14 @@
 "use client";
 
-import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { canHaveReplay, isValidReplayUrl } from "@/lib/shared/match-replay";
 import type { BracketMatch } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 
 interface MatchReplayDialogProps {
   match: BracketMatch;
@@ -24,9 +24,10 @@ interface MatchReplayDialogProps {
  * retrait reste toujours possible, y compris sur un match rouvert.
  */
 export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchReplayDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
-  const dialogLang = frenchBlockLang(useTournamentPageText());
-  const { showError, showSuccess } = useFrenchBlockToast();
+  // Textes de la fenêtre (espace `tournamentDialogs`).
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
+  const { t } = useDialogsText();
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
@@ -48,7 +49,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "MATCH_REPLAY_UPDATE_FAILED");
-      showSuccess(value === null ? "Rediff retirée." : "Rediff enregistrée.");
+      showSuccess(value === null ? t("replay.removed") : t("replay.saved"));
       onSaved();
       onClose();
     } catch (error) {
@@ -82,7 +83,6 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
-        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby="match-replay-title"
@@ -99,7 +99,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
       >
         <form onSubmit={submit}>
           <h3 id="match-replay-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-            Rediff du match
+            {t("replay.title")}
           </h3>
           <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
@@ -118,13 +118,12 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
                 color: "var(--ink-soft, #c3ccd8)",
               }}
             >
-              Ce match n&apos;est pas (ou plus) terminé : sa rediff n&apos;est pas affichée. Tu
-              peux seulement retirer le lien.
+              {t("replay.notReplayable")}
             </p>
           )}
 
           <div className="field" style={{ marginTop: 18 }}>
-            <label htmlFor="match-replay-url">Lien YouTube</label>
+            <label htmlFor="match-replay-url">{t("replay.url")}</label>
             <input
               id="match-replay-url"
               type="text"
@@ -144,9 +143,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
                 color: invalid ? "rgba(255,74,92,0.95)" : "var(--ink-quiet, #9aa4b2)",
               }}
             >
-              {invalid
-                ? "Lien non reconnu : il faut le lien d'une vidéo YouTube (youtube.com/watch?v=…, youtu.be/… ou youtube.com/live/…)."
-                : "Un bandeau « Rediff disponible » s'affichera sous le match, visible de tous."}
+              {invalid ? t("replay.invalid") : t("replay.hint")}
             </p>
           </div>
 
@@ -167,7 +164,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
                 disabled={busy}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
-                Retirer la rediff
+                {t("replay.remove")}
               </button>
             )}
             <button
@@ -177,7 +174,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
               disabled={busy}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
-              Annuler
+              {t("score.cancel")}
             </button>
             {replayable && (
               <button
@@ -186,7 +183,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
                 disabled={busy || invalid || noop}
                 style={{ padding: "8px 20px", fontSize: 13 }}
               >
-                {busy ? "Enregistrement…" : "Enregistrer"}
+                {busy ? t("schedule.saving") : t("schedule.save")}
               </button>
             )}
           </div>

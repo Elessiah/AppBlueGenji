@@ -170,27 +170,48 @@ export function canOpenPlayerScoreDialog(input: {
   return input.canReportScore || input.canActForEntrant;
 }
 
+/** Geste annoncé par le bouton de la carte — l'écran le traduit (lot 8b). */
+export type PlayerScoreButtonKey = "forfeit" | "confirm" | "edit" | "review" | "enter";
+
 /**
- * Libellé du bouton de la carte : il annonce le geste attendu du lecteur, pas
+ * Geste du bouton de la carte : il annonce le geste attendu du lecteur, pas
  * le nom de la modale — c'est ce qui manquait pour qu'un adversaire sache qu'il
  * avait un score à confirmer.
  */
+export function playerScoreButtonKey(view: PlayerReportView | null, canReportScore: boolean): PlayerScoreButtonKey {
+  if (!canReportScore) return "forfeit";
+  switch (view?.phase) {
+    case "THEIRS_PENDING":
+      return "confirm";
+    case "MINE_PENDING":
+      return "edit";
+    case "CONFLICT":
+      return "review";
+    default:
+      return "enter";
+  }
+}
+
+const PLAYER_SCORE_BUTTON_LABELS: Record<PlayerScoreButtonKey, string> = {
+  forfeit: "Déclarer forfait",
+  confirm: "Confirmer le score",
+  edit: "Modifier mon score",
+  review: "Revoir le score",
+  enter: "Saisir le score",
+};
+
+/** Libellé français du bouton de la carte ({@link playerScoreButtonKey}). */
 export function playerScoreButtonLabel(
   view: PlayerReportView | null,
   canReportScore: boolean,
 ): string {
-  if (!canReportScore) return "Déclarer forfait";
-  switch (view?.phase) {
-    case "THEIRS_PENDING":
-      return "Confirmer le score";
-    case "MINE_PENDING":
-      return "Modifier mon score";
-    case "CONFLICT":
-      return "Revoir le score";
-    default:
-      return "Saisir le score";
-  }
+  return PLAYER_SCORE_BUTTON_LABELS[playerScoreButtonKey(view, canReportScore)];
 }
+
+/** Ce que dit la ligne d'état d'une proposition en attente — l'écran la rédige. */
+export type PendingReportState =
+  | { kind: "conflict" }
+  | { kind: "proposed"; team1Score: number; team2Score: number; reporter: string | null; side: 1 | 2 };
 
 /**
  * Ligne d'état posée sous la carte, lisible par **tous** : une proposition
@@ -198,23 +219,36 @@ export function playerScoreButtonLabel(
  * distinguer « pas encore joué » de « joué, en attente de confirmation ».
  * `null` quand il n'y a rien à dire.
  */
+export function pendingReportState(
+  match: Pick<
+    BracketMatch,
+    "status" | "team1Report" | "team2Report" | "team1Name" | "team2Name"
+  >,
+): PendingReportState | null {
+  if (isMatchPlayed(match)) return null;
+  const { team1Report, team2Report } = match;
+  // Deux propositions sur un match ouvert se contredisent toujours (voir
+  // `playerReportView`) — à score égal, par leurs maps.
+  if (team1Report && team2Report) return { kind: "conflict" };
+  const report = team1Report ?? team2Report;
+  if (!report) return null;
+  const side = team1Report ? 1 : 2;
+  const reporter = side === 1 ? match.team1Name : match.team2Name;
+  return { kind: "proposed", team1Score: report.team1Score, team2Score: report.team2Score, reporter, side };
+}
+
+/** Ligne d'état française ({@link pendingReportState}). */
 export function pendingReportNotice(
   match: Pick<
     BracketMatch,
     "status" | "team1Report" | "team2Report" | "team1Name" | "team2Name"
   >,
 ): string | null {
-  if (isMatchPlayed(match)) return null;
-  const { team1Report, team2Report } = match;
-  // Deux propositions sur un match ouvert se contredisent toujours (voir
-  // `playerReportView`) — à score égal, par leurs maps.
-  if (team1Report && team2Report) {
-    return "Scores contradictoires · arbitrage alerté";
-  }
-  const report = team1Report ?? team2Report;
-  if (!report) return null;
-  const reporter = team1Report ? match.team1Name ?? "Équipe 1" : match.team2Name ?? "Équipe 2";
-  return `${report.team1Score} – ${report.team2Score} proposé par ${reporter} · à confirmer`;
+  const state = pendingReportState(match);
+  if (state === null) return null;
+  if (state.kind === "conflict") return "Scores contradictoires · arbitrage alerté";
+  const reporter = state.reporter ?? `Équipe ${state.side}`;
+  return `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · à confirmer`;
 }
 
 /**

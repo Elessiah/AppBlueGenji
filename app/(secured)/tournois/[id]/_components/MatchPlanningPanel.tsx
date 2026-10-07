@@ -2,19 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import {
-  canToggleRefereeScheduling,
-  enablePlanningConsequence,
-  matchesToPlan,
-  refereeSchedulingToggledMessage,
-  refereeSchedulingToggleLabel,
-  refereeSchedulingErrorMessage,
-  toPlanCountLabel,
-} from "@/lib/shared/match-planning";
+import { canToggleRefereeScheduling, matchesToPlan } from "@/lib/shared/match-planning";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { refereeSchedulingErrorText, useActionsText } from "../_lib/actions-text";
 import styles from "./MatchPlanningPanel.module.css";
 
 interface MatchPlanningPanelProps {
@@ -41,12 +33,11 @@ interface MatchPlanningPanelProps {
  */
 export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPlanningPanelProps>) {
   const text = useTournamentPageText();
-  // Ce que lit tout lecteur (titre, règle) suit la page ; le décompte et les
-  // commandes, outils du staff, restent français (D4).
-  const staffLang = frenchBlockLang(text);
-  const toast = useToast();
-  const showError = (message: string) => toast.showError(message, { lang: staffLang });
-  const showSuccess = (message: string) => toast.showSuccess(message, { lang: staffLang });
+  // Ce que lit tout lecteur (titre, règle) vient de la consultation (lot 8a) ;
+  // le décompte et les commandes du staff, des gestes (lot 8b).
+  const actionText = useActionsText();
+  const a = actionText.t;
+  const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
   const [confirmEnable, setConfirmEnable] = useState(false);
   const enabled = detail.card.refereeScheduling;
@@ -85,10 +76,12 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
         movedToPlanning?: number;
       };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      showSuccess(refereeSchedulingToggledMessage(next, payload.movedToPlanning ?? 0));
+      const moved = payload.movedToPlanning ?? 0;
+      if (!next) showSuccess(a("planning.disabled"));
+      else showSuccess(moved > 0 ? a("planning.enabledMoved", { count: moved }) : a("planning.enabled"));
       return true;
     } catch (error) {
-      showError(refereeSchedulingErrorMessage((error as Error).message));
+      showError(refereeSchedulingErrorText(actionText, (error as Error).message));
       return false;
     } finally {
       setBusy(false);
@@ -105,6 +98,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
     void toggle(!enabled);
   };
 
+  const toggleLabel = a(enabled ? "planning.disable" : "planning.enable");
   const pending = enabled ? toPlan : [];
   const first = pending[0] ?? null;
   // Le décompte n'intéresse que ceux qui peuvent le résorber.
@@ -127,23 +121,23 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
         {/* Le décompte n'intéresse que ceux qui peuvent le résorber. Pas de
             région live : il change à chaque instantané du flux. */}
         {showCount && pending.length > 0 && (
-          <p className={styles.pending} lang={staffLang}>{toPlanCountLabel(pending.length)}</p>
+          <p className={styles.pending}>{a("planning.toPlanCount", { count: pending.length })}</p>
         )}
         {showCount && pending.length === 0 && (
-          <p className={styles.done} lang={staffLang}>Tous les matchs jouables ont une date.</p>
+          <p className={styles.done}>{a("planning.allPlanned")}</p>
         )}
       </div>
 
       {canManage && (
-        <div className={styles.actions} lang={staffLang}>
+        <div className={styles.actions}>
           {enabled && first && (
             <button
               type="button"
               className={`btn tap-target ${styles.plan}`}
               onClick={() => onPlan(first)}
-              aria-label={`Planifier le prochain match : ${first.team1Name ?? "TBD"} contre ${first.team2Name ?? "TBD"}`}
+              aria-label={a("planning.planNextAria", { team1: first.team1Name ?? "TBD", team2: first.team2Name ?? "TBD" })}
             >
-              🗓 Planifier le prochain
+              🗓 {a("planning.planNext")}
             </button>
           )}
           {toggleable && (
@@ -153,7 +147,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
               onClick={onToggle}
               disabled={busy}
             >
-              {busy ? "…" : refereeSchedulingToggleLabel(enabled)}
+              {busy ? "…" : toggleLabel}
             </button>
           )}
         </div>
@@ -161,17 +155,16 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
 
       {confirmEnable && !enabled && (
         <ConfirmActionDialog
-          contentLang={staffLang}
-          title="Activer la planification par l'arbitrage ?"
-          confirmLabel="Activer"
-          pendingLabel="Activation…"
+          title={a("planning.confirm.title")}
+          confirmLabel={a("planning.confirm.confirm")}
+          pendingLabel={a("planning.confirm.pending")}
           tone="primary"
           onClose={() => setConfirmEnable(false)}
           onConfirm={() => toggle(true)}
         >
           <p>
-            {enablePlanningConsequence(moving.length)}{" "}
-            Les matchs déjà lancés continuent, et les manches suivantes naîtront à planifier.
+            {a("planning.confirm.consequence", { count: moving.length })}{" "}
+            {a("planning.confirm.next")}
           </p>
         </ConfirmActionDialog>
       )}

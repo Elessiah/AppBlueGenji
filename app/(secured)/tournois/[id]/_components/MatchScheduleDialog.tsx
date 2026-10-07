@@ -1,7 +1,7 @@
 "use client";
 
-import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
+import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { FormEvent, ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -12,7 +12,7 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import {
   MATCH_ENTRY_DEFAULT_TIME,
-  MATCH_ENTRY_MONTHS,
+  matchEntryMonths,
   formatMatchStartEntryPreview,
   localMatchTimeIfDifferent,
   matchEntryReference,
@@ -27,7 +27,8 @@ import {
 } from "@/lib/shared/match-start-entry";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 
 const FIELD_IDS = {
   day: "match-start-day",
@@ -38,21 +39,19 @@ const HINT_ID = "match-start-at-hint";
 const PREVIEW_ID = "match-start-at-preview";
 const YEAR_FIX_ID = "match-start-year-fix";
 
-/** Premier champ manquant, tel que l'aperçu le nomme. */
-const MISSING_FIELD_LABELS: Readonly<Record<MatchStartEntryField, string>> = {
-  day: "le jour",
-  month: "le mois",
-  time: "l'heure",
-};
+/** Premier champ manquant, tel que l'aperçu le nomme (`schedule.missing.*`). */
+const MISSING_FIELD_KEYS = {
+  day: "schedule.missing.day",
+  month: "schedule.missing.month",
+  time: "schedule.missing.time",
+} as const satisfies Readonly<Record<MatchStartEntryField, string>>;
 
 const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
 
 /** Refus de saisie, avant tout envoi. */
-function entryRefusal(state: MatchStartEntryState): string | null {
-  if (state.kind === "incomplete") {
-    return "Date incomplète : choisis le jour et le mois, ou vide les deux pour ne pas annoncer d'horaire.";
-  }
-  if (state.kind === "invalid") return "Ce jour n'existe pas dans ce mois.";
+function entryRefusal(text: TournamentDialogsText, state: MatchStartEntryState): string | null {
+  if (state.kind === "incomplete") return text.t("schedule.refusal.incomplete");
+  if (state.kind === "invalid") return text.t("schedule.refusal.invalid");
   return null;
 }
 
@@ -60,30 +59,27 @@ function entryRefusal(state: MatchStartEntryState): string | null {
  * Ligne d'aperçu d'une saisie inachevée : une consigne neutre, pas un refus —
  * le refus, lui, part en notification à l'envoi.
  */
-function pendingPreview(state: MatchStartEntryState): string | null {
-  if (state.kind === "incomplete") return `À compléter : ${MISSING_FIELD_LABELS[state.field]}.`;
-  if (state.kind === "invalid") return "Aucune date possible : ce jour n'existe pas dans ce mois.";
+function pendingPreview(text: TournamentDialogsText, state: MatchStartEntryState): string | null {
+  if (state.kind === "incomplete") return text.t("schedule.pending", { field: text.t(MISSING_FIELD_KEYS[state.field]) });
+  if (state.kind === "invalid") return text.t("schedule.pendingInvalid");
   return null;
 }
 
 /** Aide sous les champs : ce que la date va produire. */
-function startAtHint(refereeScheduling: boolean): string {
-  if (refereeScheduling) {
-    return "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.";
-  }
-  return "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.";
+function startAtHint(text: TournamentDialogsText, refereeScheduling: boolean): string {
+  return text.t(refereeScheduling ? "schedule.hintPlanning" : "schedule.hint");
 }
 
 /** Confirmation après enregistrement. */
-function savedMessage(touched: boolean, planning: boolean): string {
-  if (!touched) return "Date de début effacée.";
-  return planning ? "Match planifié." : "Date de début enregistrée.";
+function savedMessage(text: TournamentDialogsText, touched: boolean, planning: boolean): string {
+  if (!touched) return text.t("schedule.cleared");
+  return text.t(planning ? "schedule.planned" : "schedule.saved");
 }
 
 /** Libellé du bouton d'envoi. */
-function submitLabel(busy: boolean, planning: boolean): string {
-  if (busy) return "Enregistrement…";
-  return planning ? "Planifier" : "Enregistrer";
+function submitLabel(text: TournamentDialogsText, busy: boolean, planning: boolean): string {
+  if (busy) return text.t("schedule.saving");
+  return text.t(planning ? "schedule.plan" : "schedule.save");
 }
 
 /**
@@ -151,9 +147,10 @@ export function MatchScheduleDialog({
   onClose,
   onSaved,
 }: Readonly<MatchScheduleDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
-  const dialogLang = frenchBlockLang(useTournamentPageText());
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const text = useDialogsText();
+  const { t } = text;
+  const mapError = useMapError();
+  const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(MATCH_SCHEDULE_FIELD_ERRORS, FIELD_IDS);
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
   const [day, setDay] = useState(initial ? String(initial.day) : "");
@@ -203,7 +200,7 @@ export function MatchScheduleDialog({
   const cleared = entry.kind === "empty";
   // Les cartes de match affichent l'heure du navigateur : hors du fuseau de
   // Paris, l'aperçu donne aussi celle-là, pour que les deux se recoupent.
-  const localTime = entry.kind === "ready" ? localMatchTimeIfDifferent(entry.instant) : null;
+  const localTime = entry.kind === "ready" ? localMatchTimeIfDifferent(entry.instant, undefined, text.locale) : null;
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
   // le laisse programmé sans jamais passer à l'antenne : on le dit plutôt que
   // de refuser l'effacement — le calendrier ne dépend pas de la diffusion.
@@ -237,7 +234,7 @@ export function MatchScheduleDialog({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (entry.kind === "incomplete" || entry.kind === "invalid") {
-      const message = entryRefusal(entry) ?? "Date non reconnue.";
+      const message = entryRefusal(text, entry) ?? t("schedule.refusal.unknown");
       fieldErrors.flag(entry.field, message);
       showError(message);
       return;
@@ -257,7 +254,7 @@ export function MatchScheduleDialog({
         const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
         throw new CodedError(code, mapError(code));
       }
-      showSuccess(savedMessage(entry.kind === "ready", planning));
+      showSuccess(savedMessage(text, entry.kind === "ready", planning));
       onSaved();
       onClose();
     } catch (error) {
@@ -289,7 +286,6 @@ export function MatchScheduleDialog({
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
-        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby="match-schedule-title"
@@ -306,7 +302,7 @@ export function MatchScheduleDialog({
       >
         <form onSubmit={submit} noValidate>
           <h3 id="match-schedule-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-            {planning ? "Planifier le match" : "Date de début du match"}
+            {planning ? t("schedule.titlePlanning") : t("schedule.title")}
           </h3>
           <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
@@ -318,11 +314,11 @@ export function MatchScheduleDialog({
               `fieldset` n'est pas lue par tous les lecteurs d'écran. */}
           <fieldset style={{ margin: "18px 0 0", padding: 0, border: 0, minWidth: 0 }}>
             <legend style={{ padding: 0, marginBottom: 8, fontSize: 13, color: "var(--ink)" }}>
-              Début programmé (heure de Paris)
+              {t("schedule.legend")}
             </legend>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               <div className="field" style={fieldStyle}>
-                <label htmlFor={FIELD_IDS.day}>Jour</label>
+                <label htmlFor={FIELD_IDS.day}>{t("schedule.day")}</label>
                 <select
                   id={FIELD_IDS.day}
                   value={day}
@@ -344,7 +340,7 @@ export function MatchScheduleDialog({
                 <FieldErrorText fieldId={FIELD_IDS.day} message={fieldErrors.message("day")} />
               </div>
               <div className="field" style={{ ...fieldStyle, flexGrow: 2 }}>
-                <label htmlFor={FIELD_IDS.month}>Mois</label>
+                <label htmlFor={FIELD_IDS.month}>{t("schedule.month")}</label>
                 <select
                   id={FIELD_IDS.month}
                   value={month}
@@ -357,7 +353,7 @@ export function MatchScheduleDialog({
                   {...fieldErrors.aria("month")}
                 >
                   <option value="">—</option>
-                  {MATCH_ENTRY_MONTHS.map((name, index) => (
+                  {matchEntryMonths(text.locale).map((name, index) => (
                     <option key={name} value={String(index + 1)}>
                       {name}
                     </option>
@@ -366,7 +362,7 @@ export function MatchScheduleDialog({
                 <FieldErrorText fieldId={FIELD_IDS.month} message={fieldErrors.message("month")} />
               </div>
               <div className="field" style={fieldStyle}>
-                <label htmlFor={FIELD_IDS.time}>Heure</label>
+                <label htmlFor={FIELD_IDS.time}>{t("schedule.time")}</label>
                 <select
                   id={FIELD_IDS.time}
                   value={time}
@@ -394,12 +390,12 @@ export function MatchScheduleDialog({
           >
             {entry.kind === "ready" && (
               <>
-                Date retenue : <strong>{formatMatchStartEntryPreview(entry.instant)}</strong>
-                {localTime && ` (${localTime} à ton heure locale)`}
+                {t("schedule.preview")} <strong>{formatMatchStartEntryPreview(entry.instant, text.locale)}</strong>
+                {localTime && ` ${t("schedule.localTime", { time: localTime })}`}
               </>
             )}
-            {cleared && "Aucun horaire annoncé."}
-            {pendingPreview(entry)}
+            {cleared && t("schedule.none")}
+            {pendingPreview(text, entry)}
           </output>
           {entry.kind === "ready" && (previousYear !== null || nextYear !== null) && (
             // Le bouton reste en place une fois déplié : il garde le focus.
@@ -412,7 +408,7 @@ export function MatchScheduleDialog({
               aria-controls={YEAR_FIX_ID}
               style={{ padding: "4px 10px", fontSize: 12, marginTop: 6 }}
             >
-              Mauvaise année ?
+              {t("schedule.wrongYear")}
             </button>
           )}
           {entry.kind === "ready" && yearFixOpen && (previousYear !== null || nextYear !== null) && (
@@ -420,7 +416,7 @@ export function MatchScheduleDialog({
               id={YEAR_FIX_ID}
               style={{ margin: "6px 0 0", padding: 0, border: 0, minWidth: 0 }}
             >
-              <legend className="sr-only">Corriger l&apos;année</legend>
+              <legend className="sr-only">{t("schedule.fixYear")}</legend>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {previousYear !== null && (
                 <button
@@ -431,7 +427,7 @@ export function MatchScheduleDialog({
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
-                  Année précédente
+                  {t("schedule.previousYear")}
                 </button>
               )}
               {nextYear !== null && (
@@ -443,7 +439,7 @@ export function MatchScheduleDialog({
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
-                  Année suivante
+                  {t("schedule.nextYear")}
                 </button>
               )}
               </div>
@@ -453,20 +449,18 @@ export function MatchScheduleDialog({
             id={HINT_ID}
             style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}
           >
-            {startAtHint(refereeScheduling)}
+            {startAtHint(text, refereeScheduling)}
           </p>
 
           {clearsLiveTrigger && (
             <ScheduleWarning>
-              Ce match passe à l&apos;antenne à sa date de début : sans date, il restera
-              « programmé » sans jamais démarrer.
+              {t("schedule.warnLive")}
             </ScheduleWarning>
           )}
 
           {returnsToPlanning && (
             <ScheduleWarning>
-              Sans date, ce match repasse « À planifier » : il ne se lancera pas tant
-              qu&apos;une nouvelle heure n&apos;est pas fixée.
+              {t("schedule.warnPlanning")}
             </ScheduleWarning>
           )}
 
@@ -479,7 +473,7 @@ export function MatchScheduleDialog({
                 disabled={busy}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
-                Vider la date
+                {t("schedule.clear")}
               </button>
             )}
             <button
@@ -489,7 +483,7 @@ export function MatchScheduleDialog({
               disabled={busy}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
-              Annuler
+              {t("score.cancel")}
             </button>
             <button
               type="submit"
@@ -497,7 +491,7 @@ export function MatchScheduleDialog({
               disabled={busy}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
-              {submitLabel(busy, planning)}
+              {submitLabel(text, busy, planning)}
             </button>
           </div>
         </form>

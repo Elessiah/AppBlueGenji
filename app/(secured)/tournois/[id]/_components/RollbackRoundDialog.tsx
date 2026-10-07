@@ -1,12 +1,17 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
 import { ScrollArea } from "@/components/cyber";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
+import { richNodes } from "@/components/i18n/shell-text";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
+import { localizedPlaceholder } from "@/lib/shared/tournament-page-text";
 import { teamLabel } from "@/lib/shared/match-card-viewer";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import type { BracketMatch } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface RollbackRoundDialogProps {
@@ -41,14 +46,14 @@ interface RollbackRoundDialogProps {
 }
 
 /** Score affiché d'une rencontre, ou son absence, en une chaîne relisible. */
-function scoreLabel(match: BracketMatch): string {
+function scoreLabel(text: TournamentDialogsText, match: BracketMatch): string {
   // Avant le test des scores : un double forfait n'en porte aucun, et « aucun
   // score saisi » cacherait qu'un résultat va être effacé.
-  if (isMatchDoubleForfeit(match)) return "double forfait";
-  if (match.team1Score === null && match.team2Score === null) return "aucun score saisi";
+  if (isMatchDoubleForfeit(match)) return text.t("rollback.doubleForfeit");
+  if (match.team1Score === null && match.team2Score === null) return text.t("rollback.noScore");
   const score = `${match.team1Score ?? "—"} – ${match.team2Score ?? "—"}`;
-  if (match.forfeitTeamId !== null) return `${score} (forfait)`;
-  if (isMatchDrawn(match)) return `${score} (nul)`;
+  if (match.forfeitTeamId !== null) return text.t("rollback.forfeit", { score });
+  if (isMatchDrawn(match)) return text.t("rollback.draw", { score });
   return score;
 }
 
@@ -78,7 +83,15 @@ export function RollbackRoundDialog({
   onClose,
   onRolledBack,
 }: Readonly<RollbackRoundDialogProps>) {
-  const { showError } = useFrenchBlockToast();
+  const { showError } = useToast();
+  const mapError = useMapError();
+  const text = useDialogsText();
+  const { t } = text;
+  // Libellés d'attente (« Gagnant match 1 du tableau perdants… ») : rédigés en
+  // français par le serveur, redits dans la langue de la page (lot 8a-2).
+  const pageText = useTournamentPageText();
+  const strong = (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>;
+  const strongInk = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -100,8 +113,10 @@ export function RollbackRoundDialog({
       if (!res.ok) throw new Error(payload.error || "ROLLBACK_FAILED");
       // Le stade annoncé est celui que le serveur dit avoir effacé : le nôtre
       // pouvait être périmé, et un message qui nomme la mauvaise manche serait
-      // pire qu'aucun message.
-      onRolledBack(payload.rolledBack?.label ?? stageLabel);
+      // pire qu'aucun message. Le serveur le rédige en français : sous `/en`,
+      // c'est le nôtre qui est annoncé — le serveur ayant refusé tout stade
+      // autre que `expectedStage`, il désigne la même manche.
+      onRolledBack(text.locale === "fr" ? payload.rolledBack?.label ?? stageLabel : stageLabel);
     } catch (e) {
       showError(mapError((e as Error).message));
       setBusy(false);
@@ -122,18 +137,14 @@ export function RollbackRoundDialog({
         id="rollback-round-title"
         style={{ margin: 0, fontSize: 18, color: "var(--red-live, #ff4d4d)" }}
       >
-        Effacer {stageLabel}
+        {t("rollback.title", { stage: stageLabel })}
       </h3>
 
       <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
-        <strong style={{ color: "var(--ink)" }}>{stageLabel}</strong> perd tout ce qui y a été
-        saisi : scores, vainqueurs, forfaits de match et reports en attente. Les rencontres
-        restent en place, avec les mêmes équipes, et redeviennent à jouer.
+        {richNodes(text.rich("rollback.erases", { stage: stageLabel }, { strong }))}
       </p>
       <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
-        C&apos;est ce qui rouvre la manche précédente à la correction. Le geste se répète : chaque
-        fois, le tournoi recule d&apos;une manche. Les abandons et les pénalités déjà déclarés,
-        eux, restent en vigueur.
+        {t("rollback.repeat")}
       </p>
 
       {tournamentFinished && (
@@ -150,9 +161,7 @@ export function RollbackRoundDialog({
             color: "var(--ink, #e7ecf3)",
           }}
         >
-          🏁 <strong>Ce tournoi est terminé : il va être rouvert.</strong> Son classement final
-          est effacé et il repasse « en cours ». Une nouvelle championne sera proclamée — et
-          réannoncée sur Discord — dès que cette manche aura été rejouée.
+          🏁 {richNodes(text.rich("rollback.reopen", {}, { strong: strongInk }))}
         </div>
       )}
 
@@ -169,9 +178,7 @@ export function RollbackRoundDialog({
           color: "var(--ink, #e7ecf3)",
         }}
       >
-        ⚠️ <strong>Note les scores ci-dessous avant de continuer.</strong> Rien n&apos;est
-        archivé : une fois la manche effacée, il faudra les ressaisir à la main pour revenir à
-        l&apos;état actuel.
+        ⚠️ {richNodes(text.rich("rollback.noteScores", {}, { strong: strongInk }))}
       </div>
 
       {/* Une manche à seize équipes déborde des 220 pixels : la zone passe par
@@ -181,7 +188,7 @@ export function RollbackRoundDialog({
           propres sémantiques à l'intérieur. */}
       <ScrollArea
         orientation="y"
-        ariaLabel="Scores qui vont être effacés"
+        ariaLabel={t("rollback.listAria")}
         style={{ maxHeight: 220, marginTop: 12 }}
       >
         <ul
@@ -208,14 +215,14 @@ export function RollbackRoundDialog({
               }}
             >
               <span style={{ color: "var(--ink-quiet, #9aa4b2)" }}>
-                {teamLabel(match.team1Name, match.team1Placeholder, "À venir")} vs{" "}
-                {teamLabel(match.team2Name, match.team2Placeholder, "À venir")}
+                {teamLabel(match.team1Name, localizedPlaceholder(pageText, match.team1Placeholder), t("rollback.tbd"))} vs{" "}
+                {teamLabel(match.team2Name, localizedPlaceholder(pageText, match.team2Placeholder), t("rollback.tbd"))}
               </span>
               <span
                 className="mono"
                 style={{ color: "var(--ink, #e7ecf3)", whiteSpace: "nowrap" }}
               >
-                {scoreLabel(match)}
+                {scoreLabel(text, match)}
               </span>
             </li>
           ))}
@@ -243,7 +250,7 @@ export function RollbackRoundDialog({
             style={{ marginTop: 2 }}
           />
           {/* NOSONAR S6772 — label en flex avec `gap` */}
-          J&apos;ai noté les scores ci-dessus.
+          {t("rollback.acknowledge")}
         </label>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -254,7 +261,7 @@ export function RollbackRoundDialog({
             disabled={busy}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
-            Annuler
+            {t("score.cancel")}
           </button>
           <button
             type="submit"
@@ -270,7 +277,7 @@ export function RollbackRoundDialog({
             {/* Neutre, et pas « cette manche » : le stade peut être un *tour*
                 d'arbre final, et le libellé se serait trompé de genre une fois
                 sur deux. Le titre du dialogue, lui, porte déjà le nom exact. */}
-            {busy ? "Effacement…" : "Effacer et reculer"}
+            {busy ? t("rollback.pending") : t("rollback.confirm")}
           </button>
         </div>
       </form>

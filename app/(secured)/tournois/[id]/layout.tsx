@@ -9,6 +9,8 @@ import { localeAlternates, localeHref, OPEN_GRAPH_LOCALE } from "@/lib/shared/lo
 import { localizedTournamentShareDescription } from "@/lib/shared/tournament-share-text";
 import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
 import { TournamentPageTextProvider } from "@/components/i18n/tournament-page-text";
+import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
+import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -102,10 +104,15 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
  */
 export default async function TournamentDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? tournamentPageMessages(messagesFor(locale)) : undefined;
+  const catalog = locale === "en" ? messagesFor(locale) : null;
+  const messages = catalog ? tournamentPageMessages(catalog) : undefined;
+  // Gestes (lot 8b) : refus, boutons, fenêtres d'action — anglais sous `/en` seulement.
+  const actions = catalog ? tournamentActionsMessages(catalog) : undefined;
   return (
     <TournamentPageTextProvider locale={locale} messages={messages}>
-      {children}
+      <TournamentActionsTextProvider locale={locale} messages={actions}>
+        {children}
+      </TournamentActionsTextProvider>
     </TournamentPageTextProvider>
   );
 }

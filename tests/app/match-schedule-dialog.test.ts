@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import frDialogs from "@/messages/fr/tournamentDialogs.json";
 
 /**
  * Saisie de l'heure dans `MatchScheduleDialog` (harnais `node` : invariants
@@ -41,7 +42,10 @@ describe("MatchScheduleDialog — heure", () => {
 
   it("n'explique plus la déduction de l'année, mais garde l'aperçu et sa correction", () => {
     expect(SOURCE).not.toMatch(/se déduit automatiquement/);
-    expect(SOURCE).toContain("Date retenue");
-    expect(SOURCE).toContain("Mauvaise année ?");
+    // Lot 8b : les phrases vivent dans `tournamentDialogs.schedule`.
+    expect(SOURCE).toContain('{t("schedule.preview")}');
+    expect(SOURCE).toContain('{t("schedule.wrongYear")}');
+    expect(frDialogs.schedule.preview).toBe("Date retenue :");
+    expect(frDialogs.schedule.wrongYear).toBe("Mauvaise année ?");
   });
 });

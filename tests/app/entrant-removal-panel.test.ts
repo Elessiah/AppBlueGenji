@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
+import { registrationActionsColumn } from "@/app/(secured)/tournois/[id]/_lib/registrations-list";
+import frActions from "@/messages/fr/tournamentActions.json";
 
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
@@ -101,13 +103,17 @@ describe("Bouton de retrait dans la liste des inscrites", () => {
   it("nomme l'engagé dans le libellé accessible du bouton", () => {
     // Trente boutons « Retirer » identiques ne se distinguent ni à la voix ni
     // au lecteur d'écran.
-    expect(panel).toMatch(/aria-label=\{`Retirer \$\{reg\.teamName\} du tournoi`\}/);
+    // Lot 8b : la phrase vit dans les messages, le nom y entre par argument.
+    expect(panel).toMatch(/aria-label=\{a\("registrations\.removeAria", \{ name: reg\.teamName \}\)\}/);
+    expect(frActions.registrations.removeAria).toBe("Retirer {name} du tournoi");
   });
 
   it("met la phrase du refus là où le bouton aurait été", () => {
     // Rien sur la ligne ne dirait pourquoi la commande a disparu.
     expect(panel).toMatch(/\{removalNoticeReason !== null && rows\.length > 0 && \(/);
-    expect(panel).toMatch(/entrantRemovalBlockMessage\(removalNoticeReason\)/);
+    // Le code du module pur, rédigé par la table des refus (même phrase que
+    // `entrantRemovalBlockMessage`, comparée dans « Registre des refus »).
+    expect(panel).toMatch(/mapError\(removalNoticeReason\)/);
   });
 
   it("ne répète pas le verrou du seeding quand les deux disent la même chose", () => {
@@ -119,7 +125,8 @@ describe("Bouton de retrait dans la liste des inscrites", () => {
   });
 
   it("annonce le retrait à l'oreille, comme le réordonnancement", () => {
-    expect(panel).toMatch(/setAnnouncement\(`\$\{removing\.teamName\} ne figure plus/);
+    expect(panel).toMatch(/setAnnouncement\(a\("registrations\.removed", \{ name: removing\.teamName \}\)\)/);
+    expect(frActions.registrations.removed).toBe("{name} ne figure plus parmi les engagés.");
   });
 });
 
@@ -149,7 +156,13 @@ describe("Cellule d'actions partagée", () => {
   });
 
   it("nomme la colonne d'après ce qu'elle contient", () => {
-    expect(panel).toMatch(/const actionsLabel = actionsColumn\.label;/);
+    // L'intitulé du module pur choisit sa clé (lot 8b) ; le français reste le sien.
+    expect(panel).toMatch(/const actionsLabel = a\(COLUMN_KEYS\[actionsColumn\.label\]\);/);
+    const labels = { Actions: frActions.registrations.column.actions, Ordre: frActions.registrations.column.order, Retrait: frActions.registrations.column.removal };
+    for (const [reorderable, removable] of [[true, true], [true, false], [false, true]] as const) {
+      const { label } = registrationActionsColumn(reorderable, removable);
+      expect(labels[label]).toBe(label);
+    }
   });
 
   it("distingue le bouton de retrait des flèches", () => {
@@ -183,7 +196,8 @@ describe("Dialogue de confirmation", () => {
   });
 
   it("nomme l'engagé et traduit le refus", () => {
-    expect(dialog).toMatch(/Retirer \{entrantName\} du tournoi/);
+    expect(dialog).toMatch(/t\("removeEntrant\.title", \{ name: entrantName \}\)/);
+    expect(frActions.removeEntrant.title).toBe("Retirer {name} du tournoi");
     expect(dialog).toMatch(/mapError\(\(e as Error\)\.message\)/);
   });
 
@@ -196,8 +210,10 @@ describe("Dialogue de confirmation", () => {
       /const \[registrationOpen\] = useState\(\(\) => computeTournamentState\(card\) === "REGISTRATION"\);/,
     );
     expect(dialog).toMatch(/\{registrationOpen \? \(/);
-    expect(dialog).toMatch(/Les inscriptions sont ouvertes/);
-    expect(dialog).toMatch(/Les inscriptions sont closes/);
+    expect(dialog).toMatch(/t\("removeEntrant\.registrationOpen"\)/);
+    expect(dialog).toMatch(/t\("removeEntrant\.registrationClosed"\)/);
+    expect(frActions.removeEntrant.registrationOpen).toMatch(/^Les inscriptions sont ouvertes/);
+    expect(frActions.removeEntrant.registrationClosed).toMatch(/^Les inscriptions sont closes/);
     // L'ambre est la seule chose qui distingue l'avertissement du paragraphe
     // voisin : il ne dit rien à qui ne le voit pas.
     expect(dialog).toMatch(/role="note"/);

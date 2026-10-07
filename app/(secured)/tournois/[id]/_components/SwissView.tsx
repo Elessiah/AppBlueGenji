@@ -18,7 +18,8 @@ import {
 import styles from "./RankingViews.module.css";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
-import { frenchBlockLang, type TournamentPageText } from "@/lib/shared/tournament-page-text";
+import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
+import { useActionsText } from "../_lib/actions-text";
 
 interface SwissViewProps {
   swiss: SwissMeta;
@@ -68,8 +69,8 @@ export function SwissView({
 }: Readonly<SwissViewProps>) {
   const text = useTournamentViewText(FR_VIEWS_TEXT);
   const { t } = text;
-  // L'abandon est un geste du lot 8b : resté français sous `/en`.
-  const actionLang = frenchBlockLang(text);
+  // Textes de l'abandon (espace `tournamentActions`).
+  const { t: a } = useActionsText();
   const emptyText = emptyLabel ?? t("page.noMatchesShort");
   // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
   const podiumTiers = usePodiumTiers();
@@ -296,7 +297,7 @@ export function SwissView({
                           {meta.label}
                         </span>
                         {anyForfeitable && (
-                          <span role="cell" className={styles.swissAction} lang={actionLang}>
+                          <span role="cell" className={styles.swissAction}>
                             {forfeitable && (
                               <button
                                 type="button"
@@ -304,17 +305,17 @@ export function SwissView({
                                 className="btn tap-target"
                                 title={
                                   isMine
-                                    ? "Abandonner : votre équipe quitte définitivement le tournoi"
-                                    : `Déclarer l'abandon de ${team.teamName}`
+                                    ? a("forfeit.button.selfTitle")
+                                    : a("forfeit.button.otherTitle", { name: team.teamName })
                                 }
                                 aria-label={
                                   isMine
-                                    ? "Abandonner avec mon équipe"
-                                    : `Abandonner : déclarer l'abandon de ${team.teamName}`
+                                    ? a("forfeit.button.selfAria")
+                                    : a("forfeit.button.otherAriaSwiss", { name: team.teamName })
                                 }
                                 style={FORFEIT_BUTTON_STYLE}
                               >
-                                Abandonner
+                                {a("forfeit.button.label")}
                               </button>
                             )}
                           </span>

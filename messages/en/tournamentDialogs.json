@@ -1,0 +1,336 @@
+{
+  "score": {
+    "team": "Team {side}",
+    "opponents": "Round {round} · {team1} vs {team2}",
+    "close": "Close",
+    "cancel": "Cancel",
+    "violation": {
+      "draw": "No draws: this tournament requires a winner.",
+      "invalid": "Invalid score.",
+      "exceeds": "Impossible score in {label}: {max} maps at most, and never more than {wins} per team.",
+      "below": "Incomplete score in {label}: the winner must reach {wins, plural, one {# map} other {# maps}}."
+    },
+    "blocker": {
+      "incomplete": "Fill in both scores.",
+      "draw": "The scores can't be equal: there must be a winner.",
+      "doubleForfeit": "A double forfeit decides the match: it's entered with “Confirm the result”.",
+      "notInLaunch": "The score can be entered once the match is launched. Before that, only a forfeit can be ruled.",
+      "alreadyDecided": "This match is already decided. Correct it with “Confirm the result” so the winner and the rest of the board follow."
+    },
+    "stepper": {
+      "decrement": "Remove a map from {name}",
+      "field": "Maps won by {name}",
+      "increment": "Add a map to {name}"
+    },
+    "maps": {
+      "replayHintOverwatch": "Overwatch replay code: 6 characters (letters and digits).",
+      "replayHintOther": "Game code or ID: 4 to 32 characters (letters, digits, hyphens).",
+      "replayAllowance": "A drawn map can be replayed ({count} at most).",
+      "added": "Map {index} added: fill it in.",
+      "legend": "Maps played",
+      "drawHint": "A drawn map gives a point to no one.",
+      "map": "Map {index}",
+      "mapPrefix": "Map {index}, ",
+      "replayCode": "Replay code",
+      "scoreOf": "Map {index}, score of ",
+      "remove": "Remove map {index}",
+      "add": "Add a map",
+      "summary": "Match score",
+      "violation": {
+        "empty": "Add at least one played map.",
+        "tooMany": "Too many maps: {max} at most for this match.",
+        "codeRequired": "Replay code missing for this map.",
+        "codeInvalid": "Invalid replay code. {hint}",
+        "codeDuplicate": "This replay code is already on another map.",
+        "scoreInvalid": "Map score missing or invalid: a whole number between 0 and {max} (0 – 0 for a drawn map).",
+        "afterDecision": "This map comes after the end of the match: the result was already settled.",
+        "incomplete": "Unfinished match: without a winner, all {max} maps are played (a drawn map counts as one).",
+        "incompleteFree": "Unfinished match.",
+        "tooManyWon": "Too many maps won for the match format.",
+        "below": "Incomplete score: the winner must win {wins, plural, one {# map} other {# maps}}.",
+        "belowFree": "Incomplete score."
+      }
+    },
+    "admin": {
+      "title": "Match score",
+      "saved": "Score saved: the match is still in progress.",
+      "resolved": "Result confirmed: the board is up to date.",
+      "awaitingDetail": "Loading the proposed map details… Refresh the page if they don't arrive.",
+      "proposal": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Check it, then confirm the result to approve it.",
+      "proposalDirty": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Your entry replaces it.",
+      "stored": {
+        "doubleForfeit": "Double forfeit recorded: {team1} and {team2} both lose.",
+        "forfeit": "Forfeit recorded: {forfeiting}, {beneficiary} wins.",
+        "draw": "Decided: {score}, draw.",
+        "undecided": "Saved: {score}, not decided.",
+        "decided": "Decided: {score}, {winner} wins."
+      },
+      "closedToPlan": "Match to schedule: set its date before entering the score. A forfeit can be ruled right now.",
+      "closedWaiting": "Match waiting to start: the score can be entered once it's launched. A forfeit can be ruled right now.",
+      "proposalOf": "{name}'s proposal",
+      "proposalTitle": "{name}'s proposal: {score1} – {score2}",
+      "proposalMaps": "Maps proposed by {name}",
+      "conflict": "This match changed while you were entering it — someone else saved a result. Sending now would overwrite theirs.",
+      "adoptStored": "Use the latest value",
+      "derivedHint": "Score calculated from the maps below: remove every map to enter it by hand.",
+      "forfeit": {
+        "open": "Declare a forfeit on this round",
+        "cancel": "Cancel the forfeit",
+        "double": "{team1} and {team2} both forfeit: the match is lost for both, no one advances, and in a bracket their next opponent gets a bye.",
+        "single": "{out} forfeits this round: {through} wins {maps}-0, with no map played.",
+        "question": "Who forfeits this round? Their opponent wins {maps}-0, and any entered scores are ignored.",
+        "questionClosed": "Who forfeits this round? Their opponent wins {maps}-0.",
+        "both": "Both (double forfeit)"
+      },
+      "save": "Save",
+      "saveTitle": "Records progress without naming a winner.",
+      "resolve": "Confirm the result",
+      "resolveTitle": "Names the winner and updates the board.",
+      "correction": {
+        "title": "Correct a result that's already confirmed?",
+        "confirm": "Correct the result",
+        "pending": "Correcting…",
+        "replaced": "This published result will be replaced by the new entry.",
+        "consequences": "If the outcome changes, whatever followed from it is undone: a next match with no score yet may change opponent (keeping its time), the standings are recalculated, and an already finished tournament goes back to in progress."
+      }
+    },
+    "player": {
+      "title": "My match score",
+      "conflictMaps": "Same score ({score}), but the map details differ from {opponent}'s: replay codes or map scores. The referee has been alerted; you can still correct your proposal.",
+      "conflictScores": "The scores contradict each other — you: {mine}, {opponent}: {theirs}. The referee has been alerted; you can still correct your proposal.",
+      "closed": {
+        "toPlan": "This match is waiting for the referee to set its date: the score can be entered once the match is launched.",
+        "scheduledAt": "This match starts on {date}: the score can be entered once it's launched, when the parties have declared themselves ready.",
+        "scheduled": "This match hasn't started yet: the score can be entered once it's launched, when the parties have declared themselves ready.",
+        "lobby": "The score can be entered once the match is launched: every party must have declared itself ready."
+      },
+      "theirs": {
+        "readOnly": "{opponent} proposes {score}. Waiting for confirmation from someone in charge of {mine}.",
+        "withMaps": "{opponent} proposes {score}. Confirm it, or enter the score you saw: a disagreement alerts the referee.",
+        "loading": "{opponent} proposes {score}. Loading their map details… Refresh the page if they don't arrive.",
+        "withoutMaps": "{opponent} proposes {score}, without the map details. To confirm it, enter the maps played and their replay codes: a disagreement alerts the referee."
+      },
+      "confirmed": "Score confirmed: {team1} {score1} – {score2} {team2}",
+      "submitted": "Score sent: {team1} {score1} – {score2} {team2}",
+      "forfeitRecorded": "Forfeit recorded: {opponent} wins the match.",
+      "minePending": "You proposed {score}. Waiting for {opponent} to confirm.",
+      "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed at {deadline}.",
+      "willConfirm": "{opponent} will have to confirm the score you send.",
+      "confirm": "Confirm the score",
+      "send": "Send the score",
+      "alreadySent": "Score already sent: waiting for {opponent}.",
+      "forfeit": {
+        "open": "Declare a forfeit on this match",
+        "close": "Don't declare a forfeit",
+        "hint": "{mine} forfeits this match: {opponent} wins {maps}-0, with no map played. The result is immediate — only the referee can reverse it.",
+        "confirm": "Confirm {name}'s forfeit",
+        "notAllowed": "A forfeit is declared by the team's owner or a manager."
+      }
+    }
+  },
+  "schedule": {
+    "missing": {
+      "day": "the day",
+      "month": "the month",
+      "time": "the time"
+    },
+    "refusal": {
+      "incomplete": "Incomplete date: pick the day and the month, or clear both to announce no time.",
+      "invalid": "This day doesn't exist in this month.",
+      "unknown": "Date not recognized."
+    },
+    "pending": "Still to fill in: {field}.",
+    "pendingInvalid": "No possible date: this day doesn't exist in this month.",
+    "hintPlanning": "The match stays “Waiting to start” until that time, then moves into launch: both teams declare themselves ready.",
+    "hint": "No day and no month = no time announced. At the set time, the match moves into launch: both teams declare themselves ready.",
+    "cleared": "Start date cleared.",
+    "planned": "Match scheduled.",
+    "saved": "Start date saved.",
+    "saving": "Saving…",
+    "plan": "Schedule",
+    "save": "Save",
+    "titlePlanning": "Schedule the match",
+    "title": "Match start date",
+    "legend": "Scheduled start (Paris time)",
+    "day": "Day",
+    "month": "Month",
+    "time": "Time",
+    "preview": "Date set:",
+    "localTime": "({time} in your local time)",
+    "none": "No time announced.",
+    "wrongYear": "Wrong year?",
+    "fixYear": "Fix the year",
+    "previousYear": "Previous year",
+    "nextYear": "Next year",
+    "warnLive": "This match goes on air at its start date: without a date, it will stay “scheduled” and never start.",
+    "warnPlanning": "Without a date, this match goes back to “To schedule”: it won't launch until a new time is set.",
+    "clear": "Clear the date"
+  },
+  "ghost": {
+    "full": "This tournament is full: there are no slots left to take.",
+    "slotsLeft": "Only {count, plural, one {# slot is} other {# slots are}} left in this tournament.",
+    "batchMax": "{max} entrants at most per registration: start again for the rest.",
+    "counterSlots": "{selected} / {capacity, plural, one {# slot} other {# slots}}",
+    "counterBatch": "{selected} / {capacity} per batch",
+    "loading": "Loading…",
+    "loadFailed": "List unavailable. Close and reopen the window to try again.",
+    "noResult": "No results for this search.",
+    "submit": "Register",
+    "submitCount": "Register ({count})",
+    "pending": "Registering…",
+    "existing": "Existing",
+    "new": "New",
+    "searchPlaceholder": "Search…",
+    "searchAria": "Filter the list by name",
+    "selectAll": "Select all",
+    "selectNone": "Deselect all",
+    "TEAM": {
+      "title": "Register a ghost team",
+      "hint": "Only for ghost teams: a team of players always registers itself.",
+      "selectMany": "Ghost teams to register",
+      "noneAvailable": "No ghost team to register: they're all entered, or none exist yet.",
+      "newName": "New team's name",
+      "success": "{count, plural, one {Ghost team registered.} other {# ghost teams registered.}}"
+    },
+    "SOLO": {
+      "title": "Register a guest player",
+      "hint": "Only for players without an account on the site: a registered player always enters themselves.",
+      "selectMany": "Guest players to register",
+      "noneAvailable": "No guest player to register: they're all entered, or none exist yet.",
+      "newName": "Guest player's username",
+      "success": "{count, plural, one {Guest player registered.} other {# guest players registered.}}"
+    }
+  },
+  "rollback": {
+    "doubleForfeit": "double forfeit",
+    "noScore": "no score entered",
+    "forfeit": "{score} (forfeit)",
+    "draw": "{score} (draw)",
+    "title": "Erase {stage}",
+    "erases": "Everything entered in <strong>{stage}</strong> is lost: scores, winners, match forfeits and pending reports. The matches stay in place, with the same teams, and go back to being unplayed.",
+    "repeat": "This is what reopens the previous round for correction. You can repeat it: each time, the tournament goes back one round. Withdrawals and penalties already declared stay in effect.",
+    "reopen": "<strong>This tournament is finished: it will be reopened.</strong> Its final standings are erased and it goes back to “in progress”. A new champion will be crowned — and announced again on Discord — once this round has been replayed.",
+    "noteScores": "<strong>Note the scores below before continuing.</strong> Nothing is archived: once the round is erased, you'll have to re-enter them by hand to get back to the current state.",
+    "listAria": "Scores about to be erased",
+    "tbd": "TBD",
+    "acknowledge": "I've noted the scores above.",
+    "pending": "Erasing…",
+    "confirm": "Erase and go back"
+  },
+  "live": {
+    "saved": "Match stream saved.",
+    "removed": "Match removed from the stream.",
+    "title": "Match stream",
+    "streamed": "This match is being cast",
+    "trigger": "Going on air",
+    "triggers": {
+      "AUTO": "Automatically when the match starts",
+      "START_TIME": "At the match's start date",
+      "MANUAL": "Manual (on-air button)"
+    },
+    "noStartAt": "No start date is set for this match: going on air at the set time needs a time first.",
+    "autoStop": "The live stops on its own as soon as a score is entered.",
+    "url": "Match channel (optional)",
+    "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
+    "urlHint": "Leave empty to flag the match without a link. Accepted platforms: {platforms}."
+  },
+  "replay": {
+    "removed": "Replay removed.",
+    "saved": "Replay saved.",
+    "title": "Match replay",
+    "notReplayable": "This match isn't (or is no longer) finished: its replay isn't shown. You can only remove the link.",
+    "url": "YouTube link",
+    "invalid": "Link not recognized: it must be a YouTube video link (youtube.com/watch?v=…, youtu.be/… or youtube.com/live/…).",
+    "hint": "A “Replay available” banner will show under the match, visible to everyone.",
+    "remove": "Remove the replay"
+  },
+  "advance": {
+    "targets": {
+      "REGISTRATION": {
+        "title": "Open registration now",
+        "confirm": "Open registration",
+        "busy": "Opening…"
+      },
+      "LOCKED": {
+        "title": "Close registration now",
+        "confirm": "Close registration",
+        "busy": "Closing…"
+      },
+      "RUNNING": {
+        "title": "Start the tournament now",
+        "confirm": "Start now",
+        "busy": "Starting…"
+      }
+    },
+    "closeEmpty": "Close the tournament",
+    "summary": {
+      "REGISTRATION": "Registration opens right now, instead of <strong>{date}</strong>. Its closing and the kickoff stay at the announced dates.",
+      "LOCKED": "Registration closes right now, instead of <strong>{date}</strong>: no one will be able to join the tournament anymore. Kickoff stays set for <strong>{start}</strong>.",
+      "RUNNING": "Kickoff is brought forward to right now, instead of <strong>{date}</strong>. The draw is made from the current entrants: no one will be able to join the tournament anymore."
+    },
+    "stage": "Step",
+    "atStart": {
+      "TEAM": "{count, plural, one {Team at the start} other {Teams at the start}}",
+      "SOLO": "{count, plural, one {Player at the start} other {Players at the start}}"
+    },
+    "finalCount": "Final headcount",
+    "publishes": "This tournament wasn't published yet: opening its registration makes it visible to everyone.",
+    "empty": "Fewer than two entrants: the tournament won't play any match and will close right away.",
+    "emptyOne": "Fewer than two entrants: the tournament won't play any match and will close right away, with the only entrant declared first."
+  },
+  "penalty": {
+    "hint": "Reason required, visible to everyone. Remaining pool: {remaining}.",
+    "eliminates": "Pool down to 0: {name} will be eliminated from the tournament.",
+    "applied": "Penalty of {points, plural, one {# point} other {# points}} applied to {name}.",
+    "title": "Endurance penalty",
+    "points": "{count, plural, one {# point} other {# points}}",
+    "round": "round {round}",
+    "beforeFirstRound": "before the first round",
+    "pointsLabel": "Points taken",
+    "reasonLabel": "Reason",
+    "reasonPlaceholder": "Late for kickoff, ineligible player fielded…",
+    "apply": "Apply the penalty"
+  },
+  "delete": {
+    "title": "Permanently delete this tournament",
+    "body": "This can't be undone. The tournament <strong>{name}</strong> will disappear from the site with all its matches, registrations and standings — including from its participants' records and stats.",
+    "kept": "No team or player is deleted: only this tournament's results are.",
+    "label": "Type the tournament's name to confirm",
+    "armed": "Name confirmed.",
+    "blocked": "Deletion stays blocked until the name matches.",
+    "pending": "Deleting…",
+    "confirm": "Delete permanently"
+  },
+  "issue": {
+    "sentReferees": "Report sent to {count, plural, one {# referee} other {# referees}}.",
+    "sentStaff": "Report sent to the staff.",
+    "title": "Report a problem",
+    "match": "Match: {team1} vs {team2}",
+    "wholeTournament": "Scope: whole tournament",
+    "label": "What's going on?",
+    "placeholder": "Opponent missing, disputed score, server problem…",
+    "tooShort": "Describe the problem in at least {min} characters.",
+    "counter": "{length}/{max} — sent to the referees on Discord.",
+    "pending": "Sending…",
+    "send": "Send to the staff"
+  },
+  "image": {
+    "title": "Tournament image",
+    "intro": "Optional. It dresses up the tournament page, the list cards and the home page — a tournament without an image keeps its usual look.",
+    "conflict": "The image was changed elsewhere while you were adjusting it. “Save” will replace that change with yours; “Cancel” keeps it."
+  },
+  "contacts": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "empty": "No entrants yet.",
+    "unreachable": "No verified contact",
+    "noPlayer": "No linked player: entrant invited by the staff.",
+    "notVerified": "Not verified",
+    "badgeAlt": "Verified Discord tag",
+    "badgeTitle": "Verified Discord tag: this player has proven they own this Discord account.",
+    "title": "Discord contacts",
+    "intro": "Referees only. Only <strong>verified</strong> tags appear: a player who hasn't proven theirs can't be reached through the site.",
+    "hide": "Hide the contacts",
+    "show": "Show the contacts"
+  }
+}

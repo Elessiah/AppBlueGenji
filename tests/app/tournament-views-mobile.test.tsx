@@ -81,7 +81,7 @@ describe("Classements — action sous le nom sous 720 px", () => {
 
   it("le bouton d'abandon de la survie vit dans sa cellule d'action", () => {
     expect(survival).toContain("className={styles.survivalRow}");
-    expect(survival).toMatch(/<span className=\{styles\.survivalAction\} lang=\{actionLang\}>\s*<button/);
+    expect(survival).toMatch(/<span className=\{styles\.survivalAction\}>\s*<button/);
   });
 });
 

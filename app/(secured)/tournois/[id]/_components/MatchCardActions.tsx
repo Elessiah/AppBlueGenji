@@ -18,11 +18,9 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
-  CAST_IDENTITY_NOTICE,
-  launchErrorMessage,
   MATCH_LAUNCH_OPEN_EVENT,
   MATCH_LAUNCH_REFRESH_EVENT,
   type MatchLaunchPhase,
@@ -31,7 +29,8 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { focusLeftMenu, handleMenuEscape } from "@/components/cyber/landing/PublicNavMenu";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useLiveControls } from "../_lib/live-context";
-import { mapError } from "../_lib/error-map";
+import { useErrorsText, useMapError } from "../_lib/error-map";
+import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import {
   groupMatchCardActions,
   matchCardActionName,
@@ -169,10 +168,7 @@ export function MatchCardActions({
   onPlayerScore,
   onAdminScore,
   onReport,
-  lang,
 }: Readonly<{
-  /** `fr` sous une page anglaise : gestes du lot 8b, restés français. */
-  lang?: "fr";
   match: BracketMatch;
   phase: MatchLaunchPhase;
   actions: readonly MatchCardAction[];
@@ -186,7 +182,14 @@ export function MatchCardActions({
   onReport: () => void;
 }>) {
   const { openSchedule, openConfig, openReplay, castBlock } = useLiveControls();
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
+  const errorsText = useErrorsText();
+  const actionText = useActionsText();
+  const { t } = actionText;
+  const launchError = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
+  const castIdentityNotice = launchError("CASTER_IDENTITY_REQUIRED");
+  const actionName = (label: string) => matchCardActionName(label, matchLabel, actionText);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
@@ -323,7 +326,7 @@ export function MatchCardActions({
       if (refresh) window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return true;
     } catch (error) {
-      showError(refresh ? launchErrorMessage((error as Error).message) : mapError((error as Error).message));
+      showError(refresh ? launchError((error as Error).message) : mapError((error as Error).message));
       return false;
     } finally {
       setBusy(false);
@@ -340,25 +343,25 @@ export function MatchCardActions({
     force: () => setConfirmForce(true),
     hostSwap: () => {
       const next = match.hostTeamId === match.team1Id ? match.team2Id : match.team1Id;
-      void run(() => send(`/api/admin/matches/${match.id}/host`, "PUT", { teamId: next }), "Équipe hôte modifiée.");
+      void run(() => send(`/api/admin/matches/${match.id}/host`, "PUT", { teamId: next }), t("cardActions.hostChanged"));
     },
     claimCast: () => {
       if (castBlock) {
-        showError(castBlock === "CASTER_IDENTITY_REQUIRED" ? CAST_IDENTITY_NOTICE : launchErrorMessage(castBlock));
+        showError(launchError(castBlock));
         return;
       }
-      void run(() => send(`/api/matches/${match.id}/caster`, "POST"), "Tu castes ce match.");
+      void run(() => send(`/api/matches/${match.id}/caster`, "POST"), t("cardActions.casting"));
     },
     releaseCast: () => {
       void run(
         () => send(`/api/matches/${match.id}/caster`, "DELETE"),
-        isCaster ? "Tu ne castes plus ce match." : "Caster retiré.",
+        isCaster ? t("cardActions.notCasting") : t("cardActions.casterRemoved"),
       );
     },
     onAir: () => {
       void run(
         () => send(`/api/admin/matches/${match.id}/live`, "POST", { onAir: !onAir }),
-        onAir ? "Antenne fermée." : "Antenne ouverte.",
+        onAir ? t("cardActions.airClosed") : t("cardActions.airOpened"),
         false,
       );
     },
@@ -387,8 +390,8 @@ export function MatchCardActions({
           .join(" ")}
         disabled={busy && writes(action.id)}
         aria-disabled={action.id === "claimCast" ? blocked : undefined}
-        title={blocked && castBlock === "CASTER_IDENTITY_REQUIRED" ? CAST_IDENTITY_NOTICE : undefined}
-        aria-label={matchCardActionName(action.label, matchLabel)}
+        title={blocked && castBlock === "CASTER_IDENTITY_REQUIRED" ? castIdentityNotice : undefined}
+        aria-label={actionName(action.label)}
         data-action={action.id}
         onKeyDown={inMenu ? onPanelKeyDown : undefined}
         onClick={() => {
@@ -417,7 +420,7 @@ export function MatchCardActions({
     });
 
   return (
-    <div ref={rootRef} className={styles.root} onBlur={onMenuBlur} lang={lang}>
+    <div ref={rootRef} className={styles.root} onBlur={onMenuBlur}>
       <div className={styles.bar}>
         {primary && renderButton(primary, false)}
         {more.length > 0 && (
@@ -427,14 +430,14 @@ export function MatchCardActions({
             className={`tap-target ${styles.toggle} ${primary ? "" : styles.toggleWide}`}
             aria-expanded={expanded}
             aria-controls={expanded ? panelId : undefined}
-            aria-label={matchCardActionName("Plus d'actions", matchLabel)}
-            title={primary ? "Plus d'actions" : undefined}
+            aria-label={actionName(t("cardActions.more"))}
+            title={primary ? t("cardActions.more") : undefined}
             onClick={() => setOpen(!expanded)}
           >
             <Ellipsis size={18} aria-hidden />
             {/* Seul, le bouton dit son nom ; à côté de l'action principale, le
                 texte reste pour les lecteurs d'écran (il ouvre le nom accessible). */}
-            <span className={primary ? "sr-only" : styles.label}>Plus d&apos;actions</span>
+            <span className={primary ? "sr-only" : styles.label}>{t("cardActions.more")}</span>
           </button>
         )}
       </div>
@@ -447,8 +450,6 @@ export function MatchCardActions({
             id={panelId}
             ref={panelRef}
             className={styles.panel}
-            // Hors de la racine une fois porté : il redit sa langue.
-            lang={lang}
             data-placement={placement?.up ? "top" : "bottom"}
             // Coordonnées calculées à l'ouverture (`panelPlacement`) : seule
             // valeur qu'une feuille de style ne peut pas connaître.
@@ -460,7 +461,7 @@ export function MatchCardActions({
             <ScrollArea
               orientation="y"
               className={styles.list}
-              ariaLabel={matchCardActionName("Plus d'actions", matchLabel)}
+              ariaLabel={actionName(t("cardActions.more"))}
               style={placement ? { maxHeight: placement.maxHeight } : undefined}
             >
               {more.map((action) => renderButton(action, true))}
@@ -472,22 +473,15 @@ export function MatchCardActions({
           par un autre arbitre). */}
       {confirmForce && hasForce && (
         <ConfirmActionDialog
-          contentLang={lang}
-          title={`Forcer le lancement de ${matchLabel} ?`}
-          confirmLabel="Lancer le match"
-          pendingLabel="Lancement…"
+          title={t("cardActions.forceConfirm.title", { match: matchLabel })}
+          confirmLabel={t("cardActions.forceConfirm.confirm")}
+          pendingLabel={t("cardActions.forceConfirm.pending")}
           onClose={() => setConfirmForce(false)}
-          onConfirm={() => run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), "Match lancé.")}
+          onConfirm={() => run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), t("cardActions.forceConfirm.success"))}
         >
-          <p>
-            Le match démarre sans attendre les « Prêt » manquants : les engagés peuvent
-            reporter leur score dès maintenant.
-          </p>
+          <p>{t("cardActions.forceConfirm.body")}</p>
           {phase === "TO_PLAN" && (
-            <p>
-              Ce match n&apos;est pas encore planifié : il démarre maintenant, sans heure
-              annoncée aux engagés.
-            </p>
+            <p>{t("cardActions.forceConfirm.unplanned")}</p>
           )}
         </ConfirmActionDialog>
       )}

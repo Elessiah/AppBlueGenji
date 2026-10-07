@@ -1,10 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { FormEvent, useState, type ReactNode } from "react";
+import { richNodes } from "@/components/i18n/shell-text";
+import { useToast } from "@/components/ui/toast";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentCard } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useActionsText } from "../_lib/actions-text";
 import { TournamentDialogShell } from "./TournamentDialogShell";
 
 interface RemoveEntrantDialogProps {
@@ -50,7 +52,10 @@ export function RemoveEntrantDialog({
   onClose,
   onRemoved,
 }: Readonly<RemoveEntrantDialogProps>) {
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
+  const text = useActionsText();
+  const { t } = text;
   const [busy, setBusy] = useState(false);
 
   // Figé à l'ouverture, comme la liste des étapes de `LaunchTournamentDialog` :
@@ -71,7 +76,7 @@ export function RemoveEntrantDialog({
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "ENTRANT_REMOVAL_FAILED");
       // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
-      showSuccess(`${entrantName} ne figure plus parmi les engagés.`);
+      showSuccess(t("registrations.removed", { name: entrantName }));
       onRemoved();
     } catch (e) {
       showError(mapError((e as Error).message));
@@ -84,27 +89,28 @@ export function RemoveEntrantDialog({
       titleId="remove-entrant-title"
       summaryId="remove-entrant-summary"
       maxWidth={440}
-      title={<>Retirer {entrantName} du tournoi</>}
+      title={t("removeEntrant.title", { name: entrantName })}
       busy={busy}
       onClose={onClose}
       onSubmit={submit}
-      submitLabel={busy ? "Retrait…" : "Retirer"}
+      submitLabel={busy ? t("removeEntrant.pending") : t("registrations.remove")}
     >
       <p
         id="remove-entrant-summary"
         style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}
       >
-        L&apos;inscription est <strong style={{ color: "var(--ink)" }}>effacée</strong> : rien
-        n&apos;indiquera que cet engagé a pris part au tournoi, à la différence d&apos;un abandon.
-        La place est rendue au plateau.
+        {richNodes(
+          text.rich("removeEntrant.erased", {}, {
+            strong: (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>,
+          }),
+        )}
       </p>
 
       {registrationOpen ? (
         <p
           style={{ marginTop: 12, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}
         >
-          Les inscriptions sont ouvertes : la place libérée peut être reprise, et cet engagé
-          réinscrit.
+          {t("removeEntrant.registrationOpen")}
         </p>
       ) : (
         <p
@@ -119,8 +125,7 @@ export function RemoveEntrantDialog({
             color: "var(--amber)",
           }}
         >
-          Les inscriptions sont closes : plus personne ne peut prendre cette place, et cet engagé
-          ne pourra pas être réinscrit sans rouvrir les inscriptions.
+          {t("removeEntrant.registrationClosed")}
         </p>
       )}
     </TournamentDialogShell>

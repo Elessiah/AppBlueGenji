@@ -1,5 +1,7 @@
 import type { TournamentDetail } from "@/lib/shared/types";
-import { mapError } from "./error-map";
+import type { TournamentActionsText, TournamentErrorsText } from "@/lib/shared/tournament-actions-text";
+import { FR_ERRORS_TEXT, mapError } from "./error-map";
+import { FR_ACTIONS_TEXT } from "./actions-text";
 
 /**
  * Pourquoi le bouton d'inscription n'est-il pas là ?
@@ -21,7 +23,11 @@ import { mapError } from "./error-map";
  * Rend `null` quand il n'y a rien à expliquer. Le serveur reste le juge : ces
  * phrases doublent ses refus, elles ne les remplacent pas.
  */
-export function registerBlockedNotice(detail: TournamentDetail): string | null {
+export function registerBlockedNotice(
+  detail: TournamentDetail,
+  errors: TournamentErrorsText = FR_ERRORS_TEXT,
+  text: TournamentActionsText = FR_ACTIONS_TEXT,
+): string | null {
   if (detail.card.state !== "REGISTRATION") return null;
   if (detail.canRegister) return null;
 
@@ -36,7 +42,7 @@ export function registerBlockedNotice(detail: TournamentDetail): string | null {
   // affichée deux lignes plus haut, dans la case « Conditions d'inscription » du
   // même en-tête (`headerMetaItems`). La répéter ici ferait lire deux fois la
   // même chose à qui n'en cherche qu'une.
-  if (detail.registrationBlock) return mapError(detail.registrationBlock);
+  if (detail.registrationBlock) return mapError(detail.registrationBlock, errors);
 
   if (detail.canRegisterEntrant) return null;
   // Sans équipe active, le refus n'est pas celui-ci.
@@ -44,5 +50,5 @@ export function registerBlockedNotice(detail: TournamentDetail): string | null {
   // Déjà engagée : la question de qui l'inscrit ne se pose plus.
   if (detail.registrations.some((row) => row.teamId === detail.myTeamId)) return null;
 
-  return "Seuls le propriétaire et les managers de ton équipe peuvent l'inscrire à un tournoi.";
+  return text.t("register.notManager");
 }

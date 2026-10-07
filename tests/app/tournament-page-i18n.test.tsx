@@ -45,6 +45,8 @@ import { registrationConditionsText } from "@/app/(secured)/tournois/[id]/_lib/h
 import { phaseFormatLabel, phaseStateLabel } from "@/app/(secured)/tournois/[id]/_lib/phases";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { TournamentPageTextProvider } from "@/components/i18n/tournament-page-text";
+import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
+import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 import { ToastProvider } from "@/components/ui/toast";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
@@ -143,7 +145,9 @@ function inLocale(locale: "fr" | "en", ui: ReactElement, participantType: "TEAM"
     <AppLocaleProvider locale="en">
       <TournamentsTextProvider locale="en" messages={tournamentsClientMessages(messagesFor("en"))}>
         <TournamentPageTextProvider locale="en" messages={tournamentPageMessages(messagesFor("en"))}>
-          {tree}
+          <TournamentActionsTextProvider locale="en" messages={tournamentActionsMessages(messagesFor("en"))}>
+            {tree}
+          </TournamentActionsTextProvider>
         </TournamentPageTextProvider>
       </TournamentsTextProvider>
     </AppLocaleProvider>,
@@ -358,8 +362,9 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
     expect(header).toContain("Up to date");
     expect(header).toContain("In progress");
     expect(header).toContain('href="/en/tournois"');
-    // Les outils du staff restent français, annoncés comme tels.
-    expect(header).toMatch(/lang="fr"[^>]*>[^<]*Avancer le tournoi|lang="fr"/);
+    // Gestes et outils du staff de l'en-tête : anglais depuis le lot 8b
+    // (rendu à l'étape des inscriptions : tests/app/tournament-actions-i18n.test.tsx).
+    expect(header).not.toContain('lang="fr"');
     expectNoFrench(inLocale("en", <TournamentProgress detail={detail} />));
   });
 
@@ -398,7 +403,8 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
     expectNoFrench(html);
     expect(html).toContain("Round 2/3 · 1 team in contention");
     expect(html).toContain("On equal points: Buchholz, opponents&#x27; win %, head-to-head.");
-    expect(html).toMatch(/lang="fr"[^>]*>(?:<[^>]+>)*Abandonner/);
+    expect(html).toContain("Withdraw");
+    expect(html).not.toContain('lang="fr"');
   });
 
   it("survie par coupes", () => {
@@ -464,22 +470,20 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
     expectNoFrench(inLocale("en", <TournamentLoading />));
   });
 
-  it("détail des maps : langue de la page, français dans une fenêtre de score", () => {
+  it("détail des maps : langue de la page, fenêtres de score comprises (lot 8b)", () => {
     const maps = [{ mapNumber: 1, team1Score: 2, team2Score: 1, replayCode: "ABC123" }];
     const page = inLocale("en", <MapResultList maps={maps} team1Name="Alpha" team2Name="Bravo" label="Match maps" />);
     expect(page).toContain("Won by Alpha");
-    const dialog = inLocale("en", <MapResultList french maps={maps} team1Name="Alpha" team2Name="Bravo" label="Maps proposées" />);
-    expect(dialog).toContain("Gagnée par Alpha");
-    expect(dialog).toContain("Copier le code de replay de la map 1");
-    expect(dialog).not.toContain("Won by");
+    expectNoFrench(page);
+    expect(inLocale("fr", <MapResultList maps={maps} team1Name="Alpha" team2Name="Bravo" label="Maps" />)).toContain("Gagnée par Alpha");
   });
 });
 
-describe("blocs restés en français (lot 8b) sous /en", () => {
+describe("gestes traduits au lot 8b — plus de blocs français sur la fiche", () => {
   const COMPONENTS = "app/(secured)/tournois/[id]/_components";
   const source = (file: string) => readFileSync(join(process.cwd(), COMPONENTS, file), "utf8");
 
-  it("leurs notifications passent par useFrenchBlockToast, jamais useToast nu", () => {
+  it("les notifications des gestes suivent la page (useToast), hors sélecteur d'image (lot 8b-2)", () => {
     for (const file of [
       "AdvanceTournamentDialog.tsx",
       "DeleteTournamentDialog.tsx",
@@ -494,53 +498,45 @@ describe("blocs restés en français (lot 8b) sous /en", () => {
       "RegistrationsPanel.tsx",
       "RemoveEntrantDialog.tsx",
       "RollbackRoundDialog.tsx",
-      "TournamentImageDialog.tsx",
     ]) {
       const code = source(file);
-      expect(`${file}: ${code.includes("useFrenchBlockToast()")}`).toBe(`${file}: true`);
-      expect(`${file}: ${code.includes("useToast()")}`).toBe(`${file}: false`);
+      expect(`${file}: ${code.includes("useFrenchBlockToast")}`).toBe(`${file}: false`);
+      expect(`${file}: ${code.includes("frenchBlockLang")}`).toBe(`${file}: false`);
     }
-    // Les fenêtres de score notifient par leur hook commun.
     const scoreForm = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
-    expect(scoreForm).toContain("useFrenchBlockToast()");
-    expect(scoreForm).not.toContain("useToast()");
-  });
-
-  it("annonce du réordonnancement et sélecteur d'image redisent leur langue", () => {
-    expect(source("RegistrationsPanel.tsx")).toContain('<p aria-live="polite" className="sr-only" lang={staffLang}>');
-    expect(source("TournamentImageDialog.tsx")).toContain("lang={dialogLang} />");
+    expect(scoreForm).not.toContain("useFrenchBlockToast");
+    // Le sélecteur d'image (recadrage compris) est partagé avec la création :
+    // il reste français jusqu'au lot 8b-2, et le redit.
+    expect(source("TournamentImageDialog.tsx")).toContain("lang={pickerLang} />");
     const picker = readFileSync(join(process.cwd(), "app/(secured)/tournois/_components/TournamentImagePicker.tsx"), "utf8");
     expect(picker).toContain("useImageCropper({ lang })");
-    expect(picker).toContain("toast.showError(message, lang ? { lang } : undefined)");
   });
 
-  it("lien « Modifier » vers l'édition restée française : hrefLang", () => {
-    expect(source("TournamentHeader.tsx")).toMatch(/href=\{`\/tournois\/\$\{card\.id\}\/modifier`\} hrefLang=\{actionLang\}/);
+  it("lien « Modifier » vers l'édition, pas encore traduite : hrefLang", () => {
+    expect(source("TournamentHeader.tsx")).toMatch(/href=\{`\/tournois\/\$\{card\.id\}\/modifier`\} hrefLang=\{editLang\}/);
   });
 
   it("textes de la fiche indexés sur la langue seule (un refresh ne rouvre pas le flux)", () => {
     const provider = readFileSync(join(process.cwd(), "components/i18n/tournament-page-text.tsx"), "utf8");
     expect(provider).toContain("const [value, setValue] = useState(build);");
     expect(provider).toContain("if (value.locale !== locale) setValue(build());");
+    const actions = readFileSync(join(process.cwd(), "components/i18n/tournament-actions-text.tsx"), "utf8");
+    expect(actions).toContain("if (state.locale !== locale) setState({ locale, value: buildValue(locale, messages) });");
   });
 
   it("échec définitif du flux : notification dans la langue de la page, comme le témoin", () => {
     const live = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts"), "utf8");
     expect(live).toContain("showPageError(t(`live.fatal.${failure}`));");
-    expect(live).not.toContain("showError(mapError(failure))");
+    expect(live).toContain("showError(mapError((e as Error).message, errorsText));");
   });
 
-  it("le menu porté et les confirmations portées redisent lang=\"fr\"", () => {
+  it("menu porté et confirmations : plus de lang forcé, le pied d'action cite le match dans la langue de la page", () => {
     const actions = source("MatchCardActions.tsx");
-    expect(actions).toMatch(/id=\{panelId\}[\s\S]{0,300}lang=\{lang\}/);
-    expect(actions).toMatch(/contentLang=\{lang\}\s+title=\{`Forcer le lancement/);
-    expect(source("AdminScoreDialog.tsx")).toMatch(/contentLang=\{dialogLang\}\s+title="Corriger un résultat/);
-  });
-
-  it("le pied d'action cite le match en français, libellés d'attente compris", () => {
+    expect(actions).not.toMatch(/lang=\{lang\}|contentLang/);
+    expect(source("AdminScoreDialog.tsx")).not.toContain("contentLang");
     const row = source("MatchRow.tsx");
     expect(row).toContain("matchLabel={actionMatchLabel}");
-    expect(row).toMatch(/versusText\(\s*FR_TOURNAMENT_PAGE_TEXT,\s*teamLabel\(match\.team1Name, match\.team1Placeholder/);
+    expect(row).toContain("const actionMatchLabel = versusText(text, team1Display, team2Display);");
   });
 });
 

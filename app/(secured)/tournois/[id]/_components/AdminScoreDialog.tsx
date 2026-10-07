@@ -1,7 +1,8 @@
 "use client";
 
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
+import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
@@ -9,13 +10,7 @@ import type { BracketMatch, MatchProposalMaps, TournamentGame } from "@/lib/shar
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDoubleForfeit, isMatchDrawn, isMatchPlayed } from "@/lib/shared/match-outcome";
-import {
-  forfeitMapCount,
-  matchFormatDescription,
-  matchFormatLabel,
-  matchWinsRequired,
-  type MatchFormat,
-} from "@/lib/shared/match-format";
+import { forfeitMapCount, matchWinsRequired, type MatchFormat } from "@/lib/shared/match-format";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
@@ -23,10 +18,8 @@ import { useProposalMaps } from "../_hooks/useProposalMaps";
 import { proposalsNeedRefresh } from "@/lib/shared/player-score-report";
 import { useLiveControls } from "../_lib/live-context";
 import {
-  adminProposalNotice,
   forfeitParties,
   pendingScoreProposal,
-  scoreBlockerMessage,
   type ScoreFormBlocker,
   scoreCorrectionNeedsConfirmation,
   storedResultSignature,
@@ -37,7 +30,8 @@ import { ScoreStepper } from "./ScoreStepper";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
 import { MapResultList } from "./MatchMapDetails";
 import mapStyles from "./MatchMapDetails.module.css";
-import { isMapTouched, mapFieldKey, mapListViolationMessage, type MapListViolation } from "@/lib/shared/match-maps";
+import { isMapTouched, mapFieldKey, type MapListViolation } from "@/lib/shared/match-maps";
+import { adminProposalText, mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
 
@@ -46,7 +40,7 @@ import styles from "./ScoreDialog.module.css";
  * seule, ou personne encore — et, dans ce dernier cas, sans parler de scores
  * « ignorés » quand aucun ne peut être saisi (match pas encore lancé).
  */
-function forfeitHint(input: {
+function forfeitHint(text: TournamentDialogsText, input: {
   team1: string;
   team2: string;
   doubleForfeit: boolean;
@@ -55,14 +49,12 @@ function forfeitHint(input: {
   scoreEntryClosed: boolean;
 }): string {
   const { team1, team2, forfeiting, forfeitMaps } = input;
-  if (input.doubleForfeit) {
-    return `${team1} et ${team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.`;
-  }
+  const { t } = text;
+  if (input.doubleForfeit) return t("score.admin.forfeit.double", { team1, team2 });
   if (forfeiting) {
-    return `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`;
+    return t("score.admin.forfeit.single", { out: forfeiting.out, through: forfeiting.through, maps: forfeitMaps });
   }
-  const question = `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0`;
-  return input.scoreEntryClosed ? `${question}.` : `${question}, et les scores saisis sont ignorés.`;
+  return t(input.scoreEntryClosed ? "score.admin.forfeit.questionClosed" : "score.admin.forfeit.question", { maps: forfeitMaps });
 }
 
 interface AdminScoreDialogProps {
@@ -80,25 +72,24 @@ const NO_PROPOSALS: MatchProposalMaps[] = [];
 const NO_REFRESH = () => undefined;
 
 /** Résultat déjà enregistré, en une phrase — ou `null` s'il n'y en a pas. */
-function storedResultLabel(match: BracketMatch, team1: string, team2: string): string | null {
-  if (isMatchDoubleForfeit(match)) {
-    return `Double forfait enregistré : ${team1} et ${team2} perdent toutes les deux.`;
-  }
+function storedResultLabel(text: TournamentDialogsText, match: BracketMatch, team1: string, team2: string): string | null {
+  const { t } = text;
+  if (isMatchDoubleForfeit(match)) return t("score.admin.stored.doubleForfeit", { team1, team2 });
   if (match.forfeitTeamId !== null) {
     const forfeiting = match.forfeitTeamId === match.team1Id ? team1 : team2;
     const beneficiary = match.forfeitTeamId === match.team1Id ? team2 : team1;
-    return `Forfait enregistré : ${forfeiting}, ${beneficiary} l'emporte.`;
+    return t("score.admin.stored.forfeit", { forfeiting, beneficiary });
   }
   if (match.team1Score === null && match.team2Score === null) return null;
 
   const score = `${match.team1Score ?? 0} – ${match.team2Score ?? 0}`;
   // Un nul est un résultat, pas une saisie en attente : le dire « non tranché »
   // enverrait l'arbitrage chercher un vainqueur qu'il n'y a pas.
-  if (isMatchDrawn(match)) return `Tranché : ${score}, match nul.`;
-  if (match.winnerTeamId === null) return `Enregistré : ${score}, non tranché.`;
+  if (isMatchDrawn(match)) return t("score.admin.stored.draw", { score });
+  if (match.winnerTeamId === null) return t("score.admin.stored.undecided", { score });
 
   const winner = match.winnerTeamId === match.team1Id ? team1 : team2;
-  return `Tranché : ${score}, ${winner} l'emporte.`;
+  return t("score.admin.stored.decided", { score, winner });
 }
 
 /**
@@ -132,15 +123,13 @@ function derivedScoreHintId(mapCount: number, mapsSetAside: boolean): string | u
   return mapCount > 0 && !mapsSetAside ? DERIVED_SCORE_HINT_ID : undefined;
 }
 
-const AWAITING_DETAIL_MESSAGE =
-  "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.";
 
 /**
  * Infobulle d'un bouton, dans l'ordre de la phrase sous les boutons : détail
  * en lecture, map refusée (sauf sur une ligne vierge ajoutée — même silence),
  * puis blocage du score.
  */
-function buttonTitleFor(input: {
+function buttonTitleFor(text: TournamentDialogsText, input: {
   awaitingDetail: boolean;
   onBlankRow: boolean;
   mapRefusal: MapListViolation | null;
@@ -149,14 +138,14 @@ function buttonTitleFor(input: {
   format: MatchFormat | null;
   game: TournamentGame | null | undefined;
 }): string {
-  if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;
+  if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");
   if (input.mapRefusal && input.onBlankRow) return input.idle;
-  if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);
-  return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : input.idle;
+  if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);
+  return input.blocker ? scoreBlockerText(text, input.blocker, input.format) : input.idle;
 }
 
 /** La raison affichée sous les boutons, une seule, dans l'ordre de l'infobulle. */
-function visibleBlocker(input: {
+function visibleBlocker(text: TournamentDialogsText, input: {
   awaitingDetail: boolean;
   /** Le refus des maps désigne une ligne vierge, qu'on vient d'ajouter. */
   blankMaps: boolean;
@@ -165,12 +154,12 @@ function visibleBlocker(input: {
   format: MatchFormat | null;
   game: TournamentGame | null | undefined;
 }): string | null {
-  if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;
+  if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");
   // Une ligne vierge n'appelle pas encore de reproche — et le score dérivé
   // (0 – 0, steppers verrouillés) n'est pas à corriger.
   if (input.blankMaps) return null;
-  if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);
-  return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : null;
+  if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);
+  return input.blocker ? scoreBlockerText(text, input.blocker, input.format) : null;
 }
 
 export function AdminScoreDialog({
@@ -180,8 +169,9 @@ export function AdminScoreDialog({
   onClose,
   onSubmitted,
 }: Readonly<AdminScoreDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
-  const dialogLang = frenchBlockLang(useTournamentPageText());
+  const pageText = useTournamentPageText();
+  const text = useDialogsText();
+  const { t } = text;
   // Propositions complétées de leur détail map par map : l'arbitre s'ouvre sur
   // les maps de la proposition unique, et voit celles des deux en désaccord.
   const match = useProposalMaps(liveMatch, proposals, onRefreshProposals);
@@ -215,7 +205,7 @@ export function AdminScoreDialog({
     blocker: ScoreFormBlocker | null | undefined,
     idle: string,
   ): string =>
-    buttonTitleFor({
+    buttonTitleFor(text, {
       awaitingDetail,
       onBlankRow: form.mapsRefused.onBlankRow,
       mapRefusal,
@@ -230,8 +220,8 @@ export function AdminScoreDialog({
   const backdrop = useBackdropDismiss(onClose, form.submitting);
   const [forfeitOpen, setForfeitOpen] = useState(false);
 
-  const team1 = match.team1Name || "Équipe 1";
-  const team2 = match.team2Name || "Équipe 2";
+  const team1 = match.team1Name || t("score.team", { side: 1 });
+  const team2 = match.team2Name || t("score.team", { side: 2 });
   // Borne haute de la saisie : l'objectif du format (3 en BO5 comme en FT3),
   // ou 99 quand le tournoi laisse le score libre.
   const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
@@ -257,7 +247,7 @@ export function AdminScoreDialog({
     isMatchDrawn(match) ||
     isMatchDoubleForfeit(match) ||
     form.dirty
-      ? storedResultLabel(match, team1, team2)
+      ? storedResultLabel(text, match, team1, team2)
       : null;
   // Avant le lancement, la raison est déjà dite en tête du dialogue : la
   // répéter sous les boutons doublerait la même phrase.
@@ -268,7 +258,7 @@ export function AdminScoreDialog({
   // score dérivé, ne sont pas à corriger), puis blocage du score.
   const mapRefusal = form.mapsRefused.resolve ?? form.mapsRefused.save;
   const derivedHintId = derivedScoreHintId(form.maps.length, anyForfeit || scoreEntryClosed);
-  const blockerText = visibleBlocker({
+  const blockerText = visibleBlocker(text, {
     awaitingDetail,
     blankMaps: mapRefusal !== null && form.mapsRefused.onBlankRow,
     mapRefusal: form.maps.some(isMapTouched) ? mapRefusal : null,
@@ -280,13 +270,13 @@ export function AdminScoreDialog({
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
   // vérifier puis à le valider, sans le recopier.
   const proposal = pendingScoreProposal(match);
-  const proposalNotice = adminProposalNotice(proposal, team1, team2, form.dirty);
-  const forfeitToggleLabel = showForfeit ? "Annuler" : "Déclarer un forfait sur cette manche";
+  const proposalNotice = adminProposalText(text, proposal, team1, team2, form.dirty);
+  const forfeitToggleLabel = showForfeit ? t("score.cancel") : t("score.admin.forfeit.open");
 
   // Correction d'un match déjà tranché : l'écriture attend la confirmation
   // (`scoreCorrectionNeedsConfirmation`), le premier résultat part directement.
   const [confirmingCorrection, setConfirmingCorrection] = useState<"save" | "resolve" | null>(null);
-  const storedLabel = storedResultLabel(match, team1, team2);
+  const storedLabel = storedResultLabel(text, match, team1, team2);
   // Un autre arbitre écrit pendant qu'on lit la confirmation : l'avertissement
   // de conflit s'affiche dans le dialogue de score, que la confirmation
   // recouvre. On la referme à **chaque** changement du résultat stocké (et non
@@ -345,7 +335,6 @@ export function AdminScoreDialog({
         ref={dialogRef}
         className={styles.dialog}
         role="dialog"
-        lang={dialogLang}
         aria-modal="true"
         aria-labelledby="admin-score-title"
         tabIndex={-1}
@@ -354,15 +343,15 @@ export function AdminScoreDialog({
           <div className={styles.head}>
             <div className={styles.headText}>
               <h3 id="admin-score-title" className={styles.title}>
-                Score du match
+                {t("score.admin.title")}
               </h3>
               <p className={styles.opponents}>
-                Manche {match.roundNumber} · {team1} vs {team2}
+                {t("score.opponents", { round: match.roundNumber, team1, team2 })}
               </p>
             </div>
             {/* Le format n'apparaît que s'il en existe un : « Score libre —
                 aucune limite » occupait une ligne pour ne rien apprendre. */}
-            {matchFormat && <Pill variant="blue">{matchFormatLabel(matchFormat)}</Pill>}
+            {matchFormat && <Pill variant="blue">{matchFormatText(pageText, matchFormat)}</Pill>}
           </div>
 
           {/* `<output>` (région d'état native) : le résultat enregistré peut changer sous les yeux
@@ -378,9 +367,7 @@ export function AdminScoreDialog({
               sous les yeux du lecteur (l'heure de départ arrive). */}
           {scoreEntryClosed && (
             <output className={`${styles.stored} ${styles.notice}`}>
-              {launchPhase === "TO_PLAN"
-                ? "Match à planifier : fixe sa date avant d'en saisir le score. Un forfait peut être prononcé dès maintenant."
-                : "Match en attente de départ : le score se saisit à partir de son lancement. Un forfait peut être prononcé dès maintenant."}
+              {launchPhase === "TO_PLAN" ? t("score.admin.closedToPlan") : t("score.admin.closedWaiting")}
             </output>
           )}
 
@@ -399,12 +386,12 @@ export function AdminScoreDialog({
                 { report: match.team1Report, by: team1 },
                 { report: match.team2Report, by: team2 },
               ].map(({ report, by }) => (
-                <section key={by} aria-label={`Proposition de ${by}`}>
+                <section key={by} aria-label={t("score.admin.proposalOf", { name: by })}>
                   <p className={mapStyles.proposalTitle}>
-                    Proposition de {by} : {report.team1Score} – {report.team2Score}
+                    {t("score.admin.proposalTitle", { name: by, score1: report.team1Score, score2: report.team2Score })}
                   </p>
                   {report.maps.length > 0 && (
-                    <MapResultList french maps={report.maps} team1Name={team1} team2Name={team2} label={`Maps proposées par ${by}`} />
+                    <MapResultList maps={report.maps} team1Name={team1} team2Name={team2} label={t("score.admin.proposalMaps", { name: by })} />
                   )}
                 </section>
               ))}
@@ -413,8 +400,7 @@ export function AdminScoreDialog({
 
           {form.conflict && (
             <div className={styles.conflict} role="alert">
-              Ce match a été modifié pendant ta saisie — quelqu&apos;un d&apos;autre a
-              enregistré un résultat. Envoyer maintenant écraserait le sien.
+              {t("score.admin.conflict")}
               {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
               <button
                 type="button"
@@ -422,7 +408,7 @@ export function AdminScoreDialog({
                 onClick={form.adoptStoredResult}
                 disabled={form.submitting}
               >
-                Reprendre la valeur à jour
+                {t("score.admin.adoptStored")}
               </button>
             </div>
           )}
@@ -457,7 +443,7 @@ export function AdminScoreDialog({
               geste pour reprendre la main (saisie de secours, replay perdu). */}
           {derivedHintId && (
             <p id={derivedHintId} className={styles.formatHint}>
-              Score calculé à partir des maps ci-dessous : retire toutes les maps pour le saisir à la main.
+              {t("score.admin.derivedHint")}
             </p>
           )}
 
@@ -465,7 +451,7 @@ export function AdminScoreDialog({
               pastille : une infobulle sur un `<span>` ne s'atteint ni au clavier
               ni au doigt, et c'est la seule chose qui borne la saisie. */}
           {matchFormat && (
-            <p className={styles.formatHint}>{matchFormatDescription(matchFormat)}</p>
+            <p className={styles.formatHint}>{matchFormatDescriptionText(pageText, matchFormat)}</p>
           )}
 
           {/* Détail map par map (`MAP_SCORES.md`) : dès qu'une map est saisie,
@@ -510,7 +496,7 @@ export function AdminScoreDialog({
               {/* « Annuler le forfait » n'a de sens qu'une fois une équipe
                   désignée : panneau ouvert et vide, il n'y a que le panneau à
                   refermer. */}
-              {anyForfeit ? "Annuler le forfait" : forfeitToggleLabel}
+              {anyForfeit ? t("score.admin.forfeit.cancel") : forfeitToggleLabel}
             </button>
             )}
 
@@ -528,7 +514,7 @@ export function AdminScoreDialog({
                     fait passer l'adversaire suivant par exemption — un effet
                     qui descend l'arbre, et qu'on ne découvre pas après coup. */}
                 <p id="admin-score-forfeit-hint" className={styles.forfeitHint}>
-                  {forfeitHint({
+                  {forfeitHint(text, {
                     team1,
                     team2,
                     doubleForfeit,
@@ -566,7 +552,7 @@ export function AdminScoreDialog({
                     onClick={() => form.setDoubleForfeit(!doubleForfeit)}
                     disabled={form.submitting || match.team1Id === null || match.team2Id === null}
                   >
-                    Les deux (double forfait)
+                    {t("score.admin.forfeit.both")}
                   </button>
                 </div>
               </div>
@@ -587,44 +573,39 @@ export function AdminScoreDialog({
               onClick={onClose}
               disabled={form.submitting}
             >
-              Fermer
+              {t("score.close")}
             </button>
             <button
               type="button"
               className="btn ghost"
               onClick={() => void run("save")}
               disabled={(!form.decision.canSave && !form.mapsRefused.save) || form.submitting || awaitingDetail}
-              title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, "Note l'avancement sans désigner de vainqueur.")}
+              title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, t("score.admin.saveTitle"))}
             >
-              {form.submitting ? "…" : "Enregistrer"}
+              {form.submitting ? "…" : t("score.admin.save")}
             </button>
             <button
               type="submit"
               className="btn"
               disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting || awaitingDetail}
-              title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, "Désigne la gagnante et met le plateau à jour.")}
+              title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, t("score.admin.resolveTitle"))}
             >
-              {form.submitting ? "…" : "Valider le résultat"}
+              {form.submitting ? "…" : t("score.admin.resolve")}
             </button>
           </div>
         </form>
       </div>
       {confirmingCorrection !== null && (
         <ConfirmActionDialog
-          contentLang={dialogLang}
-          title="Corriger un résultat déjà validé ?"
-          confirmLabel="Corriger le résultat"
-          pendingLabel="Correction…"
+          title={t("score.admin.correction.title")}
+          confirmLabel={t("score.admin.correction.confirm")}
+          pendingLabel={t("score.admin.correction.pending")}
           onClose={() => setConfirmingCorrection(null)}
           onConfirm={() => perform(confirmingCorrection)}
         >
           {storedLabel !== null && <p>{storedLabel}</p>}
-          <p>Ce résultat publié sera remplacé par la nouvelle saisie.</p>
-          <p>
-            Si l&apos;issue change, ce qui en découlait est défait : une rencontre suivante encore sans score peut
-            changer d&apos;adversaire (son horaire conservé), le classement est recalculé, et un tournoi déjà
-            terminé repasse en cours.
-          </p>
+          <p>{t("score.admin.correction.replaced")}</p>
+          <p>{t("score.admin.correction.consequences")}</p>
         </ConfirmActionDialog>
       )}
     </div>,

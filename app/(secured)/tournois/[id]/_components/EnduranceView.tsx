@@ -24,11 +24,13 @@ import {
   splitEnduranceMatches,
   splitPlayoffBrackets,
 } from "../_lib/endurance-sections";
-import { useEntrantParticipantType, useParticipantWording } from "../_lib/entrant-link";
+import { useEntrantParticipantType } from "../_lib/entrant-link";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { INTL_LOCALE } from "@/lib/shared/locales";
-import { frenchBlockLang, participantText } from "@/lib/shared/tournament-page-text";
+import { participantText } from "@/lib/shared/tournament-page-text";
+import { toParticipantType } from "@/lib/shared/participants";
+import { useActionsText } from "../_lib/actions-text";
 import { enduranceNextRoundInput } from "../_lib/endurance-next-round";
 import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/preview";
 import type { MatchFormat } from "@/lib/shared/match-format";
@@ -270,8 +272,8 @@ function PenaltyLog({
 }>) {
   const text = useTournamentViewText(FR_VIEWS_TEXT);
   const { t } = text;
-  // Le retrait d'une sanction est un geste du staff : resté français (D4).
-  const staffLang = frenchBlockLang(text);
+  // Le retrait d'une sanction est un geste du staff (lot 8b).
+  const { t: a } = useActionsText();
   if (penalties.length === 0) return null;
 
   return (
@@ -317,20 +319,18 @@ function PenaltyLog({
             {onLift !== undefined && !penalty.removable && (
               <span
                 className={styles.penaltyMeta}
-                lang={staffLang}
-                title="Une manche a été jouée depuis : rendre ces points remettrait en lice une équipe qui ne l'a pas disputée."
+                title={a("penaltyLift.frozenTitle")}
               >
-                🔒 Figée
+                🔒 {a("penaltyLift.frozen")}
               </span>
             )}
             {onLift !== undefined && penalty.removable && (
               <button
                 type="button"
-                lang={staffLang}
                 onClick={() => onLift(penalty)}
                 className="btn ghost"
-                title={`Retirer cette pénalité : ${penalty.teamName} récupère ${penalty.points} point(s)`}
-                aria-label={`Retirer la pénalité de ${penalty.points} point(s) infligée à ${penalty.teamName}`}
+                title={a("penaltyLift.buttonTitle", { name: penalty.teamName, points: penalty.points })}
+                aria-label={a("penaltyLift.buttonAria", { name: penalty.teamName, points: penalty.points })}
                 style={{
                   padding: "2px 8px",
                   fontSize: 11,
@@ -338,7 +338,7 @@ function PenaltyLog({
                   letterSpacing: "0.04em",
                 }}
               >
-                Retirer
+                {a("penaltyLift.button")}
               </button>
             )}
           </li>
@@ -370,11 +370,10 @@ export function EnduranceView({
   showNextRound = false,
   qualificationFormat = null,
 }: Readonly<EnduranceViewProps>) {
-  const wording = useParticipantWording();
   const text = useTournamentViewText(FR_VIEWS_TEXT);
   const { t } = text;
-  // Abandon et sanctions : gestes du lot 8b et du staff, restés français.
-  const actionLang = frenchBlockLang(text);
+  // Abandon et sanctions : gestes du lot 8b et du staff.
+  const { t: a } = useActionsText();
   const participantType = useEntrantParticipantType();
   const emptyText = emptyLabel ?? t("page.noMatchesShort");
 
@@ -548,14 +547,14 @@ export function EnduranceView({
                 {standing.eliminatedRound ? t("endurance.eliminatedRound", { round: String(standing.eliminatedRound) }) : ""}
               </span>
               {showActions && (
-                <span className={styles.rowActions} lang={actionLang}>
+                <span className={styles.rowActions}>
                   {canPenalizeRow(standing.status) && onPenalize !== undefined && (
                     <button
                       type="button"
                       onClick={() => onPenalize(standing.teamId)}
                       className="btn tap-target"
-                      title={`Retirer des points d'endurance à ${standing.teamName}`}
-                      aria-label={`Infliger une pénalité d'endurance à ${standing.teamName}`}
+                      title={a("penalty.buttonTitle", { name: standing.teamName })}
+                      aria-label={a("penalty.buttonAria", { name: standing.teamName })}
                       style={{
                         padding: "3px 8px",
                         fontSize: 11,
@@ -566,7 +565,7 @@ export function EnduranceView({
                         color: AMBER,
                       }}
                     >
-                      Pénalité
+                      {a("penalty.button")}
                     </button>
                   )}
                   {forfeitable && onForfeit !== undefined && (
@@ -576,13 +575,13 @@ export function EnduranceView({
                       className="btn tap-target"
                       title={
                         isMine
-                          ? `Abandonner : ${wording.subject} quittera définitivement le tournoi`
-                          : `Déclarer ${standing.teamName} forfait pour tout le reste du tournoi`
+                          ? a(`forfeit.endurance.selfTitle.${toParticipantType(participantType)}`)
+                          : a("forfeit.endurance.otherTitle", { name: standing.teamName })
                       }
                       aria-label={
                         isMine
-                          ? "Abandonner le tournoi"
-                          : `Déclarer ${standing.teamName} forfait pour tout le reste du tournoi`
+                          ? a("forfeit.endurance.selfAria")
+                          : a("forfeit.endurance.otherTitle", { name: standing.teamName })
                       }
                       style={{
                         padding: "3px 8px",
@@ -601,7 +600,7 @@ export function EnduranceView({
                         tournoi, et non sur la seule manche en cours (ce
                         forfait-là se pose sur le match).
                       */}
-                      {isMine ? "Abandonner" : "Forfait"}
+                      {isMine ? a("forfeit.button.label") : a("forfeit.endurance.other")}
                     </button>
                   )}
                 </span>

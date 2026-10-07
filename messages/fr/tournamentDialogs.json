@@ -1,0 +1,336 @@
+{
+  "score": {
+    "team": "Équipe {side}",
+    "opponents": "Manche {round} · {team1} vs {team2}",
+    "close": "Fermer",
+    "cancel": "Annuler",
+    "violation": {
+      "draw": "Match nul impossible : ce tournoi exige un vainqueur.",
+      "invalid": "Score invalide.",
+      "exceeds": "Score impossible en {label} : {max} manches au maximum, et jamais plus de {wins} par équipe.",
+      "below": "Score incomplet en {label} : le vainqueur doit atteindre {wins, plural, one {# manche} other {# manches}}."
+    },
+    "blocker": {
+      "incomplete": "Renseigne les deux scores.",
+      "draw": "Les scores ne peuvent pas être égaux : il faut un vainqueur.",
+      "doubleForfeit": "Un double forfait tranche le match : il s'écrit avec « Valider le résultat ».",
+      "notInLaunch": "Le score se saisit à partir du lancement du match. Avant, seul un forfait peut être prononcé.",
+      "alreadyDecided": "Ce match est déjà tranché. Corrige-le avec « Valider le résultat » pour que le vainqueur et la suite du plateau suivent."
+    },
+    "stepper": {
+      "decrement": "Retirer une manche à {name}",
+      "field": "Manches gagnées par {name}",
+      "increment": "Ajouter une manche à {name}"
+    },
+    "maps": {
+      "replayHintOverwatch": "Code de replay Overwatch : 6 caractères (lettres et chiffres).",
+      "replayHintOther": "Code ou identifiant de la partie : 4 à 32 caractères (lettres, chiffres, tirets).",
+      "replayAllowance": "Une map nulle peut être rejouée ({count} au plus).",
+      "added": "Map {index} ajoutée : à renseigner.",
+      "legend": "Maps jouées",
+      "drawHint": "Une map nulle ne rapporte de point à personne.",
+      "map": "Map {index}",
+      "mapPrefix": "Map {index}, ",
+      "replayCode": "Code de replay",
+      "scoreOf": "Map {index}, score de ",
+      "remove": "Retirer la map {index}",
+      "add": "Ajouter une map",
+      "summary": "Score du match",
+      "violation": {
+        "empty": "Ajoute au moins une map jouée.",
+        "tooMany": "Trop de maps : {max} au maximum pour ce match.",
+        "codeRequired": "Code de replay manquant pour cette map.",
+        "codeInvalid": "Code de replay invalide. {hint}",
+        "codeDuplicate": "Ce code de replay figure déjà sur une autre map.",
+        "scoreInvalid": "Score de map manquant ou invalide : un entier entre 0 et {max} (0 – 0 pour une map nulle).",
+        "afterDecision": "Cette map suit la fin du match : le résultat était déjà acquis.",
+        "incomplete": "Match inachevé : sans vainqueur, les {max} maps se jouent toutes (une map nulle en occupe une).",
+        "incompleteFree": "Match inachevé.",
+        "tooManyWon": "Trop de maps gagnées pour le format du match.",
+        "below": "Score incomplet : le vainqueur doit gagner {wins, plural, one {# map} other {# maps}}.",
+        "belowFree": "Score incomplet."
+      }
+    },
+    "admin": {
+      "title": "Score du match",
+      "saved": "Score enregistré : le match reste en cours.",
+      "resolved": "Résultat validé : le plateau est à jour.",
+      "awaitingDetail": "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.",
+      "proposal": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. Vérifie-le puis valide le résultat pour le confirmer.",
+      "proposalDirty": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. Ta saisie le remplace.",
+      "stored": {
+        "doubleForfeit": "Double forfait enregistré : {team1} et {team2} perdent toutes les deux.",
+        "forfeit": "Forfait enregistré : {forfeiting}, {beneficiary} l'emporte.",
+        "draw": "Tranché : {score}, match nul.",
+        "undecided": "Enregistré : {score}, non tranché.",
+        "decided": "Tranché : {score}, {winner} l'emporte."
+      },
+      "closedToPlan": "Match à planifier : fixe sa date avant d'en saisir le score. Un forfait peut être prononcé dès maintenant.",
+      "closedWaiting": "Match en attente de départ : le score se saisit à partir de son lancement. Un forfait peut être prononcé dès maintenant.",
+      "proposalOf": "Proposition de {name}",
+      "proposalTitle": "Proposition de {name} : {score1} – {score2}",
+      "proposalMaps": "Maps proposées par {name}",
+      "conflict": "Ce match a été modifié pendant ta saisie — quelqu'un d'autre a enregistré un résultat. Envoyer maintenant écraserait le sien.",
+      "adoptStored": "Reprendre la valeur à jour",
+      "derivedHint": "Score calculé à partir des maps ci-dessous : retire toutes les maps pour le saisir à la main.",
+      "forfeit": {
+        "open": "Déclarer un forfait sur cette manche",
+        "cancel": "Annuler le forfait",
+        "double": "{team1} et {team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.",
+        "single": "{out} déclare forfait sur cette manche : {through} l'emporte {maps}-0, sans manche jouée.",
+        "question": "Qui déclare forfait sur cette manche ? Son adversaire l'emporte {maps}-0, et les scores saisis sont ignorés.",
+        "questionClosed": "Qui déclare forfait sur cette manche ? Son adversaire l'emporte {maps}-0.",
+        "both": "Les deux (double forfait)"
+      },
+      "save": "Enregistrer",
+      "saveTitle": "Note l'avancement sans désigner de vainqueur.",
+      "resolve": "Valider le résultat",
+      "resolveTitle": "Désigne la gagnante et met le plateau à jour.",
+      "correction": {
+        "title": "Corriger un résultat déjà validé ?",
+        "confirm": "Corriger le résultat",
+        "pending": "Correction…",
+        "replaced": "Ce résultat publié sera remplacé par la nouvelle saisie.",
+        "consequences": "Si l'issue change, ce qui en découlait est défait : une rencontre suivante encore sans score peut changer d'adversaire (son horaire conservé), le classement est recalculé, et un tournoi déjà terminé repasse en cours."
+      }
+    },
+    "player": {
+      "title": "Score de mon match",
+      "conflictMaps": "Même score ({score}), mais le détail des maps diffère de celui de {opponent} : codes de replay ou scores de map. L'arbitrage est alerté ; tu peux encore corriger ta proposition.",
+      "conflictScores": "Les scores se contredisent — toi : {mine}, {opponent} : {theirs}. L'arbitrage est alerté ; tu peux encore corriger ta proposition.",
+      "closed": {
+        "toPlan": "Ce match attend que l'arbitrage fixe sa date : le score se saisira une fois le match lancé.",
+        "scheduledAt": "Ce match démarre le {date} : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.",
+        "scheduled": "Ce match n'a pas encore démarré : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.",
+        "lobby": "Le score se saisit une fois le match lancé : toutes les parties doivent s'être déclarées prêtes."
+      },
+      "theirs": {
+        "readOnly": "{opponent} propose {score}. En attente de la confirmation d'un responsable de {mine}.",
+        "withMaps": "{opponent} propose {score}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.",
+        "loading": "{opponent} propose {score}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas.",
+        "withoutMaps": "{opponent} propose {score}, sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay : un désaccord alerte l'arbitrage."
+      },
+      "confirmed": "Score confirmé : {team1} {score1} – {score2} {team2}",
+      "submitted": "Score transmis : {team1} {score1} – {score2} {team2}",
+      "forfeitRecorded": "Forfait enregistré : {opponent} remporte le match.",
+      "minePending": "Tu as proposé {score}. En attente de la confirmation de {opponent}.",
+      "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé à {deadline}.",
+      "willConfirm": "{opponent} devra confirmer le score que tu envoies.",
+      "confirm": "Confirmer le score",
+      "send": "Envoyer le score",
+      "alreadySent": "Score déjà envoyé : en attente de {opponent}.",
+      "forfeit": {
+        "open": "Déclarer forfait sur ce match",
+        "close": "Ne pas déclarer forfait",
+        "hint": "{mine} déclare forfait sur ce match : {opponent} l'emporte {maps}-0, sans manche jouée. Le résultat est immédiat — seul l'arbitrage peut revenir dessus.",
+        "confirm": "Confirmer le forfait de {name}",
+        "notAllowed": "Un forfait se déclare par le propriétaire ou un manager de l'équipe."
+      }
+    }
+  },
+  "schedule": {
+    "missing": {
+      "day": "le jour",
+      "month": "le mois",
+      "time": "l'heure"
+    },
+    "refusal": {
+      "incomplete": "Date incomplète : choisis le jour et le mois, ou vide les deux pour ne pas annoncer d'horaire.",
+      "invalid": "Ce jour n'existe pas dans ce mois.",
+      "unknown": "Date non reconnue."
+    },
+    "pending": "À compléter : {field}.",
+    "pendingInvalid": "Aucune date possible : ce jour n'existe pas dans ce mois.",
+    "hintPlanning": "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.",
+    "hint": "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.",
+    "cleared": "Date de début effacée.",
+    "planned": "Match planifié.",
+    "saved": "Date de début enregistrée.",
+    "saving": "Enregistrement…",
+    "plan": "Planifier",
+    "save": "Enregistrer",
+    "titlePlanning": "Planifier le match",
+    "title": "Date de début du match",
+    "legend": "Début programmé (heure de Paris)",
+    "day": "Jour",
+    "month": "Mois",
+    "time": "Heure",
+    "preview": "Date retenue :",
+    "localTime": "({time} à ton heure locale)",
+    "none": "Aucun horaire annoncé.",
+    "wrongYear": "Mauvaise année ?",
+    "fixYear": "Corriger l'année",
+    "previousYear": "Année précédente",
+    "nextYear": "Année suivante",
+    "warnLive": "Ce match passe à l'antenne à sa date de début : sans date, il restera « programmé » sans jamais démarrer.",
+    "warnPlanning": "Sans date, ce match repasse « À planifier » : il ne se lancera pas tant qu'une nouvelle heure n'est pas fixée.",
+    "clear": "Vider la date"
+  },
+  "ghost": {
+    "full": "Ce tournoi est complet : il n'y a plus de place à prendre.",
+    "slotsLeft": "Il ne reste que {count, plural, one {# place} other {# places}} dans ce tournoi.",
+    "batchMax": "{max} engagés au maximum par inscription : recommencez pour les suivants.",
+    "counterSlots": "{selected} / {capacity, plural, one {# place} other {# places}}",
+    "counterBatch": "{selected} / {capacity} par lot",
+    "loading": "Chargement…",
+    "loadFailed": "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer.",
+    "noResult": "Aucun résultat pour cette recherche.",
+    "submit": "Inscrire",
+    "submitCount": "Inscrire ({count})",
+    "pending": "Inscription…",
+    "existing": "Existantes",
+    "new": "Nouvelle",
+    "searchPlaceholder": "Rechercher…",
+    "searchAria": "Filtrer la liste par nom",
+    "selectAll": "Tout sélectionner",
+    "selectNone": "Tout désélectionner",
+    "TEAM": {
+      "title": "Inscrire une équipe fantôme",
+      "hint": "Réservé aux équipes fantômes : une équipe de joueurs s'inscrit toujours elle-même.",
+      "selectMany": "Équipes fantômes à inscrire",
+      "noneAvailable": "Aucune équipe fantôme à inscrire : elles sont toutes engagées, ou il n'en existe pas encore.",
+      "newName": "Nom de la nouvelle équipe",
+      "success": "{count, plural, one {Équipe fantôme inscrite.} other {# équipes fantômes inscrites.}}"
+    },
+    "SOLO": {
+      "title": "Inscrire un joueur invité",
+      "hint": "Réservé aux joueurs sans compte sur le site : un joueur inscrit s'engage toujours lui-même.",
+      "selectMany": "Joueurs invités à inscrire",
+      "noneAvailable": "Aucun joueur invité à inscrire : ils sont tous engagés, ou il n'en existe pas encore.",
+      "newName": "Pseudo du joueur invité",
+      "success": "{count, plural, one {Joueur invité inscrit.} other {# joueurs invités inscrits.}}"
+    }
+  },
+  "rollback": {
+    "doubleForfeit": "double forfait",
+    "noScore": "aucun score saisi",
+    "forfeit": "{score} (forfait)",
+    "draw": "{score} (nul)",
+    "title": "Effacer {stage}",
+    "erases": "<strong>{stage}</strong> perd tout ce qui y a été saisi : scores, vainqueurs, forfaits de match et reports en attente. Les rencontres restent en place, avec les mêmes équipes, et redeviennent à jouer.",
+    "repeat": "C'est ce qui rouvre la manche précédente à la correction. Le geste se répète : chaque fois, le tournoi recule d'une manche. Les abandons et les pénalités déjà déclarés, eux, restent en vigueur.",
+    "reopen": "<strong>Ce tournoi est terminé : il va être rouvert.</strong> Son classement final est effacé et il repasse « en cours ». Une nouvelle championne sera proclamée — et réannoncée sur Discord — dès que cette manche aura été rejouée.",
+    "noteScores": "<strong>Note les scores ci-dessous avant de continuer.</strong> Rien n'est archivé : une fois la manche effacée, il faudra les ressaisir à la main pour revenir à l'état actuel.",
+    "listAria": "Scores qui vont être effacés",
+    "tbd": "À venir",
+    "acknowledge": "J'ai noté les scores ci-dessus.",
+    "pending": "Effacement…",
+    "confirm": "Effacer et reculer"
+  },
+  "live": {
+    "saved": "Diffusion du match enregistrée.",
+    "removed": "Match retiré de la diffusion.",
+    "title": "Diffusion du match",
+    "streamed": "Ce match est casté",
+    "trigger": "Passage à l'antenne",
+    "triggers": {
+      "AUTO": "Automatique au démarrage du match",
+      "START_TIME": "À la date de début du match",
+      "MANUAL": "Manuel (bouton d'antenne)"
+    },
+    "noStartAt": "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire.",
+    "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
+    "url": "Chaîne du match (facultatif)",
+    "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
+    "urlHint": "Laisser vide pour signaler le match sans lien. Plateformes acceptées : {platforms}."
+  },
+  "replay": {
+    "removed": "Rediff retirée.",
+    "saved": "Rediff enregistrée.",
+    "title": "Rediff du match",
+    "notReplayable": "Ce match n'est pas (ou plus) terminé : sa rediff n'est pas affichée. Tu peux seulement retirer le lien.",
+    "url": "Lien YouTube",
+    "invalid": "Lien non reconnu : il faut le lien d'une vidéo YouTube (youtube.com/watch?v=…, youtu.be/… ou youtube.com/live/…).",
+    "hint": "Un bandeau « Rediff disponible » s'affichera sous le match, visible de tous.",
+    "remove": "Retirer la rediff"
+  },
+  "advance": {
+    "targets": {
+      "REGISTRATION": {
+        "title": "Ouvrir les inscriptions maintenant",
+        "confirm": "Ouvrir les inscriptions",
+        "busy": "Ouverture…"
+      },
+      "LOCKED": {
+        "title": "Clore les inscriptions maintenant",
+        "confirm": "Clore les inscriptions",
+        "busy": "Clôture…"
+      },
+      "RUNNING": {
+        "title": "Lancer le tournoi maintenant",
+        "confirm": "Lancer maintenant",
+        "busy": "Lancement…"
+      }
+    },
+    "closeEmpty": "Clore le tournoi",
+    "summary": {
+      "REGISTRATION": "Les inscriptions ouvrent à cet instant, au lieu du <strong>{date}</strong>. Leur clôture et le coup d'envoi restent prévus aux dates annoncées.",
+      "LOCKED": "Les inscriptions ferment à cet instant, au lieu du <strong>{date}</strong>: personne ne pourra plus rejoindre le tournoi. Le coup d'envoi reste prévu le <strong>{start}</strong>.",
+      "RUNNING": "Le coup d'envoi est avancé à cet instant, au lieu du <strong>{date}</strong>. Le tirage est fait sur les engagés du moment : personne ne pourra plus rejoindre le tournoi."
+    },
+    "stage": "Étape",
+    "atStart": {
+      "TEAM": "{count, plural, one {Équipe au départ} other {Équipes au départ}}",
+      "SOLO": "{count, plural, one {Joueur au départ} other {Joueurs au départ}}"
+    },
+    "finalCount": "Effectif final",
+    "publishes": "Ce tournoi n'était pas encore publié : ouvrir ses inscriptions le rend visible de tous.",
+    "empty": "Moins de deux engagés : le tournoi ne jouera aucun match et sera clos aussitôt.",
+    "emptyOne": "Moins de deux engagés : le tournoi ne jouera aucun match et sera clos aussitôt, l'unique engagé étant déclaré premier."
+  },
+  "penalty": {
+    "hint": "Motif obligatoire, visible par tous. Capital restant : {remaining}.",
+    "eliminates": "Capital ramené à 0 : {name} sera éliminée du tournoi.",
+    "applied": "Pénalité de {points} point(s) appliquée à {name}.",
+    "title": "Pénalité d'endurance",
+    "points": "{count, plural, one {# point} other {# points}}",
+    "round": "manche {round}",
+    "beforeFirstRound": "avant la première manche",
+    "pointsLabel": "Points retirés",
+    "reasonLabel": "Motif",
+    "reasonPlaceholder": "Retard au coup d'envoi, joueur non éligible aligné…",
+    "apply": "Appliquer la pénalité"
+  },
+  "delete": {
+    "title": "Supprimer définitivement ce tournoi",
+    "body": "Cette action est irréversible. Le tournoi <strong>{name}</strong> disparaîtra du site avec tous ses matchs, ses inscriptions et ses classements — y compris des palmarès et des statistiques de ses participants.",
+    "kept": "Aucune équipe ni aucun joueur n'est supprimé : seuls les résultats de ce tournoi le sont.",
+    "label": "Recopie le nom du tournoi pour confirmer",
+    "armed": "Nom confirmé.",
+    "blocked": "La suppression restera bloquée tant que le nom ne correspond pas.",
+    "pending": "Suppression…",
+    "confirm": "Supprimer définitivement"
+  },
+  "issue": {
+    "sentReferees": "Signalement transmis à {count} arbitre(s).",
+    "sentStaff": "Signalement transmis au staff.",
+    "title": "Signaler un problème",
+    "match": "Match : {team1} vs {team2}",
+    "wholeTournament": "Portée : tournoi entier",
+    "label": "Que se passe-t-il ?",
+    "placeholder": "Adversaire absent, score contesté, problème de serveur…",
+    "tooShort": "Décris le problème en {min} caractères au moins.",
+    "counter": "{length}/{max} — envoyé aux arbitres sur Discord.",
+    "pending": "Envoi…",
+    "send": "Envoyer au staff"
+  },
+  "image": {
+    "title": "Image du tournoi",
+    "intro": "Facultative. Elle habille la fiche, les cartes de la liste et l'accueil — un tournoi sans image garde son apparence habituelle.",
+    "conflict": "L'image a été modifiée ailleurs pendant ton réglage. « Enregistrer » remplacera ce changement par le tien ; « Annuler » le garde."
+  },
+  "contacts": {
+    "loading": "Chargement…",
+    "retry": "Réessayer",
+    "empty": "Aucun engagé pour le moment.",
+    "unreachable": "Aucun contact certifié",
+    "noPlayer": "Aucun joueur rattaché : engagé invité par le staff.",
+    "notVerified": "Non certifié",
+    "badgeAlt": "Tag Discord vérifié",
+    "badgeTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
+    "title": "Contacts Discord",
+    "intro": "Réservé à l'arbitrage. Seuls apparaissent les tags <strong>certifiés</strong> : un joueur qui n'a pas prouvé le sien n'est pas joignable par le site.",
+    "hide": "Masquer les contacts",
+    "show": "Afficher les contacts"
+  }
+}

@@ -4,7 +4,8 @@ import type {
   EnduranceNextRoundInput,
   EnduranceNextRoundPreview,
 } from "@/lib/shared/endurance-next-round/types";
-import { plural } from "@/lib/shared/plural";
+import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
+import { FR_ACTIONS_TEXT } from "./actions-text";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 
 /**
@@ -73,52 +74,42 @@ export function enduranceNextRoundInput(
 }
 
 /** Nom d'un tour d'arbre d'après son nombre de rencontres décisives. */
-function playoffStageTitle(slots: number | null): string {
-  if (slots === 1) return "Finale";
-  if (slots === 2) return "Demi-finales";
-  if (slots === 3 || slots === 4) return "Quarts de finale";
-  if (slots !== null && slots >= 5 && slots <= 8) return "8èmes de finale";
-  // Effectif pas encore acquis : on nomme la phase, pas un tour qu'on ne sait
-  // pas situer — « tour suivant » laisserait croire à un arbre déjà tiré.
-  return "Play-offs";
+function playoffStageTitle(slots: number | null, text: TournamentActionsText): string {
+  if (slots === 1) return text.t("nextRound.stage.final");
+  if (slots === 2) return text.t("nextRound.stage.semis");
+  if (slots === 3 || slots === 4) return text.t("nextRound.stage.quarters");
+  if (slots !== null && slots >= 5 && slots <= 8) return text.t("nextRound.stage.roundOf16");
+  return text.t("nextRound.stage.playoffs");
 }
 
-/**
- * Titre de l'aperçu : la manche à venir (avec son total sous plafond, comme la
- * manche courante de la vue), ou le tour d'arbre.
- */
-export function nextRoundTitle(preview: EnduranceNextRoundPreview, maxRounds: number | null): string {
-  if (preview.stage === "PLAYOFFS") return playoffStageTitle(preview.decisiveSlots);
-  return maxRounds === null ? `Manche ${preview.round}` : `Manche ${preview.round}/${maxRounds}`;
+/** Titre de l'aperçu : « Manche 4/12 », ou le stade des play-offs. */
+export function nextRoundTitle(
+  preview: EnduranceNextRoundPreview,
+  maxRounds: number | null,
+  text: TournamentActionsText = FR_ACTIONS_TEXT,
+): string {
+  if (preview.stage === "PLAYOFFS") return playoffStageTitle(preview.decisiveSlots, text);
+  return maxRounds === null
+    ? text.t("nextRound.round", { round: preview.round })
+    : text.t("nextRound.roundOf", { round: preview.round, max: maxRounds });
 }
 
-/**
- * Bilan de l'aperçu : combien de rencontres sont acquises, sur combien quand
- * l'effectif l'est. Les exemptions ne comptent pas — ce n'est pas une rencontre
- * à organiser.
- */
-export function nextRoundSummary(preview: EnduranceNextRoundPreview): string {
+/** « 3 rencontres acquises sur 4 ». */
+export function nextRoundSummary(preview: EnduranceNextRoundPreview, text: TournamentActionsText = FR_ACTIONS_TEXT): string {
   const known = preview.matches.filter((match) => match.teamBId !== null).length;
-  const acquired = plural(known, "rencontre acquise", "rencontres acquises");
+  const acquired = text.t("nextRound.acquired", { count: known });
   if (preview.expectedMatches === null) return acquired;
-  return `${acquired} sur ${preview.expectedMatches}`;
+  return text.t("nextRound.acquiredOf", { acquired, expected: preview.expectedMatches });
 }
 
-/** Ce qui reste à jouer avant que la suite ne soit posée par le moteur. */
-export function nextRoundPendingLabel(preview: EnduranceNextRoundPreview): string {
-  return `${plural(preview.pendingMatches, "match reste", "matchs restent")} à jouer`;
+/** « 2 matchs restent à jouer ». */
+export function nextRoundPendingLabel(preview: EnduranceNextRoundPreview, text: TournamentActionsText = FR_ACTIONS_TEXT): string {
+  return text.t("nextRound.pending", { count: preview.pendingMatches });
 }
 
-/**
- * Phrase qui remplace la liste quand elle est vide — un bloc vide sous un titre
- * laisserait croire à un calcul en panne.
- */
-export function nextRoundEmptyLabel(preview: EnduranceNextRoundPreview): string {
-  if (preview.freeScore) {
-    return "Score libre : un match restant peut déplacer un capital sans limite, rien n'est acquis avant la fin de la manche.";
-  }
-  if (preview.expectedMatches === 0) {
-    return "Moins de deux qualifiées : le tournoi se clôturera sans arbre final.";
-  }
-  return "Aucune rencontre n'est encore acquise : toutes dépendent des matchs restants.";
+/** Phrase d'un aperçu sans rencontre acquise. */
+export function nextRoundEmptyLabel(preview: EnduranceNextRoundPreview, text: TournamentActionsText = FR_ACTIONS_TEXT): string {
+  if (preview.freeScore) return text.t("nextRound.empty.freeScore");
+  if (preview.expectedMatches === 0) return text.t("nextRound.empty.underfilled");
+  return text.t("nextRound.empty.none");
 }

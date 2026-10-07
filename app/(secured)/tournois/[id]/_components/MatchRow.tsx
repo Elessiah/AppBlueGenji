@@ -6,9 +6,10 @@ import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import { canReportOwnMatch, teamLabel } from "@/lib/shared/match-card-viewer";
 import {
-  pendingReportNotice,
+  pendingReportState,
   playerReportView,
-  playerScoreButtonLabel,
+  playerScoreButtonKey,
+  type PendingReportState,
 } from "@/lib/shared/player-score-report";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -31,12 +32,9 @@ import { MatchCardActions } from "./MatchCardActions";
 import { EntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import {
-  FR_TOURNAMENT_PAGE_TEXT,
-  frenchBlockLang,
-  localizedPlaceholder,
-  versusText,
-} from "@/lib/shared/tournament-page-text";
+import { localizedPlaceholder, versusText } from "@/lib/shared/tournament-page-text";
+import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
+import { useActionsText } from "../_lib/actions-text";
 
 
 /**
@@ -44,9 +42,17 @@ import {
  * lancement (le forfait), et, une fois lancé, s'il reste un score proposé à
  * valider — une confirmation qui peut ne jamais venir (adversaire fantôme).
  */
-function adminScoreButtonLabel(scoreEntryClosed: boolean, hasProposal: boolean): string {
-  if (scoreEntryClosed) return "Prononcer un forfait";
-  return hasProposal ? "Valider le score proposé" : "Éditer le score";
+function adminScoreButtonLabel(text: TournamentActionsText, scoreEntryClosed: boolean, hasProposal: boolean): string {
+  if (scoreEntryClosed) return text.t("cardActions.adminForfeit");
+  return text.t(hasProposal ? "cardActions.adminValidate" : "cardActions.adminEdit");
+}
+
+/** Ligne d'état d'une proposition en attente (`pendingReportState`), dans la langue de la page. */
+function pendingReportText(text: TournamentActionsText, state: PendingReportState | null): string | null {
+  if (state === null) return null;
+  if (state.kind === "conflict") return text.t("cardActions.reportConflict");
+  const reporter = state.reporter ?? text.t("cardActions.reportSide", { side: state.side });
+  return text.t("cardActions.reportPending", { score1: state.team1Score, score2: state.team2Score, reporter });
 }
 
 interface MatchRowProps {
@@ -85,9 +91,8 @@ export const MatchRow = memo(function MatchRow({
   // vingt-sept cartes qui ne concernent pas le lecteur ne fait que les
   // alourdir toutes.
   const text = useTournamentPageText();
-  // Gestes du lot 8b (score, signalement, lancement) et outils du staff : restés
-  // français, annoncés comme tels sous `/en`.
-  const actionLang = frenchBlockLang(text);
+  // Gestes du lot 8b (score, signalement, lancement) et outils du staff.
+  const actionText = useActionsText();
   const { canReport, openReport } = useIssueReport();
   // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
   // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
@@ -110,11 +115,11 @@ export const MatchRow = memo(function MatchRow({
   const playerScore = usePlayerScore();
   const canOpenPlayerScore = playerScore.canOpen(match);
   const playerScoreLabel = canOpenPlayerScore
-    ? playerScoreButtonLabel(playerReportView(match, myTeamId), playerScore.canReportScore(match))
+    ? actionText.t(`cardActions.playerScore.${playerScoreButtonKey(playerReportView(match, myTeamId), playerScore.canReportScore(match))}`)
     : null;
   // Proposition en attente, lisible de tous : sans elle, un match joué et
   // reporté se lisait exactement comme un match pas encore joué.
-  const reportNotice = pendingReportNotice(match);
+  const reportNotice = pendingReportText(actionText, pendingReportState(match));
   // Cible d'une ancre `#match-[id]` : la carte est surlignée quelques secondes
   // à l'arrivée. Sans ce repère, la page s'ouvre défilée au bon endroit mais le
   // lecteur ne sait pas laquelle des cartes visibles il venait voir.
@@ -153,21 +158,13 @@ export const MatchRow = memo(function MatchRow({
   const team1Display = teamLabel(match.team1Name, localizedPlaceholder(text, match.team1Placeholder), side1.emptyLabel);
   const team2Display = teamLabel(match.team2Name, localizedPlaceholder(text, match.team2Placeholder), side2.emptyLabel);
 
-  const adminScoreLabel = adminScoreButtonLabel(scoreEntryClosed, pendingScoreProposal(match) !== null);
+  const adminScoreLabel = adminScoreButtonLabel(actionText, scoreEntryClosed, pendingScoreProposal(match) !== null);
 
   // État de diffusion, calculé une fois ici : le bandeau d'horaire l'affiche,
   // le pied d'action en tire le bouton d'antenne — une seule minuterie.
   const liveState = useMatchLiveState(match);
   const launch = launchStripControls(match, launchPhase, { canManage, canSchedule, viewerUserId, myTeamId });
-  // Le pied d'action reste en français (lot 8b) : il cite le match en français,
-  // libellés d'attente de l'instantané compris.
-  const actionMatchLabel = actionLang
-    ? versusText(
-        FR_TOURNAMENT_PAGE_TEXT,
-        teamLabel(match.team1Name, match.team1Placeholder, side1.emptyLabel),
-        teamLabel(match.team2Name, match.team2Placeholder, side2.emptyLabel),
-      )
-    : versusText(text, team1Display, team2Display);
+  const actionMatchLabel = versusText(text, team1Display, team2Display);
   // Toutes les actions de la carte, rangées par `MatchCardActions` : une
   // principale visible, le reste derrière « Plus d'actions »
   // (`docs/features/MATCH_CARD_LAYOUT.md`). Chaque drapeau est celui qui
@@ -186,7 +183,7 @@ export const MatchRow = memo(function MatchRow({
     showReplay: canEditReplay(match, canManage),
     hasReplay: match.replayUrl !== null,
     canReport: canReportMatch,
-  });
+  }, actionText);
 
   return (
     <div
@@ -252,10 +249,9 @@ export const MatchRow = memo(function MatchRow({
       {/* Pas de région live : un plateau de cent vingt-sept cartes en
           annoncerait autant à chaque instantané du flux. L'annonce qui compte,
           celle du lecteur engagé, vit dans sa modale. */}
-      {reportNotice && <p className={styles.reportNotice} lang={actionLang}>{reportNotice}</p>}
+      {reportNotice && <p className={styles.reportNotice}>{reportNotice}</p>}
 
       <MatchCardActions
-        lang={actionLang}
         match={match}
         phase={launchPhase}
         actions={actions}
@@ -269,16 +265,15 @@ export const MatchRow = memo(function MatchRow({
 
       {adminResolvable && scoreLocked && (
         <div
-          lang={actionLang}
           className={styles.locked}
-          title="La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié."
+          title={actionText.t("cardActions.lockedTitle")}
         >
           <span aria-hidden="true">🔒</span>
-          Score verrouillé
+          {actionText.t("cardActions.locked")}
           {/* Le motif n'était qu'en infobulle, qu'un bloc non focalisable ne
               montre ni au clavier ni aux lecteurs d'écran. */}
           <span className="sr-only">
-            : la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.
+            {actionText.t("cardActions.lockedReason")}
           </span>
         </div>
       )}

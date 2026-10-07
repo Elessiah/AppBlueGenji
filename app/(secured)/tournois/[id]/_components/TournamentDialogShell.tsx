@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode } from "react";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
+import { useActionsText } from "../_lib/actions-text";
 
 interface TournamentDialogShellProps {
   /** Identifiant du titre (`aria-labelledby`). */
@@ -48,6 +49,7 @@ export function TournamentDialogShell({
   submitLabel,
   children,
 }: Readonly<TournamentDialogShellProps>) {
+  const { t } = useActionsText();
   return (
     <TournamentDialogFrame
       titleId={titleId}
@@ -74,7 +76,7 @@ export function TournamentDialogShell({
             disabled={busy}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
-            Annuler
+            {t("common.cancel")}
           </button>
           <button
             type="submit"

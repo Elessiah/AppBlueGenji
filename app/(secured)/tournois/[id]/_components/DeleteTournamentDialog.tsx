@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { FormEvent, useState, type ReactNode } from "react";
+import { useToast } from "@/components/ui/toast";
+import { richNodes } from "@/components/i18n/shell-text";
 import { isDeletionConfirmed } from "@/lib/shared/tournament-deletion";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface DeleteTournamentDialogProps {
@@ -32,7 +34,11 @@ export function DeleteTournamentDialog({
   onClose,
   onDeleted,
 }: Readonly<DeleteTournamentDialogProps>) {
-  const { showError } = useFrenchBlockToast();
+  const { showError } = useToast();
+  const mapError = useMapError();
+  const text = useDialogsText();
+  const { t } = text;
+  const strong = (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>;
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -68,24 +74,20 @@ export function DeleteTournamentDialog({
         id="delete-tournament-title"
         style={{ margin: 0, fontSize: 18, color: "var(--red-live, #ff4d4d)" }}
       >
-        Supprimer définitivement ce tournoi
+        {t("delete.title")}
       </h3>
 
       <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
-        Cette action est irréversible. Le tournoi{" "}
-        <strong style={{ color: "var(--ink)" }}>{tournamentName}</strong> disparaîtra du site avec
-        tous ses matchs, ses inscriptions et ses classements — y compris des palmarès et des
-        statistiques de ses participants.
+        {richNodes(text.rich("delete.body", { name: tournamentName }, { strong }))}
       </p>
       <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
-        Aucune équipe ni aucun joueur n&apos;est supprimé : seuls les résultats de ce tournoi le
-        sont.
+        {t("delete.kept")}
       </p>
 
       <form onSubmit={submit}>
         <div className="field" style={{ marginTop: 18 }}>
           <label htmlFor="delete-tournament-confirmation">
-            Recopie le nom du tournoi pour confirmer
+            {t("delete.label")}
           </label>
           <input
             id="delete-tournament-confirmation"
@@ -101,9 +103,7 @@ export function DeleteTournamentDialog({
             aria-live="polite"
             style={{ marginTop: 6, fontSize: 12, color: "var(--ink-dim, #6b7480)" }}
           >
-            {armed
-              ? "Nom confirmé."
-              : "La suppression restera bloquée tant que le nom ne correspond pas."}
+            {armed ? t("delete.armed") : t("delete.blocked")}
           </p>
         </div>
 
@@ -115,7 +115,7 @@ export function DeleteTournamentDialog({
             disabled={busy}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
-            Annuler
+            {t("score.cancel")}
           </button>
           <button
             type="submit"
@@ -128,7 +128,7 @@ export function DeleteTournamentDialog({
               color: armed && !busy ? "var(--red-live, #ff4d4d)" : undefined,
             }}
           >
-            {busy ? "Suppression…" : "Supprimer définitivement"}
+            {busy ? t("delete.pending") : t("delete.confirm")}
           </button>
         </div>
       </form>
