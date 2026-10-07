@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { CyberButton, ScrollArea } from "@/components/cyber";
+import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -58,6 +59,10 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
 
   // Route sans préfixe de langue : `/en/rgpd` est la page de confidentialité.
   const { path: pathname } = useLocalePathname();
+
+  // En anglais, les noms français cités « … » (catégories du formulaire, libellés de /profil)
+  // sont marqués lang="fr" (WCAG 3.1.2) ; le français reste du texte brut, inchangé.
+  const entryText = (text: string) => (locale === "en" ? <EnglishLegalText text={text} /> : text);
   const open = changes.length > 0 && !answered && pathname !== PRIVACY_POLICY_PATH;
   const dialogRef = useDialogBehavior({
     open,
@@ -149,11 +154,11 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
                     {formatPrivacyChangeDateIn(change.publishedAt, locale)}
                   </time>
                 </div>
-                <p className={styles.changeSummary}>{change.summary}</p>
+                <p className={styles.changeSummary}>{entryText(change.summary)}</p>
                 {change.details.length > 0 && (
                   <ul className={styles.changeDetails}>
                     {change.details.map((detail, index) => (
-                      <li key={index} /* NOSONAR S6479 — détails d'une entrée publiée, immuables */>{detail}</li>
+                      <li key={index} /* NOSONAR S6479 — détails d'une entrée publiée, immuables */>{entryText(detail)}</li>
                     ))}
                   </ul>
                 )}

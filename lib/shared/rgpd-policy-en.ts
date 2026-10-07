@@ -49,7 +49,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Certification of the Discord username",
-    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), players and caster of your match from its launch to its end; other logged-in players only if you tick “Discord tag”. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
+    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), players and caster of your match from its launch to its end; other logged-in players only if you tick “Discord tag” (« Tag Discord »). Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
   ],
   [
     "Discord ID",
@@ -69,7 +69,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Declared adulthood",
-    "Yes, no or not specified, as you choose. Shown on your page only if you tick “Adulthood” in My profile",
+    "Yes, no or not specified, as you choose. Shown on your page only if you tick “Adulthood” (« Majorité ») in My profile",
   ],
   [
     "Avatar",

@@ -53,7 +53,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "We have reviewed how BlueGenji processes your data. Here, all at once, are the rules that apply to your account today.",
     details: [
       "No email address is requested or kept any more: those collected before have been deleted. Your account relies only on usernames and on the technical identifiers of the services you log in with (Google, Discord, Blizzard).",
-      "An account is no longer linked to another through its address: you add or remove a means of logging in yourself, from “Connected apps” in My profile. The last one cannot be removed, otherwise no one could get in any more.",
+      "An account is no longer linked to another through its address: you add or remove a means of logging in yourself, from “Connected apps” (« Applications connectées ») in My profile. The last one cannot be removed, otherwise no one could get in any more.",
       "Your Discord tag remains invisible to everyone until it is certified. Once certified (with a code, or by logging in with Discord), the organizers can read it to reach you during a tournament: administrators at all times, referees while you are taking part in a tournament in progress. Never the public.",
       "If you link your Battle.net account, Blizzard fills in your BattleTag and replaces it at each login. Its visibility on your profile does not change.",
       "Your profile picture is copied to our servers at login: no page of the site calls on Google to display it any more, and an avatar you hide is hidden everywhere, home page included.",
@@ -163,7 +163,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "Logging in through Discord no longer opens your tag to the organizers: you certify it yourself, in one click, from your profile.",
     details: [
-      "Until now, logging in through Discord (button or code by direct message) certified your Discord tag, and so made it readable by administrators, by referees during your tournaments, and by the players and caster of your matches. From now on, logging in only records your Discord username, invisible to everyone; it is the “Certify my tag” button in “My profile” that opens it to the organizers.",
+      "Until now, logging in through Discord (button or code by direct message) certified your Discord tag, and so made it readable by administrators, by referees during your tournaments, and by the players and caster of your matches. From now on, logging in only records your Discord username, invisible to everyone; it is the “Certify my tag” button (« Certifier mon tag ») in “My profile” that opens it to the organizers.",
       "If your tag was certified automatically, it stays certified: the organizers can still reach you during a tournament. To remove this exposure, remove your tag in “My profile”: your next login through Discord will record it again without certifying it.",
       "The username, the login identifiers and the account are based on the performance of the service you request, and no longer on consent: the privacy policy says so. The Google One Tap prompt on the login page now only appears if you ask for it, through a box unticked by default.",
     ],
@@ -184,7 +184,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Your account, created before September 30, 2026, is linked to Google: its username and picture may have come from your Google profile. Nothing has been changed for you: check them in “My profile”.",
     details: [
       "Until September 30, 2026, an account created by logging in with Google received as its username the name of that Google account, often a real first and last name, and its Google picture was copied to the site and shown to the other members. Since then, an account created through Google receives a neutral username, and the imported picture stays hidden until you choose to show it.",
-      "Nothing has been changed on your account. If your username is your real name, replace it. If your picture comes from Google and you do not want to show it, change it, delete it, or untick “Avatar” in the “Privacy” section to hide it.",
+      "Nothing has been changed on your account. If your username is your real name, replace it. If your picture comes from Google and you do not want to show it, change it, delete it, or untick “Avatar” in the “Privacy” section (« Confidentialité ») to hide it.",
       "If your account was created another way (Discord, Blizzard) or if you have already changed your username and picture, you have nothing to do.",
     ],
     linkLabels: ["Change my username or avatar", "Hide my avatar"],
@@ -219,7 +219,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     title: `Logins: IP address kept for ${CONNECTION_LOG_RETENTION_DAYS} days`,
     summary: `At each login, the site now notes your IP address, the date and time, and the means of logging in used. This data is kept for ${CONNECTION_LOG_RETENTION_DAYS} days (one year), even if you delete your account: the law requires it of the association, which hosts the content published by its members.`,
     details: [
-      "It serves no other purpose: no screen of the site displays it, and it is only disclosed to a judicial authority that requests it (French Act on Confidence in the Digital Economy, loi pour la confiance dans l'économie numérique, art. 6).",
+      "It serves no other purpose: no screen of the site displays it, and it is only disclosed to a judicial authority that requests it (French Act on Confidence in the Digital Economy, « loi pour la confiance dans l'économie numérique », art. 6).",
       "You find it in the export of your data, from “My profile”, as long as your account exists.",
     ],
     linkLabels: [READ_POLICY],

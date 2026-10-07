@@ -84,7 +84,9 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
   return (
     <tr role="row">
       <DataCell column={0}>{entry.donnee}</DataCell>
-      <DataCell column={1}>{entry.finalite}</DataCell>
+      <DataCell column={1}>
+        <EnglishLegalText text={entry.finalite} />
+      </DataCell>
       <DataCell column={2}>
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
         {entry.extraBases?.map((extra) => (
