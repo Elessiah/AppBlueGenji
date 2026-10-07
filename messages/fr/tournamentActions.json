@@ -167,7 +167,8 @@
     "frozen": "Figée",
     "frozenTitle": "Une manche a été jouée depuis : rendre ces points remettrait en lice une équipe qui ne l'a pas disputée.",
     "buttonTitle": "Retirer cette pénalité : {name} récupère {points} point(s)",
-    "buttonAria": "Retirer la pénalité de {points} point(s) infligée à {name}"
+    "buttonAria": "Retirer la pénalité de {points} point(s) infligée à {name}",
+    "button": "Retirer"
   },
   "launch": {
     "fallback": "L'action n'a pas pu aboutir. Réessaie dans un instant.",

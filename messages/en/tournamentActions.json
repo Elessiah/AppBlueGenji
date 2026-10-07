@@ -167,7 +167,8 @@
     "frozen": "Locked",
     "frozenTitle": "A round has been played since: giving these points back would put back in contention a team that didn't play it.",
     "buttonTitle": "Lift this penalty: {name} gets back {points, plural, one {# point} other {# points}}",
-    "buttonAria": "Remove the {points}-point penalty given to {name}"
+    "buttonAria": "Lift the {points}-point penalty given to {name}",
+    "button": "Lift"
   },
   "launch": {
     "fallback": "The action couldn't go through. Try again in a moment.",

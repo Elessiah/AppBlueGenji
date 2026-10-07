@@ -338,7 +338,7 @@ function PenaltyLog({
                   letterSpacing: "0.04em",
                 }}
               >
-                {a("registrations.remove")}
+                {a("penaltyLift.button")}
               </button>
             )}
           </li>
