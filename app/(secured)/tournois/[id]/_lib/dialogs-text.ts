@@ -1,6 +1,7 @@
 import frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
+import enTournamentDialogs from "@/messages/en/tournamentDialogs.json";
 import { tournamentDialogsText, type TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { useTournamentDialogsTextFrom } from "@/components/i18n/tournament-actions-text";
+import { useTournamentActionsLocale } from "@/components/i18n/tournament-actions-text";
 import {
   matchFormatLabel,
   matchMaxMaps,
@@ -17,13 +18,16 @@ import type { PendingScoreProposal, ScoreFormBlocker } from "./score-form";
  * (`dynamic()` dans `page.tsx`) : importé par les fenêtres seules, il voyage
  * avec leurs morceaux plutôt qu'avec le premier chargement de la fiche — un
  * seul module pour toutes (un JSON est un module unique pour le bundler).
- * L'anglais vient du fournisseur, sous `/en` seulement.
+ * L'anglais voyage de même : le servir par la mise en page l'enverrait à
+ * chaque lecteur de `/en`, fenêtre ouverte ou non. Le fournisseur ne donne que
+ * la langue.
  */
 export const FR_DIALOGS_TEXT: TournamentDialogsText = tournamentDialogsText("fr", frTournamentDialogs);
+const EN_DIALOGS_TEXT: TournamentDialogsText = tournamentDialogsText("en", enTournamentDialogs);
 
 /** Textes des fenêtres d'action, dans la langue de la page. */
 export function useDialogsText(): TournamentDialogsText {
-  return useTournamentDialogsTextFrom(FR_DIALOGS_TEXT);
+  return useTournamentActionsLocale() === "en" ? EN_DIALOGS_TEXT : FR_DIALOGS_TEXT;
 }
 
 /**

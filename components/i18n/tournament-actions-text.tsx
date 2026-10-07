@@ -4,11 +4,9 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import type { Locale } from "@/lib/shared/locales";
 import {
   tournamentActionsText,
-  tournamentDialogsText,
   tournamentErrorsText,
   type TournamentActionsClientMessages,
   type TournamentActionsText,
-  type TournamentDialogsText,
   type TournamentErrorsText,
 } from "@/lib/shared/tournament-actions-text";
 
@@ -20,21 +18,26 @@ import {
  * `_lib/actions-text.ts`, `_lib/dialogs-text.ts`), qui passe son français en
  * repli aux crochets ci-dessous. Hors fournisseur (tests, page française) : ce
  * repli.
+ *
+ * Les fenêtres d'action (`tournamentDialogs`) ne passent **pas** par ici : leurs
+ * deux langues voyagent avec leurs morceaux chargés à la demande, et le
+ * fournisseur ne leur donne que la langue (`useTournamentActionsLocale`) — sans
+ * quoi tout lecteur de `/en` recevrait leur anglais à chaque chargement.
  */
 type ActionsTextValue = {
+  readonly locale?: Locale;
   readonly errors?: TournamentErrorsText;
   readonly actions?: TournamentActionsText;
-  readonly dialogs?: TournamentDialogsText;
 };
 
 const TournamentActionsTextContext = createContext<ActionsTextValue>({});
 
 function buildValue(locale: Locale, messages: TournamentActionsClientMessages | undefined): ActionsTextValue {
-  if (!messages) return {};
+  if (!messages) return { locale };
   return {
+    locale,
     errors: tournamentErrorsText(locale, messages.errors),
     actions: messages.actions ? tournamentActionsText(locale, messages.actions) : undefined,
-    dialogs: messages.dialogs ? tournamentDialogsText(locale, messages.dialogs) : undefined,
   };
 }
 
@@ -61,7 +64,7 @@ export function useTournamentActionsTextFrom(fr: TournamentActionsText): Tournam
   return useContext(TournamentActionsTextContext).actions ?? fr;
 }
 
-/** Textes des fenêtres d'action ; `fr` : ceux du morceau de la fenêtre. */
-export function useTournamentDialogsTextFrom(fr: TournamentDialogsText): TournamentDialogsText {
-  return useContext(TournamentActionsTextContext).dialogs ?? fr;
+/** Langue de la fiche ; `undefined` hors fournisseur (tests) — le français. */
+export function useTournamentActionsLocale(): Locale | undefined {
+  return useContext(TournamentActionsTextContext).locale;
 }

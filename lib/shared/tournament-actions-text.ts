@@ -12,8 +12,9 @@
  *
  * Aucun JSON n'est importé ici (types seulement) : chaque module importe le
  * français de **son** espace, pour que le bundler le range dans le bon morceau.
- * L'anglais n'arrive que sous `/en`, sérialisé par la mise en page
- * (`TournamentActionsTextProvider`).
+ * L'anglais des refus et des gestes n'arrive que sous `/en`, sérialisé par la
+ * mise en page (`TournamentActionsTextProvider`) ; celui des fenêtres voyage
+ * avec leurs morceaux (`_lib/dialogs-text.ts`).
  */
 import type frErrors from "@/messages/fr/tournamentErrors.json";
 import type frActions from "@/messages/fr/tournamentActions.json";
@@ -35,14 +36,13 @@ export type TournamentDialogsText = ScopedText<Leaves<TournamentDialogMessages>>
 export type TournamentActionsClientMessages = {
   errors: TournamentErrorMessages;
   actions?: TournamentActionMessages;
-  dialogs?: TournamentDialogMessages;
 };
 
-/** Les trois espaces de la fiche (`/tournois/[id]`). */
+/** Les espaces rendus avec la fiche (`/tournois/[id]`) : refus et gestes. */
 export function tournamentActionsMessages(
-  messages: Pick<Messages, "tournamentErrors" | "tournamentActions" | "tournamentDialogs">,
+  messages: Pick<Messages, "tournamentErrors" | "tournamentActions">,
 ): TournamentActionsClientMessages {
-  return { errors: messages.tournamentErrors, actions: messages.tournamentActions, dialogs: messages.tournamentDialogs };
+  return { errors: messages.tournamentErrors, actions: messages.tournamentActions };
 }
 
 export function tournamentErrorsText(locale: Locale, messages: TournamentErrorMessages): TournamentErrorsText {

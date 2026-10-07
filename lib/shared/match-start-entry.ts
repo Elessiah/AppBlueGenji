@@ -182,12 +182,29 @@ const PARIS_FULL = new Intl.DateTimeFormat("fr-FR", {
 export function formatMatchStartEntryPreview(instant: number, locale: Locale = DEFAULT_LOCALE): string {
   if (locale === DEFAULT_LOCALE) return PARIS_FULL.format(new Date(instant));
   // Anglais (lot 8b) : même date, sur 24 h comme le reste du site.
-  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
-    timeZone: MATCH_ENTRY_TIME_ZONE,
-    dateStyle: "full",
-    timeStyle: "short",
-    hourCycle: "h23",
-  }).format(new Date(instant));
+  return cachedFormatter(`full|${locale}`, () =>
+    new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+      timeZone: MATCH_ENTRY_TIME_ZONE,
+      dateStyle: "full",
+      timeStyle: "short",
+      hourCycle: "h23",
+    }),
+  ).format(new Date(instant));
+}
+
+/**
+ * Formateurs des autres langues, construits une fois par clé (langue, fuseau) :
+ * l'aperçu du dialogue se recalcule à chaque frappe.
+ */
+const FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+function cachedFormatter(key: string, build: () => Intl.DateTimeFormat): Intl.DateTimeFormat {
+  let formatter = FORMATTERS.get(key);
+  if (!formatter) {
+    formatter = build();
+    FORMATTERS.set(key, formatter);
+  }
+  return formatter;
 }
 
 /**
@@ -218,12 +235,15 @@ export function localMatchTimeIfDifferent(
   if (locale === DEFAULT_LOCALE) return local;
   // La comparaison reste faite en français (deux rendus d'un même formateur) ;
   // seule l'heure rendue suit la langue de la page.
-  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
-    ...(timeZone === undefined ? {} : { timeZone }),
-    dateStyle: "short",
-    timeStyle: "short",
-    hourCycle: "h23",
-  }).format(new Date(instant));
+  // Le fuseau a déjà été validé par le formateur français ci-dessus.
+  return cachedFormatter(`short|${locale}|${timeZone ?? ""}`, () =>
+    new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+      ...(timeZone === undefined ? {} : { timeZone }),
+      dateStyle: "short",
+      timeStyle: "short",
+      hourCycle: "h23",
+    }),
+  ).format(new Date(instant));
 }
 
 // Construits une fois : l'aperçu se recalcule à chaque frappe.
@@ -237,9 +257,16 @@ const PARIS_SHORT = new Intl.DateTimeFormat("fr-FR", {
 /** Noms des mois dans une langue, pour la liste du dialogue (index 0 = janvier). */
 export function matchEntryMonths(locale: Locale = DEFAULT_LOCALE): readonly string[] {
   if (locale === DEFAULT_LOCALE) return MATCH_ENTRY_MONTHS;
-  const format = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "long", timeZone: "UTC" });
-  return Array.from({ length: 12 }, (_, index) => format.format(Date.UTC(2026, index, 15)));
+  let months = MONTHS_BY_LOCALE.get(locale);
+  if (!months) {
+    const format = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "long", timeZone: "UTC" });
+    months = Array.from({ length: 12 }, (_, index) => format.format(Date.UTC(2026, index, 15)));
+    MONTHS_BY_LOCALE.set(locale, months);
+  }
+  return months;
 }
+
+const MONTHS_BY_LOCALE = new Map<Locale, readonly string[]>();
 
 /** Noms des mois, pour la liste du dialogue (index 0 = janvier). */
 export const MATCH_ENTRY_MONTHS: readonly string[] = [
