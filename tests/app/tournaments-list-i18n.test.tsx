@@ -182,6 +182,13 @@ describe("cartes — rendu anglais", () => {
     expect(text).not.toMatch(FRENCH_WORDS);
     expect(text).not.toMatch(ACCENTED);
     expect(html).toContain('href="/tournois/1"');
+    // La fiche reste française (lot 8a-2) : le lien le dit depuis `/en`.
+    expect(html).toMatch(/href="\/tournois\/1"[^>]*hrefLang="fr"|hrefLang="fr"[^>]*href="\/tournois\/1"/);
+  });
+
+  it("en français, le lien vers la fiche ne porte pas d'hrefLang", () => {
+    const html = renderToStaticMarkup(<RunningCard t={tournamentCard({ ...DATES, state: "RUNNING" })} />);
+    expect(html).not.toContain("hrefLang");
   });
 
   it("parle le glossaire", () => {

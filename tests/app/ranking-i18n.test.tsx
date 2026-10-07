@@ -173,6 +173,7 @@ describe("rendu anglais — aucune phrase française sous /en/classement", () =>
     expect(html).toContain('href="/en/regles"');
     // Les tournois sont traduits depuis le lot 8a-1.
     expect(html).toContain('href="/en/tournois"');
+    expect(html).not.toContain('hrefLang="fr"');
     // « Afficher plus » : page suivante, sous `/en`.
     expect(html).toContain('href="/en/classement?n=100#rang-51"');
   });

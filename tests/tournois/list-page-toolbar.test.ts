@@ -49,7 +49,7 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("« Créer un tournoi » est un seul contrôle interactif, pas un bouton dans un lien", () => {
-    expect(page).toMatch(/<CyberButton asChild variant="primary">\s*<LocaleLink href="\/tournois\/creer">/);
+    expect(page).toMatch(/<CyberButton asChild variant="primary">\s*<LocaleLink href="\/tournois\/creer"[^>]*>/);
     expect(page).not.toMatch(/<LocaleLink href="\/tournois\/creer">\s*<button/);
   });
 
