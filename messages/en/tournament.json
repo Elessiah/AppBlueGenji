@@ -36,7 +36,7 @@
     "fatal": {
       "expiredTitle": "Session expired",
       "notFoundTitle": "Tournament not found",
-      "expiredText": "Your session has expired: live tracking has stopped. Log in again to resume it.",
+      "expiredText": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
       "notFoundText": "This tournament isn't available. It may have been deleted, or isn't open to the public yet.",
       "relogin": "Log in again",
       "back": "Back to tournaments"

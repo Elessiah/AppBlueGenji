@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
 import { mapError } from "../_lib/error-map";
 import { clearAttention } from "../_lib/attention";
@@ -57,7 +58,11 @@ const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: f
  *   d'onglet, modale de lancement.
  */
 export function useTournamentLive(tournamentId: number) {
-  const { showError } = useToast();
+  // Refus d'une relecture : phrase de `mapError`, française (`lang="fr"` sous
+  // `/en`). Échec définitif : dit dans la langue de la page, comme le témoin.
+  const { showError } = useFrenchBlockToast();
+  const { showError: showPageError } = useToast();
+  const { t } = useTournamentPageText();
   /** État **rendu** — peut retarder sur `stateRef`, qui est l'état reçu. */
   const [state, setState] = useState<LiveState>(INITIAL_LIVE_STATE);
   const [isLive, setIsLive] = useState(false);
@@ -284,7 +289,7 @@ export function useTournamentLive(tournamentId: number) {
       onLiveChange: setIsLive,
       onFatal: (failure) => {
         setFatal(failure);
-        showError(mapError(failure));
+        showPageError(t(`live.fatal.${failure}`));
       },
     });
     reconnectRef.current = connection.reconnect;
@@ -293,7 +298,7 @@ export function useTournamentLive(tournamentId: number) {
       reconnectRef.current = null;
       connection.close();
     };
-  }, [tournamentId, load, onMessage, showError, quietStream]);
+  }, [tournamentId, load, onMessage, showPageError, t, quietStream]);
 
   return {
     tournament: state.detail,

@@ -36,7 +36,7 @@
     "fatal": {
       "expiredTitle": "Session expirée",
       "notFoundTitle": "Tournoi introuvable",
-      "expiredText": "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre.",
+      "expiredText": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
       "notFoundText": "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public.",
       "relogin": "Se reconnecter",
       "back": "Retour aux tournois"
