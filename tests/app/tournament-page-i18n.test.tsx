@@ -39,6 +39,9 @@ import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/Re
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
+import { FR_SWISS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/swiss-text";
+import { FR_SURVIVAL_TEXT } from "@/app/(secured)/tournois/[id]/_lib/survival-text";
+import { FR_ENDURANCE_TEXT } from "@/app/(secured)/tournois/[id]/_lib/endurance-text";
 import { EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { registrationConditionsText } from "@/app/(secured)/tournois/[id]/_lib/header-meta";
 import { phaseFormatLabel, phaseStateLabel } from "@/app/(secured)/tournois/[id]/_lib/phases";
@@ -58,7 +61,9 @@ import { formatMessage } from "@/lib/shared/message-format";
 import { registrationFiltersSummary } from "@/lib/shared/registration-filters";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
 import {
+  FR_TOURNAMENT_PAGE_MESSAGES,
   FR_TOURNAMENT_PAGE_TEXT,
+  TOURNAMENT_VIEW_PARTS,
   localizedPlaceholder,
   matchFormatDescriptionText,
   pageDateTime,
@@ -663,7 +668,8 @@ describe("tournament — équivalence avec next-intl, message par message", () =
   }
 
   it.each(LOCALES.map((locale) => [locale]))("%s", (locale) => {
-    const messages = leaves(messagesFor(locale).tournament);
+    const catalog = messagesFor(locale);
+    const messages = leaves({ ...catalog.tournament, ...catalog.tournamentViews });
     expect(messages.length).toBeGreaterThan(300);
     const values = {
       count: 2, entrants: 1, qualifiers: 2, wins: 3, points: 1, total: 2, win: 1,
@@ -677,5 +683,37 @@ describe("tournament — équivalence avec next-intl, message par message", () =
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
       expect(`${key}: ${formatMessage(locale, source, values)}`).toBe(`${key}: ${reference("m", values)}`);
     }
+  });
+});
+
+describe("performance — le français des vues voyage avec la vue", () => {
+  const ID = "app/(secured)/tournois/[id]";
+  const read = (file: string) => readFileSync(join(process.cwd(), ID, file), "utf8");
+
+  it("le premier chargement ne porte pas les espaces des vues", () => {
+    for (const part of TOURNAMENT_VIEW_PARTS) expect(Object.keys(FR_TOURNAMENT_PAGE_MESSAGES)).not.toContain(part);
+    // Hors vue, une clé de vue se rend telle quelle (jamais de page cassée).
+    expect(FR_TOURNAMENT_PAGE_TEXT.t("swiss.summary", { round: "1", total: "3", count: 2 })).toBe("swiss.summary");
+  });
+
+  it("chaque vue apporte son français, égal au catalogue", () => {
+    const fr = messagesFor("fr").tournamentViews;
+    expect(FR_SWISS_TEXT.t("swiss.summary", { round: "1", total: "3", count: 2 })).toBe(
+      formatMessage("fr", fr.swiss.summary, { round: "1", total: "3", count: 2 }),
+    );
+    expect(FR_SURVIVAL_TEXT.t("survival.everyRound")).toBe(fr.survival.everyRound);
+    expect(FR_ENDURANCE_TEXT.t("endurance.regionDone")).toBe(fr.endurance.regionDone);
+    // Le reste de la fiche reste lisible depuis une vue.
+    expect(FR_SWISS_TEXT.t("loading")).toBe(FR_TOURNAMENT_PAGE_TEXT.t("loading"));
+  });
+
+  it("les vues lisent leur texte par useTournamentViewText, la fiche ne les importe qu'à la demande", () => {
+    expect(read("_components/SwissView.tsx")).toContain("useTournamentViewText(FR_SWISS_TEXT)");
+    expect(read("_components/SurvivalView.tsx")).toContain("useTournamentViewText(FR_SURVIVAL_TEXT)");
+    expect(read("_components/EnduranceView.tsx")).toContain("useTournamentViewText(FR_ENDURANCE_TEXT)");
+    expect(read("_components/EnduranceRoundPanels.tsx")).toContain("useTournamentViewText(FR_ENDURANCE_TEXT)");
+    const page = read("page.tsx");
+    expect(page).not.toMatch(/_lib\/(swiss|survival|endurance)-text"/);
+    expect(page).not.toContain("tournamentViews.json");
   });
 });
