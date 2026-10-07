@@ -2,7 +2,7 @@
 
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
-import { matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
+import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { FormEvent, useEffect, useRef, useState } from "react";
@@ -222,8 +222,8 @@ export function PlayerScoreDialog({
 
   const view = playerReportView(match, myTeamId);
   const myTeamIsTeam1 = isMyTeamTeam1(myTeamId, match.team1Id);
-  const team1 = teamLabel(match.team1Name, match.team1Placeholder, t("score.team", { side: 1 }));
-  const team2 = teamLabel(match.team2Name, match.team2Placeholder, t("score.team", { side: 2 }));
+  const team1 = teamLabel(match.team1Name, localizedPlaceholder(pageText, match.team1Placeholder), t("score.team", { side: 1 }));
+  const team2 = teamLabel(match.team2Name, localizedPlaceholder(pageText, match.team2Placeholder), t("score.team", { side: 2 }));
   const [myName, opponentName] = myTeamIsTeam1 ? [team1, team2] : [team2, team1];
 
   const game = useTournamentGame();

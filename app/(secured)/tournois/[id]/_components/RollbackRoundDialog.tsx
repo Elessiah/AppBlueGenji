@@ -4,7 +4,9 @@ import { FormEvent, useState, type ReactNode } from "react";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { richNodes } from "@/components/i18n/shell-text";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
+import { localizedPlaceholder } from "@/lib/shared/tournament-page-text";
 import { teamLabel } from "@/lib/shared/match-card-viewer";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -85,6 +87,9 @@ export function RollbackRoundDialog({
   const mapError = useMapError();
   const text = useDialogsText();
   const { t } = text;
+  // Libellés d'attente (« Gagnant match 1 du tableau perdants… ») : rédigés en
+  // français par le serveur, redits dans la langue de la page (lot 8a-2).
+  const pageText = useTournamentPageText();
   const strong = (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>;
   const strongInk = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
   const [acknowledged, setAcknowledged] = useState(false);
@@ -210,8 +215,8 @@ export function RollbackRoundDialog({
               }}
             >
               <span style={{ color: "var(--ink-quiet, #9aa4b2)" }}>
-                {teamLabel(match.team1Name, match.team1Placeholder, t("rollback.tbd"))} vs{" "}
-                {teamLabel(match.team2Name, match.team2Placeholder, t("rollback.tbd"))}
+                {teamLabel(match.team1Name, localizedPlaceholder(pageText, match.team1Placeholder), t("rollback.tbd"))} vs{" "}
+                {teamLabel(match.team2Name, localizedPlaceholder(pageText, match.team2Placeholder), t("rollback.tbd"))}
               </span>
               <span
                 className="mono"

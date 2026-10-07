@@ -154,7 +154,10 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               </p>
             )}
 
-            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} lang={pickerLang} />
+            {/* Le sélecteur reste français jusqu'au lot 8b-2 : annoncé comme tel (WCAG 3.1.2). */}
+            <div lang={pickerLang}>
+              <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} lang={pickerLang} />
+            </div>
 
             <div
               style={{
