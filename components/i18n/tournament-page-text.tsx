@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { useToast } from "@/components/ui/toast";
 import type { Locale } from "@/lib/shared/locales";
 import {
@@ -24,7 +24,13 @@ export function TournamentPageTextProvider({
 }: Readonly<{ locale: Locale; messages?: TournamentPageMessages; children: ReactNode }>) {
   // `messages` n'est passé que sous `/en` : une fiche française ne sérialise
   // aucun dictionnaire, son texte est déjà dans le paquet.
-  const value = useMemo(() => (messages ? tournamentPageText(locale, messages) : FR_TOURNAMENT_PAGE_TEXT), [locale, messages]);
+  // Indexé sur la **langue** seule, comme `LoginTextProvider` : chaque rendu
+  // serveur (`router.refresh()`) renvoie un nouvel objet `messages`, au contenu
+  // identique — un nouveau `text` rouvrirait le flux (`useTournamentLive`) et
+  // redessinerait tout le plateau.
+  const build = () => (messages ? tournamentPageText(locale, messages) : FR_TOURNAMENT_PAGE_TEXT);
+  const [value, setValue] = useState(build);
+  if (value.locale !== locale) setValue(build());
   return <TournamentPageTextContext.Provider value={value}>{children}</TournamentPageTextContext.Provider>;
 }
 

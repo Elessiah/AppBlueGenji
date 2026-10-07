@@ -193,7 +193,9 @@ export function TournamentHeader({
               )}
               {showEdit && (
                 <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
-                  <LocaleLink href={`/tournois/${card.id}/modifier`}>Modifier</LocaleLink>
+                  <LocaleLink href={`/tournois/${card.id}/modifier`} hrefLang={actionLang}>
+                    Modifier
+                  </LocaleLink>
                 </CyberButton>
               )}
             </div>
