@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { CyberButton } from "@/components/cyber";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { TranslationNotice } from "@/components/legal/TranslationNotice";
+import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { ProtectedContact } from "@/components/ui/protected-contact";
@@ -579,7 +580,7 @@ export function RgpdEn({
             bug, GDPR, host, other —, describe the problem and, when logged in, designate the players, teams or
             tournaments concerned. A <strong>copyright</strong> report states {copyrightNoticeElementsTextEn()}: this
             is what the EU Digital Services Act requires of a notice of illegal content (art. 16).{" "}
-            {NOTIFIER_FOLLOW_UP_EN} <strong>In-game behavior</strong> (insults, cheating, anti-play, dispute on
+            <EnglishLegalText text={NOTIFIER_FOLLOW_UP_EN} /> <strong>In-game behavior</strong> (insults, cheating, anti-play, dispute on
             Discord) is not reported through this form but on the{" "}
             <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
               association&apos;s support portal
@@ -827,7 +828,7 @@ export function RgpdEn({
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or a caster&apos;s.{" "}
             {STREAM_NOTICE_SHOWN_EN} This processing is based on the association&apos;s legitimate interest in
-            promoting its competitions. {STREAM_NOTICE_OBJECTION_EN} A replay link that shows the player is then
+            promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then
             removed from the site, and a video published by the association&apos;s channel is hidden or deleted.
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).
