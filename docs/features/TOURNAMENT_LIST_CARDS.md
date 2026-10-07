@@ -44,6 +44,10 @@ La logique d'affichage est pure, dans `app/(secured)/tournois/_lib/card-display.
 (`runningCardAction`, `upcomingCardFace`, `registrationFill`, `progressPercent`,
 `formatCardDate`).
 
+## Langues
+
+Textes des cartes, du sommaire et du bandeau dans l'espace `tournaments` (lot 8a-1) : `useTournamentsText()`, français hors fournisseur. Détail : `I18N.md` § Tournois — liste.
+
 ## Couleurs d'état
 
 Un état a **une seule teinte**, posée par `--tone` / `--tone-rgb` sur la carte
