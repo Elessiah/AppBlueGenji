@@ -10,17 +10,47 @@ import {
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 
+/**
+ * Textes du contrôle, dans la langue de la page (`legal.audience`, lot 7b-2).
+ * Le français est inclus ici (page française, aucun dictionnaire envoyé) ;
+ * `/en/rgpd` passe l'anglais en prop. Égalité avec `messages/fr/legal.json` testée.
+ */
+export type AudienceOptOutText = {
+  status: { GPC: string; DNT: string; CHOICE: string; measured: string };
+  fieldset: string;
+  optOut: string;
+  reactivate: string;
+  optedOut: string;
+  reactivated: string;
+  blocked: string;
+};
+
+export const AUDIENCE_OPT_OUT_TEXT_FR: AudienceOptOutText = {
+  status: {
+    GPC: "Votre navigateur envoie le signal Global Privacy Control : vos visites ne sont pas mesurées. Ce signal se règle dans votre navigateur, pas sur le site.",
+    DNT: "Votre navigateur envoie le signal Do Not Track : vos visites ne sont pas mesurées. Ce signal se règle dans votre navigateur, pas sur le site.",
+    CHOICE: "Vous vous êtes opposé à la mesure d'audience : vos visites ne sont ni signalées au serveur, ni enregistrées, depuis ce navigateur.",
+    measured: "Vos visites sont actuellement mesurées, comme décrit ci-dessus.",
+  },
+  fieldset: "Mesure d'audience",
+  optOut: "M'opposer à la mesure d'audience",
+  reactivate: "Réactiver la mesure d'audience",
+  optedOut: "Vos visites ne seront plus mesurées.",
+  reactivated: "La mesure d'audience est réactivée.",
+  blocked: "Votre navigateur bloque les cookies : le choix n'a pas pu être retenu.",
+};
+
 /** Phrase d'état, une par situation : ce qui est mesuré, et ce qui le décide. */
-export function audienceOptOutStatus(reason: AudienceOptOutReason | null): string {
+export function audienceOptOutStatus(reason: AudienceOptOutReason | null, text: AudienceOptOutText = AUDIENCE_OPT_OUT_TEXT_FR): string {
   switch (reason) {
     case "GPC":
-      return "Votre navigateur envoie le signal Global Privacy Control : vos visites ne sont pas mesurées. Ce signal se règle dans votre navigateur, pas sur le site.";
+      return text.status.GPC;
     case "DNT":
-      return "Votre navigateur envoie le signal Do Not Track : vos visites ne sont pas mesurées. Ce signal se règle dans votre navigateur, pas sur le site.";
+      return text.status.DNT;
     case "CHOICE":
-      return "Vous vous êtes opposé à la mesure d'audience : vos visites ne sont ni signalées au serveur, ni enregistrées, depuis ce navigateur.";
+      return text.status.CHOICE;
     default:
-      return "Vos visites sont actuellement mesurées, comme décrit ci-dessus.";
+      return text.status.measured;
   }
 }
 
@@ -33,8 +63,12 @@ export function audienceOptOutStatus(reason: AudienceOptOutReason | null): strin
  *
  * @param initialReason État lu par le serveur sur la requête de la page, pour
  * que la phrase soit juste dès le premier affichage.
+ * @param text Textes de la langue de la page — le français par défaut.
  */
-export function AudienceOptOutControl({ initialReason }: Readonly<{ initialReason: AudienceOptOutReason | null }>) {
+export function AudienceOptOutControl({
+  initialReason,
+  text = AUDIENCE_OPT_OUT_TEXT_FR,
+}: Readonly<{ initialReason: AudienceOptOutReason | null; text?: AudienceOptOutText }>) {
   const [reason, setReason] = useState<AudienceOptOutReason | null>(initialReason);
   const { showError, showSuccess } = useToast();
 
@@ -54,7 +88,7 @@ export function AudienceOptOutControl({ initialReason }: Readonly<{ initialReaso
     try {
       document.cookie = audienceOptOutCookieString(optOut, window.location.protocol === "https:");
     } catch {
-      showError("Votre navigateur bloque les cookies : le choix n'a pas pu être retenu.");
+      showError(text.blocked);
       return;
     }
     const read = browserAudienceOptOut();
@@ -62,17 +96,17 @@ export function AudienceOptOutControl({ initialReason }: Readonly<{ initialReaso
     // Relu dans les deux sens : un cookie qui ne se pose pas, ou qui ne s'efface
     // pas (écriture ignorée par le navigateur), ne doit pas être annoncé fait.
     if ((optOut && read === null) || (!optOut && read === "CHOICE")) {
-      showError("Votre navigateur bloque les cookies : le choix n'a pas pu être retenu.");
+      showError(text.blocked);
       return;
     }
-    showSuccess(optOut ? "Vos visites ne seront plus mesurées." : "La mesure d'audience est réactivée.");
+    showSuccess(optOut ? text.optedOut : text.reactivated);
   };
 
   const browserSignal = reason === "GPC" || reason === "DNT";
   return (
-    <fieldset className="native-group" aria-label="Mesure d'audience" style={{ display: "grid", gap: 12, justifyItems: "start" }}>
+    <fieldset className="native-group" aria-label={text.fieldset} style={{ display: "grid", gap: 12, justifyItems: "start" }}>
       <p id="audience-opt-out-status" aria-live="polite" style={{ margin: 0 }}>
-        {audienceOptOutStatus(reason)}
+        {audienceOptOutStatus(reason, text)}
       </p>
       {!browserSignal && (
         <CyberButton
@@ -81,7 +115,7 @@ export function AudienceOptOutControl({ initialReason }: Readonly<{ initialReaso
           aria-describedby="audience-opt-out-status"
           onClick={() => toggle(reason !== "CHOICE")}
         >
-          {reason === "CHOICE" ? "Réactiver la mesure d'audience" : "M'opposer à la mesure d'audience"}
+          {reason === "CHOICE" ? text.reactivate : text.optOut}
         </CyberButton>
       )}
     </fieldset>

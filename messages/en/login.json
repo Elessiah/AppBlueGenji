@@ -100,7 +100,7 @@
     "noResale": "<strong>No resale</strong> of data, no advertising trackers, no targeted ads.",
     "discordTag": "Logging in with Discord saves your Discord username <strong>without certifying it</strong>: nobody sees it until you certify it yourself in your profile.",
     "export": "You can export or delete your data from your profile at any time.",
-    "policy": "Full details in our <policy>privacy policy (in French)</policy>. If you go back, no account is created; only the site's audience measurement may have counted your visit.",
+    "policy": "Full details in our <policy>privacy policy</policy>. If you go back, no account is created; only the site's audience measurement may have counted your visit.",
     "terms": "I have read and accept the terms of use (<terms>read the terms</terms>), and I declare that I am at least {age} years old.",
     "accept": "Continue",
     "refuse": "Go back"

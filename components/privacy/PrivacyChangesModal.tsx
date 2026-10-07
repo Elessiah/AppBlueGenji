@@ -2,13 +2,13 @@
 
 import { useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
+import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
-  formatPrivacyChangeDate,
+  formatPrivacyChangeDateIn,
   PRIVACY_CHANGES_ANSWERED_EVENT,
-  privacyChangesHeading,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
 import styles from "./PrivacyChangesModal.module.css";
@@ -20,9 +20,6 @@ import styles from "./PrivacyChangesModal.module.css";
  * décidé côté serveur sur `/rgpd` aurait suivi le joueur sur tout le site.
  */
 export const PRIVACY_POLICY_PATH = "/rgpd";
-
-/** Échec d'un enregistrement parti d'une modale déjà refermée : rien à réessayer ici. */
-const REPLAY_NOTICE = "Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.";
 
 /**
  * Présente à un compte connecté les changements publiés du traitement de ses
@@ -45,8 +42,13 @@ const REPLAY_NOTICE = "Ta lecture n'a pas pu être enregistrée : ces informatio
  *
  * Rendue par la mise en page racine, côté serveur : la liste est dans le HTML
  * initial, sans aller-retour ni clignotement.
+ *
+ * Langue de la page (lot 7b-2) : son habillage vient de `shell.privacyModal`,
+ * et les entrées arrivent **déjà traduites** de la mise en page
+ * (`localizedPrivacyChanges`) — aucune traduction n'est chargée ici.
  */
 export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChange[] }>) {
+  const { t, rich, locale } = useShellText();
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -89,9 +91,10 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
     try {
       await record(changes.map((change) => change.id));
       close();
-      if (!leftByLink.current) showSuccess("C'est noté, merci.");
+      if (!leftByLink.current) showSuccess(t("privacyModal.saved"));
     } catch {
-      showError(leftByLink.current ? REPLAY_NOTICE : "Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.");
+      // Échec d'un enregistrement parti d'une modale déjà refermée : rien à réessayer ici.
+      showError(leftByLink.current ? t("privacyModal.replay") : t("privacyModal.failed"));
     } finally {
       setBusy(false);
     }
@@ -113,7 +116,7 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
       leftByLink.current = true;
       return;
     }
-    record([changeId]).catch(() => showError(REPLAY_NOTICE));
+    record([changeId]).catch(() => showError(t("privacyModal.replay")));
   };
 
   return (
@@ -128,24 +131,22 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
         aria-busy={busy}
         tabIndex={-1}
       >
-        <span className="eyebrow">PROTECTION DES DONNÉES · RGPD</span>
+        <span className="eyebrow">{t("privacyModal.eyebrow")}</span>
         <h2 id="privacy-changes-title" className={styles.title}>
-          {privacyChangesHeading(changes.length)}
+          {t("privacyModal.heading", { count: changes.length })}
         </h2>
         <p id="privacy-changes-intro" className={styles.intro}>
-          {changes.length > 1
-            ? "Depuis ta dernière visite, la façon dont BlueGenji traite tes données a changé. Nous te devons cette information : aucun accord ne t'est demandé."
-            : "La façon dont BlueGenji traite tes données a changé. Nous te devons cette information : aucun accord ne t'est demandé."}
+          {changes.length > 1 ? t("privacyModal.introMany") : t("privacyModal.introOne")}
         </p>
 
-        <ScrollArea orientation="y" className={styles.changes} ariaLabel="Détail des changements">
+        <ScrollArea orientation="y" className={styles.changes} ariaLabel={t("privacyModal.detailsLabel")}>
           <ol className={styles.changeList}>
             {changes.map((change) => (
               <li key={change.id} className={styles.change}>
                 <div className={styles.changeHead}>
                   <h3 className={styles.changeTitle}>{change.title}</h3>
                   <time className={styles.changeDate} dateTime={change.publishedAt}>
-                    {formatPrivacyChangeDate(change.publishedAt)}
+                    {formatPrivacyChangeDateIn(change.publishedAt, locale)}
                   </time>
                 </div>
                 <p className={styles.changeSummary}>{change.summary}</p>
@@ -173,18 +174,20 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
         </ScrollArea>
 
         <p className={styles.policyLink}>
-          Ce qui repose sur ton choix se règle dans « Mon profil », sans rien perdre d&apos;autre.
-          Tu peux t&apos;opposer à un traitement ou exercer tes autres droits comme l&apos;explique
-          la{" "}
-          <LocaleLink href="/rgpd" target="_blank" rel="noreferrer">
-            politique de confidentialité
-          </LocaleLink>
-          .
+          {richNodes(
+            rich("privacyModal.policy", {}, {
+              policy: (children) => (
+                <LocaleLink href="/rgpd" target="_blank" rel="noreferrer">
+                  {richNodes(children)}
+                </LocaleLink>
+              ),
+            }),
+          )}
         </p>
 
         <div className={styles.actions}>
           <CyberButton variant="primary" type="button" onClick={acknowledge} disabled={busy}>
-            {busy ? "Enregistrement…" : "J'ai pris connaissance"}
+            {busy ? t("privacyModal.saving") : t("privacyModal.acknowledge")}
           </CyberButton>
         </div>
       </div>

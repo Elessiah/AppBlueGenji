@@ -44,9 +44,8 @@ interface RgpdConsentModalProps {
  * `TERMS_AGE_DECLARATION` (égalité du français testée). Les conditions sont
  * traduites depuis le lot 7b-1 : sous `/en`, leur lien mène à l'anglais, et une
  * note dit que c'est le texte français — la même `TERMS_VERSION` — que l'on
- * accepte (`TERMS_TRANSLATION_NOTE`). La politique de confidentialité reste
- * française jusqu'au lot 7b-2 : l'anglais le dit, et son lien porte
- * `hrefLang="fr"`.
+ * accepte (`TERMS_TRANSLATION_NOTE`). La politique de confidentialité est
+ * traduite depuis le lot 7b-2 : son lien mène aussi à l'anglais.
  */
 export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentModalProps>) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
@@ -135,7 +134,6 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
                   href="/rgpd"
                   target="_blank"
                   rel="noreferrer"
-                  hrefLang={frenchDocumentLang}
                   style={{ color: "var(--blue-300)", textDecoration: "underline" }}
                 >
                   {richNodes(children)}

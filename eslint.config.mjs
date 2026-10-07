@@ -85,6 +85,10 @@ const I18N_MIGRATED_FILES = [
   // Les documents eux-mêmes n'y sont pas — chaque langue est un document
   // rédigé dans sa langue (`I18N.md` § Textes légaux du site).
   "components/legal/TermsAcceptanceModal.tsx",
+  // Lot 7b-2 : fenêtre des changements de confidentialité, contrôle
+  // d'opposition à la mesure d'audience.
+  "components/privacy/PrivacyChangesModal.tsx",
+  "components/privacy/AudienceOptOutControl.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */
@@ -110,6 +114,8 @@ const I18N_LOCALE_LINK_FILES = [
   "app/conditions-utilisation/TermsOfUseEn.tsx",
   "app/mentions-legales/MentionsLegalesEn.tsx",
   "app/accessibilite/AccessibilityStatementEn.tsx",
+  "app/rgpd/RgpdEn.tsx",
+  "app/rgpd/registre/RegistreEn.tsx",
   "components/legal/EnglishLegalLink.tsx",
   "components/legal/TranslationNotice.tsx",
 ];
