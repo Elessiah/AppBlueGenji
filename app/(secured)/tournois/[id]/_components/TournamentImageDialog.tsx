@@ -1,9 +1,10 @@
 "use client";
 
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
-import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
@@ -41,7 +42,9 @@ interface TournamentImageDialogProps {
  * gardé avec un bandeau qui dit le désaccord.
  */
 export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: Readonly<TournamentImageDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [value, setValue] = useState<ImagePickerValue>(() => initialImagePickerValue(image));
   // Image sur laquelle le brouillon a été posé ; réalignée au rendu, sans effet,
   // pour qu'aucun rendu ne montre un brouillon périmé face à la nouvelle image.
@@ -101,6 +104,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby="tournament-image-title"
@@ -148,7 +152,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               </p>
             )}
 
-            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} />
+            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} lang={dialogLang} />
 
             <div
               style={{

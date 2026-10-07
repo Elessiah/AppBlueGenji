@@ -67,6 +67,11 @@ export function useEntrantSeeds(): SeedMap {
 }
 
 /** Vocabulaire du type de participant du tournoi affiché. */
+/** Type d'engagés du tournoi affiché : un écran traduit en tire son mot (`participantText`). */
+export function useEntrantParticipantType(): ParticipantType {
+  return useContext(EntrantContext).participantType;
+}
+
 export function useParticipantWording() {
   const { participantType } = useContext(EntrantContext);
   return participantWording(participantType);

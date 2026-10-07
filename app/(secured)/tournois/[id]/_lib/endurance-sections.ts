@@ -1,7 +1,8 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
-import { pluralSuffix } from "@/lib/shared/plural";
+import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
+import { FR_VIEWS_TEXT } from "./views-text";
 
 /**
  * Découpe du plateau « BlueGenji Survie » en volets, et reconstitution de
@@ -129,13 +130,16 @@ export function defaultOpenEnduranceRound(
  * chômer une équipe : à trois équipes en lice, la manche n'en porte **qu'une**,
  * et l'accord n'est pas une coquetterie — c'est un cas courant du mode.
  */
-export function enduranceMatchCountLabel(total: number): string {
-  return `${total} match${total > 1 ? "s" : ""}`;
+export function enduranceMatchCountLabel(total: number, text: TournamentPageText = FR_VIEWS_TEXT): string {
+  return text.t("bracket.matchCount", { count: total });
 }
 
 /** Avancement d'une manche en cours, pour la pastille (« 0/1 jouée »). */
-export function enduranceProgressLabel(section: EnduranceRoundSection): string {
-  return `${section.playedCount}/${section.totalCount} jouée${section.totalCount > 1 ? "s" : ""}`;
+export function enduranceProgressLabel(
+  section: EnduranceRoundSection,
+  text: TournamentPageText = FR_VIEWS_TEXT,
+): string {
+  return text.t("endurance.roundProgress", { played: String(section.playedCount), total: section.totalCount });
 }
 
 /**
@@ -146,11 +150,23 @@ export function enduranceProgressLabel(section: EnduranceRoundSection): string {
  * Le séparateur y est un mot et non une barre oblique, qu'un lecteur d'écran
  * énonce « zéro barre oblique un ».
  */
-export function enduranceRoundRegionLabel(section: EnduranceRoundSection): string {
+export function enduranceRoundRegionLabel(
+  section: EnduranceRoundSection,
+  text: TournamentPageText = FR_VIEWS_TEXT,
+): string {
   const progress = section.isComplete
-    ? "terminée"
-    : `${section.playedCount} sur ${section.totalCount} jouée${pluralSuffix(section.totalCount)}`;
-  return `${section.title}, ${enduranceMatchCountLabel(section.totalCount)}, ${progress}`;
+    ? text.t("endurance.regionDone")
+    : text.t("endurance.regionProgress", { played: String(section.playedCount), total: section.totalCount });
+  return text.t("endurance.region", {
+    title: enduranceRoundTitle(section, text),
+    count: enduranceMatchCountLabel(section.totalCount, text),
+    progress,
+  });
+}
+
+/** Titre d'un volet (« Manche 3 »), dans la langue du texte. */
+export function enduranceRoundTitle(section: EnduranceRoundSection, text: TournamentPageText = FR_VIEWS_TEXT): string {
+  return text.t("endurance.roundTitle", { round: String(section.round) });
 }
 
 /** Manche du volet contenant ce match, ou `null` s'il n'y est pas. */

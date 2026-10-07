@@ -3,6 +3,7 @@
 import type { TournamentPhase } from "@/lib/shared/types";
 import { Pill, ScrollArea } from "@/components/cyber";
 import { phaseFormatLabel, phaseStateLabel, phaseStateVariant, phaseSubtitle } from "../_lib/phases";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
 interface PhaseTimelineProps {
   phases: TournamentPhase[];
@@ -17,10 +18,11 @@ export function PhaseTimeline({
   currentPhaseId,
   onSelect,
 }: Readonly<PhaseTimelineProps>) {
+  const text = useTournamentPageText();
   return (
     <ScrollArea
       orientation="x"
-      ariaLabel="Phases du tournoi — défilement horizontal"
+      ariaLabel={text.t("phases.timelineLabel")}
       style={{ marginBottom: 20 }}
     >
       <div style={{ display: "flex", gap: 10 }}>
@@ -29,9 +31,9 @@ export function PhaseTimeline({
           const isCurrent = phase.id === currentPhaseId;
           const isSkipped = phase.state === "SKIPPED";
           const isLast = idx === phases.length - 1;
-          const label = phase.name || phaseFormatLabel(phase.format);
-          const subtitle = phaseSubtitle(phase, isLast);
-          const state = phaseStateLabel(phase.state);
+          const label = phase.name || phaseFormatLabel(phase.format, text);
+          const subtitle = phaseSubtitle(phase, isLast, text);
+          const state = phaseStateLabel(phase.state, text);
 
           return (
             <button

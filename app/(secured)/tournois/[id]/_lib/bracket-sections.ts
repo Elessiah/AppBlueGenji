@@ -1,5 +1,6 @@
 import type { BracketMatch, BracketType } from "@/lib/shared/types";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { FR_TOURNAMENT_PAGE_TEXT, type TournamentPageText } from "@/lib/shared/tournament-page-text";
 
 /** Couleur d'accent par tableau — distingue d'un coup d'œil principal / perdants / finale. */
 export const ACCENT: Record<BracketType, string> = {
@@ -29,30 +30,40 @@ export interface BracketSection {
 }
 
 /** Nom de stade d'un round, à partir de la fin du tableau (0 = round le plus précoce). */
-export function stageName(globalIdx: number, totalRounds: number, bracketType: BracketType): string {
-  if (bracketType === "GRAND") return "Grande Finale";
-  if (bracketType === "THIRD_PLACE") return "Petite Finale";
+export type StageKey =
+  | "grandFinal"
+  | "thirdPlace"
+  | "lowerFinal"
+  | "final"
+  | "semis"
+  | "quarters"
+  | "roundOf16"
+  | "early";
+
+/** Stade d'un tour, par sa distance à la finale (lot 8a-2 : une clé, traduite à l'écran). */
+export function stageKey(globalIdx: number, totalRounds: number, bracketType: BracketType): StageKey {
+  if (bracketType === "GRAND") return "grandFinal";
+  if (bracketType === "THIRD_PLACE") return "thirdPlace";
   const fromEnd = totalRounds - 1 - globalIdx;
-  if (fromEnd === 0) return bracketType === "LOWER" ? "Finale perdants" : "Finale";
-  if (fromEnd === 1) return "Demi-finales";
-  if (fromEnd === 2) return "Quarts de finale";
-  if (fromEnd === 3) return "8èmes de finale";
-  return "Premiers tours";
+  if (fromEnd === 0) return bracketType === "LOWER" ? "lowerFinal" : "final";
+  if (fromEnd === 1) return "semis";
+  if (fromEnd === 2) return "quarters";
+  if (fromEnd === 3) return "roundOf16";
+  return "early";
+}
+
+export function stageName(
+  globalIdx: number,
+  totalRounds: number,
+  bracketType: BracketType,
+  text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT,
+): string {
+  return text.t(`bracket.stage.${stageKey(globalIdx, totalRounds, bracketType)}`);
 }
 
 /** Libellé « Qualifié en X » dérivé du nom du stade suivant. */
-export function qualifyLabelFor(nextStage: string): string {
-  switch (nextStage) {
-    case "8èmes de finale": return "Qualifié en 8ème de finale";
-    case "Quarts de finale": return "Qualifié en quart de finale";
-    case "Demi-finales": return "Qualifié en demi-finale";
-    case "Finale": return "Qualifié en finale";
-    case "Finale perdants": return "Qualifié en finale perdants";
-    case "Grande Finale": return "Qualifié en grande finale";
-    // Stade intermédiaire générique (gros tableau / tableau perdants découpé en paquets).
-    case "Premiers tours": return "Qualifié au tour suivant";
-    default: return `Qualifié en ${nextStage.toLowerCase()}`;
-  }
+export function qualifyLabelFor(nextStage: StageKey, text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT): string {
+  return text.t(`bracket.qualify.${nextStage}`);
 }
 
 /** Nombre de tours regroupés dans le volet « Phase finale » (quart, demi, finale). */
@@ -91,6 +102,7 @@ export function buildSections(
   roundNums: number[],
   bracketType: BracketType,
   plannedRounds?: number,
+  text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT,
 ): BracketSection[] {
   const totalRounds = roundNums.length;
   if (totalRounds === 0) return [];
@@ -102,7 +114,7 @@ export function buildSections(
   const stageTotal = Math.max(plannedRounds ?? totalRounds, totalRounds);
 
   if (bracketType === "GRAND" || bracketType === "THIRD_PLACE") {
-    const title = stageName(0, stageTotal, bracketType);
+    const title = stageName(0, stageTotal, bracketType, text);
     return [
       { key: String(roundNums[0]), title, rounds: [...roundNums], roundIdxBase: 0, qualifyLabel: null },
     ];
@@ -117,9 +129,9 @@ export function buildSections(
   const singleEarly = earlyChunks.length === 1;
   let base = 0;
   earlyChunks.forEach((chunk) => {
-    let title = `Tours ${chunk[0]} à ${chunk.at(-1)}`;
-    if (chunk.length === 1) title = stageName(base, stageTotal, bracketType);
-    else if (singleEarly) title = "Premiers tours";
+    let title = text.t("bracket.roundsRange", { from: String(chunk[0]), to: String(chunk.at(-1)) });
+    if (chunk.length === 1) title = stageName(base, stageTotal, bracketType, text);
+    else if (singleEarly) title = text.t("bracket.stage.early");
     sections.push({
       key: String(chunk[0]),
       title,
@@ -131,7 +143,7 @@ export function buildSections(
   });
 
   // Phase finale (les 3 derniers tours).
-  const finalTitle = finalCount > 1 ? "Phase finale" : stageName(splitIdx, stageTotal, bracketType);
+  const finalTitle = finalCount > 1 ? text.t("bracket.finalPhase") : stageName(splitIdx, stageTotal, bracketType, text);
   const finalRounds = roundNums.slice(splitIdx);
   sections.push({
     key: String(finalRounds[0]),
@@ -145,7 +157,7 @@ export function buildSections(
   // (ex. vainqueurs des 8èmes → « Qualifié en quart de finale » ; entre deux paquets
   // de premiers tours → « Qualifié au tour suivant »).
   for (let i = 0; i < sections.length - 1; i += 1) {
-    sections[i].qualifyLabel = qualifyLabelFor(stageName(sections[i + 1].roundIdxBase, stageTotal, bracketType));
+    sections[i].qualifyLabel = qualifyLabelFor(stageKey(sections[i + 1].roundIdxBase, stageTotal, bracketType), text);
   }
 
   return sections;

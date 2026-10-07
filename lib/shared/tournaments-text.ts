@@ -113,5 +113,5 @@ export function localizedMatchFormatLabel(text: TournamentsText, format: MatchFo
   if (!format) return text.t("matchFormat.free");
   const base = matchFormatNotation(format);
   const maps = matchMaxMaps(format);
-  return maps === naturalMaxMaps(format) ? base : text.t("matchFormat.withMaps", { base, maps: String(maps) });
+  return maps === naturalMaxMaps(format) ? base : text.t("matchFormat.withMaps", { base, maps });
 }

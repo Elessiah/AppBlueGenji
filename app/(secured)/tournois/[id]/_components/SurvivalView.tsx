@@ -19,6 +19,9 @@ import {
   RoundColumns,
 } from "./RoundColumns";
 import styles from "./RankingViews.module.css";
+import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
+import { FR_VIEWS_TEXT } from "../_lib/views-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 
 interface SurvivalViewProps {
   survival: SurvivalMeta;
@@ -39,10 +42,13 @@ interface SurvivalViewProps {
   emptyLabel?: string;
 }
 
-const STATUS_META: Record<SurvivalStandingRow["status"], { label: string; color: string }> = {
-  ACTIVE: { label: "En lice", color: ACCENT },
-  ELIMINATED: { label: "Éliminée", color: "var(--ink-quiet)" },
-  FORFEIT: { label: "Forfait", color: AMBER },
+const STATUS_META: Record<
+  SurvivalStandingRow["status"],
+  { key: "ranking.active" | "ranking.eliminated" | "ranking.forfeit"; color: string }
+> = {
+  ACTIVE: { key: "ranking.active", color: ACCENT },
+  ELIMINATED: { key: "ranking.eliminated", color: "var(--ink-quiet)" },
+  FORFEIT: { key: "ranking.forfeit", color: AMBER },
 };
 
 export function SurvivalView({
@@ -55,8 +61,13 @@ export function SurvivalView({
   onOpenAdminModal,
   canForfeit,
   onForfeit,
-  emptyLabel = "Aucun match pour l'instant.",
+  emptyLabel,
 }: Readonly<SurvivalViewProps>) {
+  const text = useTournamentViewText(FR_VIEWS_TEXT);
+  const { t } = text;
+  // L'abandon est un geste du lot 8b : resté français sous `/en`.
+  const actionLang = frenchBlockLang(text);
+  const emptyText = emptyLabel ?? t("page.noMatchesShort");
   // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
   const podiumTiers = usePodiumTiers();
   const activeCount = survival.standings.filter((s) => s.status === "ACTIVE").length;
@@ -86,12 +97,12 @@ export function SurvivalView({
   // on écrit « à chaque manche ».
   const everyRounds =
     survival.roundsPerCut === 1
-      ? "à chaque manche"
-      : `toutes les ${survival.roundsPerCut} manches`;
+      ? t("survival.everyRound")
+      : t("survival.everyN", { count: String(survival.roundsPerCut) });
   const cadenceLabel =
     survival.roundsBeforeFirstCut === survival.roundsPerCut
-      ? `Coupe ${everyRounds}`
-      : `1re coupe à la manche ${survival.roundsBeforeFirstCut + barrageRounds}, puis ${everyRounds}`;
+      ? t("survival.cadence", { every: everyRounds })
+      : t("survival.cadenceFirst", { round: String(survival.roundsBeforeFirstCut + barrageRounds), every: everyRounds });
 
   const champion = isFinished ? survival.standings.find((s) => s.rank === 1) : null;
 
@@ -102,19 +113,19 @@ export function SurvivalView({
       {/* Bandeau récap + action forfait */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
-          Manche {survival.currentRound || "—"} · {activeCount} équipe{activeCount > 1 ? "s" : ""} en lice
+          {t("survival.summary", { round: survival.currentRound ? String(survival.currentRound) : "—", count: activeCount })}
         </span>
         <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
           {cadenceLabel}
         </span>
         {!isFinished && upcomingCut > 0 && (
           <span className="mono" style={{ fontSize: 13, color: "var(--pink-400)" }}>
-            Prochaine coupe : round {upcomingCut}
+            {t("survival.nextCut", { round: String(upcomingCut) })}
           </span>
         )}
         {barrageRounds > 0 && (
           <span className="mono" style={{ fontSize: 13, color: "var(--pink-400)" }}>
-            Barrage d&apos;équilibrage au round 1
+            {t("survival.playIn")}
           </span>
         )}
       </div>
@@ -132,16 +143,17 @@ export function SurvivalView({
               marginBottom: 10,
             }}
           >
-            Classement
+            {t("ranking.title")}
           </div>
           <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
             {survival.standings.map((team, idx) => {
               // Tournoi clos : la dernière équipe active est la championne, pas
               // une équipe « en lice ».
+              const status = STATUS_META[team.status];
               const meta =
                 isFinished && team.status === "ACTIVE"
-                  ? { label: "Championne", color: ACCENT }
-                  : STATUS_META[team.status];
+                  ? { label: t("ranking.champion"), color: ACCENT }
+                  : { label: t(status.key), color: status.color };
               const inDanger = dangerTeamIds.has(team.teamId);
               const isMine = team.teamId === myTeamId;
               // Abandon : proposé sur les équipes encore en lice, à leurs
@@ -195,7 +207,7 @@ export function SurvivalView({
                   {forfeitable && (
                     // Sous 720 px, l'action passe sous le nom : à côté, elle
                     // l'écrasait à « Test - … ».
-                    <span className={styles.survivalAction}>
+                    <span className={styles.survivalAction} lang={actionLang}>
                     <button
                       type="button"
                       onClick={() => onForfeit(team.teamId, team.teamName)}
@@ -223,12 +235,9 @@ export function SurvivalView({
           {atRisk > 0 && !isFinished && (
             <p style={{ margin: "8px 2px 0", fontSize: 12, color: AMBER }}>
               {inBarrage ? (
-                <>⚖ Barrage : le perdant du match est éliminé.</>
+                t("survival.playInNote")
               ) : (
-                <>
-                  ⚠ Bord de tableau : {atRisk} équipe{atRisk > 1 ? "s" : ""} éliminée
-                  {atRisk > 1 ? "s" : ""} à la prochaine coupe.
-                </>
+                t("survival.atRisk", { count: atRisk })
               )}
             </p>
           )}
@@ -240,7 +249,7 @@ export function SurvivalView({
           cutSchedule={cutSchedule}
           adminResolvable={adminResolvable}
           onOpenAdminModal={onOpenAdminModal}
-          emptyLabel={emptyLabel}
+          emptyLabel={emptyText}
         />
       </div>
     </div>
@@ -277,17 +286,18 @@ export function SurvivalRounds({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<SurvivalRoundsProps>) {
+  const { t } = useTournamentViewText(FR_VIEWS_TEXT);
   const barrageRounds = cutSchedule?.barrageRounds ?? 0;
   return (
     <RoundColumns
       matches={matches}
       allTournamentMatches={allTournamentMatches}
       format="SURVIVAL"
-      ariaLabel="Manches du tournoi — défilement horizontal"
-      roundNoun="Manche"
+      ariaLabel={t("survival.roundsLabel")}
+      roundNoun={t("survival.roundNoun")}
       roundMarks={(roundNum) => [
-        ...(barrageRounds > 0 && roundNum <= barrageRounds ? ["⚖ Barrage"] : []),
-        ...(cutSchedule !== null && isCutRound(roundNum, cutSchedule) ? ["⚔ Coupe"] : []),
+        ...(barrageRounds > 0 && roundNum <= barrageRounds ? [t("survival.playInMark")] : []),
+        ...(cutSchedule !== null && isCutRound(roundNum, cutSchedule) ? [t("survival.cutMark")] : []),
       ]}
       adminResolvable={adminResolvable}
       onOpenAdminModal={onOpenAdminModal}

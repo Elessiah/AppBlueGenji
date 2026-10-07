@@ -53,14 +53,20 @@ describe("annonces au lecteur", () => {
     jest.mocked(isPersonalAlert).mockReturnValue(true);
     announceViewerChanges(previous, next);
     expect(playAlertChime).toHaveBeenCalledWith("MATCH_READY");
-    expect(raiseAttention).toHaveBeenCalledWith("MATCH_READY");
+    expect(raiseAttention).toHaveBeenCalledWith("MATCH_READY", undefined);
+  });
+
+  it("passe le libellé de la page au titre d'onglet", () => {
+    jest.mocked(viewerAlert).mockReturnValue("MATCH_READY");
+    announceViewerChanges(previous, next, (alert) => `label:${alert}`);
+    expect(raiseAttention).toHaveBeenCalledWith("MATCH_READY", "label:MATCH_READY");
   });
 
   it("appelle l'attention sans sonner pour une annonce générale", () => {
     jest.mocked(viewerAlert).mockReturnValue("ROUND_STARTED");
     announceViewerChanges(previous, next);
     expect(playAlertChime).not.toHaveBeenCalled();
-    expect(raiseAttention).toHaveBeenCalledWith("ROUND_STARTED");
+    expect(raiseAttention).toHaveBeenCalledWith("ROUND_STARTED", undefined);
   });
 
   it("signale à la modale de lancement chaque changement d'une rencontre du lecteur", () => {

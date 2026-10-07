@@ -39,7 +39,7 @@ describe("détail map par map — affichage", () => {
 
   it("l'arbitrage voit le détail des deux propositions en désaccord", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<MapResultList maps=\{report\.maps\}/);
+    expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<MapResultList french maps=\{report\.maps\}/);
   });
 });
 
@@ -61,7 +61,7 @@ describe("détail map par map — focus et interblocages", () => {
     const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
     expect(details).toContain("if (!hasMaps && !open) return null;");
     expect(details).toContain("document.getElementById(matchAnchorId(match.id))?.focus()");
-    expect(details).toMatch(/aria-label=\{`Détail des maps \(\$\{match\.maps\.length\}\) : \$\{team1\} contre \$\{team2\}`\}/);
+    expect(details).toContain('aria-label={text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versusText(text, team1, team2) })}');
   });
 
   it("en désaccord, l'engagé voit le détail adverse", () => {

@@ -30,6 +30,13 @@ import { MatchMapDetails } from "./MatchMapDetails";
 import { MatchCardActions } from "./MatchCardActions";
 import { EntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import {
+  FR_TOURNAMENT_PAGE_TEXT,
+  frenchBlockLang,
+  localizedPlaceholder,
+  versusText,
+} from "@/lib/shared/tournament-page-text";
 
 
 /**
@@ -77,6 +84,10 @@ export const MatchRow = memo(function MatchRow({
   // d'en-tête couvre déjà le reste du plateau, et répéter le bouton sur cent
   // vingt-sept cartes qui ne concernent pas le lecteur ne fait que les
   // alourdir toutes.
+  const text = useTournamentPageText();
+  // Gestes du lot 8b (score, signalement, lancement) et outils du staff : restés
+  // français, annoncés comme tels sous `/en`.
+  const actionLang = frenchBlockLang(text);
   const { canReport, openReport } = useIssueReport();
   // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
   // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
@@ -137,8 +148,10 @@ export const MatchRow = memo(function MatchRow({
   const [side1, side2] = matchSideViews(match, roundNumber, isDoubleForfeit);
   const { win: team1Win, forfeits: team1Forfeits, score: team1Score } = side1;
   const { win: team2Win, forfeits: team2Forfeits, score: team2Score } = side2;
-  const team1Display = teamLabel(match.team1Name, match.team1Placeholder, side1.emptyLabel);
-  const team2Display = teamLabel(match.team2Name, match.team2Placeholder, side2.emptyLabel);
+  // Libellés d'attente : français dans l'instantané (commun à tous les
+  // lecteurs), rédigés dans la langue de la page au rendu.
+  const team1Display = teamLabel(match.team1Name, localizedPlaceholder(text, match.team1Placeholder), side1.emptyLabel);
+  const team2Display = teamLabel(match.team2Name, localizedPlaceholder(text, match.team2Placeholder), side2.emptyLabel);
 
   const adminScoreLabel = adminScoreButtonLabel(scoreEntryClosed, pendingScoreProposal(match) !== null);
 
@@ -146,7 +159,15 @@ export const MatchRow = memo(function MatchRow({
   // le pied d'action en tire le bouton d'antenne — une seule minuterie.
   const liveState = useMatchLiveState(match);
   const launch = launchStripControls(match, launchPhase, { canManage, canSchedule, viewerUserId, myTeamId });
-  const matchLabel = `${team1Display} contre ${team2Display}`;
+  // Le pied d'action reste en français (lot 8b) : il cite le match en français,
+  // libellés d'attente de l'instantané compris.
+  const actionMatchLabel = actionLang
+    ? versusText(
+        FR_TOURNAMENT_PAGE_TEXT,
+        teamLabel(match.team1Name, match.team1Placeholder, side1.emptyLabel),
+        teamLabel(match.team2Name, match.team2Placeholder, side2.emptyLabel),
+      )
+    : versusText(text, team1Display, team2Display);
   // Toutes les actions de la carte, rangées par `MatchCardActions` : une
   // principale visible, le reste derrière « Plus d'actions »
   // (`docs/features/MATCH_CARD_LAYOUT.md`). Chaque drapeau est celui qui
@@ -213,7 +234,7 @@ export const MatchRow = memo(function MatchRow({
 
       {(isDraw || isDoubleForfeit) && (
         <p className={isDoubleForfeit ? `${styles.outcome} ${styles.outcomeForfeit}` : styles.outcome}>
-          {isDoubleForfeit ? "Double forfait" : "Match nul"}
+          {isDoubleForfeit ? text.t("match.doubleForfeit") : text.t("match.draw")}
         </p>
       )}
 
@@ -231,13 +252,14 @@ export const MatchRow = memo(function MatchRow({
       {/* Pas de région live : un plateau de cent vingt-sept cartes en
           annoncerait autant à chaque instantané du flux. L'annonce qui compte,
           celle du lecteur engagé, vit dans sa modale. */}
-      {reportNotice && <p className={styles.reportNotice}>{reportNotice}</p>}
+      {reportNotice && <p className={styles.reportNotice} lang={actionLang}>{reportNotice}</p>}
 
       <MatchCardActions
+        lang={actionLang}
         match={match}
         phase={launchPhase}
         actions={actions}
-        matchLabel={matchLabel}
+        matchLabel={actionMatchLabel}
         isCaster={launch.isCaster}
         onAir={liveState === "LIVE"}
         onPlayerScore={() => playerScore.open(match)}
@@ -247,6 +269,7 @@ export const MatchRow = memo(function MatchRow({
 
       {adminResolvable && scoreLocked && (
         <div
+          lang={actionLang}
           className={styles.locked}
           title="La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié."
         >

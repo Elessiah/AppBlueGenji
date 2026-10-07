@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { participantWording } from "@/lib/shared/participants";
 import {
@@ -58,7 +58,7 @@ export function AdvanceTournamentDialog({
   onClose,
   onAdvanced,
 }: Readonly<AdvanceTournamentDialogProps>) {
-  const { showError } = useToast();
+  const { showError } = useFrenchBlockToast();
   const [busy, setBusy] = useState(false);
 
   const wording = participantWording(card.participantType);

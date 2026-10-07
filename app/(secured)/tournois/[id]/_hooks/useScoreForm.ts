@@ -13,7 +13,7 @@ import {
   type ScoreFormDecision,
   type ScoreFormState,
 } from "../_lib/score-form";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
 import {
   checkMapList,
@@ -51,7 +51,7 @@ export function useScoreForm(
     onMapsReset?: () => void;
   } = {},
 ) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const matchFormat = useMatchFormat(match);
   const game = useTournamentGame();
   const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));

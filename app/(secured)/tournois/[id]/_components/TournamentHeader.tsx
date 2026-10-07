@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, type MouseEvent } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { tournamentLabel } from "@/lib/shared/tournaments-text";
+import type { Locale } from "@/lib/shared/locales";
+import { INTL_LOCALE } from "@/lib/shared/locales";
 import { CyberButton, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
@@ -101,9 +106,15 @@ export function TournamentHeader({
   onEditImage,
 }: Readonly<TournamentHeaderProps>) {
   const { card } = detail;
+  const text = useTournamentPageText();
+  const labels = useTournamentsText();
+  const { t } = text;
+  // Inscription, signalement et gestes du staff : lot 8b / D4, restés français.
+  const actionLang = frenchBlockLang(text);
   const wording = participantWording(card.participantType);
   const state = STATE_META[card.state] ?? { label: card.state, tone: "info" as HeaderTone };
-  const items = headerMetaItems(card, detail.phases, detail.currentPhaseId);
+  const stateLabel = tournamentLabel(labels, "state", card.state);
+  const items = headerMetaItems(card, detail.phases, detail.currentPhaseId, Date.now(), text, labels);
   // Le seul refus d'inscription qui ne se lise pas tout seul sur la page :
   // avoir une équipe sans en avoir la charge (`_lib/register-entry.ts`).
   const registerNotice = frozen ? null : registerBlockedNotice(detail);
@@ -112,7 +123,7 @@ export function TournamentHeader({
   // L'image se règle dans tous les états, contrairement au formulaire : elle
   // est décorative et n'engage aucune règle du moteur.
   const showImageEdit = detail.isAdmin && !frozen;
-  const router = useRouter();
+  const router = useLocaleRouter();
   // Figé au premier rendu : l'en-tête n'est rendu que côté client (la page
   // attend le flux), et la page précédente ne change pas tant qu'on reste ici.
   const [backInSite] = useState(() => canReturnInSite(readSiteBackInput()));
@@ -131,15 +142,15 @@ export function TournamentHeader({
     <div className={`ds-header ${s.header}`}>
       <div className={`ds-header-body ${s.shell}`}>
         <div className={s.utility}>
-          <Link href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>
-            <span aria-hidden="true">←</span> {backInSite ? "Retour" : "Tous les tournois"}
-          </Link>
+          <LocaleLink href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>
+            <span aria-hidden="true">←</span> {backInSite ? t("header.back") : t("header.allTournaments")}
+          </LocaleLink>
           <div className={s.viewer}>
             {/* Dit que la page se tient à jour seule : sans ce repère, on
                 recharge par précaution même quand tout arrive tout seul. */}
             <LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />
             {detail.isAdmin && !frozen && (
-              <Pill variant="accent" title="Tu disposes des droits d'organisation sur ce tournoi.">⚙ Admin</Pill>
+              <Pill variant="accent" title={t("header.adminTitle")}>{t("header.admin")}</Pill>
             )}
           </div>
         </div>
@@ -158,15 +169,15 @@ export function TournamentHeader({
           <TournamentImageEmblem image={card.image} size={88} className={s.emblem} priority />
           <div className={s.identityText}>
             <div className={s.eyebrow}>
-              <span className={`${s.state} ${TONE_CLASS[state.tone]}`}>{state.label}</span>
-              <span className={s.identityLine}>{headerIdentityLine(card)}</span>
+              <span className={`${s.state} ${TONE_CLASS[state.tone]}`}>{stateLabel}</span>
+              <span className={s.identityLine}>{headerIdentityLine(card, text, labels)}</span>
             </div>
             <h1 className={`ds-title ${s.title}`}>{card.name}</h1>
             {card.description && <p className={s.description}>{card.description}</p>}
           </div>
 
           {(showEdit || showImageEdit) && (
-            <div className={s.identityActions}>
+            <div className={s.identityActions} lang={actionLang}>
               {showImageEdit && (
                 <CyberButton
                   variant="ghost"
@@ -182,7 +193,9 @@ export function TournamentHeader({
               )}
               {showEdit && (
                 <CyberButton asChild variant="ghost" style={{ fontSize: 13, padding: "6px 16px" }}>
-                  <Link href={`/tournois/${card.id}/modifier`}>Modifier</Link>
+                  <LocaleLink href={`/tournois/${card.id}/modifier`} hrefLang={actionLang}>
+                    Modifier
+                  </LocaleLink>
                 </CyberButton>
               )}
             </div>
@@ -191,7 +204,7 @@ export function TournamentHeader({
 
         <dl className={s.meta}>
           {items.map((item) => (
-            <MetaCell key={item.key} item={item} />
+            <MetaCell key={item.key} item={item} locale={text.locale} />
           ))}
         </dl>
 
@@ -207,6 +220,7 @@ export function TournamentHeader({
           {detail.canRegister && !frozen && (
             <CyberButton
               variant="primary"
+              lang={actionLang}
               onClick={onRegister}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
@@ -217,17 +231,18 @@ export function TournamentHeader({
               sans case à cocher : la base est l'intérêt légitime, le joueur
               garde son droit d'opposition (`lib/shared/stream-notice.ts`). */}
           {detail.canRegister && !frozen && (
-            <p className={s.registerNotice}>
+            <p className={s.registerNotice} lang={actionLang}>
               {registrationStreamNotice(isSoloTournament(card.participantType))}{" "}
-              <Link href={STREAM_NOTICE_PRIVACY_PATH}>{REGISTRATION_STREAM_NOTICE_LINK_LABEL}</Link>
+              <LocaleLink href={STREAM_NOTICE_PRIVACY_PATH}>{REGISTRATION_STREAM_NOTICE_LINK_LABEL}</LocaleLink>
             </p>
           )}
           {/* À la place du bouton, et non à côté : le lecteur cherche là où
               l'action devrait être. */}
-          {registerNotice && <p className={s.registerNotice}>{registerNotice}</p>}
+          {registerNotice && <p className={s.registerNotice} lang={actionLang}>{registerNotice}</p>}
           {detail.isAdmin && !frozen && card.state === "REGISTRATION" && (
             <CyberButton
               variant="ghost"
+              lang={actionLang}
               onClick={onGuestRegister}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
@@ -242,6 +257,7 @@ export function TournamentHeader({
           {detail.isAdmin && !frozen && nextStage !== null && (
             <CyberButton
               variant="ghost"
+              lang={actionLang}
               onClick={onAdvance}
               title={`Passer à l'étape suivante : ${TOURNAMENT_STAGE_META[nextStage].label}.`}
               style={{ fontSize: 13, padding: "8px 18px" }}
@@ -259,6 +275,7 @@ export function TournamentHeader({
           {isViewerEntrant(detail.myTeamId, detail.registrations) && (
             <CyberButton
               variant="ghost"
+              lang={actionLang}
               onClick={onReportIssue}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
@@ -275,9 +292,9 @@ export function TournamentHeader({
  * Une case de la grille. Les dates ne sont mises en forme qu'ici : leur rendu
  * dépend du fuseau du lecteur, que le module pur n'a pas à connaître.
  */
-function MetaCell({ item }: Readonly<{ item: HeaderMetaItem }>) {
+function MetaCell({ item, locale }: Readonly<{ item: HeaderMetaItem; locale: Locale }>) {
   const isNumeric = item.kind === "count";
-  const text = item.kind === "date" ? formatHeaderDate(item.value) : item.value;
+  const text = item.kind === "date" ? formatHeaderDate(item.value, locale) : item.value;
 
   return (
     <div className={s.metaItem}>
@@ -308,14 +325,17 @@ function MetaCell({ item }: Readonly<{ item: HeaderMetaItem }>) {
 }
 
 /** « 14 sept. 2025, 18:00 » — même forme que les cartes de `/tournois`. */
-function formatHeaderDate(iso: string): string {
+function formatHeaderDate(iso: string, locale: Locale): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("fr-FR", {
-    day: "2-digit",
+  // 24 h dans les deux langues (le français l'applique de lui-même) ; jour sans
+  // zéro initial en anglais (« Oct 7, 2026 »), comme `formatCardDate`.
+  return date.toLocaleString(INTL_LOCALE[locale], {
+    day: locale === "fr" ? "2-digit" : "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   });
 }

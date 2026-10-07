@@ -3,6 +3,8 @@
 import { canHaveReplay, visibleReplayUrl } from "@/lib/shared/match-replay";
 import type { BracketMatch } from "@/lib/shared/types";
 import styles from "./MatchReplayStrip.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { versusText } from "@/lib/shared/tournament-page-text";
 
 /**
  * Bandeau « Rediff disponible » d'un match terminé, sous sa carte : tout le
@@ -16,12 +18,13 @@ import styles from "./MatchReplayStrip.module.css";
  * pouvoir retirer un lien qui ne correspondrait plus.
  */
 export function MatchReplayStrip({ match }: Readonly<{ match: BracketMatch }>) {
+  const text = useTournamentPageText();
   const replayUrl = visibleReplayUrl(match);
   if (replayUrl === null) return null;
 
   // Sorti de son contexte visuel, « Rediff disponible » ne dit pas de quel match
   // il s'agit : le lien porte le nom de la rencontre.
-  const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
+  const matchLabel = versusText(text, match.team1Name ?? text.t("match.tbd"), match.team2Name ?? text.t("match.tbd"));
 
   return (
     <div className={styles.banner}>
@@ -32,13 +35,13 @@ export function MatchReplayStrip({ match }: Readonly<{ match: BracketMatch }>) {
         className={styles.link}
         // Commence par le texte visible (WCAG 2.5.3) : la commande vocale
         // « cliquer sur Rediff disponible » doit trouver ce lien.
-        aria-label={`Rediff disponible — revoir ${matchLabel} sur YouTube (nouvel onglet)`}
+        aria-label={text.t("match.replayLabel", { match: matchLabel })}
       >
         <span aria-hidden="true" className={styles.icon}>
           ▶
         </span>
         {/* NOSONAR S6772 — lien en flex avec `gap` */}
-        Rediff disponible
+        {text.t("match.replay")}
       </a>
     </div>
   );

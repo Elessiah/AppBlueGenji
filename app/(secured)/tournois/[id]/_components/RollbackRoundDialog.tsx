@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { ScrollArea } from "@/components/cyber";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import { teamLabel } from "@/lib/shared/match-card-viewer";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -78,7 +78,7 @@ export function RollbackRoundDialog({
   onClose,
   onRolledBack,
 }: Readonly<RollbackRoundDialogProps>) {
-  const { showError } = useToast();
+  const { showError } = useFrenchBlockToast();
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
 

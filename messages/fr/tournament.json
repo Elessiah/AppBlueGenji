@@ -1,0 +1,394 @@
+{
+  "meta": {
+    "fallbackTitle": "Tournoi"
+  },
+  "participants": {
+    "soloBadge": "Individuel",
+    "TEAM": {
+      "one": "équipe",
+      "oneCapitalized": "Équipe",
+      "manyCapitalized": "Équipes",
+      "manyParticipating": "Équipes participantes"
+    },
+    "SOLO": {
+      "one": "joueur",
+      "oneCapitalized": "Joueur",
+      "manyCapitalized": "Joueurs",
+      "manyParticipating": "Joueurs participants"
+    }
+  },
+  "page": {
+    "boardTitles": {
+      "SINGLE": "Arbre du tournoi",
+      "DOUBLE": "Arbre du tournoi",
+      "SWISS": "Classement et rondes",
+      "SURVIVAL": "Classement et rounds",
+      "MULTI": "Phases du tournoi",
+      "BG_SURVIE": "Endurance et manches"
+    },
+    "preLaunch": {
+      "survival": "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi.",
+      "bgSurvieManual": "Le classement de départ est l'ordre fixé par le staff ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi.",
+      "bgSurvieRanking": "Le classement de départ est celui du site, dans l'ordre des inscriptions ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi.",
+      "swiss": "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi.",
+      "bracket": "Le bracket sera généré automatiquement au démarrage du tournoi."
+    },
+    "fatal": {
+      "expiredTitle": "Session expirée",
+      "notFoundTitle": "Tournoi introuvable",
+      "expiredText": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
+      "notFoundText": "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public.",
+      "relogin": "Se reconnecter",
+      "back": "Retour aux tournois"
+    },
+    "noMatches": "Aucun match disponible pour l'instant.",
+    "noMatchesShort": "Aucun match pour l'instant.",
+    "unplayedTeam": "Tournoi clos sans être joué : moins de deux équipes engagées au coup d'envoi.",
+    "unplayedSolo": "Tournoi clos sans être joué : moins de deux joueurs engagés au coup d'envoi.",
+    "bracketLabels": {
+      "UPPER": "Tableau principal",
+      "LOWER": "Tableau perdants",
+      "GRAND": "Grande Finale",
+      "THIRD_PLACE": "Petite Finale"
+    },
+    "phaseContext": "Phase {position}",
+    "phaseContextNamed": "Phase {position} — {name}"
+  },
+  "header": {
+    "back": "Retour",
+    "allTournaments": "Tous les tournois",
+    "admin": "⚙ Admin",
+    "adminTitle": "Tu disposes des droits d'organisation sur ce tournoi.",
+    "officialChannel": "Chaîne officielle",
+    "officialChannelOn": "Chaîne officielle · {platform}",
+    "meta": {
+      "format": "Format",
+      "currentPhase": "Phase en cours",
+      "qualifierFormat": "Format des qualifications",
+      "matchFormat": "Format des matchs",
+      "playoffFormat": "Format des play-offs",
+      "thirdPlace": "Troisième place",
+      "thirdPlaceMatch": "Petite finale",
+      "conditions": "Conditions d'inscription",
+      "conditionsHint": "Contrôlées à l'inscription d'un joueur ; les équipes invitées par le staff n'y sont pas soumises.",
+      "registrationOpens": "Inscriptions dès",
+      "registrationCloses": "Clôture des inscriptions",
+      "playedOn": "Joué le",
+      "start": "Début du tournoi"
+    },
+    "filters": {
+      "minPlayers": "{count} joueurs minimum",
+      "discordSolo": "Discord vérifié",
+      "discordAny": "au moins un Discord vérifié",
+      "discordAll": "tous les Discord vérifiés",
+      "blizzardSolo": "compte Blizzard lié",
+      "blizzardAny": "au moins un compte Blizzard lié",
+      "blizzardAll": "tous les comptes Blizzard liés"
+    }
+  },
+  "matchFormat": {
+    "free": "Score libre",
+    "withMaps": "{base} · {maps} maps",
+    "noLimit": "Aucune limite de score.",
+    "race": "premier à {wins, plural, one {# manche gagnée} other {# manches gagnées}}, {maps} au maximum.",
+    "raceWithDraw": "premier à {wins, plural, one {# manche gagnée} other {# manches gagnées}}, {maps} au maximum. Le match peut se clore sans vainqueur (map nulle)."
+  },
+  "live": {
+    "upToDate": "À jour",
+    "reconnecting": "Reconnexion…",
+    "offline": "Hors ligne",
+    "reconnectingTitle": "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.",
+    "upToDateTitle": "Mise à jour automatique {cadence}. Inutile de recharger la page.",
+    "cadenceSecond": "à la seconde",
+    "cadenceSeconds": "toutes les {seconds} secondes au plus",
+    "cadenceMinutes": "toutes les {minutes} minutes au plus",
+    "fatal": {
+      "UNAUTHORIZED": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
+      "TOURNAMENT_NOT_FOUND": "Ce tournoi n'est plus accessible : il n'y a plus rien à suivre."
+    },
+    "alerts": {
+      "SCORE_TO_CONFIRM": "Score à confirmer",
+      "MATCH_READY": "Ton match est prêt",
+      "TOURNAMENT_STARTED": "Le tournoi commence",
+      "ROUND_STARTED": "Nouvelle manche"
+    }
+  },
+  "loading": "Chargement du tournoi…",
+  "progress": {
+    "title": "Progression du tournoi",
+    "winner": "Vainqueur :",
+    "closed": "Le tournoi est clos.",
+    "next": "Prochaine étape :",
+    "willClose": "Le tournoi se clôturera une fois tous les matchs joués.",
+    "railLabel": "Frise de progression du tournoi — défilement horizontal",
+    "barLabel": "Avancement du tournoi",
+    "stepsLabel": "Étapes du tournoi",
+    "stages": {
+      "HIDDEN": {
+        "label": "Masqué",
+        "hint": "Visible du seul staff tournois"
+      },
+      "ANNOUNCED": {
+        "label": "Annoncé",
+        "hint": "En attente d'ouverture des inscriptions"
+      },
+      "REGISTRATION": {
+        "label": "Inscriptions",
+        "hint": "Les engagements sont ouverts"
+      },
+      "LOCKED": {
+        "label": "Clôture",
+        "hint": "Inscriptions fermées, en attente du coup d'envoi"
+      },
+      "RUNNING": {
+        "label": "En cours",
+        "hint": "Les matchs se jouent"
+      },
+      "FINISHED": {
+        "label": "Terminé",
+        "hint": "Le classement final est figé"
+      }
+    },
+    "countdown": {
+      "underMinute": "dans moins d'une minute",
+      "days": "dans {days} j",
+      "daysHours": "dans {days} j {hours} h",
+      "hours": "dans {hours} h",
+      "hoursMinutes": "dans {hours} h {minutes} min",
+      "minutes": "dans {minutes} min"
+    }
+  },
+  "phases": {
+    "timelineLabel": "Phases du tournoi — défilement horizontal",
+    "formats": {
+      "SWISS": "Ronde suisse",
+      "SURVIVAL": "Survie par coupes",
+      "DOUBLE": "Double élimination",
+      "SINGLE": "Simple élimination"
+    },
+    "states": {
+      "PENDING": "À venir",
+      "RUNNING": "En cours",
+      "FINISHED": "Terminée",
+      "SKIPPED": "Ignorée"
+    },
+    "skipped": "Ignorée — effectif insuffisant",
+    "final": "Phase finale",
+    "flow": "{entrants, plural, one {# équipe} other {# équipes}} → {qualifiers, plural, one {# qualifiée} other {# qualifiées}}",
+    "standingsTitle": "Classement de la phase",
+    "rank": "Rang",
+    "qualified": "Qualifiée"
+  },
+  "bracket": {
+    "stage": {
+      "grandFinal": "Grande Finale",
+      "thirdPlace": "Petite Finale",
+      "lowerFinal": "Finale perdants",
+      "final": "Finale",
+      "semis": "Demi-finales",
+      "quarters": "Quarts de finale",
+      "roundOf16": "8èmes de finale",
+      "early": "Premiers tours"
+    },
+    "qualify": {
+      "grandFinal": "Qualifié en grande finale",
+      "thirdPlace": "Qualifié en petite finale",
+      "lowerFinal": "Qualifié en finale perdants",
+      "final": "Qualifié en finale",
+      "semis": "Qualifié en demi-finale",
+      "quarters": "Qualifié en quart de finale",
+      "roundOf16": "Qualifié en 8ème de finale",
+      "early": "Qualifié au tour suivant"
+    },
+    "matchLabel": {
+      "final": "Finale {number}",
+      "lowerFinal": "Finale perdants {number}",
+      "semis": "Demi finale {number}",
+      "quarters": "Quart de finale {number}",
+      "roundOf16": "8ème de finale {number}"
+    },
+    "roundN": "Manche {number}",
+    "matchN": "Match {number}",
+    "roundsRange": "Tours {from} à {to}",
+    "finalPhase": "Phase finale",
+    "yourMatch": "Votre match",
+    "matchCount": "{count, plural, one {# match} other {# matchs}}",
+    "treeLabel": "Tableau du tournoi — défilement horizontal",
+    "goToMatchTitle": "{label} — aller au match",
+    "goToMatchLabel": "{label} — aller au match d'arrivée"
+  },
+  "sections": {
+    "TO_PLAN": "À planifier",
+    "WAITING": "Planifié",
+    "LOBBY": "Lancement",
+    "PLAYING": "En cours",
+    "DONE": "Terminé",
+    "count": "{count, plural, =1 {1 match} other {# matchs}}"
+  },
+  "placeholders": {
+    "upperFinalWinner": "Vainqueur du tableau principal",
+    "lowerFinalWinner": "Vainqueur du tableau perdants",
+    "upperLoser": "Perdant match {match} du tableau principal, manche {round}",
+    "lowerWinner": "Gagnant match {match} du tableau perdants, manche {round}",
+    "semiLoser": "Perdant demi-finale {slot}"
+  },
+  "match": {
+    "tbd": "TBD",
+    "bye": "BYE",
+    "team1": "Équipe 1",
+    "team2": "Équipe 2",
+    "versus": "{team1} contre {team2}",
+    "draw": "Match nul",
+    "doubleForfeit": "Double forfait",
+    "startAtSr": "Début programmé : ",
+    "live": "En direct",
+    "scheduled": "Programmé",
+    "channel": "Chaîne",
+    "watch": "{link} : regarder {match} (nouvel onglet)",
+    "watchOn": "{link} : regarder {match} sur {platform} (nouvel onglet)",
+    "replay": "Rediff disponible",
+    "replayLabel": "Rediff disponible — revoir {match} sur YouTube (nouvel onglet)",
+    "maps": {
+      "summary": "Détail des maps ({count})",
+      "summaryLabel": "Détail des maps ({count}) : {match}",
+      "title": "Détail des maps",
+      "vs": "{team1} vs {team2}",
+      "listLabel": "Maps du match",
+      "close": "Fermer",
+      "map": "Map {number}",
+      "drawn": "Map nulle",
+      "wonBy": "Gagnée par {team}",
+      "copy": "Copier le code de replay",
+      "copyLabel": "Copier le code de replay de la map {number}",
+      "copied": "Code de replay {code} copié.",
+      "copyFailed": "Copie impossible : sélectionne le code à la main."
+    },
+    "byeWin": "✓ Victoire d'office",
+    "champion": "🏆 Championne —"
+  },
+  "launch": {
+    "toPlan": "À planifier",
+    "toPlanTitle": "L'arbitrage doit fixer la date et l'heure de ce match avant son lancement.",
+    "toPlanSr": " : l'arbitrage doit fixer la date de ce match.",
+    "scheduled": "En attente de départ",
+    "scheduledSr": " — début le {date}",
+    "lobby": "Lancement",
+    "ready": "prêts",
+    "launched": "Lancé",
+    "hostTitle": "Équipe qui crée le salon en jeu",
+    "hostSr": "Équipe hôte : ",
+    "casterTitle": "Caster du match",
+    "casterSr": "Caster : ",
+    "caster": "Caster",
+    "casterReady": "prêt",
+    "casterWaiting": "attendu",
+    "missingDateTitle": "Ce match passe à l'antenne à sa date de début, mais aucune date n'est fixée.",
+    "missingDateSr": "Attention : ",
+    "missingDate": " sans date"
+  },
+  "ranking": {
+    "title": "Classement",
+    "champion": "Championne",
+    "ranked": "Classée",
+    "active": "En lice",
+    "eliminated": "Éliminée",
+    "forfeit": "Forfait",
+    "outOfContention": "Hors course"
+  },
+  "registrations": {
+    "title": "Inscriptions · ordre de départ",
+    "empty": "Aucune inscription pour le moment.",
+    "rank": "Rang",
+    "registeredAt": "Inscription",
+    "finalRank": "Classement final",
+    "collapse": "Réduire la liste",
+    "showAll": "Voir toute la liste ({count} de plus)"
+  },
+  "planning": {
+    "titleOn": "Matchs planifiés par l'arbitrage",
+    "titleOff": "Planification des matchs",
+    "descriptionOn": "Chaque match attend qu'un arbitre ou un admin fixe sa date et son heure (« À planifier »), puis « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.",
+    "descriptionOff": "Désactivée : un match sans date entre en lancement dès que ses deux engagés sont connus."
+  },
+  "settings": {
+    "groups": {
+      "tournament": "Tournoi",
+      "conditions": "Conditions d'inscription"
+    },
+    "yes": "Oui",
+    "no": "Non",
+    "none": "Aucun",
+    "drawAllowed": "{label} · match nul possible",
+    "seeding": {
+      "MANUAL": "Fixé par l'arbitrage",
+      "RANKING": "Classement du site",
+      "REGISTRATION": "Ordre des inscriptions"
+    },
+    "requirement": {
+      "NONE": "Aucun joueur",
+      "ANY_PLAYER": "Au moins un joueur",
+      "ALL_PLAYERS": "Tous les joueurs"
+    },
+    "general": {
+      "game": "Jeu",
+      "mode": "Mode",
+      "participants": "Participants",
+      "participantsSolo": "Joueurs (tournoi individuel)",
+      "participantsTeam": "Équipes",
+      "maxTeam": "{count, plural, one {# équipe} other {# équipes}}",
+      "maxSolo": "{count, plural, one {# joueur} other {# joueurs}}",
+      "maxLabel": "Effectif maximal",
+      "matchFormat": "Format des matchs",
+      "seeding": "Ordre de départ"
+    },
+    "conditions": {
+      "minRoster": "Effectif minimal du roster",
+      "minRosterValue": "{count, plural, one {# joueur} other {# joueurs}}",
+      "discord": "Tag Discord certifié",
+      "blizzard": "Compte Battle.net rattaché"
+    },
+    "mode": {
+      "thirdPlace": "Petite finale",
+      "roundsBeforeFirstCut": "Manches avant la 1ʳᵉ coupe",
+      "roundsPerCut": "Manches entre deux coupes",
+      "swissRounds": "Nombre de rondes",
+      "swissRoundsAtLaunch": "Fixé au lancement",
+      "scoring": "Barème",
+      "swissScoring": "Victoire {win} · nul {draw} · défaite {loss} · exemption {bye}",
+      "startPoints": "Capital de départ",
+      "startPointsValue": "{count, plural, one {# point} other {# points}}",
+      "enduranceScoring": "+{win} par map gagnée · −{loss} par map perdue",
+      "playoffSize": "Qualifiées pour les play-offs",
+      "maxRounds": "Plafond de manches qualificatives",
+      "playoffFormat": "Format des play-offs",
+      "phase": "Phase {position}",
+      "phaseNamed": "Phase {position} — {name}",
+      "phaseChampion": "Désigne la championne",
+      "phasePercent": "{value} % qualifiées",
+      "phaseCount": "{count, plural, one {# qualifiée} other {# qualifiées}}",
+      "phaseSwissRounds": "{count, plural, one {# ronde} other {# rondes}}",
+      "phaseFirstCut": "1ʳᵉ coupe après {count, plural, one {# manche} other {# manches}}",
+      "phaseEveryRound": "puis à chaque manche",
+      "phaseEveryN": "puis toutes les {count} manches",
+      "phaseThirdPlace": "petite finale"
+    }
+  },
+  "share": {
+    "states": {
+      "UPCOMING": "Prochainement",
+      "REGISTRATION": "Inscriptions ouvertes",
+      "RUNNING": "Tournoi en cours",
+      "FINISHED": "Tournoi terminé"
+    },
+    "engagedTeam": "{registered}/{max} équipes engagées",
+    "engagedSolo": "{registered}/{max} joueurs engagés",
+    "schedule": {
+      "FINISHED": "Joué le {date}",
+      "RUNNING": "En cours depuis le {date}",
+      "REGISTRATION": "Inscriptions jusqu'au {date}",
+      "OPENS": "Inscriptions dès le {date}",
+      "KICKOFF": "Coup d'envoi le {date}"
+    },
+    "date": "{day} à {hour}"
+  }
+}

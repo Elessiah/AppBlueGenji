@@ -1,30 +1,13 @@
 import type { TournamentPhase, PhaseFormat, PhaseState, TournamentFormat } from "@/lib/shared/types";
 import type { PillVariant } from "@/components/cyber/Pill";
+import { FR_TOURNAMENT_PAGE_TEXT, type TournamentPageText } from "@/lib/shared/tournament-page-text";
 
-export function phaseFormatLabel(format: PhaseFormat): string {
-  switch (format) {
-    case "SWISS":
-      return "Ronde suisse";
-    case "SURVIVAL":
-      return "Survie par coupes";
-    case "DOUBLE":
-      return "Double élimination";
-    case "SINGLE":
-      return "Simple élimination";
-  }
+export function phaseFormatLabel(format: PhaseFormat, text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT): string {
+  return text.t(`phases.formats.${format}`);
 }
 
-export function phaseStateLabel(state: PhaseState): string {
-  switch (state) {
-    case "PENDING":
-      return "À venir";
-    case "RUNNING":
-      return "En cours";
-    case "FINISHED":
-      return "Terminée";
-    case "SKIPPED":
-      return "Ignorée";
-  }
+export function phaseStateLabel(state: PhaseState, text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT): string {
+  return text.t(`phases.states.${state}`);
 }
 
 /** Variante de pastille d'une phase de la frise (`PhaseTimeline`). */
@@ -43,15 +26,15 @@ export function phaseStateVariant(state: PhaseState, isCurrent: boolean): PhaseS
   return isCurrent || state === "RUNNING" ? "info" : "accent";
 }
 
-export function phaseSubtitle(phase: TournamentPhase, isLast: boolean): string {
-  if (phase.state === "SKIPPED") {
-    return "Ignorée — effectif insuffisant";
-  }
-  if (isLast) {
-    return "Phase finale";
-  }
+export function phaseSubtitle(
+  phase: TournamentPhase,
+  isLast: boolean,
+  text: TournamentPageText = FR_TOURNAMENT_PAGE_TEXT,
+): string {
+  if (phase.state === "SKIPPED") return text.t("phases.skipped");
+  if (isLast) return text.t("phases.final");
   if (phase.entrants !== null && phase.qualifiers !== null) {
-    return `${phase.entrants} équipe${phase.entrants > 1 ? "s" : ""} → ${phase.qualifiers} qualifiée${phase.qualifiers > 1 ? "s" : ""}`;
+    return text.t("phases.flow", { entrants: phase.entrants, qualifiers: phase.qualifiers });
   }
   return "";
 }

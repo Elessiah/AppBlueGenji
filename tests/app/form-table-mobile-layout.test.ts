@@ -81,7 +81,7 @@ describe("repli mobile des tableaux", () => {
     expect(block).toMatch(/\.header\s*\{\s*display:\s*none;/);
     expect(block).toMatch(/\.row > \[data-label\]::before\s*\{[^}]*content:\s*attr\(data-label\)/);
     const tsx = read("app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx");
-    expect(tsx).toContain('data-label="Inscription"');
-    expect(tsx).toContain('data-label="Classement final"');
+    expect(tsx).toContain('data-label={t("registrations.registeredAt")}');
+    expect(tsx).toContain('data-label={t("registrations.finalRank")}');
   });
 });

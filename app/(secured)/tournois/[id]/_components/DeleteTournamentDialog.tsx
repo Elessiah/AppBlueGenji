@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import { isDeletionConfirmed } from "@/lib/shared/tournament-deletion";
 import { mapError } from "../_lib/error-map";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -32,7 +32,7 @@ export function DeleteTournamentDialog({
   onClose,
   onDeleted,
 }: Readonly<DeleteTournamentDialogProps>) {
-  const { showError } = useToast();
+  const { showError } = useFrenchBlockToast();
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
 

@@ -11,17 +11,20 @@ import { formatMatchStartAt, formatMatchStartAtFull } from "@/lib/shared/match-s
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
 import styles from "./MatchLiveStrip.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { versusText } from "@/lib/shared/tournament-page-text";
 
 type LiveState = MatchLiveState;
 
 /** Horaire annoncé, à chiffres à chasse fixe pour que la colonne s'aligne. */
 function StartAtFact({ startAt }: Readonly<{ startAt: BracketMatch["startAt"] }>) {
-  const label = formatMatchStartAt(startAt);
+  const { t, locale } = useTournamentPageText();
+  const label = formatMatchStartAt(startAt, locale);
   if (label === null) return null;
   return (
-    <span className={styles.startAt} title={formatMatchStartAtFull(startAt) ?? undefined}>
+    <span className={styles.startAt} title={formatMatchStartAtFull(startAt, locale) ?? undefined}>
       <span aria-hidden="true">🕑</span>
-      <span className="sr-only">Début programmé : </span>
+      <span className="sr-only">{t("match.startAtSr")}</span>
       <span className="num">{label}</span>
     </span>
   );
@@ -33,16 +36,19 @@ function LiveStateFact({
   liveUrl,
   matchLabel,
 }: Readonly<{ state: LiveState; liveUrl: string | null; matchLabel: string }>) {
+  const { t } = useTournamentPageText();
   if (state === "OFF") return null;
   const platform = streamPlatform(liveUrl);
   const live = state === "LIVE";
-  const where = platform ? ` sur ${PLATFORM_LABELS[platform]}` : "";
-  const linkText = platform ? PLATFORM_LABELS[platform] : "Chaîne";
+  const linkText = platform ? PLATFORM_LABELS[platform] : t("match.channel");
+  const watchLabel = platform
+    ? t("match.watchOn", { link: linkText, match: matchLabel, platform: PLATFORM_LABELS[platform] })
+    : t("match.watch", { link: linkText, match: matchLabel });
   return (
     <>
       <span className={live ? `${styles.state} ${styles.stateLive}` : styles.state}>
         <span aria-hidden="true">{live ? "●" : "○"}</span>
-        {live ? "En direct" : "Programmé"}
+        {live ? t("match.live") : t("match.scheduled")}
       </span>
       {liveUrl && (
         <a
@@ -50,7 +56,7 @@ function LiveStateFact({
           target="_blank"
           rel="noopener noreferrer"
           // Le texte visible ouvre le nom accessible (WCAG 2.5.3).
-          aria-label={`${linkText} : regarder ${matchLabel}${where} (nouvel onglet)`}
+          aria-label={watchLabel}
           className={styles.link}
         >
           {linkText}
@@ -78,6 +84,7 @@ export function MatchLiveStrip({
   state: LiveState;
 }>) {
   const { canManage, canSchedule } = useLiveControls();
+  const text = useTournamentPageText();
 
   const hasStartAt = formatMatchStartAt(match.startAt) !== null;
   const missingStartAt =
@@ -85,7 +92,7 @@ export function MatchLiveStrip({
     !hasStartAt &&
     isMatchCastable(match) &&
     (canManage || canSchedule);
-  const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
+  const matchLabel = versusText(text, match.team1Name ?? text.t("match.tbd"), match.team2Name ?? text.t("match.tbd"));
 
   if (state === "OFF" && !hasStartAt && !missingStartAt) return null;
 
@@ -96,10 +103,11 @@ export function MatchLiveStrip({
       {missingStartAt && (
         <span
           className={styles.missing}
-          title="Ce match passe à l'antenne à sa date de début, mais aucune date n'est fixée."
+          title={text.t("launch.missingDateTitle")}
         >
           <span aria-hidden="true">⚠</span>
-          <span className="sr-only">Attention : </span> sans date
+          <span className="sr-only">{text.t("launch.missingDateSr")}</span>
+          {text.t("launch.missingDate")}
         </span>
       )}
 

@@ -39,5 +39,5 @@ Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à c
 - Arguments : `{launchDelay}`, `{reportTimeout}`, `{minutesPerMap}` (délais réels du moteur) et `{seedingRule}` (la règle de seeding, écrite une fois, `{basePoints}` dedans) — `ruleTextValues()`.
 - **Ancres** : calculées sur les titres **français**, dans les deux langues (`/en/regles/survie#regle-coupes`) — un lien vers une section survit au changement de langue.
 - `TOURNAMENT_RULE_MODES` / `COMMON_RULES` restent le registre **français** (bouton d'aide des pages de tournoi, client et pas encore traduit) : `tournament-rules.ts` n'importe que `messages/fr/rules.json`, l'anglais n'est lu que par le serveur.
-- Réglages d'un tournoi (`?tournoi=<id>`) : leurs libellés (`tournament-settings.ts`) appartiennent au domaine des tournois (lot 8a) ; sous `/en`, le bloc reste français et porte `lang="fr"`.
+- Réglages d'un tournoi (`?tournoi=<id>`) : traduits depuis le lot 8a-2 (`lib/shared/tournament-settings-text.ts`, espace `tournament.settings`) ; le français reste celui de `tournament-settings.ts`.
 - Pages rendues à la demande (la mise en page racine lit les en-têtes) : `generateStaticParams` ne prérend rien, la racine du site (`APP_URL`) est lue au rendu, pour chaque langue.

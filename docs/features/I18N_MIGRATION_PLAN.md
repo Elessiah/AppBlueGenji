@@ -404,6 +404,23 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **Pluriel du bandeau** : l'anglais accorde, le français garde son « 1 équipes engagées » d'origine
   (rendu inchangé exigé) — à corriger dans les deux langues hors lot si voulu.
 
+### Ce que le lot 8a-2 a établi (2026-10-07) — écarts au plan
+
+- **`/tournois/[id]` ouvert sous `/en`**, empilé sur 8a-1. Espace `tournament` (~360 messages),
+  distinct de `tournaments` (liste) pour que la liste n'embarque pas le texte de la fiche.
+  Détail : `I18N.md` § Tournois — fiche.
+- **Frontière avec 8b** : tout ce qui se **lit** est traduit ; tout ce qui **agit** (inscription,
+  score, signalement, abandon, fenêtres d'action) et les outils du staff (D4) restent français,
+  annoncés `lang="fr"` — y compris quand ils côtoient un texte anglais sur la même carte.
+- **SSE** : l'instantané ne change pas ; les libellés d'attente français qu'il transporte sont
+  rédigés à nouveau au rendu (`localizedPlaceholder`).
+- **`[id]` = entier** dans la liste blanche (écart à « tout segment non vide ») : sans cela,
+  `/tournois/creer` passait pour une fiche traduite.
+- **Carte d'aperçu** de la fiche restée française (`opengraph-image.tsx` : même adresse dans les
+  deux langues) ; titre et description, eux, suivent la langue.
+- **Performance** : +6 kB au premier chargement de la fiche (209 → 215 kB) — les textes des vues
+  chargées à la demande y arrivent avec la fiche. Découpe par vue possible si la revue le demande.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -440,7 +457,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 6 ✅ | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
 | 7a ✅ | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
 | 7b ✅ (7b-1, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
-| 8a (8a-1 ✅) | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
+| 8a ✅ (8a-1, 8a-2) | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
 | 9 | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
 | ~~10~~ | ~~Admin~~ | **Abandonné** : l'admin reste en français (D4) | — | — | — |

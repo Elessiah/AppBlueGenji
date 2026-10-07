@@ -39,7 +39,7 @@ function onReturn(): void {
 }
 
 /** Signale l'évènement dans le titre, sauf si le lecteur regarde déjà la page. */
-export function raiseAttention(alert: ViewerAlert): void {
+export function raiseAttention(alert: ViewerAlert, label?: string): void {
   if (pageIsWatched()) return;
   // Un titre réécrit par quelqu'un d'autre depuis le dernier appel devient la
   // nouvelle base : c'est lui qu'on remettra.
@@ -51,7 +51,7 @@ export function raiseAttention(alert: ViewerAlert): void {
     window.addEventListener("focus", onReturn);
     document.addEventListener("visibilitychange", onReturn);
   }
-  appliedTitle = attentionDocumentTitle(alert, baseTitle);
+  appliedTitle = attentionDocumentTitle(alert, baseTitle, label);
   document.title = appliedTitle;
 }
 

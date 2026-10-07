@@ -32,7 +32,7 @@ describe("confirmation d'inscription", () => {
   it("annonce la retransmission près du bouton d'inscription, avec le lien vers /rgpd", () => {
     const header = read("app/(secured)/tournois/[id]/_components/TournamentHeader.tsx");
     expect(header).toMatch(/registrationStreamNotice\(isSoloTournament\(card\.participantType\)\)/);
-    expect(header).toContain("<Link href={STREAM_NOTICE_PRIVACY_PATH}>");
+    expect(header).toContain("<LocaleLink href={STREAM_NOTICE_PRIVACY_PATH}>");
     // Information, pas consentement : aucune case à cocher.
     expect(header).not.toMatch(/type="checkbox"/);
   });

@@ -28,9 +28,9 @@ import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 import {
   parseRulesTournamentParam,
-  tournamentSettingsGroups,
   type TournamentSettingsGroup,
 } from "@/lib/shared/tournament-settings";
+import { localizedTournamentSettingsGroups } from "@/lib/shared/tournament-settings-text";
 import {
   RULES_PAGE_ANCHORS,
   ruleSectionAnchors,
@@ -54,7 +54,10 @@ type TournamentSettingsView = { id: number; name: string; groups: TournamentSett
  * que pour la permission `tournaments`. Tout refus, toute panne de lecture, rend
  * simplement la page générale du mode.
  */
-async function loadTournamentSettings(tournamentId: number | null): Promise<TournamentSettingsView | null> {
+async function loadTournamentSettings(
+  tournamentId: number | null,
+  locale: Locale,
+): Promise<TournamentSettingsView | null> {
   if (tournamentId === null) return null;
   try {
     const user = await getCurrentUser();
@@ -66,13 +69,19 @@ async function loadTournamentSettings(tournamentId: number | null): Promise<Tour
     return {
       id: snapshot.card.id,
       name: snapshot.card.name,
-      groups: tournamentSettingsGroups({
-        card: snapshot.card,
-        phases: snapshot.phases,
-        swiss: snapshot.swiss,
-        endurance: snapshot.endurance,
-        seedingSource: snapshot.seedingSource,
-      }),
+      // Dans la langue de la page (lot 8a-2) : le français reste celui de
+      // `tournamentSettingsGroups`.
+      groups: localizedTournamentSettingsGroups(
+        {
+          card: snapshot.card,
+          phases: snapshot.phases,
+          swiss: snapshot.swiss,
+          endurance: snapshot.endurance,
+          seedingSource: snapshot.seedingSource,
+        },
+        locale,
+        messagesFor(locale),
+      ),
     };
   } catch {
     return null;
@@ -164,6 +173,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
 
   const tournamentSettings = await loadTournamentSettings(
     parseRulesTournamentParam((await searchParams).tournoi),
+    locale,
   );
 
   const others = modes.filter((m) => m.slug !== mode.slug);
@@ -173,9 +183,6 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
     labels: messages.toc,
     anchors: ruleAnchors,
   });
-  // Réglages d'un tournoi : libellés du domaine des tournois, traduits avec
-  // eux (lot 8a) — en attendant, français et annoncés comme tels (WCAG 3.1.2).
-  const settingsLang = locale === "fr" ? undefined : "fr";
 
   return (
     <PublicPageShell>
@@ -246,7 +253,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
                   </LocaleLink>
                 </div>
                 {tournamentSettings.groups.map((group) => (
-                  <div key={group.title} className={styles.settingsGroup} lang={settingsLang}>
+                  <div key={group.title} className={styles.settingsGroup}>
                     <h3 className={styles.settingsGroupTitle}>{group.title}</h3>
                     <dl className={styles.settings}>
                       {group.settings.map((setting) => (

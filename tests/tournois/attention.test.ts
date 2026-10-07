@@ -66,6 +66,11 @@ describe("titre d'onglet d'appel", () => {
     expect(doc.title).toBe("● Ton match est prêt · Coupe · BlueGenji");
   });
 
+  it("prend le libellé de la page quand il est donné (anglais sous /en)", () => {
+    attention.raiseAttention("MATCH_READY", "Your match is ready");
+    expect(doc.title).toBe("● Your match is ready · Coupe · BlueGenji");
+  });
+
   it("ne touche à rien quand le lecteur regarde la page", () => {
     focused = true;
     attention.raiseAttention("MATCH_READY");

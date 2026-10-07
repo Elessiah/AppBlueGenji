@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentCard } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
@@ -50,7 +50,7 @@ export function RemoveEntrantDialog({
   onClose,
   onRemoved,
 }: Readonly<RemoveEntrantDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [busy, setBusy] = useState(false);
 
   // Figé à l'ouverture, comme la liste des étapes de `LaunchTournamentDialog` :

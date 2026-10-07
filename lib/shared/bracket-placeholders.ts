@@ -44,3 +44,33 @@ export function localizeBracketPlaceholder(text: string | null): string | null {
   if (lower) return lowerWinnerPlaceholder(Number(lower[2]), Number(lower[1]));
   return text;
 }
+
+/** Libellé d'attente reconnu, pour le rédiger dans une autre langue au rendu. */
+export type BracketPlaceholderParts =
+  | { kind: "upperFinalWinner" }
+  | { kind: "lowerFinalWinner" }
+  | { kind: "upperLoser"; match: number; round: number }
+  | { kind: "lowerWinner"; match: number; round: number }
+  | { kind: "semiLoser"; slot: number };
+
+const UPPER_LOSER = /^Perdant match (\d+) du tableau principal, manche (\d+)$/;
+const LOWER_WINNER = /^Gagnant match (\d+) du tableau perdants, manche (\d+)$/;
+const SEMI_LOSER = /^Perdant demi-finale (\d+)$/;
+
+/**
+ * Décompose un libellé d'attente (déjà passé par
+ * {@link localizeBracketPlaceholder}) : l'instantané temps réel le transporte en
+ * français, commun à tous les lecteurs, et une page anglaise le rédige à
+ * nouveau au rendu (lot 8a-2). `null` pour un texte inconnu, rendu tel quel.
+ */
+export function parseBracketPlaceholder(text: string): BracketPlaceholderParts | null {
+  if (text === UPPER_FINAL_WINNER_PLACEHOLDER) return { kind: "upperFinalWinner" };
+  if (text === LOWER_FINAL_WINNER_PLACEHOLDER) return { kind: "lowerFinalWinner" };
+  const upper = UPPER_LOSER.exec(text);
+  if (upper) return { kind: "upperLoser", match: Number(upper[1]), round: Number(upper[2]) };
+  const lower = LOWER_WINNER.exec(text);
+  if (lower) return { kind: "lowerWinner", match: Number(lower[1]), round: Number(lower[2]) };
+  const semi = SEMI_LOSER.exec(text);
+  if (semi) return { kind: "semiLoser", slot: Number(semi[1]) };
+  return null;
+}

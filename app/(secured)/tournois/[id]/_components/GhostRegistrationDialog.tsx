@@ -1,9 +1,10 @@
 "use client";
 
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber";
-import { useToast } from "@/components/ui/toast";
 import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -75,7 +76,9 @@ export function GhostRegistrationDialog({
   onClose,
   onRegistered,
 }: Readonly<GhostRegistrationDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
+  const { showError, showSuccess } = useFrenchBlockToast();
   const wording = useParticipantWording();
   const [teams, setTeams] = useState<GhostTeamOption[]>([]);
   // Trois états, pas deux : la liste n'est pas « vide » tant qu'on ne sait pas,
@@ -240,6 +243,7 @@ export function GhostRegistrationDialog({
       <form /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef as unknown as React.Ref<HTMLFormElement>}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         aria-labelledby="ghost-registration-title"
         tabIndex={-1}

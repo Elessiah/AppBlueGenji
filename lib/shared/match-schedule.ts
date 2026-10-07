@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "./locales";
+
 /**
  * Date de début d'un match.
  *
@@ -105,25 +107,30 @@ export function matchStartAtTime(match: MatchScheduleInput): number | null {
  */
 export function formatMatchStartAt(
   startAt: MatchScheduleInput["startAt"],
+  locale: Locale = DEFAULT_LOCALE,
 ): string | null {
   const time = matchStartAtTime({ startAt });
   if (time === null) return null;
-  return new Date(time).toLocaleString("fr-FR", {
+  // 24 h dans les deux langues (le français l'applique de lui-même).
+  return new Date(time).toLocaleString(INTL_LOCALE[locale], {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    ...(locale === DEFAULT_LOCALE ? {} : { hourCycle: "h23" as const }),
   });
 }
 
 /** Date de début complète, pour les infobulles et les lecteurs d'écran. */
 export function formatMatchStartAtFull(
   startAt: MatchScheduleInput["startAt"],
+  locale: Locale = DEFAULT_LOCALE,
 ): string | null {
   const time = matchStartAtTime({ startAt });
   if (time === null) return null;
-  return new Date(time).toLocaleString("fr-FR", {
+  return new Date(time).toLocaleString(INTL_LOCALE[locale], {
     dateStyle: "full",
     timeStyle: "short",
+    ...(locale === DEFAULT_LOCALE ? {} : { hourCycle: "h23" as const }),
   });
 }

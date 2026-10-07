@@ -1,8 +1,9 @@
 "use client";
 
+import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
-import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { canHaveReplay, isValidReplayUrl } from "@/lib/shared/match-replay";
@@ -23,7 +24,9 @@ interface MatchReplayDialogProps {
  * retrait reste toujours possible, y compris sur un match rouvert.
  */
 export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchReplayDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  const dialogLang = frenchBlockLang(useTournamentPageText());
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
@@ -79,6 +82,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
+        lang={dialogLang}
         aria-modal="true"
         className="dialog-bounded"
         aria-labelledby="match-replay-title"

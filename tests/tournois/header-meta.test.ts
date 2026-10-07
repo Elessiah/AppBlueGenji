@@ -323,7 +323,7 @@ describe("en-tête de tournoi — mise en page", () => {
     expect(viewer).toContain("LiveIndicator");
     expect(viewer).toContain("Admin");
     // Les faits, eux, viennent tous du module pur.
-    expect(HEADER).toContain("headerMetaItems(card, detail.phases, detail.currentPhaseId)");
+    expect(HEADER).toContain("headerMetaItems(card, detail.phases, detail.currentPhaseId, Date.now(), text, labels)");
   });
 
   it("réserve le rouge à ce qui est réellement à l'antenne", () => {

@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/cyber";
 import { useSlotHeight } from "../_hooks/useSlotHeight";
 import { MatchRow } from "./MatchRow";
 import { isMatchScoreLocked } from "../_lib/score-lock";
+import { stageKey } from "../_lib/bracket-sections";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
 
 const CARD_W = 260;
@@ -75,6 +77,7 @@ export function BracketTree({
   // action offerte au lecteur, et une hauteur figée la laissait déborder sur le
   // libellé du match voisin. Voir `_lib/bracket-layout.ts`.
   const { slotHeight, measureSlot } = useSlotHeight();
+  const { t } = useTournamentPageText();
   const matchRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const didScrollRef = useRef(false);
   const setMatchRef = (id: number) => (el: HTMLDivElement | null) => {
@@ -129,26 +132,18 @@ export function BracketTree({
   );
 
   // Stade nommé à partir de la fin du tableau complet (index global).
+  // Même règle que les volets (`stageKey`), libellés dans la langue de la page.
   const roundLabel = (globalIdx: number) => {
-    if (bracketType === "GRAND") return "Grande Finale";
-    if (bracketType === "THIRD_PLACE") return "Petite Finale";
-    const fromEnd = totalRoundsGlobal - 1 - globalIdx;
-    if (fromEnd === 0) return bracketType === "LOWER" ? "Finale perdants" : "Finale";
-    if (fromEnd === 1) return "Demi-finales";
-    if (fromEnd === 2) return "Quarts de finale";
-    if (fromEnd === 3) return "8èmes de finale";
-    return `Manche ${globalIdx + 1}`;
+    const key = stageKey(globalIdx, totalRoundsGlobal, bracketType);
+    return key === "early" ? t("bracket.roundN", { number: String(globalIdx + 1) }) : t(`bracket.stage.${key}`);
   };
 
   const matchLabel = (matchNum: number, globalIdx: number) => {
-    if (bracketType === "GRAND") return null;
-    if (bracketType === "THIRD_PLACE") return null;
-    const fromEnd = totalRoundsGlobal - 1 - globalIdx;
-    if (fromEnd === 0) return bracketType === "LOWER" ? `Finale perdants ${matchNum}` : `Finale ${matchNum}`;
-    if (fromEnd === 1) return `Demi finale ${matchNum}`;
-    if (fromEnd === 2) return `Quart de finale ${matchNum}`;
-    if (fromEnd === 3) return `8ème de finale ${matchNum}`;
-    return `Match ${matchNum}`;
+    const key = stageKey(globalIdx, totalRoundsGlobal, bracketType);
+    const number = String(matchNum);
+    if (key === "grandFinal" || key === "thirdPlace") return null;
+    if (key === "early") return t("bracket.matchN", { number });
+    return t(`bracket.matchLabel.${key}`, { number });
   };
 
   // Décalage vertical pour aligner traits/badges sur le centre de la carte (et non
@@ -157,7 +152,7 @@ export function BracketTree({
 
   return (
     <ScrollArea
-      ariaLabel="Tableau du tournoi — défilement horizontal"
+      ariaLabel={t("bracket.treeLabel")}
       style={{
         display: "flex",
         paddingBottom: 16,
@@ -211,7 +206,7 @@ export function BracketTree({
                       >
                         {(label || isTarget) && (
                           <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--ink-quiet)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
-                            {isTarget ? `★ ${label ?? "Votre match"}` : label}
+                            {isTarget ? `★ ${label ?? t("bracket.yourMatch")}` : label}
                           </div>
                         )}
                         <div
@@ -365,8 +360,8 @@ export function BracketTree({
                       <button
                         type="button"
                         onClick={() => onQualifyClick!(match)}
-                        title={`${qualifyLabel} — aller au match`}
-                        aria-label={`${qualifyLabel} — aller au match d'arrivée`}
+                        title={t("bracket.goToMatchTitle", { label: qualifyLabel ?? "" })}
+                        aria-label={t("bracket.goToMatchLabel", { label: qualifyLabel ?? "" })}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-1)")}
                         style={badgeStyle}

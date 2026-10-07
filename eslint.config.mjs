@@ -98,6 +98,29 @@ const I18N_MIGRATED_FILES = [
   "app/(secured)/tournois/Section.tsx",
   "app/(secured)/tournois/cards/**",
   "components/rules/RulesHelpFab.tsx",
+  // Lot 8a-2 — fiche d'un tournoi : les composants de consultation entièrement
+  // traduits. Ceux qui portent aussi des gestes du lot 8b ou des outils du
+  // staff (en-tête, plateaux à classement, carte de match, inscrites…) n'y
+  // sont pas : leurs textes restés français y sont annoncés `lang="fr"`. Leurs
+  // liens passent tout de même par `LocaleLink` (`I18N_LOCALE_LINK_FILES`).
+  "app/(secured)/tournois/[id]/layout.tsx",
+  "app/(secured)/tournois/[id]/_components/BoardPanel.tsx",
+  "app/(secured)/tournois/[id]/_components/BracketSections.tsx",
+  "app/(secured)/tournois/[id]/_components/BracketTree.tsx",
+  "app/(secured)/tournois/[id]/_components/EnduranceRoundPanels.tsx",
+  "app/(secured)/tournois/[id]/_components/EntrantName.tsx",
+  "app/(secured)/tournois/[id]/_components/LiveIndicator.tsx",
+  "app/(secured)/tournois/[id]/_components/MatchLaunchStrip.tsx",
+  "app/(secured)/tournois/[id]/_components/MatchLiveStrip.tsx",
+  "app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx",
+  "app/(secured)/tournois/[id]/_components/MatchReplayStrip.tsx",
+  "app/(secured)/tournois/[id]/_components/PhaseStandingsBlock.tsx",
+  "app/(secured)/tournois/[id]/_components/PhaseStandingsTable.tsx",
+  "app/(secured)/tournois/[id]/_components/PhaseTimeline.tsx",
+  "app/(secured)/tournois/[id]/_components/RoundColumns.tsx",
+  "app/(secured)/tournois/[id]/_components/RoundMatchSections.tsx",
+  "app/(secured)/tournois/[id]/_components/TournamentLoading.tsx",
+  "app/(secured)/tournois/[id]/_components/TournamentProgress.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */
@@ -127,6 +150,9 @@ const I18N_LOCALE_LINK_FILES = [
   "app/rgpd/registre/RegistreEn.tsx",
   "components/legal/EnglishLegalLink.tsx",
   "components/legal/TranslationNotice.tsx",
+  // Lot 8a-2 — fiche d'un tournoi : tout le dossier, gestes du lot 8b compris.
+  "app/(secured)/tournois/[id]/page.tsx",
+  "app/(secured)/tournois/[id]/_components/**",
 ];
 
 const eslintConfig = [

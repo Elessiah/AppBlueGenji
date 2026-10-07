@@ -92,7 +92,7 @@
   },
   "matchFormat": {
     "free": "Free score",
-    "withMaps": "{base} · {maps} maps"
+    "withMaps": "{base} · {maps, plural, one {# map} other {# maps}}"
   },
   "rulesHelp": {
     "index": "Tournament rules",

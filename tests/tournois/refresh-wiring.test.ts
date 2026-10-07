@@ -86,7 +86,7 @@ describe("hook temps réel — les garde-fous de dégradation", () => {
   // sur `openLiveConnection` : `live-connection.test.ts`. On ne tient ici que
   // ce que le hook lui confie.
   it("annonce l'échec définitif et sonde à la cadence du palier", () => {
-    expect(hook).toContain("showError(mapError(failure));");
+    expect(hook).toContain("showPageError(t(`live.fatal.${failure}`));");
     expect(hook).toContain("REFRESH_CADENCE[stateRef.current.tier].detailFallbackMs");
   });
 
@@ -117,7 +117,7 @@ describe("page de tournoi — ce que voit le lecteur", () => {
     // Sans ce cas, la page resterait sur « Chargement… » pour toujours : le seul
     // état où il ne reste que le F5, et où il ne sert à rien.
     expect(detailPage).toContain("if (fatal && !detail) {");
-    expect(detailPage).toContain('href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}');
+    expect(detailPage).toContain('<LocaleLink href={expired ? "/connexion" : "/tournois"}>');
   });
 
   it("retire les actions quand le suivi est arrêté", () => {

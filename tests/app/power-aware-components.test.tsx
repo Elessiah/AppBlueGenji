@@ -101,7 +101,7 @@ describe("flux du tournoi", () => {
   // spectateur se jouent sur leurs contrôleurs : `live-render-gate.test.ts`.
   // On tient ici leur câblage dans le hook.
   it("annonce sur l'état reçu, avant de décider du rendu", () => {
-    const alert = hook.indexOf("announceViewerChanges(previous.detail, next.detail);");
+    const alert = hook.indexOf("announceViewerChanges(previous.detail, next.detail, (alert) => t(`live.alerts.${alert}`));");
     const render = hook.indexOf("renderGate.received(policyRef.current.snapshotRenderDelayMs");
     expect(alert).toBeGreaterThan(0);
     expect(render).toBeGreaterThan(alert);

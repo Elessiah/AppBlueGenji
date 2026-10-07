@@ -25,8 +25,10 @@ import type frVolunteers from "@/messages/fr/volunteers.json";
 import type frRecruitment from "@/messages/fr/recruitment.json";
 import type frLegal from "@/messages/fr/legal.json";
 import type frTournaments from "@/messages/fr/tournaments.json";
+import type frTournament from "@/messages/fr/tournament.json";
+import type frTournamentViews from "@/messages/fr/tournamentViews.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -58,6 +60,14 @@ export type Messages = {
   legal: typeof frLegal;
   /** Tournois — consultation (lot 8a) : liste, cartes, fiche — `lib/shared/tournaments-text.ts`. */
   tournaments: typeof frTournaments;
+  /** Fiche d'un tournoi (lot 8a-2) et réglages `?tournoi=` des règles — `lib/shared/tournament-page-text.ts`. */
+  tournament: typeof frTournament;
+  /**
+   * Vues de la fiche chargées à la demande (suisse, survie, endurance) : un
+   * fichier à part, pour que leur français voyage avec leur morceau et non avec
+   * le premier chargement — `app/(secured)/tournois/[id]/_lib/views-text.ts`.
+   */
+  tournamentViews: typeof frTournamentViews;
 };
 
 /**

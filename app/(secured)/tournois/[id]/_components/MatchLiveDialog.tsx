@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
 import {
   isValidStreamUrl,
   LIVE_PLATFORMS,
@@ -34,7 +34,7 @@ interface MatchLiveDialogProps {
  * referme pas.
  */
 export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess } = useFrenchBlockToast();
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
   const [liveUrl, setLiveUrl] = useState(match.liveUrl ?? "");

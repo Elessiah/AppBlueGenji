@@ -162,10 +162,13 @@ export function viewerAlertTitle(alert: ViewerAlert): string {
   }
 }
 
-/** Titre complet : repère visuel, évènement, puis le titre d'origine. */
-export function attentionDocumentTitle(alert: ViewerAlert, baseTitle: string): string {
+/**
+ * Titre complet : repère visuel, évènement, puis le titre d'origine. `label` :
+ * l'évènement dans la langue de la page (`live.alerts.*`), le français sinon.
+ */
+export function attentionDocumentTitle(alert: ViewerAlert, baseTitle: string, label = viewerAlertTitle(alert)): string {
   const base = baseTitle.trim();
-  return base ? `● ${viewerAlertTitle(alert)} · ${base}` : `● ${viewerAlertTitle(alert)}`;
+  return base ? `● ${label} · ${base}` : `● ${label}`;
 }
 
 /**
