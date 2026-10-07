@@ -55,6 +55,14 @@ describe("PrivacyChangesModal — langue de la page", () => {
     expect(text).not.toMatch(/\b(tes|ton|aucun accord|J'ai pris)\b/);
   });
 
+  it("sous /en : les noms français cités sont marqués lang=fr ; le français reste brut", () => {
+    const html = render("en");
+    expect(html).toContain('<span lang="fr">« Contestation »</span>');
+    expect(html).toContain('<span lang="fr">« Applications connectées »</span>');
+    expect(html).toContain(`<span lang="fr">« loi pour la confiance dans l&#x27;économie numérique »</span>`);
+    expect(render("fr")).not.toContain('lang="fr"');
+  });
+
   it("un seul changement : titre au singulier dans chaque langue", () => {
     const one = [PRIVACY_CHANGES[0]];
     const markup = (locale: Locale) =>
