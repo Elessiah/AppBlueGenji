@@ -154,7 +154,7 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
     // Anchor targeted by the terms of use (`ASSOCIATION_CONTACT_PATH`).
     id: "editeur",
     title: "Publisher of the site",
-    meta: "PUBLICATION MANAGER",
+    meta: "PUBLICATION DIRECTOR",
     body: (
       <>
         <p>
