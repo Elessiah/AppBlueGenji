@@ -1,7 +1,8 @@
 "use client";
 
-import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
+import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
+import { toParticipantType } from "@/lib/shared/participants";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber";
@@ -10,14 +11,13 @@ import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   batchCapacity,
-  batchCounterLabel,
   GHOST_BATCH_MAX,
-  guestBatchSuccessMessage,
   matchesTeamSearch,
   registrationErrorTeamId,
 } from "@/lib/shared/ghost-registration";
-import { useParticipantWording } from "../_lib/entrant-link";
-import { mapBatchError } from "../_lib/error-map";
+import { useEntrantParticipantType } from "../_lib/entrant-link";
+import { mapBatchError, useErrorsText } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { EntrantLogo } from "./EntrantName";
 import styles from "./GhostRegistrationDialog.module.css";
 
@@ -32,25 +32,37 @@ interface GhostRegistrationDialogProps {
 }
 
 /** Pourquoi le bouton d'inscription est grisé, `undefined` s'il ne l'est pas pour la place. */
-function capacityBlockTitle(noSlot: boolean, overCapacity: boolean, remainingSlots: number): string | undefined {
-  if (noSlot) return "Ce tournoi est complet : il n'y a plus de place à prendre.";
+function capacityBlockTitle(
+  text: TournamentDialogsText,
+  noSlot: boolean,
+  overCapacity: boolean,
+  remainingSlots: number,
+): string | undefined {
+  if (noSlot) return text.t("ghost.full");
   if (!overCapacity) return undefined;
-  if (remainingSlots <= GHOST_BATCH_MAX) {
-    return `Il ne reste que ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} dans ce tournoi.`;
-  }
-  return `${GHOST_BATCH_MAX} engagés au maximum par inscription : recommencez pour les suivants.`;
+  if (remainingSlots <= GHOST_BATCH_MAX) return text.t("ghost.slotsLeft", { count: remainingSlots });
+  return text.t("ghost.batchMax", { max: GHOST_BATCH_MAX });
+}
+
+/** Compteur de la sélection (`batchCounterLabel`) : « 3 / 14 places », « 3 / 32 par lot ». */
+function batchCounterText(text: TournamentDialogsText, selectedCount: number, remaining: number): string {
+  const capacity = batchCapacity(remaining);
+  return remaining <= GHOST_BATCH_MAX
+    ? text.t("ghost.counterSlots", { selected: selectedCount, capacity })
+    : text.t("ghost.counterBatch", { selected: selectedCount, capacity });
 }
 
 /** Message d'une liste vide, selon qu'elle charge, a échoué, est épuisée ou filtrée. */
 function ghostListEmptyMessage(
+  text: TournamentDialogsText,
   load: "pending" | "loaded" | "failed",
   teamCount: number,
   noneAvailable: string,
 ): string {
-  if (load === "pending") return "Chargement…";
-  if (load === "failed") return "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer.";
+  if (load === "pending") return text.t("ghost.loading");
+  if (load === "failed") return text.t("ghost.loadFailed");
   if (teamCount === 0) return noneAvailable;
-  return "Aucun résultat pour cette recherche.";
+  return text.t("ghost.noResult");
 }
 
 /**
@@ -76,10 +88,12 @@ export function GhostRegistrationDialog({
   onClose,
   onRegistered,
 }: Readonly<GhostRegistrationDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
-  const dialogLang = frenchBlockLang(useTournamentPageText());
-  const { showError, showSuccess } = useFrenchBlockToast();
-  const wording = useParticipantWording();
+  const text = useDialogsText();
+  const { t } = text;
+  const errorsText = useErrorsText();
+  const { showError, showSuccess } = useToast();
+  // Vocabulaire : équipes fantômes, ou joueurs invités d'un tournoi individuel.
+  const type = toParticipantType(useEntrantParticipantType());
   const [teams, setTeams] = useState<GhostTeamOption[]>([]);
   // Trois états, pas deux : la liste n'est pas « vide » tant qu'on ne sait pas,
   // et une liste qu'on n'a pas pu lire n'est pas une liste épuisée.
@@ -118,13 +132,13 @@ export function GhostRegistrationDialog({
         // l'onglet « Existantes » reste ouvert : c'est là que se lit *pourquoi*
         // la liste est vide.
         setMode("new");
-        showError(mapBatchError((e as Error).message, null, 1));
+        showError(mapBatchError((e as Error).message, null, 1, errorsText));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [tournamentId, showError]);
+  }, [tournamentId, showError, errorsText]);
 
   const visible = useMemo(
     () => teams.filter((team) => matchesTeamSearch(team.name, query)),
@@ -141,12 +155,13 @@ export function GhostRegistrationDialog({
   let countClass = "";
   if (overCapacity) countClass = styles.countOver;
   else if (selected.length > 0) countClass = styles.countActive;
-  const submitLabel = mode === "existing" && selected.length > 1 ? `Inscrire (${selected.length})` : "Inscrire";
+  const submitLabel =
+    mode === "existing" && selected.length > 1 ? t("ghost.submitCount", { count: selected.length }) : t("ghost.submit");
 
   // Trois vides bien distincts : on ne sait pas encore, il n'y a plus rien à
   // inscrire, ou la recherche ne trouve rien. « Aucun résultat » sur une liste
   // qui n'a pas fini de charger enverrait créer une équipe déjà en stock.
-  const emptyMessage = ghostListEmptyMessage(load, teams.length, wording.guestNoneAvailable);
+  const emptyMessage = ghostListEmptyMessage(text, load, teams.length, t(`ghost.${type}.noneAvailable`));
 
   const toggle = (teamId: number) => {
     setSelected((current) =>
@@ -211,7 +226,7 @@ export function GhostRegistrationDialog({
       if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
 
       await registerBatch(teamIds);
-      showSuccess(guestBatchSuccessMessage(teamIds.length, wording));
+      showSuccess(t(`ghost.${type}.success`, { count: teamIds.length }));
       onRegistered();
       onClose();
     } catch (e) {
@@ -219,7 +234,7 @@ export function GhostRegistrationDialog({
       // inscrite » sans nom n'apprend rien.
       const teamId = registrationErrorTeamId(e);
       const name = teamId === undefined ? null : nameById.get(teamId) ?? null;
-      showError(mapBatchError((e as Error).message, name, batchSize));
+      showError(mapBatchError((e as Error).message, name, batchSize, errorsText));
     } finally {
       setBusy(false);
     }
@@ -243,7 +258,6 @@ export function GhostRegistrationDialog({
       <form /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef as unknown as React.Ref<HTMLFormElement>}
         role="dialog"
-        lang={dialogLang}
         aria-modal="true"
         aria-labelledby="ghost-registration-title"
         tabIndex={-1}
@@ -251,9 +265,9 @@ export function GhostRegistrationDialog({
         className={styles.panel}
       >
         <h3 id="ghost-registration-title" className={styles.title}>
-          {wording.guestTitle}
+          {t(`ghost.${type}.title`)}
         </h3>
-        <p className={styles.hint}>{wording.guestHint}</p>
+        <p className={styles.hint}>{t(`ghost.${type}.hint`)}</p>
 
         <div className={styles.modes}>
           <button
@@ -262,7 +276,7 @@ export function GhostRegistrationDialog({
             onClick={() => setMode("existing")}
             aria-pressed={mode === "existing"}
           >
-            Existantes
+            {t("ghost.existing")}
           </button>
           <button
             type="button"
@@ -270,21 +284,21 @@ export function GhostRegistrationDialog({
             onClick={() => setMode("new")}
             aria-pressed={mode === "new"}
           >
-            Nouvelle
+            {t("ghost.new")}
           </button>
         </div>
 
         {mode === "existing" ? (
           <div>
             <p className={styles.listLabel} id="ghost-team-list-label">
-              <span>{wording.guestSelectManyLabel}</span>
+              <span>{t(`ghost.${type}.selectMany`)}</span>
               {/* Le seul retour d'un clic sur une case est ce compteur : il doit
                   aussi s'entendre. */}
               <span
                 aria-live="polite"
                 className={`${styles.count} ${countClass}`}
               >
-                {batchCounterLabel(selected.length, remainingSlots)}
+                {batchCounterText(text, selected.length, remainingSlots)}
               </span>
             </p>
 
@@ -301,8 +315,8 @@ export function GhostRegistrationDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.preventDefault();
               }}
-              placeholder="Rechercher…"
-              aria-label="Filtrer la liste par nom"
+              placeholder={t("ghost.searchPlaceholder")}
+              aria-label={t("ghost.searchAria")}
               ref={focusOnMount}
               data-autofocus
             />
@@ -310,7 +324,7 @@ export function GhostRegistrationDialog({
             <ScrollArea
               orientation="y"
               className={styles.list}
-              ariaLabel={wording.guestSelectManyLabel}
+              ariaLabel={t(`ghost.${type}.selectMany`)}
             >
               {visible.length === 0 ? (
                 <p className={styles.empty}>{emptyMessage}</p>
@@ -343,7 +357,7 @@ export function GhostRegistrationDialog({
                 onClick={selectVisible}
                 disabled={busy || visible.length === 0 || selected.length >= capacity}
               >
-                Tout sélectionner
+                {t("ghost.selectAll")}
               </button>
               <button
                 type="button"
@@ -351,13 +365,13 @@ export function GhostRegistrationDialog({
                 onClick={() => setSelected([])}
                 disabled={busy || selected.length === 0}
               >
-                Tout désélectionner
+                {t("ghost.selectNone")}
               </button>
             </div>
           </div>
         ) : (
           <div className="field">
-            <label htmlFor="ghost-team-new-name">{wording.guestNewNameLabel}</label>
+            <label htmlFor="ghost-team-new-name">{t(`ghost.${type}.newName`)}</label>
             <input
               id="ghost-team-new-name"
               value={newName}
@@ -378,7 +392,7 @@ export function GhostRegistrationDialog({
             onClick={onClose}
             disabled={busy}
           >
-            Annuler
+            {t("score.cancel")}
           </button>
           <button
             type="submit"
@@ -386,9 +400,9 @@ export function GhostRegistrationDialog({
             disabled={submitDisabled}
             // Le bouton grisé doit dire pourquoi : le compteur passe à l'ambre,
             // encore faut-il faire le lien.
-            title={capacityBlockTitle(noSlot, overCapacity, remainingSlots)}
+            title={capacityBlockTitle(text, noSlot, overCapacity, remainingSlots)}
           >
-            {busy ? "Inscription…" : submitLabel}
+            {busy ? t("ghost.pending") : submitLabel}
           </button>
         </div>
       </form>

@@ -10,8 +10,7 @@ import {
 } from "../_lib/endurance-next-round";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { EntrantName } from "./EntrantName";
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
+import { useActionsText } from "../_lib/actions-text";
 import styles from "./EnduranceNextRoundPanel.module.css";
 
 interface EnduranceNextRoundPanelProps {
@@ -20,13 +19,6 @@ interface EnduranceNextRoundPanelProps {
   /** Nom de chaque engagé, lu sur le classement d'endurance. */
   teamNames: Map<number, string>;
 }
-
-/**
- * Pourquoi une affiche sûre peut avoir des côtés incertains. Écrite sans
- * « équipe » : un tournoi individuel oppose des joueurs.
- */
-const SIDES_HINT =
-  "L'affiche est sûre, mais les matchs restants décideront qui, mieux classé, part à gauche et accueille la partie.";
 
 /** Accent de l'aperçu : distinct du bleu des manches réelles, qu'il ne doit pas imiter. */
 const PREVIEW_ACCENT = "var(--blue-300, #8fd5ff)";
@@ -41,48 +33,49 @@ const PREVIEW_ACCENT = "var(--blue-300, #8fd5ff)";
  * horaires, et un couple annoncé à tort se paierait devant deux équipes.
  */
 export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Readonly<EnduranceNextRoundPanelProps>) {
-  const text = useTournamentPageText();
+  const text = useActionsText();
+  const { t } = text;
   const [open, setOpen] = useState(true);
   const panelId = useId();
-  const title = nextRoundTitle(preview, maxRounds);
+  const title = nextRoundTitle(preview, maxRounds, text);
+  // Pourquoi une affiche sûre peut avoir des côtés incertains. Écrite sans
+  // « équipe » : un tournoi individuel oppose des joueurs.
+  const sidesHint = t("nextRound.sidesHint");
   const name = (teamId: number) => teamNames.get(teamId) ?? `#${teamId}`;
 
   return (
-    // Outil d'arbitrage : resté français (D4), annoncé comme tel sous `/en`.
-    <div className={styles.wrapper} lang={frenchBlockLang(text)}>
+    // Outil d'arbitrage posé sur la fiche (lot 8b).
+    <div className={styles.wrapper}>
       <BoardPanel
         accent={PREVIEW_ACCENT}
-        title={`Aperçu · ${title}`}
+        title={t("nextRound.panelTitle", { title })}
         open={open}
         onToggle={() => setOpen((value) => !value)}
         panelId={panelId}
-        ariaLabel={`Aperçu de l'étape suivante : ${title}`}
+        ariaLabel={t("nextRound.panelAria", { title })}
         meta={
           <>
-            <PanelPill>{nextRoundSummary(preview)}</PanelPill>
-            <PanelPill>{nextRoundPendingLabel(preview)}</PanelPill>
+            <PanelPill>{nextRoundSummary(preview, text)}</PanelPill>
+            <PanelPill>{nextRoundPendingLabel(preview, text)}</PanelPill>
           </>
         }
       >
         <div className={styles.body}>
           {!preview.stageCertain && !preview.freeScore && (
-            <p className={styles.warning}>
-              La phase qualificative peut encore s&apos;achever sur la manche en cours : ces
-              rencontres ne se joueront que si elle continue.
-            </p>
+            <p className={styles.warning}>{t("nextRound.stageUncertain")}</p>
           )}
 
           {preview.matches.length === 0 ? (
-            <p className={styles.empty}>{nextRoundEmptyLabel(preview)}</p>
+            <p className={styles.empty}>{nextRoundEmptyLabel(preview, text)}</p>
           ) : (
-            <ul className={styles.list} aria-label={`Rencontres acquises — ${title}`}>
+            <ul className={styles.list} aria-label={t("nextRound.listAria", { title })}>
               {preview.matches.map((match) => (
                 <li
                   key={`${match.bracket}-${match.teamAId}-${match.teamBId ?? "bye"}`}
                   className={styles.item}
                 >
                   {match.bracket === "THIRD_PLACE" && (
-                    <span className={styles.tag}>Petite finale</span>
+                    <span className={styles.tag}>{t("nextRound.thirdPlace")}</span>
                   )}
                   <EntrantName
                     teamId={match.teamAId}
@@ -92,9 +85,7 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
                   />
                   {match.teamBId === null ? (
                     <span className={styles.bye}>
-                      {preview.stage === "PLAYOFFS"
-                        ? "passe le tour (exemption)"
-                        : "ne joue pas cette manche (effectif impair)"}
+                      {preview.stage === "PLAYOFFS" ? t("nextRound.byePlayoffs") : t("nextRound.byeRound")}
                     </span>
                   ) : (
                     <>
@@ -104,7 +95,7 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
                       <span className={styles.versus} aria-hidden="true">
                         vs
                       </span>
-                      <span className="sr-only"> contre </span>
+                      <span className="sr-only"> {t("nextRound.versus")} </span>
                       <EntrantName
                         teamId={match.teamBId}
                         name={name(match.teamBId)}
@@ -114,10 +105,10 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
                     </>
                   )}
                   {!match.sidesKnown && (
-                    <span className={styles.tag} title={SIDES_HINT}>
-                      Côtés à confirmer
+                    <span className={styles.tag} title={sidesHint}>
+                      {t("nextRound.sidesUnknown")}
                       {/* NOSONAR S6772 — texte réservé aux lecteurs d'écran, qui commence par « . » */}
-                      <span className="sr-only">{`. ${SIDES_HINT}`}</span>
+                      <span className="sr-only">{`. ${sidesHint}`}</span>
                     </span>
                   )}
                 </li>
@@ -126,10 +117,7 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
           )}
 
           <p className={styles.footnote}>
-            Rencontres sûres quel que soit le score des matchs restants — hors décision
-            d&apos;arbitrage (abandon, pénalité, double forfait). Le moteur ne pose la{" "}
-            {preview.stage === "PLAYOFFS" ? "suite" : "manche"} qu&apos;une fois la précédente
-            terminée.
+            {preview.stage === "PLAYOFFS" ? t("nextRound.footnotePlayoffs") : t("nextRound.footnoteRound")}
           </p>
         </div>
       </BoardPanel>

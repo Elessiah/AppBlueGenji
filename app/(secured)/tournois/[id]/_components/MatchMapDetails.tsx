@@ -12,38 +12,32 @@ import { matchAnchorId } from "@/lib/shared/match-anchor";
 import dialogStyles from "./ScoreDialog.module.css";
 import styles from "./MatchMapDetails.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { FR_TOURNAMENT_PAGE_TEXT, frenchBlockLang, versusText } from "@/lib/shared/tournament-page-text";
+import { versusText } from "@/lib/shared/tournament-page-text";
 
 /**
  * Liste des maps d'un match ou d'une proposition (`docs/features/MAP_SCORES.md`) :
  * score de chaque map et son code de replay, copiable — c'est lui que les
- * arbitres vérifient en jeu. `french` : liste montrée dans une fenêtre restée
- * en français (score, lot 8b) — elle suit cette fenêtre, pas la page.
+ * arbitres vérifient en jeu.
  */
 export function MapResultList({
   maps,
   team1Name,
   team2Name,
   label,
-  french = false,
 }: Readonly<{
   maps: ReadonlyArray<MatchMapResult>;
   team1Name: string;
   team2Name: string;
   label: string;
-  french?: boolean;
 }>) {
   const { showError, showSuccess } = useToast();
-  const pageText = useTournamentPageText();
-  const { t } = french ? FR_TOURNAMENT_PAGE_TEXT : pageText;
-  const toastLang = french ? frenchBlockLang(pageText) : undefined;
-  const toastOptions = toastLang ? { lang: toastLang } : undefined;
+  const { t } = useTournamentPageText();
   const copy = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
-      showSuccess(t("match.maps.copied", { code }), toastOptions);
+      showSuccess(t("match.maps.copied", { code }));
     } catch {
-      showError(t("match.maps.copyFailed"), toastOptions);
+      showError(t("match.maps.copyFailed"));
     }
   };
 

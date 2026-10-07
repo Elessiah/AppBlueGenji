@@ -1,17 +1,21 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { FormEvent, useState, type ReactNode } from "react";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
+import { richNodes } from "@/components/i18n/shell-text";
+import { pageDateTime } from "@/lib/shared/tournament-page-text";
+import { toParticipantType } from "@/lib/shared/participants";
 import { formatLocalDateTime } from "@/lib/shared/dates";
-import { participantWording } from "@/lib/shared/participants";
 import {
   advanceTarget,
   willCloseWithoutMatches,
   type AdvanceTarget,
 } from "@/lib/shared/tournament-launch";
-import { computeTournamentProgress, TOURNAMENT_STAGE_META } from "@/lib/shared/tournament-progress";
+import { computeTournamentProgress } from "@/lib/shared/tournament-progress";
 import type { TournamentCard, TournamentState } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogShell } from "./TournamentDialogShell";
 
 type AdvanceResult = { target: AdvanceTarget; state: TournamentState; entrantCount: number };
@@ -21,21 +25,6 @@ interface AdvanceTournamentDialogProps {
   onClose: () => void;
   onAdvanced: (result: AdvanceResult) => void;
 }
-
-/** Titre, bouton de confirmation et libellé d'attente, par étape visée. */
-const TARGET_COPY: Record<AdvanceTarget, { title: string; confirm: string; busy: string }> = {
-  REGISTRATION: {
-    title: "Ouvrir les inscriptions maintenant",
-    confirm: "Ouvrir les inscriptions",
-    busy: "Ouverture…",
-  },
-  LOCKED: {
-    title: "Clore les inscriptions maintenant",
-    confirm: "Clore les inscriptions",
-    busy: "Clôture…",
-  },
-  RUNNING: { title: "Lancer le tournoi maintenant", confirm: "Lancer maintenant", busy: "Lancement…" },
-};
 
 /**
  * Confirmation de « Avancer le tournoi » : l'étape suivante, sur-le-champ.
@@ -58,10 +47,18 @@ export function AdvanceTournamentDialog({
   onClose,
   onAdvanced,
 }: Readonly<AdvanceTournamentDialogProps>) {
-  const { showError } = useFrenchBlockToast();
+  const { showError } = useToast();
+  const mapError = useMapError();
+  const pageText = useTournamentPageText();
+  const text = useDialogsText();
+  const { t } = text;
   const [busy, setBusy] = useState(false);
-
-  const wording = participantWording(card.participantType);
+  const dateTime = (iso: string) =>
+    text.locale === "fr"
+      ? formatLocalDateTime(iso)
+      : pageDateTime(iso, text.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const strong = (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>;
+  const type = toParticipantType(card.participantType);
   const entrantCount = card.registeredTeams;
   // Calculé à l'ouverture et non à chaque rendu : le dialogue reste monté
   // pendant que le flux SSE redessine la page, et voir l'étape annoncée changer
@@ -75,11 +72,12 @@ export function AdvanceTournamentDialog({
   // à défaut (l'heure a tourné entre-temps), on retombe sur le coup d'envoi, que
   // le serveur refusera proprement s'il n'y a vraiment plus rien à avancer.
   const target: AdvanceTarget = plan.target ?? "RUNNING";
-  const copy = TARGET_COPY[target];
-  const passage = `${TOURNAMENT_STAGE_META[plan.from].label} › ${TOURNAMENT_STAGE_META[target].label}`;
+  // Titre, bouton et attente de chaque étape : `advance.targets.<étape>.*`.
+  const key = target;
+  const stageLabel = (stage: typeof plan.from) => pageText.t(`progress.stages.${stage}.label`);
+  const passage = `${stageLabel(plan.from)} › ${stageLabel(target)}`;
   const empty = target === "RUNNING" && willCloseWithoutMatches(entrantCount);
-  const confirmLabel = empty ? "Clore le tournoi" : copy.confirm;
-  const entrantNoun = entrantCount > 1 ? wording.manyCapitalized : wording.oneCapitalized;
+  const confirmLabel = empty ? t("advance.closeEmpty") : t(`advance.targets.${key}.confirm`);
   // Ouvrir les inscriptions d'un tournoi masqué le publie au passage : c'est
   // une conséquence visible de tous, elle ne doit pas se cacher dans le
   // passage d'étape (voir `lib/shared/tournament-launch.ts`).
@@ -108,44 +106,27 @@ export function AdvanceTournamentDialog({
       titleId="advance-tournament-title"
       summaryId="advance-tournament-summary"
       maxWidth={480}
-      title={copy.title}
+      title={t(`advance.targets.${key}.title`)}
       busy={busy}
       onClose={onClose}
       onSubmit={submit}
-      submitLabel={busy ? copy.busy : confirmLabel}
+      submitLabel={busy ? t(`advance.targets.${key}.busy`) : confirmLabel}
     >
       <p
         id="advance-tournament-summary"
         style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}
       >
-        {target === "REGISTRATION" && (
-          <>
-            Les inscriptions ouvrent à cet instant, au lieu du{" "}
-            <strong style={{ color: "var(--ink)" }}>
-              {formatLocalDateTime(card.registrationOpenAt)}
-            </strong>
-            {/* NOSONAR S6772 — le point suit la date sans espace */}
-            . Leur clôture et le coup d&apos;envoi restent prévus aux dates annoncées.
-          </>
-        )}
-        {target === "LOCKED" && (
-          <>
-            Les inscriptions ferment à cet instant, au lieu du{" "}
-            <strong style={{ color: "var(--ink)" }}>
-              {formatLocalDateTime(card.registrationCloseAt)}
-            </strong>
-            : personne ne pourra plus rejoindre le tournoi. Le coup d&apos;envoi reste prévu le{" "}
-            <strong style={{ color: "var(--ink)" }}>{formatLocalDateTime(card.startAt)}</strong>.
-          </>
-        )}
-        {target === "RUNNING" && (
-          <>
-            Le coup d&apos;envoi est avancé à cet instant, au lieu du{" "}
-            <strong style={{ color: "var(--ink)" }}>{formatLocalDateTime(card.startAt)}</strong>.
-            Le tirage est fait sur les engagés du moment : personne ne pourra plus rejoindre le
-            tournoi.
-          </>
-        )}
+        {target === "REGISTRATION" &&
+          richNodes(text.rich("advance.summary.REGISTRATION", { date: dateTime(card.registrationOpenAt) }, { strong }))}
+        {target === "LOCKED" &&
+          richNodes(
+            text.rich(
+              "advance.summary.LOCKED",
+              { date: dateTime(card.registrationCloseAt), start: dateTime(card.startAt) },
+              { strong },
+            ),
+          )}
+        {target === "RUNNING" && richNodes(text.rich("advance.summary.RUNNING", { date: dateTime(card.startAt) }, { strong }))}
       </p>
 
       <dl
@@ -161,7 +142,7 @@ export function AdvanceTournamentDialog({
           alignItems: "baseline",
         }}
       >
-        <dt style={{ color: "var(--ink-quiet, #9aa4b2)" }}>Étape</dt>
+        <dt style={{ color: "var(--ink-quiet, #9aa4b2)" }}>{t("advance.stage")}</dt>
         <dd
           style={{
             margin: 0,
@@ -178,8 +159,8 @@ export function AdvanceTournamentDialog({
           <>
             <dt style={{ color: "var(--ink-quiet, #9aa4b2)" }}>
               {target === "RUNNING"
-                ? `${entrantNoun} au départ`
-                : "Effectif final"}
+                ? t(`advance.atStart.${type}`, { count: entrantCount })
+                : t("advance.finalCount")}
             </dt>
             <dd className="num" style={{ margin: 0, fontWeight: 600, textAlign: "right" }}>
               {entrantCount}
@@ -190,8 +171,7 @@ export function AdvanceTournamentDialog({
 
       {publishes && (
         <p style={{ marginTop: 14, fontSize: 13, lineHeight: 1.55, color: "var(--ink-quiet, #9aa4b2)" }}>
-          Ce tournoi n&apos;était pas encore publié : ouvrir ses inscriptions le rend visible de
-          tous.
+          {t("advance.publishes")}
         </p>
       )}
 
@@ -210,8 +190,7 @@ export function AdvanceTournamentDialog({
             color: "var(--red-live, #ff4d4d)",
           }}
         >
-          Moins de deux engagés : le tournoi ne jouera aucun match et sera clos aussitôt
-          {entrantCount === 1 ? ", l'unique engagé étant déclaré premier" : ""}.
+          {entrantCount === 1 ? t("advance.emptyOne") : t("advance.empty")}
         </p>
       )}
     </TournamentDialogShell>

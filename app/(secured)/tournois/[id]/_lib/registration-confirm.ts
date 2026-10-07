@@ -1,5 +1,7 @@
 import type { TournamentCard } from "@/lib/shared/types";
-import { registrationStreamNotice } from "@/lib/shared/stream-notice";
+import { toParticipantType } from "@/lib/shared/participants";
+import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
+import { FR_ACTIONS_TEXT } from "./actions-text";
 
 /**
  * Texte de la confirmation d'inscription à un tournoi.
@@ -25,27 +27,18 @@ export interface RegistrationConfirmText {
 export function registrationConfirmText(
   card: Pick<TournamentCard, "name" | "participantType">,
   formattedStartAt: string,
+  text: TournamentActionsText = FR_ACTIONS_TEXT,
 ): RegistrationConfirmText {
-  if (card.participantType === "SOLO") {
-    return {
-      title: `T'inscrire à « ${card.name} » ?`,
-      body: [
-        `Coup d'envoi : ${formattedStartAt}.`,
-        "Tu ne pourras pas annuler toi-même cette inscription : seul le staff du tournoi peut retirer un engagé.",
-        registrationStreamNotice(true),
-      ],
-      confirmLabel: "M'inscrire",
-      pendingLabel: "Inscription…",
-    };
-  }
+  const { t } = text;
+  const type = toParticipantType(card.participantType);
   return {
-    title: `Inscrire ton équipe à « ${card.name} » ?`,
+    title: t(`register.confirm.${type}.title`, { name: card.name }),
     body: [
-      `Coup d'envoi : ${formattedStartAt}.`,
-      "Toute l'équipe sera engagée. Elle ne pourra pas se désinscrire elle-même : seul le staff du tournoi peut retirer un engagé.",
-      registrationStreamNotice(false),
+      t("register.confirm.kickoff", { date: formattedStartAt }),
+      t(`register.confirm.${type}.final`),
+      t(`register.streamNotice.${type}`),
     ],
-    confirmLabel: "Inscrire mon équipe",
-    pendingLabel: "Inscription…",
+    confirmLabel: t(`wording.${type}.registerCta`),
+    pendingLabel: t("register.confirm.pending"),
   };
 }

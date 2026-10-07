@@ -15,16 +15,25 @@ import Image from "next/image";
  */
 const BADGE_SRC = "/badge-certifie.webp";
 
-export type VerifiedBadgeProps = {
-  size?: number;
+/** Textes de la pastille, dans la langue de l'écran qui l'affiche (français par défaut). */
+export type VerifiedBadgeLabels = { alt: string; title: string };
+
+const FR_BADGE_LABELS: VerifiedBadgeLabels = {
+  alt: "Tag Discord vérifié",
+  title: "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
 };
 
-export function VerifiedBadge({ size = 16 }: Readonly<VerifiedBadgeProps>) {
+export type VerifiedBadgeProps = {
+  size?: number;
+  labels?: VerifiedBadgeLabels;
+};
+
+export function VerifiedBadge({ size = 16, labels = FR_BADGE_LABELS }: Readonly<VerifiedBadgeProps>) {
   return (
     <Image
       src={BADGE_SRC}
-      alt="Tag Discord vérifié"
-      title="Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord."
+      alt={labels.alt}
+      title={labels.title}
       width={size}
       height={size}
       style={{ flexShrink: 0, verticalAlign: "middle" }}
@@ -38,6 +47,8 @@ export type DiscordTagProps = {
   verified?: boolean;
   /** Texte rendu à la place d'un tag absent. */
   fallback?: string;
+  /** Textes de la pastille (écran traduit) ; français par défaut. */
+  badgeLabels?: VerifiedBadgeLabels;
 };
 
 /**
@@ -55,7 +66,7 @@ export type DiscordTagProps = {
  * simplement `verified={tag !== null}` : la règle reste la sienne, ce composant
  * ne fait qu'afficher.
  */
-export function DiscordTag({ tag, verified = false, fallback = "—" }: Readonly<DiscordTagProps>) {
+export function DiscordTag({ tag, verified = false, fallback = "—", badgeLabels }: Readonly<DiscordTagProps>) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       {tag ? (
@@ -63,7 +74,7 @@ export function DiscordTag({ tag, verified = false, fallback = "—" }: Readonly
       ) : (
         <span style={{ color: "var(--ink-dim)" }}>{fallback}</span>
       )}
-      {verified ? <VerifiedBadge /> : null}
+      {verified ? <VerifiedBadge labels={badgeLabels} /> : null}
     </span>
   );
 }

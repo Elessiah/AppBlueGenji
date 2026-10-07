@@ -1,288 +1,35 @@
-import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
-import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
-import { REFEREE_SCHEDULING_ERRORS } from "@/lib/shared/match-planning";
-import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
-import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
-import { PHASE_ERROR_MESSAGES } from "@/lib/shared/tournament-phases";
+import { useCallback } from "react";
+import frTournamentErrors from "@/messages/fr/tournamentErrors.json";
+import { tournamentErrorsText, type TournamentErrorsText } from "@/lib/shared/tournament-actions-text";
+import { formatMessage } from "@/lib/shared/message-format";
+import { useTournamentErrorsText } from "@/components/i18n/tournament-actions-text";
 
-export const ERROR_MESSAGES: Record<string, string> = {
-  // Lancement des matchs : en tête, pour que les formulations propres à cette
-  // page l'emportent sur les codes communs (match introuvable, tournoi arrêté).
-  ...LAUNCH_ERROR_MESSAGES,
-  ...REFEREE_SCHEDULING_ERRORS,
-  // Écriture défaite par un interblocage (`fail()`, `lib/server/http.ts`) :
-  // saisie de score, arbitrage ou forfait contre un réordonnancement du seeding.
-  [CONCURRENT_UPDATE_RETRY]: CONCURRENT_UPDATE_RETRY_MESSAGE,
-  CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES: "Score verrouillé : la manche suivante a déjà des scores saisis.",
-  MATCH_NOT_FOUND: "Match introuvable.",
-  MATCH_NOT_READY: "Le match n'a pas deux équipes.",
-  // Volontairement neutre : le code remonte aussi bien du report d'une équipe
-  // (`reportMatchScore`) que de l'enregistrement d'un score par l'arbitrage. La
-  // consigne « utilise Valider le résultat » enverrait un joueur chercher un
-  // bouton qu'il n'a pas — c'est `decideScoreForm` qui la donne, côté arbitrage,
-  // avant même l'aller-retour.
-  MATCH_ALREADY_COMPLETED: "Ce match est déjà tranché : son résultat ne peut plus être saisi.",
-  // Saisie d'un score ou d'un forfait par un engagé (modale joueur).
-  NOT_IN_MATCH: "Ton équipe ne joue pas ce match.",
-  SCORE_SUBMIT_FAILED: "Le score n'a pas pu être envoyé. Réessaie.",
-  MATCH_FORFEIT_FAILED: "Le forfait n'a pas pu être enregistré. Réessaie.",
-  DRAW_NOT_ALLOWED: "Match nul impossible : ce tournoi exige un vainqueur.",
-  // Formulations de repli : l'interface connaît le format du tournoi et
-  // remplace ces messages par une version chiffrée (`matchScoreViolationMessage`).
-  SCORE_EXCEEDS_MATCH_FORMAT: "Score impossible pour le format de match du tournoi.",
-  SCORE_BELOW_MATCH_FORMAT: "Le vainqueur doit atteindre le nombre de manches du format.",
-  // Saisie map par map (`docs/features/MAP_SCORES.md`) — formulations de
-  // repli, l'interface les chiffre par `mapListViolationMessage`.
-  MAP_LIST_EMPTY: "Ajoute au moins une map jouée.",
-  MAP_COUNT_EXCEEDED: "Trop de maps pour le format de ce match.",
-  MAP_REPLAY_CODE_REQUIRED: "Chaque map doit porter son code de replay.",
-  MAP_REPLAY_CODE_INVALID: "Code de replay invalide.",
-  MAP_REPLAY_CODE_DUPLICATE: "Le même code de replay figure sur deux maps.",
-  MAP_SCORE_INVALID: "Score de map invalide.",
-  MAP_AFTER_DECISION: "Une map suit la fin du match : le résultat était déjà acquis.",
-  MAP_LIST_INCOMPLETE: "Match inachevé : sans vainqueur, toutes les maps du format se jouent (une map nulle en occupe une).",
-  INVALID_MAPS: "Détail des maps illisible.",
-  PROPOSAL_STALE: "La proposition adverse a changé ou n'est plus en attente : la fenêtre affiche la version à jour.",
-  INVALID_MATCH_FORMAT: "Format de match invalide.",
-  INVALID_MATCH_FORMAT_MAX_MAPS:
-    "Plafond de maps invalide : il doit rester entre l'objectif du format et son maximum naturel.",
-  MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS:
-    "Abaisser le plafond de maps suppose les égalités : sans elles, une rencontre arrivée à égalité n'aurait plus aucun score enregistrable.",
-  INVALID_ENDURANCE_PLAYOFF_FORMAT: "Format des play-offs invalide.",
-  TOURNAMENT_NOT_FOUND: "Tournoi introuvable.",
-  TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
-  ADMIN_SAVE_SCORES_FAILED: "Erreur lors de la sauvegarde des scores.",
-  ADMIN_RESOLVE_FAILED: "Erreur lors de la résolution du match.",
-  INVALID_FORFEIT_TEAM_ID: "Le forfait doit désigner une des deux équipes du match.",
-  MISSING_SCORES_OR_FORFEIT: "Scores ou forfait requis.",
-  DOUBLE_FORFEIT_EXCLUSIVE:
-    "Un double forfait ne porte ni score ni équipe désignée : retire-les avant de valider.",
-  DOUBLE_FORFEIT_RESOLVE_ONLY:
-    "Un double forfait tranche le match : utilise « Valider le résultat ».",
-  TOURNAMENT_FULL: "Ce tournoi est complet.",
-  // Formulation neutre : l'inscrit est une équipe ou un joueur selon le tournoi.
-  ALREADY_REGISTERED: "Inscription déjà enregistrée pour ce tournoi.",
-  REGISTRATION_CLOSED: "Les inscriptions ne sont pas ouvertes.",
-  NO_ACTIVE_TEAM: "Tu dois d'abord créer ou rejoindre une équipe.",
-  // Le joueur a bien une équipe : ce qui lui manque est la charge de l'engager.
-  // La phrase nomme donc les rôles, et dit à qui s'adresser.
-  //
-  // Formulation neutre quant à l'acte : le même code refuse l'inscription **et**
-  // l'abandon, qui exigent la même qualité pour la même raison (§4.2 et §4.7 de
-  // `docs/AUTHORIZATION_RULES.md`). Nommer l'inscription faisait lire « peuvent
-  // l'inscrire à un tournoi » à qui venait de cliquer « Déclarer forfait ».
-  NOT_TEAM_MANAGER:
-    "Seuls le propriétaire et les managers de l'équipe peuvent l'engager dans un tournoi ou l'en retirer.",
-  // Report d'un score par un membre sportif du roster : le geste revient à ceux
-  // qui mènent le match, les mêmes rôles que « Prêt ».
-  NOT_TEAM_MATCH_LEADER:
-    "Seuls le capitaine, un manager ou le propriétaire peuvent saisir le score de l'équipe.",
-  // Gérant qui n'a pas accepté les conditions d'utilisation (la modale
-  // d'acceptation s'ouvre en même temps).
-  TERMS_ACCEPTANCE_REQUIRED:
-    "Pour engager ton équipe, accepte d'abord les conditions d'utilisation (fenêtre ouverte à l'instant).",
-  // Tournoi individuel : le nom d'inscription du joueur est déjà pris.
-  SOLO_ENTRY_NAME_UNAVAILABLE:
-    "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",
-  USER_NOT_FOUND: "Compte introuvable.",
-  // Conditions d'inscription (`lib/shared/registration-filters.ts`). Chaque
-  // refus nomme **le geste qui le lève** : recruter, certifier un tag, ou
-  // rattacher un compte Blizzard. Un « conditions non remplies » unique aurait
-  // laissé le capitaine deviner laquelle des trois conditions a bloqué.
-  TEAM_TOO_FEW_PLAYERS:
-    "Ton équipe n'a pas assez de joueurs pour ce tournoi : recrute, puis réessaie.",
-  TEAM_NEEDS_VERIFIED_DISCORD:
-    "Ce tournoi demande qu'au moins un joueur de l'équipe ait certifié son tag Discord (page Mon profil) : l'organisation doit pouvoir vous joindre.",
-  TEAM_NEEDS_ALL_VERIFIED_DISCORD:
-    "Ce tournoi demande que tous les joueurs de l'équipe aient certifié leur tag Discord (page Mon profil).",
-  TEAM_NEEDS_LINKED_BLIZZARD:
-    "Ce tournoi demande qu'au moins un joueur de l'équipe ait rattaché son compte Blizzard (page Mon profil, « Applications connectées »).",
-  TEAM_NEEDS_ALL_LINKED_BLIZZARD:
-    "Ce tournoi demande que tous les joueurs de l'équipe aient rattaché leur compte Blizzard (page Mon profil, « Applications connectées »).",
-  INVALID_DISCORD_REQUIREMENT: "Condition « Discord vérifié » invalide.",
-  INVALID_BLIZZARD_REQUIREMENT: "Condition « Compte Blizzard » invalide.",
-  INVALID_MIN_PLAYERS: "Nombre de joueurs minimum invalide.",
-  // Repli du panneau de contacts, sur une réponse sans corps exploitable (502
-  // d'un relais) : dire ce qui n'a pas pu se charger vaut mieux que la phrase
-  // générique de `mapError`.
-  CONTACTS_LOAD_FAILED: "Impossible de charger les contacts. Réessaie dans un instant.",
-  // L'autre refus de la **même** route, et il est atteignable : le panneau n'est
-  // pas rendu sur un tournoi clos, mais la clôture peut tomber entre le rendu et
-  // le clic (la finale est tranchée, la trame SSE n'a pas encore réaffiché la
-  // page). Sans cette ligne, l'arbitre lisait « TOURNAMENT_FINISHED ».
-  TOURNAMENT_FINISHED:
-    "Ce tournoi est terminé : les contacts de ses engagés ne sont plus accessibles.",
-  NOT_SURVIVAL: "Le forfait n'est disponible que pour les tournois en mode Survie.",
-  // Formulations neutres : le forfait peut aussi être déclaré par l'arbitrage
-  // pour une autre équipe que la sienne.
-  TEAM_ALREADY_OUT: "Cette équipe n'est plus en lice dans ce tournoi.",
-  // Partagé par l'abandon **et** par les pénalités d'endurance : les deux se
-  // ferment au même instant, quand le capital cesse de décider quoi que ce
-  // soit. D'où une phrase qui dit d'abord la cause, puis le report du seul des
-  // deux gestes qui ait encore un chemin.
-  ENDURANCE_PLAYOFFS_STARTED:
-    "Les play-offs ont commencé : le capital d'endurance est figé. Un forfait se déclare désormais sur le match lui-même.",
-  TEAM_NOT_IN_TOURNAMENT: "Cette équipe n'est pas inscrite à ce tournoi.",
-  // Volontairement neutre : le même code remonte du forfait, de la diffusion et
-  // de toute route protégée. Un message parlant de forfait sur un refus
-  // d'antenne enverrait le lecteur chercher un bug là où il n'y en a pas.
-  FORBIDDEN: "Tu n'as pas les droits nécessaires pour cette action.",
-  FORFEIT_FAILED: "Erreur lors de la déclaration de forfait.",
-  // Édition d'un tournoi (`GET`/`PATCH /api/tournaments/[id]/edit`).
-  TOURNAMENT_LOCKED: "Le tournoi est en cours : il n'est plus modifiable.",
-  FIELD_NOT_EDITABLE: "Ce réglage n'est plus modifiable depuis que le tournoi est visible.",
-  MAX_TEAMS_CANNOT_DECREASE:
-    "Le nombre de places ne peut plus être réduit une fois le tournoi visible.",
-  REGISTRATION_CLOSE_IN_PAST:
-    "La clôture des inscriptions ne peut pas être placée dans le passé.",
-  EMPTY_PATCH: "Aucune modification à enregistrer.",
-  TOURNAMENT_UPDATE_FAILED: "Erreur lors de la modification du tournoi.",
-  TOURNAMENT_CREATE_FAILED: "Le tournoi n'a pas pu être créé.",
-  // Retour en arrière (`lib/shared/tournament-rollback.ts`). Les trois refus
-  // servent deux fois : en toast si la route tranche, et tels quels sous le
-  // bouton désarmé de la zone de danger — d'où des phrases qui expliquent, et
-  // non des constats.
-  // Vrai aussi bien d'un tournoi ramené à son coup d'envoi que d'un tournoi clos
-  // faute d'adversaires, qui n'a jamais eu de plateau : c'est le même refus, et
-  // parler d'un retour au coup d'envoi mentirait au second.
-  ROLLBACK_NOTHING_TO_UNDO: "Plus rien à défaire : aucun score n'est saisi sur ce plateau.",
-  ROLLBACK_TOURNAMENT_NOT_STARTED:
-    "Le tournoi n'a pas encore commencé : il n'a aucune manche à défaire.",
-  ROLLBACK_ROUND_CHANGED:
-    "La manche courante a changé pendant que le dialogue était ouvert : le plateau vient de se rafraîchir, relis les scores avant de recommencer.",
-  ROLLBACK_FAILED: "Erreur lors du retour en arrière.",
-  INVALID_DATE_ORDER:
-    "Les dates doivent se suivre : visibilité, ouverture, clôture, puis début.",
-  INVALID_DATES: "Une des dates est illisible.",
-  INVALID_MAX_TEAMS: "Le nombre de places doit être compris entre 2 et 256.",
-  MISSING_NAME: "Le nom du tournoi est obligatoire.",
-  // Autres refus de `validateTournamentInput`, partagés par la création et
-  // l'édition. Le formulaire borne déjà ces champs : ces phrases ne sortent que
-  // sur un client périmé ou une valeur contournée, mais elles doivent sortir en
-  // français — un code en capitales dans une notification n'apprend rien.
-  INVALID_FORMAT: "Format de tournoi invalide.",
-  INVALID_GAME: "Jeu invalide : Overwatch ou Marvel Rivals attendu.",
-  INVALID_PARTICIPANT_TYPE: "Type de participants invalide : équipes ou joueurs individuels attendus.",
-  // Émis pour un tournoi en ronde suisse **et** pour une phase suisse d'un
-  // multi-phases : la phrase vaut dans les deux cas.
-  INVALID_SWISS_ROUNDS: "Nombre de rondes suisses invalide : 1 à 20 attendues.",
-  INVALID_SWISS_POINTS:
-    "Barème de ronde suisse invalide : des points de 0 à 99, une victoire qui rapporte plus qu'une défaite, et un nul entre les deux.",
-  // Même double emploi que les rondes suisses : tournoi en Survie ou phase de
-  // Survie. Pour une phase, le code couvre aussi la première coupe — la phrase
-  // nomme donc les deux réglages.
-  INVALID_SURVIVAL_ROUNDS:
-    "Cadence de survie invalide : de 1 à 50 manches entre deux coupes, comme avant la première.",
-  INVALID_SURVIVAL_FIRST_CUT: "Première coupe de survie invalide : 1 à 50 manches avant elle.",
-  INVALID_ENDURANCE_SETTINGS:
-    "Réglages d'endurance invalides : capital de 1 à 99, gain et perte de 1 à 20, play-offs de 2 à 32 équipes, plafond de 1 à 50 manches.",
-  // Plan de phases (format multi-phases) : la table vit à côté du validateur
-  // qui émet ses codes, et le formulaire la lit aussi — un code, une phrase.
-  ...PHASE_ERROR_MESSAGES,
-  // Session expirée : le suivi en direct s'arrête, il faut se reconnecter.
-  UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
-  // Diffusion en direct (`lib/shared/live-streams.ts`).
-  INVALID_STREAM_URL:
-    "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
-  INVALID_LIVE_TRIGGER: "Mode de passage à l'antenne invalide.",
-  LIVE_TRIGGER_NOT_MANUAL:
-    "Ce match passe à l'antenne automatiquement : il n'y a rien à basculer.",
-  MATCH_NOT_LIVE_READY:
-    "L'antenne ne s'ouvre que sur un match jouable dont le score n'est pas saisi.",
-  MATCH_START_AT_REQUIRED:
-    "Fixe d'abord la date de début du match pour le faire passer à l'antenne à l'heure dite.",
-  MATCH_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la diffusion.",
-  // Calendrier des matchs (`lib/shared/match-schedule.ts`).
-  INVALID_MATCH_START_AT: "Date de début non reconnue.",
-  MATCH_SCHEDULE_UPDATE_FAILED: "Erreur lors de la mise à jour de la date de début.",
-  // Rediffusion d'un match terminé (`lib/shared/match-replay.ts`).
-  INVALID_REPLAY_URL:
-    "Lien de rediff non reconnu : colle le lien d'une vidéo YouTube (youtube.com/watch?v=… ou youtu.be/…).",
-  MATCH_NOT_REPLAYABLE:
-    "Une rediff ne se pose que sur un match terminé et réellement disputé (ni exemption, ni forfait).",
-  MATCH_REPLAY_UPDATE_FAILED: "Erreur lors de la mise à jour de la rediff.",
-  TOURNAMENT_LIVE_UPDATE_FAILED: "Erreur lors de la mise à jour de la chaîne officielle.",
-  // Suppression définitive (`docs/features/TOURNAMENT_DELETION.md`).
-  // `TOURNAMENT_NOT_FOUND` et `UNAUTHORIZED` sont déjà couverts plus haut.
-  TOURNAMENT_DELETE_FAILED: "Erreur lors de la suppression du tournoi.",
-  INVALID_TOURNAMENT_ID: "Identifiant de tournoi invalide.",
-  // Lancement anticipé (`lib/shared/tournament-launch.ts`). Le bouton n'est
-  // affiché que lorsque la fenêtre est ouverte : ces messages n'apparaissent
-  // que si le tournoi a bougé entre l'affichage et le clic — d'où des
-  // formulations qui disent ce qui a changé, et non ce qu'il fallait faire.
-  TOURNAMENT_ALREADY_STARTED: "Ce tournoi a déjà démarré : il n'y a plus d'étape à avancer.",
-  TOURNAMENT_ALREADY_FINISHED: "Ce tournoi est terminé.",
-  TOURNAMENT_ADVANCE_FAILED: "Erreur lors de l'avancée du tournoi.",
-  // Signalement d'un problème (`lib/shared/discord-notifications.ts`).
-  INVALID_ISSUE_MESSAGE:
-    "Décris le problème en 10 à 1000 caractères pour que l'arbitre puisse agir.",
-  NOT_REGISTERED: "Seuls les engagés du tournoi peuvent signaler un problème.",
-  NOT_MATCH_PARTICIPANT: "Seuls les joueurs de ce match peuvent le signaler.",
-  BOT_INTERNAL_UNREACHABLE:
-    "Le bot Discord est injoignable : le signalement n'est pas parti. Préviens le staff sur Discord.",
-  // Générique à dessein : le plafond de débit est partagé par toutes les routes
-  // de la page (lecture, report de score, signalement), et cette page les mappe
-  // toutes par `mapError`.
-  TOO_MANY_REQUESTS: "Trop de requêtes coup sur coup. Patiente quelques minutes.",
-  ISSUE_REPORT_FAILED: "Erreur lors de l'envoi du signalement.",
-  INVALID_MATCH_ID: "Identifiant de match invalide.",
-  // Plus émis par aucune route de cette page — `forfeit` et le report de score
-  // nomment désormais l'identifiant en cause. Conservé comme filet : d'autres
-  // familles de routes l'emploient encore, et un code sans phrase française
-  // s'afficherait brut dans le toast.
-  INVALID_ID: "Identifiant invalide.",
-  // Ordre de départ (`PATCH /api/admin/tournaments/[id]/seeding`). Sans ces
-  // phrases, le refus s'affichait tel quel dans le toast — « SEEDING_LOCKED ».
-  SEEDING_LOCKED: "Un score a été saisi : l'ordre de départ est désormais figé.",
-  SEEDING_LOCKED_STARTED: "Le tournoi a commencé : l'ordre de départ est désormais figé.",
-  SEEDING_LOCKED_FINISHED: "Tournoi terminé : l'ordre de départ n'a plus d'effet.",
-  INVALID_SEED_ORDER: "Ordre invalide : la liste doit contenir tous les engagés, une seule fois.",
-  SEEDING_REORDER_FAILED: "Erreur lors de l'enregistrement du nouvel ordre.",
-  // Retrait d'un engagé avant le coup d'envoi
-  // (`DELETE /api/admin/tournaments/[id]/registrations/[teamId]`). Les deux
-  // refus de fenêtre viennent du module partagé, phrases comprises : l'interface
-  // les affiche déjà sous la liste quand elle ferme le bouton, et les recopier
-  // ici ferait deux formulations du même refus.
-  ...ENTRANT_REMOVAL_BLOCK_MESSAGES,
-  ENTRANT_REMOVAL_FAILED: "Erreur lors du retrait de l'engagé.",
-  // Émis par le retrait et par l'abandon : un identifiant d'engagé illisible.
-  INVALID_TEAM: "Identifiant d'engagé invalide.",
-  // Inscription en lot d'engagés sans compte
-  // (`POST /api/admin/tournaments/[id]/ghost-registrations`). Les phrases
-  // restent unitaires : le tout-ou-rien est ajouté par `mapBatchError`, qui seul
-  // sait combien d'engagés portait la requête — ces mêmes codes servent aussi à
-  // l'inscription d'un seul, où « rien n'a été enregistré » n'apprendrait rien.
-  EMPTY_TEAM_SELECTION: "Sélectionne au moins un engagé à inscrire.",
-  INVALID_TEAM_IDS: "Sélection illisible : recharge la page et recommence.",
-  TOO_MANY_TEAMS: "Sélection trop large : inscris-les en plusieurs fois.",
-  // Une fantôme attribuée à un joueur entre l'affichage de la liste et le clic
-  // n'est plus une fantôme : le staff n'inscrit pas l'équipe d'un joueur à sa
-  // place, ni une entrée solo.
-  NOT_A_GHOST_TEAM: "Cet engagé n'est plus une équipe fantôme.",
-  TEAM_ALREADY_DELETED: "Cet engagé a été dissous.",
-  TEAM_NOT_FOUND: "Engagé introuvable.",
-  GHOST_TEAMS_LOAD_FAILED: "Impossible de charger la liste des équipes fantômes.",
-  GHOST_TEAM_CREATE_FAILED: "Erreur lors de la création de l'équipe fantôme.",
-  GHOST_REGISTRATION_FAILED: "Erreur lors de l'inscription.",
-  // Pénalités d'endurance (`docs/features/ENDURANCE_PENALTIES.md`). Les quatre
-  // refus de forme viennent du module partagé, phrases comprises : le dialogue
-  // les évite déjà, et les recopier ici ferait deux bornes à tenir d'accord —
-  // celle du code et celle du message qui l'annonce.
-  POINTS_NOT_POSITIVE: endurancePenaltyMessage("POINTS_NOT_POSITIVE"),
-  POINTS_TOO_HIGH: endurancePenaltyMessage("POINTS_TOO_HIGH"),
-  REASON_REQUIRED: endurancePenaltyMessage("REASON_REQUIRED"),
-  REASON_TOO_LONG: endurancePenaltyMessage("REASON_TOO_LONG"),
-  INVALID_PENALTY: "Pénalité invalide.",
-  INVALID_PENALTY_ID: "Identifiant de pénalité invalide.",
-  PENALTY_NOT_FOUND: "Cette pénalité n'existe plus.",
-  ENDURANCE_ROUND_ALREADY_PLAYED:
-    "Une manche a été jouée depuis : cette pénalité ne peut plus être retirée.",
-  NOT_BG_SURVIE: "Les pénalités d'endurance n'existent qu'en mode BlueGenji Survie.",
-  PENALTY_FAILED: "Erreur lors de l'enregistrement de la pénalité.",
-  PENALTIES_UNAVAILABLE:
-    "Les pénalités sont indisponibles sur ce serveur : leur table n'existe pas. Prévenez un administrateur.",
-  PENALTY_LIFT_FAILED: "Erreur lors du retrait de la pénalité.",
-};
+/**
+ * Refus des écrans de tournoi : un code d'API → une phrase, par langue
+ * (`messages/<langue>/tournamentErrors.json`, lot 8b). Les réponses de l'API
+ * restent des **codes** : seule l'interface les rédige.
+ *
+ * Le français est celui d'avant le lot, au caractère près — y compris les
+ * phrases venues des modules partagés (lancement de match, planification par
+ * l'arbitrage, plan de phases, retrait d'un engagé, pénalités d'endurance,
+ * conflit d'écriture), dont la table était la recopie : un test les compare
+ * une à une. Choix de rédaction repris de l'ancienne table :
+ *
+ * - `MATCH_ALREADY_COMPLETED`, `TEAM_ALREADY_OUT`, `FORBIDDEN` : volontairement
+ *   neutres, le même code remontant de plusieurs gestes (joueur ou arbitrage,
+ *   forfait ou diffusion) ;
+ * - `NOT_TEAM_MANAGER` : refuse l'inscription **et** l'abandon (§4.2 et §4.7 de
+ *   `docs/AUTHORIZATION_RULES.md`), d'où une phrase qui nomme les deux ;
+ * - conditions d'inscription : chaque refus nomme le geste qui le lève ;
+ * - `TOO_MANY_REQUESTS` : générique, le plafond est partagé par toutes les
+ *   routes de la page ;
+ * - inscription en lot : les phrases restent unitaires, le tout-ou-rien est
+ *   ajouté par {@link mapBatchError}, seul à connaître la taille du lot.
+ */
+export const FR_ERRORS_TEXT: TournamentErrorsText = tournamentErrorsText("fr", frTournamentErrors);
+
+/** Table française (code → phrase) : celle des écrans hors fournisseur. */
+export const ERROR_MESSAGES: Readonly<Record<string, string>> = frTournamentErrors.codes;
 
 /**
  * Repli d'un code que la table ne connaît pas. Une phrase générique plutôt que
@@ -292,26 +39,26 @@ export const ERROR_MESSAGES: Record<string, string> = {
  * Elle ne promet pas qu'un nouvel essai aboutira : un code inconnu peut être un
  * refus déterministe (400, 409), que le même geste rencontrera de nouveau.
  */
-export const UNKNOWN_ERROR_MESSAGE =
-  "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.";
+export const UNKNOWN_ERROR_MESSAGE = frTournamentErrors.unknown;
 
 /** Forme d'un code d'erreur du serveur : `TOURNAMENT_NOT_FOUND`, `FORBIDDEN`… */
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 /**
- * Phrase française d'un refus.
+ * Phrase d'un refus, dans la langue de `text` (français par défaut).
  *
- * Seul un **code** inconnu retombe sur {@link UNKNOWN_ERROR_MESSAGE}. Ce qui
+ * Seul un **code** inconnu retombe sur la phrase générique. Ce qui
  * n'a pas la forme d'un code passe tel quel : les appelants transmettent
  * `error.message`, qui porte parfois déjà une phrase (rédigée par l'interface,
  * ou venue d'un échec réseau du navigateur) — la remplacer par une formule
  * générique ferait perdre une explication sans rien gagner.
  */
-export function mapError(errorCode: string): string {
-  // `Object.hasOwn` et non un simple accès : `ERROR_MESSAGES["constructor"]`
+export function mapError(errorCode: string, text: TournamentErrorsText = FR_ERRORS_TEXT): string {
+  const codes: Readonly<Record<string, string>> = text.messages.codes;
+  // `Object.hasOwn` et non un simple accès : `codes["constructor"]`
   // remonterait la chaîne de prototypes et rendrait une fonction.
-  if (Object.hasOwn(ERROR_MESSAGES, errorCode)) return ERROR_MESSAGES[errorCode];
-  return ERROR_CODE_PATTERN.test(errorCode) ? UNKNOWN_ERROR_MESSAGE : errorCode;
+  if (Object.hasOwn(codes, errorCode)) return codes[errorCode];
+  return ERROR_CODE_PATTERN.test(errorCode) ? text.messages.unknown : errorCode;
 }
 
 /**
@@ -323,9 +70,13 @@ export function mapError(errorCode: string): string {
  * d'« équipe » et de « joueur » diverge, et les messages sont partagés entre les
  * deux types de tournoi.
  */
-export function mapEntrantError(errorCode: string, entrantName: string | null): string {
-  const message = mapError(errorCode);
-  return entrantName ? `${entrantName} — ${message}` : message;
+export function mapEntrantError(
+  errorCode: string,
+  entrantName: string | null,
+  text: TournamentErrorsText = FR_ERRORS_TEXT,
+): string {
+  const message = mapError(errorCode, text);
+  return entrantName ? formatMessage(text.locale, text.messages.entrant, { name: entrantName, message }) : message;
 }
 
 /**
@@ -342,7 +93,19 @@ export function mapBatchError(
   errorCode: string,
   entrantName: string | null,
   batchSize: number,
+  text: TournamentErrorsText = FR_ERRORS_TEXT,
 ): string {
-  const message = mapEntrantError(errorCode, entrantName);
-  return batchSize > 1 ? `${message} Rien n'a été enregistré.` : message;
+  const message = mapEntrantError(errorCode, entrantName, text);
+  return batchSize > 1 ? formatMessage(text.locale, text.messages.batch, { message }) : message;
+}
+
+/** Table des refus dans la langue de la page (anglais sous `/en`). */
+export function useErrorsText(): TournamentErrorsText {
+  return useTournamentErrorsText(FR_ERRORS_TEXT);
+}
+
+/** `mapError` lié à la langue de la page. */
+export function useMapError(): (errorCode: string) => string {
+  const text = useErrorsText();
+  return useCallback((errorCode: string) => mapError(errorCode, text), [text]);
 }

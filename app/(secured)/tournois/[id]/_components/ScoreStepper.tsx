@@ -3,6 +3,7 @@
 import { parseScoreInput } from "../_lib/score-form";
 import { EntrantLogo } from "./EntrantName";
 import styles from "./ScoreDialog.module.css";
+import { useDialogsText } from "../_lib/dialogs-text";
 
 interface ScoreStepperProps {
   id: string;
@@ -33,6 +34,7 @@ export function ScoreStepper({
   onChange,
   describedBy,
 }: Readonly<ScoreStepperProps>) {
+  const { t } = useDialogsText();
   const parsed = parseScoreInput(value);
   // Un champ vide n'est pas une erreur : c'est un score pas encore saisi. Seule
   // une valeur illisible ou hors plage se signale en rouge.
@@ -59,7 +61,7 @@ export function ScoreStepper({
           // « − » est le seul moyen d'atteindre 0 aux boutons — un 3-0 se saisit
           // autrement au clavier, ce qui n'existe pas sur mobile.
           disabled={disabled || parsed === 0}
-          aria-label={`Retirer une manche à ${teamName}`}
+          aria-label={t("score.stepper.decrement", { name: teamName })}
         >
           −
         </button>
@@ -74,7 +76,7 @@ export function ScoreStepper({
           value={value}
           placeholder="—"
           aria-invalid={invalid}
-          aria-label={`Manches gagnées par ${teamName}`}
+          aria-label={t("score.stepper.field", { name: teamName })}
           aria-describedby={describedBy}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
@@ -84,7 +86,7 @@ export function ScoreStepper({
           className={styles.step}
           onClick={() => step(1)}
           disabled={disabled || (parsed ?? 0) >= max}
-          aria-label={`Ajouter une manche à ${teamName}`}
+          aria-label={t("score.stepper.increment", { name: teamName })}
         >
           +
         </button>

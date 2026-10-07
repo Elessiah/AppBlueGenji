@@ -1,0 +1,295 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save"
+  },
+  "registrations": {
+    "seedingSource": {
+      "MANUAL": "Order set by the staff",
+      "RANKING": "Site ranking",
+      "REGISTRATION": "Registration order"
+    },
+    "lock": {
+      "FINISHED": "Tournament finished: the order no longer has any effect.",
+      "SCORES_ENTERED": "A score has been entered: the order is now locked.",
+      "STARTED": "The tournament has started: the seeding order is now locked."
+    },
+    "column": {
+      "actions": "Actions",
+      "order": "Order",
+      "removal": "Removal"
+    },
+    "seedingHint": "This rank decides the first-round pairings. Use the arrows next to it to set it — until kickoff.",
+    "seedingHintWaiting": {
+      "TEAM": "This rank will decide the first-round pairings. You'll be able to set it here as soon as two teams are entered.",
+      "SOLO": "This rank will decide the first-round pairings. You'll be able to set it here as soon as two players are entered."
+    },
+    "followsRanking": "Sorted by the site ranking: each new registration takes its place by rating. The order can still change before the launch if ratings change; reorder the list to lock it — your order will then take precedence.",
+    "followsFrozenDraw": "Ranks locked at kickoff from the site ranking: these are the draw's ranks, even if ratings have changed since.",
+    "reordered": "Order updated.",
+    "newRank": "New rank for {name}: {rank} of {total}.",
+    "moveUpAria": "Move {name} up one rank",
+    "moveUpTitle": "Move up one rank",
+    "moveDownAria": "Move {name} down one rank",
+    "moveDownTitle": "Move down one rank",
+    "removeAria": "Remove {name} from the tournament",
+    "removeTitle": "Remove from the tournament",
+    "remove": "Remove",
+    "removed": "{name} is no longer among the entrants.",
+    "manualConfirm": {
+      "title": "Set the seeding order by hand?",
+      "confirm": "Set the order",
+      "pending": "Saving…",
+      "body": "The seeding order currently follows the site ranking. Changing it permanently replaces it with an order set by the staff: the ranking will no longer reorder the list, and new registrations will be added at the end of the list.",
+      "draw": "No match exists yet: the first-round pairings will be drawn from this order at kickoff."
+    }
+  },
+  "removeEntrant": {
+    "title": "Remove {name} from the tournament",
+    "pending": "Removing…",
+    "erased": "The registration is <strong>erased</strong>: nothing will show that this entrant took part in the tournament, unlike a withdrawal. The slot goes back to the board.",
+    "registrationOpen": "Registration is open: the freed slot can be taken again, and this entrant can register again.",
+    "registrationClosed": "Registration is closed: no one can take this slot anymore, and this entrant can't register again unless registration is reopened."
+  },
+  "wording": {
+    "TEAM": {
+      "registerCta": "Register my team",
+      "guestCta": "+ Ghost team",
+      "forfeitSelfConfirm": "Your team will leave the tournament for good."
+    },
+    "SOLO": {
+      "registerCta": "Register",
+      "guestCta": "+ Guest player",
+      "forfeitSelfConfirm": "You'll leave the tournament for good."
+    }
+  },
+  "register": {
+    "streamNotice": {
+      "TEAM": "This tournament's matches may be streamed live and recorded, showing your username, your team's name and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name.",
+      "SOLO": "This tournament's matches may be streamed live and recorded, showing your username and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name."
+    },
+    "streamNoticeLink": "Learn more",
+    "notManager": "Only your team's owner and managers can register it for a tournament.",
+    "confirm": {
+      "kickoff": "Kickoff: {date}.",
+      "pending": "Registering…",
+      "TEAM": {
+        "title": "Register your team for “{name}”?",
+        "final": "The whole team will be entered. It won't be able to unregister itself: only the tournament staff can remove an entrant."
+      },
+      "SOLO": {
+        "title": "Register for “{name}”?",
+        "final": "You won't be able to cancel this registration yourself: only the tournament staff can remove an entrant."
+      }
+    },
+    "success": "Registration confirmed."
+  },
+  "header": {
+    "imageAria": "Tournament image",
+    "image": "Image",
+    "addImage": "Add an image",
+    "edit": "Edit",
+    "advanceTitle": "Move to the next step: {stage}.",
+    "advance": "Advance the tournament",
+    "reportIssue": "Report a problem"
+  },
+  "danger": {
+    "title": "Danger zone",
+    "rollbackHint": "Erasing {stage} reopens the previous round for correction. You can repeat it: round by round, you can go back to the start of the tournament. Note the scores first: nothing is archived.",
+    "rollbackHintFinished": "Erasing {stage} reopens the previous round for correction. You can repeat it: round by round, you can go back to the start of the tournament. Since the tournament is finished, it will be reopened and its final standings erased. Note the scores first: nothing is archived.",
+    "rollback": "Go back one round",
+    "deleteHint": "Deleting this tournament removes it from the site for good, with its matches, registrations and standings. Teams and players are kept.",
+    "delete": "Delete the tournament"
+  },
+  "rollback": {
+    "stage": {
+      "round": "round {round}",
+      "playoffRound": "playoff round {round}",
+      "inPhase": "{round} of stage {phase}",
+      "theRound": "{stage}",
+      "thePlayoffRound": "{stage}"
+    },
+    "success": "Results erased: {stage}."
+  },
+  "advance": {
+    "success": {
+      "closedUnderfilled": "Tournament closed: there weren't enough entrants to play a match.",
+      "started": "Tournament started with {count, plural, one {# entrant} other {# entrants}}.",
+      "registrationOpen": "Registration open.",
+      "registrationClosed": "Registration closed with {count, plural, one {# entrant} other {# entrants}}."
+    }
+  },
+  "deleteTournament": {
+    "success": "Tournament “{name}” permanently deleted."
+  },
+  "forfeit": {
+    "recorded": "Forfeit recorded.",
+    "recordedFor": "Forfeit recorded for {name}.",
+    "self": {
+      "title": "Withdraw from the tournament?",
+      "confirm": "Withdraw",
+      "pending": "Withdrawing…"
+    },
+    "other": {
+      "title": "Declare a forfeit for {name}?",
+      "body": {
+        "TEAM": "The team will leave the tournament for good: the forfeit applies to everything left to play.",
+        "SOLO": "The player will leave the tournament for good: the forfeit applies to everything left to play."
+      },
+      "singleRound": "For a forfeit on a single round, go through the match score.",
+      "confirm": "Declare forfeit",
+      "pending": "Saving…"
+    },
+    "button": {
+      "label": "Withdraw",
+      "selfTitle": "Withdraw: your team leaves the tournament for good",
+      "otherTitle": "Declare {name}'s withdrawal",
+      "selfAria": "Withdraw with my team",
+      "otherAriaSwiss": "Withdraw: declare {name}'s withdrawal",
+      "otherAriaSurvival": "Withdraw: declare {name}'s withdrawal"
+    },
+    "endurance": {
+      "selfTitle": {
+        "TEAM": "Withdraw: the team will leave the tournament for good",
+        "SOLO": "Withdraw: the player will leave the tournament for good"
+      },
+      "selfAria": "Withdraw from the tournament",
+      "otherTitle": "Forfeit: declare {name} out for the rest of the tournament",
+      "other": "Forfeit"
+    }
+  },
+  "penaltyLift": {
+    "success": "Penalty lifted: {name} gets back {points, plural, one {# point} other {# points}}.",
+    "title": "Lift {name}'s penalty?",
+    "body": "{points, plural, one {# point goes} other {# points go}} back to the endurance pool, and everything the penalty triggered will be restored.",
+    "confirm": "Lift the penalty",
+    "pending": "Lifting…",
+    "frozen": "Locked",
+    "frozenTitle": "A round has been played since: giving these points back would put back in contention a team that didn't play it.",
+    "buttonTitle": "Lift this penalty: {name} gets back {points, plural, one {# point} other {# points}}",
+    "buttonAria": "Remove the {points, plural, one {# point} other {# points}} penalty given to {name}"
+  },
+  "launch": {
+    "fallback": "The action couldn't go through. Try again in a moment.",
+    "alreadyCompleted": "This match is over."
+  },
+  "cardActions": {
+    "name": "{label}: {match}",
+    "more": "More actions",
+    "openLaunch": "Open the launch",
+    "matchInfo": "Match info",
+    "plan": "Schedule",
+    "editDate": "Change the date",
+    "setDate": "Set a date",
+    "force": "Force the launch",
+    "hostSwap": "Change the host team",
+    "claimCast": "Cast this match",
+    "stopCasting": "Stop casting",
+    "removeCaster": "Remove the caster",
+    "stopLive": "End the live",
+    "startLive": "Go live",
+    "configureStream": "Set up the stream",
+    "streamMatch": "Stream this match",
+    "editReplay": "Edit the replay",
+    "addReplay": "Add the replay",
+    "playerScore": {
+      "forfeit": "Declare forfeit",
+      "confirm": "Confirm the score",
+      "edit": "Edit my score",
+      "review": "Review the score",
+      "enter": "Enter the score"
+    },
+    "adminForfeit": "Rule a forfeit",
+    "adminValidate": "Confirm the proposed score",
+    "adminEdit": "Edit the score",
+    "reportConflict": "Conflicting scores · referee alerted",
+    "reportSide": "Team {side}",
+    "reportPending": "{score1} – {score2} proposed by {reporter} · awaiting confirmation",
+    "locked": "Score locked",
+    "lockedTitle": "The next round already has scores: this match's result can no longer be changed.",
+    "lockedReason": ": the next round already has scores, this match's result can no longer be changed.",
+    "hostChanged": "Host team changed.",
+    "casting": "You're casting this match.",
+    "notCasting": "You're no longer casting this match.",
+    "casterRemoved": "Caster removed.",
+    "airClosed": "Off air.",
+    "airOpened": "On air.",
+    "forceConfirm": {
+      "title": "Force the launch of {match}?",
+      "confirm": "Launch the match",
+      "pending": "Launching…",
+      "success": "Match launched.",
+      "body": "The match starts without waiting for the missing “Ready” calls: the entrants can report their score right away.",
+      "unplanned": "This match isn't scheduled yet: it starts now, with no time announced to the entrants."
+    }
+  },
+  "planning": {
+    "toPlanCount": "{count, plural, =1 {1 match to schedule} other {# matches to schedule}}",
+    "allPlanned": "Every playable match has a date.",
+    "planNextAria": "Schedule the next match: {team1} vs {team2}",
+    "planNext": "Schedule the next one",
+    "enable": "Turn on scheduling",
+    "disable": "Turn off scheduling",
+    "disabled": "Referee scheduling turned off: matches without a date move into launch.",
+    "enabled": "Referee scheduling turned on.",
+    "enabledMoved": "Scheduling turned on: {count, plural, =1 {1 match to schedule} other {# matches to schedule}}.",
+    "confirm": {
+      "title": "Turn on referee scheduling?",
+      "confirm": "Turn on",
+      "pending": "Turning on…",
+      "consequence": "{count, plural, =1 {1 match, with no date and not launched yet, leaves the launch — its “Ready” calls are cleared — and waits for a referee to set its time.} other {# matches, with no date and not launched yet, leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time.}}",
+      "next": "Matches already launched carry on, and the next rounds will start out to be scheduled."
+    },
+    "errors": {
+      "TOURNAMENT_NOT_FOUND": "Tournament not found.",
+      "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",
+      "INVALID_REFEREE_SCHEDULING": "Invalid value for referee scheduling.",
+      "fallback": "Scheduling couldn't be changed. Try again in a moment."
+    }
+  },
+  "liveLink": {
+    "saved": "Official channel saved.",
+    "removed": "Official channel removed.",
+    "inputAria": "Tournament's official channel",
+    "invalid": "Link not recognized. Accepted platforms: {platforms}.",
+    "hint": "Clearing the field removes the channel. Accepted platforms: {platforms}.",
+    "edit": "Edit the channel",
+    "add": "Official channel"
+  },
+  "penalty": {
+    "button": "Penalty",
+    "buttonTitle": "Take endurance points from {name}",
+    "buttonAria": "Penalty: take endurance points from {name}"
+  },
+  "nextRound": {
+    "panelTitle": "Preview · {title}",
+    "panelAria": "Preview of the next step: {title}",
+    "listAria": "Settled matchups — {title}",
+    "stage": {
+      "final": "Final",
+      "semis": "Semifinals",
+      "quarters": "Quarterfinals",
+      "roundOf16": "Round of 16",
+      "playoffs": "Playoffs"
+    },
+    "round": "Round {round}",
+    "roundOf": "Round {round}/{max}",
+    "acquired": "{count, plural, one {# settled matchup} other {# settled matchups}}",
+    "acquiredOf": "{acquired} of {expected}",
+    "pending": "{count, plural, one {# match left} other {# matches left}} to play",
+    "empty": {
+      "freeScore": "Free score: a remaining match can shift a pool without limit, nothing is settled before the end of the round.",
+      "underfilled": "Fewer than two qualified: the tournament will close without a final bracket.",
+      "none": "No matchup is settled yet: they all depend on the remaining matches."
+    },
+    "stageUncertain": "The qualifying stage may still end with the current round: these matchups will only be played if it continues.",
+    "thirdPlace": "Third-place match",
+    "byePlayoffs": "advances (bye)",
+    "byeRound": "sits out this round (odd number of entrants)",
+    "versus": "vs",
+    "sidesUnknown": "Sides to be confirmed",
+    "sidesHint": "The matchup is certain, but the remaining matches will decide who, ranked higher, takes the left side and hosts the game.",
+    "footnoteRound": "Matchups that are certain whatever the score of the remaining matches — barring a referee decision (withdrawal, penalty, double forfeit). The engine only sets up the round once the previous one is over.",
+    "footnotePlayoffs": "Matchups that are certain whatever the score of the remaining matches — barring a referee decision (withdrawal, penalty, double forfeit). The engine only sets up the next stage once the previous one is over."
+  }
+}

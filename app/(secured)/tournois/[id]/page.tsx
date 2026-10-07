@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang, type TournamentPageText } from "@/lib/shared/tournament-page-text";
+import { pageDateTime, type TournamentPageText } from "@/lib/shared/tournament-page-text";
 import type {
   BracketMatch,
   BracketType,
@@ -14,14 +14,14 @@ import type {
   TournamentDetail,
   TournamentFormat,
 } from "@/lib/shared/types";
-import { participantWording } from "@/lib/shared/participants";
+import { toParticipantType } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
-import { advanceSuccessMessage } from "@/lib/shared/tournament-launch";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import type { LiveFailure } from "./_lib/live-state";
-import { mapError } from "./_lib/error-map";
+import { useMapError } from "./_lib/error-map";
+import { advanceSuccessText, rollbackStageText, useActionsText } from "./_lib/actions-text";
 import { registrationConfirmText } from "./_lib/registration-confirm";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { MatchFormatProvider } from "./_lib/match-format-context";
@@ -29,10 +29,7 @@ import { fromBracketMatch } from "@/lib/shared/match-lock";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { canOpenPlayerScoreDialog } from "@/lib/shared/player-score-report";
 import { isPreLaunchState } from "@/lib/shared/seeding";
-import {
-  planRoundRollback,
-  rollbackStageLabelWithArticle,
-} from "@/lib/shared/tournament-rollback";
+import { planRoundRollback } from "@/lib/shared/tournament-rollback";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { PodiumTiersOff } from "@/components/podium-tiers";
@@ -235,7 +232,8 @@ interface TournamentDangerZoneProps {
   rollbackPlan: ReturnType<typeof rollbackView>["rollbackPlan"];
   rollbackReady: ReturnType<typeof rollbackView>["rollbackReady"];
   rollbackRefusal: ReturnType<typeof rollbackView>["rollbackRefusal"];
-  rollbackReopenNote: string;
+  /** Le tournoi est clos : le retour en arrière le rouvrira (phrase du motif). */
+  rollbackReopenNote: boolean;
   onRollback: () => void;
   onDelete: () => void;
 }
@@ -253,12 +251,15 @@ function TournamentDangerZone({
   onRollback,
   onDelete,
 }: Readonly<TournamentDangerZoneProps>) {
-  // Outil du staff : reste français (D4), annoncé comme tel sous `/en`.
-  const text = useTournamentPageText();
+  // Outils du staff posés sur la fiche (lot 8b).
+  const actionText = useActionsText();
+  const a = actionText.t;
+  const mapError = useMapError();
+  const rollbackHintKey = rollbackReopenNote ? "danger.rollbackHintFinished" : "danger.rollbackHint";
   return (
-    <div className={`ds-block ${styles.danger}`} lang={frenchBlockLang(text)}>
+    <div className={`ds-block ${styles.danger}`}>
       <div className="ds-section-title">
-        <h2 className={styles.dangerTitle}>Zone de danger</h2>
+        <h2 className={styles.dangerTitle}>{a("danger.title")}</h2>
       </div>
       {/* Retour en arrière — au-dessus de la suppression : c'est le geste
           qu'un arbitre vient chercher ici, et le seul des deux qui se
@@ -268,7 +269,7 @@ function TournamentDangerZone({
         <div className={styles.dangerRow}>
           <p id="rollback-hint" className={styles.dangerText}>
             {rollbackReady
-              ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${rollbackReopenNote} Pense à noter les scores avant : rien n'est archivé.`
+              ? a(rollbackHintKey, { stage: rollbackStageText(actionText, rollbackReady, true) })
               : mapError(rollbackRefusal ?? "")}
           </p>
           <CyberButton
@@ -287,7 +288,7 @@ function TournamentDangerZone({
             aria-describedby="rollback-hint"
             className={`${styles.dangerAction} ${styles.rollbackAction}`}
           >
-            Revenir en arrière d&apos;une manche
+            {a("danger.rollback")}
           </CyberButton>
         </div>
       )}
@@ -295,15 +296,14 @@ function TournamentDangerZone({
       {detail.canDelete && (
         <div className={styles.dangerRow}>
           <p className={styles.dangerText}>
-            Supprimer ce tournoi l&apos;efface du site pour de bon, avec ses matchs, ses
-            inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.
+            {a("danger.deleteHint")}
           </p>
           <CyberButton
             variant="ghost"
             onClick={() => onDelete()}
             className={`${styles.dangerAction} ${styles.deleteAction}`}
           >
-            Supprimer le tournoi
+            {a("danger.delete")}
           </CyberButton>
         </div>
       )}
@@ -317,12 +317,11 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(params.id);
   const text = useTournamentPageText();
   const { t } = text;
-  // Gestes et messages du lot 8b (inscription, abandon, sanctions) et du staff :
-  // restés français, annoncés comme tels sous `/en` (WCAG 3.1.2).
-  const actionLang = frenchBlockLang(text);
-  const toast = useToast();
-  const showError = useCallback((message: string) => toast.showError(message, { lang: actionLang }), [toast, actionLang]);
-  const showSuccess = useCallback((message: string) => toast.showSuccess(message, { lang: actionLang }), [toast, actionLang]);
+  // Gestes du lot 8b (inscription, abandon, sanctions, outils du staff).
+  const actionText = useActionsText();
+  const a = actionText.t;
+  const mapError = useMapError();
+  const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
   // Relecture du contexte du lecteur quand une proposition a changé sous la
@@ -549,7 +548,7 @@ export default function TournamentDetailPage() {
 
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
-  const wording = participantWording(detail.card.participantType);
+  const entrantType = toParticipantType(detail.card.participantType);
 
   const canAdminResolve = (match: BracketMatch): boolean => {
     if (frozen) return false;
@@ -593,7 +592,7 @@ export default function TournamentDetailPage() {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
-      showSuccess(isMine ? "Forfait enregistré." : `Forfait de ${teamName} enregistré.`);
+      showSuccess(isMine ? a("forfeit.recorded") : a("forfeit.recordedFor", { name: teamName }));
       void refresh();
       return true;
     } catch (e) {
@@ -607,20 +606,17 @@ export default function TournamentDetailPage() {
     setPendingConfirm(
       isMine
         ? {
-            title: "Abandonner le tournoi ?",
-            body: [wording.forfeitSelfConfirm],
-            confirmLabel: "Abandonner",
-            pendingLabel: "Abandon…",
+            title: a("forfeit.self.title"),
+            body: [a(`wording.${entrantType}.forfeitSelfConfirm`)],
+            confirmLabel: a("forfeit.self.confirm"),
+            pendingLabel: a("forfeit.self.pending"),
             run: () => performForfeit(teamId, teamName, true),
           }
         : {
-            title: `Déclarer ${teamName} forfait ?`,
-            body: [
-              `${wording.subject} quittera définitivement le tournoi : le forfait vaut pour tout ce qui reste à jouer.`,
-              "Pour un forfait sur une seule manche, passez par le score du match.",
-            ],
-            confirmLabel: "Déclarer forfait",
-            pendingLabel: "Enregistrement…",
+            title: a("forfeit.other.title", { name: teamName }),
+            body: [a(`forfeit.other.body.${entrantType}`), a("forfeit.other.singleRound")],
+            confirmLabel: a("forfeit.other.confirm"),
+            pendingLabel: a("forfeit.other.pending"),
             run: () => performForfeit(teamId, teamName, false),
           },
     );
@@ -634,7 +630,7 @@ export default function TournamentDetailPage() {
       );
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "PENALTY_LIFT_FAILED");
-      showSuccess(`Pénalité retirée : ${penalty.teamName} récupère ${penalty.points} point(s).`);
+      showSuccess(a("penaltyLift.success", { name: penalty.teamName, points: penalty.points }));
       void refresh();
       return true;
     } catch (e) {
@@ -645,12 +641,10 @@ export default function TournamentDetailPage() {
 
   const liftPenalty = (penalty: EndurancePenaltyRow) => {
     setPendingConfirm({
-      title: `Retirer la pénalité de ${penalty.teamName} ?`,
-      body: [
-        `${penalty.points} point(s) seront rendus au capital d'endurance, et tout ce que la sanction avait entraîné sera rétabli.`,
-      ],
-      confirmLabel: "Retirer la pénalité",
-      pendingLabel: "Retrait…",
+      title: a("penaltyLift.title", { name: penalty.teamName }),
+      body: [a("penaltyLift.body", { points: penalty.points })],
+      confirmLabel: a("penaltyLift.confirm"),
+      pendingLabel: a("penaltyLift.pending"),
       run: () => performLiftPenalty(penalty),
     });
   };
@@ -684,7 +678,7 @@ export default function TournamentDetailPage() {
         }
         throw new Error(payload.error || "REGISTRATION_FAILED");
       }
-      showSuccess("Inscription validée.");
+      showSuccess(a("register.success"));
       void refresh();
       return true;
     } catch (e) {
@@ -694,8 +688,12 @@ export default function TournamentDetailPage() {
   };
 
   const registerTeam = () => {
-    const text = registrationConfirmText(detail.card, formatLocalDateTime(detail.card.startAt));
-    setPendingConfirm({ ...text, tone: "primary", run: performRegister });
+    const startAt =
+      actionText.locale === "fr"
+        ? formatLocalDateTime(detail.card.startAt)
+        : pageDateTime(detail.card.startAt, actionText.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const confirm = registrationConfirmText(detail.card, startAt, actionText);
+    setPendingConfirm({ ...confirm, tone: "primary", run: performRegister });
   };
 
   const { isMulti, selectedPhase, contextLabel, filteredMatches, formatForBracket } = selectedPhaseView(
@@ -742,7 +740,11 @@ export default function TournamentDetailPage() {
   // d'avance, et pour un tournoi déjà lancé. Il s'affiche sur tout l'avant-course
   // (`isPreLaunchState`), inscriptions closes comprises.
   const previewBlock = detail.preview ? (
-    <div className={styles.preview} lang={actionLang}>
+    // Aperçu du tirage : ses lignes (notes, plan de phases, manche) sont rédigées
+    // en français par le serveur, dans l'instantané commun — le traduire
+    // changerait le contrat du flux. Outil du staff, il reste français, annoncé
+    // comme tel sous `/en`.
+    <div className={styles.preview} lang={actionText.locale === "fr" ? undefined : "fr"}>
       {/* Outil du staff (têtes de série) : noms sobres, sans marche du podium. */}
       <PodiumTiersOff>
         <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
@@ -757,8 +759,7 @@ export default function TournamentDetailPage() {
     <PhaseStandingsBlock standings={selectedPhaseStandings} />
   ) : null;
 
-  const rollbackReopenNote =
-    detail.card.state === "FINISHED" ? " Le tournoi étant terminé, il sera rouvert et son classement final effacé." : "";
+  const rollbackReopenNote = detail.card.state === "FINISHED";
 
   // Plateau affiché : aperçu avant le coup d'envoi, vue du format, puis arbre.
   const renderBoard = () => {
@@ -1127,7 +1128,7 @@ export default function TournamentDetailPage() {
           onClose={() => setAdvanceDialogOpen(false)}
           onAdvanced={({ target, state, entrantCount }) => {
             setAdvanceDialogOpen(false);
-            showSuccess(advanceSuccessMessage(target, state, entrantCount));
+            showSuccess(advanceSuccessText(actionText, target, state, entrantCount));
             void refresh();
           }}
         />
@@ -1137,7 +1138,6 @@ export default function TournamentDetailPage() {
           partirait sur un état que la page ne montre plus. */}
       {pendingConfirm !== null && !frozen && (
         <ConfirmActionDialog
-          contentLang={actionLang}
           title={pendingConfirm.title}
           confirmLabel={pendingConfirm.confirmLabel}
           pendingLabel={pendingConfirm.pendingLabel}
@@ -1154,14 +1154,14 @@ export default function TournamentDetailPage() {
       {rollbackDialogOpen && rollbackReady !== null && (
         <RollbackRoundDialog
           tournamentId={tournamentId}
-          stageLabel={rollbackStageLabelWithArticle(rollbackReady)}
+          stageLabel={rollbackStageText(actionText, rollbackReady, true)}
           stageKey={rollbackReady.stageKey}
           matches={rollbackMatches}
           tournamentFinished={detail.card.state === "FINISHED"}
           onClose={() => setRollbackDialogOpen(false)}
           onRolledBack={(label) => {
             setRollbackDialogOpen(false);
-            showSuccess(`Résultats effacés : ${label}.`);
+            showSuccess(a("rollback.success", { stage: label }));
             // Le flux pousse déjà la nouvelle version ; on relit tout de même,
             // pour que celui qui vient d'agir voie le plateau à la seconde
             // plutôt qu'à la fenêtre de son palier de fraîcheur.
@@ -1179,7 +1179,7 @@ export default function TournamentDetailPage() {
             // On quitte sans attendre le flux : la salle finira par fermer les
             // connexions, mais celui qui vient de supprimer n'a rien à faire sur
             // la fiche d'un tournoi qui n'existe plus.
-            showSuccess(`Tournoi « ${name} » supprimé définitivement.`);
+            showSuccess(a("deleteTournament.success", { name }));
             router.replace("/tournois");
           }}
         />

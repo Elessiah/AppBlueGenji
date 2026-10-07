@@ -11,9 +11,9 @@ import {
   PLATFORM_LABELS,
   streamPlatform,
 } from "@/lib/shared/live-streams";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useActionsText } from "../_lib/actions-text";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang } from "@/lib/shared/tournament-page-text";
 
 interface TournamentLiveLinkProps {
   tournamentId: number;
@@ -38,8 +38,9 @@ export function TournamentLiveLink({
 }: Readonly<TournamentLiveLinkProps>) {
   const { showError, showSuccess } = useToast();
   const text = useTournamentPageText();
-  // L'éditeur de la chaîne est un outil du staff : resté français (D4).
-  const staffLang = frenchBlockLang(text);
+  // L'éditeur de la chaîne, outil du staff posé sur la fiche (lot 8b).
+  const { t: a } = useActionsText();
+  const mapError = useMapError();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(liveUrl ?? "");
   const [busy, setBusy] = useState(false);
@@ -77,11 +78,11 @@ export function TournamentLiveLink({
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "TOURNAMENT_LIVE_UPDATE_FAILED");
-      showSuccess(draft.trim() ? "Chaîne officielle enregistrée." : "Chaîne officielle retirée.", { lang: staffLang });
+      showSuccess(draft.trim() ? a("liveLink.saved") : a("liveLink.removed"));
       setEditing(false);
       onSaved();
     } catch (error) {
-      showError(mapError((error as Error).message), { lang: staffLang });
+      showError(mapError((error as Error).message));
     } finally {
       setBusy(false);
     }
@@ -90,7 +91,6 @@ export function TournamentLiveLink({
   if (editing) {
     return (
       <form
-        lang={staffLang}
         onSubmit={submit}
         style={{
           display: "flex",
@@ -108,7 +108,7 @@ export function TournamentLiveLink({
             onChange={(e) => setDraft(e.target.value)}
             maxLength={MAX_STREAM_URL_LENGTH}
             placeholder="https://twitch.tv/…"
-            aria-label="Chaîne officielle du tournoi"
+            aria-label={a("liveLink.inputAria")}
             aria-invalid={draftInvalid}
             aria-describedby="tournament-live-hint"
             ref={focusOnMount}
@@ -123,8 +123,8 @@ export function TournamentLiveLink({
             }}
           >
             {draftInvalid
-              ? `Lien non reconnu. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`
-              : `Vider le champ retire la chaîne. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`}
+              ? a("liveLink.invalid", { platforms: LIVE_PLATFORMS.join(", ") })
+              : a("liveLink.hint", { platforms: LIVE_PLATFORMS.join(", ") })}
           </p>
         </div>
         <button
@@ -133,7 +133,7 @@ export function TournamentLiveLink({
           disabled={busy || draftInvalid}
           style={{ padding: "6px 14px", fontSize: 13 }}
         >
-          {busy ? "…" : "Enregistrer"}
+          {busy ? "…" : a("common.save")}
         </button>
         <button
           type="button"
@@ -145,7 +145,7 @@ export function TournamentLiveLink({
           }}
           style={{ padding: "6px 14px", fontSize: 13 }}
         >
-          Annuler
+          {a("common.cancel")}
         </button>
       </form>
     );
@@ -171,11 +171,10 @@ export function TournamentLiveLink({
       {canEdit && (
         <CyberButton
           variant="ghost"
-          lang={staffLang}
           onClick={openEditor}
           style={{ fontSize: 13, padding: "8px 18px" }}
         >
-          {liveUrl ? "⚙ Modifier la chaîne" : "＋ Chaîne officielle"}
+          {liveUrl ? `⚙ ${a("liveLink.edit")}` : `＋ ${a("liveLink.add")}`}
         </CyberButton>
       )}
     </div>

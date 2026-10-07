@@ -10,18 +10,15 @@ import {
   seedingLockReason,
   seedingReorderNeedsConfirmation,
   seedingWindowState,
-  SEEDING_SOURCE_LABELS,
   type SeedingLockReason,
 } from "@/lib/shared/seeding";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
-import {
-  entrantRemovalBlockMessage,
-  entrantRemovalBlockReason,
-} from "@/lib/shared/entrant-removal";
+import { entrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
 import type { TournamentDetail } from "@/lib/shared/types";
-import { useParticipantWording } from "../_lib/entrant-link";
+import { toParticipantType } from "@/lib/shared/participants";
 import { EntrantName } from "./EntrantName";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useActionsText } from "../_lib/actions-text";
 import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -34,8 +31,9 @@ import {
 } from "../_lib/registrations-list";
 import { PodiumTiersOffWhen } from "@/components/podium-tiers";
 import styles from "./RegistrationsPanel.module.css";
-import { useFrenchBlockToast, useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { frenchBlockLang, pageDateTime, participantText } from "@/lib/shared/tournament-page-text";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
+import { pageDateTime, participantText } from "@/lib/shared/tournament-page-text";
 
 interface RegistrationsPanelProps {
   detail: TournamentDetail;
@@ -48,11 +46,19 @@ interface RegistrationsPanelProps {
   onChanged: () => void;
 }
 
-const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
-  FINISHED: "Tournoi terminé : l'ordre n'a plus d'effet.",
-  SCORES_ENTERED: "Un score a été saisi : l'ordre est désormais figé.",
-  STARTED: "Le tournoi a commencé : l'ordre de départ est désormais figé.",
-};
+/** Clé du verrou de l'ordre (`registrations.lock.*`). */
+const LOCK_KEYS = {
+  FINISHED: "registrations.lock.FINISHED",
+  SCORES_ENTERED: "registrations.lock.SCORES_ENTERED",
+  STARTED: "registrations.lock.STARTED",
+} as const satisfies Record<NonNullable<SeedingLockReason>, string>;
+
+/** Intitulé de la colonne d'actions (`registrationActionsColumn`) → sa clé. */
+const COLUMN_KEYS = {
+  Actions: "registrations.column.actions",
+  Ordre: "registrations.column.order",
+  Retrait: "registrations.column.removal",
+} as const;
 
 /** Rang figé au coup d'envoi ; « — » pour une engagée absente du tirage. */
 function frozenSeedLabel(seed: number | null): string {
@@ -79,13 +85,12 @@ function frozenSeedLabel(seed: number | null): string {
  * le serveur reste le juge, qui refuse en 409 une écriture devenue interdite.
  */
 export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<RegistrationsPanelProps>) {
-  const { showError, showSuccess } = useFrenchBlockToast();
-  const wording = useParticipantWording();
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
   const text = useTournamentPageText();
   const { t } = text;
-  // L'ordre de départ et les retraits sont des outils du staff : restés
-  // français (D4), annoncés comme tels sous `/en`.
-  const staffLang = frenchBlockLang(text);
+  // Ordre de départ et retraits (outils du staff posés sur la fiche) : lot 8b.
+  const a = useActionsText().t;
   const registeredAt = (iso: string) =>
     text.locale === "fr"
       ? formatLocalDateTime(iso)
@@ -166,9 +171,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         });
         const payload = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(payload.error || "SEEDING_REORDER_FAILED");
-        showSuccess("Ordre mis à jour.");
+        showSuccess(a("registrations.reordered"));
         // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
-        setAnnouncement(`Nouveau rang de ${name} : ${next.indexOf(teamId) + 1} sur ${next.length}.`);
+        setAnnouncement(
+          a("registrations.newRank", { name, rank: String(next.indexOf(teamId) + 1), total: String(next.length) }),
+        );
         onChanged();
         return true;
       } catch (e) {
@@ -181,7 +188,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         setBusy(false);
       }
     },
-    [detail.card.id, detail.registrations, onChanged, serverKey, showError, showSuccess],
+    [a, detail.card.id, detail.registrations, mapError, onChanged, serverKey, showError, showSuccess],
   );
 
   const rows = order.flatMap((teamId) => {
@@ -250,10 +257,10 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const gridClass = actionsColumn.grid ? styles[actionsColumn.grid] : "";
   // L'intitulé nomme ce que la colonne contient réellement : « Retrait » seul
   // sur un plateau d'un unique engagé, « Actions » sinon.
-  const actionsLabel = actionsColumn.label;
+  const actionsLabel = a(COLUMN_KEYS[actionsColumn.label]);
   const seedingHint = reorderable
-    ? "Ce rang décide des appariements de la première manche. Utilisez les flèches ci-contre pour le régler — jusqu'au coup d'envoi."
-    : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`;
+    ? a("registrations.seedingHint")
+    : a(`registrations.seedingHintWaiting.${toParticipantType(detail.card.participantType)}`);
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
@@ -262,33 +269,25 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     <div className="ds-block">
       <div className="ds-section-title green" style={{ alignItems: "center" }}>
         <h2>{t("registrations.title")}</h2>
-        {staff && <Pill variant="accent" lang={staffLang}>{SEEDING_SOURCE_LABELS[source]}</Pill>}
+        {staff && <Pill variant="accent">{a(`registrations.seedingSource.${source}`)}</Pill>}
       </div>
 
       {staff && (
         <>
-          <p className={styles.hint} lang={staffLang}>
-            {lockReason !== null ? LOCK_MESSAGES[lockReason] : seedingHint}
+          <p className={styles.hint}>
+            {lockReason !== null ? a(LOCK_KEYS[lockReason]) : seedingHint}
           </p>
           {removalNoticeReason !== null && rows.length > 0 && (
             /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit
-               pourquoi : la phrase vient du module pur, celle-là même que le
-               serveur renverrait sur une écriture tardive. */
-            <p className={styles.hint} lang={staffLang}>{entrantRemovalBlockMessage(removalNoticeReason)}</p>
+               pourquoi : la phrase est celle-là même que le serveur renverrait
+               sur une écriture tardive (code du module pur). */
+            <p className={styles.hint}>{mapError(removalNoticeReason)}</p>
           )}
           {followsRanking && rows.length > 0 && (
-            <p className={styles.hint} lang={staffLang}>
-              Rangées selon le classement du site : chaque nouvelle inscription prend sa
-              place de cote. L&apos;ordre peut encore bouger d&apos;ici le lancement si des
-              cotes changent ; réordonnez la liste pour le figer — votre ordre fera alors
-              autorité.
-            </p>
+            <p className={styles.hint}>{a("registrations.followsRanking")}</p>
           )}
           {followsFrozenDraw && rows.length > 0 && (
-            <p className={styles.hint} lang={staffLang}>
-              Rangs figés au coup d&apos;envoi selon le classement du site : ce sont ceux
-              du tirage, même si les cotes ont bougé depuis.
-            </p>
+            <p className={styles.hint}>{a("registrations.followsFrozenDraw")}</p>
           )}
         </>
       )}
@@ -304,7 +303,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
             <span>{participantText(text, detail.card.participantType, "oneCapitalized")}</span>
             <span>{t("registrations.registeredAt")}</span>
             <span>{t("registrations.finalRank")}</span>
-            {showActions && <span className={styles.actionsHead} lang={staffLang}>{actionsLabel}</span>}
+            {showActions && <span className={styles.actionsHead}>{actionsLabel}</span>}
           </div>
           {visibleRows.map((reg, index) => (
             <div key={reg.teamId} className={`${styles.row} ${gridClass}`}>
@@ -323,7 +322,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
                 {reg.finalRank ?? "-"}
               </span>
               {showActions && (
-                <span className={styles.actions} data-tap-zone lang={staffLang}>
+                <span className={styles.actions} data-tap-zone>
                   {reorderable && (
                     <>
                       <button
@@ -332,8 +331,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
                           buttons.current.set(`${reg.teamId}:up`, node);
                         }}
                         className={styles.arrow}
-                        aria-label={`Monter ${reg.teamName} d'un rang`}
-                        title="Monter d'un rang"
+                        aria-label={a("registrations.moveUpAria", { name: reg.teamName })}
+                        title={a("registrations.moveUpTitle")}
                         disabled={busy || index === 0}
                         onClick={() => move(reg.teamId, "up")}
                       >
@@ -345,8 +344,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
                           buttons.current.set(`${reg.teamId}:down`, node);
                         }}
                         className={styles.arrow}
-                        aria-label={`Descendre ${reg.teamName} d'un rang`}
-                        title="Descendre d'un rang"
+                        aria-label={a("registrations.moveDownAria", { name: reg.teamName })}
+                        title={a("registrations.moveDownTitle")}
                         disabled={busy || index === rows.length - 1}
                         onClick={() => move(reg.teamId, "down")}
                       >
@@ -361,12 +360,12 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
                     <button
                       type="button"
                       className={styles.remove}
-                      aria-label={`Retirer ${reg.teamName} du tournoi`}
-                      title="Retirer du tournoi"
+                      aria-label={a("registrations.removeAria", { name: reg.teamName })}
+                      title={a("registrations.removeTitle")}
                       disabled={busy}
                       onClick={() => setRemoving({ teamId: reg.teamId, teamName: reg.teamName })}
                     >
-                      Retirer
+                      {a("registrations.remove")}
                     </button>
                   )}
                 </span>
@@ -394,7 +393,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
 
       {/* `sr-only` global (`app/globals.css`) : la ligne qui bouge est le seul
           retour visuel d'un réordonnancement, il faut le dire à l'oreille. */}
-      <p aria-live="polite" className="sr-only" lang={staffLang}>
+      <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
 
@@ -402,10 +401,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
           disparaît avec les flèches au lieu d'offrir un 409 en boucle. */}
       {confirmingMove !== null && reorderable && (
         <ConfirmActionDialog
-          contentLang={staffLang}
-          title="Fixer l'ordre de départ à la main ?"
-          confirmLabel="Fixer l'ordre"
-          pendingLabel="Enregistrement…"
+          title={a("registrations.manualConfirm.title")}
+          confirmLabel={a("registrations.manualConfirm.confirm")}
+          pendingLabel={a("registrations.manualConfirm.pending")}
           tone="primary"
           onClose={() => setConfirmingMove(null)}
           onConfirm={async () => {
@@ -414,15 +412,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
             return done;
           }}
         >
-          <p>
-            L&apos;ordre de départ suit aujourd&apos;hui le classement du site. Le modifier le remplace,
-            définitivement, par un ordre fixé par le staff : le classement ne réordonnera plus la liste, et
-            les prochaines inscriptions s&apos;ajouteront en fin de liste.
-          </p>
-          <p>
-            Aucun match n&apos;existe encore : les appariements du premier tour seront tirés de cet ordre au
-            coup d&apos;envoi.
-          </p>
+          <p>{a("registrations.manualConfirm.body")}</p>
+          <p>{a("registrations.manualConfirm.draw")}</p>
         </ConfirmActionDialog>
       )}
 
@@ -434,7 +425,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
           onClose={() => setRemoving(null)}
           onRemoved={() => {
             setRemoving(null);
-            setAnnouncement(`${removing.teamName} ne figure plus parmi les engagés.`);
+            setAnnouncement(a("registrations.removed", { name: removing.teamName }));
             onChanged();
           }}
         />

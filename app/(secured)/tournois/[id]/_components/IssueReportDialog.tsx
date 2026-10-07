@@ -1,14 +1,15 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
 import {
   ISSUE_REPORT_MAX_LENGTH,
   ISSUE_REPORT_MIN_LENGTH,
   normalizeIssueReportMessage,
 } from "@/lib/shared/discord-notifications";
 import type { BracketMatch } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface IssueReportDialogProps {
@@ -29,7 +30,9 @@ interface IssueReportDialogProps {
  * refusera.
  */
 export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<IssueReportDialogProps>) {
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
+  const { t } = useDialogsText();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -51,8 +54,8 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
       if (!response.ok) throw new Error(payload.error || "ISSUE_REPORT_FAILED");
       showSuccess(
         payload.notifiedReferees && payload.notifiedReferees > 0
-          ? `Signalement transmis à ${payload.notifiedReferees} arbitre(s).`
-          : "Signalement transmis au staff.",
+          ? t("issue.sentReferees", { count: payload.notifiedReferees })
+          : t("issue.sentStaff"),
       );
       onClose();
     } catch (error) {
@@ -72,16 +75,16 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
     >
       <form onSubmit={submit}>
         <h3 id="issue-report-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-          Signaler un problème
+          {t("issue.title")}
         </h3>
         <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
           {match
-            ? `Match : ${match.team1Name ?? "TBD"} vs ${match.team2Name ?? "TBD"}`
-            : "Portée : tournoi entier"}
+            ? t("issue.match", { team1: match.team1Name ?? "TBD", team2: match.team2Name ?? "TBD" })
+            : t("issue.wholeTournament")}
         </p>
 
         <div className="field" style={{ marginTop: 18 }}>
-          <label htmlFor="issue-report-message">Que se passe-t-il ?</label>
+          <label htmlFor="issue-report-message">{t("issue.label")}</label>
           <textarea
             id="issue-report-message"
             value={message}
@@ -90,7 +93,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             maxLength={ISSUE_REPORT_MAX_LENGTH}
             aria-invalid={touched && !valid}
             aria-describedby="issue-report-hint"
-            placeholder="Adversaire absent, score contesté, problème de serveur…"
+            placeholder={t("issue.placeholder")}
             style={{ width: "100%", resize: "vertical", fontSize: 13 }}
           />
           <p
@@ -102,8 +105,8 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             }}
           >
             {touched && !valid
-              ? `Décris le problème en ${ISSUE_REPORT_MIN_LENGTH} caractères au moins.`
-              : `${message.trim().length}/${ISSUE_REPORT_MAX_LENGTH} — envoyé aux arbitres sur Discord.`}
+              ? t("issue.tooShort", { min: ISSUE_REPORT_MIN_LENGTH })
+              : t("issue.counter", { length: message.trim().length, max: ISSUE_REPORT_MAX_LENGTH })}
           </p>
         </div>
 
@@ -115,7 +118,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             disabled={busy}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
-            Annuler
+            {t("score.cancel")}
           </button>
           <button
             type="submit"
@@ -123,7 +126,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             disabled={busy || !valid}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
-            {busy ? "Envoi…" : "Envoyer au staff"}
+            {busy ? t("issue.pending") : t("issue.send")}
           </button>
         </div>
       </form>

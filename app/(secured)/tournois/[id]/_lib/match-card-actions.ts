@@ -1,4 +1,6 @@
 import type { LaunchStripControls } from "./launch-strip";
+import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
+import { FR_ACTIONS_TEXT } from "./actions-text";
 
 /**
  * Actions d'une carte de match (`MatchRow`), rangées : **une** action
@@ -65,29 +67,33 @@ export type MatchCardActionInput = {
 const PRIMARY_ORDER: readonly MatchCardActionId[] = ["playerScore", "openLaunch", "plan", "adminScore"];
 
 /** Toutes les actions offertes, dans l'ordre du menu. */
-export function matchCardActionList(input: MatchCardActionInput): MatchCardAction[] {
+export function matchCardActionList(
+  input: MatchCardActionInput,
+  text: TournamentActionsText = FR_ACTIONS_TEXT,
+): MatchCardAction[] {
   const { launch } = input;
+  const { t } = text;
   const either = (flag: boolean, yes: string, no: string): string => (flag ? yes : no);
   // [offerte ?, identifiant, libellé, ton] — dans l'ordre du menu.
   const rows: [boolean, MatchCardActionId, string, MatchCardActionTone][] = [
     [input.playerScoreLabel !== null, "playerScore", input.playerScoreLabel ?? "", "primary"],
-    [launch.showOpen, "openLaunch", either(input.inLobby, "Ouvrir le lancement", "Infos du match"), "primary"],
-    [launch.showPlan, "plan", "Planifier", "warn"],
+    [launch.showOpen, "openLaunch", either(input.inLobby, t("cardActions.openLaunch"), t("cardActions.matchInfo")), "primary"],
+    [launch.showPlan, "plan", t("cardActions.plan"), "warn"],
     [input.adminScoreLabel !== null, "adminScore", input.adminScoreLabel ?? "", "staff"],
-    [input.showSchedule, "schedule", either(input.hasStartAt, "Modifier la date", "Programmer une date"), "staff"],
-    [launch.showForce, "force", "Forcer le lancement", "warn"],
-    [launch.showHostSwap, "hostSwap", "Changer l'équipe hôte", "staff"],
-    [launch.showClaim, "claimCast", "Caster ce match", "neutral"],
-    [launch.showRelease, "releaseCast", either(launch.isCaster, "Ne plus caster", "Retirer le caster"), "neutral"],
-    [input.showOnAir, "onAir", either(input.onAir, "Couper le direct", "Lancer le direct"), "neutral"],
+    [input.showSchedule, "schedule", either(input.hasStartAt, t("cardActions.editDate"), t("cardActions.setDate")), "staff"],
+    [launch.showForce, "force", t("cardActions.force"), "warn"],
+    [launch.showHostSwap, "hostSwap", t("cardActions.hostSwap"), "staff"],
+    [launch.showClaim, "claimCast", t("cardActions.claimCast"), "neutral"],
+    [launch.showRelease, "releaseCast", either(launch.isCaster, t("cardActions.stopCasting"), t("cardActions.removeCaster")), "neutral"],
+    [input.showOnAir, "onAir", either(input.onAir, t("cardActions.stopLive"), t("cardActions.startLive")), "neutral"],
     [
       input.showLiveConfig,
       "liveConfig",
-      either(input.liveConfigured, "Configurer la diffusion", "Diffuser ce match"),
+      either(input.liveConfigured, t("cardActions.configureStream"), t("cardActions.streamMatch")),
       "neutral",
     ],
-    [input.showReplay, "replay", either(input.hasReplay, "Modifier la rediff", "Ajouter la rediff"), "neutral"],
-    [input.canReport, "report", "Signaler un problème", "neutral"],
+    [input.showReplay, "replay", either(input.hasReplay, t("cardActions.editReplay"), t("cardActions.addReplay")), "neutral"],
+    [input.canReport, "report", t("header.reportIssue"), "neutral"],
   ];
   return rows.filter(([offered]) => offered).map(([, id, label, tone]) => ({ id, label, tone }));
 }
@@ -109,6 +115,10 @@ export function groupMatchCardActions(actions: readonly MatchCardAction[]): Matc
 }
 
 /** Nom accessible : le libellé visible en tête, le match ensuite (huit cartes identiques par ronde). */
-export function matchCardActionName(label: string, matchLabel: string): string {
-  return `${label} : ${matchLabel}`;
+export function matchCardActionName(
+  label: string,
+  matchLabel: string,
+  text: TournamentActionsText = FR_ACTIONS_TEXT,
+): string {
+  return text.t("cardActions.name", { label, match: matchLabel });
 }

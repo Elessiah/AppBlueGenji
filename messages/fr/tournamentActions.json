@@ -1,0 +1,295 @@
+{
+  "common": {
+    "cancel": "Annuler",
+    "save": "Enregistrer"
+  },
+  "registrations": {
+    "seedingSource": {
+      "MANUAL": "Ordre fixé par le staff",
+      "RANKING": "Classement du site",
+      "REGISTRATION": "Ordre d'inscription"
+    },
+    "lock": {
+      "FINISHED": "Tournoi terminé : l'ordre n'a plus d'effet.",
+      "SCORES_ENTERED": "Un score a été saisi : l'ordre est désormais figé.",
+      "STARTED": "Le tournoi a commencé : l'ordre de départ est désormais figé."
+    },
+    "column": {
+      "actions": "Actions",
+      "order": "Ordre",
+      "removal": "Retrait"
+    },
+    "seedingHint": "Ce rang décide des appariements de la première manche. Utilisez les flèches ci-contre pour le régler — jusqu'au coup d'envoi.",
+    "seedingHintWaiting": {
+      "TEAM": "Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux équipes engagées.",
+      "SOLO": "Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux joueurs engagés."
+    },
+    "followsRanking": "Rangées selon le classement du site : chaque nouvelle inscription prend sa place de cote. L'ordre peut encore bouger d'ici le lancement si des cotes changent ; réordonnez la liste pour le figer — votre ordre fera alors autorité.",
+    "followsFrozenDraw": "Rangs figés au coup d'envoi selon le classement du site : ce sont ceux du tirage, même si les cotes ont bougé depuis.",
+    "reordered": "Ordre mis à jour.",
+    "newRank": "Nouveau rang de {name} : {rank} sur {total}.",
+    "moveUpAria": "Monter {name} d'un rang",
+    "moveUpTitle": "Monter d'un rang",
+    "moveDownAria": "Descendre {name} d'un rang",
+    "moveDownTitle": "Descendre d'un rang",
+    "removeAria": "Retirer {name} du tournoi",
+    "removeTitle": "Retirer du tournoi",
+    "remove": "Retirer",
+    "removed": "{name} ne figure plus parmi les engagés.",
+    "manualConfirm": {
+      "title": "Fixer l'ordre de départ à la main ?",
+      "confirm": "Fixer l'ordre",
+      "pending": "Enregistrement…",
+      "body": "L'ordre de départ suit aujourd'hui le classement du site. Le modifier le remplace, définitivement, par un ordre fixé par le staff : le classement ne réordonnera plus la liste, et les prochaines inscriptions s'ajouteront en fin de liste.",
+      "draw": "Aucun match n'existe encore : les appariements du premier tour seront tirés de cet ordre au coup d'envoi."
+    }
+  },
+  "removeEntrant": {
+    "title": "Retirer {name} du tournoi",
+    "pending": "Retrait…",
+    "erased": "L'inscription est <strong>effacée</strong> : rien n'indiquera que cet engagé a pris part au tournoi, à la différence d'un abandon. La place est rendue au plateau.",
+    "registrationOpen": "Les inscriptions sont ouvertes : la place libérée peut être reprise, et cet engagé réinscrit.",
+    "registrationClosed": "Les inscriptions sont closes : plus personne ne peut prendre cette place, et cet engagé ne pourra pas être réinscrit sans rouvrir les inscriptions."
+  },
+  "wording": {
+    "TEAM": {
+      "registerCta": "Inscrire mon équipe",
+      "guestCta": "+ Équipe fantôme",
+      "forfeitSelfConfirm": "Votre équipe quittera définitivement le tournoi."
+    },
+    "SOLO": {
+      "registerCta": "M'inscrire",
+      "guestCta": "+ Joueur invité",
+      "forfeitSelfConfirm": "Tu quitteras définitivement le tournoi."
+    }
+  },
+  "register": {
+    "streamNotice": {
+      "TEAM": "Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ton pseudo, le nom de ton équipe et tes résultats en jeu — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre.",
+      "SOLO": "Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ton pseudo et tes résultats en jeu — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre."
+    },
+    "streamNoticeLink": "En savoir plus",
+    "notManager": "Seuls le propriétaire et les managers de ton équipe peuvent l'inscrire à un tournoi.",
+    "confirm": {
+      "kickoff": "Coup d'envoi : {date}.",
+      "pending": "Inscription…",
+      "TEAM": {
+        "title": "Inscrire ton équipe à « {name} » ?",
+        "final": "Toute l'équipe sera engagée. Elle ne pourra pas se désinscrire elle-même : seul le staff du tournoi peut retirer un engagé."
+      },
+      "SOLO": {
+        "title": "T'inscrire à « {name} » ?",
+        "final": "Tu ne pourras pas annuler toi-même cette inscription : seul le staff du tournoi peut retirer un engagé."
+      }
+    },
+    "success": "Inscription validée."
+  },
+  "header": {
+    "imageAria": "Image du tournoi",
+    "image": "Image",
+    "addImage": "Ajouter une image",
+    "edit": "Modifier",
+    "advanceTitle": "Passer à l'étape suivante : {stage}.",
+    "advance": "Avancer le tournoi",
+    "reportIssue": "Signaler un problème"
+  },
+  "danger": {
+    "title": "Zone de danger",
+    "rollbackHint": "Effacer {stage} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi. Pense à noter les scores avant : rien n'est archivé.",
+    "rollbackHintFinished": "Effacer {stage} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi. Le tournoi étant terminé, il sera rouvert et son classement final effacé. Pense à noter les scores avant : rien n'est archivé.",
+    "rollback": "Revenir en arrière d'une manche",
+    "deleteHint": "Supprimer ce tournoi l'efface du site pour de bon, avec ses matchs, ses inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.",
+    "delete": "Supprimer le tournoi"
+  },
+  "rollback": {
+    "stage": {
+      "round": "manche {round}",
+      "playoffRound": "tour {round} des play-offs",
+      "inPhase": "{round} de la phase {phase}",
+      "theRound": "la {stage}",
+      "thePlayoffRound": "le {stage}"
+    },
+    "success": "Résultats effacés : {stage}."
+  },
+  "advance": {
+    "success": {
+      "closedUnderfilled": "Tournoi clos : il n'y avait pas assez d'engagés pour jouer un match.",
+      "started": "Tournoi lancé avec {count, plural, one {# engagé} other {# engagés}}.",
+      "registrationOpen": "Inscriptions ouvertes.",
+      "registrationClosed": "Inscriptions closes avec {count, plural, one {# engagé} other {# engagés}}."
+    }
+  },
+  "deleteTournament": {
+    "success": "Tournoi « {name} » supprimé définitivement."
+  },
+  "forfeit": {
+    "recorded": "Forfait enregistré.",
+    "recordedFor": "Forfait de {name} enregistré.",
+    "self": {
+      "title": "Abandonner le tournoi ?",
+      "confirm": "Abandonner",
+      "pending": "Abandon…"
+    },
+    "other": {
+      "title": "Déclarer {name} forfait ?",
+      "body": {
+        "TEAM": "L'équipe quittera définitivement le tournoi : le forfait vaut pour tout ce qui reste à jouer.",
+        "SOLO": "Le joueur quittera définitivement le tournoi : le forfait vaut pour tout ce qui reste à jouer."
+      },
+      "singleRound": "Pour un forfait sur une seule manche, passez par le score du match.",
+      "confirm": "Déclarer forfait",
+      "pending": "Enregistrement…"
+    },
+    "button": {
+      "label": "Abandonner",
+      "selfTitle": "Abandonner : votre équipe quitte définitivement le tournoi",
+      "otherTitle": "Déclarer l'abandon de {name}",
+      "selfAria": "Abandonner avec mon équipe",
+      "otherAriaSwiss": "Abandonner : déclarer l'abandon de {name}",
+      "otherAriaSurvival": "Déclarer l'abandon de {name}"
+    },
+    "endurance": {
+      "selfTitle": {
+        "TEAM": "Abandonner : L'équipe quittera définitivement le tournoi",
+        "SOLO": "Abandonner : Le joueur quittera définitivement le tournoi"
+      },
+      "selfAria": "Abandonner le tournoi",
+      "otherTitle": "Déclarer {name} forfait pour tout le reste du tournoi",
+      "other": "Forfait"
+    }
+  },
+  "penaltyLift": {
+    "success": "Pénalité retirée : {name} récupère {points} point(s).",
+    "title": "Retirer la pénalité de {name} ?",
+    "body": "{points} point(s) seront rendus au capital d'endurance, et tout ce que la sanction avait entraîné sera rétabli.",
+    "confirm": "Retirer la pénalité",
+    "pending": "Retrait…",
+    "frozen": "Figée",
+    "frozenTitle": "Une manche a été jouée depuis : rendre ces points remettrait en lice une équipe qui ne l'a pas disputée.",
+    "buttonTitle": "Retirer cette pénalité : {name} récupère {points} point(s)",
+    "buttonAria": "Retirer la pénalité de {points} point(s) infligée à {name}"
+  },
+  "launch": {
+    "fallback": "L'action n'a pas pu aboutir. Réessaie dans un instant.",
+    "alreadyCompleted": "Ce match est terminé."
+  },
+  "cardActions": {
+    "name": "{label} : {match}",
+    "more": "Plus d'actions",
+    "openLaunch": "Ouvrir le lancement",
+    "matchInfo": "Infos du match",
+    "plan": "Planifier",
+    "editDate": "Modifier la date",
+    "setDate": "Programmer une date",
+    "force": "Forcer le lancement",
+    "hostSwap": "Changer l'équipe hôte",
+    "claimCast": "Caster ce match",
+    "stopCasting": "Ne plus caster",
+    "removeCaster": "Retirer le caster",
+    "stopLive": "Couper le direct",
+    "startLive": "Lancer le direct",
+    "configureStream": "Configurer la diffusion",
+    "streamMatch": "Diffuser ce match",
+    "editReplay": "Modifier la rediff",
+    "addReplay": "Ajouter la rediff",
+    "playerScore": {
+      "forfeit": "Déclarer forfait",
+      "confirm": "Confirmer le score",
+      "edit": "Modifier mon score",
+      "review": "Revoir le score",
+      "enter": "Saisir le score"
+    },
+    "adminForfeit": "Prononcer un forfait",
+    "adminValidate": "Valider le score proposé",
+    "adminEdit": "Éditer le score",
+    "reportConflict": "Scores contradictoires · arbitrage alerté",
+    "reportSide": "Équipe {side}",
+    "reportPending": "{score1} – {score2} proposé par {reporter} · à confirmer",
+    "locked": "Score verrouillé",
+    "lockedTitle": "La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié.",
+    "lockedReason": ": la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.",
+    "hostChanged": "Équipe hôte modifiée.",
+    "casting": "Tu castes ce match.",
+    "notCasting": "Tu ne castes plus ce match.",
+    "casterRemoved": "Caster retiré.",
+    "airClosed": "Antenne fermée.",
+    "airOpened": "Antenne ouverte.",
+    "forceConfirm": {
+      "title": "Forcer le lancement de {match} ?",
+      "confirm": "Lancer le match",
+      "pending": "Lancement…",
+      "success": "Match lancé.",
+      "body": "Le match démarre sans attendre les « Prêt » manquants : les engagés peuvent reporter leur score dès maintenant.",
+      "unplanned": "Ce match n'est pas encore planifié : il démarre maintenant, sans heure annoncée aux engagés."
+    }
+  },
+  "planning": {
+    "toPlanCount": "{count, plural, =1 {1 match à planifier} other {# matchs à planifier}}",
+    "allPlanned": "Tous les matchs jouables ont une date.",
+    "planNextAria": "Planifier le prochain match : {team1} contre {team2}",
+    "planNext": "Planifier le prochain",
+    "enable": "Activer la planification",
+    "disable": "Désactiver la planification",
+    "disabled": "Planification par l'arbitrage désactivée : les matchs sans date entrent en lancement.",
+    "enabled": "Planification par l'arbitrage activée.",
+    "enabledMoved": "Planification activée : {count, plural, =1 {1 match à planifier} other {# matchs à planifier}}.",
+    "confirm": {
+      "title": "Activer la planification par l'arbitrage ?",
+      "confirm": "Activer",
+      "pending": "Activation…",
+      "consequence": "{count, plural, =1 {1 match, sans date et pas encore lancé, quitte le lancement — ses « Prêt » sont effacés — et attend qu'un arbitre fixe son horaire.} other {# matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.}}",
+      "next": "Les matchs déjà lancés continuent, et les manches suivantes naîtront à planifier."
+    },
+    "errors": {
+      "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
+      "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",
+      "INVALID_REFEREE_SCHEDULING": "Valeur invalide pour la planification par l'arbitrage.",
+      "fallback": "La planification n'a pas pu être modifiée. Réessaie dans un instant."
+    }
+  },
+  "liveLink": {
+    "saved": "Chaîne officielle enregistrée.",
+    "removed": "Chaîne officielle retirée.",
+    "inputAria": "Chaîne officielle du tournoi",
+    "invalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
+    "hint": "Vider le champ retire la chaîne. Plateformes acceptées : {platforms}.",
+    "edit": "Modifier la chaîne",
+    "add": "Chaîne officielle"
+  },
+  "penalty": {
+    "button": "Pénalité",
+    "buttonTitle": "Retirer des points d'endurance à {name}",
+    "buttonAria": "Infliger une pénalité d'endurance à {name}"
+  },
+  "nextRound": {
+    "panelTitle": "Aperçu · {title}",
+    "panelAria": "Aperçu de l'étape suivante : {title}",
+    "listAria": "Rencontres acquises — {title}",
+    "stage": {
+      "final": "Finale",
+      "semis": "Demi-finales",
+      "quarters": "Quarts de finale",
+      "roundOf16": "8èmes de finale",
+      "playoffs": "Play-offs"
+    },
+    "round": "Manche {round}",
+    "roundOf": "Manche {round}/{max}",
+    "acquired": "{count, plural, one {# rencontre acquise} other {# rencontres acquises}}",
+    "acquiredOf": "{acquired} sur {expected}",
+    "pending": "{count, plural, one {# match reste} other {# matchs restent}} à jouer",
+    "empty": {
+      "freeScore": "Score libre : un match restant peut déplacer un capital sans limite, rien n'est acquis avant la fin de la manche.",
+      "underfilled": "Moins de deux qualifiées : le tournoi se clôturera sans arbre final.",
+      "none": "Aucune rencontre n'est encore acquise : toutes dépendent des matchs restants."
+    },
+    "stageUncertain": "La phase qualificative peut encore s'achever sur la manche en cours : ces rencontres ne se joueront que si elle continue.",
+    "thirdPlace": "Petite finale",
+    "byePlayoffs": "passe le tour (exemption)",
+    "byeRound": "ne joue pas cette manche (effectif impair)",
+    "versus": "contre",
+    "sidesUnknown": "Côtés à confirmer",
+    "sidesHint": "L'affiche est sûre, mais les matchs restants décideront qui, mieux classé, part à gauche et accueille la partie.",
+    "footnoteRound": "Rencontres sûres quel que soit le score des matchs restants — hors décision d'arbitrage (abandon, pénalité, double forfait). Le moteur ne pose la manche qu'une fois la précédente terminée.",
+    "footnotePlayoffs": "Rencontres sûres quel que soit le score des matchs restants — hors décision d'arbitrage (abandon, pénalité, double forfait). Le moteur ne pose la suite qu'une fois la précédente terminée."
+  }
+}

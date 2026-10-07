@@ -17,6 +17,7 @@
  */
 
 import { matchStartAtTime, normalizeMatchStartAt, type MatchScheduleInput } from "@/lib/shared/match-schedule";
+import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 
 /** Fuseau de la saisie et de l'aperçu : celui de l'organisation. */
 export const MATCH_ENTRY_TIME_ZONE = "Europe/Paris";
@@ -178,8 +179,15 @@ const PARIS_FULL = new Intl.DateTimeFormat("fr-FR", {
  * (« dimanche 3 janvier 2027 à 20:00 ») : l'aperçu que l'organisateur vérifie
  * avant d'enregistrer, puisqu'il n'a pas saisi l'année lui-même.
  */
-export function formatMatchStartEntryPreview(instant: number): string {
-  return PARIS_FULL.format(new Date(instant));
+export function formatMatchStartEntryPreview(instant: number, locale: Locale = DEFAULT_LOCALE): string {
+  if (locale === DEFAULT_LOCALE) return PARIS_FULL.format(new Date(instant));
+  // Anglais (lot 8b) : même date, sur 24 h comme le reste du site.
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    timeZone: MATCH_ENTRY_TIME_ZONE,
+    dateStyle: "full",
+    timeStyle: "short",
+    hourCycle: "h23",
+  }).format(new Date(instant));
 }
 
 /**
@@ -191,7 +199,11 @@ export function formatMatchStartEntryPreview(instant: number): string {
  * la saisie, elle, est à l'heure de Paris. Hors de France, l'aperçu donne les
  * deux pour que l'organisateur reconnaisse l'horaire qu'il voit sur la carte.
  */
-export function localMatchTimeIfDifferent(instant: number, timeZone?: string): string | null {
+export function localMatchTimeIfDifferent(
+  instant: number,
+  timeZone?: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string | null {
   let local: string;
   try {
     const formatter =
@@ -202,7 +214,16 @@ export function localMatchTimeIfDifferent(instant: number, timeZone?: string): s
   } catch {
     return null;
   }
-  return local === PARIS_SHORT.format(new Date(instant)) ? null : local;
+  if (local === PARIS_SHORT.format(new Date(instant))) return null;
+  if (locale === DEFAULT_LOCALE) return local;
+  // La comparaison reste faite en français (deux rendus d'un même formateur) ;
+  // seule l'heure rendue suit la langue de la page.
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    ...(timeZone === undefined ? {} : { timeZone }),
+    dateStyle: "short",
+    timeStyle: "short",
+    hourCycle: "h23",
+  }).format(new Date(instant));
 }
 
 // Construits une fois : l'aperçu se recalcule à chaque frappe.
@@ -212,6 +233,13 @@ const PARIS_SHORT = new Intl.DateTimeFormat("fr-FR", {
   dateStyle: "short",
   timeStyle: "short",
 });
+
+/** Noms des mois dans une langue, pour la liste du dialogue (index 0 = janvier). */
+export function matchEntryMonths(locale: Locale = DEFAULT_LOCALE): readonly string[] {
+  if (locale === DEFAULT_LOCALE) return MATCH_ENTRY_MONTHS;
+  const format = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "long", timeZone: "UTC" });
+  return Array.from({ length: 12 }, (_, index) => format.format(Date.UTC(2026, index, 15)));
+}
 
 /** Noms des mois, pour la liste du dialogue (index 0 = janvier). */
 export const MATCH_ENTRY_MONTHS: readonly string[] = [

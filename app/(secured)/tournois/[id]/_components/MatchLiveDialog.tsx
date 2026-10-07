@@ -1,11 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
 import {
   isValidStreamUrl,
   LIVE_PLATFORMS,
-  MATCH_LIVE_TRIGGER_LABELS,
   MATCH_LIVE_TRIGGERS,
   MAX_STREAM_URL_LENGTH,
   requiresMatchStartAt,
@@ -13,7 +12,8 @@ import {
 } from "@/lib/shared/live-streams";
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface MatchLiveDialogProps {
@@ -34,7 +34,10 @@ interface MatchLiveDialogProps {
  * referme pas.
  */
 export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveDialogProps>) {
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
+  const text = useDialogsText();
+  const { t } = text;
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
   const [liveUrl, setLiveUrl] = useState(match.liveUrl ?? "");
@@ -56,7 +59,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
   // passé en `START_TIME` puis privé de sa date deviendrait indécastable — les
   // radios sont masquées quand la case est décochée, donc `trigger` resterait
   // bloqué sur `START_TIME` et « Enregistrer » sur désactivé.
-  const startAtLabel = formatMatchStartAt(match.startAt);
+  const startAtLabel = formatMatchStartAt(match.startAt, text.locale);
   const startAtMissing = startAtLabel === null;
   const triggerNeedsDate = streamed && requiresMatchStartAt(trigger) && startAtMissing;
 
@@ -76,7 +79,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "MATCH_LIVE_UPDATE_FAILED");
-      showSuccess(streamed ? "Diffusion du match enregistrée." : "Match retiré de la diffusion.");
+      showSuccess(streamed ? t("live.saved") : t("live.removed"));
       onSaved();
       onClose();
     } catch (error) {
@@ -96,7 +99,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
     >
       <form onSubmit={submit}>
         <h3 id="match-live-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-          Diffusion du match
+          {t("live.title")}
         </h3>
         <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
           {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
@@ -119,7 +122,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
             onChange={(e) => setStreamed(e.target.checked)}
           />
           {/* NOSONAR S6772 — label en flex avec `gap` */}
-          Ce match est casté
+          {t("live.streamed")}
         </label>
 
         {streamed && (
@@ -135,7 +138,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                   marginBottom: 8,
                 }}
               >
-                Passage à l&apos;antenne
+                {t("live.trigger")}
               </legend>
               {MATCH_LIVE_TRIGGERS.map((option) => {
                 const disabled = requiresMatchStartAt(option) && startAtMissing;
@@ -160,20 +163,18 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                       disabled={disabled}
                       onChange={() => setTrigger(option)}
                     />
-                    {MATCH_LIVE_TRIGGER_LABELS[option]}
+                    {t(`live.triggers.${option}`)}
                     {requiresMatchStartAt(option) && startAtLabel && ` (${startAtLabel})`}
                   </label>
                 );
               })}
               <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}>
-                {startAtMissing
-                  ? "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire."
-                  : "Le direct s'arrête tout seul dès qu'un score est saisi."}
+                {startAtMissing ? t("live.noStartAt") : t("live.autoStop")}
               </p>
             </fieldset>
 
             <div className="field">
-              <label htmlFor="match-live-url">Chaîne du match (facultatif)</label>
+              <label htmlFor="match-live-url">{t("live.url")}</label>
               <input
                 id="match-live-url"
                 value={liveUrl}
@@ -192,8 +193,8 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                 }}
               >
                 {urlInvalid
-                  ? `Lien non reconnu. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`
-                  : `Laisser vide pour signaler le match sans lien. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`}
+                  ? t("live.urlInvalid", { platforms: LIVE_PLATFORMS.join(", ") })
+                  : t("live.urlHint", { platforms: LIVE_PLATFORMS.join(", ") })}
               </p>
             </div>
           </>
@@ -207,7 +208,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
             disabled={busy}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
-            Annuler
+            {t("score.cancel")}
           </button>
           <button
             type="submit"
@@ -215,7 +216,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
             disabled={busy || urlInvalid || triggerNeedsDate}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
-            {busy ? "Enregistrement…" : "Enregistrer"}
+            {busy ? t("schedule.saving") : t("schedule.save")}
           </button>
         </div>
       </form>

@@ -1,14 +1,14 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useFrenchBlockToast } from "@/components/i18n/tournament-page-text";
+import { useToast } from "@/components/ui/toast";
 import {
   MAX_ENDURANCE_PENALTY_POINTS,
   MAX_ENDURANCE_PENALTY_REASON,
   checkEndurancePenalty,
-  endurancePenaltyMessage,
 } from "@/lib/shared/endurance-penalty";
-import { mapError } from "../_lib/error-map";
+import { useMapError } from "../_lib/error-map";
+import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface EndurancePenaltyDialogProps {
@@ -42,7 +42,9 @@ export function EndurancePenaltyDialog({
   onClose,
   onApplied,
 }: Readonly<EndurancePenaltyDialogProps>) {
-  const { showError, showSuccess } = useFrenchBlockToast();
+  const { showError, showSuccess } = useToast();
+  const mapError = useMapError();
+  const { t } = useDialogsText();
   const [points, setPoints] = useState("1");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -62,15 +64,16 @@ export function EndurancePenaltyDialog({
   // en cours d'abord — le bouton étant désactivé tant qu'il y en a un, sans
   // cette phrase l'arbitre n'aurait rien à corriger et rien à lire —, puis la
   // conséquence quand elle surprend, puis le rappel de forme.
-  let hint = `Motif obligatoire, visible par tous. Capital restant : ${remaining}.`;
-  if (violation !== null) hint = endurancePenaltyMessage(violation);
-  else if (eliminates) hint = `Capital ramené à 0 : ${teamName} sera éliminée du tournoi.`;
+  // Les refus de forme sont ceux de la table des refus (mêmes codes que la route).
+  let hint = t("penalty.hint", { remaining });
+  if (violation !== null) hint = mapError(violation);
+  else if (eliminates) hint = t("penalty.eliminates", { name: teamName });
   const hintIsWarning = violation !== null || eliminates;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (violation !== null) {
-      showError(endurancePenaltyMessage(violation));
+      showError(mapError(violation));
       return;
     }
 
@@ -83,7 +86,7 @@ export function EndurancePenaltyDialog({
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "PENALTY_FAILED");
-      showSuccess(`Pénalité de ${Math.floor(parsedPoints)} point(s) appliquée à ${teamName}.`);
+      showSuccess(t("penalty.applied", { points: Math.floor(parsedPoints), name: teamName }));
       onApplied();
       onClose();
     } catch (error) {
@@ -103,15 +106,15 @@ export function EndurancePenaltyDialog({
     >
       <form onSubmit={submit}>
         <h3 id="endurance-penalty-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-          Pénalité d&apos;endurance
+          {t("penalty.title")}
         </h3>
         <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
-          {teamName} · {currentPoints} point{currentPoints > 1 ? "s" : ""} ·{" "}
-          {round > 0 ? `manche ${round}` : "avant la première manche"}
+          {teamName} · {t("penalty.points", { count: currentPoints })} ·{" "}
+          {round > 0 ? t("penalty.round", { round }) : t("penalty.beforeFirstRound")}
         </p>
 
         <div className="field" style={{ marginTop: 18 }}>
-          <label htmlFor="endurance-penalty-points">Points retirés</label>
+          <label htmlFor="endurance-penalty-points">{t("penalty.pointsLabel")}</label>
           <input
             id="endurance-penalty-points"
             type="number"
@@ -128,7 +131,7 @@ export function EndurancePenaltyDialog({
         </div>
 
         <div className="field" style={{ marginTop: 14 }}>
-          <label htmlFor="endurance-penalty-reason">Motif</label>
+          <label htmlFor="endurance-penalty-reason">{t("penalty.reasonLabel")}</label>
           <textarea
             id="endurance-penalty-reason"
             value={reason}
@@ -137,7 +140,7 @@ export function EndurancePenaltyDialog({
             maxLength={MAX_ENDURANCE_PENALTY_REASON}
             aria-invalid={violation === "REASON_TOO_LONG"}
             aria-describedby="endurance-penalty-hint"
-            placeholder="Retard au coup d'envoi, joueur non éligible aligné…"
+            placeholder={t("penalty.reasonPlaceholder")}
             style={{ width: "100%", resize: "vertical", fontSize: 13 }}
           />
           {/*
@@ -167,7 +170,7 @@ export function EndurancePenaltyDialog({
             disabled={busy}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
-            Annuler
+            {t("score.cancel")}
           </button>
           <button
             type="submit"
@@ -175,7 +178,7 @@ export function EndurancePenaltyDialog({
             disabled={busy || violation !== null}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
-            {busy ? "Enregistrement…" : "Appliquer la pénalité"}
+            {busy ? t("schedule.saving") : t("penalty.apply")}
           </button>
         </div>
       </form>
