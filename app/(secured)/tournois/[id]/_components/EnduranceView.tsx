@@ -524,7 +524,7 @@ export function EnduranceView({
                 {standing.penaltyPoints > 0 && (
                   <span
                     className={styles.penaltyBadge}
-                    title={t("endurance.penaltyBadgeTitle", { points: String(standing.penaltyPoints) })}
+                    title={t("endurance.penaltyBadgeTitle", { points: standing.penaltyPoints })}
                   >
                     {/*
                       « −3 » seul se lit « moins trois » sans dire de quoi : le
@@ -533,7 +533,7 @@ export function EnduranceView({
                     */}
                     <span aria-hidden="true">−{standing.penaltyPoints}</span>
                     <span className="sr-only">
-                      {t("endurance.penaltyBadgeSr", { points: String(standing.penaltyPoints) })}
+                      {t("endurance.penaltyBadgeSr", { points: standing.penaltyPoints })}
                     </span>
                   </span>
                 )}

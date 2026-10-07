@@ -143,7 +143,9 @@ export function pageDateTime(iso: string, locale: Locale, options: Intl.DateTime
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "—";
   const hour = options.hour === undefined ? {} : { hourCycle: "h23" as const };
-  const day = locale === "en" && options.day === "2-digit" ? { day: "numeric" as const } : {};
+  // Mois en toutes lettres seulement : « 03/05 » garde ses deux chiffres.
+  const wordMonth = options.month === "short" || options.month === "long";
+  const day = locale === "en" && options.day === "2-digit" && wordMonth ? { day: "numeric" as const } : {};
   return date.toLocaleString(INTL_LOCALE[locale], { ...options, ...hour, ...day });
 }
 
