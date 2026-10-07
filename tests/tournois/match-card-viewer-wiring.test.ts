@@ -60,11 +60,12 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
     expect(MATCH_ROW).toContain("playerScore.open(match)");
     // Le libellé annonce le geste attendu (saisir, confirmer, corriger), décidé
     // par le module pur plutôt qu'écrit sur place.
-    expect(MATCH_ROW).toContain("playerScoreButtonLabel(playerReportView(match, myTeamId)");
+    // (lot 8b : le module pur rend une clé, traduite par l'écran.)
+    expect(MATCH_ROW).toContain("playerScoreButtonKey(playerReportView(match, myTeamId)");
   });
 
   it("la carte annonce la proposition en attente, lisible de tous", () => {
-    expect(MATCH_ROW).toContain("pendingReportNotice(match)");
+    expect(MATCH_ROW).toContain("pendingReportState(match)");
   });
 
   it("la modale saisit map par map, colonnes ordonnées comme la carte (MAP_SCORES.md)", () => {
@@ -95,7 +96,12 @@ describe("nom d'équipe — même repli sur la carte et dans la modale", () => {
 describe("notification d'envoi — nomme les équipes, pas l'identifiant du match", () => {
   it("la modale construit le message avec le module pur", () => {
     expect(PLAYER_DIALOG).toContain('from "@/lib/shared/match-card-viewer"');
-    expect(PLAYER_DIALOG).toContain("scoreSubmittedMessage(");
+    // Lot 8b : la phrase vient des messages (`score.player.submitted`, même
+    // texte que `scoreSubmittedMessage`, comparé dans
+    // `tests/app/tournament-actions-i18n.test.tsx`), les scores remis dans
+    // l'ordre du plateau.
+    expect(PLAYER_DIALOG).toContain('t("score.player.submitted", {');
+    expect(PLAYER_DIALOG).toContain("score1: myTeamIsTeam1 ? body.myScore : body.opponentScore,");
     expect(PLAYER_DIALOG).toContain("isMyTeamTeam1(myTeamId, match.team1Id)");
     expect(PLAYER_DIALOG).not.toMatch(/Score transmis pour le match #\$\{match\.id\}/);
   });

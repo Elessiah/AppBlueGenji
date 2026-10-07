@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { seedingReorderNeedsConfirmation } from "@/lib/shared/seeding";
 import { scoreCorrectionNeedsConfirmation } from "@/app/(secured)/tournois/[id]/_lib/score-form";
 import type { MatchStatus } from "@/lib/shared/types";
+import frActions from "@/messages/fr/tournamentActions.json";
+import frDialogs from "@/messages/fr/tournamentDialogs.json";
 
 /**
  * Confirmations des gestes du staff qui défont quelque chose
@@ -53,9 +55,11 @@ describe("Seeding — la modale dit ce qui se passe réellement", () => {
   });
 
   it("nomme la perte : le classement ne rangera plus la liste, sans retour", () => {
-    expect(PANEL).toContain(`title="Fixer l'ordre de départ à la main ?"`);
-    expect(PANEL).toContain("définitivement, par un ordre fixé par le staff");
-    expect(PANEL).toContain("Aucun match n&apos;existe encore");
+    // Lot 8b : les phrases vivent dans les messages, la source les cite par clé.
+    expect(PANEL).toContain('title={a("registrations.manualConfirm.title")}');
+    expect(frActions.registrations.manualConfirm.title).toBe("Fixer l'ordre de départ à la main ?");
+    expect(frActions.registrations.manualConfirm.body).toContain("définitivement, par un ordre fixé par le staff");
+    expect(frActions.registrations.manualConfirm.draw).toContain("Aucun match n'existe encore");
   });
 
   it("un refus du serveur laisse la modale ouverte (applyOrder rend false)", () => {
@@ -87,8 +91,9 @@ describe("Correction d'un résultat — câblage", () => {
   it("annuler referme la seule confirmation ; confirmer écrit le geste demandé", () => {
     expect(SCORE).toMatch(/onClose=\{\(\) => setConfirmingCorrection\(null\)\}/);
     expect(SCORE).toMatch(/onConfirm=\{\(\) => perform\(confirmingCorrection\)\}/);
-    expect(SCORE).toContain("son horaire conservé");
-    expect(SCORE).toContain("terminé repasse en cours");
+    expect(SCORE).toContain('t("score.admin.correction.consequences")');
+    expect(frDialogs.score.admin.correction.consequences).toContain("son horaire conservé");
+    expect(frDialogs.score.admin.correction.consequences).toContain("terminé repasse en cours");
   });
 
   it("referme la confirmation à chaque écriture d'un autre arbitre, pour qu'elle soit lue", () => {

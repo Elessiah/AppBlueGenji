@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { readSource } from "../helpers/read-source";
+import frDialogs from "@/messages/fr/tournamentDialogs.json";
+
+/** Messages des fenêtres d'action (lot 8b) : les phrases y vivent, la source les cite par clé. */
+const FR_SCORE = frDialogs.score;
 
 /**
  * Câblage du détail map par map (`docs/features/MAP_SCORES.md`) aux endroits
@@ -39,7 +43,7 @@ describe("détail map par map — affichage", () => {
 
   it("l'arbitrage voit le détail des deux propositions en désaccord", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<MapResultList french maps=\{report\.maps\}/);
+    expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<MapResultList maps=\{report\.maps\}/);
   });
 });
 
@@ -110,7 +114,10 @@ describe("détail map par map — arbitrage et relecture", () => {
 describe("détail map par map — noms accessibles", () => {
   it("chaque champ nomme sa map, et la phrase d'erreur reste hors du label", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
-    expect(list.match(/<span className="sr-only">Map \{index \+ 1\}, /g)).toHaveLength(3);
+    // Lot 8b : « Map N, » / « Map N, score de » passent par les messages.
+    expect(list.match(/<span className="sr-only">\{t\("score\.maps\.(mapPrefix|scoreOf)", \{ index: index \+ 1 \}\)\}<\/span>/g)).toHaveLength(3);
+    expect(FR_SCORE.maps.mapPrefix).toBe("Map {index}, ");
+    expect(FR_SCORE.maps.scoreOf).toBe("Map {index}, score de ");
     expect(list).not.toMatch(/<FieldErrorText[^>]*\/>\s*<\/label>/);
   });
 });
@@ -124,7 +131,8 @@ describe("détail map par map — refus rattachés au champ", () => {
 
   it("le désaccord à score égal dit que ce sont les maps qui diffèrent", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain("mais le détail des maps diffère");
+    expect(dialog).toContain('text.t("score.player.conflictMaps"');
+    expect(FR_SCORE.player.conflictMaps).toContain("mais le détail des maps diffère");
   });
 });
 
@@ -136,7 +144,8 @@ describe("détail map par map — retours de la revue UI/UX", () => {
     expect(list()).toContain("({played}/{Math.max(shownLimit, played)})");
     // La ligne vierge ouverte ne compte pas comme une map jouée.
     expect(list()).toContain("const played = maps.filter(isMapTouched).length;");
-    expect(list()).toContain("Une map nulle peut être rejouée (${limit - shownLimit} au plus).");
+    expect(list()).toContain('t("score.maps.replayAllowance", { count: limit - shownLimit })');
+    expect(FR_SCORE.maps.replayAllowance).toBe("Une map nulle peut être rejouée ({count} au plus).");
   });
 
   it("la liste passe sur deux lignes selon sa propre largeur (modale de 460 px)", () => {
@@ -159,21 +168,23 @@ describe("détail map par map — retours de la revue UI/UX", () => {
     expect(hook).toContain("const sendMaps = mapsSent;");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toContain("if (input.mapRefusal && input.onBlankRow) return input.idle;");
-    expect(dialog).toContain("if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);");
+    expect(dialog).toContain("if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);");
     expect(dialog).toContain("title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker,");
     expect(dialog).toContain("title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker,");
   });
 
   it("une proposition adverse sans détail dit quoi saisir au lieu de « Confirme-le »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain("if ((theirs.maps ?? []).length > 0) {");
-    expect(dialog).toContain("sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay");
+    expect(dialog).toContain('if ((theirs.maps ?? []).length > 0) return text.t("score.player.theirs.withMaps", values);');
+    expect(dialog).toContain('return text.t("score.player.theirs.withoutMaps", values);');
+    expect(FR_SCORE.player.theirs.withoutMaps).toContain("sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay");
   });
 
   it("un détail adverse encore en lecture est annoncé comme tel, sans inviter à ressaisir", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain("return canRead && proposalsNeedRefresh(match, proposals);");
-    expect(dialog).toContain("if (reader.detailLoading) return `${proposed}. Lecture du détail de ses maps…");
+    expect(dialog).toContain('if (reader.detailLoading) return text.t("score.player.theirs.loading", values);');
+    expect(FR_SCORE.player.theirs.loading).toContain("Lecture du détail de ses maps…");
     expect(dialog.indexOf("if ((theirs.maps ?? []).length > 0)")).toBeLessThan(dialog.indexOf("if (reader.detailLoading) return"));
   });
 });
@@ -184,15 +195,15 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
     expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, proposals\) &&\s*form\.maps\.length === 0/);
     expect(dialog).toContain("|| form.submitting || awaitingDetail}");
     expect(dialog).toContain("!form.submitting && !awaitingDetail) void run(\"resolve\");");
-    expect(dialog).toContain("if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;");
+    expect(dialog).toContain('if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");');
   });
 
   it("la phrase visible suit l'ordre de l'infobulle : détail, map refusée renseignée, puis score", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     const order = [
-      "if (input.awaitingDetail) return AWAITING_DETAIL_MESSAGE;",
-      "if (input.mapRefusal) return mapListViolationMessage(input.mapRefusal, input.format, input.game);",
-      "return input.blocker ? scoreBlockerMessage(input.blocker, input.format) : null;",
+      'if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");',
+      "if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);",
+      "return input.blocker ? scoreBlockerText(text, input.blocker, input.format) : null;",
     ].map((line) => dialog.indexOf(line, dialog.indexOf("function visibleBlocker(")));
     expect(order.every((i) => i > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -261,8 +272,8 @@ describe("détail map par map — lecteur sans droit de report", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     const fn = dialog.slice(dialog.indexOf("function theirsPendingStatus("));
     expect(fn.indexOf("if (!reader.canReport) return")).toBeGreaterThan(0);
-    expect(fn.indexOf("if (!reader.canReport) return")).toBeLessThan(fn.indexOf("sans le détail des maps"));
-    expect(dialog).toContain("theirsPendingStatus({ opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading })");
+    expect(fn.indexOf("if (!reader.canReport) return")).toBeLessThan(fn.indexOf('"score.player.theirs.withoutMaps"'));
+    expect(dialog).toContain("theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading })");
   });
 });
 
@@ -287,14 +298,17 @@ describe("détail map par map — steppers verrouillés et libellé de confirmat
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toContain("return mapCount > 0 && !mapsSetAside ? DERIVED_SCORE_HINT_ID : undefined;");
     expect(dialog.match(/describedBy=\{derivedHintId\}/g)).toHaveLength(2);
-    expect(dialog).toContain("retire toutes les maps pour le saisir à la main.");
+    expect(dialog).toContain('{t("score.admin.derivedHint")}');
+    expect(FR_SCORE.admin.derivedHint).toContain("retire toutes les maps pour le saisir à la main.");
     const stepper = readSource("app/(secured)/tournois/[id]/_components/ScoreStepper.tsx");
     expect(stepper).toContain("aria-describedby={describedBy}");
   });
 
   it("« Confirmer le score » ne se confond pas avec « Confirmer le forfait de … »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain('const submitLabel = confirmsAsIs ? "Confirmer le score" : "Envoyer le score";');
+    expect(dialog).toContain('const submitLabel = confirmsAsIs ? t("score.player.confirm") : t("score.player.send");');
+    expect(FR_SCORE.player.confirm).toBe("Confirmer le score");
+    expect(FR_SCORE.player.send).toBe("Envoyer le score");
   });
 });
 

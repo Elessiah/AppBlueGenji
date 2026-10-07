@@ -149,8 +149,9 @@ describe("RollbackRoundDialog — repli du nom d'équipe", () => {
       read("app/(secured)/tournois/[id]/_components/RollbackRoundDialog.tsx"),
     );
     expect(source).toContain('from "@/lib/shared/match-card-viewer"');
-    expect(source).toMatch(/teamLabel\(match\.team1Name, match\.team1Placeholder, "À venir"\)/);
-    expect(source).toMatch(/teamLabel\(match\.team2Name, match\.team2Placeholder, "À venir"\)/);
+    // Lot 8b : le repli « À venir » vient des messages (`rollback.tbd`).
+    expect(source).toMatch(/teamLabel\(match\.team1Name, match\.team1Placeholder, t\("rollback\.tbd"\)\)/);
+    expect(source).toMatch(/teamLabel\(match\.team2Name, match\.team2Placeholder, t\("rollback\.tbd"\)\)/);
     expect(source).not.toMatch(/team[12]Name \?\? match\.team[12]Placeholder/);
   });
 });
