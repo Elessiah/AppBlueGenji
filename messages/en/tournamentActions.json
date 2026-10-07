@@ -94,7 +94,7 @@
     "reportIssue": "Report a problem"
   },
   "danger": {
-    "title": "Danger zone",
+    "title": "Destructive actions",
     "rollbackHint": "Erasing {stage} reopens the previous round for correction. You can repeat it: round by round, you can go back to the start of the tournament. Note the scores first: nothing is archived.",
     "rollbackHintFinished": "Erasing {stage} reopens the previous round for correction. You can repeat it: round by round, you can go back to the start of the tournament. Since the tournament is finished, it will be reopened and its final standings erased. Note the scores first: nothing is archived.",
     "rollback": "Go back one round",
@@ -167,7 +167,7 @@
     "frozen": "Locked",
     "frozenTitle": "A round has been played since: giving these points back would put back in contention a team that didn't play it.",
     "buttonTitle": "Lift this penalty: {name} gets back {points, plural, one {# point} other {# points}}",
-    "buttonAria": "Remove the {points, plural, one {# point} other {# points}} penalty given to {name}"
+    "buttonAria": "Remove the {points}-point penalty given to {name}"
   },
   "launch": {
     "fallback": "The action couldn't go through. Try again in a moment.",

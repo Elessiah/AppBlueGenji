@@ -109,7 +109,7 @@
     "NON_DECREASING_PHASE_QUALIFIERS": "Fixed-number qualifications must decrease from one stage to the next.",
     "INVALID_PHASE_SWISS_ROUNDS": "Invalid number of Swiss rounds: 1 to 20 expected.",
     "INVALID_PHASE_SURVIVAL_ROUNDS": "Invalid survival pace: 1 to 50 expected.",
-    "UNAUTHORIZED": "Your session has expired. Log in again to follow the tournament live.",
+    "UNAUTHORIZED": "Your session has expired. Log in again to follow the tournament in real time.",
     "INVALID_STREAM_URL": "Stream link not recognized (Twitch, YouTube or Kick expected).",
     "INVALID_LIVE_TRIGGER": "Invalid on-air mode.",
     "LIVE_TRIGGER_NOT_MANUAL": "This match goes on air automatically: there's nothing to toggle.",

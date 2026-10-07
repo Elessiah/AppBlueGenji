@@ -24,7 +24,7 @@ interface MatchReplayDialogProps {
  * retrait reste toujours possible, y compris sur un match rouvert.
  */
 export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchReplayDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  // Textes de la fenêtre (espace `tournamentDialogs`).
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const { t } = useDialogsText();

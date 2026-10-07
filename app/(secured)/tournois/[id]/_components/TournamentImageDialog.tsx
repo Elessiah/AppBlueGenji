@@ -43,7 +43,7 @@ interface TournamentImageDialogProps {
  * gardé avec un bandeau qui dit le désaccord.
  */
 export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: Readonly<TournamentImageDialogProps>) {
-  // Dialogue du lot 8b (actions) ou du staff : resté français, annoncé comme tel sous `/en`.
+  // Textes de la fenêtre (espace `tournamentDialogs`).
   const { t } = useDialogsText();
   // Le sélecteur d'image (recadrage compris) et ses messages sont partagés avec
   // le formulaire de création, dont la traduction suit (lot 8b-2) : restés
