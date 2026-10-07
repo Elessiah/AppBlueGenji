@@ -130,6 +130,8 @@ describe("anglais : une traduction, qui le dit", () => {
     for (const [, href] of html.matchAll(/<a href="(\/rgpd[^"]*)"([^>]*)>/g)) {
       expect([href, html.includes(`href="${href}" hrefLang="fr"`)]).toEqual([href, true]);
     }
+    // « (in French) » s'ajoute dans le lien : jamais entre parenthèses déjà ouvertes.
+    expect(legalPageText(html)).not.toContain("(in French))");
     // Les pages traduites sont liées en anglais, sans mention.
     expect(html).not.toMatch(/href="\/(conditions-utilisation|mentions-legales|accessibilite|regles|association)[#"][^>]*>[^<]*\(in French\)/);
   });
