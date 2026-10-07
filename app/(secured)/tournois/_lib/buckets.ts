@@ -76,8 +76,13 @@ export function hasActiveFilter(query: string, gameFilter: GameFilter): boolean 
  * doit pousser à changer de recherche, pas laisser croire qu'il n'y a
  * vraiment rien.
  */
-export function sectionEmptyMessage(whenUnfiltered: string, query: string, gameFilter: GameFilter): string {
-  return hasActiveFilter(query, gameFilter) ? "Aucun résultat pour cette recherche." : whenUnfiltered;
+export function sectionEmptyMessage(
+  whenUnfiltered: string,
+  query: string,
+  gameFilter: GameFilter,
+  whenFiltered = "Aucun résultat pour cette recherche.",
+): string {
+  return hasActiveFilter(query, gameFilter) ? whenFiltered : whenUnfiltered;
 }
 
 /**

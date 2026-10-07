@@ -24,8 +24,9 @@ import type frAssociation from "@/messages/fr/association.json";
 import type frVolunteers from "@/messages/fr/volunteers.json";
 import type frRecruitment from "@/messages/fr/recruitment.json";
 import type frLegal from "@/messages/fr/legal.json";
+import type frTournaments from "@/messages/fr/tournaments.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -55,6 +56,8 @@ export type Messages = {
   recruitment: typeof frRecruitment;
   /** Pages légales du site (lot 7b) : métadonnées, « (in French) » — le texte légal vit dans ses modules par langue. */
   legal: typeof frLegal;
+  /** Tournois — consultation (lot 8a) : liste, cartes, fiche — `lib/shared/tournaments-text.ts`. */
+  tournaments: typeof frTournaments;
 };
 
 /**

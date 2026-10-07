@@ -1,4 +1,5 @@
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type { TournamentsText } from "@/lib/shared/tournaments-text";
 
 /**
  * Plan des sections de `/tournois`.
@@ -114,13 +115,15 @@ export type PageSectionEntry = {
 export function pageSections(
   counts: Record<PageSectionKey, number>,
   available: { hidden: boolean; mine: boolean },
+  /** Langue de la page (lot 8a) ; sans elle, les tables françaises ci-dessus. */
+  text?: TournamentsText,
 ): PageSectionEntry[] {
   return PAGE_SECTION_ORDER.filter(
     (key) => (key !== "hidden" || available.hidden) && (key !== "mine" || available.mine),
   ).map((key) => ({
     key,
-    title: PAGE_SECTION_TITLES[key],
-    navLabel: PAGE_SECTION_NAV_LABELS[key],
+    title: text ? text.t(`list.sections.${key}`) : PAGE_SECTION_TITLES[key],
+    navLabel: text ? text.t(`list.sectionNav.${key}`) : PAGE_SECTION_NAV_LABELS[key],
     count: counts[key],
   }));
 }

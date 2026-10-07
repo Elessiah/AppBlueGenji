@@ -1,7 +1,7 @@
 "use client";
 
-import { matchFormatLabel } from "@/lib/shared/match-format";
-import { participantWording } from "@/lib/shared/participants";
+import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
 import { formatCardDate, registrationFill, upcomingCardFace } from "../_lib/card-display";
 import { CardMetaItem, CardProgress, TournamentCardFrame } from "./CardParts";
@@ -23,7 +23,7 @@ interface UpcomingCardProps {
  * de section, bascule que `useScheduledBuckets` fait déjà à la seconde dite.
  */
 export function UpcomingCard({ t, priority }: Readonly<UpcomingCardProps>) {
-  const wording = participantWording(t.participantType);
+  const text = useTournamentsText();
   const fill = registrationFill(t);
   const locked = upcomingCardFace(t, Date.now()) === "LOCKED";
 
@@ -33,35 +33,38 @@ export function UpcomingCard({ t, priority }: Readonly<UpcomingCardProps>) {
       priority={priority}
       state="soon"
       ribbonClassName={s.cardRibbonSoon}
-      ribbon={locked ? "Inscriptions closes" : "À venir"}
+      ribbon={locked ? text.t("cards.registrationClosed") : text.t("cards.upcoming")}
     >
       <div className={s.cardMeta}>
-        <CardMetaItem label="Début">{formatCardDate(t.startAt, true)}</CardMetaItem>
+        <CardMetaItem label={text.t("cards.start")}>{formatCardDate(t.startAt, true, text.locale)}</CardMetaItem>
         {locked ? (
-          <CardMetaItem label="Inscriptions closes le">
-            {formatCardDate(t.registrationCloseAt, true)}
+          <CardMetaItem label={text.t("cards.closedOn")}>
+            {formatCardDate(t.registrationCloseAt, true, text.locale)}
           </CardMetaItem>
         ) : (
-          <CardMetaItem label="Ouverture inscriptions">
-            {formatCardDate(t.registrationOpenAt, true)}
+          <CardMetaItem label={text.t("cards.opensOn")}>
+            {formatCardDate(t.registrationOpenAt, true, text.locale)}
           </CardMetaItem>
         )}
-        <CardMetaItem label={wording.manyCapitalized} valueClassName={`${s.cardMetaVal} ${s.num}`}>
+        <CardMetaItem
+          label={participantLabel(text, t.participantType, "manyCapitalized")}
+          valueClassName={`${s.cardMetaVal} ${s.num}`}
+        >
           {t.registeredTeams}/{t.maxTeams}
         </CardMetaItem>
-        <CardMetaItem label="Matchs">{matchFormatLabel(t.matchFormat)}</CardMetaItem>
+        <CardMetaItem label={text.t("cards.matches")}>{localizedMatchFormatLabel(text, t.matchFormat)}</CardMetaItem>
       </div>
 
       <CardProgress percent={fill.percent} />
 
       <div className={s.cardFoot}>
         <div>
-          <div className={s.cardFootLbl}>Statut</div>
+          <div className={s.cardFootLbl}>{text.t("cards.status")}</div>
           <div className={`${s.cardFootVal} ${s.cardFootValSoon}`}>
-            {locked ? "En attente du coup d'envoi" : "Inscriptions bientôt"}
+            {locked ? text.t("cards.awaitingKickoff") : text.t("cards.registrationSoon")}
           </div>
         </div>
-        <span className={`${s.cardCta} ${s.cardCtaMuted}`}>Détails</span>
+        <span className={`${s.cardCta} ${s.cardCtaMuted}`}>{text.t("cards.details")}</span>
       </div>
     </TournamentCardFrame>
   );

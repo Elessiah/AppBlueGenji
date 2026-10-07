@@ -9,6 +9,8 @@
  */
 import { computeTournamentProgress } from "@/lib/shared/tournament-progress";
 import type { TournamentCard, TournamentFormat } from "@/lib/shared/types";
+import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/shared/locales";
+import { FR_TOURNAMENTS_TEXT, type TournamentsText } from "@/lib/shared/tournaments-text";
 
 /**
  * Action d'une carte « en cours », selon ce que la fiche montre d'abord : un
@@ -16,17 +18,17 @@ import type { TournamentCard, TournamentFormat } from "@/lib/shared/types";
  * « Voir bracket » partout promettait un arbre à la ronde suisse et à la
  * survie, qui n'en ont pas.
  */
-export function runningCardAction(format: TournamentFormat): string {
+export function runningCardAction(format: TournamentFormat, text: TournamentsText = FR_TOURNAMENTS_TEXT): string {
   switch (format) {
     case "SINGLE":
     case "DOUBLE":
-      return "Voir le bracket";
+      return text.t("cards.actions.bracket");
     case "SWISS":
     case "SURVIVAL":
     case "BG_SURVIE":
-      return "Voir le classement";
+      return text.t("cards.actions.standings");
     default:
-      return "Voir le tournoi";
+      return text.t("cards.actions.tournament");
   }
 }
 
@@ -86,15 +88,24 @@ export function progressPercent(ratio: number | null): number | null {
  * Date d'une carte, dans le fuseau du lecteur : jour, mois abrégé, année, et
  * l'heure quand elle compte (un coup d'envoi, une clôture d'inscriptions). Une
  * date illisible rend un tiret plutôt qu'« Invalid Date ».
+ *
+ * Dans la langue de la page (lot 8a) : « 07 oct. 2026, 20:00 » / « Oct 07,
+ * 2026, 20:00 » — sur 24 h dans les deux langues (`hourCycle`, que le français
+ * applique déjà de lui-même).
  */
-export function formatCardDate(iso: string | null, withTime: boolean): string {
+export function formatCardDate(iso: string | null, withTime: boolean, locale: Locale = DEFAULT_LOCALE): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "—";
-  return date.toLocaleString("fr-FR", {
+  return date.toLocaleString(INTL_LOCALE[locale], {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+    ...(withTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" } : {}),
   });
+}
+
+/** Date et heure d'un coup d'envoi dans le bandeau anglais : `formatCardDate` avec l'heure. */
+export function cardDateTime(iso: string, locale: Locale): string {
+  return formatCardDate(iso, true, locale);
 }

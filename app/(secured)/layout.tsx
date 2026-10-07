@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { ArenaShell } from "@/components/arena-shell";
 import { AuthGate } from "./_shared/AuthGate";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
 
 /**
  * L'espace sécurisé répond `200` aux visiteurs non connectés — une carte
@@ -27,11 +29,15 @@ export default async function SecuredLayout({ children }: Readonly<{ children: R
   // réponse. Seules les métadonnées du segment demandé le font, et c'est
   // exactement ce qu'on veut — c'est ce que lit le robot d'aperçu de Discord.
   if (!user) {
+    // Dans la langue de l'adresse : anglaise sous une route traduite
+    // (`/en/tournois`), française partout ailleurs (le middleware renvoie les
+    // autres `/en/…` vers le français).
+    const { authGate } = messagesFor(await requestLocale()).login;
     return (
       <>
         <main className="page-shell">
           <Suspense>
-            <AuthGate />
+            <AuthGate text={authGate} />
           </Suspense>
         </main>
         <SiteFooterBar authenticated={false} />

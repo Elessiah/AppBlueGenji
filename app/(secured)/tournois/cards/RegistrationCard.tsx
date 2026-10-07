@@ -1,7 +1,7 @@
 "use client";
 
-import { matchFormatLabel } from "@/lib/shared/match-format";
-import { participantWording } from "@/lib/shared/participants";
+import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
 import { formatCardDate, registrationFill } from "../_lib/card-display";
 import { CardMetaItem, CardProgress, LiveRibbon, TournamentCardFrame } from "./CardParts";
@@ -21,7 +21,7 @@ interface RegistrationCardProps {
  * carte : c'est le seul refus qui ne dépend de personne.
  */
 export function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps>) {
-  const wording = participantWording(t.participantType);
+  const text = useTournamentsText();
   const fill = registrationFill(t);
 
   return (
@@ -30,32 +30,35 @@ export function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps
       priority={priority}
       state="open"
       ribbonClassName={s.cardRibbonOpen}
-      ribbon={<LiveRibbon label="Inscriptions ouvertes" />}
+      ribbon={<LiveRibbon label={text.t("cards.registrationOpen")} />}
     >
       <div className={s.cardMeta}>
-        <CardMetaItem label="Début">{formatCardDate(t.startAt, true)}</CardMetaItem>
-        <CardMetaItem label="Clôture" valueClassName={`${s.cardMetaVal} ${s.cardMetaValWarn}`}>
-          {formatCardDate(t.registrationCloseAt, true)}
+        <CardMetaItem label={text.t("cards.start")}>{formatCardDate(t.startAt, true, text.locale)}</CardMetaItem>
+        <CardMetaItem label={text.t("cards.closing")} valueClassName={`${s.cardMetaVal} ${s.cardMetaValWarn}`}>
+          {formatCardDate(t.registrationCloseAt, true, text.locale)}
         </CardMetaItem>
-        <CardMetaItem label={wording.manyCapitalized} valueClassName={`${s.cardMetaVal} ${s.num}`}>
+        <CardMetaItem
+          label={participantLabel(text, t.participantType, "manyCapitalized")}
+          valueClassName={`${s.cardMetaVal} ${s.num}`}
+        >
           {t.registeredTeams}/{t.maxTeams}
         </CardMetaItem>
-        <CardMetaItem label="Matchs">{matchFormatLabel(t.matchFormat)}</CardMetaItem>
+        <CardMetaItem label={text.t("cards.matches")}>{localizedMatchFormatLabel(text, t.matchFormat)}</CardMetaItem>
       </div>
 
       <CardProgress percent={fill.percent} />
 
       <div className={s.cardFoot}>
         <div>
-          <div className={s.cardFootLbl}>Remplissage</div>
+          <div className={s.cardFootLbl}>{text.t("cards.fill")}</div>
           {fill.full ? (
-            <div className={`${s.cardFootVal} ${s.cardFootValWarn}`}>Complet</div>
+            <div className={`${s.cardFootVal} ${s.cardFootValWarn}`}>{text.t("cards.full")}</div>
           ) : (
-            <div className={`${s.cardFootVal} ${s.num}`}>{fill.percent} %</div>
+            <div className={`${s.cardFootVal} ${s.num}`}>{text.t("cards.percent", { percent: String(fill.percent) })}</div>
           )}
         </div>
         <span className={fill.full ? `${s.cardCta} ${s.cardCtaMuted}` : `${s.cardCta} ${s.cardCtaPrimary}`}>
-          Voir le tournoi
+          {text.t("cards.actions.tournament")}
         </span>
       </div>
     </TournamentCardFrame>

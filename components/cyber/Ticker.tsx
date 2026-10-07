@@ -4,8 +4,16 @@ import { useState } from "react";
 import { useLandingText } from "@/components/i18n/landing-text";
 import styles from "./Ticker.module.css";
 
+/** Libellés du bandeau et de son bouton (espace `landing.ticker`). */
+export type TickerLabels = Readonly<Record<"label" | "resume" | "pause" | "resumeShort" | "pauseShort", string>>;
+
 interface TickerProps {
   items: string[];
+  /**
+   * Libellés venus d'un autre écran que l'accueil (`/tournois`, lot 8a), qui
+   * ne pose pas le fournisseur de l'accueil. Sans eux : `useLandingText()`.
+   */
+  labels?: TickerLabels;
 }
 
 /**
@@ -23,9 +31,10 @@ interface TickerProps {
  * est masquée aux technologies d'assistance, sans quoi chaque élément serait lu
  * deux fois.
  */
-export function Ticker({ items }: Readonly<TickerProps>) {
+export function Ticker({ items, labels }: Readonly<TickerProps>) {
   const [paused, setPaused] = useState(false);
-  const { t } = useLandingText();
+  const landing = useLandingText();
+  const t = (key: `ticker.${keyof TickerLabels}`) => (labels ? labels[key.slice("ticker.".length) as keyof TickerLabels] : landing.t(key));
 
   return (
     <div className={styles.ticker} role="marquee" aria-label={t("ticker.label")} data-paused={paused ? "true" : undefined}>

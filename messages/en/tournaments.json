@@ -1,0 +1,110 @@
+{
+  "meta": {
+    "title": "Tournaments",
+    "description": "Registration, real-time brackets and results of BlueGenji Esport's Overwatch and Marvel Rivals tournaments."
+  },
+  "list": {
+    "eyebrow": "PLATFORM · TOURNAMENTS",
+    "title": "<em>BlueGenji</em> tournaments",
+    "subtitle": "REAL-TIME TRACKING · MULTIPLE STAGES · REFEREED BRACKETS",
+    "create": "Create a tournament",
+    "searchLabel": "Search for a tournament",
+    "searchPlaceholder": "Search for a tournament, a format…",
+    "filters": {
+      "all": "All",
+      "ow": "Overwatch",
+      "mr": "Marvel Rivals"
+    },
+    "countLabel": "{label} ({count})",
+    "sectionsNav": "Page sections",
+    "navNone": "(none)",
+    "emptyTitle": "No tournaments",
+    "emptyUnfiltered": "No tournament published yet.",
+    "emptyFiltered": "No results for this search.",
+    "staffAccent": "· STAFF",
+    "showLess": "Show less",
+    "showLessLabel": "Show less · {section}",
+    "showMore": "Show more ({count})",
+    "showMoreLabel": "Show more ({count}) · {section}",
+    "finishedLoading": "Loading finished tournaments…",
+    "sections": {
+      "hidden": "HIDDEN TOURNAMENTS",
+      "mine": "MY TOURNAMENTS",
+      "running": "IN PROGRESS",
+      "registration": "REGISTRATION OPEN",
+      "upcoming": "UPCOMING",
+      "finished": "FINISHED"
+    },
+    "sectionNav": {
+      "hidden": "Hidden",
+      "mine": "My tournaments",
+      "running": "In progress",
+      "registration": "Registration",
+      "upcoming": "Upcoming",
+      "finished": "Finished"
+    }
+  },
+  "ticker": {
+    "runningTeam": "IN PROGRESS · {name} · {count, plural, one {# team} other {# teams}} competing",
+    "runningSolo": "IN PROGRESS · {name} · {count, plural, one {# player} other {# players}} competing",
+    "registrationTeam": "REGISTRATION · {name} · {registered}/{max} teams",
+    "registrationSolo": "REGISTRATION · {name} · {registered}/{max} players",
+    "upcoming": "UPCOMING · {name} · {date}",
+    "empty": "No tournament news right now"
+  },
+  "cards": {
+    "open": "View the tournament {name}",
+    "start": "Start",
+    "matches": "Matches",
+    "percent": "{percent}%",
+    "running": "In progress",
+    "progress": "Progress",
+    "registrationOpen": "Registration open",
+    "closing": "Closes",
+    "fill": "Filled",
+    "full": "Full",
+    "upcoming": "Upcoming",
+    "registrationClosed": "Registration closed",
+    "closedOn": "Registration closed on",
+    "opensOn": "Registration opens",
+    "status": "Status",
+    "awaitingKickoff": "Waiting for kickoff",
+    "registrationSoon": "Registration soon",
+    "details": "Details",
+    "finished": "Finished · {date}",
+    "winner": "Winner",
+    "results": "View results",
+    "actions": {
+      "bracket": "View the bracket",
+      "standings": "View the standings",
+      "tournament": "View the tournament"
+    }
+  },
+  "participants": {
+    "TEAM": {
+      "manyCapitalized": "Teams",
+      "manyParticipating": "Participating teams"
+    },
+    "SOLO": {
+      "manyCapitalized": "Players",
+      "manyParticipating": "Participating players"
+    }
+  },
+  "matchFormat": {
+    "free": "Free score",
+    "withMaps": "{base} · {maps} maps"
+  },
+  "rulesHelp": {
+    "index": "Tournament rules",
+    "mode": "{mode} rules",
+    "withContext": "{label} — {context}",
+    "modes": {
+      "SINGLE": "Single elimination",
+      "DOUBLE": "Double elimination",
+      "BG_SURVIE": "BlueGenji's Survival",
+      "SURVIVAL": "Survival (cuts)",
+      "SWISS": "Swiss",
+      "MULTI": "Multi-stage tournament"
+    }
+  }
+}

@@ -1,6 +1,9 @@
+"use client";
+
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import type { TournamentFormat } from "@/lib/shared/types";
-import { RULE_MODE_LABELS_FR, rulesHrefForFormat } from "@/lib/shared/rule-mode-definitions";
+import { rulesHrefForFormat } from "@/lib/shared/rule-mode-definitions";
 import { rulesHrefWithTournament } from "@/lib/shared/tournament-settings";
 
 /**
@@ -8,6 +11,10 @@ import { rulesHrefWithTournament } from "@/lib/shared/tournament-settings";
  * joué (ou vers l'index `/regles` si le format n'est pas connu, cas de la liste
  * des tournois). Depuis une fiche, le lien porte le tournoi (`?tournoi=<id>`) :
  * la page des règles affiche alors, en tête, les réglages retenus pour lui.
+ *
+ * Libellé dans la langue de la page (lot 8a, `tournaments.rulesHelp`) ; le
+ * français reprend `RULE_MODE_LABELS_FR` (égalité testée). `contextLabel` est
+ * une donnée (nom du tournoi), rendue telle quelle.
  */
 export function RulesHelpFab({
   format,
@@ -18,11 +25,11 @@ export function RulesHelpFab({
   contextLabel?: string;
   tournamentId?: number;
 }>) {
+  const { t } = useTournamentsText();
   const baseHref = format ? rulesHrefForFormat(format) : "/regles";
   const href = format && tournamentId ? rulesHrefWithTournament(baseHref, tournamentId) : baseHref;
-  const modeLabel = format ? RULE_MODE_LABELS_FR[format] : undefined;
-  const baseLabel = modeLabel ? `Règles du mode ${modeLabel}` : "Règles des tournois";
-  const label = contextLabel ? `${baseLabel} — ${contextLabel}` : baseLabel;
+  const baseLabel = format ? t("rulesHelp.mode", { mode: t(`rulesHelp.modes.${format}`) }) : t("rulesHelp.index");
+  const label = contextLabel ? t("rulesHelp.withContext", { label: baseLabel, context: contextLabel }) : baseLabel;
 
   return (
     <LocaleLink href={href} className="cta-float-help" aria-label={label} title={label}>
