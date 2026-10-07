@@ -89,16 +89,17 @@ export function progressPercent(ratio: number | null): number | null {
  * l'heure quand elle compte (un coup d'envoi, une clôture d'inscriptions). Une
  * date illisible rend un tiret plutôt qu'« Invalid Date ».
  *
- * Dans la langue de la page (lot 8a) : « 07 oct. 2026, 20:00 » / « Oct 07,
- * 2026, 20:00 » — sur 24 h dans les deux langues (`hourCycle`, que le français
- * applique déjà de lui-même).
+ * Dans la langue de la page (lot 8a) : « 07 oct. 2026, 20:00 » / « Oct 7,
+ * 2026, 20:00 » — le jour sur deux chiffres reste propre au français (l'anglais
+ * n'écrit pas « Oct 07 ») ; sur 24 h dans les deux langues (`hourCycle`, que le
+ * français applique déjà de lui-même).
  */
 export function formatCardDate(iso: string | null, withTime: boolean, locale: Locale = DEFAULT_LOCALE): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "—";
   return date.toLocaleString(INTL_LOCALE[locale], {
-    day: "2-digit",
+    day: locale === "fr" ? "2-digit" : "numeric",
     month: "short",
     year: "numeric",
     ...(withTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" } : {}),

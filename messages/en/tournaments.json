@@ -47,8 +47,8 @@
   "ticker": {
     "runningTeam": "IN PROGRESS · {name} · {count, plural, one {# team} other {# teams}} competing",
     "runningSolo": "IN PROGRESS · {name} · {count, plural, one {# player} other {# players}} competing",
-    "registrationTeam": "REGISTRATION · {name} · {registered}/{max} teams",
-    "registrationSolo": "REGISTRATION · {name} · {registered}/{max} players",
+    "registrationTeam": "REGISTRATION OPEN · {name} · {registered}/{max} teams",
+    "registrationSolo": "REGISTRATION OPEN · {name} · {registered}/{max} players",
     "upcoming": "UPCOMING · {name} · {date}",
     "empty": "No tournament news right now"
   },

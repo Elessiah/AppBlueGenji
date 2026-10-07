@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { tournamentLabel } from "@/lib/shared/tournaments-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
@@ -306,8 +307,10 @@ export default function TournamentsList() {
   // comparer une chaîne déjà connue, appliqué séparément pour le panier
   // affiché (`gameFilteredBuckets`) et pour les pastilles, qui veulent le compte
   // de CHAQUE jeu sans se soucier de celui déjà choisi (`queryFilteredBuckets`).
-  const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all");
-  const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query);
+  // Le format se cherche sous le nom que la carte affiche (« Swiss » sous `/en`).
+  const formatName = (format: string) => tournamentLabel(text, "format", format);
+  const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all", formatName);
+  const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query, formatName);
 
   const gameFilteredBuckets: TournamentBuckets =
     gameFilter === "all"

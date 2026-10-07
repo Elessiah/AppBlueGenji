@@ -12,15 +12,23 @@ export type GameFilter = "all" | "ow" | "mr";
  * réponse JSON ne le garantit pas à l'exécution, et un format que
  * `FORMAT_LABELS` ignorerait encore ferait planter toute la page à la
  * première recherche.
+ *
+ * `formatName` donne le nom de format **affiché par la carte** : sous `/en`,
+ * « Swiss » doit trouver un tournoi que la carte annonce ainsi (français par
+ * défaut).
  */
-export function filterTournamentsByQuery(tournaments: TournamentCard[], query: string): TournamentCard[] {
+export function filterTournamentsByQuery(
+  tournaments: TournamentCard[],
+  query: string,
+  formatName: (format: string) => string = formatLabel
+): TournamentCard[] {
   const trimmed = query.trim();
   if (!trimmed) return tournaments;
   const lowerQuery = trimmed.toLowerCase();
   return tournaments.filter((t) => {
     const nameMatch = t.name.toLowerCase().includes(lowerQuery);
     const descMatch = (t.description || "").toLowerCase().includes(lowerQuery);
-    const formatMatch = formatLabel(t.format).toLowerCase().includes(lowerQuery);
+    const formatMatch = formatName(t.format).toLowerCase().includes(lowerQuery);
     return nameMatch || descMatch || formatMatch;
   });
 }
@@ -35,10 +43,11 @@ export function filterTournamentsByGame(tournaments: TournamentCard[], gameFilte
 export function filterBuckets(
   buckets: TournamentBuckets,
   query: string,
-  gameFilter: GameFilter
+  gameFilter: GameFilter,
+  formatName: (format: string) => string = formatLabel
 ): TournamentBuckets {
   const filterTournaments = (tournaments: TournamentCard[]) =>
-    filterTournamentsByGame(filterTournamentsByQuery(tournaments, query), gameFilter);
+    filterTournamentsByGame(filterTournamentsByQuery(tournaments, query, formatName), gameFilter);
 
   return {
     upcoming: filterTournaments(buckets.upcoming),
