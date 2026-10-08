@@ -1,6 +1,6 @@
 import type { LandingCalendarEvent } from "@/lib/shared/landing";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { tournamentMatchHref } from "@/lib/shared/match-anchor";
+import { tournamentHref } from "@/lib/shared/match-anchor";
 import { landingServerText } from "@/lib/server/i18n-landing";
 import { BOARD_TIME_ZONE } from "@/lib/shared/landing-board";
 import { LANDING_INTL_LOCALE } from "@/lib/shared/landing-text";
@@ -89,7 +89,7 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE, spectator = fals
                     accessible du lien reste celui du tournoi — pas la date,
                     le jeu et l'état concaténés. */}
                 <div className={styles.title} title={formats.full.format(date)}>
-                  <LocaleLink className={styles.link} href={tournamentMatchHref(event.tournamentId, null, spectator)}>
+                  <LocaleLink className={styles.link} href={tournamentHref(event.tournamentId, spectator)}>
                     {event.name}
                   </LocaleLink>
                 </div>

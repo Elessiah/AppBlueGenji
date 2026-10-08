@@ -69,21 +69,28 @@ export function parseMatchAnchor(hash: string | null | undefined): number | null
 }
 
 /**
+ * Chemin de la fiche d'un tournoi : celle des membres, ou la page sans compte
+ * (`spectator`, `/suivre/tournois/[id]`) pour un lien rendu à un visiteur sans
+ * session — il y serait redirigé de toute façon, ce lien lui épargne le détour
+ * (`docs/features/SPECTATOR_VIEW.md`).
+ */
+export function tournamentHref(tournamentId: number, spectator = false): string {
+  return spectator ? spectatorTournamentPath(tournamentId) : memberTournamentPath(tournamentId);
+}
+
+/**
  * Chemin de la fiche d'un tournoi, ancré sur un match quand on en désigne un.
  *
  * `matchId` absent ou inexploitable → le tournoi seul : mieux vaut une page
- * ouverte en haut qu'une ancre qui ne désigne rien.
- *
- * `spectator` : la page sans compte (`/suivre/tournois/[id]`), pour un lien
- * rendu à un visiteur sans session — il y serait redirigé de toute façon, ce
- * lien lui épargne le détour (`docs/features/SPECTATOR_VIEW.md`).
+ * ouverte en haut qu'une ancre qui ne désigne rien. `spectator` : comme
+ * `tournamentHref`.
  */
 export function tournamentMatchHref(
   tournamentId: number,
   matchId?: number | null,
   spectator = false,
 ): string {
-  const base = spectator ? spectatorTournamentPath(tournamentId) : memberTournamentPath(tournamentId);
+  const base = tournamentHref(tournamentId, spectator);
   return isMatchId(matchId) ? `${base}#${matchAnchorId(matchId)}` : base;
 }
 

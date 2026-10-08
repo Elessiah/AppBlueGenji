@@ -1,5 +1,5 @@
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { tournamentMatchHref } from "@/lib/shared/match-anchor";
+import { tournamentHref } from "@/lib/shared/match-anchor";
 import { CyberButton, CyberCard, MiniBracket, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
@@ -74,7 +74,7 @@ export function TournamentBoard({ buckets, featured, miniBracket, locale = DEFAU
 
               <div className={styles.footerRow}>
                 <CyberButton variant="primary" asChild>
-                  <LocaleLink href={tournamentMatchHref(featured.id, null, spectator)}>{actionLabel(text, featured, now)} →</LocaleLink>
+                  <LocaleLink href={tournamentHref(featured.id, spectator)}>{actionLabel(text, featured, now)} →</LocaleLink>
                 </CyberButton>
               </div>
             </>
@@ -129,7 +129,7 @@ export function TournamentBoard({ buckets, featured, miniBracket, locale = DEFAU
 
               <div className={styles.footerRow}>
                 <CyberButton variant="ghost" asChild>
-                  <LocaleLink href={tournamentMatchHref(card.id, null, spectator)}>{actionLabel(text, card, now)}</LocaleLink>
+                  <LocaleLink href={tournamentHref(card.id, spectator)}>{actionLabel(text, card, now)}</LocaleLink>
                 </CyberButton>
               </div>
             </CyberCard>
