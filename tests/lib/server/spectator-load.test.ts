@@ -6,6 +6,7 @@ import { openStreamCount } from "@/lib/server/tournament-broadcast";
 import {
   currentSpectatorLoadLevel,
   LOOP_DELAY_SAMPLE_MS,
+  LOOP_PROBE_IDLE_MS,
   recordSpectatorRead,
   resetSpectatorLoad,
   SPECTATOR_READ_WINDOW_MS,
@@ -50,11 +51,27 @@ describe("signaux et niveau", () => {
     expect(spectatorLoadSignals(T0 + 1).eventLoopDelayMs).toBeNull();
   });
 
-  it("relève un retard de boucle une fois la fenêtre close", () => {
+  it("relève un retard de boucle une fois la fenêtre close, pas de la sonde retranché", () => {
     spectatorLoadSignals(T0);
     const delay = spectatorLoadSignals(T0 + LOOP_DELAY_SAMPLE_MS).eventLoopDelayMs;
     expect(delay).not.toBeNull();
     expect(delay).toBeGreaterThanOrEqual(0);
+    // Un processus de test au repos ne doit pas lire un niveau de charge.
+    expect(delay).toBeLessThan(SPECTATOR_LOAD_THRESHOLDS.eventLoopDelayMs[0]);
+  });
+
+  it("désarme la sonde après un long silence des visiteurs sans compte", () => {
+    jest.useFakeTimers();
+    try {
+      recordSpectatorRead(T0);
+      spectatorLoadSignals(T0);
+      spectatorLoadSignals(T0 + LOOP_DELAY_SAMPLE_MS);
+      jest.advanceTimersByTime(LOOP_PROBE_IDLE_MS);
+      // Désarmée : la mesure repart de rien.
+      expect(spectatorLoadSignals(T0 + 2 * LOOP_DELAY_SAMPLE_MS).eventLoopDelayMs).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("lit les flux ouverts de la diffusion", () => {

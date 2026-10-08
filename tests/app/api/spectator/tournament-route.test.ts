@@ -126,13 +126,32 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(res.headers.get(SPECTATOR_POLL_HEADER)).toBe(String(SPECTATOR_PRE_LAUNCH_POLL_MS));
   });
 
-  it("ne demande plus de relecture d'un tournoi terminé", async () => {
+  it("relit un tournoi terminé au plus lent : un retour en arrière peut le rouvrir", async () => {
     mockedSnapshot.mockResolvedValue(snapshot({ card: tournamentCard({ id: 5, state: "FINISHED" }) }));
 
     const res = await GET(req(), params("5"));
 
     expect(res.status).toBe(200);
-    expect(res.headers.has(SPECTATOR_POLL_HEADER)).toBe(false);
+    expect(res.headers.get(SPECTATOR_POLL_HEADER)).toBe(String(SPECTATOR_MAX_POLL_MS));
+  });
+
+  it("ne garde pas un « introuvable » : le tournoi publié ensuite s'ouvre aussitôt", async () => {
+    mockedSnapshot.mockResolvedValueOnce(null).mockResolvedValueOnce(snapshot());
+
+    expect((await GET(req(), params("5"))).status).toBe(404);
+    expect((await GET(req(), params("5"))).status).toBe(200);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it("ne transmet aucun identifiant de compte", async () => {
+    mockedSnapshot.mockResolvedValue(
+      snapshot({ soloUserIds: { 3: 77 }, matches: [bracketMatch({ id: 1, tournamentId: 5, casterUserId: 88 })] }),
+    );
+
+    const body = (await (await GET(req(), params("5"))).json()) as TournamentSnapshot;
+
+    expect(body.soloUserIds).toEqual({});
+    expect(body.matches[0].casterUserId).toBeNull();
   });
 
   it("répond 404 pour un tournoi absent ou pas encore publié, sans dire lequel", async () => {

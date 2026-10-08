@@ -158,14 +158,15 @@ describe("relecteur de la page sans compte", () => {
     expect(h.fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("cesse de relire un tournoi terminé", async () => {
-    const h = harness([ok(tournamentSnapshot(), null)]);
+  it("relit un tournoi terminé à la cadence lente que le serveur lui donne", async () => {
+    const h = harness([ok(tournamentSnapshot(), SPECTATOR_MAX_POLL_MS), notModified(SPECTATOR_MAX_POLL_MS)]);
     await h.poller.start();
 
-    expect(h.last().cadenceMs).toBeNull();
-    expect(h.timers.size).toBe(0);
-    await h.advance(SPECTATOR_MAX_POLL_MS);
+    expect(h.last().cadenceMs).toBe(SPECTATOR_MAX_POLL_MS);
+    await h.advance(SPECTATOR_MAX_POLL_MS - 1);
     expect(h.fetchMock).toHaveBeenCalledTimes(1);
+    await h.advance(1);
+    expect(h.fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("s'arrête sur un tournoi introuvable", async () => {
@@ -191,16 +192,25 @@ describe("relecteur de la page sans compte", () => {
     expect(h.last().isLive).toBe(true);
   });
 
-  it("double son attente après une coupure réseau", async () => {
-    const h = harness([ok(tournamentSnapshot()), new TypeError("Failed to fetch"), notModified()]);
+  it("double son attente à chaque coupure réseau, puis revient à la cadence", async () => {
+    const down = () => new TypeError("Failed to fetch");
+    const h = harness([ok(tournamentSnapshot()), down(), down(), notModified(), notModified()]);
     await h.poller.start();
     await h.advance(SPECTATOR_RUNNING_POLL_MS);
-
     expect(h.last().isLive).toBe(false);
-    await h.advance(2 * SPECTATOR_RUNNING_POLL_MS - 1);
-    expect(h.fetchMock).toHaveBeenCalledTimes(2);
-    await h.advance(1);
+
+    // Premier recul : 2 × 30 s.
+    await h.advance(2 * SPECTATOR_RUNNING_POLL_MS);
     expect(h.fetchMock).toHaveBeenCalledTimes(3);
+    // Second recul : 2 × 60 s, et non 60 s de nouveau.
+    await h.advance(4 * SPECTATOR_RUNNING_POLL_MS - 1);
+    expect(h.fetchMock).toHaveBeenCalledTimes(3);
+    await h.advance(1);
+    expect(h.fetchMock).toHaveBeenCalledTimes(4);
+    expect(h.last().isLive).toBe(true);
+    // Rétabli : la cadence accordée reprend.
+    await h.advance(SPECTATOR_RUNNING_POLL_MS);
+    expect(h.fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it("ne relit rien onglet caché, et rattrape la lecture due au retour", async () => {

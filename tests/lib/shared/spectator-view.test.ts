@@ -32,20 +32,22 @@ describe("chemins de la fiche", () => {
     expect(memberTournamentPath(12)).toBe("/tournois/12");
   });
 
-  it("n'accepte qu'un entier strictement positif comme identifiant", () => {
+  it("n'accepte qu'un entier strictement positif, comme la fiche connectée (`Number(params.id)`)", () => {
     expect(parseTournamentId("42")).toBe(42);
+    // Même lecture que la fiche connectée : un lien qu'elle ouvre est redirigé pareil.
+    expect(parseTournamentId("12.0")).toBe(12);
     expect(parseTournamentId("0")).toBeNull();
     expect(parseTournamentId("-3")).toBeNull();
     expect(parseTournamentId("4.2")).toBeNull();
-    expect(parseTournamentId("1e3")).toBeNull();
     expect(parseTournamentId("../secrets")).toBeNull();
     expect(parseTournamentId("")).toBeNull();
-    expect(parseTournamentId("99999999999")).toBeNull();
+    expect(parseTournamentId("9007199254740993")).toBeNull();
   });
 
   it("ne reconnaît que la fiche d'un tournoi dans l'espace connecté", () => {
     expect(tournamentIdFromMemberPath("/tournois/7")).toBe(7);
     expect(tournamentIdFromMemberPath("/tournois/7/")).toBe(7);
+    expect(tournamentIdFromMemberPath("/tournois/7.0")).toBe(7);
     // Liste, création, édition : restent derrière la connexion.
     expect(tournamentIdFromMemberPath("/tournois")).toBeNull();
     expect(tournamentIdFromMemberPath("/tournois/creer")).toBeNull();
@@ -100,9 +102,9 @@ describe("cadence de relecture", () => {
     expect(spectatorPollIntervalMs("UPCOMING", 0)).toBe(SPECTATOR_PRE_LAUNCH_POLL_MS);
   });
 
-  it("n'attend plus rien d'un tournoi terminé", () => {
-    expect(spectatorPollIntervalMs("FINISHED", 0)).toBeNull();
-    expect(spectatorPollIntervalMs("FINISHED", 3)).toBeNull();
+  it("relit un tournoi terminé au plafond : le staff peut encore le rouvrir", () => {
+    expect(spectatorPollIntervalMs("FINISHED", 0)).toBe(SPECTATOR_MAX_POLL_MS);
+    expect(spectatorPollIntervalMs("FINISHED", 3)).toBe(SPECTATOR_MAX_POLL_MS);
   });
 
   it("s'allonge avec la charge, sans dépasser le plafond", () => {
@@ -128,18 +130,15 @@ describe("relecture côté client", () => {
     expect(parsePollAfterMs("99999999")).toBe(SPECTATOR_MAX_POLL_MS);
   });
 
-  it("comprend l'absence d'en-tête comme « plus de relecture »", () => {
-    expect(parsePollAfterMs(null)).toBeNull();
-  });
-
-  it("retombe sur la cadence de base devant un en-tête illisible", () => {
+  it("retombe sur la cadence de base devant un en-tête absent ou illisible", () => {
+    expect(parsePollAfterMs(null)).toBe(SPECTATOR_RUNNING_POLL_MS);
     expect(parsePollAfterMs("bientôt")).toBe(SPECTATOR_RUNNING_POLL_MS);
   });
 
-  it("recule après un échec : Retry-After d'abord, sinon le double de la dernière cadence", () => {
+  it("recule après un échec : Retry-After d'abord, sinon le double de la dernière attente", () => {
     expect(spectatorRetryDelayMs(30_000, "120")).toBe(120_000);
     expect(spectatorRetryDelayMs(30_000, null)).toBe(60_000);
-    expect(spectatorRetryDelayMs(null, null)).toBe(2 * SPECTATOR_RUNNING_POLL_MS);
+    expect(spectatorRetryDelayMs(60_000, null)).toBe(120_000);
     expect(spectatorRetryDelayMs(30_000, "n'importe")).toBe(60_000);
     expect(spectatorRetryDelayMs(500_000, null)).toBe(SPECTATOR_MAX_POLL_MS);
   });
@@ -169,6 +168,18 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(out.matches[0].team1Report?.maps).toEqual([]);
     expect(out.matches[0].team2Report).toBeNull();
     expect(JSON.stringify(out)).not.toContain("ABC123");
+  });
+
+  it("retire les identifiants de comptes : la page n'affiche que des noms", () => {
+    const snapshot = tournamentSnapshot({
+      soloUserIds: { 4: 9 },
+      matches: [bracketMatch({ id: 1, casterUserId: 33, casterPseudo: "Caster" })],
+    });
+    const out = spectatorSnapshot(snapshot);
+    expect(out.soloUserIds).toEqual({});
+    expect(out.matches[0].casterUserId).toBeNull();
+    // Le pseudo du caster reste : il est à l'antenne.
+    expect(out.matches[0].casterPseudo).toBe("Caster");
   });
 
   it("ne touche pas l'instantané partagé avec les membres", () => {

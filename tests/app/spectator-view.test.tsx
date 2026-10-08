@@ -112,7 +112,7 @@ describe("espace sécurisé — visiteur sans session", () => {
   it("relaie côté client la carte servie par un préchargement, ancre comprise", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
     expect(gate).toContain("tournamentIdFromMemberPath(splitLocalePrefix(pathname).path)");
-    expect(gate).toContain("router.replace(`${spectatorTournamentPath(spectatorId)}${globalThis.location.hash}`);");
+    expect(gate).toContain("router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);");
   });
 });
 
@@ -216,10 +216,10 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(memberHtml).toContain(frTournament.match.maps.noReplayCode);
   });
 
-  it("annonce la cadence accordée par le serveur, et la fin des relectures", () => {
+  it("annonce la cadence accordée par le serveur", () => {
     expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={60_000} />)).toContain("toutes les minutes au plus");
     expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={30_000} />)).toContain("toutes les 30 secondes au plus");
-    expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={null} />)).toContain(frTournament.live.finishedTitle.replace("'", "&#x27;"));
+    expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={600_000} />)).toContain("toutes les 10 minutes au plus");
     // Une relecture ratée ne parle pas de flux à rouvrir.
     expect(member(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).toContain("La dernière mise à jour");
     expect(member(<LiveIndicator isLive={false} tier="STANDARD" />)).toContain("flux temps réel");
@@ -271,7 +271,8 @@ describe("fiche commune sous SpectatorViewProvider", () => {
       expect(messages.header.backHome).toBeTruthy();
       expect(messages.header.spectator).toBeTruthy();
       expect(messages.header.spectatorTitle).toBeTruthy();
-      expect(messages.live.finishedTitle).toBeTruthy();
+      expect(messages.live.retryTitle).toBeTruthy();
+      expect(messages.live.cadenceMinute).toBeTruthy();
       expect(messages.page.fatal.backHome).toBeTruthy();
     }
   });
