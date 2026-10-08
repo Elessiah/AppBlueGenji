@@ -1,11 +1,10 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { adminResolveMatch } from "@/lib/server/tournaments-service";
+import { adminResolveMatch, type AdminResolveEntry } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
 import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
-import type { AdminResolveEntry } from "@/lib/server/tournaments/admin";
 
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

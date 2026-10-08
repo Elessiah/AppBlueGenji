@@ -125,17 +125,6 @@ function closedNoticeText(text: TournamentDialogsText, phase: MatchLaunchPhase, 
  * joueur vers ce geste. Il s'offre avant même le lancement — l'équipe qui ne
  * pourra pas se présenter le sait avant le coup d'envoi.
  */
-/**
- * Les maps saisies confirment-elles la proposition adverse (à score égal) ?
- * Seulement si ce sont les mêmes : toute proposition porte son détail, et le
- * serveur compare maps comprises (`reportsConcord`). Un détail encore en
- * lecture (ou introuvable) ne se confirme pas : l'envoi reste une proposition
- * ordinaire (pas de faux `PROPOSAL_STALE`).
- */
-function confirmsProposalMaps(maps: ReadonlyArray<MatchMapInput>, theirMaps: ReadonlyArray<MatchMapInput>): boolean {
-  return theirMaps.length > 0 && sameMapLists(maps, theirMaps);
-}
-
 /** Une map est renseignée, et le refus ne désigne pas une ligne vierge. */
 function refusalWorthShowing(check: MapListCheck, maps: ReadonlyArray<MatchMapInput>): boolean {
   return maps.some(isMapTouched) && refusalOnTouchedRow(check, maps);
@@ -267,11 +256,11 @@ export function PlayerScoreDialog({
   // bouton le dit plutôt que de réécrire la même ligne.
   // Un code de replay corrigé à score égal est bien une nouvelle proposition.
   const relation = enteredScoreRelation(entered, view);
-  const unchangedMine = relation.unchangedMine && sameMapLists(maps, view?.mine?.maps ?? []);
-  const { confirmsTheirs } = relation;
   // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
-  // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
-  const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? []);
+  // codes (`sameReportedScore`, la règle du serveur). Toute retouche en fait une
+  // contre-proposition, et un détail encore en lecture ou introuvable ne se
+  // confirme pas (pas de faux `PROPOSAL_STALE`).
+  const { unchangedMine, confirmsTheirs: confirmsAsIs } = relation;
   // Le bloc tombe dès que le formulaire porte les maps adverses (recopiées).
   const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], { missedProposal, confirmsAsIs });
 

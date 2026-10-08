@@ -3,11 +3,12 @@ import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
 import {
+  adminFormStateFor,
   decideScoreForm,
   initialAdminMaps,
-  isUntouched,
   pendingProposalSignature,
-  scoreFormStateFor,
+  sameScoreFormState,
+  scoresFromMaps,
   storedResultSignature,
   type ScoreFormBlocker,
   type ScoreFormDecision,
@@ -17,7 +18,6 @@ import { useToast } from "@/components/ui/toast";
 import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
 import {
   checkMapList,
-  deriveMatchScore,
   isMapTouched,
   progressiveMapRows,
   refusalFieldOnRows,
@@ -60,13 +60,16 @@ export function useScoreForm(
   const dialogText = useDialogsText();
   const matchFormat = useMatchFormat(match);
   const game = useTournamentGame();
-  const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
   // Détail map par map (`docs/features/MAP_SCORES.md`) : seule saisie du
   // score, qui en est **dérivé** — aucun score à la main.
   // Lignes affichées, une à une au fil du format (`progressiveMapRows`, une
   // ligne vierge d'emblée) ; ce qui se valide et part en retire la ligne vierge
   // de fin (`sentMaps`).
   const openingRows = () => progressiveMapRows(matchFormat, game, initialAdminMaps(match), ADMIN_MAP_RULES);
+  // Valeurs d'ouverture : le score se lit sur les maps d'ouverture, jamais sur
+  // le score stocké ou proposé — c'est lui qui part.
+  const openingState = () => adminFormStateFor(match, openingRows());
+  const [state, setState] = useState<ScoreFormState>(openingState);
   const [maps, setMaps] = useState<MatchMapInput[]>(openingRows);
   const sentMaps = trimTrailingBlankMaps(maps);
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +91,7 @@ export function useScoreForm(
     // Valeurs adoptées au dernier alignement : c'est à elles que se compare la
     // saisie courante pour savoir si le lecteur a tapé quelque chose. Comparer
     // au match qui *arrive* ne le dirait pas — il a précisément changé.
-    baseline: scoreFormStateFor(match),
+    baseline: openingState(),
     // Même rôle pour les maps : corriger un code ou ajouter une map nulle ne
     // change pas le score, et doit pourtant compter comme une saisie.
     mapsBaseline: openingRows(),
@@ -98,9 +101,9 @@ export function useScoreForm(
   const signature = storedResultSignature(match);
   const proposals = pendingProposalSignature(match);
   if (signature !== synced.signature || proposals !== synced.proposals) {
-    const untouched = sameFormState(state, synced.baseline) && sameMaps(maps, synced.mapsBaseline);
-    const next = scoreFormStateFor(match);
+    const untouched = sameScoreFormState(state, synced.baseline) && sameMaps(maps, synced.mapsBaseline);
     const nextMaps = openingRows();
+    const next = adminFormStateFor(match, nextMaps);
     setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
 
     if (untouched) {
@@ -122,8 +125,8 @@ export function useScoreForm(
 
   /** Reprendre la valeur enregistrée, en abandonnant la saisie en cours. */
   const adoptStoredResult = () => {
-    const next = scoreFormStateFor(match);
     const nextMaps = openingRows();
+    const next = adminFormStateFor(match, nextMaps);
     setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
     setState(next);
     setMaps(nextMaps);
@@ -153,13 +156,7 @@ export function useScoreForm(
   // vides : « Saisis au moins une map jouée »).
   const updateMaps = (next: MatchMapInput[]) => {
     setMaps(next);
-    const touched = next.filter(isMapTouched);
-    if (touched.length === 0) {
-      setState((s) => ({ ...s, score1: "", score2: "" }));
-      return;
-    }
-    const derived = deriveMatchScore(touched);
-    setState((s) => ({ ...s, score1: String(derived.team1), score2: String(derived.team2) }));
+    setState((s) => ({ ...s, ...scoresFromMaps(next) }));
   };
 
   const decision = decideScoreForm(state, {
@@ -252,7 +249,7 @@ export function useScoreForm(
     conflict,
     adoptStoredResult,
     /** Une saisie est en cours, non enregistrée. */
-    dirty: !isUntouched(state, match) || !sameMaps(maps, openingRows()),
+    dirty: !sameScoreFormState(state, openingState()) || !sameMaps(maps, openingRows()),
     // Forfait nominatif et double forfait s'excluent : en choisir un retire
     // l'autre, pour que le formulaire ne porte jamais deux verdicts.
     setForfeitTeamId: (id?: number) =>
@@ -318,13 +315,4 @@ function adminScoreBody(
 
 function sameMaps(a: ReadonlyArray<MatchMapInput>, b: ReadonlyArray<MatchMapInput>): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
-}
-
-function sameFormState(a: ScoreFormState, b: ScoreFormState): boolean {
-  return (
-    a.score1 === b.score1 &&
-    a.score2 === b.score2 &&
-    a.forfeitTeamId === b.forfeitTeamId &&
-    (a.doubleForfeit === true) === (b.doubleForfeit === true)
-  );
 }

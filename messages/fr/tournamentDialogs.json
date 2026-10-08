@@ -31,7 +31,6 @@
       "replayCodeOptional": "Code de replay (facultatif)",
       "scoreOf": "Map {index}, score de ",
       "remove": "Retirer la map {index}",
-      "add": "Ajouter une map",
       "summary": "Score du match",
       "violation": {
         "empty": "Ajoute au moins une map jouée.",

@@ -315,6 +315,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: [READ_POLICY],
   },
+  "2026-10-code-replay-facultatif-arbitrage": {
+    title: "Match scores: replay code optional for the referees",
+    summary: "A score is now only entered map by map; the referees may record a map without its replay code.",
+    details: [
+      "A match score is now only entered map by map, referees included: there is no longer any score set by hand.",
+      "When the replay of a game is lost, the referees may record the map without a replay code: it shows “No replay code”, and no code is collected then.",
+      "Teams still provide the replay code of every map they report.",
+    ],
+    linkLabels: [READ_POLICY],
+  },
 };
 
 /**

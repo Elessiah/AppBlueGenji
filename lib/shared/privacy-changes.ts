@@ -614,6 +614,19 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/rgpd", label: "Lire la politique de confidentialité" }],
   },
+  {
+    id: "2026-10-code-replay-facultatif-arbitrage",
+    publishedAt: "2026-10-08",
+    title: "Scores de match : code de replay facultatif pour l'arbitrage",
+    summary:
+      "Un score ne se saisit plus que map par map ; l'arbitrage peut enregistrer une map sans son code de replay.",
+    details: [
+      "Le score d'un match ne se saisit plus que map par map, arbitrage compris : il n'existe plus de score posé à la main.",
+      "Quand le replay d'une partie est perdu, l'arbitrage peut enregistrer la map sans code de replay : elle s'affiche « Pas de code de replay », et aucun code n'est alors collecté.",
+      "Les équipes fournissent toujours le code de replay de chaque map qu'elles déclarent.",
+    ],
+    links: [{ href: "/rgpd", label: "Lire la politique de confidentialité" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

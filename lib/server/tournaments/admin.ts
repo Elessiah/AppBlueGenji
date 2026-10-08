@@ -349,6 +349,15 @@ function isDoubleForfeitEntry(entry: AdminResolveEntry): entry is { doubleForfei
 }
 
 /**
+ * Les maps d'une saisie, ou `INVALID_REQUEST` : le type ferme la porte aux
+ * appelants TypeScript, la garde la ferme à tous (corps non typé, conversion).
+ */
+function mapEntryOf(entry: AdminResolveEntry): AdminMapEntry {
+  if ("maps" in entry && Array.isArray(entry.maps) && Number.isInteger(entry.userId)) return entry;
+  throw new Error("INVALID_REQUEST");
+}
+
+/**
  * Contrôle des maps d'arbitrage contre le format de la manche et le jeu du
  * tournoi (`checkMapList`, la règle du report d'équipe — code de replay
  * facultatif pour l'arbitrage). Rend le score dérivé et le format lu, pour en
@@ -450,8 +459,9 @@ export async function adminSaveMatchScores(
 
   // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
   // exiger un match terminé (l'arbitrage note l'avancement).
+  const { maps, userId } = mapEntryOf(entry);
   await assertScoreEntryOpen(connection, match);
-  const { score: derived } = await checkAdminMaps(connection, match, entry.maps, false);
+  const { score: derived } = await checkAdminMaps(connection, match, maps, false);
   await connection.execute(
     `UPDATE bg_matches
      SET team1_score = ?,
@@ -460,7 +470,7 @@ export async function adminSaveMatchScores(
      WHERE id = ?`,
     [derived.team1, derived.team2, matchId],
   );
-  await replaceMatchMaps(connection, matchId, "FINAL", entry.maps, entry.userId);
+  await replaceMatchMaps(connection, matchId, "FINAL", maps, userId);
 }
 
 /**
@@ -606,8 +616,9 @@ async function resolveAdminOutcome(
     // Le vainqueur — ou son absence — vient de `matchWinnerSide`, unique
     // implémentation de la règle : ni vainqueur ni perdant sur un nul, donc
     // rien à propager.
+    const { maps } = mapEntryOf(entry);
     await assertScoreEntryOpen(connection, match);
-    const { format, score: derived } = await checkAdminMaps(connection, match, entry.maps, true);
+    const { format, score: derived } = await checkAdminMaps(connection, match, maps, true);
     const side = matchWinnerSide(format, derived.team1, derived.team2);
     ({ winnerTeamId, loserTeamId } = sideTeamIds(side, match.team1_id, match.team2_id));
     resultTeam1Score = derived.team1;

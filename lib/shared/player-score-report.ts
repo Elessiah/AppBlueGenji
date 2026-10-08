@@ -36,9 +36,10 @@ export interface PlayerReportView {
 }
 
 /**
- * Deux propositions disent-elles le même score — et, quand toutes deux portent
- * leur détail, les mêmes maps (`MAP_SCORES.md`) ? C'est la règle du serveur :
- * deux 2-1 aux codes de replay différents se contredisent.
+ * Deux propositions disent-elles le même score **et** les mêmes maps
+ * (`MAP_SCORES.md`) ? C'est la règle du serveur (`reportsConcord`) : deux 2-1
+ * aux codes de replay différents se contredisent, et un détail absent (encore
+ * en lecture, ou introuvable) ne concorde avec rien.
  */
 type ReportedScore = Pick<MatchScoreReport, "team1Score" | "team2Score"> & {
   maps?: ReadonlyArray<MatchMapInput>;
@@ -47,8 +48,7 @@ type ReportedScore = Pick<MatchScoreReport, "team1Score" | "team2Score"> & {
 export function sameReportedScore(a: ReportedScore, b: ReportedScore): boolean {
   if (a.team1Score !== b.team1Score || a.team2Score !== b.team2Score) return false;
   const aMaps = a.maps ?? [];
-  const bMaps = b.maps ?? [];
-  return aMaps.length === 0 || bMaps.length === 0 || sameMapLists(aMaps, bMaps);
+  return aMaps.length > 0 && sameMapLists(aMaps, b.maps ?? []);
 }
 
 /**

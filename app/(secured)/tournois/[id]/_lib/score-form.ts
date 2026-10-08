@@ -5,7 +5,7 @@ import {
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
-import type { MatchMapInput } from "@/lib/shared/match-maps";
+import { deriveMatchScore, isMapTouched, type MatchMapInput } from "@/lib/shared/match-maps";
 
 export interface ScoreFormState {
   score1: string;
@@ -184,14 +184,34 @@ function reportSignature(report: BracketMatch["team1Report"] | undefined): strin
   return [`${report.team1Score}-${report.team2Score}`, ...mapsSignature(report.maps)].join(":");
 }
 
-/** Le formulaire est-il resté sur les valeurs du match, sans une saisie ? */
-export function isUntouched(state: ScoreFormState, match: BracketMatch | null): boolean {
-  const pristine = scoreFormStateFor(match);
+/** Score dérivé des maps renseignées ; vide tant qu'aucune ne l'est. */
+export function scoresFromMaps(rows: ReadonlyArray<MatchMapInput>): Pick<ScoreFormState, "score1" | "score2"> {
+  const touched = rows.filter(isMapTouched);
+  if (touched.length === 0) return { score1: "", score2: "" };
+  const derived = deriveMatchScore(touched);
+  return { score1: String(derived.team1), score2: String(derived.team2) };
+}
+
+/**
+ * Valeurs d'ouverture du formulaire d'arbitrage : le forfait enregistré
+ * (`scoreFormStateFor`), et un score **dérivé des maps d'ouverture** — seule
+ * saisie d'un score (`MAP_SCORES.md`). Un score stocké ou proposé sans le
+ * détail qui le porte ne se valide donc pas tel quel : le formulaire n'enverrait
+ * aucune map.
+ */
+export function adminFormStateFor(match: BracketMatch | null, rows: ReadonlyArray<MatchMapInput>): ScoreFormState {
+  const base = scoreFormStateFor(match);
+  if (base.forfeitTeamId !== undefined || base.doubleForfeit === true) return base;
+  return { ...base, ...scoresFromMaps(rows) };
+}
+
+/** Deux états de formulaire disent-ils la même chose ? */
+export function sameScoreFormState(a: ScoreFormState, b: ScoreFormState): boolean {
   return (
-    state.score1 === pristine.score1 &&
-    state.score2 === pristine.score2 &&
-    state.forfeitTeamId === pristine.forfeitTeamId &&
-    (state.doubleForfeit === true) === (pristine.doubleForfeit === true)
+    a.score1 === b.score1 &&
+    a.score2 === b.score2 &&
+    a.forfeitTeamId === b.forfeitTeamId &&
+    (a.doubleForfeit === true) === (b.doubleForfeit === true)
   );
 }
 

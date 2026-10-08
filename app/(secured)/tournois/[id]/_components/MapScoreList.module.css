@@ -158,34 +158,12 @@
   background: rgba(90, 200, 255, 0.1);
 }
 
-.remove:focus-visible,
-.add:focus-visible {
+.remove:focus-visible {
   outline: 2px solid var(--blue-400, #5ac8ff);
   outline-offset: 2px;
 }
 
-.add {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px dashed rgba(90, 200, 255, 0.4);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--blue-400, #5ac8ff);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.add:hover:not(:disabled) {
-  background: rgba(90, 200, 255, 0.1);
-}
-
 /* État désactivé par couleurs, jamais par opacité. */
-.add:disabled,
 .remove:disabled {
   border-color: rgba(154, 164, 178, 0.25);
   color: var(--ink-quiet, #9aa4b2);
