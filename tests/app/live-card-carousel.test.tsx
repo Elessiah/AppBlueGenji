@@ -188,8 +188,12 @@ describe("useMatchCarousel — match figé sous le lecteur", () => {
   const source = readFileSync(join(process.cwd(), "components/cyber/landing/useMatchCarousel.ts"), "utf8");
 
   it("fige le match affiché dès le survol ou le focus clavier", () => {
-    expect(source).toContain("const pin = () => setActiveId((current) => current ?? ids[index] ?? null);");
+    expect(source).toContain("if (!held) setHeldId(ids[index] ?? null);");
     expect(source.match(/pin\(\);/g)).toHaveLength(2);
+  });
+
+  it("ne le fige que le temps de la prise : la carte suit ensuite le match mis en avant", () => {
+    expect(source).toContain("resolveCarouselIndex(ids, activeId ?? (held ? heldId : null), featuredId)");
   });
 });
 

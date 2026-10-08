@@ -317,8 +317,12 @@ machine à la peine), où « Pause » nommerait un mouvement qui n'a pas lieu.
 
 **Match figé sous le lecteur.** Tant qu'il n'a ni défilé ni navigué, la carte
 suit le match mis en avant, qu'un sondage peut changer. Le survol à la souris et
-le focus clavier **figent** donc le match affiché (`activeId`) : le match qu'on
-allait ouvrir n'est pas remplacé sous les yeux.
+le focus clavier **figent** donc le match affiché (`heldId`) : le match qu'on
+allait ouvrir n'est pas remplacé sous les yeux. Le temps de la prise seulement —
+gardé au-delà, il empêcherait la carte de suivre le match mis en avant chez qui
+rien ne défile (mouvement réduit) : un match entré à l'antenne n'y paraîtrait
+jamais. Une navigation (précédent / suivant, défilement) écrit `activeId`, qui
+prime et reste.
 
 **Focus perdu par un retrait.** Un élément retiré sous le focus clavier — le
 match affiché, terminé entre deux sondages, le bouton de diffusion d'un match

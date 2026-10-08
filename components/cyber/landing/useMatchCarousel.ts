@@ -86,7 +86,13 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
   const [focused, setFocused] = useState(false);
 
   const count = ids.length;
-  const index = resolveCarouselIndex(ids, activeId, featuredId);
+  // Match figé par la prise (survol, focus clavier) : il ne vaut que le temps de
+  // la prise. Gardé au-delà, il empêcherait pour toujours la carte de suivre le
+  // match mis en avant — chez qui rien ne défile (mouvement réduit), un match
+  // entré à l'antenne ne serait jamais montré.
+  const [heldId, setHeldId] = useState<number | null>(null);
+  const held = hovered || focused;
+  const index = resolveCarouselIndex(ids, activeId ?? (held ? heldId : null), featuredId);
   const canRotate = count > 1 && decorativeMotion;
   const rotating = canRotate && !paused && !hovered && !focused;
   const nextId = count > 1 ? ids[(index + 1) % count] : null;
@@ -117,9 +123,13 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
   /**
    * Fige le match affiché dès que le lecteur s'y arrête : tant qu'il n'a ni
    * défilé ni navigué, la carte suit le match mis en avant, qu'un sondage peut
-   * changer — et remplacer sous ses yeux le match qu'il allait ouvrir.
+   * changer — et remplacer sous ses yeux le match qu'il allait ouvrir. Posé à
+   * l'entrée de la prise seulement : un second contrôle survolé ou focalisé ne
+   * le déplace pas.
    */
-  const pin = () => setActiveId((current) => current ?? ids[index] ?? null);
+  const pin = () => {
+    if (!held) setHeldId(ids[index] ?? null);
+  };
 
   useEffect(() => {
     if (!rotating || nextId === null) return;
