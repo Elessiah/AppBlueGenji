@@ -30,7 +30,23 @@ de liste publique.
   (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions.
 
 La langue suit l'adresse (`localeHref`). L'ancre `#match-[id]` traverse la
-redirection serveur (le navigateur la conserve).
+redirection serveur (le navigateur la conserve) ; la requête (`?utm=…`) non —
+le serveur ne connaît que le chemin (`x-pathname`) —, seul le relais client la
+garde.
+
+**Liens qui évitent le détour** — la vitrine sait qui la lit : pour un
+visiteur sans session, le tableau des tournois et la carte « en direct » mènent
+directement à `/suivre/tournois/[id]` (`tournamentMatchHref(…, spectator)`),
+sans passer par la carte « Connexion requise » d'un préchargement. Le calendrier
+(lien `<a>`, chargement complet) et les liens externes (Discord, ICS, push)
+passent par la redirection serveur. Pour un visiteur sans session, la fiche
+connectée ne lit même pas la carte du tournoi pour son encart : la redirection
+jetterait la requête.
+
+**Retour vers l'espace connecté, sans bouton de plus** — sur la page sans
+compte, le « Rejoindre » de l'en-tête de la vitrine mène à
+`/connexion?redirect=/tournois/[id]` (`joinHrefFor`) : un joueur dont la session
+a expiré, ou un arbitre déconnecté, retrouve ses actions après connexion.
 
 ## Une seule fiche
 
@@ -45,8 +61,9 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
 (`components/spectator-view.tsx`) :
 
 - **noms d'équipe et de joueur sans lien** (`EntityLink` rend un
-  `<span class="entity-name">`, marche du podium conservée) : leurs fiches sont
-  dans l'espace connecté, un lien mènerait à la page de connexion ;
+  `<span class="entity-name">`, marche du podium des équipes conservée — pas
+  celle, adoucie, des joueurs d'une entrée solo, faute de `soloUserIds`) : leurs
+  fiches sont dans l'espace connecté, un lien mènerait à la page de connexion ;
 - **codes de replay masqués** (`MatchMapDetails`) — et retirés de la réponse
   publique (`spectatorSnapshot`) : la politique de confidentialité les réserve
   aux membres connectés. La réponse publique perd aussi les identifiants de
@@ -91,8 +108,11 @@ désarme après 5 min sans visiteur sans compte.
   écriture ne réveille pas les visiteurs sans compte. Un « introuvable » n'est
   **pas** gardé (des identifiants parcourus au hasard ne chassent pas les clés
   chaudes du cache partagé, un tournoi publié s'ouvre aussitôt) ;
-- `ETag` = version de l'instantané ; une relecture sans nouveauté répond
-  **`304` sans corps** ;
+- `ETag` = empreinte du **corps public** (et non la version des membres, qui
+  bouge avec les champs retirés) ; une relecture sans nouveauté répond **`304`
+  sans corps** ;
+- seules les lectures d'un tournoi servi pèsent dans la charge : des
+  identifiants au hasard ne ralentissent pas les vrais spectateurs ;
 - plafond par IP (`SPECTATOR_READ_RULE`, 120/min : une salle de LAN derrière
   une même adresse passe) ; base injoignable → `503` + `Retry-After` de 10 min.
 
@@ -118,8 +138,10 @@ tournoi sur la page sans compte.
 Changement de **qui lit** la fiche : entrée `2026-10-suivi-tournoi-sans-compte`
 de `PRIVACY_CHANGES` (et son anglais), paragraphe « Suivre un tournoi sans
 compte » de `/rgpd` (`#suivi-sans-compte`), sous-finalité ajoutée au registre
-(T03). Les codes de replay restent aux membres ; l'adresse IP ne sert qu'au
-plafond de débit, en mémoire.
+(T03). Les codes de replay et les identifiants de comptes restent aux membres.
+La visite est comptée par la mesure d'audience comme sur toute page (sauf
+opposition) ; l'adresse IP ne sert par ailleurs qu'au plafond de débit, en
+mémoire.
 
 ## Tests
 
