@@ -408,6 +408,8 @@
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
+  /* Transparente d'ordinaire, la bordure dessine la pastille en contraste forcé. */
+  border: 1px solid transparent;
   background: var(--amber);
   color: var(--cyber-bg-1);
   font-family: var(--font-mono);

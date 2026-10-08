@@ -122,12 +122,6 @@
   min-width: 0;
 }
 
-/* Retour au toucher (le survol est réservé aux pointeurs fins). */
-.item:active:not(:disabled) {
-  color: var(--ink);
-  background: rgba(90, 200, 255, 0.12);
-}
-
 .item:focus-visible {
   color: var(--ink);
   background: rgba(90, 200, 255, 0.08);
@@ -137,6 +131,13 @@
 
 .item:focus-visible .itemIcon {
   opacity: 1;
+}
+
+/* Retour à l'appui (toucher, Espace) : après le focus pour l'emporter à
+   spécificité égale. */
+.item:active:not(:disabled) {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.12);
 }
 
 .itemHint {

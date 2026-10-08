@@ -122,6 +122,16 @@ describe("mise en page de la navigation", () => {
     expect(css).toMatch(/\.logout:disabled \.itemIcon\s*\{[^}]*color: var\(--ink-dim\);/);
   });
 
+  it("garde le retour à l'appui visible après le focus", () => {
+    const css = readSource("components/account-menu.module.css");
+    expect(css.indexOf(".item:active:not(:disabled) {")).toBeGreaterThan(css.indexOf(".item:focus-visible {"));
+  });
+
+  it("dessine la pastille des signalements en contraste forcé", () => {
+    const badge = arenaCss.slice(arenaCss.indexOf(".navBadge {")).split("}")[0];
+    expect(badge).toContain("border: 1px solid transparent;");
+  });
+
   it("sépare les outils du compte par un filet", () => {
     expect(arenaCss).toMatch(/\.navTools\s*\{[^}]*border-right: 1px solid var\(--line-strong-cy\);/);
   });
