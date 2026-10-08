@@ -26,7 +26,8 @@ de liste publique.
   requise ». Un **préchargement** de la fiche arrive sans `x-pathname` (le
   `matcher` du middleware les exclut) : `AuthGate` le relaie côté client
   (`router.replace`, ancre `#match-…` comprise), sans rendre la carte
-  « Connexion requise » le temps du relais ;
+  « Connexion requise » le temps du relais (un état « Ouverture du tournoi… »,
+  `<output>`, à sa place) ;
 - membre **connecté** sur `/suivre/tournois/[id]` → `/tournois/[id]`
   (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions. L'encart de la
   page sans compte ne lit alors pas la carte du tournoi (session mémoïsée pour
@@ -85,7 +86,8 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
   Sur une sanction BlueGenji Survie, l'arbitre et le motif (texte libre du
   staff) partent, et la case du motif n'est pas rendue ;
 - **en-tête** : « Accueil » au lieu de « Tous les tournois », pastille
-  « Spectateur » (qui dit pourquoi aucun bouton n'apparaît), témoin qui annonce
+  « Spectateur » (qui dit pourquoi aucun bouton n'apparaît, explication aussi
+  hors écran pour le toucher, le clavier et les lecteurs d'écran), témoin qui annonce
   la cadence accordée par le serveur. **Aucun bouton vers la connexion** n'est
   ajouté : la page est faite pour regarder.
 
@@ -159,7 +161,8 @@ arrière-plan : la lecture due part au retour ; le témoin dit « Hors ligne »
 cumulatif jusqu'à 10 min, jamais moins que le `Retry-After`, la cadence reprend
 au premier succès). Si la toute
 première lecture échoue, le squelette de chargement le dit (« La page réessaie
-seule… ») au lieu de sembler figé. Un `404` (tournoi supprimé ou pas encore publié — même réponse, comme partout)
+seule… ») au lieu de sembler figé. Un `404` (tournoi supprimé ou pas encore publié — la fiche déjà affichée part, la
+carte « introuvable » la remplace — même réponse, comme partout)
 ou un `400` (adresse fabriquée) n'est plus relu qu'au plafond
 (`SPECTATOR_NOT_FOUND_RETRY_MS`, 10 min) : un lien partagé avant la publication
 s'ouvre seul ensuite, et la page le dit (« revérifie seule toutes les 11
