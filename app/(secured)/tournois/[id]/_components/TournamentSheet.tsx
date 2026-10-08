@@ -342,7 +342,7 @@ export type TournamentSheetSource = {
   /**
    * Cadence de relecture annoncée par le témoin quand elle ne suit pas le
    * palier — celle que le serveur accorde au visiteur sans compte. `null` :
-   * tournoi introuvable (avec `fatal`), relu au plafond ou plus du tout.
+   * tournoi introuvable (avec `fatal`), relu au plafond.
    */
   cadenceMs?: number | null;
   /** La première lecture a échoué ; une autre suivra (page sans compte). */

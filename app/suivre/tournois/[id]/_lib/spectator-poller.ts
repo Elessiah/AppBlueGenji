@@ -4,7 +4,7 @@ import {
   jitteredDelayMs,
   parsePollAfterMs,
   SPECTATOR_FRESHNESS_HEADER,
-  SPECTATOR_MAX_POLL_MS,
+  SPECTATOR_NOT_FOUND_RETRY_MS,
   SPECTATOR_POLL_HEADER,
   SPECTATOR_RUNNING_POLL_MS,
   SPECTATOR_VIEWER_CONTEXT,
@@ -17,7 +17,7 @@ export type SpectatorState = {
   /** La dernière lecture a-t-elle abouti ? */
   isLive: boolean;
   fatal: LiveFailure | null;
-  /** Cadence accordée par le serveur ; `null` = tournoi introuvable (relu au plafond, ou plus du tout). */
+  /** Cadence accordée par le serveur ; `null` = tournoi introuvable (relu au plafond). */
   cadenceMs: number | null;
   /** Âge maximal de l'affichage, que le témoin annonce (`x-bg-fresh-within-ms`). */
   freshnessMs: number | null;
@@ -54,15 +54,6 @@ export type SpectatorPoller = {
 };
 
 /**
- * Relecture d'un tournoi introuvable. Un 404 peut être un tournoi pas encore
- * publié : relu au plafond, il s'ouvre seul à sa publication. Un 400
- * (identifiant illisible) ne changera jamais.
- */
-function notFoundRetryMs(status: number): number | null {
-  return status === 404 ? SPECTATOR_MAX_POLL_MS : null;
-}
-
-/**
  * Suivi d'un tournoi **sans compte** (`docs/features/SPECTATOR_VIEW.md`),
  * hors React pour se tester sans navigateur.
  *
@@ -70,8 +61,8 @@ function notFoundRetryMs(status: number): number | null {
  * choisit selon sa charge (`x-bg-poll-after-ms`), avec `If-None-Match` — une
  * relecture qui ne trouve rien de neuf coûte un `304` sans corps. Rien n'est
  * relu tant que l'onglet est caché ; au retour, la lecture due part aussitôt.
- * Échec après échec, l'attente double jusqu'au plafond. Après un 404, une
- * relecture au plafond ; plus rien après un 400.
+ * Échec après échec, l'attente double jusqu'au plafond. Un introuvable est
+ * relu au plafond (`SPECTATOR_NOT_FOUND_RETRY_MS`).
  */
 export function createSpectatorPoller(
   tournamentId: number,
@@ -138,7 +129,7 @@ export function createSpectatorPoller(
 
       if (response.status === 404 || response.status === 400) {
         commit({ ...current, isLive: false, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null, freshnessMs: null });
-        schedule(notFoundRetryMs(response.status));
+        schedule(SPECTATOR_NOT_FOUND_RETRY_MS);
         return;
       }
       if (response.status !== 200 && response.status !== 304) {
