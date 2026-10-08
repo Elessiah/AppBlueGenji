@@ -67,12 +67,40 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(arenaNav()).toContain('<nav class="nav" aria-label="Navigation principale" data-sticky-header="true">');
   });
 
-  it("masque les pictogrammes aux technologies d'assistance", () => {
+  it("n'alourdit plus la barre de raccourcis « Accueil » / « Mon équipe »", () => {
     const html = arenaNav({ teamId: 3, teamName: "Les Ours" });
-    expect(html).toContain('<span aria-hidden="true">⌂</span> <span class="navHomeLabel">Accueil</span>');
-    expect(html).toContain('<span aria-hidden="true">🛡</span> <span class="navHomeLabel">Mon équipe</span>');
-    // Le nom accessible du lien d'équipe commence par son texte visible (2.5.3).
-    expect(html).toContain('aria-label="Mon équipe : Les Ours"');
+    // L'accueil passe par le logo, l'équipe par le menu du compte.
+    expect(html).not.toContain("navHome");
+    expect(html).not.toContain('href="/equipes/3"');
+    expect(html.match(/<a [^>]*href="\/"/g)).toHaveLength(1);
+    expect(html).toContain('<a class="navLogo" aria-label="Accueil" href="/">');
+  });
+
+  it("réduit les signalements à un drapeau nommé, compteur en pastille", () => {
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={2} />
+      </ToastProvider>,
+    );
+    expect(html).toMatch(/<a class="navTool navReports"[^>]*title="Signalements"[^>]*href="\/admin\/signalements">/);
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="sr-only">Signalements<\/span>/);
+    expect(html).toContain('<span class="navBadge">2<span class="sr-only"> à traiter</span></span>');
+  });
+
+  it("ne rend ni drapeau ni groupe d'outils sans permission de modération ni langue", () => {
+    const html = arenaNav();
+    expect(html).not.toContain("navReports");
+    expect(html).not.toContain("navTools");
+  });
+
+  it("n'affiche pas de pastille quand rien n'attend", () => {
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={0} />
+      </ToastProvider>,
+    );
+    expect(html).toContain("navReports");
+    expect(html).not.toContain("navBadge");
   });
 });
 
