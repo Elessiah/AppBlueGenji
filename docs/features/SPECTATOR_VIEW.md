@@ -49,7 +49,8 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
   dans l'espace connecté, un lien mènerait à la page de connexion ;
 - **codes de replay masqués** (`MatchMapDetails`) — et retirés de la réponse
   publique (`spectatorSnapshot`) : la politique de confidentialité les réserve
-  aux membres connectés ;
+  aux membres connectés. La réponse publique perd aussi les identifiants de
+  comptes (`soloUserIds`, `casterUserId`) : elle ne montre que des noms ;
 - **en-tête** : « Accueil » au lieu de « Tous les tournois », pastille
   « Spectateur » (qui dit pourquoi aucun bouton n'apparaît), témoin qui annonce
   la cadence accordée par le serveur. **Aucun bouton vers la connexion** n'est
@@ -65,20 +66,21 @@ la cadence que le **serveur** choisit selon sa charge, annoncée par l'en-tête
 | --- | --- |
 | `RUNNING` | 30 s (`SPECTATOR_RUNNING_POLL_MS`) — après les 20 s du palier spectateur connecté |
 | `UPCOMING`, `REGISTRATION` | 2 min |
-| `FINISHED` | plus de relecture (en-tête absent) |
+| `FINISHED` | 10 min — le staff peut encore le rouvrir (retour en arrière sur la finale) |
 
 **Niveau de charge** (`lib/server/spectator-load.ts`, tout en mémoire) — le plus
 haut de trois signaux :
 
 | Signal | Niveaux 1 / 2 / 3 |
 | --- | --- |
-| Retard de la boucle d'évènements (p99, fenêtre de 10 s) | 50 / 100 / 200 ms |
+| Retard de la boucle d'évènements (p99 sur 10 s, pas de 20 ms de la sonde retranché) | 50 / 100 / 200 ms |
 | Flux SSE ouverts (membres) | 100 / 200 / 300 |
 | Lectures publiques par minute | 600 / 1 200 / 2 400 |
 
 La cadence est multipliée par 1, 2, 4 puis 10, plafonnée à 10 min. Sous la
 charge, ce sont donc les visiteurs sans compte qui reculent, jamais le staff ni
-les engagés.
+les engagés. La sonde de boucle n'est armée qu'avec les lectures publiques et se
+désarme après 5 min sans visiteur sans compte.
 
 **Coût côté serveur** :
 
@@ -86,7 +88,9 @@ les engagés.
   (`lib/server/spectator-snapshot.ts`, `cached`) : au plus une reconstruction
   par durée de vie (15 s au calme, ×1 à ×10 selon la charge), quel que soit le
   nombre de visiteurs, et sérialisée une fois. Aucune invalidation : une
-  écriture ne réveille pas les visiteurs sans compte ;
+  écriture ne réveille pas les visiteurs sans compte. Un « introuvable » n'est
+  **pas** gardé (des identifiants parcourus au hasard ne chassent pas les clés
+  chaudes du cache partagé, un tournoi publié s'ouvre aussitôt) ;
 - `ETag` = version de l'instantané ; une relecture sans nouveauté répond
   **`304` sans corps** ;
 - plafond par IP (`SPECTATOR_READ_RULE`, 120/min : une salle de LAN derrière
@@ -95,7 +99,8 @@ les engagés.
 **Côté client** (`app/suivre/tournois/[id]/_lib/spectator-poller.ts`, hors
 React, testé sans navigateur) : ±10 % de gigue, rien n'est relu **onglet
 caché** (`useClientPower`), la lecture due part au retour ; après un échec, le
-`Retry-After` du serveur ou le double de la dernière cadence. Un `404` arrête
+`Retry-After` du serveur ou le **double de la dernière attente** (recul
+cumulatif jusqu'à 10 min, la cadence reprend au premier succès). Un `404` arrête
 tout (tournoi supprimé ou pas encore publié — même réponse, comme partout).
 
 ## Visibilité
