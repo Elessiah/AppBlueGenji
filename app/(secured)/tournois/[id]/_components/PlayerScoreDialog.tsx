@@ -110,8 +110,8 @@ function closedNoticeText(text: TournamentDialogsText, phase: MatchLaunchPhase, 
 
 /**
  * Saisie du score d'un match **par un engagé** — le pendant joueur
- * d'`AdminScoreDialog`, avec lequel il partage la mise en page, le stepper et
- * la règle de format (`decideScoreForm`).
+ * d'`AdminScoreDialog`, avec lequel il partage la mise en page et la saisie
+ * map par map (`MapScoreList`, `checkMapList`).
  *
  * Ce que l'arbitrage n'a pas, et qui fait tout le cycle : les **propositions**.
  * Un score envoyé ici n'écrit pas le résultat, il le propose ; l'adversaire le
@@ -127,18 +127,13 @@ function closedNoticeText(text: TournamentDialogsText, phase: MatchLaunchPhase, 
  */
 /**
  * Les maps saisies confirment-elles la proposition adverse (à score égal) ?
- * Mêmes maps, ou proposition sans détail (antérieure aux maps) : le serveur la
- * compare alors au seul score (`reportsConcord`), et l'envoi garde le contrôle
- * de péremption. Un détail encore en lecture n'est pas une absence de détail :
- * l'envoi reste une proposition ordinaire (pas de faux `PROPOSAL_STALE`).
+ * Seulement si ce sont les mêmes : toute proposition porte son détail, et le
+ * serveur compare maps comprises (`reportsConcord`). Un détail encore en
+ * lecture (ou introuvable) ne se confirme pas : l'envoi reste une proposition
+ * ordinaire (pas de faux `PROPOSAL_STALE`).
  */
-function confirmsProposalMaps(
-  maps: ReadonlyArray<MatchMapInput>,
-  theirMaps: ReadonlyArray<MatchMapInput>,
-  detailLoading: boolean,
-): boolean {
-  if (theirMaps.length === 0) return !detailLoading;
-  return sameMapLists(maps, theirMaps);
+function confirmsProposalMaps(maps: ReadonlyArray<MatchMapInput>, theirMaps: ReadonlyArray<MatchMapInput>): boolean {
+  return theirMaps.length > 0 && sameMapLists(maps, theirMaps);
 }
 
 /** Une map est renseignée, et le refus ne désigne pas une ligne vierge. */
@@ -185,8 +180,8 @@ function theirsPendingStatus(
   // Détail encore en lecture (proposition arrivée par le flux) : ne pas
   // inviter à ressaisir ce qui va pré-remplir le formulaire.
   if (reader.detailLoading) return text.t("score.player.theirs.loading", values);
-  // Sans détail (proposition antérieure aux maps, ou détail introuvable), le
-  // formulaire s'ouvre vide : « Confirme-le » laisserait sans geste.
+  // Détail introuvable après les relectures : le formulaire s'ouvre vide, et
+  // « Confirme-le » laisserait sans geste.
   return text.t("score.player.theirs.withoutMaps", values);
 }
 
@@ -232,7 +227,7 @@ export function PlayerScoreDialog({
   // Lignes affichées, une à une au fil du format (`progressiveMapRows`) ; ce qui
   // se valide et part en retire la ligne vierge de fin (`trimTrailingBlankMaps`).
   const [rows, setRows] = useState<MatchMapInput[]>(() =>
-    progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), 1),
+    progressiveMapRows(matchFormat, game, playerReportInitialMaps(view)),
   );
   const maps = trimTrailingBlankMaps(rows);
   const fieldErrors = useFieldErrors<string>({}, mapFieldIds("player-score", rows.length));
@@ -247,7 +242,7 @@ export function PlayerScoreDialog({
   const [missedProposal, setMissedProposal] = useState(false);
   const signature = reportsSignature(match);
   useEffect(() => {
-    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(playerReportView(match, myTeamId)), 1);
+    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(playerReportView(match, myTeamId)));
     const typing = JSON.stringify(current.current) !== JSON.stringify(baseline.current);
     if (!typing) {
       // Les maps remplacées par la nouvelle proposition : les refus rattachés
@@ -276,7 +271,7 @@ export function PlayerScoreDialog({
   const { confirmsTheirs } = relation;
   // Confirmer **telle quelle** la proposition adverse — mêmes maps, mêmes
   // codes. Toute retouche en fait une contre-proposition (désaccord ordinaire).
-  const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? [], detailLoading);
+  const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? []);
   // Le bloc tombe dès que le formulaire porte les maps adverses (recopiées).
   const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], { missedProposal, confirmsAsIs });
 
@@ -453,7 +448,6 @@ export function PlayerScoreDialog({
                 idPrefix="player-score"
                 maps={rows}
                 onChange={setRows}
-                minRows={1}
                 format={matchFormat}
                 game={game}
                 team1Name={team1}

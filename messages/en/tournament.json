@@ -258,6 +258,7 @@
       "map": "Map {number}",
       "drawn": "Drawn map",
       "wonBy": "Won by {team}",
+      "noReplayCode": "No replay code",
       "copy": "Copy the replay code",
       "copyLabel": "Copy the replay code of map {number}",
       "copied": "Replay code {code} copied.",

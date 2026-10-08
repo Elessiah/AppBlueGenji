@@ -1,5 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { mapsMatchStoredScore, type MatchMapInput, type MatchMapResult } from "@/lib/shared/match-maps";
+import type { MatchMapInput, MatchMapResult } from "@/lib/shared/match-maps";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "@/lib/shared/types";
 
@@ -97,28 +97,10 @@ async function clearMatchMaps(connection: PoolConnection, matchId: number, sourc
 }
 
 /**
- * Score posé sans détail : le résultat retenu (`FINAL`) qui ne l'explique plus
- * est effacé — pas gardé, caché, pour un résultat qu'il ne décrit pas (durée
- * de conservation annoncée sur `/rgpd` : « avec le résultat qu'ils documentent »).
- * Un détail qui explique encore le score reste.
- */
-export async function dropStaleFinalMaps(
-  connection: PoolConnection,
-  matchId: number,
-  team1Score: number | null,
-  team2Score: number | null,
-): Promise<void> {
-  const final = await loadMatchMaps(connection, matchId, "FINAL");
-  if (final.length > 0 && !mapsMatchStoredScore(final, team1Score, team2Score)) {
-    await replaceMatchMaps(connection, matchId, "FINAL", [], null);
-  }
-}
-
-/**
  * Maps d'un jeu précis, dans l'ordre joué. Lecture verrouillante : elle voit
  * la proposition qu'un report concurrent vient de valider (voir
- * `clearMatchMaps`), sans quoi la comparaison des deux propositions la
- * prendrait pour un report d'avant les maps.
+ * `clearMatchMaps`), sans quoi la comparaison des deux propositions ne la
+ * trouverait pas et conclurait à un désaccord.
  */
 export async function loadMatchMaps(
   connection: PoolConnection,
@@ -336,11 +318,8 @@ export async function loadViewerProposals(
   });
 }
 
-/** Le détail d'une proposition, s'il explique son score (sinon : aucun). */
+/** Le détail d'une proposition — toute proposition en porte un (`MAP_LIST_EMPTY`). */
 function proposalOf(report: MatchScoreReport | null, maps: MatchMapResult[]): ProposalMaps | null {
   if (!report) return null;
-  return {
-    reportedAt: report.reportedAt,
-    maps: mapsMatchStoredScore(maps, report.team1Score, report.team2Score) ? maps : [],
-  };
+  return { reportedAt: report.reportedAt, maps };
 }

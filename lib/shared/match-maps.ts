@@ -9,7 +9,11 @@
  * une map nulle n'en vaut à personne. Le reste du moteur ne voit que ce score
  * dérivé, écrit dans `bg_matches.team1_score` / `team2_score` comme avant — si
  * bien que le rejeu des classements, la cote et les fiches lisent un match à
- * maps exactement comme un match d'avant cette fonctionnalité.
+ * maps comme n'importe quel autre.
+ *
+ * C'est la **seule** saisie d'un score : engagés comme arbitrage passent par
+ * des maps. L'arbitrage seul peut laisser le code de replay vide
+ * (`requireReplayCode: false`) — replay perdu, partie hors client.
  */
 
 import { checkMatchScores, matchAllowsDraw, matchMaxMaps, matchWinsRequired } from "./match-format";
@@ -163,17 +167,34 @@ export interface MapListCheck {
   score: { team1: number; team2: number; drawnMaps: number };
 }
 
+/**
+ * Règles de saisie qui dépendent de **qui** saisit : un engagé doit fournir le
+ * code de replay de chaque map, l'arbitrage peut s'en passer (`false`). Un code
+ * saisi suit toujours le motif du jeu et reste unique dans le match.
+ */
+export interface MapEntryRules {
+  requireReplayCode?: boolean;
+}
+
 /** Contrôle d'une ligne seule : code (présent, au motif, unique) puis scores. */
 function checkMapEntry(
   map: MatchMapInput,
   game: TournamentGame | null | undefined,
   seen: Set<string>,
+  requireReplayCode: boolean,
 ): { error: MapListViolation; field: MapField } | null {
   const code = normalizeReplayCode(map.replayCode);
-  if (code === "") return { error: "MAP_REPLAY_CODE_REQUIRED", field: "replayCode" };
+  if (code === "") {
+    if (requireReplayCode) return { error: "MAP_REPLAY_CODE_REQUIRED", field: "replayCode" };
+    return checkMapScores(map);
+  }
   if (!isValidReplayCode(code, game)) return { error: "MAP_REPLAY_CODE_INVALID", field: "replayCode" };
   if (seen.has(code)) return { error: "MAP_REPLAY_CODE_DUPLICATE", field: "replayCode" };
   seen.add(code);
+  return checkMapScores(map);
+}
+
+function checkMapScores(map: MatchMapInput): { error: MapListViolation; field: MapField } | null {
   if (!isValidMapScore(map.team1Score)) return { error: "MAP_SCORE_INVALID", field: "team1Score" };
   if (!isValidMapScore(map.team2Score)) return { error: "MAP_SCORE_INVALID", field: "team2Score" };
   return null;
@@ -188,16 +209,16 @@ function isValidMapScore(value: unknown): value is number {
  *
  * Les règles propres aux maps (code, score de map, plafond de lignes, map après
  * la fin) s'ajoutent ; le **score dérivé** passe ensuite par
- * `checkMatchScores`, exactement comme un score saisi d'un bloc avant cette
- * fonctionnalité — `decisive` garde son sens : la liste clôt la rencontre
+ * `checkMatchScores` — `decisive` garde son sens : la liste clôt la rencontre
  * (report d'équipe, « Valider le résultat ») ou note un avancement.
  */
 export function checkMapList(
   format: MatchFormat | null,
   game: TournamentGame | null | undefined,
   maps: ReadonlyArray<MatchMapInput>,
-  options: { decisive: boolean },
+  options: { decisive: boolean } & MapEntryRules,
 ): MapListCheck {
+  const requireReplayCode = options.requireReplayCode !== false;
   const score = deriveMatchScore(
     maps.map((m) => ({
       team1Score: isValidMapScore(m.team1Score) ? m.team1Score : 0,
@@ -217,7 +238,7 @@ export function checkMapList(
   let team1 = 0;
   let team2 = 0;
   for (const [index, map] of maps.entries()) {
-    const entry = checkMapEntry(map, game, seen);
+    const entry = checkMapEntry(map, game, seen, requireReplayCode);
     if (entry) return refuse(entry.error, index, entry.field);
     // Une map jouée après que la rencontre est acquise n'a pas eu lieu.
     if (index > 0 && isSettled(format, team1, team2, index)) return refuse("MAP_AFTER_DECISION", index);
@@ -266,21 +287,6 @@ export function sameMapLists(
         map.team2Score === b[i].team2Score,
     )
   );
-}
-
-/**
- * Les maps enregistrées ne s'affichent que si elles **expliquent** le score du
- * match : un score corrigé à la main par l'arbitrage, ou une ligne d'avant
- * cette fonctionnalité, ne doit pas porter un détail qui le contredit.
- */
-export function mapsMatchStoredScore(
-  maps: ReadonlyArray<MatchMapInput>,
-  team1Score: number | null,
-  team2Score: number | null,
-): boolean {
-  if (maps.length === 0) return false;
-  const derived = deriveMatchScore(maps);
-  return derived.team1 === team1Score && derived.team2 === team2Score;
 }
 
 /** Message en clair d'un refus, pour la notification et le champ. */
@@ -352,10 +358,18 @@ export function canAddMap(format: MatchFormat | null, maps: ReadonlyArray<MatchM
   return !isSettled(format, team1, team2, maps.length);
 }
 
-/** Une ligne est-elle complète : code de replay valable et deux scores de map valables ? */
-export function isMapComplete(map: MatchMapInput, game: TournamentGame | null | undefined): boolean {
+/**
+ * Une ligne est-elle complète : code de replay valable (ou absent, quand
+ * l'arbitrage s'en passe) et deux scores de map valables ?
+ */
+export function isMapComplete(
+  map: MatchMapInput,
+  game: TournamentGame | null | undefined,
+  rules: MapEntryRules = {},
+): boolean {
   const code = normalizeReplayCode(map.replayCode);
-  return code !== "" && isValidReplayCode(code, game) && isValidMapScore(map.team1Score) && isValidMapScore(map.team2Score);
+  const codeOk = code === "" ? rules.requireReplayCode === false : isValidReplayCode(code, game);
+  return codeOk && isValidMapScore(map.team1Score) && isValidMapScore(map.team2Score);
 }
 
 /**
@@ -378,20 +392,18 @@ export function trimTrailingBlankMaps(maps: ReadonlyArray<MatchMapInput>): Match
  * égalités ouvertes) dans le plafond (`mapListLimit`, maps nulles rejouées
  * comprises). Une ligne **renseignée** devenue superflue reste : la validation
  * la refuse sur son champ (`MAP_AFTER_DECISION`), rien ne se perd en silence.
- *
- * `minRows` : 1 pour un engagé (une ligne vierge d'emblée), 0 pour l'arbitrage
- * (sans map, il pose le score à la main).
+ * Toujours une ligne au moins : le score ne se saisit que par les maps.
  */
 export function progressiveMapRows(
   format: MatchFormat | null,
   game: TournamentGame | null | undefined,
   maps: ReadonlyArray<MatchMapInput>,
-  minRows: 0 | 1,
+  rules: MapEntryRules = {},
 ): MatchMapInput[] {
   const rows = trimTrailingBlankMaps(maps);
-  if (rows.length === 0) return minRows === 1 ? [emptyMap()] : [];
+  if (rows.length === 0) return [emptyMap()];
   const last = rows.at(-1);
-  if (last && isMapComplete(last, game) && canAddMap(format, rows)) rows.push(emptyMap());
+  if (last && isMapComplete(last, game, rules) && canAddMap(format, rows)) rows.push(emptyMap());
   return rows;
 }
 

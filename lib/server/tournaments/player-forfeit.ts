@@ -63,6 +63,6 @@ export async function forfeitOwnMatch(
     throw new Error("NOT_IN_MATCH");
   }
 
-  await adminResolveMatch(connection, matchId, undefined, undefined, teamId);
+  await adminResolveMatch(connection, matchId, { forfeitTeamId: teamId });
   return { forfeitTeamId: teamId };
 }

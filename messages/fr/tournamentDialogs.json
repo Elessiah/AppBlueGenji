@@ -11,20 +11,16 @@
       "below": "Score incomplet en {label} : le vainqueur doit atteindre {wins, plural, one {# manche} other {# manches}}."
     },
     "blocker": {
-      "incomplete": "Renseigne les deux scores.",
+      "incomplete": "Saisis au moins une map jouée.",
       "draw": "Les scores ne peuvent pas être égaux : il faut un vainqueur.",
       "doubleForfeit": "Un double forfait tranche le match : il s'écrit avec « Valider le résultat ».",
       "notInLaunch": "Le score se saisit à partir du lancement du match. Avant, seul un forfait peut être prononcé.",
       "alreadyDecided": "Ce match est déjà tranché. Corrige-le avec « Valider le résultat » pour que le vainqueur et la suite du plateau suivent."
     },
-    "stepper": {
-      "decrement": "Retirer une manche à {name}",
-      "field": "Manches gagnées par {name}",
-      "increment": "Ajouter une manche à {name}"
-    },
     "maps": {
       "replayHintOverwatch": "Code de replay Overwatch : 6 caractères (lettres et chiffres).",
       "replayHintOther": "Code ou identifiant de la partie : 4 à 32 caractères (lettres, chiffres, tirets).",
+      "replayOptionalHint": "Arbitrage : le code de replay est facultatif, une map sans code s'affichera « Pas de code de replay ».",
       "replayAllowance": "Une map nulle peut être rejouée ({count} au plus).",
       "added": "Map {index} ajoutée : à renseigner.",
       "legend": "Maps jouées",
@@ -32,6 +28,7 @@
       "map": "Map {index}",
       "mapPrefix": "Map {index}, ",
       "replayCode": "Code de replay",
+      "replayCodeOptional": "Code de replay (facultatif)",
       "scoreOf": "Map {index}, score de ",
       "remove": "Retirer la map {index}",
       "add": "Ajouter une map",
@@ -72,7 +69,6 @@
       "proposalMaps": "Maps proposées par {name}",
       "conflict": "Ce match a été modifié pendant ta saisie — quelqu'un d'autre a enregistré un résultat. Envoyer maintenant écraserait le sien.",
       "adoptStored": "Reprendre la valeur à jour",
-      "derivedHint": "Score calculé à partir des maps ci-dessous : retire toutes les maps pour le saisir à la main.",
       "forfeit": {
         "open": "Déclarer un forfait sur cette manche",
         "cancel": "Annuler le forfait",
@@ -108,7 +104,7 @@
         "readOnly": "{opponent} propose {score}. En attente de la confirmation d'un responsable de {mine}.",
         "withMaps": "{opponent} propose {score}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.",
         "loading": "{opponent} propose {score}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas.",
-        "withoutMaps": "{opponent} propose {score}, sans le détail des maps. Pour le confirmer, saisis les maps jouées et leurs codes de replay : un désaccord alerte l'arbitrage."
+        "withoutMaps": "{opponent} propose {score}, mais le détail de ses maps n'a pas pu être lu. Actualise la page pour le confirmer : un score saisi à la place alerte l'arbitrage."
       },
       "confirmed": "Score confirmé : {team1} {score1} – {score2} {team2}",
       "submitted": "Score transmis : {team1} {score1} – {score2} {team2}",

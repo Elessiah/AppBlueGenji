@@ -17,7 +17,8 @@ import { versusText } from "@/lib/shared/tournament-page-text";
 /**
  * Liste des maps d'un match ou d'une proposition (`docs/features/MAP_SCORES.md`) :
  * score de chaque map et son code de replay, copiable — c'est lui que les
- * arbitres vérifient en jeu.
+ * arbitres vérifient en jeu. Une map posée sans code par l'arbitrage le dit
+ * (« Pas de code de replay »).
  */
 export function MapResultList({
   maps,
@@ -55,16 +56,23 @@ export function MapResultList({
               {map.team1Score} – {map.team2Score}
               <span className="sr-only"> : {outcome}</span>
             </span>
-            <code className={styles.code}>{map.replayCode}</code>
-            <button
-              type="button"
-              className={styles.copy}
-              onClick={() => void copy(map.replayCode)}
-              aria-label={t("match.maps.copyLabel", { number: String(map.mapNumber) })}
-              title={t("match.maps.copy")}
-            >
-              <Copy size={14} aria-hidden="true" />
-            </button>
+            {/* L'arbitrage peut poser une map sans code (replay perdu) : rien à copier. */}
+            {map.replayCode === "" ? (
+              <span className={styles.noCode}>{t("match.maps.noReplayCode")}</span>
+            ) : (
+              <>
+                <code className={styles.code}>{map.replayCode}</code>
+                <button
+                  type="button"
+                  className={styles.copy}
+                  onClick={() => void copy(map.replayCode)}
+                  aria-label={t("match.maps.copyLabel", { number: String(map.mapNumber) })}
+                  title={t("match.maps.copy")}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                </button>
+              </>
+            )}
           </li>
         );
       })}
@@ -77,13 +85,13 @@ export function MapResultList({
  * dans une modale. Pas de volet déplié **dans** la carte : l'arbre dimensionne
  * chaque créneau sur la plus haute de ses cartes, si bien qu'un volet ouvert
  * faisait sauter tout le plateau. Rien sur un match sans détail (forfait,
- * exemption, match d'avant les maps).
+ * exemption).
  */
 export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name"> }>) {
   const text = useTournamentPageText();
   const [open, setOpen] = useState(false);
   // Détail affiché tant que la modale est ouverte, même s'il disparaît de
-  // l'instantané (score corrigé à la main, forfait, retour en arrière) : la
+  // l'instantané (forfait, retour en arrière) : la
   // modale reste lisible jusqu'à ce que le lecteur la ferme.
   const shown = useRef(match.maps);
   if (match.maps.length > 0) shown.current = match.maps;

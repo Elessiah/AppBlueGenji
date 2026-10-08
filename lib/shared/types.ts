@@ -501,7 +501,8 @@ export type MatchScoreReport = {
   reportedAt: string;
   /**
    * Détail map par map de la proposition (`docs/features/MAP_SCORES.md`),
-   * orientation du plateau ; vide pour une proposition d'avant les maps.
+   * orientation du plateau ; vide dans l'instantané diffusé, rempli par le
+   * contexte du lecteur (`matchProposals`).
    */
   maps: MatchMapResult[];
 };
@@ -542,9 +543,9 @@ export type BracketMatch = {
   team2Report: MatchScoreReport | null;
   /**
    * Détail map par map du résultat **retenu** (`docs/features/MAP_SCORES.md`) :
-   * code de replay et score de chaque map. Vide pour un match d'avant les maps,
-   * un forfait, une exemption, ou un score corrigé à la main par l'arbitrage —
-   * le score du match s'affiche alors seul, comme avant.
+   * code de replay (vide quand l'arbitrage s'en est passé) et score de chaque
+   * map. Vide pour un forfait ou une exemption, et tant qu'aucun score n'est
+   * posé.
    */
   maps: MatchMapResult[];
   updatedAt: string;

@@ -68,7 +68,7 @@ export function pendingScoreProposal(match: BracketMatch | null): PendingScorePr
  * Maps d'ouverture du dialogue d'arbitrage (`docs/features/MAP_SCORES.md`) :
  * le détail retenu s'il y en a un, sinon celui de la proposition unique qui
  * pré-remplit déjà le score (`pendingScoreProposal`), sinon rien — l'arbitre
- * peut alors poser un score à la main, comme avant.
+ * saisit alors les maps jouées, seule façon de poser un score.
  */
 export function initialAdminMaps(match: BracketMatch | null): MatchMapInput[] {
   if (!match) return [];
@@ -340,7 +340,7 @@ export function scoreBlockerMessage(
 ): string {
   switch (blocker) {
     case "INCOMPLETE":
-      return "Renseigne les deux scores.";
+      return "Saisis au moins une map jouée.";
     case "EXCEEDS_FORMAT":
       return matchScoreViolationMessage(format, "SCORE_EXCEEDS_MATCH_FORMAT");
     case "BELOW_FORMAT":
