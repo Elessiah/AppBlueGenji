@@ -17,7 +17,7 @@ type LiveIndicatorProps = {
   tier: RefreshTier;
   /**
    * Cadence de relecture, quand elle ne suit pas le palier : celle que le
-   * serveur accorde à la page sans compte. `null` : plus de relecture.
+   * serveur accorde à la page sans compte (`null` n'arrive qu'avec `fatal`).
    */
   cadenceMs?: number | null;
   /** Échec définitif : la page a cessé de réessayer. */
@@ -71,10 +71,7 @@ export function LiveIndicator({ isLive, tier, cadenceMs, fatal = null }: Readonl
     title = t(`live.fatal.${fatal}`);
   } else if (isLive) {
     label = t("live.upToDate");
-    title =
-      cadenceMs === null
-        ? t("live.finishedTitle")
-        : t("live.upToDateTitle", { cadence: cadenceLabel(text, cadenceMs ?? REFRESH_CADENCE[tier].pushCoalesceMs) });
+    title = t("live.upToDateTitle", { cadence: cadenceLabel(text, cadenceMs ?? REFRESH_CADENCE[tier].pushCoalesceMs) });
   }
 
   return (

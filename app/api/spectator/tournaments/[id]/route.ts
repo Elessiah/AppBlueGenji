@@ -31,10 +31,8 @@ function matchesEtag(header: string | null, etag: string): boolean {
     .some((tag) => tag === "*" || tag === etag);
 }
 
-function pollHeaders(pollAfterMs: number | null): Record<string, string> {
-  const headers: Record<string, string> = { "Cache-Control": "no-store" };
-  if (pollAfterMs !== null) headers[SPECTATOR_POLL_HEADER] = String(pollAfterMs);
-  return headers;
+function pollHeaders(pollAfterMs: number): Record<string, string> {
+  return { "Cache-Control": "no-store", [SPECTATOR_POLL_HEADER]: String(pollAfterMs) };
 }
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {

@@ -104,7 +104,6 @@
     "reconnectingTitle": "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.",
     "retryTitle": "La dernière mise à jour n'a pas abouti. La page réessaie seule, un peu plus tard ; ce qui est affiché reste valable jusque-là.",
     "upToDateTitle": "Mise à jour automatique {cadence}. Inutile de recharger la page.",
-    "finishedTitle": "Tournoi terminé : la page ne se met plus à jour, le résultat est définitif.",
     "cadenceSecond": "à la seconde",
     "cadenceSeconds": "toutes les {seconds} secondes au plus",
     "cadenceMinute": "toutes les minutes au plus",

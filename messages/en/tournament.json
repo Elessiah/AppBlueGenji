@@ -104,7 +104,6 @@
     "reconnectingTitle": "Connection to the real-time feed lost. The page reconnects on its own and keeps updating, more slowly.",
     "retryTitle": "The last update did not go through. The page tries again by itself, a little later; what is shown remains valid until then.",
     "upToDateTitle": "Automatic updates {cadence}. No need to reload the page.",
-    "finishedTitle": "Tournament over: the page no longer updates, the result is final.",
     "cadenceSecond": "every second",
     "cadenceSeconds": "at most every {seconds} seconds",
     "cadenceMinute": "at most every minute",

@@ -15,7 +15,7 @@ export type SpectatorState = {
   /** La dernière lecture a-t-elle abouti ? */
   isLive: boolean;
   fatal: LiveFailure | null;
-  /** Cadence accordée par le serveur ; `null` = plus de relecture. */
+  /** Cadence accordée par le serveur ; `null` = plus de relecture (tournoi introuvable). */
   cadenceMs: number | null;
 };
 
@@ -55,7 +55,7 @@ export type SpectatorPoller = {
  * choisit selon sa charge (`x-bg-poll-after-ms`), avec `If-None-Match` — une
  * relecture qui ne trouve rien de neuf coûte un `304` sans corps. Rien n'est
  * relu tant que l'onglet est caché ; au retour, la lecture due part aussitôt.
- * Plus rien après la fin du tournoi (en-tête absent) ni après un 404.
+ * Échec après échec, l'attente double jusqu'au plafond. Plus rien après un 404.
  */
 export function createSpectatorPoller(
   tournamentId: number,
@@ -66,6 +66,8 @@ export function createSpectatorPoller(
   let etag: string | null = null;
   /** Prochaine lecture prévue (horodatage), `null` = aucune. */
   let dueAt: number | null = null;
+  /** Dernière attente armée : la base du recul après un échec. */
+  let lastWaitMs = SPECTATOR_RUNNING_POLL_MS;
   let timer: unknown = null;
   let inflight = false;
   let disposed = false;
@@ -96,6 +98,7 @@ export function createSpectatorPoller(
       dueAt = null;
       return;
     }
+    lastWaitMs = delayMs;
     const wait = jitteredDelayMs(delayMs, env.random);
     dueAt = env.now() + wait;
     if (!env.isHidden()) arm(wait);
@@ -118,7 +121,7 @@ export function createSpectatorPoller(
       }
       if (response.status !== 200 && response.status !== 304) {
         commit({ ...current, isLive: false });
-        schedule(spectatorRetryDelayMs(current.cadenceMs, response.headers.get("retry-after")));
+        schedule(spectatorRetryDelayMs(lastWaitMs, response.headers.get("retry-after")));
         return;
       }
 
@@ -138,7 +141,7 @@ export function createSpectatorPoller(
       if (disposed) return;
       // Réseau coupé : on garde ce qui est affiché, et on recule.
       commit({ ...current, isLive: false });
-      schedule(spectatorRetryDelayMs(current.cadenceMs, null));
+      schedule(spectatorRetryDelayMs(lastWaitMs, null));
     } finally {
       inflight = false;
     }

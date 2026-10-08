@@ -25,7 +25,17 @@ export const LOOP_DELAY_SAMPLE_MS = 10_000;
 /** Fenêtre du compte des lectures publiques. */
 export const SPECTATOR_READ_WINDOW_MS = 60_000;
 
+/** Pas de la sonde de boucle : il entre dans chaque mesure, qui le retranche. */
+export const LOOP_DELAY_RESOLUTION_MS = 20;
+
+/**
+ * Sans lecture publique depuis ce délai, la sonde se désarme : elle ne tourne
+ * que pendant qu'il y a des visiteurs sans compte à régler.
+ */
+export const LOOP_PROBE_IDLE_MS = 5 * 60_000;
+
 let histogram: IntervalHistogram | null = null;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSampleAt = 0;
 let lastLoopDelayMs: number | null = null;
 
@@ -34,21 +44,34 @@ let windowStartedAt = 0;
 let currentReads = 0;
 let previousReads = 0;
 
+function disarmProbe(): void {
+  histogram?.disable();
+  histogram = null;
+  lastLoopDelayMs = null;
+  if (idleTimer !== null) clearTimeout(idleTimer);
+  idleTimer = null;
+}
+
 /**
- * Retard de boucle au 99ᵉ centile, en millisecondes. La sonde n'est armée qu'à
- * la première lecture publique : un serveur sans visiteur anonyme n'en paie
- * rien. `null` tant qu'aucune fenêtre n'est close.
+ * Retard de boucle au 99ᵉ centile, en millisecondes. La sonde n'est armée
+ * qu'avec les lectures publiques, et se désarme après
+ * {@link LOOP_PROBE_IDLE_MS} sans visiteur : un serveur sans visiteur anonyme
+ * n'en paie rien. `null` tant qu'aucune fenêtre n'est close.
+ *
+ * L'histogramme mesure chaque tour **de son propre minuteur** : le pas
+ * (`LOOP_DELAY_RESOLUTION_MS`) y figure toujours — un processus au repos lit
+ * ~20 ms. Il est retranché : seuls comptent les retards en plus.
  */
 function loopDelayMs(now: number): number | null {
   if (histogram === null) {
-    histogram = monitorEventLoopDelay({ resolution: 20 });
+    histogram = monitorEventLoopDelay({ resolution: LOOP_DELAY_RESOLUTION_MS });
     histogram.enable();
     lastSampleAt = now;
     return lastLoopDelayMs;
   }
   if (now - lastSampleAt >= LOOP_DELAY_SAMPLE_MS) {
     // Le centile est en nanosecondes.
-    const p99 = histogram.percentile(99) / 1e6;
+    const p99 = histogram.percentile(99) / 1e6 - LOOP_DELAY_RESOLUTION_MS;
     lastLoopDelayMs = Number.isFinite(p99) && p99 > 0 ? p99 : 0;
     histogram.reset();
     lastSampleAt = now;
@@ -64,10 +87,14 @@ function rollWindow(now: number): void {
   windowStartedAt = now;
 }
 
-/** Compte une lecture publique. */
+/** Compte une lecture publique, et repousse le désarmement de la sonde. */
 export function recordSpectatorRead(now: number = Date.now()): void {
   rollWindow(now);
   currentReads += 1;
+  if (idleTimer !== null) clearTimeout(idleTimer);
+  idleTimer = setTimeout(disarmProbe, LOOP_PROBE_IDLE_MS);
+  // Le minuteur ne retient pas le processus : un arrêt du serveur n'attend pas.
+  idleTimer.unref?.();
 }
 
 /**
@@ -96,10 +123,8 @@ export function currentSpectatorLoadLevel(now: number = Date.now()): SpectatorLo
 
 /** Remet les mesures à zéro. Réservé aux tests. */
 export function resetSpectatorLoad(): void {
-  histogram?.disable();
-  histogram = null;
+  disarmProbe();
   lastSampleAt = 0;
-  lastLoopDelayMs = null;
   windowStartedAt = 0;
   currentReads = 0;
   previousReads = 0;

@@ -17,6 +17,7 @@ import type {
   TournamentState,
   TournamentViewerContext,
 } from "@/lib/shared/types";
+import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 
 /** Chemin public de la fiche (sans préfixe de langue). */
 export function spectatorTournamentPath(tournamentId: number): string {
@@ -28,12 +29,12 @@ export function memberTournamentPath(tournamentId: number): string {
   return `/tournois/${tournamentId}`;
 }
 
-/** Identifiant de tournoi valide : entier strictement positif. */
-export function parseTournamentId(value: string): number | null {
-  if (!/^\d{1,10}$/.test(value)) return null;
-  const id = Number(value);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
-}
+/**
+ * Identifiant de tournoi valide : entier strictement positif — la règle des
+ * autres fiches (`parseEntityPageId`), et donc celle que la fiche connectée
+ * applique (`Number(params.id)`) : un lien qui l'ouvre est redirigé pareil.
+ */
+export const parseTournamentId = parseEntityPageId;
 
 /**
  * Le tournoi désigné par un chemin de **fiche** de l'espace connecté
@@ -118,11 +119,15 @@ export const SPECTATOR_PRE_LAUNCH_POLL_MS = 120_000;
 export const SPECTATOR_MAX_POLL_MS = 600_000;
 
 /**
- * Intervalle avant la prochaine lecture, ou `null` : le tournoi est terminé, il
- * n'y a plus rien à attendre.
+ * Intervalle avant la prochaine lecture.
+ *
+ * Un tournoi **terminé** est relu au plafond, et non plus jamais : le staff peut
+ * le rouvrir (retour en arrière sur la finale, `TOURNAMENT_ROLLBACK`), et un
+ * onglet resté ouvert afficherait sinon l'ancien résultat pour toujours. Une
+ * relecture sans nouveauté ne coûte qu'un `304` sans corps.
  */
-export function spectatorPollIntervalMs(state: TournamentState, level: SpectatorLoadLevel): number | null {
-  if (state === "FINISHED") return null;
+export function spectatorPollIntervalMs(state: TournamentState, level: SpectatorLoadLevel): number {
+  if (state === "FINISHED") return SPECTATOR_MAX_POLL_MS;
   const base = state === "RUNNING" ? SPECTATOR_RUNNING_POLL_MS : SPECTATOR_PRE_LAUNCH_POLL_MS;
   return Math.min(SPECTATOR_MAX_POLL_MS, base * SPECTATOR_LOAD_FACTOR[level]);
 }
@@ -139,7 +144,7 @@ export function spectatorCacheTtlMs(level: SpectatorLoadLevel): number {
   return Math.min(SPECTATOR_MAX_POLL_MS, SPECTATOR_CACHE_TTL_MS * SPECTATOR_LOAD_FACTOR[level]);
 }
 
-/** En-tête de réponse qui porte l'intervalle choisi (ms), absent = plus de lecture. */
+/** En-tête de réponse qui porte l'intervalle choisi (ms). */
 export const SPECTATOR_POLL_HEADER = "x-bg-poll-after-ms";
 
 /**
@@ -150,12 +155,18 @@ export const SPECTATOR_POLL_HEADER = "x-bg-poll-after-ms";
  * identifiants des joueurs, BattleTag masqué compris). Le détail des
  * propositions en attente est déjà vide dans l'instantané diffusé ; il l'est
  * ici aussi, explicitement.
+ *
+ * Les **identifiants de comptes** partent aussi (minimisation) : la page sans
+ * compte ne lie vers aucune fiche de joueur (`soloUserIds`) et ne reconnaît
+ * aucun caster (`casterUserId`) — elle n'affiche que des noms et des pseudos.
  */
 export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnapshot {
   return {
     ...snapshot,
+    soloUserIds: {},
     matches: snapshot.matches.map((match) => ({
       ...match,
+      casterUserId: null,
       maps: match.maps.map((map) => ({ ...map, replayCode: "" })),
       team1Report: match.team1Report ? { ...match.team1Report, maps: [] } : null,
       team2Report: match.team2Report ? { ...match.team2Report, maps: [] } : null,
@@ -195,25 +206,24 @@ function clampPoll(ms: number): number {
   return Math.min(SPECTATOR_MAX_POLL_MS, Math.max(SPECTATOR_MIN_POLL_MS, ms));
 }
 
-/**
- * Intervalle lu dans `x-bg-poll-after-ms`. `null` : l'en-tête est absent, le
- * serveur n'attend plus de relecture (tournoi terminé).
- */
-export function parsePollAfterMs(header: string | null): number | null {
-  if (header === null) return null;
-  const ms = Number(header);
+/** Intervalle lu dans `x-bg-poll-after-ms` ; la cadence de base s'il manque ou ne se lit pas. */
+export function parsePollAfterMs(header: string | null): number {
+  const ms = header === null ? Number.NaN : Number(header);
   return Number.isFinite(ms) ? clampPoll(ms) : SPECTATOR_RUNNING_POLL_MS;
 }
 
 /**
  * Attente après un échec (réseau, 429, 503) : le `Retry-After` du serveur s'il
- * en donne un, sinon le double de la dernière cadence — le visiteur sans compte
- * recule le premier.
+ * en donne un, sinon le **double de la dernière attente** — échec après échec,
+ * le visiteur sans compte recule jusqu'au plafond.
+ *
+ * @param lastWaitMs Dernière attente : la cadence après un succès, l'attente
+ *   précédente après un échec.
  */
-export function spectatorRetryDelayMs(lastPollMs: number | null, retryAfterHeader: string | null): number {
+export function spectatorRetryDelayMs(lastWaitMs: number, retryAfterHeader: string | null): number {
   const seconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
   if (Number.isFinite(seconds) && seconds > 0) return clampPoll(seconds * 1000);
-  return clampPoll((lastPollMs ?? SPECTATOR_RUNNING_POLL_MS) * 2);
+  return clampPoll(lastWaitMs * 2);
 }
 
 /**

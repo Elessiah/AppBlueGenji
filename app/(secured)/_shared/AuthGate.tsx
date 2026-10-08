@@ -47,11 +47,13 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
   // La fiche d'un tournoi se suit sans compte (`docs/features/SPECTATOR_VIEW.md`).
   // L'espace sécurisé redirige déjà côté serveur ; ce relais couvre la carte
   // venue d'un **préchargement**, que Next sert sans le chemin demandé
-  // (`x-pathname`) et réutilise à la navigation. L'ancre `#match-…` suit.
+  // (`x-pathname`) et réutilise à la navigation. Requête et ancre `#match-…`
+  // suivent.
   const spectatorId = tournamentIdFromMemberPath(splitLocalePrefix(pathname).path);
   useEffect(() => {
     if (spectatorId === null) return;
-    router.replace(`${spectatorTournamentPath(spectatorId)}${globalThis.location.hash}`);
+    const { search, hash } = globalThis.location;
+    router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);
   }, [spectatorId, router]);
 
   // On ne reconstitue qu'un chemin **du site** : il vient de `usePathname`, pas

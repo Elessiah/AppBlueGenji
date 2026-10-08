@@ -13,7 +13,7 @@
  * La durée de vie borne leur retard, et le nombre de reconstructions — au plus
  * une par tournoi et par durée de vie, quel que soit leur nombre.
  */
-import { cached } from "@/lib/server/cache";
+import { cached, invalidateCached } from "@/lib/server/cache";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { spectatorSnapshot } from "@/lib/shared/spectator-view";
 import type { TournamentState } from "@/lib/shared/types";
@@ -37,8 +37,9 @@ function cacheKey(tournamentId: number): string {
  *   (`spectatorCacheTtlMs`, selon la charge). Une réponse déjà en cache garde
  *   la sienne.
  */
-export function getSpectatorPayload(tournamentId: number, ttlMs: number): Promise<SpectatorPayload | null> {
-  return cached(cacheKey(tournamentId), ttlMs, async () => {
+export async function getSpectatorPayload(tournamentId: number, ttlMs: number): Promise<SpectatorPayload | null> {
+  const key = cacheKey(tournamentId);
+  const payload = await cached(key, ttlMs, async () => {
     const snapshot = await getVisibleTournamentSnapshot(tournamentId);
     if (!snapshot) return null;
     return {
@@ -47,4 +48,10 @@ export function getSpectatorPayload(tournamentId: number, ttlMs: number): Promis
       body: JSON.stringify(spectatorSnapshot(snapshot)),
     };
   });
+  // Un « introuvable » n'est pas gardé : parcourir des identifiants au hasard
+  // ne remplirait pas le cache partagé (500 entrées) au détriment des clés
+  // chaudes, et un tournoi publié une seconde plus tard s'ouvre aussitôt. La
+  // porte de visibilité garde sa propre mutualisation (instantané, 3 s).
+  if (payload === null) invalidateCached(key);
+  return payload;
 }

@@ -336,7 +336,7 @@ export type TournamentSheetSource = {
   /**
    * Cadence de relecture annoncée par le témoin quand elle ne suit pas le
    * palier — celle que le serveur accorde au visiteur sans compte. `null` :
-   * plus de relecture (tournoi terminé).
+   * plus de relecture (tournoi introuvable, avec `fatal`).
    */
   cadenceMs?: number | null;
 };
