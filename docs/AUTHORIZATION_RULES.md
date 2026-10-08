@@ -285,8 +285,9 @@ if (!user) return fail("UNAUTHORIZED", 401);
 if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 ```
 
-**Une seule exception dans tout le projet** : la suppression définitive d'un
-tournoi teste `user.isAdmin === true` (§4.6). L'attribution des rôles (§7) est
+**Deux exceptions dans tout le projet** : la suppression définitive d'un
+tournoi (§4.6) et l'annulation d'un abandon (§4.7) testent
+`user.isAdmin === true`. L'attribution des rôles (§7) est
 elle aussi réservée à `ADMIN`, mais elle l'exprime par sa permission —
 `can(user, "roles")`, que seul `ADMIN` porte : même public, même règle
 d'écriture que partout ailleurs.
@@ -795,9 +796,10 @@ rencontre réellement disputée — `canHaveReplay`). Voir
 
 ### 4.6 Supprimer un tournoi
 
-`DELETE /api/admin/tournaments/[id]` teste `user.isAdmin === true`. C'est le
-**seul** point du projet où le contrôle n'est pas une permission scopée : un
-arbitre gère un tournoi, il ne l'efface pas. Le champ
+`DELETE /api/admin/tournaments/[id]` teste `user.isAdmin === true`. C'est l'un
+des **deux** points du projet où le contrôle n'est pas une permission scopée
+(l'autre : annuler un abandon, §4.7) : un arbitre gère un tournoi, il ne
+l'efface pas. Le champ
 `TournamentDetail.canDelete` transporte ce droit, distinct de `canManage`, par
 les deux portes (flux + REST).
 
@@ -822,6 +824,12 @@ portant un `tournament_id`, plus les rappels de match.
   qualité ;
 - dans tous les cas, refusé hors `RUNNING`, et dès les play-offs d'endurance
   lancés.
+
+**Annuler un abandon** — `DELETE /api/admin/tournaments/[id]/forfeits/[teamId]`
+— teste `user.isAdmin === true` : décision du propriétaire du site, l'arbitre
+déclare un abandon mais ne remet pas en lice. Champ `canCancelForfeit` du
+contexte du lecteur, par les deux portes. Voir
+`docs/features/FORFEIT_CANCELLATION.md`.
 
 ### 4.8 Retirer un engagé (avant le coup d'envoi)
 
@@ -1106,7 +1114,8 @@ Des refus légitimes ne relèvent pas des permissions, et ne doivent pas être
 - [`docs/features/GHOST_TEAMS.md`](features/GHOST_TEAMS.md) — équipes fantômes
 - [`docs/features/SOLO_TOURNAMENTS.md`](features/SOLO_TOURNAMENTS.md) — entrées solo
 - [`docs/features/LIVE_STREAMS.md`](features/LIVE_STREAMS.md) — `live` vs `casting`
-- [`docs/features/TOURNAMENT_DELETION.md`](features/TOURNAMENT_DELETION.md) — le seul `isAdmin` du projet
+- [`docs/features/TOURNAMENT_DELETION.md`](features/TOURNAMENT_DELETION.md) — l'un des deux `isAdmin` du projet
+- [`docs/features/FORFEIT_CANCELLATION.md`](features/FORFEIT_CANCELLATION.md) — l'autre
 - [`docs/features/SAFE_LOGIN_REDIRECT.md`](features/SAFE_LOGIN_REDIRECT.md) — redirection d'après connexion
 - [`docs/features/RGPD_DATA_RIGHTS.md`](features/RGPD_DATA_RIGHTS.md) — export et anonymisation
 - [`docs/features/CONTENT_REPORTS.md`](features/CONTENT_REPORTS.md) — signalements et modération (§6.1)
