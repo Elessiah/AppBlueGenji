@@ -8,11 +8,11 @@
  * politique de confidentialité réserve aux membres (`spectatorSnapshot`), puis
  * sérialisé **une fois** pour tous.
  *
- * Une écriture ne **réveille** pas les visiteurs sans compte, qui relisent à la
- * cadence que la charge leur accorde ; elle **invalide** en revanche cette
- * réponse avec l'instantané des membres (`invalidateTournamentSnapshot`) — un
- * tournoi supprimé ou corrigé n'est pas resservi. Entre deux écritures, au plus
- * une reconstruction par tournoi et par durée de vie, quel que soit leur nombre.
+ * Une écriture ne réveille pas les visiteurs sans compte et n'invalide pas cette
+ * réponse : sa durée de vie, allongée sous la charge, est ce qui protège la
+ * machine d'un tournoi animé — au plus une reconstruction par tournoi et par
+ * durée de vie, quel que soit le nombre de visiteurs. Seule la suppression du
+ * tournoi la retire (`invalidateSpectatorSnapshot`).
  */
 import { createHash } from "node:crypto";
 import { cached } from "@/lib/server/cache";
@@ -31,6 +31,8 @@ export type SpectatorPayload = {
   version: string;
   state: TournamentState;
   body: string;
+  /** Durée de vie reçue à la construction : l'âge maximal annoncé en dépend. */
+  ttlMs: number;
 };
 
 /** Refus du chargeur : rien à servir, et rien à mettre en cache. */
@@ -66,6 +68,7 @@ export async function getSpectatorPayload(tournamentId: number, ttlMs: number): 
         version,
         state: snapshot.card.state,
         body: JSON.stringify({ ...publicSnapshot, version }),
+        ttlMs,
       };
     });
   } catch (error) {

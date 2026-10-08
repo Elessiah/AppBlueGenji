@@ -52,6 +52,16 @@ function tournamentIdUnder(prefix: string, path: string | null | undefined): num
   return rest === "" || rest.includes("/") ? null : parseTournamentId(rest);
 }
 
+/**
+ * Requête à faire suivre lors d'une redirection entre les deux espaces, lue
+ * dans `x-search` (posé par le middleware). Un préchargement échappe au
+ * middleware et peut porter un en-tête venu du client : seule une requête
+ * (`?…`) est reprise, jamais un fragment de chemin.
+ */
+export function forwardedSearch(value: string | null | undefined): string {
+  return value?.startsWith("?") ? value : "";
+}
+
 /** Le tournoi désigné par un chemin de **page sans compte**, `null` ailleurs. */
 export function tournamentIdFromSpectatorPath(path: string | null | undefined): number | null {
   return tournamentIdUnder("/suivre/tournois/", path);
@@ -178,9 +188,13 @@ export const SPECTATOR_POLL_HEADER = "x-bg-poll-after-ms";
  */
 export const SPECTATOR_FRESHNESS_HEADER = "x-bg-fresh-within-ms";
 
-/** Âge maximal de l'affichage pour une cadence et un niveau de charge donnés. */
-export function spectatorFreshnessMs(pollMs: number, level: SpectatorLoadLevel): number {
-  return Math.ceil(pollMs * 1.1) + spectatorCacheTtlMs(level);
+/**
+ * Âge maximal de l'affichage : la cadence, gigue comprise, plus la durée de vie
+ * **de la réponse servie** — celle qu'elle a reçue à sa construction, peut-être
+ * sous une charge plus forte que l'actuelle.
+ */
+export function spectatorFreshnessMs(pollMs: number, cacheTtlMs: number): number {
+  return Math.ceil(pollMs * 1.1) + cacheTtlMs;
 }
 
 /**
@@ -192,8 +206,9 @@ export function spectatorFreshnessMs(pollMs: number, level: SpectatorLoadLevel):
  * propositions en attente est déjà vide dans l'instantané diffusé ; il l'est
  * ici aussi, explicitement.
  *
- * L'identifiant du **caster** part aussi (`casterUserId`) : la page sans compte
- * ne reconnaît personne, seul son pseudo, à l'antenne, reste. `soloUserIds`
+ * L'identifiant du **caster** est remplacé par {@link SPECTATOR_HIDDEN_USER_ID} :
+ * la fiche sait qu'un caster est inscrit (son pseudo, à l'antenne, s'affiche et
+ * il compte dans les « prêts » du lancement) sans savoir qui. `soloUserIds`
  * reste en revanche : il porte la marche du podium d'un joueur engagé en
  * individuel (`useEntrantPodiumClass`), et le podium est public.
  *
@@ -213,13 +228,20 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       : null,
     matches: snapshot.matches.map((match) => ({
       ...match,
-      casterUserId: null,
+      casterUserId: match.casterUserId === null ? null : SPECTATOR_HIDDEN_USER_ID,
       maps: match.maps.map((map) => ({ ...map, replayCode: "" })),
       team1Report: match.team1Report ? { ...match.team1Report, maps: [] } : null,
       team2Report: match.team2Report ? { ...match.team2Report, maps: [] } : null,
     })),
   };
 }
+
+/**
+ * Identifiant de compte « quelqu'un » : présent, mais qui ne désigne personne.
+ * Négatif, donc jamais un compte (`AUTO_INCREMENT` part de 1), et distinct du
+ * `viewerUserId` du visiteur sans compte (`0`) : il n'est le caster de rien.
+ */
+export const SPECTATOR_HIDDEN_USER_ID = -1;
 
 /**
  * Contexte du lecteur sans compte : aucun droit, aucun engagé. Toutes les

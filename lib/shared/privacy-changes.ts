@@ -637,7 +637,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "La fiche d'un tournoi publié se consulte désormais sans se connecter : plateau, scores, classements, noms des équipes et pseudos des joueurs engagés.",
     details: [
-      "Un visiteur sans compte suit le tournoi à l'adresse /suivre/tournois/… : il y lit ce que les retransmissions et Discord montrent déjà — noms des équipes, pseudos des joueurs engagés, scores, classements, pseudo du caster d'un match.",
+      "Un visiteur sans compte suit le tournoi à l'adresse /suivre/tournois/… : il y lit ce que les retransmissions et Discord montrent déjà — noms des équipes, pseudos des joueurs engagés, scores, classements, pseudo du caster d'un match —, ainsi que, pour un tournoi individuel, le numéro de compte interne de chaque joueur engagé, qui porte sa marque du podium.",
       "Les codes de replay n'y figurent pas : ils restent réservés aux membres connectés.",
       "La page est exclue des moteurs de recherche et n'ouvre aucune session. Comme toute page du site, sa visite est comptée par la mesure d'audience, sauf opposition ; l'adresse IP du visiteur n'y sert par ailleurs qu'à limiter le nombre de lectures, en mémoire.",
       "Tu peux t'opposer à l'affichage de ton pseudo, comme pour la retransmission des matchs.",

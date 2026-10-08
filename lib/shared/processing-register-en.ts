@@ -208,7 +208,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Notifying the owner and managers of a team of a request to join by Discord direct message (without naming the requester, at most one message per player and per team every 24 h)",
       "Registering teams or players, generating brackets, entering and refereeing scores",
       "Publishing results, rankings, statistics and achievements",
-      "Letting visitors without an account follow the page of a published tournament (/suivre/tournois/…): bracket, scores, rankings, team names and usernames of the participants, without replay codes; page excluded from search engines",
+      "Letting visitors without an account follow the page of a published tournament (/suivre/tournois/…): bracket, scores, rankings, team names and usernames of the participants (and, in a solo tournament, their internal account number, for the podium mark), without replay codes; page excluded from search engines",
     ],
     legalBasis: "Legitimate interest (organizing competitions, sporting memory of the scene)",
     dataSubjects: ["Registered players", "Team members", "Refereeing staff"],

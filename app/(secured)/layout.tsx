@@ -10,7 +10,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { localeHref } from "@/lib/shared/locales";
-import { spectatorTournamentPath, tournamentIdFromMemberPath } from "@/lib/shared/spectator-view";
+import { forwardedSearch, spectatorTournamentPath, tournamentIdFromMemberPath } from "@/lib/shared/spectator-view";
 
 /**
  * L'espace sécurisé répond `200` aux visiteurs non connectés — une carte
@@ -27,16 +27,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/**
- * Requête à faire suivre, ou rien. Un préchargement échappe au middleware et
- * peut porter un `x-search` venu du client : seule une requête (`?…`) est
- * reprise, jamais un fragment de chemin.
- */
-function redirectSearch(requestHeaders: Headers): string {
-  const search = requestHeaders.get(SEARCH_HEADER) ?? "";
-  return search.startsWith("?") ? search : "";
-}
-
 export default async function SecuredLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser();
 
@@ -50,7 +40,7 @@ export default async function SecuredLayout({ children }: Readonly<{ children: R
     const requestHeaders = await headers();
     const tournamentId = tournamentIdFromMemberPath(requestHeaders.get(PATHNAME_HEADER));
     if (tournamentId !== null) {
-      redirect(localeHref(`${spectatorTournamentPath(tournamentId)}${redirectSearch(requestHeaders)}`, await requestLocale()));
+      redirect(localeHref(`${spectatorTournamentPath(tournamentId)}${forwardedSearch(requestHeaders.get(SEARCH_HEADER))}`, await requestLocale()));
     }
     // Dans la langue de l'adresse : anglaise sous une route traduite
     // (`/en/tournois`), française partout ailleurs (le middleware renvoie les

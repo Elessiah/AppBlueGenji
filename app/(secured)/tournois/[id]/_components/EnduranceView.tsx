@@ -311,7 +311,8 @@ function PenaltyLog({
           >
             <span className={styles.penaltyAmount}>−{penalty.points}</span>
             <EntrantName teamId={penalty.teamId} name={penalty.teamName} />
-            <span className={styles.penaltyReason}>{penalty.reason}</span>
+            {/* Vide sur la page sans compte (`spectatorSnapshot`) : pas de case muette. */}
+            {penalty.reason && <span className={styles.penaltyReason}>{penalty.reason}</span>}
             <span className={styles.penaltyMeta}>
               {t("endurance.penaltyRound", { round: String(penalty.round) })}
               {/* Une sanction se conteste : elle porte le nom de qui l'a

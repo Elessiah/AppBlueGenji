@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
+import { SEARCH_HEADER } from "@/lib/shared/csp";
 import { localeHref } from "@/lib/shared/locales";
-import { memberTournamentPath, parseTournamentId, spectatorTournamentPath } from "@/lib/shared/spectator-view";
+import {
+  forwardedSearch,
+  memberTournamentPath,
+  parseTournamentId,
+  spectatorTournamentPath,
+} from "@/lib/shared/spectator-view";
 import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
 import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
@@ -27,10 +34,16 @@ type LayoutProps = {
  *
  * `noindex` : la page est faite pour suivre un tournoi dont on a reçu le lien,
  * pas pour faire entrer les pseudos des joueurs dans les moteurs de recherche.
+ *
+ * Un membre connecté est redirigé vers sa fiche : pour lui, la carte n'est pas
+ * lue. La session est mémoïsée pour la requête (`getCurrentUser`), la mise en
+ * page la relit sans nouvelle requête. Aucun droit n'est jamais accordé ici.
  */
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { id } = await params;
-  const metadata = await tournamentPageMetadata(id, spectatorTournamentPath, async () => ({ canManage: false }));
+  const metadata = await tournamentPageMetadata(id, spectatorTournamentPath, async () =>
+    (await getCurrentUser().catch(() => null)) ? null : { canManage: false },
+  );
   return { ...metadata, robots: { index: false, follow: false } };
 }
 
@@ -55,7 +68,10 @@ export default async function SpectatorTournamentLayout({
   // Une base injoignable ne bloque pas la page : sans session lisible, on la
   // sert telle qu'au visiteur sans compte.
   const user = await getCurrentUser().catch(() => null);
-  if (user) redirect(localeHref(memberTournamentPath(tournamentId), locale));
+  if (user) {
+    const search = forwardedSearch((await headers()).get(SEARCH_HEADER));
+    redirect(localeHref(`${memberTournamentPath(tournamentId)}${search}`, locale));
+  }
 
   const catalog = locale === "en" ? messagesFor(locale) : null;
   return (

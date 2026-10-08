@@ -68,7 +68,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const pollMs = spectatorPollIntervalMs(payload.state, level);
   const headers = {
     ...pollHeaders(pollMs),
-    [SPECTATOR_FRESHNESS_HEADER]: String(spectatorFreshnessMs(pollMs, level)),
+    [SPECTATOR_FRESHNESS_HEADER]: String(spectatorFreshnessMs(pollMs, payload.ttlMs)),
     ETag: etag,
   };
   if (matchesEtag(req.headers.get("if-none-match"), etag)) {
