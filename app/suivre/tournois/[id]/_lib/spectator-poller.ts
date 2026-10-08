@@ -53,6 +53,18 @@ export type SpectatorPoller = {
   dispose: () => void;
 };
 
+/** Même état affiché (la fiche est comparée par référence, comme React le fera). */
+function sameState(a: SpectatorState, b: SpectatorState): boolean {
+  return (
+    a.detail === b.detail &&
+    a.isLive === b.isLive &&
+    a.fatal === b.fatal &&
+    a.cadenceMs === b.cadenceMs &&
+    a.freshnessMs === b.freshnessMs &&
+    a.retrying === b.retrying
+  );
+}
+
 /**
  * Suivi d'un tournoi **sans compte** (`docs/features/SPECTATOR_VIEW.md`),
  * hors React pour se tester sans navigateur.
@@ -153,7 +165,10 @@ export function createSpectatorPoller(
         const shared = detail ? shareUnchanged(detail, snapshot) : snapshot;
         detail = { ...shared, ...SPECTATOR_VIEWER_CONTEXT };
       }
-      commit({ detail, isLive: true, fatal: null, cadenceMs, freshnessMs, retrying: false });
+      const next: SpectatorState = { detail, isLive: true, fatal: null, cadenceMs, freshnessMs, retrying: false };
+      // Un `304` sans rien de neuf ne republie rien : la fiche ne se redessine
+      // pas à chaque relecture.
+      if (!sameState(current, next)) commit(next);
       schedule(cadenceMs);
     } catch {
       if (disposed) return;
