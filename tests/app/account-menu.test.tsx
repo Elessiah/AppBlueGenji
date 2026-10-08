@@ -111,12 +111,14 @@ describe("mise en page de la navigation", () => {
     expect(block).toMatch(/^@media \(max-width: 1000px\) \{\s*\.navLink::before\s*\{\s*display: none;/);
   });
 
-  it("masque le groupe d'outils vide (langue muette, pas de modération)", () => {
-    expect(arenaCss).toMatch(/\.navTools:empty\s*\{\s*display: none;/);
-  });
-
   it("garde aux outils une cible de 44 px, comme le sélecteur de langue", () => {
     expect(arenaCss).toMatch(/\.navTools \.navTool\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
+  });
+
+  it("n'éclaire pas la déconnexion désactivée au survol", () => {
+    const css = readSource("components/account-menu.module.css");
+    expect(css).toContain(".item:hover:not(:disabled),");
+    expect(css).toMatch(/\.logout:disabled \.itemIcon\s*\{[^}]*color: var\(--ink-dim\);/);
   });
 
   it("sépare les outils du compte par un filet", () => {

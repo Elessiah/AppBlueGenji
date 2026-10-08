@@ -6,6 +6,7 @@ import { LogoWithGlow } from "./logo-with-glow";
 import { AccountMenu } from "./account-menu";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
+import { isMigratedRoute } from "@/lib/shared/locales";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import { useShellText } from "./i18n/shell-text";
@@ -51,6 +52,7 @@ export function ArenaNav({
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
   const { t } = useShellText();
+  const showLanguage = Boolean(languageSwitcherLabel) && isMigratedRoute(pathname);
 
   return (
     <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
@@ -87,15 +89,12 @@ export function ArenaNav({
         <div className={s.navRight}>
           {/* Barre allégée : l'accueil passe par le logo, « Mon équipe » par le
               menu du compte. Restent les outils (langue, modération) et le
-              compte, séparés par un filet. */}
-          {/* Vide (langue muette, aucun signalement à voir), le groupe est masqué
-              par `.navTools:empty`. */}
-          {(languageSwitcherLabel || openReports !== null) && (
+              compte, séparés par un filet — le groupe n'est rendu que s'il a
+              quelque chose à montrer (sinon le filet resterait seul). */}
+          {(showLanguage || openReports !== null) && (
             <div className={s.navTools}>
-              {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
-              {languageSwitcherLabel && (
-                <LanguageSwitcher label={languageSwitcherLabel} compact className={s.navTool} />
-              )}
+              {/* Même page dans l'autre langue — seulement sur une route traduite. */}
+              {showLanguage && languageSwitcherLabel && <LanguageSwitcher label={languageSwitcherLabel} compact className={s.navTool} />}
               {openReports !== null && (
                 <LocaleLink
                   href={REPORTS_ADMIN_PATH}
@@ -103,12 +102,15 @@ export function ArenaNav({
                   aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
                 >
                   <Flag size={16} strokeWidth={2} aria-hidden="true" />
-                  <span className="sr-only">{t("nav.reports")}</span>
+                  {/* Libellé visible sur grand écran, lu seul en dessous de 1280 px. */}
+                  <span className={s.navReportsLabel}>{t("nav.reports")}</span>
                   {openReports > 0 && (
-                    <span className={s.navBadge}>
-                      {openReports}
-                      <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
-                    </span>
+                    <>
+                      <span className={s.navBadge} aria-hidden="true">
+                        {openReports}
+                      </span>
+                      <span className="sr-only">{`, ${openReports} ${t("nav.reportsPending", { count: openReports })}`}</span>
+                    </>
                   )}
                 </LocaleLink>
               )}

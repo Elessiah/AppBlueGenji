@@ -4,6 +4,7 @@ let mockPathname: string | null = "/equipes/12";
 jest.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -85,8 +86,41 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(html).toContain('<a class="navTool navReports" href="/admin/signalements">');
     // Pas de `title` : il doublait le nom accessible à la lecture.
     expect(html).not.toContain('title="Signalements"');
-    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="sr-only">Signalements<\/span>/);
-    expect(html).toContain('<span class="navBadge">2<span class="sr-only"> à traiter</span></span>');
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="navReportsLabel">Signalements<\/span>/);
+    // Pastille muette, compte lu séparé du libellé (« Signalements, 2 à traiter »).
+    expect(html).toContain('<span class="navBadge" aria-hidden="true">2</span><span class="sr-only">, 2 à traiter</span>');
+  });
+
+  it("marque la page des signalements comme courante", () => {
+    mockPathname = "/admin/signalements";
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={0} />
+      </ToastProvider>,
+    );
+    expect(html).toContain('<a class="navTool navReports" aria-current="page" href="/admin/signalements">');
+    const css = readSource("components/arena-nav.module.css");
+    expect(css).toMatch(/\.navReports\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
+  });
+
+  it("ne rend pas de groupe d'outils vide sur une route pas encore traduite", () => {
+    // `/equipes/12` n'est pas traduite : le sélecteur serait muet, le filet orphelin.
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <ArenaNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />
+      </ToastProvider>,
+    );
+    expect(html).not.toContain("navTools");
+  });
+
+  it("rend le sélecteur compact dans le groupe d'outils sur une route traduite", () => {
+    mockPathname = "/tournois";
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <ArenaNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />
+      </ToastProvider>,
+    );
+    expect(html).toMatch(/<div class="navTools"><a href="\/en\/tournois"[^>]*class="link navTool"/);
   });
 
   it("ne rend ni drapeau ni groupe d'outils sans permission de modération ni langue", () => {
