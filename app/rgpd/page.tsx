@@ -425,7 +425,8 @@ function RgpdFr({
             pseudos des joueurs engagés, pseudo du caster d&apos;un match — ce que les retransmissions
             et Discord montrent déjà —, ainsi que les logos des équipes et, pour un tournoi individuel,
             l&apos;avatar de chaque joueur engagé (sauf s&apos;il l&apos;a masqué) et son numéro de compte
-            interne, qui porte sa marque du podium. Les codes de replay n&apos;y figurent pas : ils restent réservés
+            interne, qui porte sa marque du podium, et les pénalités d&apos;une BlueGenji Survie (engagé, manche,
+            points), sans leur motif ni l&apos;arbitre qui les a posées. Les codes de replay n&apos;y figurent pas : ils restent réservés
             aux membres connectés. La page est servie depuis une copie partagée, renouvelée au plus
             tard toutes les deux minutes et demie : un changement de pseudo, un avatar masqué ou une
             suppression de compte peut y apparaître avec ce délai. Cette page est exclue des moteurs de recherche (<code>noindex</code>)

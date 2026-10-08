@@ -18,6 +18,7 @@ import type {
   TournamentViewerContext,
 } from "@/lib/shared/types";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
+import { visibleReplayUrl } from "@/lib/shared/match-replay";
 
 /** Chemin public de la fiche (sans préfixe de langue). */
 export function spectatorTournamentPath(tournamentId: number): string {
@@ -260,6 +261,9 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
     matches: snapshot.matches.map((match) => ({
       ...match,
       casterUserId: match.casterUserId === null ? null : SPECTATOR_HIDDEN_USER_ID,
+      // Le lien de rediffusion que l'interface masque (match rouvert…) ne part
+      // pas non plus dans la réponse publique.
+      replayUrl: visibleReplayUrl(match),
       maps: match.maps.map((map) => ({ ...map, replayCode: "" })),
       team1Report: match.team1Report ? { ...match.team1Report, maps: [] } : null,
       team2Report: match.team2Report ? { ...match.team2Report, maps: [] } : null,

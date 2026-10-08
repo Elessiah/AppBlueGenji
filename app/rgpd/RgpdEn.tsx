@@ -315,7 +315,8 @@ export function RgpdEn({
             bracket, scores, rankings, names of the teams and usernames of the players taking part, username of a
             match&apos;s caster — what streams and Discord already show —, as well as team logos and, for a solo
             tournament, the avatar of each player taking part (unless they hid it) and their internal account
-            number, which carries their podium mark. Replay codes are not shown there: they
+            number, which carries their podium mark, and BlueGenji Survival penalties (entrant, round, points),
+            without their reason or the referee who imposed them. Replay codes are not shown there: they
             remain reserved to logged-in members. The page is served from a shared copy, renewed at
             least every two and a half minutes: a username change, a hidden avatar or an account deletion
             may show up there with that delay. This page is excluded from search engines (<code>noindex</code>)

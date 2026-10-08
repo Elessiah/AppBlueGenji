@@ -46,6 +46,21 @@ let lastLoopDelayMs: number | null = null;
 let windowStartedAt = 0;
 let currentReads = 0;
 let previousReads = 0;
+/** Lectures comptées par client dans la fenêtre courante (plafond `SPECTATOR_READS_PER_CLIENT`). */
+const readsByClient = new Map<string, number>();
+
+/**
+ * Part d'un même client (adresse IP) dans le signal, par fenêtre. Un onglet en
+ * fait un peu plus de deux par minute : le plafond laisse passer quelques
+ * onglets, mais une poignée d'adresses qui martèlent la route ne peuvent plus
+ * pousser à elles seules le niveau de charge — et ralentir tous les visiteurs
+ * sans compte du site. Une salle de LAN derrière une même adresse y pèse
+ * moins qu'elle ne lit : ses lectures ne coûtent que le cache partagé.
+ */
+export const SPECTATOR_READS_PER_CLIENT = 10;
+
+/** Au-delà, les clients ne sont plus suivis un à un (mémoire bornée) : ils comptent sans plafond. */
+const MAX_TRACKED_CLIENTS = 10_000;
 
 function disarmProbe(): void {
   histogram?.disable();
@@ -123,13 +138,21 @@ function rollWindow(now: number): void {
     windowStartedAt = now;
   }
   currentReads = 0;
+  readsByClient.clear();
 }
 
 /** Compte une lecture publique, et repousse le désarmement de la sonde. */
-export function recordSpectatorRead(now: number = Date.now()): void {
+export function recordSpectatorRead(now: number = Date.now(), client: string | null = null): void {
   rollWindow(now);
-  currentReads += 1;
   touchProbe(now);
+  // Sans adresse connue (proxy de confiance non configuré), tous les clients
+  // partagent une même part : le signal sous-estime plutôt que de se laisser
+  // pousser par un seul.
+  const key = client ?? "";
+  const counted = readsByClient.get(key) ?? 0;
+  if (counted >= SPECTATOR_READS_PER_CLIENT) return;
+  if (counted > 0 || readsByClient.size < MAX_TRACKED_CLIENTS) readsByClient.set(key, counted + 1);
+  currentReads += 1;
 }
 
 /**
@@ -163,4 +186,5 @@ export function resetSpectatorLoad(): void {
   windowStartedAt = 0;
   currentReads = 0;
   previousReads = 0;
+  readsByClient.clear();
 }

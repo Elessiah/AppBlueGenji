@@ -38,7 +38,8 @@ function pollHeaders(pollAfterMs: number): Record<string, string> {
 }
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
-  const throttled = enforceRateLimit(SPECTATOR_READ_RULE, requestClientIp(req));
+  const clientIp = requestClientIp(req);
+  const throttled = enforceRateLimit(SPECTATOR_READ_RULE, clientIp);
   if (throttled) return throttled;
 
   const { id } = await context.params;
@@ -64,8 +65,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   }
   if (!payload) return fail("TOURNAMENT_NOT_FOUND", 404);
   // Seules les lectures d'un tournoi servi pèsent dans la charge : des
-  // identifiants au hasard ne ralentissent pas les vrais spectateurs.
-  recordSpectatorRead();
+  // identifiants au hasard ne ralentissent pas les vrais spectateurs, et la
+  // part d'une même adresse est plafonnée (`SPECTATOR_READS_PER_CLIENT`).
+  recordSpectatorRead(Date.now(), clientIp);
 
   const etag = `"${payload.version}"`;
   const pollMs = spectatorPollIntervalMs(payload.state, level);

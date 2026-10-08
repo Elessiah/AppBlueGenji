@@ -208,12 +208,13 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Notifying the owner and managers of a team of a request to join by Discord direct message (without naming the requester, at most one message per player and per team every 24 h)",
       "Registering teams or players, generating brackets, entering and refereeing scores",
       "Publishing results, rankings, statistics and achievements",
-      "Letting visitors without an account follow the page of a published tournament (/suivre/tournois/…): bracket, scores, rankings, team names and logos and usernames of the participants (and, in a solo tournament, their avatar unless hidden and their internal account number, for the podium mark), without replay codes; page excluded from search engines",
+      "Letting visitors without an account follow the page of a published tournament (/suivre/tournois/…): bracket, scores, rankings, team names and logos and usernames of the participants (and, in a solo tournament, their avatar unless hidden and their internal account number, for the podium mark), BlueGenji Survival penalties without reason or referee, without replay codes; page excluded from search engines",
     ],
     legalBasis: "Legitimate interest (organizing competitions, sporting memory of the scene)",
-    dataSubjects: ["Registered players", "Team members", "Refereeing staff"],
+    dataSubjects: ["Registered players", "Team members", "Refereeing staff", "Visitors without an account of a tournament's public page"],
     dataCategories: [
       "Team membership and team roles",
+      "IP address of a visitor without an account, in memory only, to cap their reads of the public page",
       "Registrations, scores, forfeits, penalties (with reason and referee who imposed it), rankings",
       "Map-by-map detail of a match: score and replay code of each map (optional when the referees enter the map, replay lost; the replay shows the players' identifiers in game, hidden BattleTag included), account that entered it",
     ],
@@ -222,6 +223,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Results and achievements: no defined retention period, kept as long as the site exists; anonymized when the account is deleted (borrowed username)",
       "Replay codes: kept with the result they document (a detail that no longer explains it is erased); the link to the account that entered them is erased when the account is deleted, the codes remain (the game is kept by the game's publisher)",
       "Right to object available on request",
+      "IP address of a visitor without an account: in memory, for the read cap's window (one minute), never stored",
     ],
     recipients: [
       "The site's public",
