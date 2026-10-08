@@ -163,7 +163,12 @@ export function TournamentHeader({
             {/* Dit pourquoi aucun bouton n'apparaît, sans en ajouter un vers la
                 connexion : la page sans compte est faite pour regarder. */}
             {spectator && (
-              <Pill variant="neutral" title={t("header.spectatorTitle")}>{t("header.spectator")}</Pill>
+              // L'explication aussi hors écran : `title` seul échappe au toucher,
+              // au clavier et aux lecteurs d'écran (comme `MetaCell`).
+              <Pill variant="neutral" title={t("header.spectatorTitle")}>
+                {t("header.spectator")}
+                <span className="sr-only"> — {t("header.spectatorTitle")}</span>
+              </Pill>
             )}
           </div>
         </div>

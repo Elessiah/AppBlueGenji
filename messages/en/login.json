@@ -111,6 +111,7 @@
     "body": "This page is part of the competitive area. Log in to view it: you will come straight back here.",
     "login": "Log in",
     "home": "Back to home",
-    "rules": "Discover the tournament rules"
+    "rules": "Discover the tournament rules",
+    "redirecting": "Opening the tournament…"
   }
 }

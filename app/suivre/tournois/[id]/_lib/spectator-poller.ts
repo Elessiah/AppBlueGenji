@@ -128,7 +128,10 @@ export function createSpectatorPoller(
       if (disposed) return;
 
       if (response.status === 404 || response.status === 400) {
-        commit({ ...current, isLive: false, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null, freshnessMs: null });
+        // La fiche déjà affichée part aussi : un tournoi supprimé ne reste pas à
+        // l'écran, et la carte « introuvable » le dit (`TournamentFatal`).
+        etag = null; // plus rien en main : la prochaine réponse doit porter un corps
+        commit({ ...INITIAL_SPECTATOR_STATE, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null });
         schedule(SPECTATOR_NOT_FOUND_RETRY_MS);
         return;
       }

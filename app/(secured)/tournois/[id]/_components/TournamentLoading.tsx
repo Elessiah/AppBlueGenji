@@ -14,13 +14,14 @@ import styles from "./TournamentLoading.module.css";
  *
  * `retrying` : la première lecture a échoué et la page réessaiera plus tard
  * (page sans compte, `docs/features/SPECTATOR_VIEW.md`) — la phrase le dit,
- * plutôt que de laisser croire à un chargement qui n'avance pas.
+ * plutôt que de laisser croire à un chargement qui n'avance pas. La région
+ * n'est plus `aria-busy` alors : sinon la phrase ne serait jamais annoncée.
  */
 export function TournamentLoading({ retrying = false }: Readonly<{ retrying?: boolean }>) {
   const { t } = useTournamentPageText();
   const caption = retrying ? t("live.loadingRetry") : t("loading");
   return (
-    <section /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.root} role="status" aria-busy="true">
+    <section /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.root} role="status" aria-busy={!retrying}>
       <span className="sr-only">{caption}</span>
       <div className={styles.shapes} aria-hidden="true">
         <div className={`${styles.bar} ${styles.back}`} />
