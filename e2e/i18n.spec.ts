@@ -168,12 +168,15 @@ test.describe("Langues — adresses /en", () => {
     }
   });
 
-  // Lot 8a-2 : la fiche d'un tournoi. `[id]` n'accepte qu'un entier.
-  test("/en/tournois/<id> : lang=en, carte de connexion anglaise, hreflang de la fiche", async ({ page }) => {
+  // Lot 8a-2 : la fiche d'un tournoi. `[id]` n'accepte qu'un entier. Sans
+  // session, elle se suit sans compte (`docs/features/SPECTATOR_VIEW.md`) : la
+  // redirection garde la langue.
+  test("/en/tournois/<id> : redirigée vers la page sans compte anglaise, noindex", async ({ page }) => {
+    test.skip(!!process.env.E2E_AUTH_USER, "Bypass DEV_AUTH actif : la fiche connectée s'affiche.");
     const response = await page.goto("/en/tournois/1");
     expect(response?.status()).toBe(200);
-    expect(new URL(page.url()).pathname).toBe("/en/tournois/1");
+    expect(new URL(page.url()).pathname).toBe("/en/suivre/tournois/1");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   });
 });
