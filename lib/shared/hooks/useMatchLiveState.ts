@@ -45,9 +45,13 @@ export function useMatchLiveState(match: MatchLiveInput): MatchLiveState {
   useEffect(() => {
     // Vue reconstruite depuis les primitives, et non `match` : la garder hors
     // des dépendances est justement ce qui évite la boucle ci-dessus. Poser
-    // `liveStartedAt: null` est fidèle — seul `START_TIME` produit une
-    // frontière, et son état ne consulte jamais l'antenne manuelle.
-    const at = nextMatchLiveChangeAt({ status, liveTrigger, liveStartedAt: null, startAt }, now);
+    // `liveStartedAt`/`launchedAt: null` est fidèle — seul `START_TIME` produit
+    // une frontière, et son état ne consulte ni l'antenne manuelle ni le
+    // lancement.
+    const at = nextMatchLiveChangeAt(
+      { status, liveTrigger, liveStartedAt: null, launchedAt: null, startAt },
+      now,
+    );
     if (at === null) return;
 
     // `setTimeout` sature au-delà de ~24,8 jours et se déclencherait alors
@@ -63,6 +67,7 @@ export function useMatchLiveState(match: MatchLiveInput): MatchLiveState {
   }, [status, liveTrigger, startAt, now]);
 
   // Au rendu, en revanche, on repasse le match tel quel : aucune dépendance
-  // n'est en jeu, et l'antenne manuelle compte pour les modes qui la lisent.
+  // n'est en jeu, et l'antenne manuelle comme le lancement comptent pour les
+  // modes qui les lisent (le lancement arrive par le flux, qui rend à nouveau).
   return resolveMatchLiveState(match, now);
 }

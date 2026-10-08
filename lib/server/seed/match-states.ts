@@ -115,7 +115,8 @@ export async function applyMatchSchedule(
  * appliqué aux seules manches encore jouables (`READY`), c'est-à-dire celles
  * que la simulation n'a pas résolues. Poser un mode sur une manche déjà notée
  * ne produirait rien de visible : l'état est dérivé, et un score saisi éteint
- * le direct (`lib/shared/live-streams.ts`).
+ * le direct (`lib/shared/live-streams.ts`). En `AUTO`, les manches castées
+ * sont lancées, sauf la première.
  */
 export async function applyLiveStreams(
   db: Pool,
@@ -141,6 +142,27 @@ export async function applyLiveStreams(
        AND team2_id IS NOT NULL`,
     [def.live.trigger, normalizeStreamUrl(def.live.matchUrl), startedAt, tournamentId]
   );
+
+  // `AUTO` ne passe à l'antenne qu'au lancement du match : on lance toutes les
+  // manches castées sauf la première, que `applyMatchLaunchCases` laisse en
+  // lancement avec son caster — le même plateau montre ainsi un match en direct
+  // et un match casté encore « programmé ».
+  if (def.live.trigger === "AUTO") {
+    await db.execute(
+      `UPDATE bg_matches m
+       JOIN (
+         SELECT MIN(id) AS first_id FROM bg_matches
+         WHERE tournament_id = ? AND status = 'READY' AND live_trigger IS NOT NULL
+       ) f
+       SET m.launched_at = NOW(), m.lobby_opened_at = NOW(),
+           m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
+       WHERE m.tournament_id = ?
+         AND m.status = 'READY'
+         AND m.live_trigger IS NOT NULL
+         AND m.id <> f.first_id`,
+      [tournamentId, tournamentId]
+    );
+  }
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
+import { launchPairingKey } from "@/lib/shared/match-launch";
 import type { MatchStatus } from "@/lib/shared/types";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 
@@ -45,6 +46,10 @@ type MatchLiveRow = RowDataPacket & {
   start_at: Date | string | null;
   live_trigger: MatchLiveTrigger | null;
   live_started_at: Date | string | null;
+  team1_id: number | null;
+  team2_id: number | null;
+  launched_at: Date | string | null;
+  launch_pairing: string | null;
 };
 
 type BroadcastRow = RowDataPacket & {
@@ -218,7 +223,11 @@ export async function findBroadcastingTournament(): Promise<BroadcastingTourname
       m.status,
       m.start_at,
       m.live_trigger,
-      m.live_started_at
+      m.live_started_at,
+      m.team1_id,
+      m.team2_id,
+      m.launched_at,
+      m.launch_pairing
      FROM bg_tournaments t
      JOIN bg_matches m ON m.tournament_id = t.id
      WHERE t.state = 'RUNNING'
@@ -233,6 +242,12 @@ export async function findBroadcastingTournament(): Promise<BroadcastingTourname
       liveTrigger: row.live_trigger,
       liveStartedAt: row.live_started_at,
       startAt: row.start_at,
+      // Un lancement posé pour une autre paire d'engagés ne compte pas
+      // (`currentLaunchState`).
+      launchedAt:
+        row.launch_pairing !== null && row.launch_pairing === launchPairingKey(row.team1_id, row.team2_id)
+          ? row.launched_at
+          : null,
     });
     if (!live) continue;
 

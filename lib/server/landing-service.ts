@@ -157,6 +157,18 @@ function toSeed(value: number | null): number | null {
   return Number.isSafeInteger(seed) && seed > 0 ? seed : null;
 }
 
+/**
+ * Lancement de la ligne, s'il vaut pour son appariement courant : un lancement
+ * posé pour une autre paire d'engagés (arbitre revenu en arrière, seeding
+ * réordonné) ne compte pas — même règle que `currentLaunchState`, que lit la
+ * fiche du tournoi.
+ */
+function currentLaunchedAt(row: LiveMatchRow): string | null {
+  return row.launch_pairing !== null && row.launch_pairing === launchPairingKey(row.team1_id, row.team2_id)
+    ? toIso(row.launched_at)
+    : null;
+}
+
 /** Vue « diffusion » d'une ligne de match, pour le module pur partagé. */
 function toLiveInput(row: LiveMatchRow) {
   return {
@@ -164,6 +176,7 @@ function toLiveInput(row: LiveMatchRow) {
     liveTrigger: row.live_trigger,
     liveStartedAt: row.live_started_at,
     startAt: row.start_at,
+    launchedAt: currentLaunchedAt(row),
   };
 }
 
@@ -257,13 +270,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           team1Id: row.team1_id,
           team2Id: row.team2_id,
           startAt: toIso(row.start_at),
-          // Un lancement posé pour une autre paire d'engagés (arbitre revenu
-          // en arrière, seeding réordonné) ne compte pas — même règle que
-          // `currentLaunchState`, que lit la fiche du tournoi.
-          launchedAt:
-            row.launch_pairing !== null && row.launch_pairing === launchPairingKey(row.team1_id, row.team2_id)
-              ? toIso(row.launched_at)
-              : null,
+          launchedAt: currentLaunchedAt(row),
           refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
         },
         now,

@@ -23,7 +23,9 @@ import type { MatchStatus } from "./types";
 
 /**
  * Mode de passage à l'antenne d'un match casté.
- * - `AUTO` — le direct s'ouvre dès que le match devient jouable.
+ * - `AUTO` — le direct s'ouvre au **lancement** du match
+ *   (`lib/shared/match-launch.ts`) : ni « À planifier », ni « Planifié », ni
+ *   pendant l'attente des « Prêt » — à l'antenne quand la partie commence.
  * - `START_TIME` — le direct s'ouvre à la **date de début du match**
  *   (`lib/shared/match-schedule.ts`), une fois le match jouable. C'est le mode
  *   d'un plateau annoncé à l'avance : l'antenne suit le programme publié, sans
@@ -179,6 +181,13 @@ export type MatchLiveInput = {
    * Accepte aussi l'instant en millisecondes (`matchStartAtTime`).
    */
   startAt?: string | Date | number | null;
+  /**
+   * Lancement du match (mode `AUTO`) **valable pour l'appariement courant**
+   * (`currentLaunchState`) ; `null` = pas encore lancé. Obligatoire, et non
+   * facultatif : un appelant qui l'oublierait laisserait tout match `AUTO`
+   * « programmé » à jamais.
+   */
+  launchedAt: string | Date | null;
 };
 
 /**
@@ -189,7 +198,9 @@ export type MatchLiveInput = {
  * 2. le match a quitté `READY`/`PENDING` → **un score a été saisi** (report en
  *    attente ou score validé) : le direct est terminé ;
  * 3. le match n'est pas encore jouable → annoncé, pas encore à l'antenne ;
- * 4. `AUTO` → à l'antenne dès que le match est jouable ;
+ * 4. `AUTO` → à l'antenne une fois le match **lancé** : un match jouable
+ *    encore « À planifier », « Planifié » (heure pas atteinte) ou en attente
+ *    des « Prêt » n'a pas commencé, et l'annoncer en direct serait faux ;
  * 5. `START_TIME` → à l'antenne une fois la date de début atteinte. Une date
  *    absente laisse le match « programmé » indéfiniment : c'est une impasse,
  *    mais une impasse **visible et réversible** — préférable à un direct qui
@@ -206,7 +217,7 @@ export function resolveMatchLiveState(
   if (match.liveTrigger === null) return "OFF";
   if (match.status === "AWAITING_CONFIRMATION" || match.status === "COMPLETED") return "OFF";
   if (match.status === "PENDING") return "SCHEDULED";
-  if (match.liveTrigger === "AUTO") return "LIVE";
+  if (match.liveTrigger === "AUTO") return match.launchedAt ? "LIVE" : "SCHEDULED";
   if (match.liveTrigger === "START_TIME") {
     const startAt = matchStartAtTime({ startAt: match.startAt });
     return startAt !== null && now >= startAt ? "LIVE" : "SCHEDULED";
