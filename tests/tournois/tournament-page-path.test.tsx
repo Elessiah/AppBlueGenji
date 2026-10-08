@@ -64,7 +64,7 @@ describe("squelette de chargement", () => {
   });
 
   it("remplace le texte nu de la page", () => {
-    expect(page).toContain("return <TournamentLoading />;");
+    expect(page).toContain("return <TournamentLoading retrying={retrying} />;");
   });
 });
 

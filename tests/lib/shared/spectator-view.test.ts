@@ -13,6 +13,7 @@ import {
   SPECTATOR_RUNNING_POLL_MS,
   SPECTATOR_VIEWER_CONTEXT,
   spectatorCacheTtlMs,
+  spectatorFreshnessMs,
   spectatorLoadLevel,
   spectatorPollIntervalMs,
   spectatorRetryDelayMs,
@@ -23,6 +24,7 @@ import {
   type SpectatorLoadSignals,
 } from "@/lib/shared/spectator-view";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
+import type { TournamentSnapshot } from "@/lib/shared/types";
 import { bracketMatch } from "../../helpers/bracket-match";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
@@ -50,6 +52,9 @@ describe("chemins de la fiche", () => {
     expect(tournamentIdFromMemberPath("/tournois/7")).toBe(7);
     expect(tournamentIdFromMemberPath("/tournois/7/")).toBe(7);
     expect(tournamentIdFromMemberPath("/tournois/7.0")).toBe(7);
+    expect(tournamentIdFromMemberPath("/tournois/")).toBeNull();
+    expect(tournamentIdFromMemberPath("/tournois/7//")).toBeNull();
+    expect(tournamentIdFromMemberPath("/xtournois/7")).toBeNull();
     // Liste, création, édition : restent derrière la connexion.
     expect(tournamentIdFromMemberPath("/tournois")).toBeNull();
     expect(tournamentIdFromMemberPath("/tournois/creer")).toBeNull();
@@ -136,6 +141,11 @@ describe("cadence de relecture", () => {
     expect(spectatorPollIntervalMs("REGISTRATION", 3)).toBe(SPECTATOR_MAX_POLL_MS);
   });
 
+  it("annonce un âge maximal qui compte la gigue et le cache partagé", () => {
+    expect(spectatorFreshnessMs(30_000, 0)).toBe(33_000 + SPECTATOR_CACHE_TTL_MS);
+    expect(spectatorFreshnessMs(120_000, 2)).toBe(132_000 + 4 * SPECTATOR_CACHE_TTL_MS);
+  });
+
   it("allonge aussi la durée de vie de la réponse partagée", () => {
     expect(spectatorCacheTtlMs(0)).toBe(SPECTATOR_CACHE_TTL_MS);
     expect(spectatorCacheTtlMs(3)).toBe(10 * SPECTATOR_CACHE_TTL_MS);
@@ -202,6 +212,26 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(out.matches[0].casterUserId).toBeNull();
     // Le pseudo du caster reste : il est à l'antenne.
     expect(out.matches[0].casterPseudo).toBe("Caster");
+  });
+
+  it("garde les sanctions, sans leur arbitre ni leur motif", () => {
+    const penalty = {
+      id: 1,
+      teamId: 4,
+      teamName: "Alpha",
+      round: 2,
+      points: 3,
+      reason: "Retard de Nova",
+      authorPseudo: "Arbitre",
+      createdAt: null,
+      removable: false,
+    };
+    const snapshot = tournamentSnapshot({
+      endurance: { penalties: [penalty] } as unknown as TournamentSnapshot["endurance"],
+    });
+    const out = spectatorSnapshot(snapshot).endurance!.penalties[0];
+    expect(out).toMatchObject({ teamId: 4, teamName: "Alpha", round: 2, points: 3, reason: "", authorPseudo: null });
+    expect(spectatorSnapshot(tournamentSnapshot({ endurance: null })).endurance).toBeNull();
   });
 
   it("ne touche pas l'instantané partagé avec les membres", () => {

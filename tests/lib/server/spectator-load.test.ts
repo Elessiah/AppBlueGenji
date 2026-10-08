@@ -74,6 +74,19 @@ describe("signaux et niveau", () => {
     }
   });
 
+  it("se désarme aussi quand elle n'a servi qu'à mesurer (404, 503)", () => {
+    jest.useFakeTimers();
+    try {
+      // Aucune lecture servie : seule la mesure de charge a armé la sonde.
+      spectatorLoadSignals(T0);
+      spectatorLoadSignals(T0 + LOOP_DELAY_SAMPLE_MS);
+      jest.advanceTimersByTime(LOOP_PROBE_IDLE_MS);
+      expect(spectatorLoadSignals(T0 + 2 * LOOP_DELAY_SAMPLE_MS).eventLoopDelayMs).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("lit les flux ouverts de la diffusion", () => {
     jest.mocked(openStreamCount).mockReturnValue(123);
     expect(spectatorLoadSignals(T0).openStreams).toBe(123);

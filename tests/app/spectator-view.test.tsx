@@ -42,6 +42,7 @@ import { EntrantLink, EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib
 import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
 import { LiveIndicator } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
 import { TournamentHeader } from "@/app/(secured)/tournois/[id]/_components/TournamentHeader";
+import { TournamentLoading } from "@/app/(secured)/tournois/[id]/_components/TournamentLoading";
 import { ToastProvider } from "@/components/ui/toast";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { isMigratedRoute } from "@/lib/shared/locales";
@@ -266,6 +267,13 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(html).toContain("toutes les 2 minutes au plus");
   });
 
+  it("dit que la page réessaiera quand la première lecture a échoué", () => {
+    expect(member(<TournamentLoading />)).toContain(frTournament.loading);
+    const retrying = member(<TournamentLoading retrying />);
+    expect(retrying).toContain("ne peut pas être chargé pour l");
+    expect(retrying).not.toContain(frTournament.loading);
+  });
+
   it("a ses textes dans les deux langues", () => {
     for (const messages of [frTournament, enTournament]) {
       expect(messages.header.backHome).toBeTruthy();
@@ -273,6 +281,7 @@ describe("fiche commune sous SpectatorViewProvider", () => {
       expect(messages.header.spectatorTitle).toBeTruthy();
       expect(messages.live.retryTitle).toBeTruthy();
       expect(messages.live.cadenceMinute).toBeTruthy();
+      expect(messages.live.loadingRetry).toBeTruthy();
       expect(messages.page.fatal.backHome).toBeTruthy();
     }
   });
@@ -288,6 +297,11 @@ describe("liens publics vers un tournoi", () => {
     expect(board).toContain("tournamentMatchHref(card.id, null, spectator)");
     expect(board).not.toMatch(/href=\{`\/tournois\/\$\{/);
     expect(readSource("components/cyber/landing/Hero.tsx")).toContain("spectator={spectator} />");
+    expect(page).toContain("locale={locale} spectator={!user} />");
+    expect(readSource("components/cyber/landing/LeaderCal.tsx")).toContain("spectator={spectator} />");
+    expect(readSource("components/cyber/landing/CalendarCard.tsx")).toContain(
+      "tournamentMatchHref(event.tournamentId, null, spectator)",
+    );
     expect(readSource("components/cyber/landing/LiveCard.tsx")).toContain(
       "tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null, spectator)",
     );
@@ -295,7 +309,7 @@ describe("liens publics vers un tournoi", () => {
 
   it("« Rejoindre » ramène à la fiche connectée depuis la page sans compte, sans bouton de plus", () => {
     const header = readSource("components/cyber/landing/PublicHeader.tsx");
-    expect(header).toContain('const joinHref = user ? "/connexion" : joinHrefFor(await requestedPath());');
+    expect(header).toContain("const joinHref = joinHrefFor(await requestedPath());");
     expect(header).toContain("return (await headers()).get(PATHNAME_HEADER);");
     expect(header).toContain("<LocaleLink href={joinHref}>{t(\"join\")}</LocaleLink>");
   });

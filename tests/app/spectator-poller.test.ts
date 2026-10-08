@@ -169,6 +169,33 @@ describe("relecteur de la page sans compte", () => {
     expect(h.fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("dit qu'il réessaiera quand la toute première lecture échoue", async () => {
+    const h = harness([{ status: 503, headers: { "retry-after": "60" } }, ok(tournamentSnapshot())]);
+    await h.poller.start();
+
+    expect(h.last()).toMatchObject({ detail: null, retrying: true, isLive: false });
+    await h.advance(60_000);
+    expect(h.last()).toMatchObject({ retrying: false, isLive: true });
+  });
+
+  it("ne parle pas de réessai quand un plateau est déjà affiché", async () => {
+    const h = harness([ok(tournamentSnapshot()), new TypeError("Failed to fetch")]);
+    await h.poller.start();
+    await h.advance(SPECTATOR_RUNNING_POLL_MS);
+
+    expect(h.last()).toMatchObject({ retrying: false, isLive: false });
+    expect(h.last().detail).not.toBeNull();
+  });
+
+  it("retient l'âge maximal annoncé par le serveur", async () => {
+    const reply = ok(tournamentSnapshot()) as { status: number; headers: Record<string, string>; body: unknown };
+    reply.headers["x-bg-fresh-within-ms"] = "48000";
+    const h = harness([reply]);
+    await h.poller.start();
+
+    expect(h.last().freshnessMs).toBe(48_000);
+  });
+
   it("s'arrête sur un tournoi introuvable", async () => {
     const h = harness([{ status: 404, body: { error: "TOURNAMENT_NOT_FOUND" } }]);
     await h.poller.start();

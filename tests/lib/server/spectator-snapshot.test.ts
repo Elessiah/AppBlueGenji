@@ -5,6 +5,7 @@ jest.mock("@/lib/server/tournaments-service");
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { cached, clearCache } from "@/lib/server/cache";
 import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
+import { invalidateTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
 /** Réponse publique mutualisée : ce qui entre dans le cache partagé, et ce qui n'y entre pas. */
@@ -37,6 +38,16 @@ describe("getSpectatorPayload", () => {
     const probe = jest.fn(async () => "témoin");
     expect(await cached("spectator-snapshot:9", 60_000, probe)).toBe("témoin");
     expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it("est oubliée avec l'instantané des membres : une écriture n'est pas resservie périmée", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "v1" }));
+    await getSpectatorPayload(5, 60_000);
+
+    invalidateTournamentSnapshot(5);
+    await getSpectatorPayload(5, 60_000);
+
+    expect(mockedSnapshot).toHaveBeenCalledTimes(2);
   });
 
   it("laisse remonter une vraie panne", async () => {

@@ -11,6 +11,7 @@ import { resetRateLimit } from "@/lib/server/rate-limit";
 import { SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
 import { resetSpectatorLoad, spectatorReadsPerMinute } from "@/lib/server/spectator-load";
 import {
+  SPECTATOR_FRESHNESS_HEADER,
   SPECTATOR_MAX_POLL_MS,
   SPECTATOR_POLL_HEADER,
   SPECTATOR_PRE_LAUNCH_POLL_MS,
@@ -74,6 +75,8 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("etag")).toMatch(/^"[\w-]{22}"$/);
     expect(res.headers.get(SPECTATOR_POLL_HEADER)).toBe(String(SPECTATOR_RUNNING_POLL_MS));
+    // L'âge maximal annoncé compte la gigue et le cache partagé.
+    expect(Number(res.headers.get(SPECTATOR_FRESHNESS_HEADER))).toBeGreaterThan(SPECTATOR_RUNNING_POLL_MS);
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("content-type")).toContain("application/json");
     const body = (await res.json()) as TournamentSnapshot;
