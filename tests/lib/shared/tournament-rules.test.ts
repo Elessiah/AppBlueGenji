@@ -162,7 +162,7 @@ describe("tournament-rules — câblage des pages", () => {
   });
 
   it("affiche le bouton d'aide flottant sur les pages de tournoi", () => {
-    const detailPage = read("app/(secured)/tournois/[id]/page.tsx");
+    const detailPage = read("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     // Le bouton cible le mode **affiché à l'écran** : sur un tournoi multi-phases,
     // sélectionner une autre phase change la page de règles visée.
     expect(detailPage).toContain("<RulesHelpFab format={visibleFormat}");

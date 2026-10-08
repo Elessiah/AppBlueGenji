@@ -40,7 +40,7 @@ describe("confirmation d'inscription", () => {
   });
 
   it("passe par la confirmation, bouton désactivé pendant l'envoi", () => {
-    const page = read("app/(secured)/tournois/[id]/page.tsx");
+    const page = read("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     expect(page).toMatch(/const registerTeam = \(\) => \{[\s\S]*?setPendingConfirm\(/);
     expect(page).toContain("run: performRegister");
     const dialog = read("components/ui/confirm-action-dialog.tsx");

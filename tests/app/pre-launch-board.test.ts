@@ -5,7 +5,7 @@ import { join } from "node:path";
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
-const PAGE = "app/(secured)/tournois/[id]/page.tsx";
+const PAGE = "app/(secured)/tournois/[id]/_components/TournamentSheet.tsx";
 const PANEL = "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx";
 
 /** Retire commentaires de bloc et de ligne : ils citent le code en prose. */

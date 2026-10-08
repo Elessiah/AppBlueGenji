@@ -94,7 +94,7 @@ describe("forfait — restrictions de contexte", () => {
 describe("abandon — câblage des vues à classement", () => {
   const ROOT = join(__dirname, "..", "..");
   const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
-  const page = read("app/(secured)/tournois/[id]/page.tsx");
+  const page = read("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
   const enduranceView = read("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
 
   it("passe la règle d'éligibilité et l'action aux trois vues", () => {

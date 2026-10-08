@@ -16,7 +16,7 @@ import {
  */
 
 const PAGE_DIR = "app/(secured)/tournois/[id]";
-const page = readFileSync(join(process.cwd(), PAGE_DIR, "page.tsx"), "utf8");
+const page = readFileSync(join(process.cwd(), PAGE_DIR, "_components/TournamentSheet.tsx"), "utf8");
 
 const LAZY = [
   "SurvivalView",
@@ -42,7 +42,7 @@ const LAZY = [
 describe("paquet de la fiche tournoi", () => {
   it.each(LAZY.map((name) => [name]))("%s est chargé à la demande", (name) => {
     expect(page).toContain(
-      `const ${name} = dynamic(() => orReload(import("./_components/${name}").then((m) => m.${name})), { ssr: false });`,
+      `const ${name} = dynamic(() => orReload(import("./${name}").then((m) => m.${name})), { ssr: false });`,
     );
     expect(page).not.toMatch(new RegExp(`^import[^;]*\\b${name}\\b[^;]*from`, "m"));
     expect(page).toContain(`<${name}`);
@@ -65,7 +65,7 @@ describe("paquet de la fiche tournoi", () => {
   });
 
   it("n'importe aucun dialogue de façon statique", () => {
-    const staticDialogs = page.match(/^import \{[^}]*Dialog\b[^}]*\} from "\.\/_components\/[^"]+";$/gm);
+    const staticDialogs = page.match(/^import \{[^}]*Dialog\b[^}]*\} from "\.\/[^"]+";$/gm);
     expect(staticDialogs).toBeNull();
   });
 });

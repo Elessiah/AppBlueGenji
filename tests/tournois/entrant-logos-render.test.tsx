@@ -242,7 +242,7 @@ describe("vues du tournoi — le nom d'un engagé porte son emblème", () => {
   });
 
   it("construit la table des logos depuis les inscrites et la pose dans le contexte", () => {
-    const page = readFileSync(join(TOURNAMENT, "page.tsx"), "utf8");
+    const page = readFileSync(join(TOURNAMENT, "_components/TournamentSheet.tsx"), "utf8");
 
     expect(page).toContain("buildEntrantLogoMap(detail?.registrations ?? [])");
     expect(page).toContain("logos={entrantLogos}");

@@ -80,10 +80,18 @@ afterEach(() => {
 });
 
 describe("garde de l'espace sécurisé", () => {
-  it("rend une carte au lieu de rediriger : un 307 n'a pas de <head>", () => {
+  it("rend une carte au lieu de rediriger : un 307 vers /connexion n'a pas de <head>", () => {
     expect(SECURED_LAYOUT).toContain("getCurrentUser");
     expect(SECURED_LAYOUT).toContain("<AuthGate text={authGate} />");
-    expect(SECURED_LAYOUT).not.toContain("redirect(");
+    expect(SECURED_LAYOUT).not.toMatch(/redirect\([^)]*connexion/);
+  });
+
+  it("ne redirige que la fiche d'un tournoi, vers sa page sans compte qui porte le même encart", () => {
+    // Seule redirection de la garde : la page d'arrivée a son propre <head>
+    // (`app/suivre/tournois/[id]/layout.tsx`), le robot d'aperçu y voit le tournoi.
+    expect(SECURED_LAYOUT.match(/redirect\(/g)).toHaveLength(1);
+    expect(SECURED_LAYOUT).toContain("redirect(localeHref(spectatorTournamentPath(tournamentId), await requestLocale()));");
+    expect(SECURED_LAYOUT).toContain("tournamentIdFromMemberPath((await headers()).get(PATHNAME_HEADER))");
   });
 
   it("ne rend pas les enfants sans session : rien du contenu protégé ne fuit", () => {

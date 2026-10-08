@@ -197,7 +197,7 @@ describe("fiche — filets de section, cartes de match, panneaux", () => {
     expect(PAGE_CSS).toMatch(
       /@media print\s*\{\s*\.sheet :global\(\.ds-section-title\.green\) h2,\s*\.sheet :global\(\.ds-section-title\.blue\) h2\s*\{[^}]*color:\s*var\(--ink\)/,
     );
-    const page = readSource(join(tournamentDir, "[id]", "page.tsx"));
+    const page = readSource(join(tournamentDir, "[id]", "_components/TournamentSheet.tsx"));
     expect(page).toContain("styles.sheet");
   });
 });

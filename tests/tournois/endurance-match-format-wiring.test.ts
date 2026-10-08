@@ -18,7 +18,7 @@ import { dependentMatches, type MatchScoreState } from "@/lib/shared/match-lock"
  * test est ce qui rendrait le premier indispensable s'il changeait.
  */
 const PAGE = readFileSync(
-  join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "page.tsx"),
+  join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "_components/TournamentSheet.tsx"),
   "utf8",
 );
 

@@ -164,7 +164,7 @@ describe("page du tournoi — ce que dit la zone des matchs vide", () => {
   // Même approche que `refresh-wiring` : la page est un composant client bardé
   // de contextes, et ce qu'on veut garantir tient au câblage, pas au rendu.
   const source = readFileSync(
-    join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "page.tsx"),
+    join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "_components/TournamentSheet.tsx"),
     "utf8",
   );
 

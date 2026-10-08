@@ -19,7 +19,7 @@ const VIEW = read("_components", "EnduranceView.tsx");
 const PANELS = read("_components", "EnduranceRoundPanels.tsx");
 const SECTIONS = read("_components", "BracketSections.tsx");
 const TREE = read("_components", "BracketTree.tsx");
-const PAGE = read("page.tsx");
+const PAGE = read("_components/TournamentSheet.tsx");
 
 describe("volets de manche — câblage de la vue", () => {
   it("rend ses cartes elle-même, comme les trois autres vues de plateau", () => {

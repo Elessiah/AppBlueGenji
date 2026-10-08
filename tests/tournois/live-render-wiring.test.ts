@@ -8,7 +8,7 @@ import { readSource } from "../helpers/read-source";
  * `live-state.test.ts` (partage structurel) et `viewer-alerts.test.ts`
  * (`viewerLaunchChanged`).
  */
-const page = readSource("app/(secured)/tournois/[id]/page.tsx");
+const page = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
 const hook = readSource("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 const formatContext = readSource("app/(secured)/tournois/[id]/_lib/match-format-context.tsx");
 const launchCenter = readSource("components/match-launch/MatchLaunchCenter.tsx");
