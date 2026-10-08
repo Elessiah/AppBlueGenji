@@ -54,6 +54,15 @@ export type SpectatorPoller = {
 };
 
 /**
+ * Relecture d'un tournoi introuvable. Un 404 peut être un tournoi pas encore
+ * publié : relu au plafond, il s'ouvre seul à sa publication. Un 400
+ * (identifiant illisible) ne changera jamais.
+ */
+function notFoundRetryMs(status: number): number | null {
+  return status === 404 ? SPECTATOR_MAX_POLL_MS : null;
+}
+
+/**
  * Suivi d'un tournoi **sans compte** (`docs/features/SPECTATOR_VIEW.md`),
  * hors React pour se tester sans navigateur.
  *
@@ -129,10 +138,7 @@ export function createSpectatorPoller(
 
       if (response.status === 404 || response.status === 400) {
         commit({ ...current, isLive: false, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null });
-        // Un 404 peut être un tournoi pas encore publié : relu au plafond, il
-        // s'ouvre seul à sa publication. Un 400 (identifiant illisible) ne
-        // changera jamais.
-        schedule(response.status === 404 ? SPECTATOR_MAX_POLL_MS : null);
+        schedule(notFoundRetryMs(response.status));
         return;
       }
       if (response.status !== 200 && response.status !== 304) {
