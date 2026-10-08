@@ -153,11 +153,12 @@ test.describe("Protection des routes sécurisées", () => {
     page,
   }) => {
     await page.context().clearCookies();
-    // Le tournoi n'a pas besoin d'exister : ce qui est vérifié ici, c'est que la
-    // réponse est une page (avec son `<head>`) et non une redirection — sans
-    // quoi aucune métadonnée d'aperçu ne pourrait jamais être lue.
+    // Le tournoi n'a pas besoin d'exister : ce qui est vérifié ici, c'est que le
+    // visiteur arrive sur une page (avec son `<head>`) — la page sans compte
+    // (`docs/features/SPECTATOR_VIEW.md`), où un robot d'aperçu lit l'encart.
     const response = await page.goto("/tournois/1");
 
+    await expect(page).toHaveURL(/\/suivre\/tournois\/1$/);
     expect(response?.status()).toBe(200);
     await expect(page.locator('meta[property="og:image"]')).toHaveCount(1);
     await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
