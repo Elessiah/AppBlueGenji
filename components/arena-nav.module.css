@@ -138,30 +138,51 @@
 .navRight {
   display: flex;
   justify-content: flex-end;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
+  min-width: 0;
 }
 
-.navHome {
+/* Outils (langue, modération) : boutons carrés discrets, regroupés et séparés
+   du compte par un filet vertical — la barre ne porte plus qu'un seul bouton
+   « fort », celui du compte. */
+.navTools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 14px;
+  border-right: 1px solid var(--line-strong-cy);
+}
+
+.navTools .navTool {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-cy-sm);
+  background: transparent;
+  color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--blue-300);
-  padding: 8px 14px;
-  border: 1px solid rgba(90, 200, 255, 0.45);
-  background: rgba(90, 200, 255, 0.08);
-  border-radius: var(--r-cy-sm);
-  box-shadow: 0 0 12px rgba(90, 200, 255, 0.18), inset 0 0 0 1px rgba(90, 200, 255, 0.04);
-  transition: all 0.15s;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-decoration: none;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.navHome:hover {
-  color: var(--blue-200, #8ddcff);
-  border-color: rgba(90, 200, 255, 0.65);
-  background: rgba(90, 200, 255, 0.14);
-  box-shadow: 0 0 18px rgba(90, 200, 255, 0.35);
+.navTools .navTool:hover {
+  color: var(--blue-300);
+  border-color: rgba(90, 200, 255, 0.35);
+  background: rgba(90, 200, 255, 0.06);
+}
+
+.navTools .navTool:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
 }
 
 /* Hauteur de la barre : elle reste collée en haut de l'écran, chaque pixel
@@ -171,35 +192,6 @@
 @media (max-height: 500px) {
   .nav {
     position: relative;
-  }
-}
-
-/* ── Portable, tablette : « Accueil » / « Mon équipe » en pictogramme seul ──
-   Entre 721 et 1150 px les libellés passaient sur deux lignes et rognaient le
-   pseudo. Le libellé reste lu par les technologies d'assistance (le nom
-   accessible du lien ne change pas). */
-@media (max-width: 1150px) {
-  .navHomeLabel {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .navHome {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 40px;
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 14px;
-    letter-spacing: 0;
   }
 }
 
@@ -240,9 +232,16 @@
   }
 }
 
+/* Sous 1000 px, le losange cède sa place au libellé : le trait sous le lien
+   actif suffit à marquer la section, et les quatre liens tiennent sur une
+   ligne au lieu de se replier. */
+@media (max-width: 1000px) {
+  .navLink::before {
+    display: none;
+  }
+}
+
 /* ── Mobile : passage sur deux lignes (logo + avatar en haut, liens en bas) ──
-   Les raccourcis « Accueil » / « Mon équipe » sont masqués : l'accueil reste
-   accessible par le logo, l'équipe par le menu du compte (sous l'avatar).
    Espacements resserrés : collante, la barre prenait 110 px. */
 @media (max-width: 720px) {
   .navInner {
@@ -290,8 +289,9 @@
     letter-spacing: 0.06em;
   }
 
-  .navHome {
-    display: none;
+  .navTools {
+    gap: 2px;
+    padding-right: 8px;
   }
 }
 
@@ -307,49 +307,35 @@
   }
 }
 
-/* Lien de la modération : ambre, comme tout ce qui attend une décision. */
-.navReports {
+/* Lien de la modération : drapeau ambre, comme tout ce qui attend une
+   décision ; le compteur se pose en pastille sur le coin du bouton. */
+.navTools .navReports {
+  color: var(--amber);
+}
+
+.navTools .navReports:hover,
+.navTools .navReports[aria-current="page"] {
   color: var(--amber);
   border-color: rgba(var(--amber-rgb), 0.45);
   background: rgba(var(--amber-rgb), 0.08);
-  box-shadow: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.navReports:hover {
-  color: #ffc566;
-  border-color: rgba(var(--amber-rgb), 0.7);
-  background: rgba(var(--amber-rgb), 0.14);
-  box-shadow: none;
 }
 
 .navBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
   min-width: 18px;
-  padding: 1px 6px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
   border-radius: 999px;
+  border: 2px solid var(--cyber-bg-1);
   background: var(--amber);
   color: #111;
+  font-family: var(--font-mono);
   font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
   letter-spacing: 0;
-  text-align: center;
-}
-
-/* Sous 1150 px — même seuil que les pictogrammes d'« Accueil » —, la barre ne
-   tient plus ce lien en toutes lettres : le libellé passe en lecture seule pour les technologies
-   d'assistance (le nom accessible reste « Signalements »), le drapeau et le
-   compteur restent visibles. */
-@media (max-width: 1150px) {
-  .navReportsLabel {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
 }

@@ -15,6 +15,11 @@
   white-space: nowrap;
 }
 
+.globe {
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
 .link:hover {
   color: var(--blue-300);
 }

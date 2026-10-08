@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { Flag } from "lucide-react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { LogoWithGlow } from "./logo-with-glow";
 import { AccountMenu } from "./account-menu";
@@ -84,40 +85,35 @@ export function ArenaNav({
         </LocaleLink>
 
         <div className={s.navRight}>
-          {/* Les pictogrammes sont décoratifs : lus à voix haute, « ⌂ » et
-              « 🛡 » précédaient le nom du lien d'un mot sans rapport. */}
-          <LocaleLink href="/" className={s.navHome}>
-            <span aria-hidden="true">⌂</span> <span className={s.navHomeLabel}>{t("nav.home")}</span>
-          </LocaleLink>
-          {activeTeam && (
-            <LocaleLink
-              href={`/equipes/${activeTeam.teamId}`}
-              className={s.navHome}
-              aria-label={t("nav.myTeamLabel", { team: activeTeam.teamName })}
-              title={activeTeam.teamName}
-            >
-              <span aria-hidden="true">🛡</span> <span className={s.navHomeLabel}>{t("nav.myTeam")}</span>
-            </LocaleLink>
-          )}
-          {openReports !== null && (
-            <LocaleLink
-              href={REPORTS_ADMIN_PATH}
-              className={`${s.navHome} ${s.navReports}`}
-              aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
-            >
-              <span aria-hidden="true">⚑</span> <span className={s.navReportsLabel}>{t("nav.reports")}</span>
-              {openReports > 0 && (
-                <span className={s.navBadge}>
-                  {openReports}
-                  <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
-                </span>
+          {/* Barre allégée : l'accueil passe par le logo, « Mon équipe » par le
+              menu du compte. Restent les outils (langue, modération) et le
+              compte, séparés par un filet. */}
+          {(languageSwitcherLabel || openReports !== null) && (
+            <div className={s.navTools}>
+              {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
+              {languageSwitcherLabel && (
+                <LanguageSwitcher label={languageSwitcherLabel} compact className={s.navTool} />
               )}
-            </LocaleLink>
+              {openReports !== null && (
+                <LocaleLink
+                  href={REPORTS_ADMIN_PATH}
+                  className={`${s.navTool} ${s.navReports}`}
+                  aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
+                  title={t("nav.reports")}
+                >
+                  <Flag size={16} strokeWidth={2} aria-hidden="true" />
+                  <span className="sr-only">{t("nav.reports")}</span>
+                  {openReports > 0 && (
+                    <span className={s.navBadge}>
+                      {openReports}
+                      <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
+                    </span>
+                  )}
+                </LocaleLink>
+              )}
+            </div>
           )}
-          {/* Profil, équipe et déconnexion, à portée de main sur toutes les
-              largeurs — sous 720 px, c'est le seul chemin vers sa propre équipe. */}
-          {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
-          {languageSwitcherLabel && <LanguageSwitcher label={languageSwitcherLabel} />}
+          {/* Profil, équipe et déconnexion, à portée de main sur toutes les largeurs. */}
           <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
       </div>
