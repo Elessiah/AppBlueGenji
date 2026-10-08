@@ -216,7 +216,7 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
       );
       showSuccess("Équipe mise à jour.");
       onChanged();
-      // Le bouton « Mon équipe » de la barre porte le nom : il doit suivre.
+      // Le menu du compte (« Mon équipe ») rappelle le nom : il doit suivre.
       router.refresh();
     } catch (e) {
       // `teamApi` lève le code du refus tel quel : c'est lui qui désigne le

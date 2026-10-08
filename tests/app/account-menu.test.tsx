@@ -52,6 +52,8 @@ describe("AccountMenuPanel", () => {
     expect(html).toContain('href="/profil"');
     expect(html).toContain('href="/equipes/7"');
     expect(html).toContain('aria-label="Mon équipe : Les Ours"');
+    // Nom complet au survol s'il est rogné, sans rien ajouter à la lecture.
+    expect(html).toContain('<span class="itemHint" aria-hidden="true" title="Les Ours">Les Ours</span>');
     expect(html).toMatch(/<button type="button"[^>]*><svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="itemText">Déconnexion<\/span><\/button>/);
   });
 

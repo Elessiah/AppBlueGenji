@@ -153,6 +153,8 @@
 .navTools {
   display: flex;
   align-items: center;
+  /* 6 px à toutes les largeurs : le contour de focus (2 px, décalé de 2 px)
+     ne déborde pas sur le bouton voisin. */
   gap: 6px;
   padding-right: 14px;
   border-right: 1px solid var(--line-strong-cy);
@@ -301,12 +303,6 @@
      alourdit la barre collante. */
   .navLink {
     letter-spacing: 0.06em;
-  }
-
-  /* 6 px : le contour de focus (2 px, décalé de 2 px) ne déborde pas sur le
-     bouton voisin. */
-  .navTools {
-    gap: 6px;
   }
 }
 

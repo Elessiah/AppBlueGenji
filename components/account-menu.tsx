@@ -143,8 +143,10 @@ export function AccountMenuPanel({
           <Shield className={s.itemIcon} size={16} aria-hidden="true" />
           <span className={s.itemText}>
             {t("nav.myTeam")}
+            {/* `title` : le nom complet au survol quand il est rogné ; muet, le
+                rappel étant masqué aux technologies d'assistance. */}
             {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
-            <span className={s.itemHint} aria-hidden="true">
+            <span className={s.itemHint} aria-hidden="true" title={activeTeam.teamName}>
               {activeTeam.teamName}
             </span>
           </span>

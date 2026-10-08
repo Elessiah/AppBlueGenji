@@ -140,6 +140,14 @@
   background: rgba(90, 200, 255, 0.12);
 }
 
+.item:active:not(:disabled) .itemIcon {
+  opacity: 1;
+}
+
+.logout:active:not(:disabled) .itemIcon {
+  color: var(--ink);
+}
+
 .itemHint {
   max-width: 190px;
   overflow: hidden;

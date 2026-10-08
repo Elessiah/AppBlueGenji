@@ -116,7 +116,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     // Hauteur minimale, pas fixe : la pastille suit l'agrandissement du texte (1.4.4).
     expect(badgeRule).toContain("min-height: 18px;");
     // Sous 720 px, l'écart laisse la place au contour de focus (2 px + 2 px).
-    expect(css).toMatch(/\.navTools \{\s*gap: 6px;/);
+    expect(css).toMatch(/\.navTools \{[^}]*gap: 6px;/);
     // Filet centré sous 900 px : marge des outils = écart du groupe de droite.
     expect(css).toMatch(/\.navRight \{\s*gap: 10px;\s*\}\s*\/\*[^*]*\*\/\s*\.navTools \{\s*padding-right: 10px;/);
     // Les liens de section ne gardent pas un survol collé au toucher.
