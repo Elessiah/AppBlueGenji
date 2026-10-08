@@ -184,11 +184,14 @@ describe("carouselCanAutoRotate", () => {
   });
 });
 
-describe("LiveCard — focus du bouton de pause", () => {
-  const source = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
+describe("useMatchCarousel — focus perdu par un retrait", () => {
+  const source = readFileSync(join(process.cwd(), "components/cyber/landing/useMatchCarousel.ts"), "utf8");
+  const card = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
 
-  it("rend le focus au bouton suivant quand la pause disparaît en l'ayant", () => {
-    expect(source).toContain("else pauseFocused.current = document.activeElement === pauseButton.current;");
-    expect(source).toContain("nextRef.current?.focus();");
+  it("rend à la carte le focus tombé sur <body>, sinon relâche la prise", () => {
+    expect(source).toContain("if (!focused || !hold || hold.contains(document.activeElement)) return;");
+    expect(source).toContain('hold.querySelector<HTMLElement>("[data-carousel-next]")');
+    expect(card).toContain("data-carousel-next");
+    expect(card).toContain("<div ref={carousel.holdRef} className={styles.hold}");
   });
 });

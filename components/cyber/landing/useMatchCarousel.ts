@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type PointerEvent, type RefObject } from "react";
 import { useClientPower, useClientPowerInput } from "@/lib/shared/hooks/useClientPower";
 import type { ClientPowerInput } from "@/lib/shared/client-power";
 
@@ -55,6 +55,8 @@ export type MatchCarousel = {
    * doigt, focus gardé tant qu'on ne clique pas ailleurs), et le bouton
    * « Reprendre » paraîtrait sans effet.
    */
+  /** Enveloppe de la carte, pour retrouver le focus qu'un retrait a perdu. */
+  holdRef: RefObject<HTMLDivElement>;
   holdHandlers: {
     onPointerEnter: (event: PointerEvent<HTMLElement>) => void;
     onPointerLeave: (event: PointerEvent<HTMLElement>) => void;
@@ -89,6 +91,28 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
   const rotating = canRotate && !paused && !hovered && !focused;
   const nextId = count > 1 ? ids[(index + 1) % count] : null;
 
+  // Un retrait sous le focus clavier — match terminé entre deux sondages, bouton
+  // de pause sous un gel durable — n'émet aucun `blur` : la prise resterait
+  // posée pour toujours, et le focus tomberait sur `<body>`. Relu après chaque
+  // rendu utile (une comparaison, rien de plus) : le focus perdu revient dans la
+  // carte, au bouton « suivant » ou à défaut à la plaque de lien ; parti
+  // ailleurs, il relâche la prise. Rejoué quand la liste ou le gel changent :
+  // les deux seuls retraits possibles.
+  const idsKey = ids.join(",");
+  const holdRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const hold = holdRef.current;
+    if (!focused || !hold || hold.contains(document.activeElement)) return;
+    if (document.activeElement === null || document.activeElement === document.body) {
+      const fallback = hold.querySelector<HTMLElement>("[data-carousel-next]") ?? hold.querySelector<HTMLElement>("a");
+      if (fallback) {
+        fallback.focus();
+        return;
+      }
+    }
+    setFocused(false);
+  }, [focused, idsKey, autoRotates]);
+
   useEffect(() => {
     if (!rotating || nextId === null) return;
     const timer = setTimeout(() => setActiveId(nextId), LANDING_CAROUSEL_INTERVAL_MS);
@@ -106,6 +130,7 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
       setActiveId(ids[(((index + delta) % count) + count) % count]);
     },
     togglePaused: () => setPaused((value) => !value),
+    holdRef,
     holdHandlers: {
       onPointerEnter: (event) => {
         if (event.pointerType === "mouse") setHovered(true);

@@ -313,9 +313,14 @@ carte sur son voisin.
 **passager** (fenêtre sans focus, onglet caché) — un bouton qui disparaîtrait à
 chaque perte de focus ferait perdre le focus clavier — mais pas sous un gel
 **durable** (`carouselCanAutoRotate` : mouvement réduit, rencontre en cours,
-machine à la peine), où « Pause » nommerait un mouvement qui n'a pas lieu. Si
-elle disparaît en ayant le focus (ralenti constaté page regardée), le focus passe
-au bouton « suivant » plutôt que de tomber sur `<body>`. La position n'est annoncée (`aria-live="polite"`) que
+machine à la peine), où « Pause » nommerait un mouvement qui n'a pas lieu.
+
+**Focus perdu par un retrait.** Un élément retiré sous le focus clavier — le
+match affiché, terminé entre deux sondages, ou la pause sous un ralenti constaté
+page regardée — n'émet aucun `blur` : la prise resterait posée pour toujours et
+le focus tomberait sur `<body>`. `useMatchCarousel` le relit après chaque rendu :
+le focus revient au bouton « suivant » (`data-carousel-next`), à défaut à la
+plaque de lien ; parti ailleurs, il relâche la prise. La position n'est annoncée (`aria-live="polite"`) que
 défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
 
 ## Fichiers
