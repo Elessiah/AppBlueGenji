@@ -33,7 +33,8 @@ de liste publique.
   la requête, la redirection la jetterait).
 
 La langue suit l'adresse (`localeHref`). L'ancre `#match-[id]` traverse la
-redirection serveur (le navigateur la conserve), la requête (`?utm=…`) aussi :
+redirection serveur d'une navigation complète (le navigateur la conserve ; une
+navigation client la perdrait, d'où les liens directs de la vitrine), la requête (`?utm=…`) aussi :
 le middleware la pose à côté du chemin (`x-search`, toujours remplacé), et seule
 une valeur qui commence par `?` est reprise (`forwardedSearch`), dans les deux
 sens. Le relais client garde les deux.
@@ -124,7 +125,8 @@ lui-même).
   par durée de vie (15 s au calme, ×1 à ×10 selon la charge), quel que soit le
   nombre de visiteurs. Une écriture ne **réveille** pas les visiteurs sans
   compte et n'**invalide** pas cette réponse : sa durée de vie, allongée sous la
-  charge, est ce qui protège la machine d'un tournoi animé. Seule la
+  charge, est ce qui protège la machine d'un tournoi animé (choix de l'auteur ;
+  ce délai, 150 s au pire, est déclaré dans `/rgpd`). Seule la
   **suppression** du tournoi la retire (`invalidateSpectatorSnapshot`,
   `deletion.ts`). La reconstruction lit d'abord la **carte** du tournoi (une
   requête indexée) : un identifiant inconnu ou pas encore publié s'arrête là,
