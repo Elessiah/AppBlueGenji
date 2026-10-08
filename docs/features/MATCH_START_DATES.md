@@ -46,7 +46,7 @@ la route du flux SSE et la lecture REST de secours.
 ## Le mode d'antenne « à la date de début »
 
 `bg_matches.live_trigger` accepte un troisième mode, `START_TIME`, à côté de
-`AUTO` (à l'antenne dès que le match est jouable) et `MANUAL` (à l'antenne au
+`AUTO` (à l'antenne au lancement du match) et `MANUAL` (à l'antenne au
 clic) :
 
 ```

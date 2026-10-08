@@ -30,7 +30,8 @@ mode de déclenchement, le lien, et l'horodatage d'ouverture d'antenne.
 liveTrigger === null                          → OFF        (match non casté)
 status ∈ {AWAITING_CONFIRMATION, COMPLETED}   → OFF        (un score a été saisi)
 status === PENDING                            → SCHEDULED  (annoncé, pas jouable)
-liveTrigger === "AUTO"                        → LIVE
+liveTrigger === "AUTO" && launchedAt          → LIVE
+liveTrigger === "AUTO"                        → SCHEDULED  (À planifier, Planifié, Lancement)
 liveTrigger === "START_TIME" && now >= startAt → LIVE
 liveTrigger === "START_TIME"                  → SCHEDULED  (heure pas atteinte, ou pas de date)
 liveTrigger === "MANUAL" && liveStartedAt     → LIVE
@@ -74,8 +75,15 @@ après un ré-appariement ; seule l'antenne, qui affirme « maintenant », tombe
 
 Choisis **par match**, au moment où on le marque comme casté :
 
-- **`AUTO`** — le direct s'ouvre dès que le match devient jouable (`READY`),
-  c'est-à-dire quand le tournoi atteint le round concerné.
+- **`AUTO`** — le direct s'ouvre au **lancement** du match
+  (`MATCH_LAUNCH.md`) : quand toutes les parties sont prêtes, que l'arbitrage
+  force le départ ou que le délai d'office expire. Tant que le match est
+  « À planifier », « Planifié » (heure pas atteinte) ou en lancement, il reste
+  « programmé ». Seul compte un lancement **de l'appariement courant**
+  (`currentLaunchState`) : les lectures serveur (`findBroadcastingTournament`,
+  `getLandingLive`) chargent `launched_at` et `launch_pairing` pour l'écarter
+  sinon. Avant cette règle, `AUTO` s'allumait dès `READY` — donc sur un match
+  qui attendait encore sa date ou ses « Prêt ».
 - **`MANUAL`** — le direct s'ouvre au clic (« Lancer le direct », menu « Plus d'actions » de la carte), et se referme au clic
   (« Couper le direct ») ou tout seul à la saisie du score. C'est le mode qui convient
   aux tournois étalés sur plusieurs jours, où un match peut être jouable des
@@ -198,8 +206,9 @@ match casté. `ADMIN` a tout.
 
 `npm run seed` produit cinq cas (`lib/server/seed/cases.ts`, champ `live`) :
 
-- **Live Auto (à l'antenne)** — chaîne officielle + matchs en `AUTO` : le cas
-  nominal du bouton d'accueil.
+- **Live Auto (à l'antenne)** — chaîne officielle + matchs en `AUTO`, lancés
+  sauf le premier (resté en lancement avec le caster, donc « programmé ») : le
+  cas nominal du bouton d'accueil.
 - **Live Manuel (hors antenne)** — chaîne renseignée, antenne fermée : les matchs
   sont « programmés » et ce tournoi **ne doit pas** faire apparaître le bouton.
 - **Live Manuel (antenne ouverte)** — antenne ouverte sans lien sur les matchs :
