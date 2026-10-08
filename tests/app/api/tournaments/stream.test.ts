@@ -49,6 +49,7 @@ function rightsPassedToViewerContext(): {
   canPreview?: boolean;
   canManageLive?: boolean;
   canDelete?: boolean;
+  canCancelForfeit?: boolean;
 } {
   return jest.mocked(getTournamentViewerContext).mock.calls[0][2] as Record<string, boolean>;
 }
@@ -79,6 +80,7 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
     canCreateReportsForTeamIds: [],
     isAdmin: false,
     canDelete: false,
+    canCancelForfeit: false,
     canManageLive: false,
     viewerUserId: 1,
     castBlock: "NOT_CASTER",

@@ -44,6 +44,7 @@ export function tournamentViewerContext(
     canCreateReportsForTeamIds: [],
     isAdmin: false,
     canDelete: false,
+    canCancelForfeit: false,
     canManageLive: false,
     viewerUserId: 1,
     castBlock: "NOT_CASTER",

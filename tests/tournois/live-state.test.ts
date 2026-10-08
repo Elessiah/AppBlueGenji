@@ -109,6 +109,7 @@ const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentVie
   canCreateReportsForTeamIds: [10],
   isAdmin: false,
   canDelete: false,
+  canCancelForfeit: false,
   canManageLive: false,
   viewerUserId: 1,
   castBlock: "NOT_CASTER",

@@ -45,7 +45,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       1,
-      { canManage: true, canPreview: true, canManageLive: true, canDelete: true },
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: true, canCancelForfeit: true },
     ]);
   });
 
@@ -58,7 +58,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       2,
-      { canManage: true, canPreview: true, canManageLive: true, canDelete: false },
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false },
     ]);
   });
 
@@ -70,7 +70,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       3,
-      { canManage: false, canPreview: true, canManageLive: true, canDelete: false },
+      { canManage: false, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false },
     ]);
   });
 
@@ -82,7 +82,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       4,
-      { canManage: false, canPreview: false, canManageLive: false, canDelete: false },
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false },
     ]);
   });
 
@@ -94,7 +94,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       5,
-      { canManage: false, canPreview: false, canManageLive: false, canDelete: false },
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false },
     ]);
   });
 
