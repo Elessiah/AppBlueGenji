@@ -10,6 +10,7 @@ import {
 } from "@/lib/shared/player-score-report";
 import type { MatchScoreReport } from "@/lib/shared/types";
 import { bracketMatch } from "../../helpers/bracket-match";
+import { mapsFor } from "../../helpers/match-maps";
 
 const report = (team1Score: number, team2Score: number): MatchScoreReport => ({
   team1Score,
@@ -87,9 +88,25 @@ describe("toReporterScores", () => {
 });
 
 describe("sameReportedScore", () => {
-  it("compare les deux scores, pas l'horodatage", () => {
-    expect(sameReportedScore(report(2, 1), { team1Score: 2, team2Score: 1 })).toBe(true);
-    expect(sameReportedScore(report(2, 1), report(1, 2))).toBe(false);
+  const withMaps = (team1Score: number, team2Score: number, maps = mapsFor(team1Score, team2Score)) => ({
+    ...report(team1Score, team2Score),
+    maps: maps.map((map, index) => ({ ...map, mapNumber: index + 1 })),
+  });
+
+  it("compare les scores et les maps, pas l'horodatage", () => {
+    expect(sameReportedScore(withMaps(2, 1), { team1Score: 2, team2Score: 1, maps: mapsFor(2, 1) })).toBe(true);
+    expect(sameReportedScore(withMaps(2, 1), withMaps(1, 2))).toBe(false);
+  });
+
+  it("deux 2-1 aux codes différents se contredisent, comme au serveur", () => {
+    const other = mapsFor(2, 1).map((map) => ({ ...map, replayCode: `X${map.replayCode}` }));
+    expect(sameReportedScore(withMaps(2, 1), withMaps(2, 1, other))).toBe(false);
+  });
+
+  it("un détail absent (en lecture ou introuvable) ne concorde avec rien", () => {
+    expect(sameReportedScore(report(2, 1), withMaps(2, 1))).toBe(false);
+    expect(sameReportedScore(withMaps(2, 1), report(2, 1))).toBe(false);
+    expect(sameReportedScore(report(2, 1), report(2, 1))).toBe(false);
   });
 });
 

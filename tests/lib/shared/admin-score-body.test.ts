@@ -1,48 +1,81 @@
 import { describe, expect, it } from "@jest/globals";
-import { ADMIN_SCORE_MAX, parseAdminScoreBody } from "@/lib/shared/admin-score-body";
+import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
+import { mapsFor } from "../../helpers/match-maps";
 
 describe("parseAdminScoreBody", () => {
-  it("lit deux scores, chaînes numériques comprises", () => {
-    expect(parseAdminScoreBody({ team1Score: "2", team2Score: 1 })).toEqual({
+  it("lit le détail map par map, codes normalisés", () => {
+    expect(
+      parseAdminScoreBody({
+        maps: [
+          { replayCode: "abc123", team1Score: 2, team2Score: 0 },
+          { replayCode: "DEF456", team1Score: 1, team2Score: 1 },
+        ],
+      }),
+    ).toEqual({
       ok: true,
-      value: { team1Score: 2, team2Score: 1, forfeitTeamId: undefined },
+      value: {
+        maps: [
+          { replayCode: "ABC123", team1Score: 2, team2Score: 0 },
+          { replayCode: "DEF456", team1Score: 1, team2Score: 1 },
+        ],
+      },
     });
   });
 
-  it("accepte l'égalité : c'est au format de la manche d'en juger", () => {
-    expect(parseAdminScoreBody({ team1Score: 2, team2Score: 2 }).ok).toBe(true);
+  it("accepte des maps qui dérivent une égalité : c'est au format de la manche d'en juger", () => {
+    expect(parseAdminScoreBody({ maps: mapsFor(1, 1) }).ok).toBe(true);
   });
 
-  it("laisse le forfait l'emporter sans juger les scores", () => {
-    expect(parseAdminScoreBody({ forfeitTeamId: 5, team1Score: -4 })).toEqual({
+  it("lit un forfait nominatif, chaîne numérique comprise", () => {
+    expect(parseAdminScoreBody({ forfeitTeamId: "5" })).toEqual({ ok: true, value: { forfeitTeamId: 5 } });
+  });
+
+  it("laisse le forfait l'emporter sur des maps, même mal formées", () => {
+    expect(parseAdminScoreBody({ forfeitTeamId: 5, maps: mapsFor(2, 0) })).toEqual({
       ok: true,
-      value: { team1Score: -4, team2Score: undefined, forfeitTeamId: 5 },
+      value: { forfeitTeamId: 5 },
     });
+    expect(parseAdminScoreBody({ forfeitTeamId: 5, maps: "x" })).toEqual({ ok: true, value: { forfeitTeamId: 5 } });
   });
 
   it("refuse un forfait qui ne désigne pas un identifiant", () => {
     for (const forfeitTeamId of [0, -1, 2.5, "x"]) {
-      expect(parseAdminScoreBody({ forfeitTeamId })).toEqual({ ok: false, error: "INVALID_FORFEIT_TEAM_ID" });
+      expect(parseAdminScoreBody({ forfeitTeamId, maps: mapsFor(2, 0) })).toEqual({
+        ok: false,
+        error: "INVALID_FORFEIT_TEAM_ID",
+      });
     }
   });
 
   it("traite `null` comme une absence", () => {
-    expect(parseAdminScoreBody({ forfeitTeamId: null, team1Score: null, team2Score: 1 })).toEqual({
-      ok: false,
-      error: "MISSING_SCORES_OR_FORFEIT",
+    expect(parseAdminScoreBody({ forfeitTeamId: null, maps: mapsFor(2, 1) })).toEqual({
+      ok: true,
+      value: { maps: mapsFor(2, 1) },
     });
+    expect(parseAdminScoreBody({ forfeitTeamId: null, maps: null })).toEqual({ ok: false, error: "MAP_LIST_EMPTY" });
   });
 
-  it("borne les scores entre 0 et le maximum, entiers seulement", () => {
-    expect(parseAdminScoreBody({ team1Score: 0, team2Score: ADMIN_SCORE_MAX }).ok).toBe(true);
-    for (const [team1Score, team2Score] of [
-      [-1, 0],
-      [0, ADMIN_SCORE_MAX + 1],
-      [0.5, 1],
-      [Number.NaN, 1],
-      [Infinity, 1],
+  it("refuse un corps sans forfait ni maps, ou une liste vide, en MAP_LIST_EMPTY", () => {
+    expect(parseAdminScoreBody({})).toEqual({ ok: false, error: "MAP_LIST_EMPTY" });
+    expect(parseAdminScoreBody({ maps: [] })).toEqual({ ok: false, error: "MAP_LIST_EMPTY" });
+  });
+
+  it("refuse l'ancienne saisie à la main (deux scores sans maps) en MAP_LIST_EMPTY", () => {
+    const legacy: Record<string, unknown> = { team1Score: 2, team2Score: 1 };
+    expect(parseAdminScoreBody(legacy)).toEqual({ ok: false, error: "MAP_LIST_EMPTY" });
+  });
+
+  it("refuse un détail mal formé en INVALID_MAPS", () => {
+    for (const maps of [
+      "x",
+      { replayCode: "AAA111", team1Score: 1, team2Score: 0 },
+      [1],
+      [null],
+      [{ replayCode: 12, team1Score: 1, team2Score: 0 }],
+      [{ replayCode: "AAA111", team1Score: "1", team2Score: 0 }],
+      [{ replayCode: "A".repeat(65), team1Score: 1, team2Score: 0 }],
     ]) {
-      expect(parseAdminScoreBody({ team1Score, team2Score })).toEqual({ ok: false, error: "INVALID_SCORES" });
+      expect(parseAdminScoreBody({ maps })).toEqual({ ok: false, error: "INVALID_MAPS" });
     }
   });
 });

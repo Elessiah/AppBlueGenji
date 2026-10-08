@@ -10,7 +10,7 @@ import type { BracketMatch, MatchProposalMaps, TournamentGame } from "@/lib/shar
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDoubleForfeit, isMatchDrawn, isMatchPlayed } from "@/lib/shared/match-outcome";
-import { forfeitMapCount, matchWinsRequired, type MatchFormat } from "@/lib/shared/match-format";
+import { forfeitMapCount, type MatchFormat } from "@/lib/shared/match-format";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
@@ -26,7 +26,6 @@ import {
 } from "../_lib/score-form";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useMatchFormat } from "../_lib/match-format-context";
-import { ScoreStepper } from "./ScoreStepper";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
 import { MapResultList } from "./MatchMapDetails";
 import mapStyles from "./MatchMapDetails.module.css";
@@ -116,14 +115,6 @@ function storedResultLabel(text: TournamentDialogsText, match: BracketMatch, tea
 /** Lignes de maps adressables par `useFieldErrors` — au-delà de tout plafond. */
 const MAP_FIELD_ID_SLOTS = 32;
 
-const DERIVED_SCORE_HINT_ID = "admin-score-derived-hint";
-
-/** Steppers verrouillés sur le score dérivé des maps : l'`id` de la phrase qui le dit. */
-function derivedScoreHintId(mapCount: number, mapsSetAside: boolean): string | undefined {
-  return mapCount > 0 && !mapsSetAside ? DERIVED_SCORE_HINT_ID : undefined;
-}
-
-
 /**
  * Infobulle d'un bouton, dans l'ordre de la phrase sous les boutons : détail
  * en lecture, map refusée (sauf sur une ligne vierge ajoutée — même silence),
@@ -155,8 +146,7 @@ function visibleBlocker(text: TournamentDialogsText, input: {
   game: TournamentGame | null | undefined;
 }): string | null {
   if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");
-  // Une ligne vierge n'appelle pas encore de reproche — et le score dérivé
-  // (0 – 0, steppers verrouillés) n'est pas à corriger.
+  // Une ligne vierge n'appelle pas encore de reproche.
   if (input.blankMaps) return null;
   if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);
   return input.blocker ? scoreBlockerText(text, input.blocker, input.format) : null;
@@ -192,12 +182,12 @@ export function AdminScoreDialog({
   const matchFormat = useMatchFormat(match);
   // Infobulle d'un bouton : une map refusée passe avant le score, puisque
   // c'est elle que le clic désignera (`mapsRefused`).
-  // Détail de la proposition encore en lecture : un score validé maintenant
-  // partirait sans maps (`maps: []`) et effacerait les codes de la proposition
-  // à la clôture. Les boutons de score attendent qu'il arrive.
+  // Détail de la proposition encore en lecture : il va pré-remplir les maps,
+  // l'arbitre ne doit pas les ressaisir. Les boutons de score attendent qu'il
+  // arrive.
   const awaitingDetail =
     proposalsNeedRefresh(liveMatch, proposals) &&
-    form.maps.length === 0 &&
+    !form.maps.some(isMapTouched) &&
     form.forfeitTeamId === undefined &&
     !form.doubleForfeit;
   const buttonTitle = (
@@ -222,9 +212,6 @@ export function AdminScoreDialog({
 
   const team1 = match.team1Name || t("score.team", { side: 1 });
   const team2 = match.team2Name || t("score.team", { side: 2 });
-  // Borne haute de la saisie : l'objectif du format (3 en BO5 comme en FT3),
-  // ou 99 quand le tournoi laisse le score libre.
-  const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
   // Score qu'emporte le vainqueur d'un forfait : celui du format, 1 en saisie
   // libre — la même valeur que celle écrite en base par la route.
   const forfeitMaps = forfeitMapCount(matchFormat);
@@ -254,10 +241,8 @@ export function AdminScoreDialog({
   const rawBlocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
   const blocker = rawBlocker === "NOT_IN_LAUNCH" ? null : rawBlocker;
   // Phrase visible, dans l'ordre de l'infobulle : détail en lecture, puis map
-  // refusée (une fois une map renseignée — les steppers, verrouillés sur le
-  // score dérivé, ne sont pas à corriger), puis blocage du score.
+  // refusée (une fois une map renseignée), puis blocage du score.
   const mapRefusal = form.mapsRefused.resolve ?? form.mapsRefused.save;
-  const derivedHintId = derivedScoreHintId(form.maps.length, anyForfeit || scoreEntryClosed);
   const blockerText = visibleBlocker(text, {
     awaitingDetail,
     blankMaps: mapRefusal !== null && form.mapsRefused.onBlankRow,
@@ -413,40 +398,6 @@ export function AdminScoreDialog({
             </div>
           )}
 
-          <div className={styles.scores}>
-            <ScoreStepper
-              id="admin-score-team1"
-              teamId={match.team1Id}
-              teamName={team1}
-              value={form.score1}
-              max={maxScore}
-              disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
-              onChange={form.setScore1}
-              describedBy={derivedHintId}
-            />
-            <span className={styles.versus} aria-hidden="true">
-              VS
-            </span>
-            <ScoreStepper
-              id="admin-score-team2"
-              teamId={match.team2Id}
-              teamName={team2}
-              value={form.score2}
-              max={maxScore}
-              disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
-              onChange={form.setScore2}
-              describedBy={derivedHintId}
-            />
-          </div>
-
-          {/* Steppers verrouillés par les maps : la raison est dite, et le
-              geste pour reprendre la main (saisie de secours, replay perdu). */}
-          {derivedHintId && (
-            <p id={derivedHintId} className={styles.formatHint}>
-              {t("score.admin.derivedHint")}
-            </p>
-          )}
-
           {/* La règle chiffrée sous les champs plutôt qu'en `title` de la
               pastille : une infobulle sur un `<span>` ne s'atteint ni au clavier
               ni au doigt, et c'est la seule chose qui borne la saisie. */}
@@ -454,9 +405,9 @@ export function AdminScoreDialog({
             <p className={styles.formatHint}>{matchFormatDescriptionText(pageText, matchFormat)}</p>
           )}
 
-          {/* Détail map par map (`MAP_SCORES.md`) : dès qu'une map est saisie,
-              le score ci-dessus en découle. Sans map, l'arbitre pose le score
-              à la main, comme avant (replay perdu, saisie de secours). */}
+          {/* Détail map par map (`MAP_SCORES.md`) : seule saisie du score, qui
+              s'en dérive. Le code de replay y est facultatif pour l'arbitrage
+              (replay perdu) : la map s'affiche alors « Pas de code de replay ». */}
           {!anyForfeit && !scoreEntryClosed && (
             <MapScoreList
               idPrefix="admin-score"
@@ -468,6 +419,7 @@ export function AdminScoreDialog({
               team2Name={team2}
               team1Id={match.team1Id}
               team2Id={match.team2Id}
+              replayCodeOptional
               disabled={form.submitting}
               fieldErrors={mapFieldErrors}
             />

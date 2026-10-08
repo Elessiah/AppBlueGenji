@@ -5,6 +5,7 @@ jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/byes");
 
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * Garde-fous d'écriture de l'arbitrage, indépendants du format de match (voir
@@ -137,14 +138,14 @@ describe("adminSaveMatchScores — match déjà tranché", () => {
     // résultat — un match affiché 2-1 pour l'équipe portée perdante.
     const { conn, writes } = fakeConnection({ winnerTeamId: 100 });
 
-    await expect(adminSaveMatchScores(conn, 10, 1, 2)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 2), userId: 1 })).rejects.toThrow("MATCH_ALREADY_COMPLETED");
     expect(writes).toHaveLength(0);
   });
 
   it("refuse aussi un forfait par-dessus un résultat acquis", async () => {
     const { conn, writes } = fakeConnection({ winnerTeamId: 100 });
 
-    await expect(adminSaveMatchScores(conn, 10, undefined, undefined, 200)).rejects.toThrow(
+    await expect(adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 })).rejects.toThrow(
       "MATCH_ALREADY_COMPLETED",
     );
     expect(writes).toHaveLength(0);
@@ -153,7 +154,7 @@ describe("adminSaveMatchScores — match déjà tranché", () => {
   it("laisse enregistrer tant que le match n'est pas tranché", async () => {
     const { conn, writes } = fakeConnection();
 
-    await expect(adminSaveMatchScores(conn, 10, 1, 0)).resolves.toBeUndefined();
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBeUndefined();
     expect(writes).toHaveLength(1);
   });
 
@@ -161,7 +162,7 @@ describe("adminSaveMatchScores — match déjà tranché", () => {
     // La correction d'un résultat passe par là, et non par l'enregistrement.
     const { conn } = fakeConnection({ winnerTeamId: 100 });
 
-    await expect(adminResolveMatch(conn, 10, 1, 2)).resolves.toBeUndefined();
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(1, 2), userId: 1 })).resolves.toBeUndefined();
   });
 });
 
@@ -173,7 +174,7 @@ describe("forfait — l'équipe doit jouer le match", () => {
   it("refuse un forfait déclaré pour une équipe étrangère (enregistrement)", async () => {
     const { conn, writes } = fakeConnection();
 
-    await expect(adminSaveMatchScores(conn, 10, undefined, undefined, 999)).rejects.toThrow(
+    await expect(adminSaveMatchScores(conn, 10, { forfeitTeamId: 999 })).rejects.toThrow(
       "INVALID_FORFEIT_TEAM_ID",
     );
     expect(writes).toHaveLength(0);
@@ -184,7 +185,7 @@ describe("forfait — l'équipe doit jouer le match", () => {
     // défaut : l'équipe 1 gagnait parce qu'aucune des deux n'était la forfait.
     const { conn } = fakeConnection();
 
-    await expect(adminResolveMatch(conn, 10, undefined, undefined, 999)).rejects.toThrow(
+    await expect(adminResolveMatch(conn, 10, { forfeitTeamId: 999 })).rejects.toThrow(
       "INVALID_FORFEIT_TEAM_ID",
     );
   });
@@ -193,7 +194,7 @@ describe("forfait — l'équipe doit jouer le match", () => {
     for (const teamId of [100, 200]) {
       const { conn, writes } = fakeConnection();
       await expect(
-        adminSaveMatchScores(conn, 10, undefined, undefined, teamId),
+        adminSaveMatchScores(conn, 10, { forfeitTeamId: teamId }),
       ).resolves.toBeUndefined();
       expect(writes).toHaveLength(1);
     }
@@ -234,7 +235,7 @@ describe("verrou de manche — depuis l'arbitrage, pas depuis l'helper", () => {
       dependents: PLAYED_NEXT_ROUND,
     });
 
-    await expect(adminSaveMatchScores(conn, 10, 2, 1)).rejects.toThrow(
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow(
       "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
     );
     expect(writes).toHaveLength(0);
@@ -246,7 +247,7 @@ describe("verrou de manche — depuis l'arbitrage, pas depuis l'helper", () => {
       dependents: PLAYED_NEXT_ROUND,
     });
 
-    await expect(adminResolveMatch(conn, 10, 2, 1)).rejects.toThrow(
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow(
       "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
     );
     expect(writes).toHaveLength(0);
@@ -272,7 +273,7 @@ describe("verrou de manche — depuis l'arbitrage, pas depuis l'helper", () => {
       ],
     });
 
-    await expect(adminResolveMatch(conn, 10, 2, 1)).resolves.toBeUndefined();
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBeUndefined();
     expect(writes.length).toBeGreaterThan(0);
   });
 });
@@ -301,8 +302,8 @@ describe("lecture verrouillante du match — course avec le réordonnancement du
   }
 
   it.each<[string, (conn: PoolConnection) => Promise<void>]>([
-    ["l'enregistrement", (conn) => adminSaveMatchScores(conn, 10, 1, 0)],
-    ["la validation", (conn) => adminResolveMatch(conn, 10, 1, 0)],
+    ["l'enregistrement", (conn) => adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })],
+    ["la validation", (conn) => adminResolveMatch(conn, 10, { maps: mapsFor(1, 0), userId: 1 })],
   ])("%s lit le match sous `FOR UPDATE`, sans jointure", async (_label, run) => {
     const { conn, reads } = recordingConnection([]);
 
@@ -313,8 +314,8 @@ describe("lecture verrouillante du match — course avec le réordonnancement du
   });
 
   it.each<[string, (conn: PoolConnection) => Promise<void>]>([
-    ["l'enregistrement", (conn) => adminSaveMatchScores(conn, 10, 1, 0)],
-    ["la validation", (conn) => adminResolveMatch(conn, 10, 1, 0)],
+    ["l'enregistrement", (conn) => adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })],
+    ["la validation", (conn) => adminResolveMatch(conn, 10, { maps: mapsFor(1, 0), userId: 1 })],
   ])("%s refuse un match supprimé pendant l'attente, sans rien écrire", async (_label, run) => {
     const { conn, writes } = recordingConnection([]);
 
@@ -332,39 +333,39 @@ describe("aucun score avant le lancement — arbitrage compris", () => {
 
   it("refuse d'enregistrer un score sur un match à planifier", async () => {
     const { conn, writes } = fakeConnection({ refereeScheduling: true });
-    await expect(adminSaveMatchScores(conn, 10, 1, 0)).rejects.toThrow("MATCH_NOT_IN_LAUNCH");
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).rejects.toThrow("MATCH_NOT_IN_LAUNCH");
     expect(writes).toHaveLength(0);
   });
 
   it("refuse de valider un score sur un match en attente de départ, option éteinte", async () => {
     const { conn, writes } = fakeConnection({ startAt: FUTURE });
-    await expect(adminResolveMatch(conn, 10, 2, 0)).rejects.toThrow("MATCH_NOT_IN_LAUNCH");
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(2, 0), userId: 1 })).rejects.toThrow("MATCH_NOT_IN_LAUNCH");
     expect(writes).toHaveLength(0);
   });
 
   it("laisse prononcer un forfait avant le lancement (enregistrement et validation)", async () => {
     const save = fakeConnection({ refereeScheduling: true });
-    await expect(adminSaveMatchScores(save.conn, 10, undefined, undefined, 200)).resolves.toBeUndefined();
+    await expect(adminSaveMatchScores(save.conn, 10, { forfeitTeamId: 200 })).resolves.toBeUndefined();
 
     const resolve = fakeConnection({ startAt: FUTURE });
-    await expect(adminResolveMatch(resolve.conn, 10, undefined, undefined, 200)).resolves.toBeUndefined();
+    await expect(adminResolveMatch(resolve.conn, 10, { forfeitTeamId: 200 })).resolves.toBeUndefined();
   });
 
   it("laisse prononcer un double forfait avant le lancement", async () => {
     const { conn } = fakeConnection({ refereeScheduling: true });
-    await expect(adminResolveMatch(conn, 10, undefined, undefined, undefined, true)).resolves.toBeUndefined();
+    await expect(adminResolveMatch(conn, 10, { doubleForfeit: true })).resolves.toBeUndefined();
   });
 
   it("laisse saisir dès le lancement, et sur un match lancé avant son heure", async () => {
     const lobby = fakeConnection({ startAt: new Date(Date.now() - 60_000), refereeScheduling: true });
-    await expect(adminSaveMatchScores(lobby.conn, 10, 1, 0)).resolves.toBeUndefined();
+    await expect(adminSaveMatchScores(lobby.conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBeUndefined();
 
     const forced = fakeConnection({ startAt: FUTURE, launchedAt: new Date() });
-    await expect(adminSaveMatchScores(forced.conn, 10, 1, 0)).resolves.toBeUndefined();
+    await expect(adminSaveMatchScores(forced.conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBeUndefined();
   });
 
   it("laisse corriger un match terminé, même à planifier ou daté dans le futur", async () => {
     const { conn } = fakeConnection({ winnerTeamId: 100, refereeScheduling: true, startAt: FUTURE });
-    await expect(adminResolveMatch(conn, 10, 2, 1)).resolves.toBeUndefined();
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBeUndefined();
   });
 });

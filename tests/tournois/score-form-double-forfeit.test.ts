@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  adminFormStateFor,
   decideScoreForm,
-  isUntouched,
+  sameScoreFormState,
   scoreBlockerMessage,
   scoreFormStateFor,
   storedResultSignature,
@@ -9,6 +10,7 @@ import {
 import { mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 import { formatMatchResultLog } from "@/lib/shared/bot-logs";
 import type { BracketMatch } from "@/lib/shared/types";
+import { emptyMap } from "@/lib/shared/match-maps";
 
 function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
   return {
@@ -50,13 +52,16 @@ describe("formulaire d'arbitrage — double forfait", () => {
       forfeitTeamId: undefined,
       doubleForfeit: true,
     });
-    expect(isUntouched({ score1: "", score2: "", doubleForfeit: true }, stored)).toBe(true);
-    expect(isUntouched({ score1: "", score2: "" }, stored)).toBe(false);
+    const opening = adminFormStateFor(stored, [emptyMap()]);
+    expect(opening).toEqual(scoreFormStateFor(stored));
+    expect(sameScoreFormState({ score1: "", score2: "", doubleForfeit: true }, opening)).toBe(true);
+    expect(sameScoreFormState({ score1: "", score2: "" }, opening)).toBe(false);
   });
 
   it("n'est pas une saisie sur un match vierge tant qu'il n'est pas coché", () => {
-    expect(isUntouched({ score1: "", score2: "", doubleForfeit: undefined }, match())).toBe(true);
-    expect(isUntouched({ score1: "", score2: "", doubleForfeit: true }, match())).toBe(false);
+    const opening = adminFormStateFor(match(), [emptyMap()]);
+    expect(sameScoreFormState({ score1: "", score2: "", doubleForfeit: undefined }, opening)).toBe(true);
+    expect(sameScoreFormState({ score1: "", score2: "", doubleForfeit: true }, opening)).toBe(false);
   });
 
   it("change l'empreinte du résultat enregistré (flux SSE)", () => {

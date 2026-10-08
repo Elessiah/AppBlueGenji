@@ -48,7 +48,6 @@
     "ADMIN_SAVE_SCORES_FAILED": "Error while saving the scores.",
     "ADMIN_RESOLVE_FAILED": "Error while deciding the match.",
     "INVALID_FORFEIT_TEAM_ID": "The forfeit must name one of the match's two teams.",
-    "MISSING_SCORES_OR_FORFEIT": "Scores or a forfeit are required.",
     "DOUBLE_FORFEIT_EXCLUSIVE": "A double forfeit carries no score and no named team: remove them before confirming.",
     "DOUBLE_FORFEIT_RESOLVE_ONLY": "A double forfeit decides the match: use “Confirm the result”.",
     "TOURNAMENT_FULL": "This tournament is full.",

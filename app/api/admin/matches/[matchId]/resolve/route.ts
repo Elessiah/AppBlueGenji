@@ -1,10 +1,10 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { adminResolveMatch } from "@/lib/server/tournaments-service";
+import { adminResolveMatch, type AdminResolveEntry } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
-import { parseAdminScoreBody, parseAdminMapEntry } from "@/lib/shared/admin-score-body";
-import { MAP_LIST_ERROR_CODES, type MatchMapInput } from "@/lib/shared/match-maps";
+import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
+import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
 
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -25,51 +25,30 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 
   // Double forfait : les deux engagées déclarent forfait, la rencontre se clôt
   // sans vainqueur (`lib/shared/double-forfeit.ts`). Un booléen strict, et
-  // exclusif de tout le reste : un corps qui porterait aussi un score ou une
+  // exclusif de tout le reste : un corps qui porterait aussi des maps ou une
   // équipe dirait deux choses, et on ne choisit pas à la place de l'arbitre.
-  // `null` vaut absence, comme pour les trois autres champs.
+  // `null` vaut absence, comme pour les autres champs.
   if (body.doubleForfeit !== undefined && body.doubleForfeit !== null && body.doubleForfeit !== false) {
     if (body.doubleForfeit !== true) return fail("INVALID_REQUEST", 400);
     const mixed = [body.team1Score, body.team2Score, body.forfeitTeamId, body.maps].some(
       (value) => value !== undefined && value !== null,
     );
     if (mixed) return fail("DOUBLE_FORFEIT_EXCLUSIVE", 400);
-    return resolve(matchId_, undefined, undefined, undefined, true, user.id);
+    return resolve(matchId_, { doubleForfeit: true });
   }
 
-  // L'égalité n'est plus refusée d'office : c'est le **format de la manche**
-  // qui tranche (`checkMatchScores`), et lui seul sait qu'une qualification
-  // de « BlueGenji Survie » peut se clore sur un 2-2. Le refus arrive donc du
-  // service, en `DRAW_NOT_ALLOWED` comme avant, mais avec la bonne règle.
-  // Détail map par map facultatif (`docs/features/MAP_SCORES.md`) : présent,
-  // il fait foi et le score se dérive des maps.
-  const mapParse = parseAdminMapEntry(body.maps);
-  if (!mapParse.ok) return fail(mapParse.error, 400);
-  const hasMaps = (mapParse.maps?.length ?? 0) > 0;
-  const parsed = parseAdminScoreBody(hasMaps ? { ...body, ...mapParse.placeholderScores } : body);
+  // Un forfait, ou le détail map par map dont le score se dérive
+  // (`docs/features/MAP_SCORES.md`) — aucun score posé à la main. L'égalité
+  // n'est pas refusée d'office : c'est le **format de la manche** qui tranche
+  // (`checkMatchScores` sur le score dérivé), en `DRAW_NOT_ALLOWED`.
+  const parsed = parseAdminScoreBody(body);
   if (!parsed.ok) return fail(parsed.error, 400);
-  const { team1Score, team2Score, forfeitTeamId } = parsed.value;
-
-  return resolve(matchId_, team1Score, team2Score, forfeitTeamId, false, user.id, mapParse.maps);
+  return resolve(matchId_, "maps" in parsed.value ? { maps: parsed.value.maps, userId: user.id } : parsed.value);
 }
 
-async function resolve(
-  matchId: number,
-  team1Score: number | undefined,
-  team2Score: number | undefined,
-  forfeitTeamId: number | undefined,
-  doubleForfeit: boolean,
-  userId: number,
-  maps?: MatchMapInput[] | null,
-) {
+async function resolve(matchId: number, entry: AdminResolveEntry) {
   try {
-    // L'arbitrage tranche toujours avec un détail de maps — vide sur un
-    // forfait ou un score posé à la main : celui d'avant ne décrirait plus le
-    // résultat retenu.
-    await adminResolveMatch(matchId, team1Score, team2Score, forfeitTeamId, doubleForfeit, {
-      maps: maps ?? [],
-      userId,
-    });
+    await adminResolveMatch(matchId, entry);
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;

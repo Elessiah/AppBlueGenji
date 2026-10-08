@@ -8,6 +8,7 @@ import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import type { PlayoffRoundPlan } from "@/lib/shared/bg-survie/playoffs";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { createMatch } from "../repository";
+import { clearMapSets } from "../match-maps";
 
 /** Une rencontre d'arbre final telle qu'elle est posée en base. */
 type PlayoffMatchRow = {
@@ -133,6 +134,15 @@ export async function writePlayoffRound(
       reusable[index]?.id ?? (await createMatch(conn, tournamentId, bracket, round, index + 1, 0));
     await writePlayoffPairing(conn, matchId, pairing);
   }
+
+  // Le résultat remis à zéro emporte son détail map par map : un détail retenu
+  // ne se garde qu'avec le résultat qu'il documente (`MAP_SCORES.md`), et
+  // l'instantané le montrerait sinon sous les nouvelles engagées.
+  await clearMapSets(
+    conn,
+    reusable.slice(0, plan.length).map((row) => Number(row.id)),
+    ["FINAL"],
+  );
 
   await clearRewrittenReminders(conn, rewrittenPlayoffMatchIds(reusable, plan));
 }

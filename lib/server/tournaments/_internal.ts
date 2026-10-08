@@ -2,7 +2,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { toIso } from "@/lib/server/serialization";
 import { toParticipantType } from "@/lib/shared/participants";
 import type { BracketMatch, MatchScoreReport, TournamentCard, TournamentPhase } from "@/lib/shared/types";
-import { mapsMatchStoredScore, type MatchMapResult } from "@/lib/shared/match-maps";
+import type { MatchMapResult } from "@/lib/shared/match-maps";
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import {
   parseRegistrationFilters,
@@ -343,10 +343,8 @@ function mapScoreReport(
 
 /**
  * Pose le détail map par map sur des matchs déjà sérialisés
- * (`docs/features/MAP_SCORES.md`). Un jeu de maps ne s'affiche que s'il
- * **explique** le score qu'il accompagne : un score corrigé à la main par
- * l'arbitrage, ou un reste d'avant une correction, ne porte pas un détail qui
- * le contredit.
+ * (`docs/features/MAP_SCORES.md`) : le détail retenu (`FINAL`), d'où le
+ * score du match est dérivé — tout score passe par des maps, hors forfait.
  */
 export function attachMatchMaps(
   matches: BracketMatch[],
@@ -360,13 +358,12 @@ export function attachMatchMaps(
     // (arbitrage, abandon en Survie / Ronde suisse / BG Survie) : son score
     // plein pourrait coïncider avec un détail noté plus tôt.
     const forfeited = match.forfeitTeamId !== null || match.doubleForfeit;
-    const final = !forfeited && mapsMatchStoredScore(sets.final, match.team1Score, match.team2Score);
     return {
       ...match,
       // Les propositions gardent `maps: []` ici : l'instantané part à tous les
       // abonnés, leur détail ne voyage que dans le contexte des deux engagés et
       // de l'arbitrage (`loadViewerProposals`, `./match-maps`).
-      maps: final ? sets.final : [],
+      maps: forfeited ? [] : sets.final,
     };
   });
 }

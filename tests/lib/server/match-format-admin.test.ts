@@ -7,6 +7,7 @@ jest.mock("@/lib/server/tournaments/byes");
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * Connexion factice pour les deux entrées d'arbitrage. Le match n'a pas encore
@@ -85,47 +86,51 @@ describe("adminSaveMatchScores — respect du format de match", () => {
 
   it("accepte un score partiel : l'arbitrage note un match en cours", async () => {
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });
-    await adminSaveMatchScores(conn, 10, 2, 1);
+    await adminSaveMatchScores(conn, 10, { maps: mapsFor(2, 1), userId: 1 });
     expect(writes.some((q) => q.includes("team1_score"))).toBe(true);
   });
 
   it("refuse un score au-dessus du plafond, sans écrire", async () => {
+    // BO5 : la quatrième victoire se joue après la décision, refusée sur sa map.
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });
-    await expect(adminSaveMatchScores(conn, 10, 4, 0)).rejects.toThrow(
-      "SCORE_EXCEEDS_MATCH_FORMAT",
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(4, 0), userId: 1 })).rejects.toThrow(
+      "MAP_AFTER_DECISION",
     );
     expect(writes).toHaveLength(0);
   });
 
-  it("refuse une somme au-dessus des manches jouables", async () => {
-    const { conn } = fakeConnection({ type: "FT", value: 3 });
-    await expect(adminSaveMatchScores(conn, 10, 3, 3)).rejects.toThrow(
-      "SCORE_EXCEEDS_MATCH_FORMAT",
+  it("refuse plus de maps que le format n'en joue, sans écrire", async () => {
+    // FT3 sans égalités : 5 maps décisives + 2 nulles rejouées au plus.
+    const { conn, writes } = fakeConnection({ type: "FT", value: 3 });
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(0, 0, 8), userId: 1 })).rejects.toThrow(
+      "MAP_COUNT_EXCEEDED",
     );
+    expect(writes).toHaveLength(0);
   });
 
   it("ne contraint rien en saisie libre", async () => {
+    // Score libre : aucun objectif, seul le plafond de lignes (9 maps) tient.
     const { conn, writes } = fakeConnection(null);
-    await adminSaveMatchScores(conn, 10, 12, 9);
+    await adminSaveMatchScores(conn, 10, { maps: mapsFor(5, 4), userId: 1 });
     expect(writes.some((q) => q.includes("team1_score"))).toBe(true);
   });
 
   it("laisse passer un forfait sans regarder le format", async () => {
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });
-    await adminSaveMatchScores(conn, 10, undefined, undefined, 200);
+    await adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 });
     expect(writes.some((q) => q.includes("forfeit_team_id"))).toBe(true);
   });
 
   it("écrit le score plein du format sur un forfait, pas des colonnes vides", async () => {
     const { conn, writeParams } = fakeConnection({ type: "BO", value: 5 });
-    await adminSaveMatchScores(conn, 10, undefined, undefined, 200);
+    await adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 });
     // BO5 → objectif 3 : l'équipe 1 l'emporte 3-0 sur l'équipe 2, partie.
     expect(writeParams[0].slice(0, 3)).toEqual([3, 0, 200]);
   });
 
   it("retombe sur 1-0 en saisie libre — un 0-0 ne désignerait aucun vainqueur", async () => {
     const { conn, writeParams } = fakeConnection(null);
-    await adminSaveMatchScores(conn, 10, undefined, undefined, 100);
+    await adminSaveMatchScores(conn, 10, { forfeitTeamId: 100 });
     expect(writeParams[0].slice(0, 3)).toEqual([0, 1, 100]);
   });
 });
@@ -139,7 +144,7 @@ describe("adminResolveMatch — respect du format de match", () => {
 
   it("accepte un 3-2 en BO5 et désigne le vainqueur", async () => {
     const { conn } = fakeConnection({ type: "BO", value: 5 });
-    await adminResolveMatch(conn, 10, 3, 2);
+    await adminResolveMatch(conn, 10, { maps: mapsFor(3, 2), userId: 1 });
     expect(finalizeMatch).toHaveBeenCalledWith(
       expect.anything(),
       1,
@@ -150,19 +155,24 @@ describe("adminResolveMatch — respect du format de match", () => {
 
   it("refuse un score qui n'atteint pas l'objectif — rien n'est finalisé", async () => {
     const { conn } = fakeConnection({ type: "BO", value: 5 });
-    await expect(adminResolveMatch(conn, 10, 2, 1)).rejects.toThrow("SCORE_BELOW_MATCH_FORMAT");
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow(
+      "SCORE_BELOW_MATCH_FORMAT",
+    );
     expect(finalizeMatch).not.toHaveBeenCalled();
   });
 
   it("refuse un score au-dessus de l'objectif", async () => {
+    // FT3 : les victoires au-delà de la troisième suivent la décision.
     const { conn } = fakeConnection({ type: "FT", value: 3 });
-    await expect(adminResolveMatch(conn, 10, 5, 1)).rejects.toThrow("SCORE_EXCEEDS_MATCH_FORMAT");
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(5, 1), userId: 1 })).rejects.toThrow(
+      "MAP_AFTER_DECISION",
+    );
     expect(finalizeMatch).not.toHaveBeenCalled();
   });
 
   it("finalise un forfait quel que soit le format", async () => {
     const { conn } = fakeConnection({ type: "BO", value: 5 });
-    await adminResolveMatch(conn, 10, undefined, undefined, 100);
+    await adminResolveMatch(conn, 10, { forfeitTeamId: 100 });
     // Le forfait n'est pas contrôlé contre le format — il est *chiffré* par lui :
     // un score plein 0-3 au lieu de deux colonnes vides, pour qu'il compte
     // partout où le score d'une manche est relu (bilan de maps, endurance).
@@ -176,7 +186,7 @@ describe("adminResolveMatch — respect du format de match", () => {
 
   it("chiffre le forfait selon le format du tournoi", async () => {
     const { conn } = fakeConnection({ type: "BO", value: 3 });
-    await adminResolveMatch(conn, 10, undefined, undefined, 200);
+    await adminResolveMatch(conn, 10, { forfeitTeamId: 200 });
     expect(finalizeMatch).toHaveBeenCalledWith(
       expect.anything(),
       1,
@@ -187,7 +197,7 @@ describe("adminResolveMatch — respect du format de match", () => {
 
   it("retombe sur 1-0 quand le tournoi laisse le score libre", async () => {
     const { conn } = fakeConnection(null);
-    await adminResolveMatch(conn, 10, undefined, undefined, 200);
+    await adminResolveMatch(conn, 10, { forfeitTeamId: 200 });
     expect(finalizeMatch).toHaveBeenCalledWith(
       expect.anything(),
       1,

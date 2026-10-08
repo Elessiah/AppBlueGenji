@@ -17,6 +17,7 @@ import { qualifyDestinationMatchId } from "@/app/(secured)/tournois/[id]/_lib/br
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import { tournamentRow } from "../../helpers/tournament-rows";
 import { mapsFor } from "../../helpers/match-maps";
+import type { MatchMapInput } from "@/lib/shared/match-maps";
 
 describe("tournaments-service: match state machine", () => {
   // Avancement réel : on exerce `finalizeMatch` avec une connexion mockée et on
@@ -141,8 +142,12 @@ describe("tournaments-service: match state machine", () => {
     /**
      * Connexion à état : les reports écrits sont relus par la seconde lecture du
      * match, comme en base — c'est elle qui décide de l'accord.
+     *
+     * `opponentMaps` : proposition map par map déjà déposée par l'adversaire
+     * (orientation du plateau), relue par la comparaison des deux reports —
+     * sans elle, aucune proposition adverse ne concorde (MAP_SCORES.md).
      */
-    function reportConnection(overrides: Partial<Row> = {}) {
+    function reportConnection(overrides: Partial<Row> = {}, opponentMaps: MatchMapInput[] = []) {
       const row: Row = {
         status: "READY",
         team1_id: 100,
@@ -191,6 +196,21 @@ describe("tournaments-service: match state machine", () => {
                 winner_team_id: null,
               },
             ],
+            [],
+          ];
+        }
+        // Proposition adverse relue sous verrou (`loadMatchMaps`).
+        if (q.startsWith("SELECT match_id, source, map_number, replay_code, team1_score, team2_score FROM bg_match_maps WHERE match_id = ? AND source = ?")) {
+          const source = params[1];
+          return [
+            opponentMaps.map((m, i) => ({
+              match_id: 10,
+              source,
+              map_number: i + 1,
+              replay_code: m.replayCode,
+              team1_score: m.team1Score,
+              team2_score: m.team2Score,
+            })),
             [],
           ];
         }
@@ -331,11 +351,14 @@ describe("tournaments-service: match state machine", () => {
     });
 
     it("deux reports concordants clôturent la rencontre au profit du vainqueur", async () => {
-      const { connection, calls } = reportConnection({
-        status: "AWAITING_CONFIRMATION",
-        team2_report_score: 1,
-        team2_report_opponent_score: 3,
-      });
+      const { connection, calls } = reportConnection(
+        {
+          status: "AWAITING_CONFIRMATION",
+          team2_report_score: 1,
+          team2_report_opponent_score: 3,
+        },
+        mapsFor(3, 1),
+      );
 
       await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
 
@@ -349,15 +372,33 @@ describe("tournaments-service: match state machine", () => {
 
     it("la concordance se lit du point de vue de chaque engagée", async () => {
       reporterIs(200);
-      const { connection, calls } = reportConnection({
-        status: "AWAITING_CONFIRMATION",
-        team1_report_score: 1,
-        team1_report_opponent_score: 3,
-      });
+      const { connection, calls } = reportConnection(
+        {
+          status: "AWAITING_CONFIRMATION",
+          team1_report_score: 1,
+          team1_report_opponent_score: 3,
+        },
+        mapsFor(1, 3),
+      );
 
       await reportMatchScore(connection, 1, 10, 42, mapsFor(1, 3));
 
       expect(completion(calls)?.params).toEqual([1, 3, 200, 100, 10]);
+    });
+
+    it("même score sans maps adverses : désaccord, aucune concordance au seul score (MAP_SCORES.md)", async () => {
+      // Toute proposition porte ses maps : une proposition adverse sans détail
+      // ne décrit aucune série, le score seul ne suffit plus à clore.
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 1,
+        team2_report_opponent_score: 3,
+      });
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+
+      expect(completion(calls)).toBeUndefined();
+      expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
     });
 
     describe("« Confirmer » la proposition adverse telle quelle (MAP_SCORES.md)", () => {
@@ -370,12 +411,21 @@ describe("tournaments-service: match state machine", () => {
       };
 
       it("clôt la rencontre par le même chemin qu'un envoi concordant", async () => {
-        const { connection, calls } = reportConnection(pendingTeam2);
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
 
         await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() });
 
         expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
         expect(queueRefereeAlert).not.toHaveBeenCalled();
+      });
+
+      it("refuse la confirmation d'une proposition adverse sans maps, sans rien écrire", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2);
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() }),
+        ).rejects.toThrow("PROPOSAL_STALE");
+        expect(writes(calls)).toHaveLength(0);
       });
 
       it("refuse une proposition remplacée depuis (autre dépôt), sans rien écrire", async () => {

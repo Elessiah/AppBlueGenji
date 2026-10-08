@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -10,7 +10,6 @@ import {
   MAP_SCORE_MAX,
   REPLAY_CODE_MAX_LENGTH,
   deriveMatchScore,
-  emptyMap,
   isMapTouched,
   mapFieldKey,
   mapListLimit,
@@ -42,11 +41,10 @@ interface MapScoreListProps {
   team1Id?: number | null;
   team2Id?: number | null;
   /**
-   * Lignes minimales : 1 pour un engagé (une ligne vierge d'emblée), 0 pour
-   * l'arbitrage (sans map, il pose le score à la main). Les suivantes viennent
-   * d'elles-mêmes au fil du format (`progressiveMapRows`).
+   * Code de replay facultatif — l'arbitrage seul (replay perdu) : une map sans
+   * code s'affiche « Pas de code de replay ». Un code saisi reste contrôlé.
    */
-  minRows?: 0 | 1;
+  replayCodeOptional?: boolean;
   disabled: boolean;
   fieldErrors: FieldErrors<string>;
 }
@@ -70,9 +68,9 @@ export function mapFieldIds(idPrefix: string, count: number): Record<string, str
 /**
  * Saisie **map par map** d'un match (`docs/features/MAP_SCORES.md`) : une ligne
  * par map jouée — code de replay et score de chaque camp —, ajoutées une à une
- * jusqu'au plafond du format. Le score du match, dérivé (map gagnée = un point,
- * map nulle = rien), se lit en direct sous la liste ; c'est lui qui part dans le
- * circuit de report habituel.
+ * jusqu'au plafond du format (`progressiveMapRows`, une ligne au moins). Le
+ * score du match, dérivé (map gagnée = un point, map nulle = rien), se lit en
+ * direct sous la liste ; c'est la seule façon de le saisir.
  */
 export function MapScoreList({
   idPrefix,
@@ -84,7 +82,7 @@ export function MapScoreList({
   team2Name,
   team1Id = null,
   team2Id = null,
-  minRows = 0,
+  replayCodeOptional = false,
   disabled,
   fieldErrors,
 }: Readonly<MapScoreListProps>) {
@@ -119,7 +117,7 @@ export function MapScoreList({
   // et que le match n'est pas acquis ; les lignes vierges devenues inutiles
   // s'en vont, les lignes renseignées restent (refusées sur leur champ).
   const change = (next: MatchMapInput[]) => {
-    const rows = progressiveMapRows(format, game, next, minRows);
+    const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional });
     // Seule une ligne ajoutée **par l'affichage progressif** s'annonce : une
     // liste remplacée de l'extérieur (proposition reçue) arrive déjà remplie.
     autoGrown.current = rows.length > maps.length;
@@ -131,7 +129,7 @@ export function MapScoreList({
   const [announcement, setAnnouncement] = useState("");
   const autoGrown = useRef(false);
   useEffect(() => {
-    if (autoGrown.current && !focusNewRow.current) setAnnouncement(t("score.maps.added", { index: maps.length }));
+    if (autoGrown.current) setAnnouncement(t("score.maps.added", { index: maps.length }));
     // Ligne retirée (un nul de passage pendant la frappe) : l'annonce se vide,
     // pour qu'une ligne qui revient soit annoncée de nouveau.
     else if (!autoGrown.current) setAnnouncement("");
@@ -148,8 +146,8 @@ export function MapScoreList({
     change(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
   };
   // Le bouton « Retirer » activé disparaît avec sa ligne : le focus va au
-  // « Retirer » de la ligne qui prend sa place (ou de la dernière), sinon à
-  // « Ajouter une map » — jamais au `<body>`, hors de la modale (WCAG 2.4.3).
+  // « Retirer » de la ligne qui prend sa place (ou de la dernière), sinon au
+  // code de la ligne vierge — jamais au `<body>`, hors de la modale (WCAG 2.4.3).
   const focusAfterRemove = useRef<number | null>(null);
   // Suit la liste elle-même, pas sa longueur : un retrait suivi d'une ligne
   // vierge rouverte garde la même longueur, et la cible armée ne doit pas
@@ -158,10 +156,12 @@ export function MapScoreList({
     const target = focusAfterRemove.current;
     if (target === null) return;
     focusAfterRemove.current = null;
-    const index = Math.min(target, maps.length - 1);
-    const id = maps.length > 0 ? `${idPrefix}-map-${index}-remove` : `${idPrefix}-map-add`;
+    const index = Math.max(Math.min(target, maps.length - 1), 0);
     // Une ligne vierge n'a pas de « Retirer » : le focus va alors à son code.
-    (document.getElementById(id) ?? document.getElementById(mapFieldId(idPrefix, index, "replayCode")))?.focus();
+    (
+      document.getElementById(`${idPrefix}-map-${index}-remove`) ??
+      document.getElementById(mapFieldId(idPrefix, index, "replayCode"))
+    )?.focus();
   }, [maps, idPrefix]);
   const remove = (index: number) => {
     fieldErrors.clear();
@@ -169,23 +169,6 @@ export function MapScoreList({
     focusAfterRemove.current = index;
     change(maps.filter((_, i) => i !== index));
   };
-  // Après un ajout, le focus va au code de la nouvelle ligne : c'est la suite
-  // de la saisie, et le bouton « Ajouter » peut se désactiver sous le focus
-  // (plafond atteint), ce qui le renverrait au `<body>`.
-  const focusNewRow = useRef(false);
-  useEffect(() => {
-    if (!focusNewRow.current) return;
-    focusNewRow.current = false;
-    if (maps.length > 0) document.getElementById(mapFieldId(idPrefix, maps.length - 1, "replayCode"))?.focus();
-  }, [maps.length, idPrefix]);
-  const add = () => {
-    // Ajouter une map répond souvent au refus d'une autre (match inachevé) : il se lève.
-    fieldErrors.clear();
-    keys.current = [...keys.current, newKey()];
-    focusNewRow.current = true;
-    onChange([...maps, emptyMap()]);
-  };
-
   return (
     <fieldset className={styles.list} disabled={disabled}>
       <legend className={styles.legend}>
@@ -197,6 +180,7 @@ export function MapScoreList({
       <p id={hintId} className={styles.hint}>
         {replayCodeHintText(text, game)} {t("score.maps.drawHint")}
         {replayHint ? ` ${replayHint}` : ""}
+        {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
       </p>
 
       {maps.length > 0 && (
@@ -219,7 +203,8 @@ export function MapScoreList({
                     dans le nom du champ et serait lue deux fois. */}
                 <div className={styles.code}>
                   <label className={styles.fieldLabel} htmlFor={codeId}>
-                    <span className="sr-only">{t("score.maps.mapPrefix", { index: index + 1 })}</span>{t("score.maps.replayCode")}
+                    <span className="sr-only">{t("score.maps.mapPrefix", { index: index + 1 })}</span>
+                    {replayCodeOptional ? t("score.maps.replayCodeOptional") : t("score.maps.replayCode")}
                   </label>
                   <input
                     id={codeId}
@@ -288,10 +273,8 @@ export function MapScoreList({
                   />
                   <FieldErrorText fieldId={t2Id} message={fieldErrors.message(t2Key)} />
                 </div>
-                {/* Rien à retirer d'une ligne vierge (elle reviendrait aussitôt) ;
-                    l'arbitrage garde le retrait de sa ligne unique, pour revenir
-                    au score à la main. */}
-                {(isMapTouched(map) || (minRows === 0 && maps.length === 1)) && (
+                {/* Rien à retirer d'une ligne vierge (elle reviendrait aussitôt). */}
+                {isMapTouched(map) && (
                   <button
                     id={`${idPrefix}-map-${index}-remove`}
                     type="button"
@@ -309,19 +292,12 @@ export function MapScoreList({
         </ol>
       )}
 
-      {/* Sans ligne (arbitrage, score à la main) : la première s'ajoute ici ;
-          les suivantes viennent d'elles-mêmes. */}
-      {maps.length === 0 && (
-        <button id={`${idPrefix}-map-add`} type="button" className={styles.add} onClick={add}>
-          <Plus size={16} aria-hidden="true" /> {t("score.maps.add")}
-        </button>
-      )}
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
 
-      {/* Région d'état : le score dérivé change à chaque frappe. Rien sans map —
-          un « 0 – 0 » contredirait le score posé à la main au-dessus. */}
+      {/* Région d'état : le score dérivé change à chaque frappe. Rien tant
+          qu'aucune map n'est renseignée — un « 0 – 0 » n'aurait rien dit. */}
       {played > 0 && (
         <output className={styles.summary}>
           <span className={styles.summaryLabel}>{t("score.maps.summary")}</span>

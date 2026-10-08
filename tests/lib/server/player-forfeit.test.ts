@@ -47,7 +47,7 @@ describe("forfeitOwnMatch", () => {
   it("tranche le match au forfait de l'équipe du joueur, par le chemin de l'arbitrage", async () => {
     const { conn } = connection(readyMatch);
     await expect(forfeitOwnMatch(conn, 1, 42, 7)).resolves.toEqual({ forfeitTeamId: 20 });
-    expect(adminResolveMatch).toHaveBeenCalledWith(conn, 42, undefined, undefined, 20);
+    expect(adminResolveMatch).toHaveBeenCalledWith(conn, 42, { forfeitTeamId: 20 });
   });
 
   it("verrouille la ligne du match, sans jointure (MariaDB)", async () => {

@@ -8,6 +8,7 @@ import { PATCH as scoresRoute } from "@/app/api/admin/matches/[matchId]/scores/r
 import { getCurrentUser } from "@/lib/server/auth";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
+import { mapsFor } from "../../../helpers/match-maps";
 
 const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
 
@@ -38,48 +39,49 @@ const routes = [
 ] as const;
 
 describe.each(routes)("$name — lecture du corps", ({ call, service }) => {
-  it("transmet deux scores valides", async () => {
-    const res = await call({ team1Score: 3, team2Score: "1" });
+  it("transmet le détail map par map avec l'arbitre courant", async () => {
+    const res = await call({ maps: mapsFor(3, 1) });
     expect(res.status).toBe(200);
-    expect(jest.mocked(service).mock.calls[0].slice(0, 4)).toEqual([42, 3, 1, undefined]);
+    expect(service).toHaveBeenCalledWith(42, { maps: mapsFor(3, 1), userId: 3 });
   });
 
-  it("transmet un forfait nominatif, qui l'emporte sur les scores", async () => {
-    const res = await call({ forfeitTeamId: 7, team1Score: 120 });
+  it("transmet un forfait nominatif, qui l'emporte sur les maps", async () => {
+    const res = await call({ forfeitTeamId: "7", maps: mapsFor(2, 0) });
     expect(res.status).toBe(200);
-    expect(jest.mocked(service).mock.calls[0].slice(0, 4)).toEqual([42, 120, undefined, 7]);
+    expect(service).toHaveBeenCalledWith(42, { forfeitTeamId: 7 });
   });
 
   it.each<[unknown]>([[0], [-2], [1.5], ["abc"]])("refuse le forfait %p", async (forfeitTeamId) => {
-    const res = await call({ forfeitTeamId, team1Score: 1, team2Score: 0 });
+    const res = await call({ forfeitTeamId, maps: mapsFor(1, 0) });
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toBe("INVALID_FORFEIT_TEAM_ID");
     expect(service).not.toHaveBeenCalled();
   });
 
-  it.each<[unknown, unknown]>([
-    [-1, 0],
-    [0, 100],
-    [1.5, 2],
-    ["x", 1],
-  ])("refuse les scores %p – %p", async (team1Score, team2Score) => {
-    const res = await call({ team1Score, team2Score });
+  it("refuse l'ancienne saisie à la main { team1Score, team2Score } en 400 MAP_LIST_EMPTY", async () => {
+    const res = await call({ team1Score: 2, team2Score: 1 });
     expect(res.status).toBe(400);
-    expect(await errorOf(res)).toBe("INVALID_SCORES");
+    expect(await errorOf(res)).toBe("MAP_LIST_EMPTY");
     expect(service).not.toHaveBeenCalled();
   });
 
-  it("accepte les bornes 0 et 99", async () => {
-    const res = await call({ team1Score: 0, team2Score: 99 });
-    expect(res.status).toBe(200);
-  });
-
-  it.each<[Record<string, unknown>]>([[{}], [{ team1Score: 1 }], [{ team2Score: null, team1Score: 2 }], [{ forfeitTeamId: null }]])(
-    "refuse un corps sans scores complets ni forfait %p",
+  it.each<[Record<string, unknown>]>([[{}], [{ maps: [] }], [{ maps: null }], [{ forfeitTeamId: null }], [{ forfeitTeamId: null, maps: [] }]])(
+    "refuse un corps sans forfait ni maps %p en MAP_LIST_EMPTY",
     async (body) => {
       const res = await call(body);
       expect(res.status).toBe(400);
-      expect(await errorOf(res)).toBe("MISSING_SCORES_OR_FORFEIT");
+      expect(await errorOf(res)).toBe("MAP_LIST_EMPTY");
+      expect(service).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each<[unknown]>([["x"], [{}], [[1]], [[{ replayCode: "AAA111", team1Score: "2", team2Score: 0 }]]])(
+    "refuse le détail mal formé %p en INVALID_MAPS",
+    async (maps) => {
+      const res = await call({ maps });
+      expect(res.status).toBe(400);
+      expect(await errorOf(res)).toBe("INVALID_MAPS");
+      expect(service).not.toHaveBeenCalled();
     },
   );
 
@@ -95,7 +97,7 @@ describe.each(routes)("$name — lecture du corps", ({ call, service }) => {
     ["UNEXPECTED", 500],
   ])("traduit le refus %s en %i", async (code, status) => {
     jest.mocked(service).mockRejectedValue(new Error(code));
-    const res = await call({ team1Score: 1, team2Score: 0 });
+    const res = await call({ maps: mapsFor(1, 0) });
     expect(res.status).toBe(status);
   });
 });
@@ -104,14 +106,14 @@ describe("codes propres à chaque route", () => {
   it("« Valider » rend DRAW_NOT_ALLOWED et INVALID_REQUEST en 400", async () => {
     for (const code of ["DRAW_NOT_ALLOWED", "INVALID_REQUEST"]) {
       jest.mocked(adminResolveMatch).mockRejectedValueOnce(new Error(code));
-      const res = await resolveRoute(req("POST", { team1Score: 1, team2Score: 1 }), params);
+      const res = await resolveRoute(req("POST", { maps: mapsFor(1, 1) }), params);
       expect(res.status).toBe(400);
     }
   });
 
   it("« Enregistrer » ne connaît pas DRAW_NOT_ALLOWED : 500", async () => {
     jest.mocked(adminSaveMatchScores).mockRejectedValueOnce(new Error("DRAW_NOT_ALLOWED"));
-    const res = await scoresRoute(req("PATCH", { team1Score: 1, team2Score: 1 }), params);
+    const res = await scoresRoute(req("PATCH", { maps: mapsFor(1, 1) }), params);
     expect(res.status).toBe(500);
   });
 });

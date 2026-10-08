@@ -171,7 +171,7 @@ import { reportMatchScore, type ProposalConfirmation } from "./scoring";
 import { loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
-import type { AdminMapEntry } from "./admin";
+import type { AdminResolveEntry, AdminScoreEntry } from "./admin";
 import {
   publishMatchUpdatedEvent,
   publishUpdatedEvent,
@@ -1323,24 +1323,12 @@ async function runPlayerMatchWrite(
   }
 }
 
-export async function adminSaveMatchScoresPublic(
-  matchId: number,
-  team1Score?: number,
-  team2Score?: number,
-  forfeitTeamId?: number,
-  mapEntry?: AdminMapEntry,
-): Promise<void> {
+export async function adminSaveMatchScoresPublic(matchId: number, entry: AdminScoreEntry): Promise<void> {
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
-  await retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, team1Score, team2Score, forfeitTeamId, mapEntry));
+  await retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, entry));
 }
 
-async function adminSaveMatchScoresOnce(
-  matchId: number,
-  team1Score?: number,
-  team2Score?: number,
-  forfeitTeamId?: number,
-  mapEntry?: AdminMapEntry,
-): Promise<void> {
+async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -1348,7 +1336,7 @@ async function adminSaveMatchScoresOnce(
     await connection.beginTransaction();
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
-    await adminSaveInternal(connection, matchId, team1Score, team2Score, forfeitTeamId, mapEntry);
+    await adminSaveInternal(connection, matchId, entry);
 
     // Need to get tournament ID for event + Survival reconciliation
     const [matchData] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
@@ -1579,28 +1567,12 @@ export async function liftEndurancePenaltyPublic(
   }
 }
 
-export async function adminResolveMatchPublic(
-  matchId: number,
-  team1Score?: number,
-  team2Score?: number,
-  forfeitTeamId?: number,
-  doubleForfeit = false,
-  mapEntry?: AdminMapEntry,
-): Promise<void> {
+export async function adminResolveMatchPublic(matchId: number, entry: AdminResolveEntry): Promise<void> {
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
-  await retryOnDeadlock(() =>
-    adminResolveMatchOnce(matchId, team1Score, team2Score, forfeitTeamId, doubleForfeit, mapEntry),
-  );
+  await retryOnDeadlock(() => adminResolveMatchOnce(matchId, entry));
 }
 
-async function adminResolveMatchOnce(
-  matchId: number,
-  team1Score?: number,
-  team2Score?: number,
-  forfeitTeamId?: number,
-  doubleForfeit = false,
-  mapEntry?: AdminMapEntry,
-): Promise<void> {
+async function adminResolveMatchOnce(matchId: number, entry: AdminResolveEntry): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -1617,15 +1589,7 @@ async function adminResolveMatchOnce(
     const tournamentId = Number(matchData[0].tournament_id);
 
     const { adminResolveMatch } = await import("./admin");
-    await adminResolveMatch(
-      connection,
-      matchId,
-      team1Score,
-      team2Score,
-      forfeitTeamId,
-      doubleForfeit,
-      mapEntry,
-    );
+    await adminResolveMatch(connection, matchId, entry);
 
     await tryAutoResolveByes(connection, tournamentId);
 

@@ -76,6 +76,14 @@
   user-select: all;
 }
 
+/* Map posée sans code par l'arbitrage : la mention occupe la place du code et
+   du bouton de copie. */
+.noCode {
+  grid-column: span 2;
+  color: var(--ink-quiet, #9aa4b2);
+  font-style: italic;
+}
+
 .copy {
   display: inline-flex;
   align-items: center;

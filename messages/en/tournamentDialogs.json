@@ -11,20 +11,16 @@
       "below": "Incomplete score in {label}: the winner must reach {wins, plural, one {# map} other {# maps}}."
     },
     "blocker": {
-      "incomplete": "Fill in both scores.",
+      "incomplete": "Enter at least one played map.",
       "draw": "The scores can't be equal: there must be a winner.",
       "doubleForfeit": "A double forfeit decides the match: it's entered with “Confirm the result”.",
       "notInLaunch": "The score can be entered once the match is launched. Before that, only a forfeit can be ruled.",
       "alreadyDecided": "This match is already decided. Correct it with “Confirm the result” so the winner and the rest of the board follow."
     },
-    "stepper": {
-      "decrement": "Remove a map from {name}",
-      "field": "Maps won by {name}",
-      "increment": "Add a map to {name}"
-    },
     "maps": {
       "replayHintOverwatch": "Overwatch replay code: 6 characters (letters and digits).",
       "replayHintOther": "Game code or ID: 4 to 32 characters (letters, digits, hyphens).",
+      "replayOptionalHint": "Referees: the replay code is optional; a map without one shows “No replay code”.",
       "replayAllowance": "A drawn map can be replayed ({count} at most).",
       "added": "Map {index} added: fill it in.",
       "legend": "Maps played",
@@ -32,9 +28,9 @@
       "map": "Map {index}",
       "mapPrefix": "Map {index}, ",
       "replayCode": "Replay code",
+      "replayCodeOptional": "Replay code (optional)",
       "scoreOf": "Map {index}, score of ",
       "remove": "Remove map {index}",
-      "add": "Add a map",
       "summary": "Match score",
       "violation": {
         "empty": "Add at least one played map.",
@@ -72,7 +68,6 @@
       "proposalMaps": "Maps proposed by {name}",
       "conflict": "This match changed while you were entering it — someone else saved a result. Sending now would overwrite theirs.",
       "adoptStored": "Use the latest value",
-      "derivedHint": "Score calculated from the maps below: remove every map to enter it by hand.",
       "forfeit": {
         "open": "Declare a forfeit on this round",
         "cancel": "Cancel the forfeit",
@@ -108,7 +103,7 @@
         "readOnly": "{opponent} proposes {score}. Waiting for confirmation from someone in charge of {mine}.",
         "withMaps": "{opponent} proposes {score}. Confirm it, or enter the score you saw: a disagreement alerts the referee.",
         "loading": "{opponent} proposes {score}. Loading their map details… Refresh the page if they don't arrive.",
-        "withoutMaps": "{opponent} proposes {score}, without the map details. To confirm it, enter the maps played and their replay codes: a disagreement alerts the referee."
+        "withoutMaps": "{opponent} proposes {score}, but their map details could not be loaded. Refresh the page to confirm it: entering a score instead alerts the referee."
       },
       "confirmed": "Score confirmed: {team1} {score1} – {score2} {team2}",
       "submitted": "Score sent: {team1} {score1} – {score2} {team2}",

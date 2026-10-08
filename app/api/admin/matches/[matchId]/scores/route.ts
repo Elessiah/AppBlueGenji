@@ -3,7 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
-import { parseAdminScoreBody, parseAdminMapEntry } from "@/lib/shared/admin-score-body";
+import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
 
 export async function PATCH(req: Request, context: { params: Promise<{ matchId: string }> }) {
@@ -16,8 +16,6 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   if (!Number.isInteger(matchId_) || matchId_ <= 0) return fail("INVALID_MATCH_ID", 400);
 
   const body = (await readJsonBody(req)) as {
-    team1Score?: unknown;
-    team2Score?: unknown;
     forfeitTeamId?: unknown;
     doubleForfeit?: unknown;
     maps?: unknown;
@@ -28,19 +26,15 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   // l'accepter ici laisserait une rencontre « en cours » sans score ni équipe.
   if (body.doubleForfeit === true) return fail("DOUBLE_FORFEIT_RESOLVE_ONLY", 400);
 
-  // Détail map par map facultatif (`docs/features/MAP_SCORES.md`) : présent,
-  // il fait foi et le score se dérive des maps.
-  const mapParse = parseAdminMapEntry(body.maps);
-  if (!mapParse.ok) return fail(mapParse.error, 400);
-  const hasMaps = (mapParse.maps?.length ?? 0) > 0;
-  const parsed = parseAdminScoreBody(hasMaps ? { ...body, ...mapParse.placeholderScores } : body);
+  // Un forfait, ou le détail map par map dont le score se dérive
+  // (`docs/features/MAP_SCORES.md`) — aucun score posé à la main. L'égalité
+  // est permise ici : on enregistre l'avancement sans déclarer de vainqueur.
+  const parsed = parseAdminScoreBody(body);
   if (!parsed.ok) return fail(parsed.error, 400);
-  // L'égalité est autorisée sur cette route : on enregistre les scores sans déclarer de vainqueur.
-  const { team1Score, team2Score, forfeitTeamId } = parsed.value;
-  const mapEntry = mapParse.maps === null ? undefined : { maps: mapParse.maps, userId: user.id };
+  const entry = "maps" in parsed.value ? { maps: parsed.value.maps, userId: user.id } : parsed.value;
 
   try {
-    await adminSaveMatchScores(matchId_, team1Score, team2Score, forfeitTeamId, mapEntry);
+    await adminSaveMatchScores(matchId_, entry);
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;

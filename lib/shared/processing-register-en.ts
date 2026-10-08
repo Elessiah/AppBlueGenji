@@ -214,7 +214,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     dataCategories: [
       "Team membership and team roles",
       "Registrations, scores, forfeits, penalties (with reason and referee who imposed it), rankings",
-      "Map-by-map detail of a match: score and replay code of each map (the replay shows the players' identifiers in game, hidden BattleTag included), account that entered it",
+      "Map-by-map detail of a match: score and replay code of each map (optional when the referees enter the map, replay lost; the replay shows the players' identifiers in game, hidden BattleTag included), account that entered it",
     ],
     sensitiveData: "None",
     retention: [

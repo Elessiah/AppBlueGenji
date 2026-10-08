@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  adminFormStateFor,
   decideScoreForm,
-  isUntouched,
+  sameScoreFormState,
   pendingProposalSignature,
   pendingScoreProposal,
   scoreFormStateFor,
@@ -10,6 +11,8 @@ import {
 import type { BracketMatch, MatchScoreReport } from "@/lib/shared/types";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { bracketMatch } from "../helpers/bracket-match";
+import { mapsFor } from "../helpers/match-maps";
+import { emptyMap } from "@/lib/shared/match-maps";
 
 const BO3: MatchFormat = { type: "BO", value: 3 };
 
@@ -89,9 +92,21 @@ describe("scoreFormStateFor — ouverture sur la proposition", () => {
     expect(decision.scores).toEqual({ team1: 2, team2: 1 });
   });
 
-  it("considère le formulaire pré-rempli comme intact", () => {
+  it("dérive le score d'ouverture des maps de la proposition : intact, et identique au score proposé", () => {
     const opened = match({ team2Report: report(1, 2) });
-    expect(isUntouched(scoreFormStateFor(opened), opened)).toBe(true);
+    const opening = adminFormStateFor(opened, mapsFor(1, 2));
+    expect(opening).toEqual(scoreFormStateFor(opened));
+    expect(sameScoreFormState(opening, adminFormStateFor(opened, mapsFor(1, 2)))).toBe(true);
+  });
+
+  it("n'ouvre sur aucun score quand le détail de la proposition manque : rien à valider sans maps", () => {
+    const opened = match({ team1Report: report(2, 1) });
+    const opening = adminFormStateFor(opened, [emptyMap()]);
+    expect(opening).toMatchObject({ score1: "", score2: "" });
+    expect(decideScoreForm(opening, { format: BO3, decided: false })).toMatchObject({
+      canResolve: false,
+      resolveBlocker: "INCOMPLETE",
+    });
   });
 
   it("reste vide en cas de désaccord", () => {

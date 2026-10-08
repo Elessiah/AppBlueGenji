@@ -297,8 +297,6 @@ function assertMatchLaunchedForPlayers(match: MatchRow): void {
  * décrivent pas la même série, et les codes sont justement ce que l'arbitrage
  * vérifie. Un désaccord sur les maps suit donc le chemin de tout désaccord —
  * arbitrage alerté —, sans rien changer à la mécanique vainqueur / perdant.
- * Une proposition adverse d'avant les maps (aucune ligne) ne se compare que
- * sur le score.
  */
 async function reportsConcord(
   connection: PoolConnection,
@@ -312,7 +310,7 @@ async function reportsConcord(
   if (!scoresAgree) return false;
   const otherSource = reporterSource === "TEAM1" ? "TEAM2" : "TEAM1";
   const otherMaps = await loadMatchMaps(connection, Number(updated.id), otherSource);
-  return otherMaps.length === 0 || sameMapLists(maps, otherMaps);
+  return sameMapLists(maps, otherMaps);
 }
 
 /** Ce que l'engagé confirme : le dépôt de la proposition adverse qu'il a lue. */
@@ -320,8 +318,7 @@ export type ProposalConfirmation = { reportedAt: string };
 
 /**
  * La proposition adverse est-elle toujours celle que l'engagé confirme ? Même
- * instant de dépôt, et — quand elle porte un détail — les mêmes maps que
- * celles renvoyées. Lève `PROPOSAL_STALE` sinon. La ligne du match est déjà
+ * instant de dépôt, et les mêmes maps que celles renvoyées. Lève `PROPOSAL_STALE` sinon. La ligne du match est déjà
  * verrouillée ; le détail adverse est relu sous verrou (la dernière version).
  */
 async function assertProposalUnchanged(
@@ -337,7 +334,7 @@ async function assertProposalUnchanged(
     throw new Error("PROPOSAL_STALE");
   }
   const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
-  if (theirMaps.length > 0 && !sameMapLists(maps, theirMaps)) throw new Error("PROPOSAL_STALE");
+  if (!sameMapLists(maps, theirMaps)) throw new Error("PROPOSAL_STALE");
 }
 
 /**

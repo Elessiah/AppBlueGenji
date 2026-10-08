@@ -37,25 +37,41 @@ beforeEach(() => {
 });
 
 describe("arbitrage — détail map par map (MAP_SCORES.md)", () => {
-  it("« Valider le résultat » transmet les maps et l'arbitre ; le score se dérive dans le service", async () => {
+  it("« Valider le résultat » transmet les maps et l'arbitre courant ; le score se dérive dans le service", async () => {
     const res = await resolveRoute(req("POST", { maps: MAPS }), params);
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, 0, 0, undefined, false, { maps: NORMALIZED, userId: 3 });
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 3 });
   });
 
-  it("un score à la main efface le détail retenu (maps vides)", async () => {
-    await resolveRoute(req("POST", { team1Score: 3, team2Score: 1 }), params);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false, { maps: [], userId: 3 });
+  it("« Enregistrer » transmet les maps et l'arbitre courant", async () => {
+    const res = await scoresRoute(req("PATCH", { maps: MAPS }), params);
+    expect(res.status).toBe(200);
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 3 });
   });
 
-  it("« Enregistrer » transmet les maps ; une liste vide efface le détail, un champ absent n'y touche pas", async () => {
-    await scoresRoute(req("PATCH", { maps: MAPS }), params);
-    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, 0, 0, undefined, { maps: NORMALIZED, userId: 3 });
-    await scoresRoute(req("PATCH", { team1Score: 1, team2Score: 0, maps: [] }), params);
-    // Liste explicitement vide : score à la main qui efface le détail retenu.
-    expect(adminSaveMatchScores).toHaveBeenLastCalledWith(42, 1, 0, undefined, { maps: [], userId: 3 });
-    await scoresRoute(req("PATCH", { team1Score: 1, team2Score: 0 }), params);
-    expect(adminSaveMatchScores).toHaveBeenLastCalledWith(42, 1, 0, undefined, undefined);
+  it("l'arbitre transmis est celui de la session, jamais un champ du corps", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9, isAdmin: false, roles: ["ARBITRE"] }));
+    await resolveRoute(req("POST", { maps: MAPS, userId: 1 }), params);
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 9 });
+    await scoresRoute(req("PATCH", { maps: MAPS, userId: 1 }), params);
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 9 });
+  });
+
+  it("un forfait l'emporte sur des maps présentes : entrée de forfait, sans maps ni arbitre", async () => {
+    await resolveRoute(req("POST", { forfeitTeamId: 7, maps: MAPS }), params);
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, { forfeitTeamId: 7 });
+    await scoresRoute(req("PATCH", { forfeitTeamId: 7, maps: MAPS }), params);
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { forfeitTeamId: 7 });
+  });
+
+  it("refuse une liste vide en 400 MAP_LIST_EMPTY : plus de score posé à la main", async () => {
+    for (const route of [() => resolveRoute(req("POST", { maps: [] }), params), () => scoresRoute(req("PATCH", { maps: [] }), params)]) {
+      const res = await route();
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "MAP_LIST_EMPTY" });
+    }
+    expect(adminResolveMatch).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
   });
 
   it("refuse un détail mal formé en 400 INVALID_MAPS, sans atteindre le service", async () => {

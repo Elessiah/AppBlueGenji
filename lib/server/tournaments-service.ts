@@ -8,6 +8,7 @@ export type {
   TournamentListRow,
   EditableTournamentValues,
 } from "./tournaments";
+export type { AdminResolveEntry, AdminScoreEntry } from "./tournaments/admin";
 
 export {
   // Mappers

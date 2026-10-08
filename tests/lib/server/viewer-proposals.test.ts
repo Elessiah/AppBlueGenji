@@ -51,16 +51,23 @@ describe("propositions map par map — qui les lit (MAP_SCORES.md)", () => {
     expect(proposals.map((p) => p.matchId)).toEqual([10, 11]);
   });
 
-  it("ignore un match tranché, et tait un détail qui n'explique pas son score", async () => {
+  it("ignore un match tranché", async () => {
     const { connection } = conn();
     const played = { ...pending(10, 5, 6), status: "COMPLETED" as const };
     expect(await loadViewerProposals(connection, [played], { all: true, teamIds: [] })).toEqual([]);
+  });
 
-    const mismatch = {
+  it("rend le détail d'une proposition tel quel, sans le confronter à son score", async () => {
+    const { connection } = conn();
+    const other = {
       ...pending(10, 5, 6),
       team1Report: { team1Score: 0, team2Score: 1, reportedAt: reportAt, maps: [] },
     };
-    const [entry] = await loadViewerProposals(connection, [mismatch], { all: true, teamIds: [] });
-    expect(entry.team1?.maps).toEqual([]);
+    const [entry] = await loadViewerProposals(connection, [other], { all: true, teamIds: [] });
+    expect(entry.team1).toEqual({
+      reportedAt: reportAt,
+      maps: [{ mapNumber: 1, replayCode: "SECRET", team1Score: 2, team2Score: 0 }],
+    });
+    expect(entry.team2).toBeNull();
   });
 });

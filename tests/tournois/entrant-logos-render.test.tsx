@@ -273,9 +273,10 @@ describe("emblème — alignement et cas limites", () => {
   });
 
   it("ne réserve pas de case blanche devant le libellé d'un côté vide du dialogue de score", () => {
-    expect(stripComments(read("ScoreStepper.tsx"))).toContain(
-      "{teamId !== null && <EntrantLogo teamId={teamId}",
-    );
+    // Les steppers partis, ce sont les libellés des scores de map qui portent l'emblème.
+    const list = stripComments(read("MapScoreList.tsx"));
+    expect(list).toContain("{team1Id !== null && <EntrantLogo teamId={team1Id}");
+    expect(list).toContain("{team2Id !== null && <EntrantLogo teamId={team2Id}");
   });
 });
 

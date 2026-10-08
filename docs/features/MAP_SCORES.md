@@ -14,6 +14,17 @@ rapporte de point à personne. Aucun état « nul » nouveau, aucun libellé
 « Match nul / Non terminé » de plus que ceux qui existent
 ([MATCH_DRAWS.md](./MATCH_DRAWS.md)).
 
+**Demande du 2026-10-08 — l'ancien système disparaît.** La saisie map par map
+est désormais la **seule** : plus aucun score posé à la main, arbitrage compris
+(steppers et `ScoreStepper` retirés, routes d'arbitrage refusant un corps
+`team1Score` / `team2Score` sans maps en `MAP_LIST_EMPTY`). **Décision de
+l'utilisateur** : l'arbitrage peut laisser le code de replay vide
+(`requireReplayCode: false`) ; la map s'affiche alors « Pas de code de replay ».
+Tous les matchs en production étant saisis map par map, les chemins de lecture
+d'un score « d'avant les maps » sont retirés : `mapsMatchStoredScore`,
+`dropStaleFinalMaps`, la concordance « au seul score » avec une proposition sans
+détail, l'ajout « Ajouter une map » d'une liste vide (`minRows = 0`).
+
 ## Plan (écrit avant l'exécution, tenu à jour)
 
 1. Module pur `lib/shared/match-maps.ts` : dérivation du score, plafond de
@@ -74,7 +85,12 @@ n'a pas eu lieu. L'affichage progressif n'ouvre plus de ligne à ce moment-là.
 
 ### Codes de replay
 
-Normalisés (espaces retirés, majuscules), uniques dans un match.
+Normalisés (espaces retirés, majuscules), uniques dans un match. Obligatoires
+pour un engagé ; **facultatifs pour l'arbitrage** (`MapEntryRules`,
+`requireReplayCode: false` dans `checkMapList`, `isMapComplete`,
+`progressiveMapRows`) — un code vide est stocké `''` (`replay_code` reste
+`NOT NULL`, aucun changement de schéma), un code saisi suit le motif et
+l'unicité.
 
 | Jeu | Motif |
 |---|---|
@@ -88,7 +104,7 @@ Le jeu se lit avec le format, dans la même requête
 
 | Code | Cause |
 |---|---|
-| `MAP_LIST_EMPTY` | report sans map (y compris l'ancien corps `myScore` / `opponentScore`) |
+| `MAP_LIST_EMPTY` | report ou saisie d'arbitrage sans map (y compris les anciens corps `myScore` / `opponentScore` et `team1Score` / `team2Score`) |
 | `INVALID_MAPS` | corps mal formé |
 | `MAP_COUNT_EXCEEDED` | plus de lignes que le plafond |
 | `MAP_REPLAY_CODE_REQUIRED` / `_INVALID` / `_DUPLICATE` | code manquant, hors motif, en double |
@@ -119,8 +135,7 @@ bg_match_maps (
 - Lectures **verrouillantes** (`FOR UPDATE`, table seule) avant d'effacer et
   pour comparer deux propositions : une lecture cohérente verrait l'instantané
   pris avant le verrou du match et manquerait la proposition qu'un report
-  concurrent vient de valider (clé unique heurtée, ou désaccord pris pour un
-  report d'avant les maps). Sur un intervalle vide, elles posent un verrou
+  concurrent vient de valider (clé unique heurtée, ou désaccord pris à tort). Sur un intervalle vide, elles posent un verrou
   d'intervalle : deux reports simultanés sur des matchs voisins peuvent
   s'interbloquer, et `reportMatchScorePublic` rejoue alors la transaction
   annulée (3 essais), comme les deux écritures d'arbitrage et le forfait déclaré
@@ -130,26 +145,25 @@ bg_match_maps (
   { knownEmpty: true })` insère sans lecture verrouillante (verrous d'intention
   d'insertion, compatibles entre eux), en `ON DUPLICATE KEY UPDATE` pour qu'un
   reste éventuel n'aboutisse pas en 500. Retirer une map rend le focus à la ligne
-  suivante (ou à « Ajouter une map » quand il n'en reste aucune, arbitrage).
+  suivante (ou au code de la ligne vierge qui la remplace).
   Les chemins qui ne rejouent pas leur transaction (clôture d'un match,
   abandons, retour en arrière, entretien des reports expirés) lisent **sans
   verrou** avant d'effacer (`clearMapSets`) ; l'entretien verrouille et relit
   d'abord le match (`stillSingleReport` : statut et reports relus sous verrou, scores du report relu), ce qui ferme la double
   clôture d'un même report expiré.
-- Dialogue d'arbitrage : un score posé à la main avant la première map est
-  rendu aux champs quand la dernière map est retirée.
 - `FINAL` : le détail retenu. Promu depuis la proposition qui fait foi (accord
   des deux engagées — celle qui confirme —, ou report seul à l'échéance), ou
   écrit par l'arbitrage. Un forfait l'efface toujours (arbitrage ou engagée :
-  son score plein pourrait sinon coïncider avec un détail noté plus tôt) ; un
-  score posé à la main l'efface quand le corps porte `maps: []` — ce que le
-  dialogue d'arbitrage envoie toujours sans map. `maps` absent : détail
-  inchangé (appelants hors interface).
+  son score plein pourrait sinon coïncider avec un détail noté plus tôt) ; une
+  saisie d'arbitrage le remplace par ses maps ; un tour d'arbre final BG Survie
+  réécrit sur place (`writePlayoffRound`, résultat remis à zéro) l'efface — le
+  détail n'est plus filtré sur le score à l'affichage, il doit donc partir avec
+  le résultat qu'il documente.
 - Le dialogue d'arbitrage compte les maps dans « saisie en cours » : corriger
   un code ou ajouter une map nulle, qui ne changent pas le score, n'est pas
   écrasé par une proposition arrivée par le flux.
-- Scores toujours dans l'orientation du plateau. Un match sans ligne — tous ceux
-  d'avant — se lit comme avant ; les rejeux ne lisent jamais cette table.
+- Scores toujours dans l'orientation du plateau ; les rejeux ne lisent jamais
+  cette table.
 
 ### Circuit inchangé
 
@@ -157,8 +171,8 @@ Deux reports concordent quand le score dérivé **et** le détail concordent
 (codes normalisés, scores de map) : deux 2-1 aux codes différents ne décrivent
 pas la même série, et les codes sont ce que l'arbitrage vérifie. Un désaccord
 sur les maps suit le chemin de tout désaccord (arbitrage alerté) — la mécanique
-vainqueur / perdant ne change pas. Une proposition d'avant les maps ne se
-compare que sur le score. La modale de l'adversaire s'ouvre sur la proposition
+vainqueur / perdant ne change pas. Une proposition sans maps ne concorde avec
+rien (`reportsConcord`, `PROPOSAL_STALE` à la confirmation). La modale de l'adversaire s'ouvre sur la proposition
 (maps comprises) : confirmer d'un clic renvoie le même détail. Corriger un code
 à score égal reste une nouvelle proposition (le bouton ne se bloque pas sur
 « déjà envoyé »). **Décision de l'utilisateur (2026-10-06)** : un désaccord sur
@@ -185,16 +199,12 @@ La seconde équipe ne ressaisit rien :
   autre instant de dépôt, report retiré ou expiré, ou maps qui ne sont plus
   celles envoyées → `409 PROPOSAL_STALE`, rien d'écrit. La modale relit alors le
   contexte du lecteur et se réaligne sur la version à jour.
-- **Proposition sans détail** (antérieure aux maps, ou détail resté
-  introuvable après trois relectures) : la modale s'ouvre vide et la phrase
-  d'état dit de saisir les maps jouées et leurs codes pour confirmer, au lieu
-  de « Confirme-le ». Tant que le détail est **en lecture** (proposition
-  arrivée par le flux), la phrase le dit, pour que le joueur ne ressaisisse pas
-  ce qui va pré-remplir le formulaire. Saisir les maps au **même score** qu'une
-  proposition sans détail vaut confirmation (« Confirmer », contrôle de
-  péremption compris) : le serveur la compare au seul score. Pas tant que le
-  détail est en lecture : l'envoi reste alors une proposition ordinaire, sans
-  faux `PROPOSAL_STALE`.
+- **Détail introuvable** (resté illisible après trois relectures) : la modale
+  s'ouvre vide et la phrase d'état dit d'actualiser la page pour confirmer, au
+  lieu de « Confirme-le » ; un score saisi à la place est une contre-proposition.
+  Tant que le détail est **en lecture** (proposition arrivée par le flux), la
+  phrase le dit, pour que le joueur ne ressaisisse pas ce qui va pré-remplir le
+  formulaire.
 - **Détail adverse à part** : en désaccord, et aussi quand une proposition
   adverse arrive **pendant** une saisie (le formulaire ne la reprend pas) — pas
   dès qu'une retouche écarte le formulaire du pré-remplissage, le bloc ferait
@@ -236,11 +246,10 @@ le tait.
   seule porte de données**, servie à l'identique par le flux SSE et par le REST
   de secours (le détail des propositions, lui, passe par le contexte du
   lecteur — voir ci-dessus).
-  Un détail ne s'affiche que s'il **explique** le score qu'il accompagne
-  (`mapsMatchStoredScore`) : un score corrigé à la main ne porte pas un détail
-  qui le contredit.
+  Le détail retenu s'affiche tel quel, sauf sur un forfait.
 - Carte de match : bouton « Détail des maps (N) » qui ouvre une **modale** (un volet déplié dans la carte grandissait chaque créneau de l'arbre), score de chaque map et code
-  copiable. **Décision de l'utilisateur (2026-10-06)** : les codes retenus
+  copiable — « Pas de code de replay » (sans bouton de copie) pour une map
+  posée sans code par l'arbitrage. **Décision de l'utilisateur (2026-10-06)** : les codes retenus
   (`FINAL`) ou enregistrés par l'arbitrage sont visibles de tout membre connecté
   (les pages de tournoi exigent une session), pour qu'un match diffusé en direct
   et un match qui ne l'est pas offrent les mêmes informations ; les propositions
@@ -250,7 +259,7 @@ le tait.
 
 ## Saisie
 
-- **Engagé** (`PlayerScoreDialog`) : la liste remplace les deux steppers ; une
+- **Engagé** (`PlayerScoreDialog`) : une
   ligne par map (« Map N », code, score de chaque équipe en `<NumberInput>`,
   retrait), score du match dérivé en direct.
 - **Lignes progressives** (demande du 2026-10-06, `progressiveMapRows`) : la
@@ -273,21 +282,18 @@ le tait.
   (score incomplet, match inachevé) désigne le code de la ligne ouverte
   (`refusalFieldOnRows`), pas le score de la dernière map jouée. En confirmation,
   la modale montre exactement les lignes adverses, puis le même comportement si
-  l'engagé les retouche. L'arbitrage partage la liste (`MapScoreList`) : sans
-  ligne d'emblée (`minRows = 0`, score à la main), « Ajouter une map » ouvre la
-  première, les suivantes viennent de la même façon.
-- **Arbitrage** (`AdminScoreDialog`) : la même liste sous les steppers. Dès
-  qu'une map est saisie, les steppers suivent le score dérivé (désactivés, une
-  phrase reliée par `aria-describedby` dit de retirer les maps pour saisir à la
-  main) ;
-  sans map, l'arbitre pose le score à la main comme avant (replay perdu). La
-  confirmation de correction d'un résultat validé (#381) est inchangée.
+  l'engagé les retouche. L'arbitrage partage la liste (`MapScoreList`) et le
+  même comportement (une ligne vierge d'emblée), code de replay facultatif
+  (`replayCodeOptional` : « Code de replay (facultatif) », aide qui le dit).
+- **Arbitrage** (`AdminScoreDialog`) : la même liste, seule saisie du score
+  (plus de steppers ni de score à la main — 2026-10-08) ; sans map renseignée,
+  les deux actions sur un score sont refusées (« Saisis au moins une map
+  jouée »). La confirmation de correction d'un résultat validé (#381) est inchangée.
   En désaccord (deux propositions), le dialogue montre le détail des deux,
   codes de replay compris (`MapResultList`). Tant que le détail de la
   proposition est en lecture (`proposalsNeedRefresh`, formulaire sans map ni
   forfait), « Enregistrer » et « Valider » attendent, avec une phrase visible :
-  un score validé avant partirait avec `maps: []` et effacerait les codes de la
-  proposition à la clôture. Une seule phrase sous les boutons, dans l'ordre de
+  le détail va pré-remplir la liste, l'arbitre n'a pas à le ressaisir. Une seule phrase sous les boutons, dans l'ordre de
   l'infobulle : détail en lecture, map refusée (une fois une map renseignée),
   puis blocage du score. Sous un forfait ou une saisie fermée, la liste masquée ne refuse plus rien
   (ses maps ne partent pas) ; un refus qui désigne une ligne vierge ajoutée
@@ -302,9 +308,11 @@ le tait.
 ## RGPD
 
 Un code de replay mène aux identifiants de jeu des joueurs présents (BattleTag
-masqué sur le site compris) : traité comme donnée personnelle. Un score posé par
-l'arbitrage **sans** `maps` efface le détail retenu qui ne l'explique plus
-(`dropStaleFinalMaps`) ; l'export RGPD rend les maps saisies par le titulaire
+masqué sur le site compris) : traité comme donnée personnelle. Une correction
+d'arbitrage remplace le détail retenu par le sien ; un code omis par l'arbitrage
+n'est pas collecté (précisé sur `/rgpd`, au registre et dans l'entrée
+`2026-10-code-replay-facultatif-arbitrage` de `PRIVACY_CHANGES`, 2026-10-08) ;
+l'export RGPD rend les maps saisies par le titulaire
 (`mapEntries`, `lib/server/match-map-entries.ts`). La suppression d'un compte
 délie la saisie mais garde les codes (la partie est conservée par l'éditeur du
 jeu) — dit sur `/rgpd`, dans l'entrée `PRIVACY_CHANGES` (datée du 2026-10-06,
