@@ -29,7 +29,7 @@ describe("globals.css — champs d'heure", () => {
 });
 
 describe("MatchScheduleDialog — heure", () => {
-  it("propose une liste de demi-heures, pas un champ libre", () => {
+  it("propose une liste de quarts d'heure, pas un champ libre", () => {
     expect(SOURCE).not.toContain('type="time"');
     expect(SOURCE).toContain("matchEntryTimeOptions(");
     expect(SOURCE).toMatch(/<select\s+id=\{FIELD_IDS\.time\}/);
@@ -38,6 +38,11 @@ describe("MatchScheduleDialog — heure", () => {
   it("part de 21:00 sans date posée, et y revient quand on vide la date", () => {
     expect(SOURCE).toContain("useState(initial ? matchEntryTimeValue(initial) : MATCH_ENTRY_DEFAULT_TIME)");
     expect(SOURCE).toContain("setTime(MATCH_ENTRY_DEFAULT_TIME)");
+  });
+
+  it("présélectionne le mois courant sans date posée, et le vide avec la date", () => {
+    expect(SOURCE).toContain("initial ? String(initial.month) : String(matchEntryDefaultMonth(Date.now()))");
+    expect(SOURCE).toContain('setMonth("")');
   });
 
   it("n'explique plus la déduction de l'année, mais garde l'aperçu et sa correction", () => {

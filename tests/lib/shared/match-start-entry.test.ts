@@ -1,13 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   MATCH_ENTRY_DEFAULT_TIME,
-  MATCH_ENTRY_HALF_HOURS,
+  MATCH_ENTRY_QUARTER_HOURS,
   MATCH_ENTRY_MONTHS,
   formatMatchStartEntryPreview,
   isMatchStartEntryInRange,
   localMatchTimeIfDifferent,
   matchEntryMonths,
   matchEntryReference,
+  matchEntryDefaultMonth,
   matchEntryTimeOptions,
   matchEntryTimeValue,
   matchStartEntryOf,
@@ -233,29 +234,38 @@ describe("heure du champ", () => {
     expect(parseMatchEntryTime("8:00")).toBeNull();
   });
 
-  it("propose les 48 demi-heures, 21:00 par défaut", () => {
-    expect(MATCH_ENTRY_HALF_HOURS).toHaveLength(48);
-    expect(MATCH_ENTRY_HALF_HOURS[0]).toBe("00:00");
-    expect(MATCH_ENTRY_HALF_HOURS[1]).toBe("00:30");
-    expect(MATCH_ENTRY_HALF_HOURS.at(-1)).toBe("23:30");
-    expect(MATCH_ENTRY_HALF_HOURS.every((value) => /^\d{2}:(00|30)$/.test(value))).toBe(true);
-    expect(MATCH_ENTRY_HALF_HOURS).toContain(MATCH_ENTRY_DEFAULT_TIME);
+  it("propose les 96 quarts d'heure, 21:00 par défaut", () => {
+    expect(MATCH_ENTRY_QUARTER_HOURS).toHaveLength(96);
+    expect(MATCH_ENTRY_QUARTER_HOURS.slice(0, 5)).toEqual(["00:00", "00:15", "00:30", "00:45", "01:00"]);
+    expect(MATCH_ENTRY_QUARTER_HOURS.at(-1)).toBe("23:45");
+    expect(MATCH_ENTRY_QUARTER_HOURS.every((value) => /^\d{2}:(00|15|30|45)$/.test(value))).toBe(true);
+    expect(MATCH_ENTRY_QUARTER_HOURS).toContain(MATCH_ENTRY_DEFAULT_TIME);
     expect(MATCH_ENTRY_DEFAULT_TIME).toBe("21:00");
   });
 
-  it("garde à sa place une heure posée entre deux demi-heures", () => {
-    expect(matchEntryTimeOptions()).toBe(MATCH_ENTRY_HALF_HOURS);
-    expect(matchEntryTimeOptions("20:30")).toBe(MATCH_ENTRY_HALF_HOURS);
-    const options = matchEntryTimeOptions("20:45");
-    expect(options).toHaveLength(49);
-    expect(options.slice(41, 44)).toEqual(["20:30", "20:45", "21:00"]);
-    expect(matchEntryTimeOptions("00:05").slice(0, 3)).toEqual(["00:00", "00:05", "00:30"]);
+  it("garde à sa place une heure posée entre deux quarts d'heure", () => {
+    expect(matchEntryTimeOptions()).toBe(MATCH_ENTRY_QUARTER_HOURS);
+    expect(matchEntryTimeOptions("20:45")).toBe(MATCH_ENTRY_QUARTER_HOURS);
+    const options = matchEntryTimeOptions("20:50");
+    expect(options).toHaveLength(97);
+    expect(options.slice(83, 86)).toEqual(["20:45", "20:50", "21:00"]);
+    expect(matchEntryTimeOptions("00:05").slice(0, 3)).toEqual(["00:00", "00:05", "00:15"]);
     expect(matchEntryTimeOptions("23:59").at(-1)).toBe("23:59");
   });
 
+  it("présélectionne le mois courant à l'heure de Paris", () => {
+    expect(matchEntryDefaultMonth(Date.UTC(2026, 9, 8, 12))).toBe(10);
+    expect(matchEntryDefaultMonth(Date.UTC(2026, 0, 1))).toBe(1);
+    // 31 décembre 23:30 UTC = 1er janvier 00:30 à Paris.
+    expect(matchEntryDefaultMonth(Date.UTC(2026, 11, 31, 23, 30))).toBe(1);
+    // 30 avril 22:30 UTC = 1er mai 00:30 à Paris (heure d'été).
+    expect(matchEntryDefaultMonth(Date.UTC(2026, 3, 30, 22, 30))).toBe(5);
+    expect(matchEntryDefaultMonth(Date.UTC(2026, 3, 30, 21, 30))).toBe(4);
+  });
+
   it("ignore une heure posée illisible", () => {
-    expect(matchEntryTimeOptions("")).toBe(MATCH_ENTRY_HALF_HOURS);
-    expect(matchEntryTimeOptions("24:10")).toBe(MATCH_ENTRY_HALF_HOURS);
+    expect(matchEntryTimeOptions("")).toBe(MATCH_ENTRY_QUARTER_HOURS);
+    expect(matchEntryTimeOptions("24:10")).toBe(MATCH_ENTRY_QUARTER_HOURS);
   });
 
   it("borne la saisie", () => {
@@ -341,10 +351,10 @@ describe("readMatchStartEntry", () => {
     expect(readMatchStartEntry(raw("3", "1", "25:00"), reference)).toEqual({ kind: "incomplete", field: "time" });
   });
 
-  it("une heure hors demi-heure reste acceptée (date déjà posée)", () => {
-    expect(readMatchStartEntry(raw("3", "1", "20:45"), reference)).toEqual({
+  it("une heure hors quart d'heure reste acceptée (date déjà posée)", () => {
+    expect(readMatchStartEntry(raw("3", "1", "20:50"), reference)).toEqual({
       kind: "ready",
-      instant: at("2027-01-03T19:45:00Z"),
+      instant: at("2027-01-03T19:50:00Z"),
     });
   });
 
