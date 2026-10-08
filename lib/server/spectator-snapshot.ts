@@ -47,12 +47,19 @@ class SpectatorNotFound extends Error {}
  *   la sienne.
  */
 export async function getSpectatorPayload(tournamentId: number, ttlMs: number): Promise<SpectatorPayload | null> {
+  // Choix assumé (décision de l'auteur, `SPECTATOR_VIEW.md`) : seule la
+  // suppression du tournoi retire cette réponse. Un renommage, un avatar retiré
+  // ou un compte supprimé attendent son expiration (15 s au calme, 150 s sous
+  // la charge) — c'est elle qui protège la machine d'un tournoi animé. Un
+  // tournoi publié ne redevient jamais invisible : `startVisibilityAt` ne
+  // change que dans la fenêtre `FULL`, celle d'un tournoi encore caché.
   try {
     return await cached(spectatorSnapshotCacheKey(tournamentId), ttlMs, async () => {
       // La carte d'abord : une requête indexée, sans écriture. Un tournoi
       // inconnu ou pas encore publié s'arrête là, sans faire construire son
       // instantané entier (matchs, classements, entretien) par un visiteur
-      // anonyme qui parcourt les identifiants.
+      // anonyme qui parcourt les identifiants. Pour un tournoi visible, c'est
+      // une requête de plus par durée de vie (4 par minute au plus) : voulu.
       const visible = await getVisibleTournamentCard(tournamentId);
       const snapshot = visible ? await getVisibleTournamentSnapshot(tournamentId) : null;
       // Un « introuvable » **n'entre pas** dans le cache : `cached` ne garde
