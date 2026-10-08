@@ -88,6 +88,8 @@ export function ArenaNav({
           {/* Barre allégée : l'accueil passe par le logo, « Mon équipe » par le
               menu du compte. Restent les outils (langue, modération) et le
               compte, séparés par un filet. */}
+          {/* Vide (langue muette, aucun signalement à voir), le groupe est masqué
+              par `.navTools:empty`. */}
           {(languageSwitcherLabel || openReports !== null) && (
             <div className={s.navTools}>
               {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
@@ -99,7 +101,6 @@ export function ArenaNav({
                   href={REPORTS_ADMIN_PATH}
                   className={`${s.navTool} ${s.navReports}`}
                   aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
-                  title={t("nav.reports")}
                 >
                   <Flag size={16} strokeWidth={2} aria-hidden="true" />
                   <span className="sr-only">{t("nav.reports")}</span>

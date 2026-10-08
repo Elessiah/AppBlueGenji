@@ -82,7 +82,9 @@ describe("ArenaNav — page courante et pictogrammes", () => {
         <ArenaNav pseudo="Nova" avatarUrl={null} openReports={2} />
       </ToastProvider>,
     );
-    expect(html).toMatch(/<a class="navTool navReports"[^>]*title="Signalements"[^>]*href="\/admin\/signalements">/);
+    expect(html).toContain('<a class="navTool navReports" href="/admin/signalements">');
+    // Pas de `title` : il doublait le nom accessible à la lecture.
+    expect(html).not.toContain('title="Signalements"');
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="sr-only">Signalements<\/span>/);
     expect(html).toContain('<span class="navBadge">2<span class="sr-only"> à traiter</span></span>');
   });

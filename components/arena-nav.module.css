@@ -154,22 +154,28 @@
   border-right: 1px solid var(--line-strong-cy);
 }
 
+/* Sélecteur de langue muet (route pas encore traduite) et aucun droit de
+   modération : le groupe vide ne laisse pas un filet orphelin. */
+.navTools:empty {
+  display: none;
+}
+
 .navTools .navTool {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0 10px;
   border: 1px solid transparent;
   border-radius: var(--r-cy-sm);
   background: transparent;
   color: var(--ink-soft);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.06em;
   text-decoration: none;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }

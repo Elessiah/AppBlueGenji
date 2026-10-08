@@ -141,9 +141,9 @@ export function AccountMenuPanel({
           aria-label={t("nav.myTeamLabel", { team: activeTeam.teamName })}
         >
           <Shield className={s.itemIcon} size={16} aria-hidden="true" />
-          {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
           <span className={s.itemText}>
             {t("nav.myTeam")}
+            {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
             <span className={s.itemHint} aria-hidden="true">
               {activeTeam.teamName}
             </span>

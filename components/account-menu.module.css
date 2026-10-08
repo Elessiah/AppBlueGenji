@@ -115,7 +115,7 @@
 }
 
 .itemHint {
-  max-width: 160px;
+  max-width: 190px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -134,6 +134,11 @@
 
 .logout .itemIcon {
   color: var(--ink-mute);
+}
+
+.logout:disabled .itemIcon {
+  color: var(--ink-dim);
+  opacity: 1;
 }
 
 .logout:disabled {
