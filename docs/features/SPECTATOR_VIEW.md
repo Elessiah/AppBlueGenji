@@ -48,8 +48,10 @@ jetterait la requête.
 
 **Retour vers l'espace connecté, sans bouton de plus** — sur la page sans
 compte, le « Rejoindre » de l'en-tête de la vitrine mène à
-`/connexion?redirect=/tournois/[id]` (`joinHrefFor`) : un joueur dont la session
-a expiré, ou un arbitre déconnecté, retrouve ses actions après connexion.
+`/connexion?redirect=/tournois/[id]` (`joinHrefFor`), requête comprise, et
+l'ancre `#match-…` s'y ajoute côté navigateur (`JoinLink`, `withRedirectAnchor`) :
+un joueur dont la session a expiré, ou un arbitre déconnecté, retrouve ses
+actions — et son match — après connexion.
 
 ## Une seule fiche
 
@@ -103,7 +105,9 @@ haut de trois signaux :
 
 La cadence est multipliée par 1, 2, 4 puis 10, plafonnée à 10 min. Sous la
 charge, ce sont donc les visiteurs sans compte qui reculent, jamais le staff ni
-les engagés. La sonde de boucle n'est armée qu'avec les lectures publiques et se
+les engagés. Le retard de boucle est relevé par une minuterie toutes les 10 s
+tant que la sonde est armée (jamais une pause d'il y a cinq minutes). La sonde
+n'est armée qu'avec les lectures publiques et se
 désarme après 5 min sans activité publique (un seul minuteur, qui se relance
 lui-même).
 
@@ -116,19 +120,25 @@ lui-même).
   compte et n'**invalide** pas cette réponse : sa durée de vie, allongée sous la
   charge, est ce qui protège la machine d'un tournoi animé. Seule la
   **suppression** du tournoi la retire (`invalidateSpectatorSnapshot`,
-  `deletion.ts`). Un « introuvable » n'entre **pas** dans le cache (le chargeur
-  lève une sentinelle, `cached` ne garde jamais un échec) ;
+  `deletion.ts`). La reconstruction lit d'abord la **carte** du tournoi (une
+  requête indexée) : un identifiant inconnu ou pas encore publié s'arrête là,
+  sans faire construire d'instantané. Un « introuvable » n'entre **pas** dans le
+  cache (le chargeur lève une sentinelle, `cached` ne garde jamais un échec). Le
+  corps est sérialisé **une fois** (version vide) ;
 - en-tête `x-bg-fresh-within-ms` : l'âge maximal de l'affichage (attente entre
   deux lectures, gigue comprise, **plus** la durée de vie de la réponse servie,
   celle reçue à sa construction, peut-être sous une charge plus forte) — c'est
   lui que le témoin annonce, pour ne pas promettre mieux que le cache ;
 - `ETag` = empreinte du **corps public** (et non la version des membres, qui
-  bouge avec les champs retirés) ; une relecture sans nouveauté répond **`304`
+  bouge avec les champs retirés), qui ne voyage que dans l'en-tête ; une relecture sans nouveauté répond **`304`
   sans corps** ;
 - seules les lectures d'un tournoi servi pèsent dans la charge : des
   identifiants au hasard ne ralentissent pas les vrais spectateurs ;
 - plafond par IP (`SPECTATOR_READ_RULE`, 240/min : une salle de LAN d'une
-  centaine d'écrans derrière une même adresse passe, gigue comprise) ; base injoignable → `503` + `Retry-After` de 10 min.
+  centaine d'écrans derrière une même adresse passe, gigue comprise) ; base injoignable → `503` +
+  `Retry-After` du double de la cadence au niveau du moment
+  (`spectatorUnavailableRetryMs` : 1 min au calme, 10 au pire), puis recul
+  doublé par le relecteur.
 
 **Côté client** (`app/suivre/tournois/[id]/_lib/spectator-poller.ts`, hors
 React, testé sans navigateur) : ±10 % de gigue, rien n'est relu **onglet
