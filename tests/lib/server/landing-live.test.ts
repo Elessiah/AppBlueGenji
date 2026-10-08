@@ -197,7 +197,13 @@ describe("getLandingLive", () => {
     jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([
       matchRow({ id: 100 }),
-      matchRow({ id: 101, live_trigger: "AUTO", live_url: "https://twitch.tv/bg" }),
+      matchRow({
+        id: 101,
+        live_trigger: "AUTO",
+        live_url: "https://twitch.tv/bg",
+        launched_at: new Date(Date.now() - 60_000),
+        launch_pairing: "11:12",
+      }),
     ]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -205,6 +211,26 @@ describe("getLandingLive", () => {
     expect(live?.currentMatch?.id).toBe(101);
     expect(live?.currentMatch?.liveState).toBe("LIVE");
     expect(live?.currentMatch?.liveUrl).toBe("https://twitch.tv/bg");
+  });
+
+  it("n'annonce pas en direct un match AUTO encore en attente de lancement", async () => {
+    // Retour terrain : un match casté « au démarrage » s'affichait en direct
+    // alors qu'il était encore « À planifier » ou « Planifié ».
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([
+      matchRow({
+        id: 100,
+        live_trigger: "AUTO",
+        live_url: "https://twitch.tv/bg",
+        start_at: new Date(Date.now() + 3_600_000),
+      }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.id).toBe(100);
+    expect(live?.currentMatch?.liveState).toBe("SCHEDULED");
+    expect(live?.currentMatch?.launchPhase).toBe("SCHEDULED");
   });
 
   it("retombe sur le premier match jouable quand aucun n'est à l'antenne", async () => {

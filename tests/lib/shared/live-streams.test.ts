@@ -29,6 +29,7 @@ function match(overrides: Partial<MatchLiveInput> = {}): MatchLiveInput {
     status: "READY",
     liveTrigger: null,
     liveStartedAt: null,
+    launchedAt: null,
     ...overrides,
   };
 }
@@ -205,8 +206,38 @@ describe("resolveMatchLiveState", () => {
     );
   });
 
-  it("passe AUTO à l'antenne dès que le match est jouable", () => {
-    expect(resolveMatchLiveState(match({ status: "READY", liveTrigger: "AUTO" }))).toBe("LIVE");
+  it("passe AUTO à l'antenne au lancement du match", () => {
+    expect(
+      resolveMatchLiveState(match({ liveTrigger: "AUTO", launchedAt: "2026-08-28T10:00:00Z" })),
+    ).toBe("LIVE");
+    expect(resolveMatchLiveState(match({ liveTrigger: "AUTO", launchedAt: new Date() }))).toBe(
+      "LIVE",
+    );
+  });
+
+  it("garde AUTO programmé tant que le match n'est pas lancé (À planifier, Planifié, Lancement)", () => {
+    // Jouable mais non lancé : à planifier, en attente de son heure ou en
+    // attente des « Prêt » — la partie n'a pas commencé.
+    const at = Date.UTC(2026, 7, 29, 18, 30);
+    expect(resolveMatchLiveState(match({ liveTrigger: "AUTO" }))).toBe("SCHEDULED");
+    expect(
+      resolveMatchLiveState(match({ liveTrigger: "AUTO", startAt: new Date(at) }), at - 1),
+    ).toBe("SCHEDULED");
+    expect(
+      resolveMatchLiveState(match({ liveTrigger: "AUTO", startAt: new Date(at) }), at + 60_000),
+    ).toBe("SCHEDULED");
+  });
+
+  it("n'ouvre pas AUTO sur une antenne manuelle restée en base", () => {
+    expect(resolveMatchLiveState(match({ liveTrigger: "AUTO", liveStartedAt: new Date() }))).toBe(
+      "SCHEDULED",
+    );
+  });
+
+  it("garde AUTO programmé sur un match lancé mais pas encore jouable", () => {
+    expect(
+      resolveMatchLiveState(match({ status: "PENDING", liveTrigger: "AUTO", launchedAt: new Date() })),
+    ).toBe("SCHEDULED");
   });
 
   it("n'ouvre MANUAL que si l'antenne a été ouverte", () => {
@@ -328,7 +359,8 @@ describe("nextMatchLiveChangeAt", () => {
 
 describe("isMatchLive", () => {
   it("ne retient que l'état LIVE", () => {
-    expect(isMatchLive(match({ liveTrigger: "AUTO" }))).toBe(true);
+    expect(isMatchLive(match({ liveTrigger: "AUTO", launchedAt: new Date() }))).toBe(true);
+    expect(isMatchLive(match({ liveTrigger: "AUTO" }))).toBe(false);
     expect(isMatchLive(match({ liveTrigger: "MANUAL" }))).toBe(false);
     expect(isMatchLive(match())).toBe(false);
   });

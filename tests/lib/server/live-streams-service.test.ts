@@ -328,6 +328,10 @@ describe("findBroadcastingTournament", () => {
       start_at: null,
       live_trigger: "AUTO",
       live_started_at: null,
+      team1_id: 11,
+      team2_id: 12,
+      launched_at: new Date(),
+      launch_pairing: "11:12",
       ...overrides,
     };
   }
@@ -340,6 +344,22 @@ describe("findBroadcastingTournament", () => {
       tournamentId: 7,
       url: "https://twitch.tv/bluegenji",
     });
+  });
+
+  it("ignore un match AUTO pas encore lancé (À planifier, Planifié, Lancement)", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[row({ launched_at: null })]]);
+    await mockDb(execute);
+
+    expect(await findBroadcastingTournament()).toBeNull();
+  });
+
+  it("ignore un lancement posé pour un autre appariement", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[row({ launch_pairing: "11:99" })]]);
+    await mockDb(execute);
+
+    expect(await findBroadcastingTournament()).toBeNull();
   });
 
   it("ignore un match seulement programmé", async () => {
