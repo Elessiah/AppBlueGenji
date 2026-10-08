@@ -43,6 +43,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { SpectatorViewProvider } from "@/components/spectator-view";
+import { PodiumTiersProvider } from "@/components/podium-tiers";
+import { buildPodiumTiers } from "@/lib/shared/podium-tiers";
 import { EntrantLink, EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
 import { LiveIndicator } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
@@ -218,6 +220,22 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     );
     expect(html).not.toContain("<a");
     expect(html).toContain("Nova");
+  });
+
+  it("garde la marche du podium d'un joueur engagé en solo : le podium est public", () => {
+    // Joueur 9 membre de l'équipe 10, première du classement.
+    const tiers = buildPodiumTiers([10, 20, 30], [{ userId: 9, teamId: 10 }]);
+    const html = renderToStaticMarkup(
+      <PodiumTiersProvider tiers={tiers}>
+        <SpectatorViewProvider>
+          <EntrantProvider participantType="SOLO" soloUserIds={{ 4: 9 }} logos={buildEntrantLogoMap([])}>
+            <EntrantLink teamId={4}>Nova</EntrantLink>
+          </EntrantProvider>
+        </SpectatorViewProvider>
+      </PodiumTiersProvider>,
+    );
+    expect(html).not.toContain("<a");
+    expect(html).toMatch(/class="entity-name [^"]*podium-member/);
   });
 
   it("tait les codes de replay, réservés aux membres connectés", () => {

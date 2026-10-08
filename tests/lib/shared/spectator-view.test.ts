@@ -202,13 +202,14 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(JSON.stringify(out)).not.toContain("ABC123");
   });
 
-  it("retire les identifiants de comptes : la page n'affiche que des noms", () => {
+  it("retire l'identifiant du caster, garde les entrées solo pour la marche du podium", () => {
     const snapshot = tournamentSnapshot({
       soloUserIds: { 4: 9 },
       matches: [bracketMatch({ id: 1, casterUserId: 33, casterPseudo: "Caster" })],
     });
     const out = spectatorSnapshot(snapshot);
-    expect(out.soloUserIds).toEqual({});
+    // Le podium est public : un joueur solo garde sa marche sur la page sans compte.
+    expect(out.soloUserIds).toEqual({ 4: 9 });
     expect(out.matches[0].casterUserId).toBeNull();
     // Le pseudo du caster reste : il est à l'antenne.
     expect(out.matches[0].casterPseudo).toBe("Caster");

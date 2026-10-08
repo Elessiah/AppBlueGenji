@@ -181,14 +181,14 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(mockedSnapshot).toHaveBeenCalledTimes(2);
   });
 
-  it("ne transmet aucun identifiant de compte", async () => {
+  it("ne transmet pas l'identifiant du caster, mais garde les entrées solo (marche du podium)", async () => {
     mockedSnapshot.mockResolvedValue(
       snapshot({ soloUserIds: { 3: 77 }, matches: [bracketMatch({ id: 1, tournamentId: 5, casterUserId: 88 })] }),
     );
 
     const body = (await (await GET(req(), params("5"))).json()) as TournamentSnapshot;
 
-    expect(body.soloUserIds).toEqual({});
+    expect(body.soloUserIds).toEqual({ 3: 77 });
     expect(body.matches[0].casterUserId).toBeNull();
   });
 
