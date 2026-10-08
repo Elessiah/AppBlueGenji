@@ -158,6 +158,19 @@
       "other": "Forfeit"
     }
   },
+  "forfeitCancel": {
+    "success": "Withdrawal cancelled: {name} is back in contention.",
+    "title": "Cancel {name}'s withdrawal?",
+    "body": {
+      "TEAM": "The team is back in contention and will be paired from the next round. The match lost by forfeit stays lost: correct its score if needed.",
+      "SOLO": "The player is back in contention and will be paired from the next round. The match lost by forfeit stays lost: correct its score if needed."
+    },
+    "confirm": "Cancel the withdrawal",
+    "pending": "Cancelling…",
+    "button": "Cancel withdrawal",
+    "buttonTitle": "Cancel the withdrawal: {name} is back in contention",
+    "buttonAria": "Cancel {name}'s withdrawal"
+  },
   "penaltyLift": {
     "success": "Penalty lifted: {name} gets back {points, plural, one {# point} other {# points}}.",
     "title": "Lift {name}'s penalty?",

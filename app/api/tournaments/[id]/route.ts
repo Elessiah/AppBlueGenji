@@ -33,6 +33,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     // Suppression définitive : administrateur strict. `can(user, "tournaments")`
     // ne convient pas — un arbitre gère le tournoi, il ne l'efface pas.
     canDelete: user.isAdmin === true,
+    // Annuler un abandon : administrateur strict (FORFEIT_CANCELLATION.md).
+    canCancelForfeit: user.isAdmin === true,
   });
   if (!detail) return fail("TOURNAMENT_NOT_FOUND", 404);
 

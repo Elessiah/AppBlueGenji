@@ -145,6 +145,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       // les deux portes — ici et par la lecture REST de secours —, faute de quoi
       // la zone de danger n'apparaîtrait qu'après une coupure du direct.
       canDelete: user.isAdmin === true,
+      // Annuler un abandon : administrateur strict, par les deux portes aussi.
+      canCancelForfeit: user.isAdmin === true,
     });
 
     // Palier de fraîcheur : ceux qui font le tournoi — staff, cast, engagés — sont

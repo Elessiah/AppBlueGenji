@@ -16,6 +16,7 @@ import {
   BORDER,
   ChampionBanner,
   FORFEIT_BUTTON_STYLE,
+  FORFEIT_CANCEL_BUTTON_STYLE,
   RoundColumns,
 } from "./RoundColumns";
 import styles from "./RankingViews.module.css";
@@ -34,6 +35,13 @@ interface SurvivalViewProps {
   /** Le forfait de cette équipe peut-il être déclaré depuis le classement ? */
   canForfeit: (teamId: number) => boolean;
   onForfeit: (teamId: number, teamName: string) => void;
+  /**
+   * Annulation d'un abandon (administrateur strict) : le bouton n'apparaît que
+   * sur une ligne `FORFEIT` d'un tournoi en cours
+   * (`docs/features/FORFEIT_CANCELLATION.md`).
+   */
+  canCancelForfeit?: boolean;
+  onCancelForfeit?: (teamId: number, teamName: string) => void;
   /**
    * Ce qu'affiche la zone des manches quand il n'y en a aucune. La page le
    * calcule : un tournoi clos sans avoir été joué n'attend plus de match, et le
@@ -61,6 +69,8 @@ export function SurvivalView({
   onOpenAdminModal,
   canForfeit,
   onForfeit,
+  canCancelForfeit = false,
+  onCancelForfeit,
   emptyLabel,
 }: Readonly<SurvivalViewProps>) {
   const text = useTournamentViewText(FR_VIEWS_TEXT);
@@ -160,6 +170,8 @@ export function SurvivalView({
               // représentants comme à l'arbitrage (cf. `canForfeit` côté page).
               const forfeitable =
                 !isFinished && team.status === "ACTIVE" && canForfeit(team.teamId);
+              const cancellable =
+                !isFinished && team.status === "FORFEIT" && canCancelForfeit && onCancelForfeit !== undefined;
               return (
                 <div
                   key={team.teamId}
@@ -225,6 +237,20 @@ export function SurvivalView({
                       style={FORFEIT_BUTTON_STYLE}
                     >
                       {a("forfeit.button.label")}
+                    </button>
+                    </span>
+                  )}
+                  {cancellable && (
+                    <span className={styles.survivalAction}>
+                    <button
+                      type="button"
+                      onClick={() => onCancelForfeit?.(team.teamId, team.teamName)}
+                      className="btn tap-target"
+                      title={a("forfeitCancel.buttonTitle", { name: team.teamName })}
+                      aria-label={a("forfeitCancel.buttonAria", { name: team.teamName })}
+                      style={FORFEIT_CANCEL_BUTTON_STYLE}
+                    >
+                      {a("forfeitCancel.button")}
                     </button>
                     </span>
                   )}

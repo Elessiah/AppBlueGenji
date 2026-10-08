@@ -158,6 +158,19 @@
       "other": "Forfait"
     }
   },
+  "forfeitCancel": {
+    "success": "Abandon annulé : {name} revient en lice.",
+    "title": "Annuler l'abandon de {name} ?",
+    "body": {
+      "TEAM": "L'équipe revient en lice et sera appariée dès la prochaine manche. Le match perdu par forfait reste perdu : corrigez son score si besoin.",
+      "SOLO": "Le joueur revient en lice et sera apparié dès la prochaine manche. Le match perdu par forfait reste perdu : corrigez son score si besoin."
+    },
+    "confirm": "Annuler l'abandon",
+    "pending": "Annulation…",
+    "button": "Annuler l'abandon",
+    "buttonTitle": "Annuler l'abandon : {name} revient en lice",
+    "buttonAria": "Annuler l'abandon de {name}"
+  },
   "penaltyLift": {
     "success": "Pénalité retirée : {name} récupère {points} point(s).",
     "title": "Retirer la pénalité de {name} ?",
