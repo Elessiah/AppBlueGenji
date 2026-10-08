@@ -6,7 +6,7 @@ jest.mock("@/lib/shared/i18n-routes", () => ({
 
 import { NextRequest } from "next/server";
 import { LEGACY_SUSPENSION_NOTICE_PATH, config, middleware } from "@/middleware";
-import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER } from "@/lib/shared/csp";
+import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { LOCALE_HEADER } from "@/lib/shared/locales";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 
@@ -39,6 +39,13 @@ describe("middleware — adresses anglaises marquées", () => {
     expect(rewrittenTo(response)).toBeNull();
     expect(forwarded(response, LOCALE_HEADER)).toBe("en");
     expect(forwarded(response, PATHNAME_HEADER)).toBe("/regles");
+    // La requête voyage à part, pour une redirection rendue côté serveur.
+    expect(forwarded(response, SEARCH_HEADER)).toBe("?mode=swiss");
+  });
+
+  it("remplace toujours la requête annoncée par le client", () => {
+    const response = call("/tournois/12", { headers: { [SEARCH_HEADER]: "//evil.test" } });
+    expect(forwarded(response, SEARCH_HEADER)).toBe("");
   });
 
   it("marque /en (l'accueil) anglais", () => {

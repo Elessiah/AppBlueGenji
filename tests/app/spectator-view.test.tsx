@@ -3,11 +3,16 @@ import type { ReactElement } from "react";
 
 let mockLocale: "fr" | "en" = "fr";
 let mockPathname: string | null = "/tournois/12";
+let mockSearch: string | null = null;
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn(async () => null) }));
 jest.mock("@/lib/server/tournaments-service", () => ({ getVisibleTournamentCard: jest.fn() }));
 jest.mock("next/headers", () => ({
-  headers: async () => new Headers(mockPathname === null ? {} : { "x-pathname": mockPathname }),
+  headers: async () =>
+    new Headers({
+      ...(mockPathname === null ? {} : { "x-pathname": mockPathname }),
+      ...(mockSearch === null ? {} : { "x-search": mockSearch }),
+    }),
 }));
 jest.mock("next/navigation", () => ({
   redirect: jest.fn((url: string) => {
@@ -77,6 +82,7 @@ const noop = () => undefined;
 beforeEach(() => {
   mockLocale = "fr";
   mockPathname = "/tournois/12";
+  mockSearch = null;
   jest.mocked(getCurrentUser).mockResolvedValue(null);
 });
 
@@ -92,6 +98,18 @@ describe("espace sécurisé — visiteur sans session", () => {
   it("garde la langue de l'adresse", async () => {
     mockLocale = "en";
     await expect(SecuredLayout({ children: <p>protégé</p> })).rejects.toThrow("NEXT_REDIRECT /en/suivre/tournois/12");
+  });
+
+  it("fait suivre la requête de l'adresse demandée", async () => {
+    mockSearch = "?utm_source=discord";
+    await expect(SecuredLayout({ children: <p>protégé</p> })).rejects.toThrow(
+      "NEXT_REDIRECT /suivre/tournois/12?utm_source=discord",
+    );
+  });
+
+  it("ne reprend qu'une requête, jamais un fragment de chemin venu du client", async () => {
+    mockSearch = "//evil.test";
+    await expect(SecuredLayout({ children: <p>protégé</p> })).rejects.toThrow(/NEXT_REDIRECT \/suivre\/tournois\/12$/);
   });
 
   it("laisse la carte « Connexion requise » partout ailleurs", async () => {

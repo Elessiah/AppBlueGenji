@@ -90,8 +90,10 @@ describe("garde de l'espace sécurisé", () => {
     // Seule redirection de la garde : la page d'arrivée a son propre <head>
     // (`app/suivre/tournois/[id]/layout.tsx`), le robot d'aperçu y voit le tournoi.
     expect(SECURED_LAYOUT.match(/redirect\(/g)).toHaveLength(1);
-    expect(SECURED_LAYOUT).toContain("redirect(localeHref(spectatorTournamentPath(tournamentId), await requestLocale()));");
-    expect(SECURED_LAYOUT).toContain("tournamentIdFromMemberPath((await headers()).get(PATHNAME_HEADER))");
+    expect(SECURED_LAYOUT).toContain(
+      "redirect(localeHref(`${spectatorTournamentPath(tournamentId)}${redirectSearch(requestHeaders)}`, await requestLocale()));",
+    );
+    expect(SECURED_LAYOUT).toContain("tournamentIdFromMemberPath(requestHeaders.get(PATHNAME_HEADER))");
   });
 
   it("ne rend pas les enfants sans session : rien du contenu protégé ne fuit", () => {
