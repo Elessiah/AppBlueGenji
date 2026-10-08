@@ -11,7 +11,7 @@
 
 ### `components/account-menu.tsx`
 
-Un bouton (avatar + pseudo + ▾) ouvre un panneau : **Mon profil**, **Mon équipe** (si le joueur en a une active, nom de l'équipe en rappel), **Déconnexion**. Le même composant est rendu par `ArenaNav` et par `PublicHeader`.
+Un bouton (avatar + pseudo + ▾) ouvre un panneau : **Mon profil**, **Mon équipe** (si le joueur en a une active, nom de l'équipe en rappel), **Déconnexion** — chaque entrée précédée d'un pictogramme Lucide (`aria-hidden`), hors du nom accessible. Le même composant est rendu par `ArenaNav` et par `PublicHeader`.
 
 - Bouton de divulgation (`aria-expanded`, `aria-controls` seulement ouvert), jamais `role="menu"` : c'est une courte liste de liens.
 - Nom accessible `« <pseudo>, menu du compte »` — il commence par le texte visible (WCAG 2.5.3).
@@ -24,7 +24,8 @@ Le bouton « Déconnexion » du bas de `/profil` reste en place.
 ### Hauteur des barres
 
 - **En-tête public** : une seule ligne à toutes les largeurs. Le CTA passe à « Compétition → » sous 960 px, la marque se réduit à l'emblème sous 480 px (mot-symbole masqué à l'œil seulement, il reste le nom accessible du lien), et sous 480 px le menu du compte peut passer sous le CTA plutôt que de provoquer un défilement horizontal.
-- **Barre connectée** : entre 721 et 1150 px, « Accueil » / « Mon équipe » sont en pictogramme seul (libellé visuellement masqué, nom accessible inchangé) ; sous 720 px, espacements et logo resserrés.
+- **Barre connectée** (allégée, octobre 2026) : plus de boutons « Accueil » ni « Mon équipe » — l'accueil passe par le logo central (nom accessible « Accueil »), l'équipe par le menu du compte. À droite, un groupe d'**outils** discrets (`.navTools`, séparé du compte par un filet) : la langue en mode `compact` (globe + code « EN », nom accessible inchangé) et, pour la modération, un drapeau ambre nommé « Signalements » (texte masqué + `title`) dont le compteur se pose en pastille sur le coin. Le menu du compte reste le seul bouton marqué. Sous 1000 px, les losanges des liens disparaissent pour que les quatre sections tiennent sur une ligne (le trait du lien actif marque la section) ; sous 720 px, espacements et logo resserrés.
+- Toute page de l'espace connecté (`app/(secured)/layout.tsx` → `ArenaShell`) et toute page publique suivie par la session (`SessionPageShell`) rendent cette même barre : aucune sous-mise en page n'en ajoute une autre.
 - **Paysage bas** (`max-height: 500px` — téléphone couché, zoom 200 % d'un portable) : les deux barres cessent d'être collantes.
 
 ## Tests
