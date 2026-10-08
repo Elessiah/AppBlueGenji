@@ -295,22 +295,30 @@ export function matchEntryTimeValue(entry: Pick<MatchStartEntry, "hour" | "minut
  */
 export const MATCH_ENTRY_DEFAULT_TIME = "21:00";
 
-/** Les 48 demi-heures d'une journée (`00:00`, `00:30` … `23:30`). */
-export const MATCH_ENTRY_HALF_HOURS: readonly string[] = Array.from({ length: 48 }, (_, index) =>
-  matchEntryTimeValue({ hour: Math.floor(index / 2), minute: (index % 2) * 30 }),
+/** Les 96 quarts d'heure d'une journée (`00:00`, `00:15` … `23:45`). */
+export const MATCH_ENTRY_QUARTER_HOURS: readonly string[] = Array.from({ length: 96 }, (_, index) =>
+  matchEntryTimeValue({ hour: Math.floor(index / 4), minute: (index % 4) * 15 }),
 );
 
 /**
- * Choix de la liste des heures : les demi-heures, plus l'heure déjà posée si
- * elle tombe entre deux (`20:45`, posée par un autre chemin) — insérée à sa
+ * Mois (1–12) proposé à l'ouverture du dialogue quand le match n'a pas encore
+ * de date : celui de `now`, à l'heure de Paris.
+ */
+export function matchEntryDefaultMonth(now: number): number {
+  return parisParts(now).month;
+}
+
+/**
+ * Choix de la liste des heures : les quarts d'heure, plus l'heure déjà posée si
+ * elle tombe entre deux (`20:50`, posée par un autre chemin) — insérée à sa
  * place, pour qu'elle s'affiche telle quelle et reste gardée tant qu'on n'y
  * touche pas. Une valeur illisible est ignorée.
  */
 export function matchEntryTimeOptions(current: string | null = null): readonly string[] {
-  if (current === null || MATCH_ENTRY_HALF_HOURS.includes(current) || parseMatchEntryTime(current) === null) {
-    return MATCH_ENTRY_HALF_HOURS;
+  if (current === null || MATCH_ENTRY_QUARTER_HOURS.includes(current) || parseMatchEntryTime(current) === null) {
+    return MATCH_ENTRY_QUARTER_HOURS;
   }
-  return [...MATCH_ENTRY_HALF_HOURS, current].sort((a, b) => a.localeCompare(b));
+  return [...MATCH_ENTRY_QUARTER_HOURS, current].sort((a, b) => a.localeCompare(b));
 }
 
 /** Heure et minute d'une valeur `HH:MM` (secondes tolérées), `null` si illisible. */
