@@ -760,6 +760,8 @@ describe("PRIVACY_CHANGES — suivi d'un tournoi sans compte", () => {
     expect(text()).toMatch(/logos des équipes/);
     expect(text()).toMatch(/avatar de chaque joueur engagé \(sauf s'il l'a masqué\)/);
     expect(text()).toMatch(/codes de replay n'y figurent pas/);
+    // Le délai de la copie partagée (150 s au pire) est dit, suppression de compte comprise.
+    expect(text()).toMatch(/toutes les deux minutes et demie[^.]*suppression de compte/);
     expect(text()).toMatch(/exclue des moteurs de recherche/);
     // La visite reste comptée comme partout : la page ne prétend pas le contraire.
     expect(text()).toMatch(/comptée par la mesure d'audience, sauf opposition/);
