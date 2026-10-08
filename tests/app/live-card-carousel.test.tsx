@@ -154,8 +154,8 @@ describe("useMatchCarousel — régime de charge", () => {
 
   it("ne se laisse retenir ni par le toucher ni par le focus d'un clic", () => {
     // Rien ne relâcherait la prise : le carrousel resterait figé sous « Pause ».
-    expect(source).toContain('if (event.pointerType === "mouse") setHovered(true);');
-    expect(source).toContain('setFocused(event.target.matches(":focus-visible"))');
+    expect(source).toContain('if (event.pointerType !== "mouse") return;');
+    expect(source).toContain('const keyboard = event.target.matches(":focus-visible");');
     expect(source).not.toContain("onMouseEnter");
   });
 });
@@ -184,12 +184,24 @@ describe("carouselCanAutoRotate", () => {
   });
 });
 
+describe("useMatchCarousel — match figé sous le lecteur", () => {
+  const source = readFileSync(join(process.cwd(), "components/cyber/landing/useMatchCarousel.ts"), "utf8");
+
+  it("fige le match affiché dès le survol ou le focus clavier", () => {
+    expect(source).toContain("const pin = () => setActiveId((current) => current ?? ids[index] ?? null);");
+    expect(source.match(/pin\(\);/g)).toHaveLength(2);
+  });
+});
+
 describe("useMatchCarousel — focus perdu par un retrait", () => {
   const source = readFileSync(join(process.cwd(), "components/cyber/landing/useMatchCarousel.ts"), "utf8");
   const card = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
 
   it("rend à la carte le focus tombé sur <body>, sinon relâche la prise", () => {
-    expect(source).toContain("if (!focused || !hold || hold.contains(document.activeElement)) return;");
+    expect(source).toContain("if (hold?.contains(document.activeElement)) return;");
+    expect(source).toContain("fallback.focus({ preventScroll: true });");
+    // Relu à chaque rendu, donc dans celui du retrait — jamais des minutes après.
+    expect(source).toContain("}, [focused, ids]);");
     expect(source).toContain('hold.querySelector<HTMLElement>("[data-carousel-next]")');
     expect(card).toContain("data-carousel-next");
     expect(card).toContain("<div ref={carousel.holdRef} className={styles.hold}");

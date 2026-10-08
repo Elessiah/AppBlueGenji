@@ -92,26 +92,34 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
   const nextId = count > 1 ? ids[(index + 1) % count] : null;
 
   // Un retrait sous le focus clavier — match terminé entre deux sondages, bouton
-  // de pause sous un gel durable — n'émet aucun `blur` : la prise resterait
-  // posée pour toujours, et le focus tomberait sur `<body>`. Relu après chaque
-  // rendu utile (une comparaison, rien de plus) : le focus perdu revient dans la
-  // carte, au bouton « suivant » ou à défaut à la plaque de lien ; parti
-  // ailleurs, il relâche la prise. Rejoué quand la liste ou le gel changent :
-  // les deux seuls retraits possibles.
-  const idsKey = ids.join(",");
+  // de diffusion d'un match qui quitte l'antenne, pause sous un gel durable —
+  // n'émet aucun `blur` : la prise resterait posée pour toujours, et le focus
+  // tomberait sur `<body>`. Relu après **chaque** rendu de la carte (`ids` est
+  // un tableau neuf à chacun), donc dans le rendu même du retrait : le focus
+  // perdu revient dans la carte, au bouton « suivant » ou à défaut à la plaque
+  // de lien ; parti ailleurs — ou carte démontée —, il relâche la prise. Jamais
+  // plus tard : rendre le focus des minutes après ramènerait la page au hero.
   const holdRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (!focused) return;
     const hold = holdRef.current;
-    if (!focused || !hold || hold.contains(document.activeElement)) return;
-    if (document.activeElement === null || document.activeElement === document.body) {
+    if (hold?.contains(document.activeElement)) return;
+    if (hold && (document.activeElement === null || document.activeElement === document.body)) {
       const fallback = hold.querySelector<HTMLElement>("[data-carousel-next]") ?? hold.querySelector<HTMLElement>("a");
       if (fallback) {
-        fallback.focus();
+        fallback.focus({ preventScroll: true });
         return;
       }
     }
     setFocused(false);
-  }, [focused, idsKey, autoRotates]);
+  }, [focused, ids]);
+
+  /**
+   * Fige le match affiché dès que le lecteur s'y arrête : tant qu'il n'a ni
+   * défilé ni navigué, la carte suit le match mis en avant, qu'un sondage peut
+   * changer — et remplacer sous ses yeux le match qu'il allait ouvrir.
+   */
+  const pin = () => setActiveId((current) => current ?? ids[index] ?? null);
 
   useEffect(() => {
     if (!rotating || nextId === null) return;
@@ -133,13 +141,19 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
     holdRef,
     holdHandlers: {
       onPointerEnter: (event) => {
-        if (event.pointerType === "mouse") setHovered(true);
+        if (event.pointerType !== "mouse") return;
+        pin();
+        setHovered(true);
       },
       onPointerLeave: (event) => {
         if (event.pointerType === "mouse") setHovered(false);
       },
       // `:focus-visible` : focus posé au clavier, pas par un clic de souris.
-      onFocus: (event) => setFocused(event.target.matches(":focus-visible")),
+      onFocus: (event) => {
+        const keyboard = event.target.matches(":focus-visible");
+        if (keyboard) pin();
+        setFocused(keyboard);
+      },
       onBlur: (event) => {
         // Le focus passe d'un contrôle de la carte à un autre : on garde la main.
         if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;

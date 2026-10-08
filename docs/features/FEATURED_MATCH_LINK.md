@@ -315,12 +315,19 @@ chaque perte de focus ferait perdre le focus clavier — mais pas sous un gel
 **durable** (`carouselCanAutoRotate` : mouvement réduit, rencontre en cours,
 machine à la peine), où « Pause » nommerait un mouvement qui n'a pas lieu.
 
+**Match figé sous le lecteur.** Tant qu'il n'a ni défilé ni navigué, la carte
+suit le match mis en avant, qu'un sondage peut changer. Le survol à la souris et
+le focus clavier **figent** donc le match affiché (`activeId`) : le match qu'on
+allait ouvrir n'est pas remplacé sous les yeux.
+
 **Focus perdu par un retrait.** Un élément retiré sous le focus clavier — le
-match affiché, terminé entre deux sondages, ou la pause sous un ralenti constaté
-page regardée — n'émet aucun `blur` : la prise resterait posée pour toujours et
-le focus tomberait sur `<body>`. `useMatchCarousel` le relit après chaque rendu :
-le focus revient au bouton « suivant » (`data-carousel-next`), à défaut à la
-plaque de lien ; parti ailleurs, il relâche la prise. La position n'est annoncée (`aria-live="polite"`) que
+match affiché, terminé entre deux sondages, le bouton de diffusion d'un match
+qui quitte l'antenne, la pause sous un ralenti constaté page regardée — n'émet
+aucun `blur` : la prise resterait posée pour toujours et le focus tomberait sur
+`<body>`. `useMatchCarousel` le relit après **chaque** rendu de la carte, donc
+dans celui du retrait : le focus revient au bouton « suivant »
+(`data-carousel-next`), à défaut à la plaque de lien, sans défiler la page ;
+parti ailleurs, ou carte démontée, il relâche la prise. La position n'est annoncée (`aria-live="polite"`) que
 défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
 
 ## Fichiers
