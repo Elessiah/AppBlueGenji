@@ -16,9 +16,10 @@ import {
 } from "@/lib/shared/spectator-view";
 
 /**
- * Fenêtre d'échantillonnage du retard de boucle. Le centile est relu puis remis
- * à zéro au plus une fois par fenêtre : il décrit les dix dernières secondes,
- * pas toute la vie du processus.
+ * Fenêtre d'échantillonnage du retard de boucle. Tant que la sonde est armée,
+ * un minuteur relit le centile puis le remet à zéro à chaque fenêtre : il décrit
+ * les dix dernières secondes, même quand les lectures publiques sont rares —
+ * jamais une pause d'il y a cinq minutes.
  */
 export const LOOP_DELAY_SAMPLE_MS = 10_000;
 
@@ -35,10 +36,10 @@ export const LOOP_DELAY_RESOLUTION_MS = 20;
 export const LOOP_PROBE_IDLE_MS = 5 * 60_000;
 
 let histogram: IntervalHistogram | null = null;
+let sampleTimer: ReturnType<typeof setInterval> | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 /** Dernière activité publique (lecture servie, ou mesure de la charge). */
 let lastActivityAt = 0;
-let lastSampleAt = 0;
 let lastLoopDelayMs: number | null = null;
 
 /** Les lectures de la fenêtre courante et de la précédente (compte glissant approché). */
@@ -49,6 +50,8 @@ let previousReads = 0;
 function disarmProbe(): void {
   histogram?.disable();
   histogram = null;
+  if (sampleTimer !== null) clearInterval(sampleTimer);
+  sampleTimer = null;
   lastLoopDelayMs = null;
   if (idleTimer !== null) clearTimeout(idleTimer);
   idleTimer = null;
@@ -85,6 +88,15 @@ function touchProbe(now: number): void {
  * (`LOOP_DELAY_RESOLUTION_MS`) y figure toujours — un processus au repos lit
  * ~20 ms. Il est retranché : seuls comptent les retards en plus.
  */
+/** Relève le centile de la fenêtre écoulée, puis repart de zéro. */
+function sampleLoopDelay(): void {
+  if (histogram === null) return;
+  // Le centile est en nanosecondes.
+  const p99 = histogram.percentile(99) / 1e6 - LOOP_DELAY_RESOLUTION_MS;
+  lastLoopDelayMs = Number.isFinite(p99) && p99 > 0 ? p99 : 0;
+  histogram.reset();
+}
+
 function loopDelayMs(now: number): number | null {
   // Toute mesure compte comme activité : une sonde armée par une lecture qui
   // n'aboutit pas (404, 503) se désarme aussi.
@@ -92,15 +104,8 @@ function loopDelayMs(now: number): number | null {
   if (histogram === null) {
     histogram = monitorEventLoopDelay({ resolution: LOOP_DELAY_RESOLUTION_MS });
     histogram.enable();
-    lastSampleAt = now;
-    return lastLoopDelayMs;
-  }
-  if (now - lastSampleAt >= LOOP_DELAY_SAMPLE_MS) {
-    // Le centile est en nanosecondes.
-    const p99 = histogram.percentile(99) / 1e6 - LOOP_DELAY_RESOLUTION_MS;
-    lastLoopDelayMs = Number.isFinite(p99) && p99 > 0 ? p99 : 0;
-    histogram.reset();
-    lastSampleAt = now;
+    sampleTimer = setInterval(sampleLoopDelay, LOOP_DELAY_SAMPLE_MS);
+    sampleTimer.unref?.();
   }
   return lastLoopDelayMs;
 }
@@ -148,7 +153,6 @@ export function currentSpectatorLoadLevel(now: number = Date.now()): SpectatorLo
 export function resetSpectatorLoad(): void {
   disarmProbe();
   lastActivityAt = 0;
-  lastSampleAt = 0;
   windowStartedAt = 0;
   currentReads = 0;
   previousReads = 0;

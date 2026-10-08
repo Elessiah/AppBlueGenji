@@ -8,9 +8,10 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
-import { PATHNAME_HEADER } from "@/lib/shared/csp";
+import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { joinHrefFor } from "@/lib/shared/spectator-view";
 import { PublicNavMenu } from "./PublicNavMenu";
+import { JoinLink } from "./JoinLink";
 import styles from "./PublicHeader.module.css";
 
 /**
@@ -31,14 +32,16 @@ import styles from "./PublicHeader.module.css";
  * si la session est absente ou invalide).
  */
 /**
- * Chemin demandé, posé par le middleware (`x-pathname`). `null` hors requête
- * (rendu de test) : « Rejoindre » mène alors à la page de connexion seule.
+ * Chemin et requête demandés, posés par le middleware (`x-pathname`,
+ * `x-search`). Vides hors requête (rendu de test) : « Rejoindre » mène alors à
+ * la page de connexion seule.
  */
-async function requestedPath(): Promise<string | null> {
+async function requestedLocation(): Promise<{ path: string | null; search: string | null }> {
   try {
-    return (await headers()).get(PATHNAME_HEADER);
+    const requestHeaders = await headers();
+    return { path: requestHeaders.get(PATHNAME_HEADER), search: requestHeaders.get(SEARCH_HEADER) };
   } catch {
-    return null;
+    return { path: null, search: null };
   }
 }
 
@@ -50,7 +53,8 @@ export async function PublicHeader() {
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
   const switcherLabel = await languageSwitcherLabel();
   const t = await getTranslations("shell.header");
-  const joinHref = joinHrefFor(await requestedPath());
+  const { path, search } = await requestedLocation();
+  const joinHref = joinHrefFor(path, search);
 
   return (
     <header className={styles.root} data-sticky-header>
@@ -95,7 +99,7 @@ export async function PublicHeader() {
             </>
           ) : (
             <CyberButton variant="primary" asChild>
-              <LocaleLink href={joinHref}>{t("join")}</LocaleLink>
+              <JoinLink href={joinHref}>{t("join")}</JoinLink>
             </CyberButton>
           )}
         </div>

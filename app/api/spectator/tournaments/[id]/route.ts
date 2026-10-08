@@ -4,12 +4,12 @@ import { currentSpectatorLoadLevel, recordSpectatorRead } from "@/lib/server/spe
 import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
 import {
   parseTournamentId,
-  SPECTATOR_MAX_POLL_MS,
   SPECTATOR_FRESHNESS_HEADER,
   SPECTATOR_POLL_HEADER,
   spectatorCacheTtlMs,
   spectatorFreshnessMs,
   spectatorPollIntervalMs,
+  spectatorUnavailableRetryMs,
 } from "@/lib/shared/spectator-view";
 
 /**
@@ -51,12 +51,15 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   try {
     payload = await getSpectatorPayload(tournamentId, spectatorCacheTtlMs(level));
   } catch (error) {
-    // Base injoignable ou saturée : le visiteur sans compte est le premier à
-    // reculer — il garde ce qu'il affiche et revient au plus tard possible.
+    // Base injoignable ou saturée : le visiteur sans compte recule le premier —
+    // il garde ce qu'il affiche et revient après une attente que la charge
+    // allonge (une minute au calme, dix au pire). Son relecteur double ensuite
+    // l'attente à chaque nouvel échec.
     console.error("[spectator] lecture publique impossible :", error);
+    const retryMs = spectatorUnavailableRetryMs(level);
     const response = fail("TOURNAMENT_LOAD_FAILED", 503);
-    for (const [name, value] of Object.entries(pollHeaders(SPECTATOR_MAX_POLL_MS))) response.headers.set(name, value);
-    response.headers.set("Retry-After", String(SPECTATOR_MAX_POLL_MS / 1000));
+    for (const [name, value] of Object.entries(pollHeaders(retryMs))) response.headers.set(name, value);
+    response.headers.set("Retry-After", String(retryMs / 1000));
     return response;
   }
   if (!payload) return fail("TOURNAMENT_NOT_FOUND", 404);

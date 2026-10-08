@@ -16,7 +16,7 @@
  */
 import { createHash } from "node:crypto";
 import { cached } from "@/lib/server/cache";
-import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
 import { spectatorSnapshot } from "@/lib/shared/spectator-view";
 import type { TournamentState } from "@/lib/shared/types";
@@ -49,25 +49,25 @@ class SpectatorNotFound extends Error {}
 export async function getSpectatorPayload(tournamentId: number, ttlMs: number): Promise<SpectatorPayload | null> {
   try {
     return await cached(spectatorSnapshotCacheKey(tournamentId), ttlMs, async () => {
-      const snapshot = await getVisibleTournamentSnapshot(tournamentId);
+      // La carte d'abord : une requête indexée, sans écriture. Un tournoi
+      // inconnu ou pas encore publié s'arrête là, sans faire construire son
+      // instantané entier (matchs, classements, entretien) par un visiteur
+      // anonyme qui parcourt les identifiants.
+      const visible = await getVisibleTournamentCard(tournamentId);
+      const snapshot = visible ? await getVisibleTournamentSnapshot(tournamentId) : null;
       // Un « introuvable » **n'entre pas** dans le cache : `cached` ne garde
       // jamais un échec. Des identifiants parcourus au hasard n'y chassent donc
       // pas les clés chaudes (500 entrées, partagées avec tout le site), et un
-      // tournoi publié une seconde plus tard s'ouvre aussitôt. La porte de
-      // visibilité garde sa propre mutualisation (instantané, 3 s).
+      // tournoi publié une seconde plus tard s'ouvre aussitôt.
       if (!snapshot) throw new SpectatorNotFound();
-      // L'empreinte se prend sur le contenu public **sans** la version des
-      // membres, qui bouge avec les champs retirés ; elle prend ensuite sa
-      // place. Deux sérialisations, au plus une fois par durée de vie.
-      const publicSnapshot = spectatorSnapshot(snapshot);
-      const version = createHash("sha256")
-        .update(JSON.stringify({ ...publicSnapshot, version: "" }))
-        .digest("base64url")
-        .slice(0, 22);
+      // Une seule sérialisation. La version des membres en sort (elle bouge avec
+      // les champs retirés) : l'empreinte du corps public la remplace, et ne
+      // voyage que dans l'en-tête `ETag` — le relecteur ne lit pas `version`.
+      const body = JSON.stringify({ ...spectatorSnapshot(snapshot), version: "" });
       return {
-        version,
+        version: createHash("sha256").update(body).digest("base64url").slice(0, 22),
         state: snapshot.card.state,
-        body: JSON.stringify({ ...publicSnapshot, version }),
+        body,
         ttlMs,
       };
     });

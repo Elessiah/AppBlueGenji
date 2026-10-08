@@ -73,10 +73,20 @@ export function tournamentIdFromSpectatorPath(path: string | null | undefined): 
  * joueur dont la session a expiré, ou l'arbitre déconnecté, retrouve ses
  * actions sans bouton de plus. Ailleurs, la page de connexion seule.
  */
-export function joinHrefFor(path: string | null | undefined): string {
+export function joinHrefFor(path: string | null | undefined, search?: string | null): string {
   const tournamentId = tournamentIdFromSpectatorPath(path);
   if (tournamentId === null) return "/connexion";
-  return `/connexion?redirect=${encodeURIComponent(memberTournamentPath(tournamentId))}`;
+  const destination = `${memberTournamentPath(tournamentId)}${forwardedSearch(search)}`;
+  return `/connexion?redirect=${encodeURIComponent(destination)}`;
+}
+
+/**
+ * Le même lien, ancre de la page comprise (`#match-…`) : le serveur ne la voit
+ * jamais, le navigateur l'ajoute à la destination au moment du rendu client.
+ */
+export function withRedirectAnchor(href: string, hash: string): string {
+  if (!hash.startsWith("#") || hash.length < 2 || !href.includes("?redirect=")) return href;
+  return `${href}${encodeURIComponent(hash)}`;
 }
 
 /**
@@ -175,6 +185,16 @@ export const SPECTATOR_CACHE_TTL_MS = 15_000;
 /** Durée de vie de la réponse publique, allongée avec la charge. */
 export function spectatorCacheTtlMs(level: SpectatorLoadLevel): number {
   return Math.min(SPECTATOR_MAX_POLL_MS, SPECTATOR_CACHE_TTL_MS * SPECTATOR_LOAD_FACTOR[level]);
+}
+
+/**
+ * Attente imposée après une lecture impossible (base injoignable) : le double de
+ * la cadence d'un tournoi en cours **au niveau de charge du moment** — une
+ * minute au calme, dix sous la pire charge. Un incident bref ne fige pas la
+ * page dix minutes ; une base réellement saturée n'est pas relancée sans cesse.
+ */
+export function spectatorUnavailableRetryMs(level: SpectatorLoadLevel): number {
+  return Math.min(SPECTATOR_MAX_POLL_MS, 2 * SPECTATOR_RUNNING_POLL_MS * SPECTATOR_LOAD_FACTOR[level]);
 }
 
 /** En-tête de réponse qui porte l'intervalle choisi (ms). */

@@ -1,6 +1,7 @@
 "use client";
 
 import { Pill } from "@/components/cyber";
+import { useSpectatorView } from "@/components/spectator-view";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { LiveFailure } from "../_lib/live-state";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -63,9 +64,10 @@ export function LiveIndicator({ isLive, tier, cadenceMs, fatal = null }: Readonl
   const text = useTournamentPageText();
   const { t } = text;
   let label = t("live.reconnecting");
-  // Une cadence imposée vient de la page sans compte : pas de flux à rouvrir,
-  // une relecture qui réessaiera plus tard.
-  let title = cadenceMs === undefined ? t("live.reconnectingTitle") : t("live.retryTitle");
+  // Page sans compte : pas de flux à rouvrir, une relecture qui réessaiera
+  // plus tard.
+  const spectator = useSpectatorView();
+  let title = spectator ? t("live.retryTitle") : t("live.reconnectingTitle");
   if (fatal) {
     label = t("live.offline");
     title = t(`live.fatal.${fatal}`);
