@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { siteBaseUrl } from "@/lib/server/site-url";
-import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
+import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 import { LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
@@ -168,6 +168,7 @@ function localizedRequestHeaders(request: NextRequest, locale: Locale, path: str
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(LOCALE_HEADER, locale);
   requestHeaders.set(PATHNAME_HEADER, path);
+  requestHeaders.set(SEARCH_HEADER, request.nextUrl.search);
   return requestHeaders;
 }
 
