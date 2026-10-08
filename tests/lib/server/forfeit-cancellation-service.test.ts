@@ -32,7 +32,8 @@ type Head = {
 function setup(options: {
   head?: Head | null;
   phase?: { id: number; format: string } | null;
-  standing?: { status: string } | null;
+  standing?: { status: string; forfeit_round?: number } | null;
+  laterInputs?: number;
 } = {}) {
   const head =
     options.head === null
@@ -45,7 +46,8 @@ function setup(options: {
           endurance_playoffs_started: 0,
           ...options.head,
         };
-  const standing = options.standing === undefined ? { status: "FORFEIT" } : options.standing;
+  const standing =
+    options.standing === undefined ? { status: "FORFEIT", forfeit_round: 2 } : options.standing;
   const sqls: string[] = [];
   const params: unknown[] = [];
   const connection = connectionMock();
@@ -59,6 +61,7 @@ function setup(options: {
     if (/^SELECT s.status/.test(flat)) {
       return [standing ? [{ ...standing, team_name: "Team Nova" }] : []];
     }
+    if (/COUNT\(\*\) AS c FROM bg_matches/.test(flat)) return [[{ c: options.laterInputs ?? 0 }]];
     return [{ affectedRows: 1 }];
   });
   jest.mocked(getDatabase).mockResolvedValue(
@@ -108,7 +111,7 @@ describe("cancelTournamentForfeit", () => {
 
     await cancelTournamentForfeit(7, 102);
 
-    expect(sqls.some((sql) => /bg_matches/.test(sql))).toBe(false);
+    expect(sqls.some((sql) => /^(UPDATE|DELETE|INSERT).*bg_matches/.test(sql))).toBe(false);
   });
 
   it("efface la ronde de sortie en Ronde suisse", async () => {
@@ -132,7 +135,17 @@ describe("cancelTournamentForfeit", () => {
     expect(reconcileEndurance).toHaveBeenCalledWith(7, fakeConnection(connection));
   });
 
-  it("suit la phase en cours d'un multi-phases, puis réconcilie les phases", async () => {
+  it("ne regarde que les manches postérieures à l'abandon, dans la bonne phase", async () => {
+    const { sqls, params } = setup();
+
+    await cancelTournamentForfeit(7, 102);
+
+    const later = sqls.findIndex((sql) => /COUNT\(\*\) AS c FROM bg_matches/.test(sql));
+    expect(sqls[later]).toContain("round_number > ?");
+    expect(params[later]).toEqual([7, 0, 2]);
+  });
+
+  it("suit la phase en cours d'un multi-phases et laisse `reconcilePhases` rejouer le moteur", async () => {
     const { params, sqls, connection } = setup({
       head: { format: "MULTI" },
       phase: { id: 12, format: "SWISS" },
@@ -142,7 +155,9 @@ describe("cancelTournamentForfeit", () => {
 
     const update = sqls.findIndex((sql) => sql.startsWith("UPDATE bg_swiss_standings"));
     expect(params[update]).toEqual([7, 12, 102]);
-    expect(reconcileSwiss).toHaveBeenCalledWith(7, fakeConnection(connection), { phaseId: 12 });
+    // Le moteur n'est pas appelé en direct : sa cible de qualifiées vient de
+    // la phase, que seul `reconcilePhases` connaît.
+    expect(reconcileSwiss).not.toHaveBeenCalled();
     expect(reconcilePhases).toHaveBeenCalledWith(7, fakeConnection(connection));
   });
 
@@ -155,6 +170,7 @@ describe("cancelTournamentForfeit", () => {
     ["TEAM_NOT_IN_TOURNAMENT", { standing: null }],
     ["TEAM_NOT_FORFEITED", { standing: { status: "ACTIVE" } }],
     ["TEAM_NOT_FORFEITED", { standing: { status: "ELIMINATED" } }],
+    ["FORFEIT_ROUND_PASSED", { laterInputs: 1 }],
   ])("refuse en %s, sans rien écrire", async (code, options) => {
     const { sqls, connection } = setup(options);
 

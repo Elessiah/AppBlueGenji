@@ -19,7 +19,9 @@ dialogue de score.
 
 Une seule chose : l'engagé repasse de `FORFEIT` à `ACTIVE` (manche de sortie
 remise à `NULL`), puis le moteur rejoue le classement (`reconcileSurvival`,
-`reconcileSwiss`, `reconcileEndurance`, puis `reconcilePhases` en multi-phases).
+`reconcileSwiss`, `reconcileEndurance`). En multi-phases, seul `reconcilePhases`
+est appelé : il rejoue le moteur de la phase avec la cible de qualifiées
+qu'il est seul à connaître (un appel direct couperait jusqu'à une équipe).
 
 Les trois moteurs relisent les abandons **depuis le statut stocké** : effacer le
 statut suffit à rendre victoires, capital d'endurance et rang à ce que les matchs
@@ -33,7 +35,8 @@ dépassée. L'arbitrage corrige ce score par le dialogue habituel si besoin, dan
 les limites de `SCORE_EDIT_LOCK.md`. La modale de confirmation le dit.
 
 L'équipe est appariée dès la **prochaine** manche posée par le moteur : dans la
-manche en cours, elle n'a pas de match.
+manche en cours, elle n'a pas de match. Le rejeu pouvant l'éliminer aussitôt, le
+message de succès dit seulement que le classement est recalculé.
 
 ## Fenêtre
 
@@ -44,6 +47,7 @@ manche en cours, elle n'a pas de match.
 | BG Survie : play-offs non lancés (l'arbre final est posé, l'équipe ne peut plus y entrer) | `409 ENDURANCE_PLAYOFFS_STARTED` |
 | L'engagé figure au classement | `404 TEAM_NOT_IN_TOURNAMENT` |
 | L'engagé est `FORFEIT` | `409 TEAM_NOT_FORFEITED` |
+| Aucune manche **postérieure** à celle de l'abandon ne porte de saisie (même borne que le retrait d'une pénalité) — sinon l'équipe rentrerait sans que les manches manquées comptent contre elle | `409 FORFEIT_ROUND_PASSED` |
 
 La transaction prend `lockTournamentRow` en toute première instruction.
 

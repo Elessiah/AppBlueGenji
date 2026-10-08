@@ -108,6 +108,7 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
     ["FORMAT_WITHOUT_FORFEIT", 409],
     ["ENDURANCE_PLAYOFFS_STARTED", 409],
     ["TEAM_NOT_FORFEITED", 409],
+    ["FORFEIT_ROUND_PASSED", 409],
   ])("traduit %s en %d", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(cancelTournamentForfeit).mockRejectedValue(new Error(code));
