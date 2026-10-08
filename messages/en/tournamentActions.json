@@ -159,7 +159,7 @@
     }
   },
   "forfeitCancel": {
-    "success": "Withdrawal cancelled: {name} is back in contention.",
+    "success": "{name}'s withdrawal cancelled: its standing is recalculated.",
     "title": "Cancel {name}'s withdrawal?",
     "body": {
       "TEAM": "The team is back in contention and will be paired from the next round. The match lost by forfeit stays lost: correct its score if needed.",

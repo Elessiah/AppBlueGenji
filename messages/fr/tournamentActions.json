@@ -159,7 +159,7 @@
     }
   },
   "forfeitCancel": {
-    "success": "Abandon annulé : {name} revient en lice.",
+    "success": "Abandon de {name} annulé : son classement est recalculé.",
     "title": "Annuler l'abandon de {name} ?",
     "body": {
       "TEAM": "L'équipe revient en lice et sera appariée dès la prochaine manche. Le match perdu par forfait reste perdu : corrigez son score si besoin.",

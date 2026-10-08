@@ -78,6 +78,7 @@
     "FORMAT_WITHOUT_FORFEIT": "This tournament format has no withdrawal.",
     "TEAM_NOT_FORFEITED": "This team hasn't withdrawn: there is nothing to cancel.",
     "FORFEIT_CANCEL_FAILED": "Error while cancelling the withdrawal.",
+    "FORFEIT_ROUND_PASSED": "A round has been played since the withdrawal: putting the team back would spare it the rounds it missed. Roll back first.",
     "TOURNAMENT_LOCKED": "The tournament is in progress: it can no longer be edited.",
     "FIELD_NOT_EDITABLE": "This setting can no longer be changed now that the tournament is visible.",
     "MAX_TEAMS_CANNOT_DECREASE": "The number of slots can no longer be reduced once the tournament is visible.",

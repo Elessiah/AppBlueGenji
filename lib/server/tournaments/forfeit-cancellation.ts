@@ -14,9 +14,10 @@
  * depuis le statut stocké, si bien qu'effacer le statut suffit à rendre
  * victoires, capital et rang à ce que les matchs disent.
  */
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import { HAS_SCORE_INPUT_SQL } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { publishUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
@@ -52,6 +53,55 @@ function isEngineFormat(format: string | null): format is EngineFormat {
 }
 
 /**
+ * Moteur qui porte l'abandon. En multi-phases, l'abandon vit dans le classement
+ * de la phase en cours — le seul que `forfeitTournamentTeamPublic` sache écrire.
+ */
+async function resolveEngine(
+  connection: PoolConnection,
+  tournamentId: number,
+  format: string,
+): Promise<{ engineFormat: string | null; phaseId: number }> {
+  if (format !== "MULTI") return { engineFormat: format, phaseId: 0 };
+  const [phaseRows] = await connection.execute<(RowDataPacket & { id: number; format: string })[]>(
+    `SELECT p.id, p.format
+     FROM bg_tournament_phases p
+     JOIN bg_tournaments t ON t.current_phase_id = p.id
+     WHERE t.id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  return { engineFormat: phaseRows[0]?.format ?? null, phaseId: Number(phaseRows[0]?.id ?? 0) };
+}
+
+/**
+ * Rejoue le classement : il rend à l'équipe ce que ses matchs lui donnent — y
+ * compris une élimination par coupe ou par capital épuisé, que l'abandon
+ * masquait. En multi-phases, `reconcilePhases` rejoue lui-même le moteur de la
+ * phase, avec la cible de qualifiées que lui seul connaît : un appel direct
+ * couperait jusqu'à une seule équipe.
+ */
+async function replayStandings(
+  connection: PoolConnection,
+  tournamentId: number,
+  multiPhase: boolean,
+  engineFormat: EngineFormat,
+  phaseId: number,
+): Promise<void> {
+  if (multiPhase) {
+    const { reconcilePhases } = await import("./phases");
+    await reconcilePhases(tournamentId, connection);
+  } else if (engineFormat === "SURVIVAL") {
+    const { reconcileSurvival } = await import("./survival");
+    await reconcileSurvival(tournamentId, connection, { phaseId });
+  } else if (engineFormat === "SWISS") {
+    const { reconcileSwiss } = await import("./swiss");
+    await reconcileSwiss(tournamentId, connection, { phaseId });
+  } else {
+    const { reconcileEndurance } = await import("./bg-survie/reconcile");
+    await reconcileEndurance(tournamentId, connection);
+  }
+}
+
+/**
  * Remet en lice un engagé qui avait abandonné.
  *
  * Le contrôle de permission appartient à la route (administrateur strict).
@@ -63,6 +113,9 @@ function isEngineFormat(format: string | null): format is EngineFormat {
  *         peut plus y entrer.
  * @throws `TEAM_NOT_IN_TOURNAMENT` — l'engagé n'est pas au classement.
  * @throws `TEAM_NOT_FORFEITED` — l'engagé n'a pas abandonné.
+ * @throws `FORFEIT_ROUND_PASSED` — une manche postérieure à l'abandon porte une
+ *         saisie : l'équipe rentrerait sans que les manches qu'elle a manquées
+ *         comptent contre elle.
  */
 export async function cancelTournamentForfeit(
   tournamentId: number,
@@ -87,24 +140,7 @@ export async function cancelTournamentForfeit(
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
     if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 
-    // En multi-phases, l'abandon vit dans le classement de la phase en cours —
-    // le seul que `forfeitTournamentTeamPublic` sache écrire.
-    let engineFormat: string | null = tournament.format;
-    let phaseId = 0;
-    if (tournament.format === "MULTI") {
-      const [phaseRows] = await connection.execute<
-        (RowDataPacket & { id: number; format: string })[]
-      >(
-        `SELECT p.id, p.format
-         FROM bg_tournament_phases p
-         JOIN bg_tournaments t ON t.current_phase_id = p.id
-         WHERE t.id = ? LIMIT 1`,
-        [tournamentId],
-      );
-      engineFormat = phaseRows[0]?.format ?? null;
-      phaseId = Number(phaseRows[0]?.id ?? 0);
-    }
-
+    const { engineFormat, phaseId } = await resolveEngine(connection, tournamentId, tournament.format);
     if (!isEngineFormat(engineFormat)) throw new Error("FORMAT_WITHOUT_FORFEIT");
     if (engineFormat === "BG_SURVIE" && Number(tournament.endurance_playoffs_started) === 1) {
       throw new Error("ENDURANCE_PLAYOFFS_STARTED");
@@ -115,9 +151,9 @@ export async function cancelTournamentForfeit(
     const scopeParams = phased ? [tournamentId, phaseId, teamId] : [tournamentId, teamId];
 
     const [standingRows] = await connection.execute<
-      (RowDataPacket & { status: string; team_name: string })[]
+      (RowDataPacket & { status: string; forfeit_round: number | null; team_name: string })[]
     >(
-      `SELECT s.status, t.name AS team_name
+      `SELECT s.status, s.${roundColumn} AS forfeit_round, t.name AS team_name
        FROM ${table} s
        JOIN bg_teams t ON t.id = s.team_id
        WHERE ${scope}
@@ -128,28 +164,25 @@ export async function cancelTournamentForfeit(
     if (!standing) throw new Error("TEAM_NOT_IN_TOURNAMENT");
     if (standing.status !== "FORFEIT") throw new Error("TEAM_NOT_FORFEITED");
 
+    // Même borne que le retrait d'une pénalité (`laterRoundHasScoreInput`) :
+    // une manche **postérieure** à l'abandon déjà entamée, et l'équipe
+    // rentrerait sans que les manches manquées comptent contre elle — capital
+    // intact en BG Survie, défaites en moins en Survie. Une manche posée mais
+    // vierge ne bloque pas : l'équipe rejoint l'appariement suivant.
+    const [laterRows] = await connection.execute<(RowDataPacket & { c: number })[]>(
+      `SELECT COUNT(*) AS c FROM bg_matches
+       WHERE tournament_id = ? AND phase_id = ? AND round_number > ?
+         AND ${HAS_SCORE_INPUT_SQL}`,
+      [tournamentId, phaseId, Number(standing.forfeit_round ?? 1)],
+    );
+    if (Number(laterRows[0]?.c ?? 0) > 0) throw new Error("FORFEIT_ROUND_PASSED");
+
     await connection.execute(
       `UPDATE ${table} s SET s.status = 'ACTIVE', s.${roundColumn} = NULL WHERE ${scope}`,
       scopeParams,
     );
 
-    // Le rejeu rend à l'équipe ce que ses matchs lui donnent — y compris une
-    // élimination par coupe ou par capital épuisé, que l'abandon masquait.
-    if (engineFormat === "SURVIVAL") {
-      const { reconcileSurvival } = await import("./survival");
-      await reconcileSurvival(tournamentId, connection, { phaseId });
-    } else if (engineFormat === "SWISS") {
-      const { reconcileSwiss } = await import("./swiss");
-      await reconcileSwiss(tournamentId, connection, { phaseId });
-    } else {
-      const { reconcileEndurance } = await import("./bg-survie/reconcile");
-      await reconcileEndurance(tournamentId, connection);
-    }
-
-    if (tournament.format === "MULTI") {
-      const { reconcilePhases } = await import("./phases");
-      await reconcilePhases(tournamentId, connection);
-    }
+    await replayStandings(connection, tournamentId, tournament.format === "MULTI", engineFormat, phaseId);
 
     await connection.commit();
     // Le rejeu a pu réserver des lignes de journal (manche suivante posée).

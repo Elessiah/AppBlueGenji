@@ -17,7 +17,7 @@ import { planEnduranceRound, type EnduranceStanding } from "@/lib/shared/bg-surv
  * divergeraient au premier réglage, et l'interface offrirait alors un bouton
  * voué au 409.
  */
-const HAS_SCORE_INPUT_SQL = `(team1_score IS NOT NULL OR team2_score IS NOT NULL
+export const HAS_SCORE_INPUT_SQL = `(team1_score IS NOT NULL OR team2_score IS NOT NULL
             OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
             OR double_forfeit = 1 OR status = 'AWAITING_CONFIRMATION')`;
 

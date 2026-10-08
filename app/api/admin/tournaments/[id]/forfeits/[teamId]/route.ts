@@ -70,4 +70,5 @@ const CANCEL_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
   ["FORMAT_WITHOUT_FORFEIT", 409],
   ["ENDURANCE_PLAYOFFS_STARTED", 409],
   ["TEAM_NOT_FORFEITED", 409],
+  ["FORFEIT_ROUND_PASSED", 409],
 ]);
