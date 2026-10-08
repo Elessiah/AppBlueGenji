@@ -188,11 +188,6 @@
   }
 }
 
-/* Retour au toucher (le survol est réservé aux pointeurs fins). */
-.navTools .navTool:active {
-  background: rgba(90, 200, 255, 0.1);
-}
-
 .navTools .navTool:focus-visible {
   outline: 2px solid var(--blue-500);
   outline-offset: 2px;
@@ -360,6 +355,17 @@
   border-color: var(--amber);
   background: rgba(var(--amber-rgb), 0.14);
   box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(var(--amber-rgb), 0.35);
+}
+
+/* Retour au toucher (le survol est réservé aux pointeurs fins), après les
+   règles d'état pour l'emporter à spécificité égale ; ambre sur le drapeau
+   en attente, comme son survol. */
+.navTools .navTool:active {
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.navTools .navReportsPending:active {
+  background: rgba(var(--amber-rgb), 0.2);
 }
 
 /* Contraste forcé (Windows) : fonds et halos disparaissent ; la bordure

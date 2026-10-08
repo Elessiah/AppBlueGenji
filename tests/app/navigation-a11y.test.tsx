@@ -136,6 +136,9 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(css).toMatch(/\.navReportsPending\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
     // Contraste forcé : un contour système remplace fond et halo.
     expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.navTools \.navReports\[aria-current="page"\],\s*\.navTools \.navReportsPending\[aria-current="page"\]\s*\{\s*border-color: Highlight;/);
+    // Retour au toucher après les états courants, ambre sur le drapeau en attente.
+    expect(css.indexOf(".navTools .navTool:active")).toBeGreaterThan(css.indexOf('.navTools .navReportsPending[aria-current="page"] {'));
+    expect(css).toMatch(/\.navTools \.navReportsPending:active\s*\{\s*background: rgba\(var\(--amber-rgb\), 0\.2\);/);
     // Après la règle ambre, à spécificité égale : sinon elle l'emporterait.
     expect(css.indexOf("@media (forced-colors: active)")).toBeGreaterThan(css.indexOf('.navTools .navReportsPending[aria-current="page"] {'));
   });
