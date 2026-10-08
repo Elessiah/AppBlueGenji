@@ -28,7 +28,14 @@ import {
   type SpectatorLoadSignals,
 } from "@/lib/shared/spectator-view";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
-import type { EnduranceMeta } from "@/lib/shared/types";
+import type { MatchMapResult } from "@/lib/shared/match-maps";
+import type {
+  BracketMatch,
+  EnduranceMeta,
+  EndurancePenaltyRow,
+  MatchScoreReport,
+  TournamentSnapshot,
+} from "@/lib/shared/types";
 import { bracketMatch } from "../../helpers/bracket-match";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
@@ -207,8 +214,11 @@ describe("relecture côté client", () => {
     expect(parsePollAfterMs("bientôt")).toBe(SPECTATOR_RUNNING_POLL_MS);
   });
 
-  it("recule après un échec : Retry-After d'abord, sinon le double de la dernière attente", () => {
+  it("recule après un échec : le double de la dernière attente, jamais moins que Retry-After", () => {
     expect(spectatorRetryDelayMs(30_000, "120")).toBe(120_000);
+    // Un Retry-After répété à l'identique ne fige pas le recul.
+    expect(spectatorRetryDelayMs(60_000, "60")).toBe(120_000);
+    expect(spectatorRetryDelayMs(120_000, "60")).toBe(240_000);
     expect(spectatorRetryDelayMs(30_000, null)).toBe(60_000);
     expect(spectatorRetryDelayMs(60_000, null)).toBe(120_000);
     expect(spectatorRetryDelayMs(30_000, "n'importe")).toBe(60_000);
@@ -317,5 +327,150 @@ describe("ce que lit le visiteur sans compte", () => {
     // Aucun compte ne porte l'identifiant 0 : personne n'est reconnu caster.
     expect(SPECTATOR_VIEWER_CONTEXT.viewerUserId).toBe(0);
     expect(Object.isFrozen(SPECTATOR_VIEWER_CONTEXT)).toBe(true);
+  });
+});
+
+/**
+ * Inventaire des champs de la réponse publique : `spectatorSnapshot` recopie
+ * l'instantané des membres et n'efface que ce qu'il connaît. Chaque champ doit
+ * donc être classé ici — un champ ajouté à l'un de ces types casse le contrôle
+ * de types tant qu'on n'a pas décidé s'il part en public ou s'il est retiré.
+ */
+type Disposition = "public" | "retiré" | "parcouru";
+
+const SNAPSHOT_FIELDS = {
+  card: "public",
+  currentPhaseId: "public",
+  endurance: "parcouru",
+  matches: "parcouru",
+  phaseStandings: "public",
+  phases: "public",
+  registrations: "public",
+  seedingSource: "public",
+  // Marche du podium d'une entrée solo (public, déclaré au RGPD).
+  soloUserIds: "public",
+  survival: "public",
+  swiss: "public",
+  version: "public",
+} as const satisfies Record<keyof TournamentSnapshot, Disposition>;
+
+const MATCH_FIELDS = {
+  bracket: "public",
+  casterPseudo: "public",
+  casterReady: "public",
+  casterUserId: "retiré",
+  doubleForfeit: "public",
+  forfeitTeamId: "public",
+  hostTeamId: "public",
+  id: "public",
+  launchedAt: "public",
+  liveStartedAt: "public",
+  liveTrigger: "public",
+  liveUrl: "public",
+  lobbyOpenedAt: "public",
+  loserTeamId: "public",
+  maps: "parcouru",
+  matchNumber: "public",
+  nextLoserMatchId: "public",
+  nextLoserSlot: "public",
+  nextWinnerMatchId: "public",
+  nextWinnerSlot: "public",
+  phaseId: "public",
+  phasePosition: "public",
+  replayUrl: "public",
+  roundNumber: "public",
+  scoreDeadlineAt: "public",
+  startAt: "public",
+  status: "public",
+  team1Id: "public",
+  team1Name: "public",
+  team1Placeholder: "public",
+  team1Ready: "public",
+  team1Report: "parcouru",
+  team1Score: "public",
+  team2Id: "public",
+  team2Name: "public",
+  team2Placeholder: "public",
+  team2Ready: "public",
+  team2Report: "parcouru",
+  team2Score: "public",
+  tournamentId: "public",
+  updatedAt: "public",
+  winnerTeamId: "public",
+} as const satisfies Record<keyof BracketMatch, Disposition>;
+
+const MAP_FIELDS = {
+  mapNumber: "public",
+  replayCode: "retiré",
+  team1Score: "public",
+  team2Score: "public",
+} as const satisfies Record<keyof MatchMapResult, Disposition>;
+
+const REPORT_FIELDS = {
+  maps: "retiré",
+  reportedAt: "public",
+  team1Score: "public",
+  team2Score: "public",
+} as const satisfies Record<keyof MatchScoreReport, Disposition>;
+
+const PENALTY_FIELDS = {
+  authorPseudo: "retiré",
+  createdAt: "public",
+  id: "public",
+  points: "public",
+  reason: "retiré",
+  removable: "public",
+  round: "public",
+  teamId: "public",
+  teamName: "public",
+} as const satisfies Record<keyof EndurancePenaltyRow, Disposition>;
+
+describe("inventaire des champs publics", () => {
+  it("couvre exactement les champs des fabriques de test", () => {
+    expect(Object.keys(SNAPSHOT_FIELDS).sort()).toEqual(Object.keys(tournamentSnapshot()).sort());
+    expect(Object.keys(MATCH_FIELDS).sort()).toEqual(Object.keys(bracketMatch()).sort());
+  });
+
+  it("n'ajoute aucun champ, à aucun niveau", () => {
+    const maps: MatchMapResult[] = [{ mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 1 }];
+    const report: MatchScoreReport = { team1Score: 2, team2Score: 1, reportedAt: "2026-01-01T00:00:00.000Z", maps };
+    const snapshot = tournamentSnapshot({
+      matches: [bracketMatch({ maps, casterUserId: 7, team1Report: report, team2Report: report })],
+    });
+    const out = spectatorSnapshot(snapshot);
+    expect(Object.keys(out).sort()).toEqual(Object.keys(snapshot).sort());
+    const match = out.matches[0];
+    expect(Object.keys(match).sort()).toEqual(Object.keys(snapshot.matches[0]).sort());
+    expect(Object.keys(match.maps[0]).sort()).toEqual(Object.keys(MAP_FIELDS).sort());
+    expect(Object.keys(match.team1Report!).sort()).toEqual(Object.keys(REPORT_FIELDS).sort());
+  });
+
+  it("garde la forme d'une sanction", () => {
+    const penalty: EndurancePenaltyRow = {
+      id: 1,
+      teamId: 4,
+      teamName: "Alpha",
+      round: 2,
+      points: 3,
+      reason: "Motif",
+      authorPseudo: "Arbitre",
+      createdAt: null,
+      removable: false,
+    };
+    const endurance: EnduranceMeta = {
+      startPoints: 9,
+      winDelta: 1,
+      lossDelta: 1,
+      forfeitMaps: 3,
+      playoffSize: 8,
+      maxRounds: null,
+      currentRound: 2,
+      playoffsStarted: false,
+      rounds: [1, 2],
+      penalties: [penalty],
+      standings: [],
+    };
+    const out = spectatorSnapshot(tournamentSnapshot({ endurance })).endurance!.penalties[0];
+    expect(Object.keys(out).sort()).toEqual(Object.keys(PENALTY_FIELDS).sort());
   });
 });

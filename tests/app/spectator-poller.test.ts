@@ -219,6 +219,27 @@ describe("relecteur de la page sans compte", () => {
     expect(h.last().isLive).toBe(true);
   });
 
+  it("double son attente quand chaque 503 redonne le même Retry-After", async () => {
+    const unavailable = () => ({ status: 503, headers: { "retry-after": "60" } });
+    const h = harness([ok(tournamentSnapshot()), unavailable(), unavailable(), unavailable(), notModified()]);
+    await h.poller.start();
+    await h.advance(SPECTATOR_RUNNING_POLL_MS);
+    expect(h.fetchMock).toHaveBeenCalledTimes(2);
+
+    // 60 s (le Retry-After vaut le double des 30 s), puis 120 s, puis 240 s.
+    await h.advance(60_000);
+    expect(h.fetchMock).toHaveBeenCalledTimes(3);
+    await h.advance(119_999);
+    expect(h.fetchMock).toHaveBeenCalledTimes(3);
+    await h.advance(1);
+    expect(h.fetchMock).toHaveBeenCalledTimes(4);
+    await h.advance(239_999);
+    expect(h.fetchMock).toHaveBeenCalledTimes(4);
+    await h.advance(1);
+    expect(h.fetchMock).toHaveBeenCalledTimes(5);
+    expect(h.last().isLive).toBe(true);
+  });
+
   it("double son attente à chaque coupure réseau, puis revient à la cadence", async () => {
     const down = () => new TypeError("Failed to fetch");
     const h = harness([ok(tournamentSnapshot()), down(), down(), notModified(), notModified()]);

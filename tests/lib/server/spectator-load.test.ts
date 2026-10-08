@@ -39,6 +39,14 @@ describe("lectures publiques par minute", () => {
     expect(spectatorReadsPerMinute(T0 + 1.5 * SPECTATOR_READ_WINDOW_MS)).toBe(6);
   });
 
+  it("ferme chaque fenêtre au bout d'une minute exacte, pas à la lecture qui la referme", () => {
+    for (let i = 0; i < 10; i += 1) recordSpectatorRead(T0);
+    // Première lecture après 90 s : la fenêtre close est [T0, T0 + 60 s[, la
+    // courante a déjà 30 s — les dix lectures ne comptent plus que pour moitié.
+    recordSpectatorRead(T0 + 1.5 * SPECTATOR_READ_WINDOW_MS);
+    expect(spectatorReadsPerMinute(T0 + 1.5 * SPECTATOR_READ_WINDOW_MS)).toBe(6);
+  });
+
   it("oublie tout après deux minutes sans lecture", () => {
     for (let i = 0; i < 10; i += 1) recordSpectatorRead(T0);
     expect(spectatorReadsPerMinute(T0 + 3 * SPECTATOR_READ_WINDOW_MS)).toBe(0);
