@@ -906,6 +906,32 @@ a.sectionNavLink[data-tone="finished"]:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* Recherche + jeux et sommaire : empilés (le conteneur ne crée aucune boîte),
+   sur une seule rangée au-delà de 1800 px, où la page s'élargit (`.page-wide`). */
+.controls {
+  display: contents;
+}
+
+@media (min-width: 1800px) {
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 24px;
+    margin-top: 4px;
+  }
+  .controls .toolbar {
+    flex: 1 1 640px;
+    margin-top: 0;
+  }
+  .controls .sectionNav {
+    margin: 0;
+  }
+  .sectionBody {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 1080px) {
   .sectionBody {

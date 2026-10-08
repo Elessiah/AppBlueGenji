@@ -420,7 +420,7 @@ export default function TournamentsList() {
     list.slice(0, expandedSections.has(key) ? list.length : SECTION_DISPLAY_LIMIT);
 
   return (
-    <div className={s.page}>
+    <div className={`${s.page} page-wide`}>
       <RulesHelpFab />
       <BgCanvas mode="network" />
       <div className={s.fabric} />
@@ -449,83 +449,86 @@ export default function TournamentsList() {
             )}
           </header>
 
-          <div className={s.toolbar}>
-            <div className={s.search}>
-              <span className={s.searchIcon}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
-              </span>
-              <input
-                ref={searchInputRef}
-                aria-label={t("list.searchLabel")}
-                aria-keyshortcuts={SEARCH_ARIA_KEYSHORTCUTS}
-                placeholder={t("list.searchPlaceholder")}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <span className={s.searchKbd} aria-hidden="true">
-                {shortcutLabel}
-              </span>
-            </div>
-            <div className={s.filterRow}>
-              {GAME_FILTERS.map((key) => {
-                const label = t(`list.filters.${key}`);
-                const count = countGame(key);
-                return (
-                  <button
-                    key={key}
-                    className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
-                    aria-pressed={gameFilter === key}
-                    aria-label={t("list.countLabel", { label, count: String(count) })}
-                    onClick={() => setGameFilter(key)}
-                  >
-                    {label}
-                    <span className={s.num} aria-hidden="true">
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Sommaire : remplace le bandeau de chiffres, qui répétait les
-              comptes des sections sans mener nulle part. Une section vide y
-              reste, grisée, au lieu d'occuper un grand cadre « Vide » plus bas. */}
-          <nav className={s.sectionNav} aria-label={t("list.sectionsNav")}>
-            {sections.map((entry) =>
-              entry.count > 0 ? (
-                <a
-                  key={entry.key}
-                  href={`#${pageSectionAnchor(entry.key)}`}
-                  className={s.sectionNavLink}
-                  data-tone={entry.key}
-                  // Mène parfois à une section repliée (« Terminés ») : on la
-                  // déplie, sans quoi le lien aboutirait sur un en-tête vide.
-                  onClick={() => setSectionOpen(entry.key, true)}
-                  // Libellé et compte sont deux éléments sans séparateur : le
-                  // nom accessible les collerait (« Mes tournois34 »). Il
-                  // commence par le texte visible (WCAG 2.5.3).
-                  aria-label={t("list.countLabel", { label: entry.navLabel, count: String(entry.count) })}
-                >
-                  {entry.navLabel}
-                  <span className={s.num} aria-hidden="true">
-                    {entry.count}
-                  </span>
-                </a>
-              ) : (
-                <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
-                  {entry.navLabel}
-                  <span className={s.num} aria-hidden="true">
-                    0
-                  </span>
-                  <span className="sr-only"> {t("list.navNone")}</span>
+          {/* Recherche, jeux et sommaire : deux rangées, une seule sur grand écran. */}
+          <div className={s.controls}>
+            <div className={s.toolbar}>
+              <div className={s.search}>
+                <span className={s.searchIcon}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4" />
+                    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
                 </span>
-              ),
-            )}
-          </nav>
+                <input
+                  ref={searchInputRef}
+                  aria-label={t("list.searchLabel")}
+                  aria-keyshortcuts={SEARCH_ARIA_KEYSHORTCUTS}
+                  placeholder={t("list.searchPlaceholder")}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                <span className={s.searchKbd} aria-hidden="true">
+                  {shortcutLabel}
+                </span>
+              </div>
+              <div className={s.filterRow}>
+                {GAME_FILTERS.map((key) => {
+                  const label = t(`list.filters.${key}`);
+                  const count = countGame(key);
+                  return (
+                    <button
+                      key={key}
+                      className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
+                      aria-pressed={gameFilter === key}
+                      aria-label={t("list.countLabel", { label, count: String(count) })}
+                      onClick={() => setGameFilter(key)}
+                    >
+                      {label}
+                      <span className={s.num} aria-hidden="true">
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Sommaire : remplace le bandeau de chiffres, qui répétait les
+                comptes des sections sans mener nulle part. Une section vide y
+                reste, grisée, au lieu d'occuper un grand cadre « Vide » plus bas. */}
+            <nav className={s.sectionNav} aria-label={t("list.sectionsNav")}>
+              {sections.map((entry) =>
+                entry.count > 0 ? (
+                  <a
+                    key={entry.key}
+                    href={`#${pageSectionAnchor(entry.key)}`}
+                    className={s.sectionNavLink}
+                    data-tone={entry.key}
+                    // Mène parfois à une section repliée (« Terminés ») : on la
+                    // déplie, sans quoi le lien aboutirait sur un en-tête vide.
+                    onClick={() => setSectionOpen(entry.key, true)}
+                    // Libellé et compte sont deux éléments sans séparateur : le
+                    // nom accessible les collerait (« Mes tournois34 »). Il
+                    // commence par le texte visible (WCAG 2.5.3).
+                    aria-label={t("list.countLabel", { label: entry.navLabel, count: String(entry.count) })}
+                  >
+                    {entry.navLabel}
+                    <span className={s.num} aria-hidden="true">
+                      {entry.count}
+                    </span>
+                  </a>
+                ) : (
+                  <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
+                    {entry.navLabel}
+                    <span className={s.num} aria-hidden="true">
+                      0
+                    </span>
+                    <span className="sr-only"> {t("list.navNone")}</span>
+                  </span>
+                ),
+              )}
+            </nav>
+          </div>
 
           {/* Les paniers reclassés, comme les sections : sinon le bandeau
               annoncerait « À VENIR » un tournoi affiché juste dessous en

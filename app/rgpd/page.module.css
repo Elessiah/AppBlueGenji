@@ -109,6 +109,10 @@
 .dataTable {
   width: 100%;
   border-collapse: collapse;
+  /* Largeurs fixées par l'en-tête : en mise en page automatique, la colonne
+     « Donnée » (sans retour à la ligne) prenait toute la place qu'exigeait son
+     plus long intitulé et ne laissait qu'un filet à la finalité. */
+  table-layout: fixed;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -128,8 +132,25 @@
   font-weight: 400;
 }
 
+.dataTable th:nth-child(1) {
+  width: 20%;
+}
+
+.dataTable th:nth-child(2) {
+  width: 38%;
+}
+
+.dataTable th:nth-child(3) {
+  width: 18%;
+}
+
+.dataTable th:nth-child(4) {
+  width: 24%;
+}
+
 .dataTable td {
   padding: 14px 12px 14px 0;
+  overflow-wrap: break-word;
   vertical-align: top;
   border-bottom: 1px solid var(--line-soft);
   color: var(--ink-mute);
@@ -138,7 +159,6 @@
 .dataTable td:first-child {
   color: var(--ink);
   font-weight: 500;
-  white-space: nowrap;
 }
 
 /* Intitulé d'une cellule en fiche mobile — masqué sur le tableau large. */
@@ -333,9 +353,6 @@
     border-bottom: none;
   }
 
-  .dataTable td:first-child {
-    white-space: normal;
-  }
 
   .cellLabel {
     display: block;
