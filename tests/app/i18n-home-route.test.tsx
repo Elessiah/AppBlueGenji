@@ -93,24 +93,23 @@ describe("sélecteur de langue — sur l'accueil, et sur mobile", () => {
     );
   }
 
-  it("visible sur l'accueil : nom complet et code court, chacun dans sa langue", () => {
+  it("visible sur l'accueil : globe et code, dans la langue visée", () => {
     const fr = render("fr", "/");
     expect(fr).toContain('href="/en"');
     expect(fr).toContain('hrefLang="en"');
-    expect(fr).toMatch(/<span lang="en" class="full">English<\/span><span lang="en" class="short">EN<\/span>/);
+    expect(fr).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span lang="en">EN<\/span>/);
     const en = render("en", "/en");
     expect(en).toContain('href="/"');
-    expect(en).toMatch(/<span lang="fr" class="short">FR<\/span>/);
+    expect(en).toMatch(/<span lang="fr">FR<\/span>/);
   });
 
   it("muet sur une page non traduite", () => {
     expect(render("fr", "/equipes")).toBe("");
   });
 
-  it("sur un écran étroit, le code remplace le nom, et l'en-tête resserre le sélecteur", () => {
+  it("sur un très petit écran, le globe s'efface, et l'en-tête resserre le sélecteur", () => {
     const css = readFileSync(join(__dirname, "..", "..", "components/i18n/LanguageSwitcher.module.css"), "utf8");
-    expect(css).toMatch(/\.short\s*\{\s*display:\s*none;/);
-    expect(css).toMatch(/@media \(max-width: 720px\)\s*\{[\s\S]*\.full\s*\{\s*display:\s*none;[\s\S]*\.short\s*\{\s*display:\s*inline;/);
+    expect(css).toMatch(/@media \(max-width: 380px\)\s*\{\s*\.globe\s*\{\s*display: none;/);
     const header = readFileSync(join(__dirname, "..", "..", "components/cyber/landing/PublicHeader.module.css"), "utf8");
     expect(header).toMatch(/\.actions > a\[hreflang\]\s*\{\s*padding: 10px 6px;/);
   });

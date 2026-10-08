@@ -11,6 +11,7 @@ jest.mock("next/navigation", () => ({
 
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readSource } from "../helpers/read-source";
 import { LanguageSwitcher, switcherHref } from "@/components/i18n/LanguageSwitcher";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -52,7 +53,7 @@ describe("LanguageSwitcher — même page, autre langue", () => {
     const html = renderSwitcher();
     expect(html).toContain('href="/en/regles/swiss"');
     expect(html).toContain('hrefLang="en"');
-    expect(html).toContain('<span lang="en" class="full">English</span>');
+    expect(html).toContain('<span lang="en">EN</span>');
     expect(html).toContain("lire cette page en anglais");
   });
 
@@ -60,22 +61,29 @@ describe("LanguageSwitcher — même page, autre langue", () => {
     mockPathname = "/en/regles";
     const html = renderSwitcher("en");
     expect(html).toContain('href="/regles"');
-    expect(html).toContain('<span lang="fr" class="full">Français</span>');
+    expect(html).toContain('<span lang="fr">FR</span>');
     expect(html).toContain("read this page in French");
   });
 
-  it("en mode compact, montre le globe et le code seul, nom accessible en tête", () => {
+  it("montre le globe décoratif et le code seul, nom accessible en tête", () => {
     mockPathname = "/regles";
     const label = messagesFor("fr").common.languageSwitcher.label;
     const html = renderToStaticMarkup(
       <AppLocaleProvider locale="fr">
-        <LanguageSwitcher label={label} compact className="navTool" />
+        <LanguageSwitcher label={label} className="extra" />
       </AppLocaleProvider>,
     );
-    expect(html).toContain('class="link navTool"');
+    expect(html).toContain('class="link extra"');
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"/);
     expect(html).not.toContain("English");
     expect(html).toContain('<span lang="en">EN</span><span class="sr-only"> — lire cette page en anglais</span>');
+  });
+
+  it("a le style de bouton-outil : cible de 44 px, survol réservé aux pointeurs fins", () => {
+    const css = readSource("components/i18n/LanguageSwitcher.module.css");
+    expect(css).toMatch(/\.link\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;[^}]*border: 1px solid transparent;/);
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.link:hover/);
+    expect(css).toMatch(/\.link:focus-visible\s*\{\s*outline: 2px solid var\(--blue-500\);/);
   });
 
   it("vise l'accueil anglais depuis /", () => {
@@ -96,6 +104,6 @@ describe("LanguageSwitcher — même page, autre langue", () => {
   it("commence son nom accessible par le texte visible (WCAG 2.5.3)", () => {
     mockPathname = "/regles";
     const text = renderSwitcher().replaceAll(/<[^>]+>/g, "");
-    expect(text.startsWith("English")).toBe(true);
+    expect(text.startsWith("EN")).toBe(true);
   });
 });
