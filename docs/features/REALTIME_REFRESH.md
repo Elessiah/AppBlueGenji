@@ -97,6 +97,10 @@ est publique et anonyme, il n'y a personne dont résoudre le palier. Sa cadence
 vit à part (`LANDING_LIVE_INTERVAL_MS`, 5 min) plutôt que d'annoncer une
 distinction qui n'aurait aucun effet.
 
+Le visiteur **sans compte** (`/suivre/tournois/[id]`) passe après les deux
+paliers : pas de flux, une lecture publique relue toutes les 30 s au mieux, à
+une cadence que le serveur allonge selon sa charge — voir `SPECTATOR_VIEW.md`.
+
 Le palier est décidé **par le serveur** à la connexion du flux et annoncé au
 client : il ne se déclare pas.
 
