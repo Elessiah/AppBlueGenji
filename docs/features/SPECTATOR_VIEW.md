@@ -50,7 +50,9 @@ jetterait la requête.
 **Retour vers l'espace connecté, sans bouton de plus** — sur la page sans
 compte, le « Rejoindre » de l'en-tête de la vitrine mène à
 `/connexion?redirect=/tournois/[id]` (`joinHrefFor`), requête comprise, et
-l'ancre `#match-…` s'y ajoute côté navigateur (`JoinLink`, `withRedirectAnchor`) :
+l'ancre `#match-…` s'y ajoute côté navigateur (`JoinLink`, `withRedirectAnchor`,
+relue à `hashchange` et juste avant le geste — une navigation client ne
+déclenche pas `hashchange`) :
 un joueur dont la session a expiré, ou un arbitre déconnecté, retrouve ses
 actions — et son match — après connexion.
 
@@ -155,7 +157,8 @@ au premier succès). Si la toute
 première lecture échoue, le squelette de chargement le dit (« La page réessaie
 seule… ») au lieu de sembler figé. Un `404` (tournoi supprimé ou pas encore publié — même réponse, comme partout)
 n'est plus relu qu'au plafond (10 min) : un lien partagé avant la publication
-s'ouvre seul ensuite ; un `400` (identifiant illisible) arrête tout. Le
+s'ouvre seul ensuite, et la page le dit (« revérifie seule toutes les 10
+minutes ») ; un `400` (identifiant illisible) arrête tout. Le
 démontage coupe la lecture en vol (`AbortController`).
 
 ## Visibilité
