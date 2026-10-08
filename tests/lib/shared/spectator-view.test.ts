@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   jitteredDelayMs,
+  joinHrefFor,
   memberTournamentPath,
   parsePollAfterMs,
   parseTournamentId,
@@ -18,6 +19,7 @@ import {
   spectatorSnapshot,
   spectatorTournamentPath,
   tournamentIdFromMemberPath,
+  tournamentIdFromSpectatorPath,
   type SpectatorLoadSignals,
 } from "@/lib/shared/spectator-view";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
@@ -55,6 +57,26 @@ describe("chemins de la fiche", () => {
     expect(tournamentIdFromMemberPath("/equipes/7")).toBeNull();
     expect(tournamentIdFromMemberPath(null)).toBeNull();
     expect(tournamentIdFromMemberPath(undefined)).toBeNull();
+  });
+});
+
+describe("retour vers l'espace connecté", () => {
+  it("reconnaît la page sans compte d'un tournoi, et elle seule", () => {
+    expect(tournamentIdFromSpectatorPath("/suivre/tournois/12")).toBe(12);
+    expect(tournamentIdFromSpectatorPath("/suivre/tournois/12/")).toBe(12);
+    expect(tournamentIdFromSpectatorPath("/tournois/12")).toBeNull();
+    expect(tournamentIdFromSpectatorPath("/suivre/tournois/abc")).toBeNull();
+    expect(tournamentIdFromSpectatorPath(null)).toBeNull();
+  });
+
+  it("fait ramener « Rejoindre » à la fiche connectée depuis la page sans compte", () => {
+    expect(joinHrefFor("/suivre/tournois/12")).toBe("/connexion?redirect=%2Ftournois%2F12");
+  });
+
+  it("garde la page de connexion seule partout ailleurs", () => {
+    expect(joinHrefFor("/")).toBe("/connexion");
+    expect(joinHrefFor("/classement")).toBe("/connexion");
+    expect(joinHrefFor(null)).toBe("/connexion");
   });
 });
 

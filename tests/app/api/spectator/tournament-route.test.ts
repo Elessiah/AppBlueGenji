@@ -9,7 +9,7 @@ import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
-import { resetSpectatorLoad } from "@/lib/server/spectator-load";
+import { resetSpectatorLoad, spectatorReadsPerMinute } from "@/lib/server/spectator-load";
 import {
   SPECTATOR_MAX_POLL_MS,
   SPECTATOR_POLL_HEADER,
@@ -72,7 +72,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     const res = await GET(req(), params("5"));
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("etag")).toBe('"v42"');
+    expect(res.headers.get("etag")).toMatch(/^"[\w-]{22}"$/);
     expect(res.headers.get(SPECTATOR_POLL_HEADER)).toBe(String(SPECTATOR_RUNNING_POLL_MS));
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("content-type")).toContain("application/json");
@@ -93,8 +93,9 @@ describe("GET /api/spectator/tournaments/[id]", () => {
 
   it("répond 304 sans corps quand le client détient déjà cette version", async () => {
     mockedSnapshot.mockResolvedValue(snapshot());
+    const etag = (await GET(req(), params("5"))).headers.get("etag")!;
 
-    const res = await GET(req("5", { "if-none-match": '"v42"' }), params("5"));
+    const res = await GET(req("5", { "if-none-match": etag }), params("5"));
 
     expect(res.status).toBe(304);
     expect(await res.text()).toBe("");
@@ -103,10 +104,44 @@ describe("GET /api/spectator/tournaments/[id]", () => {
 
   it("reconnaît une empreinte faible ou une liste d'empreintes", async () => {
     mockedSnapshot.mockResolvedValue(snapshot());
+    const etag = (await GET(req(), params("5"))).headers.get("etag")!;
 
-    expect((await GET(req("5", { "if-none-match": 'W/"v42"' }), params("5"))).status).toBe(304);
-    expect((await GET(req("5", { "if-none-match": '"v1", "v42"' }), params("5"))).status).toBe(304);
+    expect((await GET(req("5", { "if-none-match": `W/${etag}` }), params("5"))).status).toBe(304);
+    expect((await GET(req("5", { "if-none-match": `"v1", ${etag}` }), params("5"))).status).toBe(304);
     expect((await GET(req("5", { "if-none-match": '"v41"' }), params("5"))).status).toBe(200);
+  });
+
+  it("garde la même empreinte quand seul un champ retiré au public change", async () => {
+    mockedSnapshot.mockResolvedValueOnce(snapshot());
+    const first = (await GET(req(), params("5"))).headers.get("etag");
+    clearCache();
+    // Code de replay corrigé : nouvelle version pour les membres, rien de neuf pour le public.
+    mockedSnapshot.mockResolvedValueOnce(
+      snapshot({
+        version: "v43",
+        matches: [
+          bracketMatch({
+            id: 1,
+            tournamentId: 5,
+            status: "COMPLETED",
+            maps: [{ mapNumber: 1, replayCode: "SECRET2", team1Score: 3, team2Score: 1 }],
+          }),
+        ],
+      }),
+    );
+    const second = (await GET(req(), params("5"))).headers.get("etag");
+
+    expect(second).toBe(first);
+  });
+
+  it("ne compte dans la charge que les lectures d'un tournoi servi", async () => {
+    mockedSnapshot.mockResolvedValue(null);
+    for (let i = 0; i < 5; i += 1) await GET(req(String(100 + i)), params(String(100 + i)));
+    expect(spectatorReadsPerMinute()).toBe(0);
+
+    mockedSnapshot.mockResolvedValue(snapshot());
+    await GET(req(), params("5"));
+    expect(spectatorReadsPerMinute()).toBe(1);
   });
 
   it("mutualise la lecture : deux visiteurs, une seule passe en base", async () => {

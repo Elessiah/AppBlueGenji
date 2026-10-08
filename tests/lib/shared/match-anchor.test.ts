@@ -77,6 +77,12 @@ describe("tournamentMatchHref", () => {
     expect(tournamentMatchHref(7, 42)).toBe("/tournois/7#match-42");
   });
 
+  it("mène à la page sans compte pour un visiteur sans session, ancre comprise", () => {
+    expect(tournamentMatchHref(7, 42, true)).toBe("/suivre/tournois/7#match-42");
+    expect(tournamentMatchHref(7, null, true)).toBe("/suivre/tournois/7");
+    expect(tournamentMatchHref(7, 42, false)).toBe("/tournois/7#match-42");
+  });
+
   it("se réduit au tournoi sans match à désigner", () => {
     expect(tournamentMatchHref(7)).toBe("/tournois/7");
     expect(tournamentMatchHref(7, null)).toBe("/tournois/7");

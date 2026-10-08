@@ -277,3 +277,26 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     }
   });
 });
+
+describe("liens publics vers un tournoi", () => {
+  it("la vitrine mène le visiteur sans session droit à la page sans compte", () => {
+    const page = readSource("app/page.tsx");
+    expect(page).toContain("canEditCopy={isAdmin} spectator={!user} />");
+    expect(page).toContain("locale={locale} spectator={!user} />");
+    const board = readSource("components/cyber/landing/TournamentBoard.tsx");
+    expect(board).toContain("tournamentMatchHref(featured.id, null, spectator)");
+    expect(board).toContain("tournamentMatchHref(card.id, null, spectator)");
+    expect(board).not.toMatch(/href=\{`\/tournois\/\$\{/);
+    expect(readSource("components/cyber/landing/Hero.tsx")).toContain("spectator={spectator} />");
+    expect(readSource("components/cyber/landing/LiveCard.tsx")).toContain(
+      "tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null, spectator)",
+    );
+  });
+
+  it("« Rejoindre » ramène à la fiche connectée depuis la page sans compte, sans bouton de plus", () => {
+    const header = readSource("components/cyber/landing/PublicHeader.tsx");
+    expect(header).toContain('const joinHref = user ? "/connexion" : joinHrefFor(await requestedPath());');
+    expect(header).toContain("return (await headers()).get(PATHNAME_HEADER);");
+    expect(header).toContain("<LocaleLink href={joinHref}>{t(\"join\")}</LocaleLink>");
+  });
+});

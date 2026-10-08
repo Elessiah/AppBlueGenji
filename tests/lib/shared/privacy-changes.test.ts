@@ -756,7 +756,10 @@ describe("PRIVACY_CHANGES — suivi d'un tournoi sans compte", () => {
     expect(text()).toMatch(/pseudos des joueurs engagés/);
     expect(text()).toMatch(/codes de replay n'y figurent pas/);
     expect(text()).toMatch(/exclue des moteurs de recherche/);
-    expect(text()).toMatch(/adresse IP[^.]*sans être enregistrée/);
+    // La visite reste comptée comme partout : la page ne prétend pas le contraire.
+    expect(text()).toMatch(/comptée par la mesure d'audience, sauf opposition/);
+    expect(text()).toMatch(/adresse IP[^.]*limiter le nombre de lectures, en mémoire/);
+    expect(text()).not.toMatch(/sans être enregistrée/);
     expect(text()).toMatch(/t'opposer/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#suivi-sans-compte"]);
   });

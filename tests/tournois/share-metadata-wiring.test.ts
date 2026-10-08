@@ -120,7 +120,7 @@ describe("garde de l'espace sécurisé", () => {
 
 describe("generateMetadata de la fiche", () => {
   it("rédige l'encart depuis la carte visible", async () => {
-    mockedUser.mockResolvedValue(null);
+    mockedUser.mockResolvedValue(user());
     mockedCard.mockResolvedValue(card());
 
     const meta = await generateMetadata(params("42") as never);
@@ -142,8 +142,8 @@ describe("generateMetadata de la fiche", () => {
     expect(mockedCard).toHaveBeenCalledWith(42, { canManage: true });
   });
 
-  it("traite un visiteur sans session comme un lecteur sans droits", async () => {
-    mockedUser.mockResolvedValue(null);
+  it("passe un membre sans permission comme un lecteur sans droits", async () => {
+    mockedUser.mockResolvedValue(user());
     mockedCard.mockResolvedValue(null);
 
     await generateMetadata(params("42") as never);
@@ -151,8 +151,17 @@ describe("generateMetadata de la fiche", () => {
     expect(mockedCard).toHaveBeenCalledWith(42, { canManage: false });
   });
 
-  it("retombe sur l'encart du site quand le tournoi n'est pas lisible", async () => {
+  it("ne lit pas la carte pour un visiteur sans session : il est redirigé vers /suivre", async () => {
     mockedUser.mockResolvedValue(null);
+
+    const meta = await generateMetadata(params("42") as never);
+
+    expect(mockedCard).not.toHaveBeenCalled();
+    expect(meta.title).toBe("Tournoi");
+  });
+
+  it("retombe sur l'encart du site quand le tournoi n'est pas lisible", async () => {
+    mockedUser.mockResolvedValue(user());
     mockedCard.mockResolvedValue(null);
 
     const meta = await generateMetadata(params("42") as never);
