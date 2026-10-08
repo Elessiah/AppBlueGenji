@@ -311,15 +311,19 @@
   }
 }
 
-/* Lien de la modération : drapeau ambre, comme tout ce qui attend une
-   décision ; le compteur se pose en pastille sur le coin du bouton. */
+/* Lien de la modération : drapeau, compteur en pastille sur le coin. */
 .navTools .navReports {
   gap: 8px;
+}
+
+/* Ambre seulement quand un signalement attend : l'ambre est réservé aux
+   avertissements. À zéro, le drapeau reste un outil neutre. */
+.navTools .navReportsPending {
   color: var(--amber);
 }
 
 @media (hover: hover) {
-  .navTools .navReports:hover {
+  .navTools .navReportsPending:hover {
     color: var(--amber);
     border-color: rgba(var(--amber-rgb), 0.45);
     background: rgba(var(--amber-rgb), 0.08);
@@ -328,6 +332,13 @@
 
 /* Page courante : cadre plein et halo, distinct du simple survol. */
 .navTools .navReports[aria-current="page"] {
+  color: var(--blue-300);
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.12);
+  box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(90, 200, 255, 0.3);
+}
+
+.navTools .navReportsPending[aria-current="page"] {
   color: var(--amber);
   border-color: var(--amber);
   background: rgba(var(--amber-rgb), 0.14);

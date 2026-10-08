@@ -20,8 +20,12 @@
   flex-shrink: 0;
 }
 
-.link:hover {
-  color: var(--blue-300);
+/* Survol réservé aux pointeurs qui survolent : collé après un tap, il
+   passerait pour un état. */
+@media (hover: hover) {
+  .link:hover {
+    color: var(--blue-300);
+  }
 }
 
 /* Nom complet (« English ») sur grand écran, code (« EN ») sur téléphone :

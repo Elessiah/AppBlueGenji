@@ -4,9 +4,8 @@ import { Flag } from "lucide-react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { LogoWithGlow } from "./logo-with-glow";
 import { AccountMenu } from "./account-menu";
-import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
+import { LanguageSwitcher, useSwitchablePath } from "./i18n/LanguageSwitcher";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
-import { isMigratedRoute } from "@/lib/shared/locales";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import { useShellText } from "./i18n/shell-text";
@@ -52,11 +51,13 @@ export function ArenaNav({
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
   const { t } = useShellText();
-  // Le sélecteur se tait sur une route pas encore traduite : décidé ici pour ne
-  // pas rendre un groupe d'outils vide, dont le filet resterait seul.
-  const languageLabel = languageSwitcherLabel && isMigratedRoute(pathname) ? languageSwitcherLabel : null;
-  // Au-delà de 99, la pastille déborderait du drapeau ; le compte exact reste lu.
-  const badge = openReports !== null && openReports > 99 ? "99+" : openReports;
+  // Le sélecteur se tait sur une route pas encore traduite (même décision que
+  // lui) : le savoir d'avance évite un groupe d'outils vide au filet orphelin.
+  const switchable = useSwitchablePath() !== null;
+  const languageLabel = switchable && languageSwitcherLabel ? languageSwitcherLabel : null;
+  // Au-delà de 99, la pastille déborderait du drapeau.
+  const badge = openReports !== null && openReports > 99 ? "99+" : String(openReports);
+  const pending = openReports !== null && openReports > 0;
 
   return (
     <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
@@ -102,18 +103,19 @@ export function ArenaNav({
               {openReports !== null && (
                 <LocaleLink
                   href={REPORTS_ADMIN_PATH}
-                  className={`${s.navTool} ${s.navReports}`}
+                  className={[s.navTool, s.navReports, pending && s.navReportsPending].filter(Boolean).join(" ")}
                   aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
                 >
                   <Flag size={16} strokeWidth={2} aria-hidden="true" />
                   {/* Libellé visible sur grand écran, lu seul en dessous de 1280 px. */}
                   <span className={s.navReportsLabel}>{t("nav.reports")}</span>
-                  {openReports > 0 && (
+                  {pending && (
                     <>
-                      <span className={s.navBadge} aria-hidden="true">
-                        {badge}
-                      </span>
-                      <span className="sr-only">{`, ${openReports} ${t("nav.reportsPending", { count: openReports })}`}</span>
+                      {/* Le nom lu contient le compte affiché (« 99+ » compris) :
+                          « Signalements, 2 à traiter ». */}
+                      <span className="sr-only">, </span>
+                      <span className={s.navBadge}>{badge}</span>
+                      <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
                     </>
                   )}
                 </LocaleLink>

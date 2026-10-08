@@ -113,7 +113,7 @@ describe("coquille en anglais — composants client", () => {
     expect(html).toContain('aria-label="Main navigation"');
     expect(html).toMatch(/aria-current="page"[^>]*>Teams<\/a>/);
     for (const label of ["Players", "Tournaments", "Ranking", "Home", "Reports"]) expect(html).toContain(label);
-    expect(html).toContain('<span class="sr-only">, 2 to review</span>');
+    expect(html).toContain('<span class="sr-only">, </span><span class="navBadge">2</span><span class="sr-only"> to review</span>');
     expect(html).toContain('aria-label="Nova, account menu"');
     // « My team » vit dans le menu du compte (AccountMenuPanel), plus dans la barre.
     expect(html).not.toContain('href="/equipes/7"');

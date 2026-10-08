@@ -83,27 +83,29 @@ describe("ArenaNav — page courante et pictogrammes", () => {
         <ArenaNav pseudo="Nova" avatarUrl={null} openReports={2} />
       </ToastProvider>,
     );
-    expect(html).toContain('<a class="navTool navReports" href="/admin/signalements">');
+    expect(html).toContain('<a class="navTool navReports navReportsPending" href="/admin/signalements">');
     // Pas de `title` : il doublait le nom accessible à la lecture.
     expect(html).not.toContain('title="Signalements"');
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="navReportsLabel">Signalements<\/span>/);
-    // Pastille muette, compte lu séparé du libellé (« Signalements, 2 à traiter »).
-    expect(html).toContain('<span class="navBadge" aria-hidden="true">2</span><span class="sr-only">, 2 à traiter</span>');
+    // Compte lu tel qu'affiché, séparé du libellé (« Signalements, 2 à traiter »).
+    expect(html).toContain('<span class="sr-only">, </span><span class="navBadge">2</span><span class="sr-only"> à traiter</span>');
   });
 
-  it("plafonne la pastille à « 99+ » et garde le compte exact pour la lecture", () => {
+  it("plafonne la pastille à « 99+ », lue telle qu'affichée (WCAG 2.5.3)", () => {
     const html = renderToStaticMarkup(
       <ToastProvider>
         <ArenaNav pseudo="Nova" avatarUrl={null} openReports={142} />
       </ToastProvider>,
     );
-    expect(html).toContain('<span class="navBadge" aria-hidden="true">99+</span><span class="sr-only">, 142 à traiter</span>');
+    expect(html).toContain('<span class="navBadge">99+</span><span class="sr-only"> à traiter</span>');
+    expect(html).not.toContain("142");
   });
 
   it("réserve le survol des outils aux pointeurs qui survolent", () => {
     const css = readSource("components/arena-nav.module.css");
     expect(css).toMatch(/@media \(hover: hover\) \{\s*\.navTools \.navTool:hover/);
-    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.navTools \.navReports:hover/);
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.navTools \.navReportsPending:hover/);
+    expect(readSource("components/i18n/LanguageSwitcher.module.css")).toMatch(/@media \(hover: hover\) \{\s*\.link:hover/);
     expect(css).toMatch(/\.navBadge\s*\{[^}]*color: var\(--cyber-bg-1\);/);
   });
 
@@ -116,7 +118,8 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     );
     expect(html).toContain('<a class="navTool navReports" aria-current="page" href="/admin/signalements">');
     const css = readSource("components/arena-nav.module.css");
-    expect(css).toMatch(/\.navReports\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
+    expect(css).toMatch(/\.navReports\[aria-current="page"\]\s*\{[^}]*border-color: var\(--blue-500\);/);
+    expect(css).toMatch(/\.navReportsPending\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
   });
 
   it("ne rend pas de groupe d'outils vide sur une route pas encore traduite", () => {
@@ -153,6 +156,8 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     );
     expect(html).toContain("navReports");
     expect(html).not.toContain("navBadge");
+    // Rien n'attend : pas d'ambre, réservé aux avertissements.
+    expect(html).not.toContain("navReportsPending");
   });
 });
 

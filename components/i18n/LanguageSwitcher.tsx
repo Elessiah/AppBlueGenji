@@ -28,13 +28,23 @@ export function LanguageSwitcher({
   className,
   compact = false,
 }: Readonly<{ label: string; className?: string; compact?: boolean }>) {
-  const path = splitLocalePrefix(usePathname() ?? "/").path;
+  const path = useSwitchablePath();
   const locale = useAppLocale();
-  if (!isMigratedRoute(path)) return null;
+  if (path === null) return null;
   const target: Locale = locale === "fr" ? "en" : "fr";
   return (
     <SwitcherLink href={localeHref(path, target)} target={target} label={label} className={className} compact={compact} />
   );
+}
+
+/**
+ * Le chemin courant (sans préfixe de langue) s'il a une autre langue, sinon
+ * `null` : la seule décision « le sélecteur parle-t-il ? », partagée avec qui
+ * doit savoir d'avance s'il sera rendu (groupe d'outils de `ArenaNav`).
+ */
+export function useSwitchablePath(): string | null {
+  const path = splitLocalePrefix(usePathname() ?? "/").path;
+  return isMigratedRoute(path) ? path : null;
 }
 
 /** L'adresse de l'autre langue, avec la requête (`a=1`) et l'ancre (`#x`) de la page courante. */
