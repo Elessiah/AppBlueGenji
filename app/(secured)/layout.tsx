@@ -35,8 +35,11 @@ export default async function SecuredLayout({ children }: Readonly<{ children: R
   // exactement ce qu'on veut — c'est ce que lit le robot d'aperçu de Discord.
   if (!user) {
     // Fiche de tournoi : le tournoi se suit sans compte. Chemin et requête sont
-    // ceux posés par le middleware (sans préfixe de langue) ; l'ancre
-    // `#match-…` suit d'elle-même la redirection (le navigateur la conserve).
+    // ceux posés par le middleware (sans préfixe de langue). L'ancre
+    // `#match-…` suit une redirection de navigation complète (le navigateur la
+    // conserve) ; une navigation client la perd — c'est pourquoi les liens de
+    // la vitrine mènent directement à `/suivre/…` (`tournamentHref`,
+    // `tournamentMatchHref`).
     const requestHeaders = await headers();
     const tournamentId = tournamentIdFromMemberPath(requestHeaders.get(PATHNAME_HEADER));
     if (tournamentId !== null) {

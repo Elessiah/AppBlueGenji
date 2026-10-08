@@ -316,7 +316,9 @@ export function RgpdEn({
             match&apos;s caster — what streams and Discord already show —, as well as team logos and, for a solo
             tournament, the avatar of each player taking part (unless they hid it) and their internal account
             number, which carries their podium mark. Replay codes are not shown there: they
-            remain reserved to logged-in members. This page is excluded from search engines (<code>noindex</code>)
+            remain reserved to logged-in members. The page is served from a shared copy, renewed at
+            least every two and a half minutes: a username change, a hidden avatar or an account deletion
+            may show up there with that delay. This page is excluded from search engines (<code>noindex</code>)
             and opens no session. Like any page of the site, its visit is counted by the audience measurement,
             unless you object (see “Audience measurement”); beyond that, the visitor&apos;s IP address is only used
             there, in memory, to limit the number of reads. You can object to your username being displayed (see
