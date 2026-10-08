@@ -52,7 +52,11 @@ export function ArenaNav({
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
   const { t } = useShellText();
-  const showLanguage = Boolean(languageSwitcherLabel) && isMigratedRoute(pathname);
+  // Le sélecteur se tait sur une route pas encore traduite : décidé ici pour ne
+  // pas rendre un groupe d'outils vide, dont le filet resterait seul.
+  const languageLabel = languageSwitcherLabel && isMigratedRoute(pathname) ? languageSwitcherLabel : null;
+  // Au-delà de 99, la pastille déborderait du drapeau ; le compte exact reste lu.
+  const badge = openReports !== null && openReports > 99 ? "99+" : openReports;
 
   return (
     <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
@@ -91,10 +95,10 @@ export function ArenaNav({
               menu du compte. Restent les outils (langue, modération) et le
               compte, séparés par un filet — le groupe n'est rendu que s'il a
               quelque chose à montrer (sinon le filet resterait seul). */}
-          {(showLanguage || openReports !== null) && (
+          {(languageLabel || openReports !== null) && (
             <div className={s.navTools}>
               {/* Même page dans l'autre langue — seulement sur une route traduite. */}
-              {showLanguage && languageSwitcherLabel && <LanguageSwitcher label={languageSwitcherLabel} compact className={s.navTool} />}
+              {languageLabel && <LanguageSwitcher label={languageLabel} compact className={s.navTool} />}
               {openReports !== null && (
                 <LocaleLink
                   href={REPORTS_ADMIN_PATH}
@@ -107,7 +111,7 @@ export function ArenaNav({
                   {openReports > 0 && (
                     <>
                       <span className={s.navBadge} aria-hidden="true">
-                        {openReports}
+                        {badge}
                       </span>
                       <span className="sr-only">{`, ${openReports} ${t("nav.reportsPending", { count: openReports })}`}</span>
                     </>

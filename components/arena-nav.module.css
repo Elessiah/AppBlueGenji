@@ -174,10 +174,14 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.navTools .navTool:hover {
-  color: var(--blue-300);
-  border-color: rgba(90, 200, 255, 0.35);
-  background: rgba(90, 200, 255, 0.06);
+/* Survol réservé aux pointeurs qui survolent : au toucher, l'état resterait
+   collé après le tap et passerait pour la page courante. */
+@media (hover: hover) {
+  .navTools .navTool:hover {
+    color: var(--blue-300);
+    border-color: rgba(90, 200, 255, 0.35);
+    background: rgba(90, 200, 255, 0.06);
+  }
 }
 
 .navTools .navTool:focus-visible {
@@ -314,10 +318,12 @@
   color: var(--amber);
 }
 
-.navTools .navReports:hover {
-  color: var(--amber);
-  border-color: rgba(var(--amber-rgb), 0.45);
-  background: rgba(var(--amber-rgb), 0.08);
+@media (hover: hover) {
+  .navTools .navReports:hover {
+    color: var(--amber);
+    border-color: rgba(var(--amber-rgb), 0.45);
+    background: rgba(var(--amber-rgb), 0.08);
+  }
 }
 
 /* Page courante : cadre plein et halo, distinct du simple survol. */
@@ -362,7 +368,7 @@
   border-radius: 999px;
   border: 2px solid var(--cyber-bg-1);
   background: var(--amber);
-  color: #111;
+  color: var(--cyber-bg-1);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;

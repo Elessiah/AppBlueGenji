@@ -91,6 +91,22 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(html).toContain('<span class="navBadge" aria-hidden="true">2</span><span class="sr-only">, 2 à traiter</span>');
   });
 
+  it("plafonne la pastille à « 99+ » et garde le compte exact pour la lecture", () => {
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={142} />
+      </ToastProvider>,
+    );
+    expect(html).toContain('<span class="navBadge" aria-hidden="true">99+</span><span class="sr-only">, 142 à traiter</span>');
+  });
+
+  it("réserve le survol des outils aux pointeurs qui survolent", () => {
+    const css = readSource("components/arena-nav.module.css");
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.navTools \.navTool:hover/);
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.navTools \.navReports:hover/);
+    expect(css).toMatch(/\.navBadge\s*\{[^}]*color: var\(--cyber-bg-1\);/);
+  });
+
   it("marque la page des signalements comme courante", () => {
     mockPathname = "/admin/signalements";
     const html = renderToStaticMarkup(
