@@ -27,12 +27,15 @@ de liste publique.
   `matcher` du middleware les exclut) : `AuthGate` le relaie côté client
   (`router.replace`, ancre `#match-…` comprise) ;
 - membre **connecté** sur `/suivre/tournois/[id]` → `/tournois/[id]`
-  (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions.
+  (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions. L'encart de la
+  page sans compte ne lit alors pas la carte du tournoi (session mémoïsée pour
+  la requête, la redirection la jetterait).
 
 La langue suit l'adresse (`localeHref`). L'ancre `#match-[id]` traverse la
 redirection serveur (le navigateur la conserve), la requête (`?utm=…`) aussi :
 le middleware la pose à côté du chemin (`x-search`, toujours remplacé), et seule
-une valeur qui commence par `?` est reprise. Le relais client garde les deux.
+une valeur qui commence par `?` est reprise (`forwardedSearch`), dans les deux
+sens. Le relais client garde les deux.
 
 **Liens qui évitent le détour** — la vitrine sait qui la lit : pour un
 visiteur sans session, le tableau des tournois, la carte « en direct » et
@@ -67,10 +70,11 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
   connexion ;
 - **codes de replay masqués** (`MatchMapDetails`) — et retirés de la réponse
   publique (`spectatorSnapshot`) : la politique de confidentialité les réserve
-  aux membres connectés. La réponse publique perd aussi l'identifiant du caster
-  (`casterUserId`) et, sur une sanction BlueGenji
-  Survie, l'arbitre et le motif (texte libre du staff) : elle ne montre que des
-  noms d'engagés, des points et des pseudos à l'antenne ;
+  aux membres connectés. L'identifiant du caster devient
+  `SPECTATOR_HIDDEN_USER_ID` (−1) : la fiche sait qu'un caster est inscrit (son
+  pseudo s'affiche, il compte dans les « prêts » du lancement) sans savoir qui.
+  Sur une sanction BlueGenji Survie, l'arbitre et le motif (texte libre du
+  staff) partent, et la case du motif n'est pas rendue ;
 - **en-tête** : « Accueil » au lieu de « Tous les tournois », pastille
   « Spectateur » (qui dit pourquoi aucun bouton n'apparaît), témoin qui annonce
   la cadence accordée par le serveur. **Aucun bouton vers la connexion** n'est
@@ -109,20 +113,22 @@ lui-même).
   (`lib/server/spectator-snapshot.ts`, `cached`) : au plus une reconstruction
   par durée de vie (15 s au calme, ×1 à ×10 selon la charge), quel que soit le
   nombre de visiteurs. Une écriture ne **réveille** pas les visiteurs sans
-  compte, mais elle **invalide** cette réponse avec l'instantané des membres
-  (`invalidateTournamentSnapshot`) : un tournoi supprimé ou corrigé n'est pas
-  resservi. Un « introuvable » n'entre **pas** dans le cache (le chargeur lève
-  une sentinelle, `cached` ne garde jamais un échec) ;
+  compte et n'**invalide** pas cette réponse : sa durée de vie, allongée sous la
+  charge, est ce qui protège la machine d'un tournoi animé. Seule la
+  **suppression** du tournoi la retire (`invalidateSpectatorSnapshot`,
+  `deletion.ts`). Un « introuvable » n'entre **pas** dans le cache (le chargeur
+  lève une sentinelle, `cached` ne garde jamais un échec) ;
 - en-tête `x-bg-fresh-within-ms` : l'âge maximal de l'affichage (attente entre
-  deux lectures, gigue comprise, **plus** la durée de vie du cache) — c'est lui
-  que le témoin annonce, pour ne pas promettre mieux que le cache ;
+  deux lectures, gigue comprise, **plus** la durée de vie de la réponse servie,
+  celle reçue à sa construction, peut-être sous une charge plus forte) — c'est
+  lui que le témoin annonce, pour ne pas promettre mieux que le cache ;
 - `ETag` = empreinte du **corps public** (et non la version des membres, qui
   bouge avec les champs retirés) ; une relecture sans nouveauté répond **`304`
   sans corps** ;
 - seules les lectures d'un tournoi servi pèsent dans la charge : des
   identifiants au hasard ne ralentissent pas les vrais spectateurs ;
-- plafond par IP (`SPECTATOR_READ_RULE`, 120/min : une salle de LAN derrière
-  une même adresse passe) ; base injoignable → `503` + `Retry-After` de 10 min.
+- plafond par IP (`SPECTATOR_READ_RULE`, 240/min : une salle de LAN d'une
+  centaine d'écrans derrière une même adresse passe, gigue comprise) ; base injoignable → `503` + `Retry-After` de 10 min.
 
 **Côté client** (`app/suivre/tournois/[id]/_lib/spectator-poller.ts`, hors
 React, testé sans navigateur) : ±10 % de gigue, rien n'est relu **onglet
@@ -148,7 +154,9 @@ Changement de **qui lit** la fiche : entrée `2026-10-suivi-tournoi-sans-compte`
 de `PRIVACY_CHANGES` (et son anglais), paragraphe « Suivre un tournoi sans
 compte » de `/rgpd` (`#suivi-sans-compte`), sous-finalité ajoutée au registre
 (T03). Les codes de replay restent aux membres, comme l'arbitre et le motif d'une
-sanction.
+sanction et l'identité du caster. Le numéro de compte interne d'un joueur engagé
+en individuel est public (`soloUserIds`, il porte sa marque du podium, publique)
+et déclaré comme tel.
 La visite est comptée par la mesure d'audience comme sur toute page (sauf
 opposition) ; l'adresse IP ne sert par ailleurs qu'au plafond de débit, en
 mémoire.
