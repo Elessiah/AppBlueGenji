@@ -147,6 +147,16 @@ describe("page sans compte — mise en page", () => {
     await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow("NEXT_REDIRECT /en/tournois/12");
   });
 
+  it("fait suivre la requête au membre renvoyé vers sa fiche, et elle seule", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+    mockSearch = "?utm_source=discord";
+    await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow(
+      "NEXT_REDIRECT /tournois/12?utm_source=discord",
+    );
+    mockSearch = "//evil.test";
+    await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow(/NEXT_REDIRECT \/tournois\/12$/);
+  });
+
   it("sert la page au visiteur sans session, dans le gabarit de la vitrine", async () => {
     const html = renderToStaticMarkup(await SpectatorLayout({ children: <p>plateau</p>, ...params("12") }));
     expect(html).toContain("plateau");
@@ -172,7 +182,14 @@ describe("page sans compte — mise en page", () => {
     expect(getVisibleTournamentCard).toHaveBeenCalledWith(12, { canManage: false });
     expect((meta.openGraph as { url?: string }).url).toBe("/suivre/tournois/12");
     expect(meta.robots).toEqual({ index: false, follow: false });
-    expect(getCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it("ne lit pas la carte pour un membre connecté : il est redirigé vers sa fiche", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+    const meta = await generateMetadata(params("12"));
+
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+    expect(meta.robots).toEqual({ index: false, follow: false });
   });
 
   it("retombe sur l'encart du site pour un tournoi non publié, toujours hors des moteurs", async () => {
@@ -236,6 +253,16 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     );
     expect(html).not.toContain("<a");
     expect(html).toMatch(/class="entity-name [^"]*podium-member/);
+  });
+
+  it("ne laisse pas de case vide pour le motif d'une sanction retiré au public", () => {
+    const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
+    expect(view).toContain("{penalty.reason && <span className={styles.penaltyReason}>{penalty.reason}</span>}");
+  });
+
+  it("oublie la réponse publique d'un tournoi supprimé", () => {
+    const deletion = readSource("lib/server/tournaments/deletion.ts");
+    expect(deletion).toMatch(/publishUpdatedEvent\(tournamentId\);[\s\S]{0,200}invalidateSpectatorSnapshot\(tournamentId\);/);
   });
 
   it("tait les codes de replay, réservés aux membres connectés", () => {

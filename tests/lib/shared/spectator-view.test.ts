@@ -1,11 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  forwardedSearch,
   jitteredDelayMs,
   joinHrefFor,
   memberTournamentPath,
   parsePollAfterMs,
   parseTournamentId,
   SPECTATOR_CACHE_TTL_MS,
+  SPECTATOR_HIDDEN_USER_ID,
   SPECTATOR_LOAD_THRESHOLDS,
   SPECTATOR_MAX_POLL_MS,
   SPECTATOR_MIN_POLL_MS,
@@ -85,6 +87,19 @@ describe("retour vers l'espace connecté", () => {
   });
 });
 
+describe("requête qui suit une redirection", () => {
+  it("reprend une requête", () => {
+    expect(forwardedSearch("?utm_source=discord")).toBe("?utm_source=discord");
+  });
+
+  it("ignore tout ce qui n'en est pas une", () => {
+    expect(forwardedSearch("//evil.test")).toBe("");
+    expect(forwardedSearch("")).toBe("");
+    expect(forwardedSearch(null)).toBe("");
+    expect(forwardedSearch(undefined)).toBe("");
+  });
+});
+
 describe("niveau de charge", () => {
   it("reste calme sous tous les seuils, et quand la boucle n'est pas encore mesurée", () => {
     expect(spectatorLoadLevel(calm)).toBe(0);
@@ -142,8 +157,9 @@ describe("cadence de relecture", () => {
   });
 
   it("annonce un âge maximal qui compte la gigue et le cache partagé", () => {
-    expect(spectatorFreshnessMs(30_000, 0)).toBe(33_000 + SPECTATOR_CACHE_TTL_MS);
-    expect(spectatorFreshnessMs(120_000, 2)).toBe(132_000 + 4 * SPECTATOR_CACHE_TTL_MS);
+    expect(spectatorFreshnessMs(30_000, SPECTATOR_CACHE_TTL_MS)).toBe(33_000 + SPECTATOR_CACHE_TTL_MS);
+    // La durée de vie est celle de la réponse servie, reçue peut-être sous une charge plus forte.
+    expect(spectatorFreshnessMs(30_000, spectatorCacheTtlMs(3))).toBe(33_000 + 10 * SPECTATOR_CACHE_TTL_MS);
   });
 
   it("allonge aussi la durée de vie de la réponse partagée", () => {
@@ -202,7 +218,7 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(JSON.stringify(out)).not.toContain("ABC123");
   });
 
-  it("retire l'identifiant du caster, garde les entrées solo pour la marche du podium", () => {
+  it("masque qui caste sans masquer qu'un caster est inscrit, garde les entrées solo", () => {
     const snapshot = tournamentSnapshot({
       soloUserIds: { 4: 9 },
       matches: [bracketMatch({ id: 1, casterUserId: 33, casterPseudo: "Caster" })],
@@ -210,7 +226,10 @@ describe("ce que lit le visiteur sans compte", () => {
     const out = spectatorSnapshot(snapshot);
     // Le podium est public : un joueur solo garde sa marche sur la page sans compte.
     expect(out.soloUserIds).toEqual({ 4: 9 });
-    expect(out.matches[0].casterUserId).toBeNull();
+    // Un caster est inscrit (le lancement le compte dans les « prêts »), sans dire qui.
+    expect(out.matches[0].casterUserId).toBe(SPECTATOR_HIDDEN_USER_ID);
+    expect(SPECTATOR_HIDDEN_USER_ID).not.toBe(SPECTATOR_VIEWER_CONTEXT.viewerUserId);
+    expect(spectatorSnapshot(tournamentSnapshot({ matches: [bracketMatch({ casterUserId: null })] })).matches[0].casterUserId).toBeNull();
     // Le pseudo du caster reste : il est à l'antenne.
     expect(out.matches[0].casterPseudo).toBe("Caster");
   });

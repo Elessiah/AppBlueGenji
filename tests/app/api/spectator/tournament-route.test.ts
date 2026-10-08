@@ -12,6 +12,7 @@ import { SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
 import { resetSpectatorLoad, spectatorReadsPerMinute } from "@/lib/server/spectator-load";
 import {
   SPECTATOR_FRESHNESS_HEADER,
+  SPECTATOR_HIDDEN_USER_ID,
   SPECTATOR_MAX_POLL_MS,
   SPECTATOR_POLL_HEADER,
   SPECTATOR_PRE_LAUNCH_POLL_MS,
@@ -189,7 +190,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     const body = (await (await GET(req(), params("5"))).json()) as TournamentSnapshot;
 
     expect(body.soloUserIds).toEqual({ 3: 77 });
-    expect(body.matches[0].casterUserId).toBeNull();
+    expect(body.matches[0].casterUserId).toBe(SPECTATOR_HIDDEN_USER_ID);
   });
 
   it("répond 404 pour un tournoi absent ou pas encore publié, sans dire lequel", async () => {

@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments-service");
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { cached, clearCache } from "@/lib/server/cache";
 import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
-import { invalidateTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
+import { invalidateSpectatorSnapshot, invalidateTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
 /** Réponse publique mutualisée : ce qui entre dans le cache partagé, et ce qui n'y entre pas. */
@@ -40,14 +40,31 @@ describe("getSpectatorPayload", () => {
     expect(probe).toHaveBeenCalledTimes(1);
   });
 
-  it("est oubliée avec l'instantané des membres : une écriture n'est pas resservie périmée", async () => {
+  it("survit aux écritures : sa durée de vie protège la machine d'un tournoi animé", async () => {
     mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "v1" }));
     await getSpectatorPayload(5, 60_000);
 
     invalidateTournamentSnapshot(5);
     await getSpectatorPayload(5, 60_000);
 
+    expect(mockedSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("part avec le tournoi supprimé", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "v1" }));
+    await getSpectatorPayload(5, 60_000);
+
+    invalidateSpectatorSnapshot(5);
+    await getSpectatorPayload(5, 60_000);
+
     expect(mockedSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it("retient la durée de vie reçue à sa construction", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    expect((await getSpectatorPayload(5, 150_000))?.ttlMs).toBe(150_000);
+    // Déjà en cache : la durée demandée ensuite ne la change pas.
+    expect((await getSpectatorPayload(5, 15_000))?.ttlMs).toBe(150_000);
   });
 
   it("laisse remonter une vraie panne", async () => {

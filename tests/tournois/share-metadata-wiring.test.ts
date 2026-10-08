@@ -91,7 +91,7 @@ describe("garde de l'espace sécurisé", () => {
     // (`app/suivre/tournois/[id]/layout.tsx`), le robot d'aperçu y voit le tournoi.
     expect(SECURED_LAYOUT.match(/redirect\(/g)).toHaveLength(1);
     expect(SECURED_LAYOUT).toContain(
-      "redirect(localeHref(`${spectatorTournamentPath(tournamentId)}${redirectSearch(requestHeaders)}`, await requestLocale()));",
+      "redirect(localeHref(`${spectatorTournamentPath(tournamentId)}${forwardedSearch(requestHeaders.get(SEARCH_HEADER))}`, await requestLocale()));",
     );
     expect(SECURED_LAYOUT).toContain("tournamentIdFromMemberPath(requestHeaders.get(PATHNAME_HEADER))");
   });
