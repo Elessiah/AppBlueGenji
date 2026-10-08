@@ -101,7 +101,7 @@ haut de trois signaux :
 | --- | --- |
 | Retard de la boucle d'évènements (p99 sur 10 s, pas de 20 ms de la sonde retranché) | 50 / 100 / 200 ms |
 | Flux SSE ouverts (membres) | 100 / 200 / 300 |
-| Lectures publiques par minute | 600 / 1 200 / 2 400 |
+| Lectures publiques par minute (fenêtres d'une minute exacte, la précédente au prorata) | 600 / 1 200 / 2 400 |
 
 La cadence est multipliée par 1, 2, 4 puis 10, plafonnée à 10 min. Sous la
 charge, ce sont donc les visiteurs sans compte qui reculent, jamais le staff ni
@@ -138,13 +138,15 @@ lui-même).
   centaine d'écrans derrière une même adresse passe, gigue comprise) ; base injoignable → `503` +
   `Retry-After` du double de la cadence au niveau du moment
   (`spectatorUnavailableRetryMs` : 1 min au calme, 10 au pire), puis recul
-  doublé par le relecteur.
+  doublé par le relecteur — le `Retry-After` n'est qu'un plancher : des `503`
+  répétés à l'identique ne figent pas l'attente.
 
 **Côté client** (`app/suivre/tournois/[id]/_lib/spectator-poller.ts`, hors
 React, testé sans navigateur) : ±10 % de gigue, rien n'est relu **onglet
 caché** (`useClientPower`), la lecture due part au retour ; après un échec, le
 `Retry-After` du serveur ou le **double de la dernière attente** (recul
-cumulatif jusqu'à 10 min, la cadence reprend au premier succès). Si la toute
+cumulatif jusqu'à 10 min, jamais moins que le `Retry-After`, la cadence reprend
+au premier succès). Si la toute
 première lecture échoue, le squelette de chargement le dit (« La page réessaie
 seule… ») au lieu de sembler figé. Un `404` arrête tout (tournoi supprimé ou pas encore publié — même réponse, comme partout).
 
@@ -174,7 +176,11 @@ mémoire.
 ## Tests
 
 - `tests/lib/shared/spectator-view.test.ts` — chemins, niveaux, cadences,
-  instantané allégé, contexte sans droit.
+  instantané allégé, contexte sans droit, et **inventaire des champs** : chaque
+  champ de `TournamentSnapshot`, `BracketMatch`, d'une map, d'un rapport de
+  score et d'une sanction y est classé (`public`, `retiré`, `parcouru`) par un
+  `satisfies Record<keyof …>` — un champ ajouté à ces types casse le contrôle
+  de types tant qu'on n'a pas décidé s'il part en public.
 - `tests/lib/server/spectator-load.test.ts` — signaux de charge.
 - `tests/app/api/spectator/tournament-route.test.ts` — route publique (`304`,
   mutualisation, plafond, `503`, aucune session lue).
