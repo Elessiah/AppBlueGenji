@@ -362,9 +362,8 @@ describe("liens publics vers un tournoi", () => {
     expect(readSource("components/cyber/landing/Hero.tsx")).toContain("spectator={spectator} />");
     expect(page).toContain("locale={locale} spectator={!user} />");
     expect(readSource("components/cyber/landing/LeaderCal.tsx")).toContain("spectator={spectator} />");
-    expect(readSource("components/cyber/landing/CalendarCard.tsx")).toContain(
-      "tournamentMatchHref(event.tournamentId, null, spectator)",
-    );
+    const calendar = readSource("components/cyber/landing/CalendarCard.tsx");
+    expect(calendar).toContain("<LocaleLink className={styles.link} href={tournamentMatchHref(event.tournamentId, null, spectator)}>");
     expect(readSource("components/cyber/landing/LiveCard.tsx")).toContain(
       "tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null, spectator)",
     );
@@ -376,5 +375,15 @@ describe("liens publics vers un tournoi", () => {
     expect(header).toContain("return { path: requestHeaders.get(PATHNAME_HEADER), search: requestHeaders.get(SEARCH_HEADER) };");
     expect(header).toContain("<JoinLink href={joinHref}>{t(\"join\")}</JoinLink>");
     expect(readSource("components/cyber/landing/JoinLink.tsx")).toContain("withRedirectAnchor(href, globalThis.location.hash)");
+  });
+});
+
+describe("textes de la fiche", () => {
+  it("les deux espaces posent les mêmes textes, par un seul composant", () => {
+    expect(readSource("app/(secured)/tournois/[id]/layout.tsx")).toContain("<TournamentSheetText locale={await requestLocale()}>");
+    const spectator = readSource("app/suivre/tournois/[id]/layout.tsx");
+    expect(spectator).toContain("<TournamentSheetText locale={locale}>");
+    expect(spectator).not.toContain("TournamentPageTextProvider");
+    expect(spectator).not.toContain("TournamentActionsTextProvider");
   });
 });
