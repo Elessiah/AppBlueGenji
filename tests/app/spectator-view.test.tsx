@@ -288,6 +288,9 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={600_000} />)).toContain("toutes les 10 minutes au plus");
     // Une relecture ratée ne parle pas de flux à rouvrir.
     expect(spectator(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).toContain("La dernière mise à jour");
+    // Pas de flux à rouvrir : « Hors ligne », jamais « Reconnexion… ».
+    expect(spectator(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).toContain("Hors ligne");
+    expect(spectator(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).not.toContain("Reconnexion");
     expect(member(<LiveIndicator isLive={false} tier="STANDARD" />)).toContain("flux temps réel");
     // Sans cadence imposée : celle du palier, comme avant.
     expect(member(<LiveIndicator isLive tier="STANDARD" />)).toContain("toutes les 20 secondes au plus");
@@ -360,6 +363,9 @@ describe("fiche commune sous SpectatorViewProvider", () => {
       expect(messages.page.fatal.spectatorRecheck).toContain("{minutes}");
       expect(messages.live.spectatorNotFoundTitle).toContain("{minutes}");
     }
+    // « au plus » : en anglais aussi, une borne haute de l'attente.
+    expect(enTournament.page.fatal.spectatorRecheck).toContain("at most every {minutes} minutes");
+    expect(enTournament.live.spectatorNotFoundTitle).toContain("at most every {minutes} minutes");
   });
 });
 

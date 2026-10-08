@@ -317,10 +317,25 @@ describe("relecteur de la page sans compte", () => {
     expect(h.fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("n'arme aucune minuterie si l'onglet est déjà caché à la réponse", async () => {
+  it("attend le retour sur l'onglet pour la première lecture d'un onglet caché", async () => {
     const h = harness([ok(tournamentSnapshot())], { hidden: true });
     await h.poller.start();
+    expect(h.fetchMock).not.toHaveBeenCalled();
 
+    h.setHidden(false);
+    h.poller.attentionChanged();
+    await h.advance(0);
+    expect(h.fetchMock).toHaveBeenCalledTimes(1);
+    expect(h.last().isLive).toBe(true);
+  });
+
+  it("n'arme aucune minuterie si l'onglet est caché à la réponse", async () => {
+    const h = harness([ok(tournamentSnapshot())]);
+    const pending = h.poller.start();
+    h.setHidden(true);
+    await pending;
+
+    expect(h.fetchMock).toHaveBeenCalledTimes(1);
     expect(h.timers.size).toBe(0);
   });
 
