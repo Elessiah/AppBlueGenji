@@ -102,7 +102,7 @@ export default function TeamsPage() {
   } as React.CSSProperties;
 
   return (
-    <div style={accentStyle}>
+    <div className="page-wide" style={accentStyle}>
       <BgCanvas rgb={ACCENT_RGB} />
 
       <header className={s.page}>
@@ -161,53 +161,56 @@ export default function TeamsPage() {
             </div>
           </div>
 
-          <div className={s.toolbar}>
-            <AnnuaireSearchField
-              label="Rechercher une équipe"
-              placeholder="Rechercher une équipe, un tag, une région…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <div className={s.filters}>
-              {(
-                [
-                  ["all", "Toutes", teams.length],
-                  ["ow", "Overwatch", countOw],
-                  ["mr", "Marvel Rivals", countMr],
-                ] as const
-              ).map(([k, label, n]) => (
-                <button
-                  key={k}
-                  className={`${s.chip} ${gameFilter === k ? s.chipOn : ""}`}
-                  onClick={() => setGameFilter(k)}
-                >
-                  {label}
-                  <span className={s.num}>{n}</span>
-                </button>
-              ))}
+          {/* Recherche, jeux et tri : deux rangées, une seule sur grand écran. */}
+          <div className={s.controls}>
+            <div className={s.toolbar}>
+              <AnnuaireSearchField
+                label="Rechercher une équipe"
+                placeholder="Rechercher une équipe, un tag, une région…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <div className={s.filters}>
+                {(
+                  [
+                    ["all", "Toutes", teams.length],
+                    ["ow", "Overwatch", countOw],
+                    ["mr", "Marvel Rivals", countMr],
+                  ] as const
+                ).map(([k, label, n]) => (
+                  <button
+                    key={k}
+                    className={`${s.chip} ${gameFilter === k ? s.chipOn : ""}`}
+                    onClick={() => setGameFilter(k)}
+                  >
+                    {label}
+                    <span className={s.num}>{n}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className={s.sortRow}>
-            <span>{filtered.length} équipe{filtered.length > 1 ? "s" : ""}</span>
-            <div className={s.sortOpts}>
-              <span style={{ color: "var(--ink-dim)" }}>Trier :</span>
-              {(
-                [
-                  ["rank", "Classement"],
-                  ["name", "Nom"],
-                  ["wins", "Victoires"],
-                  ["members", "Effectif"],
-                ] as const
-              ).map(([k, l]) => (
-                <button
-                  key={k}
-                  className={`${s.sortBtn} ${sort === k ? s.sortBtnOn : ""}`}
-                  onClick={() => setSort(k)}
-                >
-                  {l}
-                </button>
-              ))}
+            <div className={s.sortRow}>
+              <span>{filtered.length} équipe{filtered.length > 1 ? "s" : ""}</span>
+              <div className={s.sortOpts}>
+                <span style={{ color: "var(--ink-dim)" }}>Trier :</span>
+                {(
+                  [
+                    ["rank", "Classement"],
+                    ["name", "Nom"],
+                    ["wins", "Victoires"],
+                    ["members", "Effectif"],
+                  ] as const
+                ).map(([k, l]) => (
+                  <button
+                    key={k}
+                    className={`${s.sortBtn} ${sort === k ? s.sortBtnOn : ""}`}
+                    onClick={() => setSort(k)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

@@ -2069,6 +2069,21 @@ html {
   }
 }
 
+/* Pages d'annuaire larges (`.page-wide` : liste des tournois, annuaire des
+   équipes) : sur un grand écran (2K et au-delà), la colonne de 1200 px laissait
+   plus de la moitié de l'écran vide et repliait les commandes sur deux rangées.
+   Au-delà de 1800 px, la colonne s'élargit jusqu'à 1680 px et le `.container`
+   intérieur la suit ; les formulaires et fiches gardent leur colonne. */
+@media (min-width: 1800px) {
+  .page-shell:has(.page-wide) {
+    width: min(1680px, calc(100vw - max(80px, var(--a11y-tab-gutter))));
+  }
+
+  .page-wide .container {
+    width: calc(100% - 48px);
+  }
+}
+
 /* Survol des cartes partenaires (page /partenaires) — remplace le hover JS
    qui cassait le rendu (handlers d'événement interdits en Server Component). */
 .sponsor-slot:hover {

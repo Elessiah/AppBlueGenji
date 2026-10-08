@@ -119,6 +119,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `BACKGROUND_NEON_REFRESH.md` — Fonds noirs à éclats bleutés, néon de navigation.
 - `TYPOGRAPHY.md` — Polices hébergées, plancher de taille.
 - `RESPONSIVE_TABLES.md` — Tableaux `.table-row` libellés par `data-label`.
+- `WIDE_SCREEN_LAYOUT.md` — Annuaires élargis sur grand écran (`.page-wide`, `.controls`), colonnes du tableau /rgpd.
 - `MODAL_DIALOGS.md` — Modales : portail, `useDialogBehavior`, `useBackdropDismiss`.
 - `NUMBER_INPUT.md` — `<NumberInput>`.
 - `CHECKBOX_STYLES.md` — Cases à cocher et radios.
