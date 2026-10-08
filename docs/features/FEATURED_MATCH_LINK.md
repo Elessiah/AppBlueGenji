@@ -300,15 +300,18 @@ les 7 s (`LANDING_CAROUSEL_INTERVAL_MS`), par un `setTimeout` relancé à chaque
 changement — un geste du lecteur redonne le délai entier. Il ne tourne qu'avec
 `decorativeMotion` (régime de charge : figé onglet caché, page sans focus,
 mouvement réduit, machine à la peine — `CLIENT_POWER_MODES.md`) et s'arrête sous
-le pointeur ou le focus **de toute la carte** : l'enveloppe `.hold`
+la souris ou le focus **clavier** (`:focus-visible`) **de toute la carte** — ni
+le toucher ni le focus laissé par un clic, que rien ne viendrait relâcher : le
+carrousel resterait figé, bouton « Pause » affiché. L'enveloppe `.hold`
 (`display: contents`) porte les écouteurs, la plaque de lien couvrant les
 matchs. Le match affiché est suivi **par identifiant** (`resolveCarouselIndex`) :
 un sondage de `useLandingLive` qui retire un match terminé ne décale pas la
 carte sur son voisin.
 
 **Commandes** (pied de carte, au-dessus de la plaque) : précédent, position
-« 2 / 5 », suivant, et pause (WCAG 2.2.2) — affichée seulement quand le défilement
-automatique est permis. La position n'est annoncée (`aria-live="polite"`) que
+« 2 / 5 », suivant, et pause (WCAG 2.2.2) — toujours rendue dès deux matchs :
+le régime de charge fige le défilement à chaque perte de focus de la fenêtre, et
+un bouton qui disparaîtrait alors ferait perdre le focus clavier. La position n'est annoncée (`aria-live="polite"`) que
 défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
 
 ## Fichiers

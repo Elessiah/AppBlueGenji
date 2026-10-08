@@ -248,16 +248,18 @@ function CarouselControls({ carousel }: Readonly<{ carousel: MatchCarousel }>) {
       <button type="button" className={styles.carouselButton} onClick={() => carousel.go(1)} aria-label={t("live.carousel.next")}>
         <ChevronRight size={14} aria-hidden="true" />
       </button>
-      {carousel.canRotate && (
-        <button
-          type="button"
-          className={styles.carouselButton}
-          onClick={carousel.togglePaused}
-          aria-label={carousel.paused ? t("live.carousel.play") : t("live.carousel.pause")}
-        >
-          {carousel.paused ? <Play size={12} aria-hidden="true" /> : <Pause size={12} aria-hidden="true" />}
-        </button>
-      )}
+      {/* Toujours rendu dès deux matchs : le régime de charge fige le défilement
+          à chaque perte de focus de la fenêtre, et un bouton qui disparaîtrait
+          alors ferait perdre le focus clavier et décalerait les commandes. Il
+          tient la préférence du lecteur, que le défilement tourne ou non. */}
+      <button
+        type="button"
+        className={styles.carouselButton}
+        onClick={carousel.togglePaused}
+        aria-label={carousel.paused ? t("live.carousel.play") : t("live.carousel.pause")}
+      >
+        {carousel.paused ? <Play size={12} aria-hidden="true" /> : <Pause size={12} aria-hidden="true" />}
+      </button>
     </div>
   );
 }

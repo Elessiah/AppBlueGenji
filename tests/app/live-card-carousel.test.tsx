@@ -150,4 +150,11 @@ describe("useMatchCarousel — régime de charge", () => {
     expect(source).toContain("const { decorativeMotion } = useClientPower();");
     expect(source).toContain("const rotating = canRotate && !paused && !hovered && !focused;");
   });
+
+  it("ne se laisse retenir ni par le toucher ni par le focus d'un clic", () => {
+    // Rien ne relâcherait la prise : le carrousel resterait figé sous « Pause ».
+    expect(source).toContain('if (event.pointerType === "mouse") setHovered(true);');
+    expect(source).toContain('setFocused(event.target.matches(":focus-visible"))');
+    expect(source).not.toContain("onMouseEnter");
+  });
 });

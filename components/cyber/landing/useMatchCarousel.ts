@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FocusEvent } from "react";
+import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 
 /** Durée d'affichage d'un match avant de passer au suivant. */
@@ -28,17 +28,21 @@ export type MatchCarousel = {
   count: number;
   /** Le défilement tourne réellement en ce moment. */
   rotating: boolean;
-  /** Le défilement automatique est permis par le régime de charge. */
-  canRotate: boolean;
   /** Le lecteur a mis le défilement en pause (bouton). */
   paused: boolean;
   go: (delta: number) => void;
   togglePaused: () => void;
-  /** Survol ou focus dans la carte : on ne fait pas défiler sous le lecteur. */
+  /**
+   * Survol à la souris ou focus clavier dans la carte : on ne fait pas défiler
+   * sous le lecteur. Ni le toucher ni le focus laissé par un clic ne retiennent
+   * le carrousel : rien ne viendrait le relâcher (pas de sortie du pointeur au
+   * doigt, focus gardé tant qu'on ne clique pas ailleurs), et le bouton
+   * « Reprendre » paraîtrait sans effet.
+   */
   holdHandlers: {
-    onMouseEnter: () => void;
-    onMouseLeave: () => void;
-    onFocus: () => void;
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => void;
+    onPointerLeave: (event: PointerEvent<HTMLElement>) => void;
+    onFocus: (event: FocusEvent<HTMLElement>) => void;
     onBlur: (event: FocusEvent<HTMLElement>) => void;
   };
 };
@@ -78,7 +82,6 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
     index,
     count,
     rotating,
-    canRotate,
     paused,
     go: (delta) => {
       if (count === 0) return;
@@ -86,9 +89,14 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
     },
     togglePaused: () => setPaused((value) => !value),
     holdHandlers: {
-      onMouseEnter: () => setHovered(true),
-      onMouseLeave: () => setHovered(false),
-      onFocus: () => setFocused(true),
+      onPointerEnter: (event) => {
+        if (event.pointerType === "mouse") setHovered(true);
+      },
+      onPointerLeave: (event) => {
+        if (event.pointerType === "mouse") setHovered(false);
+      },
+      // `:focus-visible` : focus posé au clavier, pas par un clic de souris.
+      onFocus: (event) => setFocused(event.target.matches(":focus-visible")),
       onBlur: (event) => {
         // Le focus passe d'un contrôle de la carte à un autre : on garde la main.
         if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
