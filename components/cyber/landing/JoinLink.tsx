@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { withRedirectAnchor } from "@/lib/shared/spectator-view";
 
@@ -11,14 +11,34 @@ import { withRedirectAnchor } from "@/lib/shared/spectator-view";
  * jamais, s'y ajoute ici après l'hydratation — le premier rendu reste celui du
  * serveur, sans écart.
  */
-export function JoinLink({ href, ...rest }: Readonly<ComponentProps<typeof LocaleLink> & { href: string }>) {
+export function JoinLink({
+  href,
+  onPointerDown,
+  onFocus,
+  ...rest
+}: Readonly<ComponentProps<typeof LocaleLink> & { href: string }>) {
   const [target, setTarget] = useState(href);
+  const update = useCallback(() => setTarget(withRedirectAnchor(href, globalThis.location.hash)), [href]);
   useEffect(() => {
-    const update = () => setTarget(withRedirectAnchor(href, globalThis.location.hash));
     update();
     globalThis.addEventListener("hashchange", update);
     return () => globalThis.removeEventListener("hashchange", update);
-  }, [href]);
+  }, [update]);
   // Les propriétés du bouton (`CyberButton asChild`, classe et style) passent.
-  return <LocaleLink {...rest} href={target} />;
+  // Une navigation client (`pushState`) ne déclenche pas `hashchange` : l'ancre
+  // est relue aussi juste avant le geste (pointeur, ou focus avant Entrée).
+  return (
+    <LocaleLink
+      {...rest}
+      href={target}
+      onPointerDown={(event) => {
+        update();
+        onPointerDown?.(event);
+      }}
+      onFocus={(event) => {
+        update();
+        onFocus?.(event);
+      }}
+    />
+  );
 }

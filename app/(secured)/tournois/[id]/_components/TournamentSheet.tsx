@@ -18,6 +18,7 @@ import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
+import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { LiveFailure } from "../_lib/live-state";
 import { useMapError } from "../_lib/error-map";
@@ -139,6 +140,11 @@ function TournamentFatal({ fatal }: Readonly<{ fatal: LiveFailure }>) {
             des deux (`docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`). */}
         {expired ? t("page.fatal.expiredText") : t("page.fatal.notFoundText")}
       </p>
+      {spectator && !expired ? (
+        <p className={styles.fatalText}>
+          {t("page.fatal.spectatorRecheck", { minutes: SPECTATOR_NOT_FOUND_RECHECK_MINUTES })}
+        </p>
+      ) : null}
       <CyberButton asChild variant="primary">
         <LocaleLink href={backHref}>{backLabel}</LocaleLink>
       </CyberButton>
@@ -336,7 +342,7 @@ export type TournamentSheetSource = {
   /**
    * Cadence de relecture annoncée par le témoin quand elle ne suit pas le
    * palier — celle que le serveur accorde au visiteur sans compte. `null` :
-   * plus de relecture (tournoi introuvable, avec `fatal`).
+   * tournoi introuvable (avec `fatal`), relu au plafond ou plus du tout.
    */
   cadenceMs?: number | null;
   /** La première lecture a échoué ; une autre suivra (page sans compte). */

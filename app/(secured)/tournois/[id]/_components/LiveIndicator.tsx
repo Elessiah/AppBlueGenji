@@ -2,6 +2,7 @@
 
 import { Pill } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
+import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { LiveFailure } from "../_lib/live-state";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -70,7 +71,11 @@ export function LiveIndicator({ isLive, tier, cadenceMs, fatal = null }: Readonl
   let title = spectator ? t("live.retryTitle") : t("live.reconnectingTitle");
   if (fatal) {
     label = t("live.offline");
-    title = t(`live.fatal.${fatal}`);
+    // Sans compte, un introuvable est relu au plafond : rien n'est fini.
+    title =
+      spectator && fatal === "TOURNAMENT_NOT_FOUND"
+        ? t("live.spectatorNotFoundTitle", { minutes: SPECTATOR_NOT_FOUND_RECHECK_MINUTES })
+        : t(`live.fatal.${fatal}`);
   } else if (isLive) {
     label = t("live.upToDate");
     title = t("live.upToDateTitle", { cadence: cadenceLabel(text, cadenceMs ?? REFRESH_CADENCE[tier].pushCoalesceMs) });

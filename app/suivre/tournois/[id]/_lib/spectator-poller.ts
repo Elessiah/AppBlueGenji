@@ -137,7 +137,7 @@ export function createSpectatorPoller(
       if (disposed) return;
 
       if (response.status === 404 || response.status === 400) {
-        commit({ ...current, isLive: false, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null });
+        commit({ ...current, isLive: false, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null, freshnessMs: null });
         schedule(notFoundRetryMs(response.status));
         return;
       }

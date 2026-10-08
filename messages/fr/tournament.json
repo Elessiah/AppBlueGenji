@@ -38,6 +38,7 @@
       "notFoundTitle": "Tournoi introuvable",
       "expiredText": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
       "notFoundText": "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public.",
+      "spectatorRecheck": "La page revérifie seule toutes les {minutes} minutes : s'il ouvre au public, il s'affichera.",
       "relogin": "Se reconnecter",
       "back": "Retour aux tournois",
       "backHome": "Retour à l'accueil"
@@ -113,6 +114,7 @@
       "UNAUTHORIZED": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
       "TOURNAMENT_NOT_FOUND": "Ce tournoi n'est plus accessible : il n'y a plus rien à suivre."
     },
+    "spectatorNotFoundTitle": "Ce tournoi n'est pas accessible pour l'instant. La page revérifie seule toutes les {minutes} minutes.",
     "alerts": {
       "SCORE_TO_CONFIRM": "Score à confirmer",
       "MATCH_READY": "Ton match est prêt",

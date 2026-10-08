@@ -161,6 +161,9 @@ export const SPECTATOR_PRE_LAUNCH_POLL_MS = 120_000;
 /** Plafond, quelle que soit la charge. */
 export const SPECTATOR_MAX_POLL_MS = 600_000;
 
+/** Un tournoi introuvable est relu au plafond (pas encore publié ?) : en minutes, pour le dire. */
+export const SPECTATOR_NOT_FOUND_RECHECK_MINUTES = SPECTATOR_MAX_POLL_MS / 60_000;
+
 /**
  * Intervalle avant la prochaine lecture.
  *
