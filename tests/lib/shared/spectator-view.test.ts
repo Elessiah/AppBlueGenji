@@ -13,6 +13,8 @@ import {
   SPECTATOR_LOAD_THRESHOLDS,
   SPECTATOR_MAX_POLL_MS,
   SPECTATOR_MIN_POLL_MS,
+  SPECTATOR_NOT_FOUND_RECHECK_MINUTES,
+  SPECTATOR_NOT_FOUND_RETRY_MS,
   SPECTATOR_PRE_LAUNCH_POLL_MS,
   SPECTATOR_RUNNING_POLL_MS,
   SPECTATOR_VIEWER_CONTEXT,
@@ -198,6 +200,14 @@ describe("cadence de relecture", () => {
     expect(spectatorCacheTtlMs(3)).toBe(10 * SPECTATOR_CACHE_TTL_MS);
     // Une réponse ne vit jamais plus longtemps que l'attente d'un visiteur au calme ne le justifie.
     expect(spectatorCacheTtlMs(0)).toBeLessThan(SPECTATOR_RUNNING_POLL_MS);
+  });
+});
+
+describe("tournoi introuvable", () => {
+  it("est relu au plafond, et l'attente annoncée couvre la gigue", () => {
+    expect(SPECTATOR_NOT_FOUND_RETRY_MS).toBe(SPECTATOR_MAX_POLL_MS);
+    // 10 min + 10 % de gigue au plus : la page promet 11 minutes, pas 10.
+    expect(SPECTATOR_NOT_FOUND_RECHECK_MINUTES).toBe(11);
   });
 });
 

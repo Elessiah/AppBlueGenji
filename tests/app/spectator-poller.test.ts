@@ -6,6 +6,7 @@ import {
 } from "@/app/suivre/tournois/[id]/_lib/spectator-poller";
 import {
   SPECTATOR_MAX_POLL_MS,
+  SPECTATOR_NOT_FOUND_RETRY_MS,
   SPECTATOR_POLL_HEADER,
   SPECTATOR_RUNNING_POLL_MS,
   SPECTATOR_VIEWER_CONTEXT,
@@ -221,12 +222,12 @@ describe("relecteur de la page sans compte", () => {
     expect(h.last()).toMatchObject({ fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null, freshnessMs: null });
   });
 
-  it("s'arrête sur un identifiant illisible (400)", async () => {
+  it("relit aussi au plafond une adresse illisible (400)", async () => {
     const h = harness([{ status: 400, body: { error: "INVALID_TOURNAMENT_ID" } }]);
     await h.poller.start();
 
     expect(h.last()).toMatchObject({ fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null });
-    expect(h.timers.size).toBe(0);
+    expect([...h.timers.values()].map((timer) => timer.at)).toEqual([SPECTATOR_NOT_FOUND_RETRY_MS]);
   });
 
   it("recule après un refus du serveur, en suivant son Retry-After", async () => {

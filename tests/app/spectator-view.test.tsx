@@ -295,7 +295,7 @@ describe("fiche commune sous SpectatorViewProvider", () => {
 
   it("dit qu'un tournoi introuvable est revérifié, sans compte seulement", () => {
     const notFound = <LiveIndicator isLive={false} tier="STANDARD" cadenceMs={null} fatal="TOURNAMENT_NOT_FOUND" />;
-    expect(spectator(notFound)).toContain("revérifie seule toutes les 10 minutes");
+    expect(spectator(notFound)).toContain("revérifie seule toutes les 11 minutes au plus");
     expect(member(notFound)).toContain("plus rien à suivre");
     const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     expect(sheet).toContain("{spectator && !expired ? (");
