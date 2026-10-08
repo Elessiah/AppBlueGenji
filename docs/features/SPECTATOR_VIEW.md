@@ -58,7 +58,10 @@ actions — et son match — après connexion.
 La fiche est **commune** : `TournamentSheet`
 (`app/(secured)/tournois/[id]/_components/TournamentSheet.tsx`) reçoit sa
 source (`TournamentSheetSource`) — `useTournamentLive` dans l'espace connecté,
-`useSpectatorTournament` sur la page sans compte. Toutes ses actions se
+`useSpectatorTournament` sur la page sans compte. Ses textes aussi :
+`TournamentSheetText` (même dossier), posé par les deux mises en page — un
+espace de textes ajouté à la fiche s'y ajoute, et les deux pages le reçoivent.
+Toutes ses actions se
 décident déjà sur les droits du lecteur ; le contexte du visiteur sans compte
 n'en ouvre aucun (ni inscription, ni score, ni signalement, ni outil du staff).
 
