@@ -599,3 +599,52 @@ describe("getLandingLive — libellé de la manche", () => {
     expect(live?.currentMatch?.roundLabel).toBe("Manche 1");
   });
 });
+
+describe("getLandingLive — carrousel des matchs", () => {
+  beforeEach(() => {
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+  });
+
+  it("range les matchs jouables et datés dans l'ordre chronologique", async () => {
+    const hour = 3_600_000;
+    await mockDb([
+      matchRow({ id: 100, start_at: new Date(Date.now() + 3 * hour) }),
+      matchRow({ id: 101, status: "COMPLETED" }),
+      matchRow({ id: 102, start_at: new Date(Date.now() + hour) }),
+      matchRow({ id: 103, launched_at: new Date(Date.now() - 60_000), launch_pairing: "11:12" }),
+      matchRow({ id: 104, referee_scheduling: 1 }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    // Le match lancé sans horaire passe devant ; terminé et « À planifier » écartés.
+    expect(live?.matches?.map((match) => match.id)).toEqual([103, 102, 100]);
+    expect(live?.currentMatch?.id).toBe(103);
+  });
+
+  it("donne à chaque match du carrousel sa propre phase et ses engagés", async () => {
+    await mockDb([
+      matchRow({ id: 100, start_at: new Date(Date.now() + 3_600_000), team1_name: "Gamma" }),
+      matchRow({ id: 101, ...ON_AIR, live_url: "https://twitch.tv/bg" }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+    const byId = new Map(live?.matches?.map((match) => [match.id, match]));
+
+    expect(byId.get(101)?.liveState).toBe("LIVE");
+    expect(byId.get(101)?.launchPhase).toBe("LAUNCHED");
+    expect(byId.get(100)?.launchPhase).toBe("SCHEDULED");
+    expect(byId.get(100)?.team1Name).toBe("Gamma");
+    // Le match mis en avant est le même objet que celui du carrousel.
+    expect(live?.currentMatch).toBe(byId.get(101));
+  });
+
+  it("rend un carrousel vide quand aucun match ne s'y prête", async () => {
+    await mockDb([matchRow({ id: 100, referee_scheduling: 1 }), matchRow({ id: 101, status: "COMPLETED" })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.matches).toEqual([]);
+    expect(live?.currentMatch).toBeNull();
+  });
+});

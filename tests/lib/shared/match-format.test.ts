@@ -371,7 +371,7 @@ describe("match-format — une seule écriture de la notation", () => {
     // Le format lu est celui **du match**, résolu côté serveur : le tournoi en
     // joue deux en « BlueGenji Survie », et l'étiquette d'une demi-finale ne
     // doit pas venir de la qualification.
-    expect(code).toContain("currentMatch?.matchFormat");
+    expect(code).toContain("match.matchFormat");
   });
 
   it("rend bien type + nombre, sur tout le domaine de saisie", () => {
