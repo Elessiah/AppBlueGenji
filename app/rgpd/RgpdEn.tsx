@@ -297,7 +297,8 @@ export function RgpdEn({
           </p>
           <p>
             Since October 2026, a score is entered <strong>map by map</strong>: each map carries the{" "}
-            <strong>replay code</strong> of the game, which makes it possible to watch it again in game — and so
+            <strong>replay code</strong> of the game (the referees may do without it when the replay is lost), which
+            makes it possible to watch it again in game — and so
             to read there the in-game identifiers of the players present, including a BattleTag hidden on the
             site. These codes are visible to the site&apos;s logged-in members on the tournament page once
             recorded by the referees or retained as the result, so that a match streamed live and one that is not

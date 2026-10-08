@@ -10,6 +10,24 @@ dans le tournoi.
 - Rendu : `app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx`
 - Écriture serveur : `lib/server/tournaments/admin.ts`
 
+## Le score se saisit map par map, et seulement ainsi
+
+**Demande du 2026-10-08** : l'ancien système de score (deux steppers, un score
+posé à la main) a disparu ; il ne reste que la saisie **map par map**
+(`MAP_SCORES.md`). Le dialogue n'affiche plus de champ de score : la liste de
+maps (`MapScoreList`) s'ouvre sur une ligne vierge et le score du match se lit,
+dérivé, sous la liste. Les routes refusent un corps `team1Score` / `team2Score`
+sans maps (`MAP_LIST_EMPTY`) ; le service ne connaît que trois saisies — maps,
+forfait, double forfait (`AdminScoreEntry`, `AdminResolveEntry`).
+
+**Décision de l'utilisateur (2026-10-08)** : pour l'arbitrage seul, le **code de
+replay est facultatif** (replay perdu, partie hors client) — le champ s'intitule
+« Code de replay (facultatif) », un code saisi reste contrôlé (motif du jeu,
+unicité), et le détail de la map affiche « Pas de code de replay » à sa place.
+Les engagés, eux, fournissent toujours un code. Tous les matchs en production
+ayant été saisis map par map, aucun chemin de lecture d'un score « sans détail »
+n'est gardé (`mapsMatchStoredScore`, `dropStaleFinalMaps` retirés).
+
 ## Deux actions, deux routes
 
 Le dialogue propose deux gestes qu'il ne faut pas confondre — ce sont deux
@@ -29,9 +47,11 @@ validation est ce qui fait avancer le tournoi.
 `decideScoreForm` (pur) décide seul de ce qui est permis ; l'interface ne fait
 qu'afficher ses refus, et le serveur applique les mêmes règles.
 
-### Un match jamais joué s'ouvre sur des champs vides
+### Un match jamais joué s'ouvre sans score
 
-Le dialogue affichait autrefois « 0 – 0 » sur un match sans le moindre score.
+Le dialogue s'ouvre sur une ligne de map vierge, et le score dérivé reste vide
+tant qu'aucune map n'est renseignée (« Saisis au moins une map jouée »).
+Historique : le dialogue affichait autrefois « 0 – 0 » sur un match sans le moindre score.
 C'était un score **inventé**, et il était immédiatement enregistrable. Or
 `hasScoreInput` (`lib/shared/match-lock.ts`) compte « un score même nul » comme
 une saisie : ce 0-0 accidentel **verrouillait définitivement la manche
@@ -139,16 +159,15 @@ verrouillé, focus rendu au bouton déclencheur à la fermeture. Il se déclare
 vaut « Valider le résultat » — l'issue attendue d'une saisie de score,
 l'enregistrement intermédiaire restant un geste délibéré.
 
-Les deux côtés du score partagent le même composant `ScoreStepper` : les
-boutons `−` / `+` portent un `aria-label` nommant l'équipe, et le champ signale
-`aria-invalid` sur une valeur illisible ou hors plage — mais jamais sur un champ
-vide, qui n'est pas une erreur.
+Les champs de score sont ceux de la liste de maps (`MapScoreList`,
+`<NumberInput>`), un refus rattaché à son champ (`useFieldErrors`) — jamais sur
+une ligne vierge, qui n'est pas une erreur.
 
 ## Ouverture sur une proposition d'équipe en attente
 
 Face à une **équipe fantôme**, la confirmation d'un score proposé n'arrive jamais : personne ne s'y connecte. L'arbitrage devait alors ouvrir le dialogue sur des champs vides et recopier le score que les joueurs avaient déjà saisi.
 
-`pendingScoreProposal` (`_lib/score-form.ts`) rend la proposition **seule** en attente, et `scoreFormStateFor` ouvre le dialogue dessus : un clic sur « Valider le résultat » la confirme. Le bouton de la carte devient « Valider le score proposé », et le dialogue dit d'où viennent les chiffres.
+`pendingScoreProposal` (`_lib/score-form.ts`) rend la proposition **seule** en attente, et le dialogue s'ouvre sur ses maps (`initialAdminMaps`) : un clic sur « Valider le résultat » la confirme. Le bouton de la carte devient « Valider le score proposé », et le dialogue dit d'où viennent les chiffres.
 
 Pas de pré-remplissage quand :
 

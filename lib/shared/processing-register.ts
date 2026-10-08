@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-06";
+export const REGISTER_UPDATED_AT = "2026-10-08";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -391,7 +391,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataCategories: [
       "Appartenance à une équipe et rôles d'équipe",
       "Inscriptions, scores, forfaits, pénalités (avec motif et arbitre auteur), classements",
-      "Détail map par map d'un match : score et code de replay de chaque map (le replay montre en jeu les identifiants des joueurs, BattleTag masqué compris), compte qui l'a saisi",
+      "Détail map par map d'un match : score et code de replay de chaque map (facultatif quand l'arbitrage saisit la map, replay perdu ; le replay montre en jeu les identifiants des joueurs, BattleTag masqué compris), compte qui l'a saisi",
     ],
     sensitiveData: "Aucune",
     retention: [

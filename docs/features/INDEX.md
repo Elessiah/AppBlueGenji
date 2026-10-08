@@ -25,7 +25,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `FINISHED_TOURNAMENT_RECONCILIATION.md` — Corriger un tournoi terminé : le classement se rejoue, le tournoi ne se rouvre pas.
 - `SCORE_EDIT_DIALOG.md` — Dialogue d'arbitrage : « Enregistrer » (avancement) vs « Valider le résultat » (propagation).
 - `PLAYER_SCORE_ENTRY.md` — Saisie, confirmation et contestation du score par un joueur ; forfait sur la manche.
-- `MAP_SCORES.md` — Saisie du score map par map (code de replay + score de map), score du match dérivé dans le circuit existant.
+- `MAP_SCORES.md` — Saisie du score map par map, seule saisie (arbitrage compris, code de replay facultatif pour lui), score du match dérivé dans le circuit existant.
 - `TOURNAMENT_PREVIEW.md` — Aperçu du plateau pendant les inscriptions (staff et cast), sans écriture.
 - `SEEDING_ORDER.md` — Ordre de seeding aux flèches ↑ / ↓, figé au coup d'envoi.
 - `ENTRANT_REMOVAL.md` — Retrait d'un engagé, jusqu'au coup d'envoi seulement.

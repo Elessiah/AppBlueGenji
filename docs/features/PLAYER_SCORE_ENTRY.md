@@ -94,8 +94,9 @@ du tournoi (`POST /api/tournaments/[id]/forfeit`).
   lecteur (`playerReportView`), valeurs d'ouverture, conversion vers le contrat
   de la route, libellé du bouton, ligne d'état, ouverture de la modale.
 - `app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx` — la modale.
-- `_components/ScoreStepper.tsx` + `ScoreDialog.module.css` — partagés avec
-  `AdminScoreDialog` (une seule implémentation du stepper et du gabarit).
+- `_components/MapScoreList.tsx` + `ScoreDialog.module.css` — partagés avec
+  `AdminScoreDialog` (une seule saisie map par map, un seul gabarit ;
+  `ScoreStepper` retiré le 2026-10-08 avec l'ancien score à la main).
 - `_lib/player-score-context.tsx` — droit et ouverture diffusés par contexte
   jusqu'à `MatchRow`, au lieu des quatre props (brouillons, saisie, envoi,
   droit) que les six vues du plateau relayaient.

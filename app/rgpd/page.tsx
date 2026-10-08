@@ -403,7 +403,8 @@ function RgpdFr({
           </p>
           <p>
             Depuis octobre 2026, un score se saisit <strong>map par map</strong> : chaque map
-            porte le <strong>code de replay</strong> de la partie, qui permet de la revoir en
+            porte le <strong>code de replay</strong> de la partie (l'arbitrage peut s'en passer
+            quand le replay est perdu), qui permet de la revoir en
             jeu — et donc d'y lire les identifiants de jeu des joueurs présents, y compris un
             BattleTag masqué sur le site. Ces codes
             sont visibles des membres connectés du site sur la fiche du tournoi une fois
