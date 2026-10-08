@@ -78,6 +78,15 @@ function touchProbe(now: number): void {
   check(LOOP_PROBE_IDLE_MS);
 }
 
+/** Relève le centile de la fenêtre écoulée, puis repart de zéro. */
+function sampleLoopDelay(): void {
+  if (histogram === null) return;
+  // Le centile est en nanosecondes.
+  const p99 = histogram.percentile(99) / 1e6 - LOOP_DELAY_RESOLUTION_MS;
+  lastLoopDelayMs = Number.isFinite(p99) && p99 > 0 ? p99 : 0;
+  histogram.reset();
+}
+
 /**
  * Retard de boucle au 99ᵉ centile, en millisecondes. La sonde n'est armée
  * qu'avec les lectures publiques, et se désarme après
@@ -88,15 +97,6 @@ function touchProbe(now: number): void {
  * (`LOOP_DELAY_RESOLUTION_MS`) y figure toujours — un processus au repos lit
  * ~20 ms. Il est retranché : seuls comptent les retards en plus.
  */
-/** Relève le centile de la fenêtre écoulée, puis repart de zéro. */
-function sampleLoopDelay(): void {
-  if (histogram === null) return;
-  // Le centile est en nanosecondes.
-  const p99 = histogram.percentile(99) / 1e6 - LOOP_DELAY_RESOLUTION_MS;
-  lastLoopDelayMs = Number.isFinite(p99) && p99 > 0 ? p99 : 0;
-  histogram.reset();
-}
-
 function loopDelayMs(now: number): number | null {
   // Toute mesure compte comme activité : une sonde armée par une lecture qui
   // n'aboutit pas (404, 503) se désarme aussi.

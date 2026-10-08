@@ -14,13 +14,10 @@ import {
   spectatorTournamentPath,
 } from "@/lib/shared/spectator-view";
 import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
-import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
-import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
-import { TournamentPageTextProvider } from "@/components/i18n/tournament-page-text";
-import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
 import { SpectatorViewProvider } from "@/components/spectator-view";
+import { TournamentSheetText } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
 
 type LayoutProps = {
   params: Promise<{ id: string }>;
@@ -76,15 +73,13 @@ export default async function SpectatorTournamentLayout({
   const catalog = locale === "en" ? messagesFor(locale) : null;
   return (
     <TournamentsTextProvider locale={locale} messages={catalog ? tournamentsClientMessages(catalog) : undefined}>
-      <TournamentPageTextProvider locale={locale} messages={catalog ? tournamentPageMessages(catalog) : undefined}>
-        <TournamentActionsTextProvider locale={locale} messages={catalog ? tournamentActionsMessages(catalog) : undefined}>
-          <SpectatorViewProvider>
-            <PublicPageShell>
-              <div className="page-shell">{children}</div>
-            </PublicPageShell>
-          </SpectatorViewProvider>
-        </TournamentActionsTextProvider>
-      </TournamentPageTextProvider>
+      <TournamentSheetText locale={locale}>
+        <SpectatorViewProvider>
+          <PublicPageShell>
+            <div className="page-shell">{children}</div>
+          </PublicPageShell>
+        </SpectatorViewProvider>
+      </TournamentSheetText>
     </TournamentsTextProvider>
   );
 }

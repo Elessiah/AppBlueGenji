@@ -47,8 +47,6 @@ export type SpectatorPollerEnv = {
 export type SpectatorPoller = {
   /** Première lecture, tout de suite. */
   start: () => Promise<void>;
-  /** Relecture immédiate. */
-  load: () => Promise<void>;
   /** L'onglet a changé de visibilité. */
   attentionChanged: () => void;
   dispose: () => void;
@@ -158,7 +156,6 @@ export function createSpectatorPoller(
 
   return {
     start: load,
-    load,
     attentionChanged() {
       if (disposed) return;
       if (env.isHidden()) {

@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
-import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
 import { memberTournamentPath } from "@/lib/shared/spectator-view";
-import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
-import { TournamentPageTextProvider } from "@/components/i18n/tournament-page-text";
-import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
-import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
+import { TournamentSheetText } from "./_components/TournamentSheetText";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -31,21 +27,7 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
   });
 }
 
-/**
- * Pose les textes de la fiche : rien en français (déjà dans le paquet),
- * l'espace `tournament` (sans ses parties serveur) sous `/en` seulement.
- */
+/** Pose les textes de la fiche (`TournamentSheetText`, communs à la page sans compte). */
 export default async function TournamentDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const locale = await requestLocale();
-  const catalog = locale === "en" ? messagesFor(locale) : null;
-  const messages = catalog ? tournamentPageMessages(catalog) : undefined;
-  // Gestes (lot 8b) : refus, boutons, fenêtres d'action — anglais sous `/en` seulement.
-  const actions = catalog ? tournamentActionsMessages(catalog) : undefined;
-  return (
-    <TournamentPageTextProvider locale={locale} messages={messages}>
-      <TournamentActionsTextProvider locale={locale} messages={actions}>
-        {children}
-      </TournamentActionsTextProvider>
-    </TournamentPageTextProvider>
-  );
+  return <TournamentSheetText locale={await requestLocale()}>{children}</TournamentSheetText>;
 }

@@ -15,6 +15,20 @@ import { JoinLink } from "./JoinLink";
 import styles from "./PublicHeader.module.css";
 
 /**
+ * Chemin et requête demandés, posés par le middleware (`x-pathname`,
+ * `x-search`). Vides hors requête (rendu de test) : « Rejoindre » mène alors à
+ * la page de connexion seule.
+ */
+async function requestedLocation(): Promise<{ path: string | null; search: string | null }> {
+  try {
+    const requestHeaders = await headers();
+    return { path: requestHeaders.get(PATHNAME_HEADER), search: requestHeaders.get(SEARCH_HEADER) };
+  } catch {
+    return { path: null, search: null };
+  }
+}
+
+/**
  * En-tête public des pages vitrine (landing, asso, bot…).
  *
  * À gauche : le menu burger (`PublicNavMenu`) puis la marque — le menu est placé
@@ -31,20 +45,6 @@ import styles from "./PublicHeader.module.css";
  * Server component : lit la session via `getCurrentUser()` (retombe sur `null`
  * si la session est absente ou invalide).
  */
-/**
- * Chemin et requête demandés, posés par le middleware (`x-pathname`,
- * `x-search`). Vides hors requête (rendu de test) : « Rejoindre » mène alors à
- * la page de connexion seule.
- */
-async function requestedLocation(): Promise<{ path: string | null; search: string | null }> {
-  try {
-    const requestHeaders = await headers();
-    return { path: requestHeaders.get(PATHNAME_HEADER), search: requestHeaders.get(SEARCH_HEADER) };
-  } catch {
-    return { path: null, search: null };
-  }
-}
-
 export async function PublicHeader() {
   const user = await getCurrentUser().catch(() => null);
   // L'équipe n'alimente qu'une entrée du menu du compte : une lecture ratée
