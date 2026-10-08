@@ -359,6 +359,9 @@
   grid-area: 1 / 1;
   opacity: 0;
   visibility: hidden;
+  /* Le match sortant reste peint le temps du fondu : ses liens ne doivent pas
+     intercepter un clic destiné au match entrant. */
+  pointer-events: none;
   transition:
     opacity 0.35s ease,
     visibility 0s linear 0.35s;
@@ -367,9 +370,21 @@
 .slideActive {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
   transition:
     opacity 0.35s ease,
     visibility 0s linear 0s;
+}
+
+/* Pied à commandes : à 320 px, l'affordance et les commandes ne tiennent pas
+   sur une ligne — les commandes passent dessous, calées à droite. */
+.footerCarousel {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.footerCarousel .carouselControls {
+  margin-left: auto;
 }
 
 .footerHint {

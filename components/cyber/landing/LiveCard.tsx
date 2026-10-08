@@ -403,7 +403,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
           matchs, les commandes du carrousel prennent la droite du pied.
         */}
         {matches.length > 1 ? (
-          <div className={styles.footer}>
+          <div className={`${styles.footer} ${styles.footerCarousel}`}>
             <span className={styles.footerHint} aria-hidden="true">
               <span>{footerHint}</span>
               <span className={styles.footerArrow}>→</span>
