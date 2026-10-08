@@ -44,7 +44,6 @@ describe("sélection de texte sur les contrôles", () => {
   });
 
   it.each([
-    "app/(secured)/tournois/[id]/_components/ScoreStepper.tsx",
     "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx",
     "app/(secured)/tournois/creer/PhaseCard.tsx",
     "app/association/BureauSection.tsx",

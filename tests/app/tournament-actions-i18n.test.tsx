@@ -80,6 +80,7 @@ import { EntrantContactsPanel } from "@/app/(secured)/tournois/[id]/_components/
 import { GhostRegistrationDialog } from "@/app/(secured)/tournois/[id]/_components/GhostRegistrationDialog";
 import { IssueReportDialog } from "@/app/(secured)/tournois/[id]/_components/IssueReportDialog";
 import { MatchLiveDialog } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchReplayDialog } from "@/app/(secured)/tournois/[id]/_components/MatchReplayDialog";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
@@ -216,6 +217,8 @@ describe("table des refus (error-map)", () => {
   it("le français est celui d'avant le lot, code par code", () => {
     expect(ERROR_MESSAGES).toEqual(referenceErrors.errors);
     expect(Object.keys(ERROR_MESSAGES)).toHaveLength(referenceErrors.count);
+    // Parti avec la saisie du score à la main (`MAP_SCORES.md`) : `MAP_LIST_EMPTY` le remplace.
+    expect(ERROR_MESSAGES).not.toHaveProperty("MISSING_SCORES_OR_FORFEIT");
     expect(UNKNOWN_ERROR_MESSAGE).toBe(referenceErrors.unknown);
   });
 
@@ -447,6 +450,57 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const locked = renderPage("en", <MatchRow match={versus} adminResolvable onOpenAdminModal={noop} scoreLocked roundNumber={2} />);
     expectNoFrench(locked);
     expect(locked).toContain("Score locked");
+  });
+
+  it("détail des maps : une map posée sans code dit « Pas de code de replay », sans bouton de copie", () => {
+    const maps = [
+      { mapNumber: 1, team1Score: 2, team2Score: 1, replayCode: "ABC123" },
+      { mapNumber: 2, team1Score: 0, team2Score: 2, replayCode: "" },
+    ];
+    const ui = <MapResultList maps={maps} team1Name="Alpha" team2Name="Bravo" label="Maps" />;
+    const fr = renderPage("fr", ui);
+    expect(fr).toContain("Pas de code de replay");
+    expect(fr).toContain("ABC123");
+    // Un seul bouton de copie : celui de la map qui a un code.
+    expect(fr.match(/<button\b/g)).toHaveLength(1);
+    expect(fr).toContain('aria-label="Copier le code de replay de la map 1"');
+    expect(fr).not.toContain("Copier le code de replay de la map 2");
+    expect(fr).not.toMatch(/<code[^>]*><\/code>/);
+    const en = renderPage("en", ui);
+    expectNoFrench(en);
+    expect(en).toContain("No replay code");
+    expect(en.match(/<button\b/g)).toHaveLength(1);
+    expect(en).not.toContain("Copy the replay code of map 2");
+  });
+
+  it("détail des maps : toutes les maps ont leur code, aucune mention d'absence", () => {
+    const maps = [{ mapNumber: 1, team1Score: 2, team2Score: 0, replayCode: "ABC123" }];
+    const fr = renderPage("fr", <MapResultList maps={maps} team1Name="Alpha" team2Name="Bravo" label="Maps" />);
+    expect(fr).not.toContain("Pas de code de replay");
+    expect(fr.match(/<button\b/g)).toHaveLength(1);
+  });
+
+  it("score (arbitrage) : une ligne de map d'emblée, au code facultatif, sans steppers", () => {
+    const ui = () => <AdminScoreDialog match={versus} onClose={noop} onSubmitted={noop} />;
+    const fr = render("fr", ui());
+    expect(fr).toContain("Code de replay (facultatif)");
+    expect(fr).toContain("Arbitrage : le code de replay est facultatif");
+    expect(fr).not.toContain("Ajouter une map");
+    expect(fr).not.toContain("admin-score-team1");
+    const en = render("en", ui());
+    expect(en).toContain("Replay code (optional)");
+    expect(en).toContain("Referees: the replay code is optional");
+    expectNoFrench(en);
+  });
+
+  it("score (engagé) : le code de replay reste exigé", () => {
+    const fr = render(
+      "fr",
+      <PlayerScoreDialog tournamentId={1} match={versus} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />,
+    );
+    expect(fr).toContain("Code de replay");
+    expect(fr).not.toContain("(facultatif)");
+    expect(fr).not.toContain("le code de replay est facultatif");
   });
 
   it.each<[string, () => ReactElement]>([

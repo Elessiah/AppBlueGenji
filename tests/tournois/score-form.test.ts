@@ -218,7 +218,7 @@ describe("scoreBlockerMessage", () => {
   });
 
   it("nomme les autres refus en clair", () => {
-    expect(scoreBlockerMessage("INCOMPLETE", null)).toBe("Renseigne les deux scores.");
+    expect(scoreBlockerMessage("INCOMPLETE", null)).toBe("Saisis au moins une map jouée.");
     expect(scoreBlockerMessage("DRAW", null)).toContain("vainqueur");
     expect(scoreBlockerMessage("ALREADY_DECIDED", null)).toContain("Valider le résultat");
   });

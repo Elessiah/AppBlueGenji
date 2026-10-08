@@ -17,7 +17,6 @@ import {
   trimTrailingBlankMaps,
   isMapComplete,
   mapWinnerSide,
-  mapsMatchStoredScore,
   normalizeReplayCode,
   parseMapListBody,
   sameMapLists,
@@ -182,13 +181,6 @@ describe("saisie et affichage", () => {
     expect(canAddMap(null, mapsFor(0, 0, FREE_FORMAT_MAP_LIMIT))).toBe(false);
   });
 
-  it("le détail ne s'affiche que s'il explique le score stocké (match d'avant les maps, score corrigé)", () => {
-    const maps = mapsFor(3, 1);
-    expect(mapsMatchStoredScore(maps, 3, 1)).toBe(true);
-    expect(mapsMatchStoredScore(maps, 3, 0)).toBe(false);
-    expect(mapsMatchStoredScore([], null, null)).toBe(false);
-  });
-
   it("compare deux listes au code normalisé près", () => {
     const a: MatchMapInput[] = [{ replayCode: "abc123", team1Score: 1, team2Score: 0 }];
     expect(sameMapLists(a, [{ replayCode: "ABC123", team1Score: 1, team2Score: 0 }])).toBe(true);
@@ -305,17 +297,19 @@ describe("progressiveMapRows — lignes une à une au fil du format (demande du 
   };
   /** Rejoue une saisie ligne à ligne : chaque map remplit la dernière ligne affichée. */
   const play = (format: MatchFormat, results: Array<() => ReturnType<typeof win>>) => {
-    let rows = progressiveMapRows(format, "OW", [], 1);
+    let rows = progressiveMapRows(format, "OW", []);
     for (const next of results) {
       expect(isMapTouched(rows[rows.length - 1])).toBe(false);
-      rows = progressiveMapRows(format, "OW", [...rows.slice(0, -1), next()], 1);
+      rows = progressiveMapRows(format, "OW", [...rows.slice(0, -1), next()]);
     }
     return rows;
   };
 
-  it("commence par une seule ligne vierge (engagé), aucune pour l'arbitrage", () => {
-    expect(progressiveMapRows(FT2, "OW", [], 1)).toEqual([emptyMap()]);
-    expect(progressiveMapRows(FT2, "OW", [], 0)).toEqual([]);
+  it("commence par une seule ligne vierge, engagé comme arbitrage", () => {
+    expect(progressiveMapRows(FT2, "OW", [])).toEqual([emptyMap()]);
+    expect(progressiveMapRows(FT2, "OW", [], { requireReplayCode: false })).toEqual([emptyMap()]);
+    // Une liste faite de seules lignes vierges revient à une ligne.
+    expect(progressiveMapRows(FT2, "OW", [emptyMap(), emptyMap()])).toEqual([emptyMap()]);
   });
 
   it("FT2 2-0 : deux lignes, pas de troisième", () => {
@@ -338,14 +332,14 @@ describe("progressiveMapRows — lignes une à une au fil du format (demande du 
     const four = play(BO5_DRAWS, [() => win(1), () => win(2), () => win(1), () => win(2)]);
     expect(four).toHaveLength(5);
     expect(isMapTouched(four[4])).toBe(false);
-    const five = progressiveMapRows(BO5_DRAWS, "OW", [...four.slice(0, -1), drawn()], 1);
+    const five = progressiveMapRows(BO5_DRAWS, "OW", [...four.slice(0, -1), drawn()]);
     expect(five).toHaveLength(5);
     expect(checkMapList(BO5_DRAWS, "OW", five, { decisive: true }).error).toBeNull();
   });
 
   it("une ligne incomplète n'ouvre pas la suivante", () => {
     const partial = { replayCode: "ABC123", team1Score: 2, team2Score: Number.NaN };
-    expect(progressiveMapRows(FT2, "OW", [partial], 1)).toEqual([partial]);
+    expect(progressiveMapRows(FT2, "OW", [partial])).toEqual([partial]);
     expect(isMapComplete(partial, "OW")).toBe(false);
     expect(isMapComplete({ ...partial, replayCode: "AB", team2Score: 0 }, "OW")).toBe(false);
   });
@@ -353,14 +347,14 @@ describe("progressiveMapRows — lignes une à une au fil du format (demande du 
   it("une retouche qui tranche plus tôt retire les lignes vierges, garde les renseignées", () => {
     const [a, b] = [win(1), win(2)];
     // 1-1 en FT2 : la troisième ligne est vierge.
-    const open = progressiveMapRows(FT2, "OW", [a, b], 1);
+    const open = progressiveMapRows(FT2, "OW", [a, b]);
     expect(open).toHaveLength(3);
     // La map 2 corrigée en victoire de l'équipe 1 : 2-0, la ligne vierge s'en va.
-    const fixed = progressiveMapRows(FT2, "OW", [a, { ...b, team1Score: 2, team2Score: 0 }, open[2]], 1);
+    const fixed = progressiveMapRows(FT2, "OW", [a, { ...b, team1Score: 2, team2Score: 0 }, open[2]]);
     expect(fixed).toHaveLength(2);
     // Une troisième ligne renseignée reste, et la validation la désigne.
     const c = win(2);
-    const kept = progressiveMapRows(FT2, "OW", [a, { ...b, team1Score: 2, team2Score: 0 }, c], 1);
+    const kept = progressiveMapRows(FT2, "OW", [a, { ...b, team1Score: 2, team2Score: 0 }, c]);
     expect(kept).toHaveLength(3);
     expect(checkMapList(FT2, "OW", kept, { decisive: true })).toMatchObject({
       error: "MAP_AFTER_DECISION",
@@ -370,7 +364,7 @@ describe("progressiveMapRows — lignes une à une au fil du format (demande du 
 
   it("une proposition adverse pré-remplie s'affiche telle quelle, sans ligne de plus", () => {
     const theirs = [win(1), win(2), win(1)];
-    expect(progressiveMapRows(FT2, "OW", theirs, 1)).toEqual(theirs);
+    expect(progressiveMapRows(FT2, "OW", theirs)).toEqual(theirs);
   });
 
   it("ce qui part retire la ligne vierge de fin, mais jamais la seule ligne", () => {
@@ -399,5 +393,83 @@ describe("refusalFieldOnRows — le refus désigne la ligne à renseigner", () =
     const codeCheck = checkMapList(BO3, "OW", trimTrailingBlankMaps(bad), { decisive: true });
     expect(refusalFieldOnRows(codeCheck, bad)).toEqual({ index: 0, field: "replayCode" });
     expect(refusalFieldOnRows({ error: null, field: null }, bad)).toBeNull();
+  });
+});
+
+describe("code de replay facultatif — arbitrage (requireReplayCode: false)", () => {
+  const FT2: MatchFormat = { type: "FT", value: 2 };
+  const optional = { decisive: true, requireReplayCode: false };
+  const noCode = (team1Score: number, team2Score: number): MatchMapInput => ({ replayCode: "", team1Score, team2Score });
+
+  it("accepte des maps sans code et en dérive le score", () => {
+    const check = checkMapList(BO5, "OW", [noCode(2, 0), noCode(0, 2), noCode(2, 0), noCode(2, 1)], optional);
+    expect(check.error).toBeNull();
+    expect(check.score).toMatchObject({ team1: 3, team2: 1 });
+    // Un code fait d'espaces vaut un code absent.
+    expect(checkMapList(FT2, "OW", [{ ...noCode(2, 0), replayCode: "   " }, noCode(2, 0)], optional).error).toBeNull();
+  });
+
+  it("par défaut, et pour un engagé, le code reste exigé", () => {
+    const maps = [noCode(2, 0), noCode(2, 0)];
+    expect(checkMapList(FT2, "OW", maps, decisive)).toMatchObject({
+      error: "MAP_REPLAY_CODE_REQUIRED",
+      field: { index: 0, field: "replayCode" },
+    });
+    expect(checkMapList(FT2, "OW", maps, { decisive: true, requireReplayCode: true }).error).toBe("MAP_REPLAY_CODE_REQUIRED");
+  });
+
+  it("un code saisi reste contrôlé : motif du jeu et unicité", () => {
+    expect(checkMapList(FT2, "OW", [{ ...noCode(2, 0), replayCode: "ABC12" }, noCode(2, 0)], optional)).toMatchObject({
+      error: "MAP_REPLAY_CODE_INVALID",
+      field: { index: 0, field: "replayCode" },
+    });
+    const twice = [
+      { replayCode: "ABC123", team1Score: 2, team2Score: 0 },
+      noCode(0, 2),
+      { replayCode: "abc123", team1Score: 2, team2Score: 0 },
+    ];
+    expect(checkMapList(FT2, "OW", twice, optional)).toMatchObject({
+      error: "MAP_REPLAY_CODE_DUPLICATE",
+      field: { index: 2, field: "replayCode" },
+    });
+  });
+
+  it("le contrôle d'unicité ignore les codes absents", () => {
+    const maps = [noCode(2, 0), { replayCode: "ABC123", team1Score: 0, team2Score: 2 }, noCode(2, 0)];
+    expect(checkMapList(FT2, "OW", maps, optional).error).toBeNull();
+  });
+
+  it("une map sans code garde le contrôle de ses scores", () => {
+    expect(checkMapList(FT2, "OW", [noCode(2, Number.NaN)], optional)).toMatchObject({
+      error: "MAP_SCORE_INVALID",
+      field: { index: 0, field: "team2Score" },
+    });
+    expect(checkMapList(FT2, "OW", [noCode(-1, 0)], optional)).toMatchObject({
+      error: "MAP_SCORE_INVALID",
+      field: { index: 0, field: "team1Score" },
+    });
+  });
+
+  it("isMapComplete : une ligne sans code n'est complète que si l'arbitrage s'en passe", () => {
+    const row = noCode(2, 0);
+    expect(isMapComplete(row, "OW")).toBe(false);
+    expect(isMapComplete(row, "OW", { requireReplayCode: true })).toBe(false);
+    expect(isMapComplete(row, "OW", { requireReplayCode: false })).toBe(true);
+    // Scores manquants, ou code saisi mais invalide : incomplète dans tous les cas.
+    expect(isMapComplete(noCode(2, Number.NaN), "OW", { requireReplayCode: false })).toBe(false);
+    expect(isMapComplete({ ...row, replayCode: "AB" }, "OW", { requireReplayCode: false })).toBe(false);
+    expect(isMapComplete({ ...row, replayCode: "ABC123" }, "OW", { requireReplayCode: false })).toBe(true);
+  });
+
+  it("progressiveMapRows ouvre la ligne suivante après une map complète sans code", () => {
+    const rules = { requireReplayCode: false };
+    const first = progressiveMapRows(FT2, "OW", [noCode(2, 0)], rules);
+    expect(first).toEqual([noCode(2, 0), emptyMap()]);
+    // Pour un engagé, la même ligne attend son code : pas de ligne de plus.
+    expect(progressiveMapRows(FT2, "OW", [noCode(2, 0)])).toEqual([noCode(2, 0)]);
+    // Match acquis (2-0) : pas de troisième ligne.
+    expect(progressiveMapRows(FT2, "OW", [noCode(2, 0), noCode(2, 0)], rules)).toHaveLength(2);
+    // Une ligne sans code mais au score incomplet n'ouvre rien.
+    expect(progressiveMapRows(FT2, "OW", [noCode(2, Number.NaN)], rules)).toHaveLength(1);
   });
 });

@@ -12,7 +12,8 @@ import { join } from "node:path";
  *   (432 px) sortait de l'écran en paysage (390 px), boutons compris, alors que
  *   le défilement de la page est verrouillé ; une borne en `100vh` vaut la
  *   *grande* hauteur sur iOS et laisse passer le clavier virtuel ;
- * - **champs de score** — sous ~340 px ils tombaient à 21 px, chiffre invisible ;
+ * - **champs de score** — sous ~340 px ils tombaient à 21 px, chiffre invisible
+ *   (saisie map par map désormais : la ligne d'une map se replie) ;
  * - **modale de lancement** — « Prêt » à 800 px du haut sur un 320 × 568, et le
  *   focus d'ouverture sur un « Copier » de 17 px.
  */
@@ -85,15 +86,21 @@ describe("dialogues de la fiche tournoi — hauteur bornée", () => {
 });
 
 describe("champs de score sur un petit écran", () => {
-  const css = stripComments(read(join(DIR, "ScoreDialog.module.css")));
+  // Le score ne se saisit plus que map par map (`MAP_SCORES.md`) : les
+  // steppers de `ScoreStepper` (et leurs classes) sont partis.
+  const dialogCss = stripComments(read(join(DIR, "ScoreDialog.module.css")));
+  const mapCss = stripComments(read(join(DIR, "MapScoreList.module.css")));
 
-  it("un champ ne descend pas sous 44 px", () => {
-    expect(rule(css, ".field")).toContain("min-width: 44px");
+  it("les classes des steppers retirés ne restent pas dans la feuille du dialogue", () => {
+    for (const selector of [".scores", ".versus", ".sideLabel", ".sideLabelText", ".stepper", ".step", ".field"]) {
+      expect(rule(dialogCss, selector)).toBe("");
+    }
   });
 
-  it("les deux côtés s'empilent sous 375 px", () => {
-    const media = css.match(/@media \(max-width: 374px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
-    expect(media).toMatch(/\.scores \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
+  it("sur un conteneur étroit, le code prend toute la ligne et les deux scores se partagent la suivante", () => {
+    const narrow = mapCss.match(/@container \(max-width: 560px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(narrow).toMatch(/\.row \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) 36px;/);
+    expect(narrow).toMatch(/\.code \{[^}]*grid-column: 1 \/ -1;/);
   });
 });
 

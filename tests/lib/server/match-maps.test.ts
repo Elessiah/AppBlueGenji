@@ -2,7 +2,6 @@ import { describe, expect, it, jest } from "@jest/globals";
 import {
   REPORTED_MAP_SOURCES,
   clearMapSets,
-  dropStaleFinalMaps,
   loadMapsByMatch,
   loadMatchMaps,
   promoteReportedMaps,
@@ -160,10 +159,12 @@ describe("attachMatchMaps — détail posé sur l'instantané (flux et REST de s
     expect(out.team2Report).toBeNull();
   });
 
-  it("tait un détail qui contredit le score (score corrigé à la main, match d'avant les maps)", () => {
+  it("pose le détail retenu tel quel, sans le confronter au score : tout score en est dérivé", () => {
+    // Plus de score à la main : aucun filtre de cohérence ne tait le détail.
+    const final = [map("F1", 2, 1, 1), map("", 0, 2, 2)];
     const match = bracketMatch({ id: 10, team1Score: 3, team2Score: 0 });
-    const [out] = attachMatchMaps([match], new Map([[10, { final: [map("F1", 2, 1, 1)], team1: [], team2: [] }]]));
-    expect(out.maps).toEqual([]);
+    const [out] = attachMatchMaps([match], new Map([[10, { final, team1: [], team2: [] }]]));
+    expect(out.maps).toEqual(final);
   });
 
   it("tait le détail d'un forfait, quel que soit le chemin qui l'a posé", () => {
@@ -177,30 +178,5 @@ describe("attachMatchMaps — détail posé sur l'instantané (flux et REST de s
   it("laisse un match sans ligne exactement comme avant", () => {
     const match = bracketMatch({ id: 12, team1Score: 2, team2Score: 1 });
     expect(attachMatchMaps([match], new Map())).toEqual([match]);
-  });
-});
-
-describe("dropStaleFinalMaps — un score posé sans détail", () => {
-  const finalRows = [
-    { match_id: 10, source: "FINAL", map_number: 1, replay_code: "AAA111", team1_score: 2, team2_score: 0 },
-    { match_id: 10, source: "FINAL", map_number: 2, replay_code: "BBB222", team1_score: 2, team2_score: 0 },
-  ];
-
-  it("efface un détail qui n'explique plus le score retenu", async () => {
-    const { execute, connection } = conn([[finalRows, []], [[{ found: 1 }], []]]);
-    await dropStaleFinalMaps(connection, 10, 1, 2);
-    expect(execute.mock.calls.some(([sql]) => /^DELETE FROM bg_match_maps/.test(flat(String(sql))))).toBe(true);
-  });
-
-  it("garde un détail qui explique encore le score", async () => {
-    const { execute, connection } = conn([[finalRows, []]]);
-    await dropStaleFinalMaps(connection, 10, 2, 0);
-    expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("ne fait rien sans détail", async () => {
-    const { execute, connection } = conn([[[], []]]);
-    await dropStaleFinalMaps(connection, 10, 1, 0);
-    expect(execute).toHaveBeenCalledTimes(1);
   });
 });
