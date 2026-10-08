@@ -339,3 +339,98 @@
     opacity: 0.5;
   }
 }
+
+/*
+ * Carrousel des matchs. Enveloppe sans boîte : elle ne porte que les écouteurs
+ * de survol et de focus, la carte reste l'élément de mise en page du hero.
+ */
+.hold {
+  display: contents;
+}
+
+/* Tous les matchs dans la même case : la carte prend la hauteur du plus haut
+   et ne bouge pas d'un match à l'autre. Un seul est visible ; `visibility`
+   retire les autres de la tabulation et de l'arbre d'accessibilité. */
+.slides {
+  display: grid;
+}
+
+.slide {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.35s ease,
+    visibility 0s linear 0.35s;
+}
+
+.slideActive {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.35s ease,
+    visibility 0s linear 0s;
+}
+
+.footerHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.carouselControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* 26 px : au-dessus du minimum de 24 px (WCAG 2.5.8). */
+.carouselButton {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm);
+  background: rgba(90, 200, 255, 0.04);
+  color: var(--blue-300);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.carouselButton:hover,
+.carouselButton:focus-visible {
+  border-color: rgba(90, 200, 255, 0.5);
+  background: rgba(90, 200, 255, 0.12);
+}
+
+.carouselButton:focus-visible {
+  outline: 1px solid var(--blue-300);
+  outline-offset: 2px;
+}
+
+.carouselCount {
+  min-width: 4.5ch;
+  text-align: center;
+  color: var(--ink-mute);
+  letter-spacing: 0.08em;
+}
+
+:global(:root[data-a11y~="motion"]) .slide,
+:global(:root[data-a11y~="motion"]) .carouselButton {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide,
+  .slideActive,
+  .carouselButton {
+    transition: none;
+  }
+}

@@ -196,6 +196,50 @@ export function pickFeaturedMatchIndex(candidates: readonly FeaturedMatchCandida
   return best;
 }
 
+/** Plafond du carrousel de la carte « en cours » : au-delà, un tour complet dépasserait la minute. */
+export const LANDING_CAROUSEL_MAX_MATCHES = 12;
+
+/**
+ * Matchs que fait défiler le carrousel de la carte « en cours », en index du
+ * plateau, dans l'**ordre chronologique**.
+ *
+ * Mêmes candidats que la mise en avant ({@link pickFeaturedMatchIndex}) : un
+ * match à l'antenne, lancé, en lancement ou daté — jamais « À planifier »,
+ * terminé ou sans adversaire. Un match qui se joue sans horaire passe devant
+ * (il a commencé) ; à horaire égal, l'ordre du plateau départage.
+ *
+ * Au-delà de {@link LANDING_CAROUSEL_MAX_MATCHES}, on garde les premiers — en
+ * décalant la fenêtre s'il le faut pour que le match mis en avant
+ * (`featuredIndex`) en fasse toujours partie : c'est sur lui que s'ouvre la carte.
+ */
+export function carouselMatchOrder(
+  candidates: readonly FeaturedMatchCandidate[],
+  featuredIndex: number,
+  max: number = LANDING_CAROUSEL_MAX_MATCHES,
+): number[] {
+  const eligible = candidates
+    .map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate }) => candidate.onAir || isFeaturedMatchPhase(candidate.phase));
+  const sortKey = ({ candidate }: (typeof eligible)[number]): number => {
+    const start = startTime(candidate.startAt);
+    if (start !== Number.POSITIVE_INFINITY) return start;
+    return candidate.onAir || candidate.phase !== "SCHEDULED" ? Number.NEGATIVE_INFINITY : start;
+  };
+  // `sort` est stable : à clé égale, l'ordre du plateau est conservé.
+  const ordered = [...eligible]
+    .sort((left, right) => {
+      const a = sortKey(left);
+      const b = sortKey(right);
+      if (a === b) return 0;
+      return a < b ? -1 : 1;
+    })
+    .map(({ index }) => index);
+  if (ordered.length <= max) return ordered;
+  const featuredPosition = ordered.indexOf(featuredIndex);
+  const start = featuredPosition < max ? 0 : featuredPosition - max + 1;
+  return ordered.slice(start, start + max);
+}
+
 /**
  * Cible du bouton « Regarder le live » de l'accueil.
  *
@@ -213,6 +257,12 @@ export type LandingLiveStream = {
 export type LandingLive = {
   tournament: TournamentCard;
   currentMatch: LandingLiveMatch | null;
+  /**
+   * Matchs du carrousel de la carte, dans l'ordre chronologique
+   * ({@link carouselMatchOrder}) ; `currentMatch` en fait partie. Absent : la
+   * carte ne montre que `currentMatch`.
+   */
+  matches?: LandingLiveMatch[];
   viewers: number;
   game: string;
   phase: string;

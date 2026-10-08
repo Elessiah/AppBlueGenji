@@ -15,6 +15,7 @@ import {
   landingRound,
   type LandingRound,
   isFeaturedMatchPhase,
+  carouselMatchOrder,
   pickFeaturedMatchIndex,
   type LandingCalendarEvent,
   type LandingLeaderboardRow,
@@ -282,20 +283,20 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       startAt: toIso(row.start_at),
     }));
     const currentIndex = pickFeaturedMatchIndex(candidates);
-    const currentRow = currentIndex === -1 ? null : rows[currentIndex];
-    // Un match à l'antenne se joue, quelle que soit sa phase de lancement : la
-    // carte ne doit pas dire « En direct » et « Prochain match » à la fois.
-    const currentPhase =
-      currentIndex === -1 || candidates[currentIndex].onAir ? "LAUNCHED" : phases[currentIndex];
+    // Le carrousel de la carte : tous les matchs que la mise en avant aurait pu
+    // retenir, dans l'ordre chronologique, ouvert sur le match mis en avant.
+    const carouselIndexes = carouselMatchOrder(candidates, currentIndex);
     // La colonne `seed` porte l'ordre d'inscription ; elle n'est le **tirage**
     // du tournoi que dans les formats qui seedent depuis elle (ou dès que le
     // staff a réordonné à la main). En Suisse, en Survie, en BG Survie et en
     // multi-phases, le moteur seede depuis le classement du site et fige ce
     // rang au coup d'envoi (`loadFrozenRankingSeeds`) : c'est lui qu'on montre,
     // comme la fiche du tournoi — rien plutôt qu'un seed inventé s'il manque.
+    // `manual_seeding` est une colonne du tournoi : toutes les lignes la portent.
+    const firstRow = rows[currentIndex] ?? rows[carouselIndexes[0]] ?? null;
     const frozenSeeds =
-      currentRow !== null &&
-      seedingSource(tournament.format, Number(currentRow.manual_seeding ?? 0) === 1) === "RANKING"
+      firstRow !== null &&
+      seedingSource(tournament.format, Number(firstRow.manual_seeding ?? 0) === 1) === "RANKING"
         ? await loadFrozenRankingSeeds(db, tournament.id, tournament.format)
         : null;
     const scoreOf = (value: number | null): number | null => (value === null ? null : Number(value));
@@ -304,50 +305,59 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       return teamId === null ? null : (frozenSeeds.get(Number(teamId)) ?? null);
     };
 
-    const currentRound = currentRow
-      ? roundOf(
-          currentRow.bracket,
-          Number(currentRow.round_number),
-          rows.filter((row) => row.bracket === currentRow.bracket).length,
-        )
-      : null;
-    const currentMatch: LandingLiveMatch | null = currentRow && currentRound
-      ? {
-          id: Number(currentRow.id),
-          team1Name: currentRow.team1_name,
-          team2Name: currentRow.team2_name,
-          team1Href: entrantHrefFor(currentRow.team1_id, currentRow.team1_solo_user_id),
-          team2Href: entrantHrefFor(currentRow.team2_id, currentRow.team2_solo_user_id),
-          // Filtré à la sortie comme partout : la vitrine est lue sans compte,
-          // et `next/image` lèverait sur une origine étrangère.
-          team1LogoUrl: localUploadUrl(currentRow.team1_logo_url),
-          team2LogoUrl: localUploadUrl(currentRow.team2_logo_url),
-          team1Score: scoreOf(currentRow.team1_score),
-          team2Score: scoreOf(currentRow.team2_score),
-          team1Seed: drawSeedOf(currentRow.team1_id, currentRow.team1_seed),
-          team2Seed: drawSeedOf(currentRow.team2_id, currentRow.team2_seed),
-          bracket: currentRow.bracket,
-          roundLabel: frenchRoundLabel(currentRound),
-          round: currentRound,
-          // Le format **de cette manche** : « BlueGenji Survie » en joue deux,
-          // et une demi-finale ne se joue pas au format de la qualification.
-          // Même règle que la fiche du tournoi et que le garde-fou de saisie.
-          matchFormat: tournamentMatchFormat(
-            tournament.format,
-            tournament.matchFormat,
-            tournament.endurancePlayoffFormat,
-            Number(currentRow.round_number),
-          ),
-          liveState: resolveMatchLiveState(toLiveInput(currentRow)),
-          liveUrl: normalizeStreamUrl(currentRow.live_url),
-          launchPhase: isFeaturedMatchPhase(currentPhase) ? currentPhase : "LAUNCHED",
-          startAt: toIso(currentRow.start_at),
-        }
-      : null;
+    const toLandingMatch = (index: number): LandingLiveMatch => {
+      const row = rows[index];
+      // Un match à l'antenne se joue, quelle que soit sa phase de lancement : la
+      // carte ne doit pas dire « En direct » et « Prochain match » à la fois.
+      const phase = candidates[index].onAir ? "LAUNCHED" : phases[index];
+      const round = roundOf(
+        row.bracket,
+        Number(row.round_number),
+        rows.filter((other) => other.bracket === row.bracket).length,
+      );
+      return {
+        id: Number(row.id),
+        team1Name: row.team1_name,
+        team2Name: row.team2_name,
+        team1Href: entrantHrefFor(row.team1_id, row.team1_solo_user_id),
+        team2Href: entrantHrefFor(row.team2_id, row.team2_solo_user_id),
+        // Filtré à la sortie comme partout : la vitrine est lue sans compte,
+        // et `next/image` lèverait sur une origine étrangère.
+        team1LogoUrl: localUploadUrl(row.team1_logo_url),
+        team2LogoUrl: localUploadUrl(row.team2_logo_url),
+        team1Score: scoreOf(row.team1_score),
+        team2Score: scoreOf(row.team2_score),
+        team1Seed: drawSeedOf(row.team1_id, row.team1_seed),
+        team2Seed: drawSeedOf(row.team2_id, row.team2_seed),
+        bracket: row.bracket,
+        roundLabel: frenchRoundLabel(round),
+        round,
+        // Le format **de cette manche** : « BlueGenji Survie » en joue deux,
+        // et une demi-finale ne se joue pas au format de la qualification.
+        // Même règle que la fiche du tournoi et que le garde-fou de saisie.
+        matchFormat: tournamentMatchFormat(
+          tournament.format,
+          tournament.matchFormat,
+          tournament.endurancePlayoffFormat,
+          Number(row.round_number),
+        ),
+        liveState: resolveMatchLiveState(toLiveInput(row)),
+        liveUrl: normalizeStreamUrl(row.live_url),
+        launchPhase: isFeaturedMatchPhase(phase) ? phase : "LAUNCHED",
+        startAt: toIso(row.start_at),
+      };
+    };
+
+    const matches = carouselIndexes.map(toLandingMatch);
+    const currentMatch: LandingLiveMatch | null =
+      currentIndex === -1
+        ? null
+        : (matches.find((match) => match.id === Number(rows[currentIndex].id)) ?? toLandingMatch(currentIndex));
 
     return {
       tournament,
       currentMatch,
+      matches,
       viewers: tournamentAudience(tournament.id),
       game: gameLabel(tournament.game),
       phase: inferPhaseLabel(currentMatch),
