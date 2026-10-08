@@ -24,7 +24,7 @@
 - [2026-10-09] Rajouter une notification qu'un match a été planifié aux arbitres et dans les logs arbitre
 - [2026-10-09] Faire un système de propriété de cast où un admin ou arbitre à la main (peut jarter ou donner la propriété à un caster qui a son btag et dtag certifié), mais sinon c'est premier arrivé premier servi. Et seul le propriétaire (ou arbitre et admin) peut mettre ou changer son lien, et changer les paramètres de diffusion.
 - [2026-10-09] Signaler aux joueurs quand le match est défini et s'il est changé (Normalement c'est déjà fait)
-- [2026-10-09] Annoncer les lives avec le début du match dans le channel de BlueGenji esport #live (id: 678961388030394401) en publiant le lien du live
+- [2026-10-09] Annoncer les lives avec le début du match dans le channel de BlueGenji esport #live (id: 678961388030394401) en publiant le lien du live avec une mention @everyone (oui c'est normal ça mentionne 1200 personnes) et mettre le nom des deux équipes du match (Le cas de deux matchs à la suite, donc deux notifs est assumé)
 - [2026-10-09] Faire un rappel 10h avant pour le check-in en envoyant le lien (https://discord.gg/Sgdh3p4VhC) pour le salon du check-in à venir un quart d'heure avant la date du match. Et en même temps faire le rappel pour les arbitres en détaillant les matchs, les heures et les équipes qui jouent
 - [2026-10-09] Envoyer les notifications du bot en anglais et français (ou se baser sur la langue détecté par le site, pour les plus importante ou quand on sait pas, mettre les deux)
 - [2026-10-09] Limiter les notifications envoyés aux joueurs pour éviter le spam. On peut déjà commencé par retirer le rappel une heure avant
