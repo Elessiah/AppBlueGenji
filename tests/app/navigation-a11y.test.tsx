@@ -111,7 +111,12 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(readSource("components/i18n/LanguageSwitcher.module.css")).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.link:hover/);
     expect(css).toMatch(/\.navBadge\s*\{[^}]*color: var\(--cyber-bg-1\);/);
     // Pastille à la suite du libellé : elle ne recouvre ni le drapeau ni le focus.
-    expect(css.slice(css.indexOf(".navBadge {")).split("}")[0]).not.toContain("position: absolute");
+    const badgeRule = css.slice(css.indexOf(".navBadge {")).split("}")[0];
+    expect(badgeRule).not.toContain("position: absolute");
+    // Hauteur minimale, pas fixe : la pastille suit l'agrandissement du texte (1.4.4).
+    expect(badgeRule).toContain("min-height: 18px;");
+    // Sous 720 px, l'écart laisse la place au contour de focus (2 px + 2 px).
+    expect(css).toMatch(/\.navTools \{\s*gap: 6px;/);
   });
 
   it("marque la page des signalements comme courante", () => {

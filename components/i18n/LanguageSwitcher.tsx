@@ -87,7 +87,7 @@ function SwitcherLink({
           d'actions de l'en-tête passait sinon à la ligne et poussait le menu du
           compte sous le logo. Le nom accessible garde le code visible en tête. */}
       {/* `compact` (barre connectée) : globe et code, à toutes les largeurs. */}
-      {compact && <Globe size={14} aria-hidden="true" className={styles.globe} />}
+      {compact && <Globe size={16} strokeWidth={2} aria-hidden="true" className={styles.globe} />}
       {!compact && (
         <span lang={target} className={styles.full}>
           {LOCALE_NATIVE_NAME[target]}

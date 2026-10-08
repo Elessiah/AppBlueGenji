@@ -294,8 +294,10 @@
     letter-spacing: 0.06em;
   }
 
+  /* 6 px : le contour de focus (2 px, décalé de 2 px) ne déborde pas sur le
+     bouton voisin. */
   .navTools {
-    gap: 2px;
+    gap: 6px;
     padding-right: 8px;
   }
 }
@@ -380,7 +382,7 @@
 
 .navBadge {
   min-width: 20px;
-  height: 18px;
+  min-height: 18px;
   padding: 0 6px;
   display: inline-grid;
   place-items: center;
