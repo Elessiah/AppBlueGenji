@@ -41,7 +41,7 @@ sens. Le relais client garde les deux.
 **Liens qui évitent le détour** — la vitrine sait qui la lit : pour un
 visiteur sans session, le tableau des tournois, la carte « en direct » et
 l'agenda mènent directement à `/suivre/tournois/[id]`
-(`tournamentMatchHref(…, spectator)`), sans passer par la carte « Connexion
+(`tournamentHref(…, spectator)`, `tournamentMatchHref` pour l'ancre d'un match), sans passer par la carte « Connexion
 requise » d'un préchargement. Les liens externes (Discord, ICS, push) passent
 par la redirection serveur. Pour un visiteur sans session, la fiche
 connectée ne lit même pas la carte du tournoi pour son encart : la redirection
@@ -138,8 +138,9 @@ lui-même).
   sans corps** ;
 - seules les lectures d'un tournoi servi pèsent dans la charge : des
   identifiants au hasard ne ralentissent pas les vrais spectateurs ;
-- plafond par IP (`SPECTATOR_READ_RULE`, 240/min : une salle de LAN d'une
-  centaine d'écrans derrière une même adresse passe, gigue comprise) ; base injoignable → `503` +
+- plafond par IP (`SPECTATOR_READ_RULE`, 360/min : une salle de LAN d'une
+  centaine d'écrans derrière une même adresse passe, gigue, ouvertures et
+  reprises comprises) ; base injoignable → `503` +
   `Retry-After` du double de la cadence au niveau du moment
   (`spectatorUnavailableRetryMs` : 1 min au calme, 10 au pire), puis recul
   doublé par le relecteur — le `Retry-After` n'est qu'un plancher : des `503`
@@ -152,7 +153,9 @@ caché** (`useClientPower`), la lecture due part au retour ; après un échec, l
 cumulatif jusqu'à 10 min, jamais moins que le `Retry-After`, la cadence reprend
 au premier succès). Si la toute
 première lecture échoue, le squelette de chargement le dit (« La page réessaie
-seule… ») au lieu de sembler figé. Un `404` arrête tout (tournoi supprimé ou pas encore publié — même réponse, comme partout). Le
+seule… ») au lieu de sembler figé. Un `404` (tournoi supprimé ou pas encore publié — même réponse, comme partout)
+n'est plus relu qu'au plafond (10 min) : un lien partagé avant la publication
+s'ouvre seul ensuite ; un `400` (identifiant illisible) arrête tout. Le
 démontage coupe la lecture en vol (`AbortController`).
 
 ## Visibilité
