@@ -61,13 +61,14 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
 (`components/spectator-view.tsx`) :
 
 - **noms d'équipe et de joueur sans lien** (`EntityLink` rend un
-  `<span class="entity-name">`, marche du podium des équipes conservée — pas
-  celle, adoucie, des joueurs d'une entrée solo, faute de `soloUserIds`) : leurs
-  fiches sont dans l'espace connecté, un lien mènerait à la page de connexion ;
+  `<span class="entity-name">`, marche du podium conservée — celle des équipes
+  comme celle, adoucie, des joueurs d'une entrée solo : le podium est public)
+  : leurs fiches sont dans l'espace connecté, un lien mènerait à la page de
+  connexion ;
 - **codes de replay masqués** (`MatchMapDetails`) — et retirés de la réponse
   publique (`spectatorSnapshot`) : la politique de confidentialité les réserve
-  aux membres connectés. La réponse publique perd aussi les identifiants de
-  comptes (`soloUserIds`, `casterUserId`) et, sur une sanction BlueGenji
+  aux membres connectés. La réponse publique perd aussi l'identifiant du caster
+  (`casterUserId`) et, sur une sanction BlueGenji
   Survie, l'arbitre et le motif (texte libre du staff) : elle ne montre que des
   noms d'engagés, des points et des pseudos à l'antenne ;
 - **en-tête** : « Accueil » au lieu de « Tous les tournois », pastille
@@ -146,7 +147,8 @@ tournoi sur la page sans compte.
 Changement de **qui lit** la fiche : entrée `2026-10-suivi-tournoi-sans-compte`
 de `PRIVACY_CHANGES` (et son anglais), paragraphe « Suivre un tournoi sans
 compte » de `/rgpd` (`#suivi-sans-compte`), sous-finalité ajoutée au registre
-(T03). Les codes de replay et les identifiants de comptes restent aux membres.
+(T03). Les codes de replay restent aux membres, comme l'arbitre et le motif d'une
+sanction.
 La visite est comptée par la mesure d'audience comme sur toute page (sauf
 opposition) ; l'adresse IP ne sert par ailleurs qu'au plafond de débit, en
 mémoire.
