@@ -26,6 +26,8 @@
  * Le défilement lui-même reste dans le hook `useMatchAnchor` : lui seul touche
  * au DOM.
  */
+import { memberTournamentPath, spectatorTournamentPath } from "@/lib/shared/spectator-view";
+
 
 /** Préfixe des identifiants DOM portés par les cartes de match. */
 export const MATCH_ANCHOR_PREFIX = "match-";
@@ -71,12 +73,17 @@ export function parseMatchAnchor(hash: string | null | undefined): number | null
  *
  * `matchId` absent ou inexploitable → le tournoi seul : mieux vaut une page
  * ouverte en haut qu'une ancre qui ne désigne rien.
+ *
+ * `spectator` : la page sans compte (`/suivre/tournois/[id]`), pour un lien
+ * rendu à un visiteur sans session — il y serait redirigé de toute façon, ce
+ * lien lui épargne le détour (`docs/features/SPECTATOR_VIEW.md`).
  */
 export function tournamentMatchHref(
   tournamentId: number,
   matchId?: number | null,
+  spectator = false,
 ): string {
-  const base = `/tournois/${tournamentId}`;
+  const base = spectator ? spectatorTournamentPath(tournamentId) : memberTournamentPath(tournamentId);
   return isMatchId(matchId) ? `${base}#${matchAnchorId(matchId)}` : base;
 }
 

@@ -18,16 +18,16 @@ type MetadataProps = {
  * Ce qu'un lien de tournoi raconte là où on le colle (`tournamentPageMetadata`).
  *
  * La fiche est une page cliente : elle ne peut pas exporter `generateMetadata`,
- * d'où cette mise en page. Un robot d'aperçu, sans session, n'arrive plus ici :
- * l'espace sécurisé le renvoie vers la page sans compte
- * (`/suivre/tournois/[id]`), qui porte le même encart. Un membre qui colle le
- * lien le voit donc pareil, que le robot suive ou non la redirection.
+ * d'où cette mise en page. Un visiteur sans session — robot d'aperçu compris —
+ * n'est pas servi ici : l'espace sécurisé le renvoie vers la page sans compte
+ * (`/suivre/tournois/[id]`), qui porte le même encart. Pour lui, la carte du
+ * tournoi n'est donc même pas lue : la redirection jetterait la requête.
  */
 export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const { id } = await params;
   return tournamentPageMetadata(id, memberTournamentPath, async () => {
     const user = await getCurrentUser();
-    return { canManage: user ? can(user, "tournaments") : false };
+    return user ? { canManage: can(user, "tournaments") } : null;
   });
 }
 

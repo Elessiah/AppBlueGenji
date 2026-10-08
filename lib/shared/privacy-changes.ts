@@ -639,7 +639,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Un visiteur sans compte suit le tournoi à l'adresse /suivre/tournois/… : il y lit ce que les retransmissions et Discord montrent déjà — noms des équipes, pseudos des joueurs engagés, scores, classements, pseudo du caster d'un match.",
       "Les codes de replay n'y figurent pas : ils restent réservés aux membres connectés.",
-      "La page est exclue des moteurs de recherche et n'ouvre aucune session ; l'adresse IP du visiteur ne sert qu'à limiter le nombre de lectures, en mémoire, sans être enregistrée.",
+      "La page est exclue des moteurs de recherche et n'ouvre aucune session. Comme toute page du site, sa visite est comptée par la mesure d'audience, sauf opposition ; l'adresse IP du visiteur n'y sert par ailleurs qu'à limiter le nombre de lectures, en mémoire.",
       "Tu peux t'opposer à l'affichage de ton pseudo, comme pour la retransmission des matchs.",
     ],
     links: [{ href: "/rgpd#suivi-sans-compte", label: "Lire le paragraphe « Suivre un tournoi sans compte »" }],

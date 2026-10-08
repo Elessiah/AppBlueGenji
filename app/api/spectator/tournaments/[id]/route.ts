@@ -43,7 +43,6 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const tournamentId = parseTournamentId(id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
 
-  recordSpectatorRead();
   const level = currentSpectatorLoadLevel();
 
   let payload;
@@ -59,6 +58,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return response;
   }
   if (!payload) return fail("TOURNAMENT_NOT_FOUND", 404);
+  // Seules les lectures d'un tournoi servi pèsent dans la charge : des
+  // identifiants au hasard ne ralentissent pas les vrais spectateurs.
+  recordSpectatorRead();
 
   const etag = `"${payload.version}"`;
   const headers = { ...pollHeaders(spectatorPollIntervalMs(payload.state, level)), ETag: etag };

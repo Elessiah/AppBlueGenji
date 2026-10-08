@@ -41,6 +41,8 @@ function phaseText(text: LandingText, match: LandingLiveMatch): string {
 const LIVE_CARD_CLOCK_MS = 30_000;
 
 type LiveCardProps = {
+  /** Visiteur sans session : la carte mène à la page sans compte (`SPECTATOR_VIEW.md`). */
+  spectator?: boolean;
   /**
    * État du direct, tenu par le `Hero` (`useLandingLive`). La carte est
    * volontairement contrôlée : elle partage sa source avec le bouton
@@ -146,7 +148,7 @@ function noLiveTournamentMessage({ t }: LandingText, iso: string | null | undefi
  * tournoi s'ouvre défilée sur ce match précis, et le surligne à l'arrivée. Sans
  * match à montrer, elle se réduit au tournoi.
  */
-export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
+export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<LiveCardProps>) {
   // Seule l'horloge fait passer un match daté en lancement : sans elle, la
   // carte annoncerait « En attente de lancement » jusqu'au sondage suivant.
   // Elle ne tourne que pour un tel match (`useClock` respecte le mode économe).
@@ -180,7 +182,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   const visibleViewers = visibleLiveViewerCount(live.viewers);
   const team1Label = currentMatch?.team1Name ?? t("live.team1");
   const team2Label = currentMatch?.team2Name ?? t("live.team2");
-  const href = tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null);
+  const href = tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null, spectator);
   const tournament = live.tournament.name;
   const openLabel = currentMatch
     ? t("live.openMatch", { tournament, team1: team1Label, team2: team2Label })

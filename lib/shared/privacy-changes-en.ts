@@ -332,7 +332,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     details: [
       "A visitor without an account follows the tournament at /suivre/tournois/…: they read there what streams and Discord already show — team names, usernames of the players taking part, scores, rankings, username of a match's caster.",
       "Replay codes are not shown there: they remain reserved to logged-in members.",
-      "The page is excluded from search engines and opens no session; the visitor's IP address is only used to limit the number of reads, in memory, without being recorded.",
+      "The page is excluded from search engines and opens no session. Like any page of the site, its visit is counted by the audience measurement, unless you object; beyond that, the visitor's IP address is only used there, in memory, to limit the number of reads.",
       "You can object to your username being displayed, as for match streaming.",
     ],
     linkLabels: ["Read the paragraph “Following a tournament without an account”"],

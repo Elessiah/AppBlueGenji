@@ -13,17 +13,26 @@
  * La durée de vie borne leur retard, et le nombre de reconstructions — au plus
  * une par tournoi et par durée de vie, quel que soit leur nombre.
  */
-import { cached, invalidateCached } from "@/lib/server/cache";
+import { createHash } from "node:crypto";
+import { cached } from "@/lib/server/cache";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { spectatorSnapshot } from "@/lib/shared/spectator-view";
 import type { TournamentState } from "@/lib/shared/types";
 
-/** Ce que la route sert : l'empreinte, l'état (pour la cadence) et le corps prêt à écrire. */
+/**
+ * Ce que la route sert : l'empreinte, l'état (pour la cadence) et le corps prêt
+ * à écrire. L'empreinte est celle du **corps public**, et non la version de
+ * l'instantané des membres : un code de replay corrigé ne change rien de ce que
+ * lit le visiteur, il garde son `304`.
+ */
 export type SpectatorPayload = {
   version: string;
   state: TournamentState;
   body: string;
 };
+
+/** Refus du chargeur : rien à servir, et rien à mettre en cache. */
+class SpectatorNotFound extends Error {}
 
 function cacheKey(tournamentId: number): string {
   return `spectator-snapshot:${tournamentId}`;
@@ -38,20 +47,31 @@ function cacheKey(tournamentId: number): string {
  *   la sienne.
  */
 export async function getSpectatorPayload(tournamentId: number, ttlMs: number): Promise<SpectatorPayload | null> {
-  const key = cacheKey(tournamentId);
-  const payload = await cached(key, ttlMs, async () => {
-    const snapshot = await getVisibleTournamentSnapshot(tournamentId);
-    if (!snapshot) return null;
-    return {
-      version: snapshot.version,
-      state: snapshot.card.state,
-      body: JSON.stringify(spectatorSnapshot(snapshot)),
-    };
-  });
-  // Un « introuvable » n'est pas gardé : parcourir des identifiants au hasard
-  // ne remplirait pas le cache partagé (500 entrées) au détriment des clés
-  // chaudes, et un tournoi publié une seconde plus tard s'ouvre aussitôt. La
-  // porte de visibilité garde sa propre mutualisation (instantané, 3 s).
-  if (payload === null) invalidateCached(key);
-  return payload;
+  try {
+    return await cached(cacheKey(tournamentId), ttlMs, async () => {
+      const snapshot = await getVisibleTournamentSnapshot(tournamentId);
+      // Un « introuvable » **n'entre pas** dans le cache : `cached` ne garde
+      // jamais un échec. Des identifiants parcourus au hasard n'y chassent donc
+      // pas les clés chaudes (500 entrées, partagées avec tout le site), et un
+      // tournoi publié une seconde plus tard s'ouvre aussitôt. La porte de
+      // visibilité garde sa propre mutualisation (instantané, 3 s).
+      if (!snapshot) throw new SpectatorNotFound();
+      // L'empreinte se prend sur le contenu public **sans** la version des
+      // membres, qui bouge avec les champs retirés ; elle prend ensuite sa
+      // place. Deux sérialisations, au plus une fois par durée de vie.
+      const publicSnapshot = spectatorSnapshot(snapshot);
+      const version = createHash("sha256")
+        .update(JSON.stringify({ ...publicSnapshot, version: "" }))
+        .digest("base64url")
+        .slice(0, 22);
+      return {
+        version,
+        state: snapshot.card.state,
+        body: JSON.stringify({ ...publicSnapshot, version }),
+      };
+    });
+  } catch (error) {
+    if (error instanceof SpectatorNotFound) return null;
+    throw error;
+  }
 }

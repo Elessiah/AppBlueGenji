@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { headers } from "next/headers";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import Image from "next/image";
 import { AccountMenu } from "@/components/account-menu";
@@ -7,6 +8,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
+import { PATHNAME_HEADER } from "@/lib/shared/csp";
+import { joinHrefFor } from "@/lib/shared/spectator-view";
 import { PublicNavMenu } from "./PublicNavMenu";
 import styles from "./PublicHeader.module.css";
 
@@ -21,11 +24,24 @@ import styles from "./PublicHeader.module.css";
  *   l'espace sécurisé) suivi du menu du compte (`AccountMenu` : profil,
  *   équipe, déconnexion).
  * - **Déconnecté** : un seul bouton « Rejoindre » (primary) vers `/connexion`,
- *   qui sert aussi de page de connexion.
+ *   qui sert aussi de page de connexion. Sur la page sans compte d'un tournoi,
+ *   il ramène après connexion à la fiche connectée (`joinHrefFor`).
  *
  * Server component : lit la session via `getCurrentUser()` (retombe sur `null`
  * si la session est absente ou invalide).
  */
+/**
+ * Chemin demandé, posé par le middleware (`x-pathname`). `null` hors requête
+ * (rendu de test) : « Rejoindre » mène alors à la page de connexion seule.
+ */
+async function requestedPath(): Promise<string | null> {
+  try {
+    return (await headers()).get(PATHNAME_HEADER);
+  } catch {
+    return null;
+  }
+}
+
 export async function PublicHeader() {
   const user = await getCurrentUser().catch(() => null);
   // L'équipe n'alimente qu'une entrée du menu du compte : une lecture ratée
@@ -34,6 +50,7 @@ export async function PublicHeader() {
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
   const switcherLabel = await languageSwitcherLabel();
   const t = await getTranslations("shell.header");
+  const joinHref = user ? "/connexion" : joinHrefFor(await requestedPath());
 
   return (
     <header className={styles.root} data-sticky-header>
@@ -78,7 +95,7 @@ export async function PublicHeader() {
             </>
           ) : (
             <CyberButton variant="primary" asChild>
-              <LocaleLink href="/connexion">{t("join")}</LocaleLink>
+              <LocaleLink href={joinHref}>{t("join")}</LocaleLink>
             </CyberButton>
           )}
         </div>

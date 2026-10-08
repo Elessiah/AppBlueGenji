@@ -315,8 +315,10 @@ export function RgpdEn({
             bracket, scores, rankings, names of the teams and usernames of the players taking part, username of a
             match&apos;s caster — what streams and Discord already show. Replay codes are not shown there: they
             remain reserved to logged-in members. This page is excluded from search engines (<code>noindex</code>)
-            and opens no session; the visitor&apos;s IP address is only used there, in memory, to limit the number
-            of reads, and is not recorded. You can object to your username being displayed (see “Your rights”).
+            and opens no session. Like any page of the site, its visit is counted by the audience measurement,
+            unless you object (see “Audience measurement”); beyond that, the visitor&apos;s IP address is only used
+            there, in memory, to limit the number of reads. You can object to your username being displayed (see
+            “Your rights”).
           </p>
         </div>
         <div className={styles.highlight} style={{ marginTop: 20 }}>

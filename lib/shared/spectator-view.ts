@@ -46,6 +46,24 @@ export function tournamentIdFromMemberPath(path: string | null | undefined): num
   return match ? parseTournamentId(match[1]) : null;
 }
 
+/** Le tournoi désigné par un chemin de **page sans compte**, `null` ailleurs. */
+export function tournamentIdFromSpectatorPath(path: string | null | undefined): number | null {
+  const match = /^\/suivre\/tournois\/([^/]+)\/?$/.exec(path ?? "");
+  return match ? parseTournamentId(match[1]) : null;
+}
+
+/**
+ * Où mène « Rejoindre » sur une page donnée : sur la page sans compte d'un
+ * tournoi, la connexion ramène à **sa fiche connectée** (`?redirect=`) — un
+ * joueur dont la session a expiré, ou l'arbitre déconnecté, retrouve ses
+ * actions sans bouton de plus. Ailleurs, la page de connexion seule.
+ */
+export function joinHrefFor(path: string | null | undefined): string {
+  const tournamentId = tournamentIdFromSpectatorPath(path);
+  if (tournamentId === null) return "/connexion";
+  return `/connexion?redirect=${encodeURIComponent(memberTournamentPath(tournamentId))}`;
+}
+
 /**
  * Niveau de charge du serveur, de `0` (calme) à `3` (saturé). Il ne règle que
  * la cadence des visiteurs sans compte : rien de ce que voit un membre connecté

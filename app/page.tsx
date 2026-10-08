@@ -117,11 +117,11 @@ export default async function HomePage() {
       <LandingTextProvider locale={locale} messages={locale === DEFAULT_LOCALE ? undefined : landingClientMessages(messagesFor(locale).landing)}>
         {/* L'éditeur bilingue ne reçoit ses textes que pour le staff `showcase`. */}
         <SiteCopyEditorProvider entries={isAdmin ? copyBundle.editor : null}>
-          <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} />
+          <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} spectator={!user} />
           <Ticker items={ticker.items} />
           {/* Apparition au défilement, une fois : sans JavaScript, tout est visible. */}
           <Reveal>
-            <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} locale={locale} />
+            <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} locale={locale} spectator={!user} />
           </Reveal>
           <Reveal>
             <LeaderCal leaderboard={leaderboard} events={events} locale={locale} />

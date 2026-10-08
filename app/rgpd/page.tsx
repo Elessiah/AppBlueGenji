@@ -425,9 +425,10 @@ function RgpdFr({
             pseudos des joueurs engagés, pseudo du caster d&apos;un match — ce que les retransmissions
             et Discord montrent déjà. Les codes de replay n&apos;y figurent pas : ils restent réservés
             aux membres connectés. Cette page est exclue des moteurs de recherche (<code>noindex</code>)
-            et n&apos;ouvre aucune session ; l&apos;adresse IP du visiteur n&apos;y sert qu&apos;à limiter le
-            nombre de lectures, en mémoire, sans être enregistrée. Vous pouvez vous opposer à
-            l&apos;affichage de votre pseudo (voir « Vos droits »).
+            et n&apos;ouvre aucune session. Comme toute page du site, sa visite est comptée par la
+            mesure d&apos;audience, sauf opposition (voir « Mesure d&apos;audience ») ; l&apos;adresse IP
+            du visiteur n&apos;y sert par ailleurs qu&apos;à limiter le nombre de lectures, en mémoire.
+            Vous pouvez vous opposer à l&apos;affichage de votre pseudo (voir « Vos droits »).
           </p>
         </div>
         <div className={styles.highlight} style={{ marginTop: 20 }}>

@@ -34,12 +34,14 @@ export type TournamentMetadataRights = { canManage: boolean };
  *
  * @param rawId Segment `[id]` tel que reçu.
  * @param pathOf Chemin (sans préfixe de langue) de la page décrite.
- * @param rights Droits du lecteur, lus seulement pour un identifiant valide.
+ * @param rights Droits du lecteur, lus seulement pour un identifiant valide ;
+ *   `null` : la page ne sera pas servie à ce lecteur (redirection), l'encart du
+ *   site suffit et la base n'est pas interrogée.
  */
 export async function tournamentPageMetadata(
   rawId: string,
   pathOf: (tournamentId: number) => string,
-  rights: () => Promise<TournamentMetadataRights>,
+  rights: () => Promise<TournamentMetadataRights | null>,
 ): Promise<Metadata> {
   const locale = await requestLocale();
   const messages = messagesFor(locale);
@@ -60,7 +62,7 @@ export async function tournamentPageMetadata(
   // filet, une panne de lecture rendrait la fiche inaccessible au lieu de la
   // laisser afficher son propre message d'erreur.
   const card = await rights()
-    .then((granted) => getVisibleTournamentCard(tournamentId, granted))
+    .then((granted) => (granted ? getVisibleTournamentCard(tournamentId, granted) : null))
     .catch(() => null);
 
   if (!card) return fallback;
