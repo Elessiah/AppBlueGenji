@@ -46,7 +46,7 @@ export type SpectatorPollerEnv = {
 };
 
 export type SpectatorPoller = {
-  /** Première lecture, tout de suite. */
+  /** Première lecture, tout de suite — ou au retour sur l'onglet s'il est caché. */
   start: () => Promise<void>;
   /** L'onglet a changé de visibilité. */
   attentionChanged: () => void;
@@ -163,7 +163,15 @@ export function createSpectatorPoller(
   }
 
   return {
-    start: load,
+    start() {
+      // Ouvert dans un onglet d'arrière-plan (lien Discord) : la première
+      // lecture attend le retour sur l'onglet, comme les suivantes.
+      if (env.isHidden()) {
+        dueAt = env.now();
+        return Promise.resolve();
+      }
+      return load();
+    },
     attentionChanged() {
       if (disposed) return;
       if (env.isHidden()) {

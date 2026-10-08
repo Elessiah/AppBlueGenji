@@ -38,7 +38,7 @@
       "notFoundTitle": "Tournament not found",
       "expiredText": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
       "notFoundText": "This tournament isn't available. It may have been deleted, or isn't open to the public yet.",
-      "spectatorRecheck": "The page checks again on its own at least every {minutes} minutes: if the tournament becomes available, it will show up.",
+      "spectatorRecheck": "The page checks again on its own at most every {minutes} minutes: if the tournament becomes available, it will show up.",
       "relogin": "Log in again",
       "back": "Back to tournaments",
       "backHome": "Back to home"
@@ -114,7 +114,7 @@
       "UNAUTHORIZED": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
       "TOURNAMENT_NOT_FOUND": "This tournament is no longer available: there's nothing left to follow."
     },
-    "spectatorNotFoundTitle": "This tournament isn't available right now. The page checks again on its own at least every {minutes} minutes.",
+    "spectatorNotFoundTitle": "This tournament isn't available right now. The page checks again on its own at most every {minutes} minutes.",
     "alerts": {
       "SCORE_TO_CONFIRM": "Score to confirm",
       "MATCH_READY": "Your match is ready",

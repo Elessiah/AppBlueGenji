@@ -64,10 +64,10 @@ export function LiveIndicator({ isLive, tier, cadenceMs, fatal = null }: Readonl
   // de la page : rien de localisé ne passe par l'instantané.
   const text = useTournamentPageText();
   const { t } = text;
-  let label = t("live.reconnecting");
   // Page sans compte : pas de flux à rouvrir, une relecture qui réessaiera
-  // plus tard.
+  // plus tard — « Hors ligne », jamais « Reconnexion… » (glossaire).
   const spectator = useSpectatorView();
+  let label = spectator ? t("live.offline") : t("live.reconnecting");
   let title = spectator ? t("live.retryTitle") : t("live.reconnectingTitle");
   if (fatal) {
     label = t("live.offline");
