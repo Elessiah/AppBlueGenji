@@ -73,7 +73,7 @@ function user(overrides: Partial<AuthUser> = {}): AuthUser {
   return authUser({ id: 7, pseudo: "Nova", ...overrides });
 }
 
-const params = (id: string) => ({ params: Promise.resolve({ id }), children: null });
+const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 afterEach(() => {
   jest.resetAllMocks();
@@ -125,7 +125,7 @@ describe("generateMetadata de la fiche", () => {
     mockedUser.mockResolvedValue(user());
     mockedCard.mockResolvedValue(card());
 
-    const meta = await generateMetadata(params("42") as never);
+    const meta = await generateMetadata(params("42"));
 
     expect(meta.title).toEqual({ absolute: "OW Open Cup · Overwatch" });
     expect(meta.openGraph?.title).toBe("OW Open Cup · Overwatch");
@@ -139,7 +139,7 @@ describe("generateMetadata de la fiche", () => {
     mockedUser.mockResolvedValue(user({ isAdmin: true }));
     mockedCard.mockResolvedValue(card());
 
-    await generateMetadata(params("42") as never);
+    await generateMetadata(params("42"));
 
     expect(mockedCard).toHaveBeenCalledWith(42, { canManage: true });
   });
@@ -148,7 +148,7 @@ describe("generateMetadata de la fiche", () => {
     mockedUser.mockResolvedValue(user());
     mockedCard.mockResolvedValue(null);
 
-    await generateMetadata(params("42") as never);
+    await generateMetadata(params("42"));
 
     expect(mockedCard).toHaveBeenCalledWith(42, { canManage: false });
   });
@@ -156,7 +156,7 @@ describe("generateMetadata de la fiche", () => {
   it("ne lit pas la carte pour un visiteur sans session : il est redirigé vers /suivre", async () => {
     mockedUser.mockResolvedValue(null);
 
-    const meta = await generateMetadata(params("42") as never);
+    const meta = await generateMetadata(params("42"));
 
     expect(mockedCard).not.toHaveBeenCalled();
     expect(meta.title).toBe("Tournoi");
@@ -166,7 +166,7 @@ describe("generateMetadata de la fiche", () => {
     mockedUser.mockResolvedValue(user());
     mockedCard.mockResolvedValue(null);
 
-    const meta = await generateMetadata(params("42") as never);
+    const meta = await generateMetadata(params("42"));
 
     // Pas d'« accès refusé » : ce serait confirmer l'existence qu'on protège.
     expect(meta.title).toBe("Tournoi");
@@ -178,7 +178,7 @@ describe("generateMetadata de la fiche", () => {
   });
 
   it("n'interroge même pas la base sur un identifiant qui n'en est pas un", async () => {
-    const meta = await generateMetadata(params("../secrets") as never);
+    const meta = await generateMetadata(params("../secrets"));
 
     expect(mockedCard).not.toHaveBeenCalled();
     expect(meta.title).toBe("Tournoi");
@@ -187,7 +187,7 @@ describe("generateMetadata de la fiche", () => {
   it("survit à une base injoignable : la fiche affichera son propre message", async () => {
     mockedUser.mockRejectedValue(new Error("ECONNREFUSED"));
 
-    await expect(generateMetadata(params("42") as never)).resolves.toMatchObject({
+    await expect(generateMetadata(params("42"))).resolves.toMatchObject({
       title: "Tournoi",
     });
   });

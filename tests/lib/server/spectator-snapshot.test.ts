@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/tournaments-service");
 
-import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { tournamentCard } from "../../helpers/tournament-card";
 import { cached, clearCache } from "@/lib/server/cache";
 import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
 import { invalidateSpectatorSnapshot, invalidateTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
@@ -14,6 +15,7 @@ const mockedSnapshot = jest.mocked(getVisibleTournamentSnapshot);
 
 beforeEach(() => {
   clearCache();
+  jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5 }));
 });
 afterEach(() => {
   jest.resetAllMocks();
@@ -65,6 +67,14 @@ describe("getSpectatorPayload", () => {
     expect((await getSpectatorPayload(5, 150_000))?.ttlMs).toBe(150_000);
     // Déjà en cache : la durée demandée ensuite ne la change pas.
     expect((await getSpectatorPayload(5, 15_000))?.ttlMs).toBe(150_000);
+  });
+
+  it("sert une version vide dans le corps : l'empreinte ne voyage que dans l'ETag", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "membres-v7" }));
+    const payload = await getSpectatorPayload(5, 60_000);
+
+    expect(JSON.parse(payload!.body).version).toBe("");
+    expect(payload!.version).toMatch(/^[\w-]{22}$/);
   });
 
   it("laisse remonter une vraie panne", async () => {

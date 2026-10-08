@@ -51,9 +51,17 @@ describe("signaux et niveau", () => {
     expect(spectatorLoadSignals(T0 + 1).eventLoopDelayMs).toBeNull();
   });
 
-  it("relève un retard de boucle une fois la fenêtre close, pas de la sonde retranché", () => {
-    spectatorLoadSignals(T0);
-    const delay = spectatorLoadSignals(T0 + LOOP_DELAY_SAMPLE_MS).eventLoopDelayMs;
+  it("relève un retard de boucle à chaque fenêtre close, pas de la sonde retranché", () => {
+    jest.useFakeTimers();
+    let delay: number | null;
+    try {
+      spectatorLoadSignals(T0);
+      // Le relevé est fait par la minuterie de la sonde, pas par la lecture suivante.
+      jest.advanceTimersByTime(LOOP_DELAY_SAMPLE_MS);
+      delay = spectatorLoadSignals(T0 + 1).eventLoopDelayMs;
+    } finally {
+      jest.useRealTimers();
+    }
     expect(delay).not.toBeNull();
     expect(delay).toBeGreaterThanOrEqual(0);
     // Un processus de test au repos ne doit pas lire un niveau de charge.

@@ -285,7 +285,7 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={30_000} />)).toContain("toutes les 30 secondes au plus");
     expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={600_000} />)).toContain("toutes les 10 minutes au plus");
     // Une relecture ratée ne parle pas de flux à rouvrir.
-    expect(member(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).toContain("La dernière mise à jour");
+    expect(spectator(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).toContain("La dernière mise à jour");
     expect(member(<LiveIndicator isLive={false} tier="STANDARD" />)).toContain("flux temps réel");
     // Sans cadence imposée : celle du palier, comme avant.
     expect(member(<LiveIndicator isLive tier="STANDARD" />)).toContain("toutes les 20 secondes au plus");
@@ -372,8 +372,9 @@ describe("liens publics vers un tournoi", () => {
 
   it("« Rejoindre » ramène à la fiche connectée depuis la page sans compte, sans bouton de plus", () => {
     const header = readSource("components/cyber/landing/PublicHeader.tsx");
-    expect(header).toContain("const joinHref = joinHrefFor(await requestedPath());");
-    expect(header).toContain("return (await headers()).get(PATHNAME_HEADER);");
-    expect(header).toContain("<LocaleLink href={joinHref}>{t(\"join\")}</LocaleLink>");
+    expect(header).toContain("const joinHref = joinHrefFor(path, search);");
+    expect(header).toContain("return { path: requestHeaders.get(PATHNAME_HEADER), search: requestHeaders.get(SEARCH_HEADER) };");
+    expect(header).toContain("<JoinLink href={joinHref}>{t(\"join\")}</JoinLink>");
+    expect(readSource("components/cyber/landing/JoinLink.tsx")).toContain("withRedirectAnchor(href, globalThis.location.hash)");
   });
 });

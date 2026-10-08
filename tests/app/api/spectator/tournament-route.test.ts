@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments-service");
 
 import { GET } from "@/app/api/spectator/tournaments/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
@@ -53,8 +53,11 @@ function snapshot(overrides: Partial<TournamentSnapshot> = {}): TournamentSnapsh
 }
 
 const mockedSnapshot = jest.mocked(getVisibleTournamentSnapshot);
+const mockedCard = jest.mocked(getVisibleTournamentCard);
 
 beforeEach(() => {
+  // Tournoi publié par défaut : la carte (lecture légère) passe avant l'instantané.
+  mockedCard.mockResolvedValue(tournamentCard({ id: 5 }));
   clearCache();
   resetRateLimit();
   resetSpectatorLoad();
@@ -91,6 +94,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
 
     await GET(req(), params("5"));
 
+    expect(mockedCard).toHaveBeenCalledWith(5);
     expect(mockedSnapshot).toHaveBeenCalledWith(5);
     expect(getCurrentUser).not.toHaveBeenCalled();
   });
@@ -193,6 +197,15 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(body.matches[0].casterUserId).toBe(SPECTATOR_HIDDEN_USER_ID);
   });
 
+  it("arrête un tournoi non publié à sa carte, sans construire son instantané", async () => {
+    mockedCard.mockResolvedValue(null);
+
+    const res = await GET(req(), params("5"));
+
+    expect(res.status).toBe(404);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
   it("répond 404 pour un tournoi absent ou pas encore publié, sans dire lequel", async () => {
     mockedSnapshot.mockResolvedValue(null);
 
@@ -210,14 +223,16 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(mockedSnapshot).not.toHaveBeenCalled();
   });
 
-  it("fait reculer le visiteur au plus loin quand la base ne répond pas", async () => {
+  it("fait reculer le visiteur quand la base ne répond pas, d'une minute au calme", async () => {
     mockedSnapshot.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.2:3306"));
 
     const res = await GET(req(), params("5"));
 
     expect(res.status).toBe(503);
-    expect(res.headers.get("retry-after")).toBe(String(SPECTATOR_MAX_POLL_MS / 1000));
-    expect(res.headers.get(SPECTATOR_POLL_HEADER)).toBe(String(SPECTATOR_MAX_POLL_MS));
+    // Un incident bref ne fige pas la page dix minutes : 2 × 30 s au calme.
+    expect(res.headers.get("retry-after")).toBe(String((2 * SPECTATOR_RUNNING_POLL_MS) / 1000));
+    expect(res.headers.get(SPECTATOR_POLL_HEADER)).toBe(String(2 * SPECTATOR_RUNNING_POLL_MS));
+    expect(Number(res.headers.get(SPECTATOR_POLL_HEADER))).toBeLessThan(SPECTATOR_MAX_POLL_MS);
     // Seul un code sort : ni hôte ni port de la base.
     expect(await res.json()).toEqual({ error: "TOURNAMENT_LOAD_FAILED" });
   });

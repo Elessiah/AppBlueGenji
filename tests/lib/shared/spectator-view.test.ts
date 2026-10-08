@@ -3,6 +3,8 @@ import {
   forwardedSearch,
   jitteredDelayMs,
   joinHrefFor,
+  spectatorUnavailableRetryMs,
+  withRedirectAnchor,
   memberTournamentPath,
   parsePollAfterMs,
   parseTournamentId,
@@ -26,7 +28,7 @@ import {
   type SpectatorLoadSignals,
 } from "@/lib/shared/spectator-view";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
-import type { TournamentSnapshot } from "@/lib/shared/types";
+import type { EnduranceMeta } from "@/lib/shared/types";
 import { bracketMatch } from "../../helpers/bracket-match";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
@@ -80,10 +82,32 @@ describe("retour vers l'espace connecté", () => {
     expect(joinHrefFor("/suivre/tournois/12")).toBe("/connexion?redirect=%2Ftournois%2F12");
   });
 
+  it("fait suivre la requête, jamais un fragment de chemin", () => {
+    expect(joinHrefFor("/suivre/tournois/12", "?utm=x")).toBe("/connexion?redirect=%2Ftournois%2F12%3Futm%3Dx");
+    expect(joinHrefFor("/suivre/tournois/12", "//evil.test")).toBe("/connexion?redirect=%2Ftournois%2F12");
+  });
+
+  it("ajoute l'ancre du match à la destination, côté navigateur", () => {
+    const href = joinHrefFor("/suivre/tournois/12");
+    expect(withRedirectAnchor(href, "#match-5")).toBe("/connexion?redirect=%2Ftournois%2F12%23match-5");
+    expect(withRedirectAnchor(href, "")).toBe(href);
+    expect(withRedirectAnchor(href, "#")).toBe(href);
+    // Hors page sans compte, la connexion seule ne prend pas d'ancre.
+    expect(withRedirectAnchor("/connexion", "#match-5")).toBe("/connexion");
+  });
+
   it("garde la page de connexion seule partout ailleurs", () => {
     expect(joinHrefFor("/")).toBe("/connexion");
     expect(joinHrefFor("/classement")).toBe("/connexion");
     expect(joinHrefFor(null)).toBe("/connexion");
+  });
+});
+
+describe("attente après une base injoignable", () => {
+  it("double la cadence d'un tournoi en cours, au niveau de charge du moment", () => {
+    expect(spectatorUnavailableRetryMs(0)).toBe(2 * SPECTATOR_RUNNING_POLL_MS);
+    expect(spectatorUnavailableRetryMs(1)).toBe(4 * SPECTATOR_RUNNING_POLL_MS);
+    expect(spectatorUnavailableRetryMs(3)).toBe(SPECTATOR_MAX_POLL_MS);
   });
 });
 
@@ -246,9 +270,20 @@ describe("ce que lit le visiteur sans compte", () => {
       createdAt: null,
       removable: false,
     };
-    const snapshot = tournamentSnapshot({
-      endurance: { penalties: [penalty] } as unknown as TournamentSnapshot["endurance"],
-    });
+    const endurance: EnduranceMeta = {
+      startPoints: 9,
+      winDelta: 1,
+      lossDelta: 1,
+      forfeitMaps: 3,
+      playoffSize: 8,
+      maxRounds: null,
+      currentRound: 2,
+      playoffsStarted: false,
+      rounds: [1, 2],
+      penalties: [penalty],
+      standings: [],
+    };
+    const snapshot = tournamentSnapshot({ endurance });
     const out = spectatorSnapshot(snapshot).endurance!.penalties[0];
     expect(out).toMatchObject({ teamId: 4, teamName: "Alpha", round: 2, points: 3, reason: "", authorPseudo: null });
     expect(spectatorSnapshot(tournamentSnapshot({ endurance: null })).endurance).toBeNull();
