@@ -103,6 +103,7 @@
     "offline": "Hors ligne",
     "reconnectingTitle": "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.",
     "retryTitle": "La dernière mise à jour n'a pas abouti. La page réessaie seule, un peu plus tard ; ce qui est affiché reste valable jusque-là.",
+    "loadingRetry": "Le tournoi ne peut pas être chargé pour l'instant. La page réessaie seule, un peu plus tard : inutile de la recharger.",
     "upToDateTitle": "Mise à jour automatique {cadence}. Inutile de recharger la page.",
     "cadenceSecond": "à la seconde",
     "cadenceSeconds": "toutes les {seconds} secondes au plus",

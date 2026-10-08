@@ -103,6 +103,7 @@
     "offline": "Offline",
     "reconnectingTitle": "Connection to the real-time feed lost. The page reconnects on its own and keeps updating, more slowly.",
     "retryTitle": "The last update did not go through. The page tries again by itself, a little later; what is shown remains valid until then.",
+    "loadingRetry": "The tournament cannot be loaded right now. The page tries again by itself, a little later: no need to reload it.",
     "upToDateTitle": "Automatic updates {cadence}. No need to reload the page.",
     "cadenceSecond": "every second",
     "cadenceSeconds": "at most every {seconds} seconds",

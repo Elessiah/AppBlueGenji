@@ -8,14 +8,16 @@
  * politique de confidentialité réserve aux membres (`spectatorSnapshot`), puis
  * sérialisé **une fois** pour tous.
  *
- * Aucune invalidation n'est branchée : une écriture ne réveille pas les
- * visiteurs sans compte, qui relisent à la cadence que la charge leur accorde.
- * La durée de vie borne leur retard, et le nombre de reconstructions — au plus
- * une par tournoi et par durée de vie, quel que soit leur nombre.
+ * Une écriture ne **réveille** pas les visiteurs sans compte, qui relisent à la
+ * cadence que la charge leur accorde ; elle **invalide** en revanche cette
+ * réponse avec l'instantané des membres (`invalidateTournamentSnapshot`) — un
+ * tournoi supprimé ou corrigé n'est pas resservi. Entre deux écritures, au plus
+ * une reconstruction par tournoi et par durée de vie, quel que soit leur nombre.
  */
 import { createHash } from "node:crypto";
 import { cached } from "@/lib/server/cache";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
 import { spectatorSnapshot } from "@/lib/shared/spectator-view";
 import type { TournamentState } from "@/lib/shared/types";
 
@@ -34,10 +36,6 @@ export type SpectatorPayload = {
 /** Refus du chargeur : rien à servir, et rien à mettre en cache. */
 class SpectatorNotFound extends Error {}
 
-function cacheKey(tournamentId: number): string {
-  return `spectator-snapshot:${tournamentId}`;
-}
-
 /**
  * Réponse publique du tournoi, ou `null` : il n'existe pas, ou pas encore pour
  * le public — les deux cas se confondent, comme partout ailleurs.
@@ -48,7 +46,7 @@ function cacheKey(tournamentId: number): string {
  */
 export async function getSpectatorPayload(tournamentId: number, ttlMs: number): Promise<SpectatorPayload | null> {
   try {
-    return await cached(cacheKey(tournamentId), ttlMs, async () => {
+    return await cached(spectatorSnapshotCacheKey(tournamentId), ttlMs, async () => {
       const snapshot = await getVisibleTournamentSnapshot(tournamentId);
       // Un « introuvable » **n'entre pas** dans le cache : `cached` ne garde
       // jamais un échec. Des identifiants parcourus au hasard n'y chassent donc

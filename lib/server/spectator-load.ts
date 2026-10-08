@@ -36,6 +36,8 @@ export const LOOP_PROBE_IDLE_MS = 5 * 60_000;
 
 let histogram: IntervalHistogram | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
+/** Dernière activité publique (lecture servie, ou mesure de la charge). */
+let lastActivityAt = 0;
 let lastSampleAt = 0;
 let lastLoopDelayMs: number | null = null;
 
@@ -53,6 +55,27 @@ function disarmProbe(): void {
 }
 
 /**
+ * Note une activité, et garde **un seul** minuteur d'inactivité : il se relance
+ * lui-même tant que l'activité continue, plutôt que d'être recréé à chaque
+ * lecture — sous la charge, c'est précisément là qu'on économise. Il ne
+ * retient pas le processus (`unref`).
+ */
+function touchProbe(now: number): void {
+  lastActivityAt = now;
+  if (idleTimer !== null) return;
+  const check = (wait: number) => {
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      const idle = Date.now() - lastActivityAt;
+      if (idle >= LOOP_PROBE_IDLE_MS) disarmProbe();
+      else check(LOOP_PROBE_IDLE_MS - idle);
+    }, wait);
+    idleTimer.unref?.();
+  };
+  check(LOOP_PROBE_IDLE_MS);
+}
+
+/**
  * Retard de boucle au 99ᵉ centile, en millisecondes. La sonde n'est armée
  * qu'avec les lectures publiques, et se désarme après
  * {@link LOOP_PROBE_IDLE_MS} sans visiteur : un serveur sans visiteur anonyme
@@ -63,6 +86,9 @@ function disarmProbe(): void {
  * ~20 ms. Il est retranché : seuls comptent les retards en plus.
  */
 function loopDelayMs(now: number): number | null {
+  // Toute mesure compte comme activité : une sonde armée par une lecture qui
+  // n'aboutit pas (404, 503) se désarme aussi.
+  touchProbe(now);
   if (histogram === null) {
     histogram = monitorEventLoopDelay({ resolution: LOOP_DELAY_RESOLUTION_MS });
     histogram.enable();
@@ -91,10 +117,7 @@ function rollWindow(now: number): void {
 export function recordSpectatorRead(now: number = Date.now()): void {
   rollWindow(now);
   currentReads += 1;
-  if (idleTimer !== null) clearTimeout(idleTimer);
-  idleTimer = setTimeout(disarmProbe, LOOP_PROBE_IDLE_MS);
-  // Le minuteur ne retient pas le processus : un arrêt du serveur n'attend pas.
-  idleTimer.unref?.();
+  touchProbe(now);
 }
 
 /**
@@ -124,6 +147,7 @@ export function currentSpectatorLoadLevel(now: number = Date.now()): SpectatorLo
 /** Remet les mesures à zéro. Réservé aux tests. */
 export function resetSpectatorLoad(): void {
   disarmProbe();
+  lastActivityAt = 0;
   lastSampleAt = 0;
   windowStartedAt = 0;
   currentReads = 0;

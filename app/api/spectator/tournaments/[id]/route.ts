@@ -5,8 +5,10 @@ import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
 import {
   parseTournamentId,
   SPECTATOR_MAX_POLL_MS,
+  SPECTATOR_FRESHNESS_HEADER,
   SPECTATOR_POLL_HEADER,
   spectatorCacheTtlMs,
+  spectatorFreshnessMs,
   spectatorPollIntervalMs,
 } from "@/lib/shared/spectator-view";
 
@@ -63,7 +65,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   recordSpectatorRead();
 
   const etag = `"${payload.version}"`;
-  const headers = { ...pollHeaders(spectatorPollIntervalMs(payload.state, level)), ETag: etag };
+  const pollMs = spectatorPollIntervalMs(payload.state, level);
+  const headers = {
+    ...pollHeaders(pollMs),
+    [SPECTATOR_FRESHNESS_HEADER]: String(spectatorFreshnessMs(pollMs, level)),
+    ETag: etag,
+  };
   if (matchesEtag(req.headers.get("if-none-match"), etag)) {
     return new Response(null, { status: 304, headers });
   }

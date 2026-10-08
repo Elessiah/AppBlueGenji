@@ -42,14 +42,19 @@ export const parseTournamentId = parseEntityPageId;
  * `/tournois/creer`, `/tournois/12/modifier` restent derrière la connexion.
  */
 export function tournamentIdFromMemberPath(path: string | null | undefined): number | null {
-  const match = /^\/tournois\/([^/]+)\/?$/.exec(path ?? "");
-  return match ? parseTournamentId(match[1]) : null;
+  return tournamentIdUnder("/tournois/", path);
+}
+
+/** Identifiant de la fiche `<préfixe><id>` (barre finale tolérée), `null` pour tout autre chemin. */
+function tournamentIdUnder(prefix: string, path: string | null | undefined): number | null {
+  if (!path?.startsWith(prefix)) return null;
+  const rest = path.slice(prefix.length).replace(/\/$/, "");
+  return rest === "" || rest.includes("/") ? null : parseTournamentId(rest);
 }
 
 /** Le tournoi désigné par un chemin de **page sans compte**, `null` ailleurs. */
 export function tournamentIdFromSpectatorPath(path: string | null | undefined): number | null {
-  const match = /^\/suivre\/tournois\/([^/]+)\/?$/.exec(path ?? "");
-  return match ? parseTournamentId(match[1]) : null;
+  return tournamentIdUnder("/suivre/tournois/", path);
 }
 
 /**
@@ -166,6 +171,19 @@ export function spectatorCacheTtlMs(level: SpectatorLoadLevel): number {
 export const SPECTATOR_POLL_HEADER = "x-bg-poll-after-ms";
 
 /**
+ * En-tête de réponse qui porte l'âge maximal de ce que le visiteur affiche
+ * (ms) : l'attente entre deux lectures, gigue comprise, **plus** la durée de vie
+ * de la réponse partagée. C'est ce que le témoin annonce — « toutes les N au
+ * plus » ne doit pas promettre mieux que ce que le cache permet.
+ */
+export const SPECTATOR_FRESHNESS_HEADER = "x-bg-fresh-within-ms";
+
+/** Âge maximal de l'affichage pour une cadence et un niveau de charge donnés. */
+export function spectatorFreshnessMs(pollMs: number, level: SpectatorLoadLevel): number {
+  return Math.ceil(pollMs * 1.1) + spectatorCacheTtlMs(level);
+}
+
+/**
  * Ce que le visiteur sans compte lit de l'instantané partagé.
  *
  * Les **codes de replay** restent aux membres connectés : la politique de
@@ -177,11 +195,22 @@ export const SPECTATOR_POLL_HEADER = "x-bg-poll-after-ms";
  * Les **identifiants de comptes** partent aussi (minimisation) : la page sans
  * compte ne lie vers aucune fiche de joueur (`soloUserIds`) et ne reconnaît
  * aucun caster (`casterUserId`) — elle n'affiche que des noms et des pseudos.
+ *
+ * Les **sanctions** (BlueGenji Survie) gardent l'équipe, la manche et les
+ * points, mais ni l'arbitre qui les a prononcées (le staff reste anonyme hors de
+ * l'espace connecté) ni leur motif, texte libre du staff qui peut nommer
+ * quelqu'un.
  */
 export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnapshot {
   return {
     ...snapshot,
     soloUserIds: {},
+    endurance: snapshot.endurance
+      ? {
+          ...snapshot.endurance,
+          penalties: snapshot.endurance.penalties.map((penalty) => ({ ...penalty, reason: "", authorPseudo: null })),
+        }
+      : null,
     matches: snapshot.matches.map((match) => ({
       ...match,
       casterUserId: null,

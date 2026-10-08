@@ -339,6 +339,8 @@ export type TournamentSheetSource = {
    * plus de relecture (tournoi introuvable, avec `fatal`).
    */
   cadenceMs?: number | null;
+  /** La première lecture a échoué ; une autre suivra (page sans compte). */
+  retrying?: boolean;
 };
 
 /**
@@ -357,7 +359,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   const mapError = useMapError();
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs } = source;
+  const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying } = source;
   // Relecture du contexte du lecteur quand une proposition a changé sous la
   // modale de score (son détail map par map n'arrive qu'avec lui).
   const refreshProposals = useCallback(() => refresh(), [refresh]);
@@ -563,7 +565,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
     // Le premier affichage attend l'ouverture du flux, qui apporte le plateau
     // et le contexte du lecteur d'un seul coup — ou, passé un délai sans rien,
     // la lecture REST de secours (`FIRST_SNAPSHOT_TIMEOUT_MS`).
-    return <TournamentLoading />;
+    return <TournamentLoading retrying={retrying} />;
   }
 
   /**

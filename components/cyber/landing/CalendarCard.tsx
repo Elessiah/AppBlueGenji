@@ -10,6 +10,8 @@ type CalendarCardProps = {
   events: LandingCalendarEvent[];
   /** Langue de la page (`requestLocale()`), français par défaut. */
   locale?: Locale;
+  /** Visiteur sans session : les liens mènent à la page sans compte (`SPECTATOR_VIEW.md`). */
+  spectator?: boolean;
 };
 
 // Formateurs construits une fois par langue (une construction coûte bien plus
@@ -50,7 +52,7 @@ function tagKey(state: LandingCalendarEvent["state"]): "running" | "registration
   return "soon";
 }
 
-export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<CalendarCardProps>) {
+export function CalendarCard({ events, locale = DEFAULT_LOCALE, spectator = false }: Readonly<CalendarCardProps>) {
   const { t } = landingServerText(locale);
   const formats = CALENDAR_FORMATS[locale];
   return (
@@ -86,7 +88,7 @@ export function CalendarCard({ events, locale = DEFAULT_LOCALE }: Readonly<Calen
                     accessible du lien reste celui du tournoi — pas la date,
                     le jeu et l'état concaténés. */}
                 <div className={styles.title} title={formats.full.format(date)}>
-                  <a className={styles.link} href={tournamentMatchHref(event.tournamentId)}>
+                  <a className={styles.link} href={tournamentMatchHref(event.tournamentId, null, spectator)}>
                     {event.name}
                   </a>
                 </div>

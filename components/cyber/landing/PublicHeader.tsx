@@ -50,7 +50,7 @@ export async function PublicHeader() {
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
   const switcherLabel = await languageSwitcherLabel();
   const t = await getTranslations("shell.header");
-  const joinHref = user ? "/connexion" : joinHrefFor(await requestedPath());
+  const joinHref = joinHrefFor(await requestedPath());
 
   return (
     <header className={styles.root} data-sticky-header>

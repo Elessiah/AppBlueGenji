@@ -49,6 +49,8 @@ export function useSpectatorTournament(tournamentId: number): TournamentSheetSou
     isLive: state.isLive,
     tier: "STANDARD",
     fatal: state.fatal,
-    cadenceMs: state.cadenceMs,
+    // Le témoin annonce l'âge maximal de l'affichage, cache serveur compris.
+    cadenceMs: state.freshnessMs ?? state.cadenceMs,
+    retrying: state.retrying,
   };
 }

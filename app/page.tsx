@@ -124,7 +124,7 @@ export default async function HomePage() {
             <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} locale={locale} spectator={!user} />
           </Reveal>
           <Reveal>
-            <LeaderCal leaderboard={leaderboard} events={events} locale={locale} />
+            <LeaderCal leaderboard={leaderboard} events={events} locale={locale} spectator={!user} />
           </Reveal>
           <Reveal>
             <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} locale={locale} />

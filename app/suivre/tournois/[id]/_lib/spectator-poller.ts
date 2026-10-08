@@ -3,6 +3,7 @@ import { shareUnchanged, type LiveFailure } from "@/app/(secured)/tournois/[id]/
 import {
   jitteredDelayMs,
   parsePollAfterMs,
+  SPECTATOR_FRESHNESS_HEADER,
   SPECTATOR_POLL_HEADER,
   SPECTATOR_RUNNING_POLL_MS,
   SPECTATOR_VIEWER_CONTEXT,
@@ -17,6 +18,10 @@ export type SpectatorState = {
   fatal: LiveFailure | null;
   /** Cadence accordée par le serveur ; `null` = plus de relecture (tournoi introuvable). */
   cadenceMs: number | null;
+  /** Âge maximal de l'affichage, que le témoin annonce (`x-bg-fresh-within-ms`). */
+  freshnessMs: number | null;
+  /** Une lecture a échoué avant la première réussite. */
+  retrying: boolean;
 };
 
 export const INITIAL_SPECTATOR_STATE: SpectatorState = {
@@ -24,6 +29,8 @@ export const INITIAL_SPECTATOR_STATE: SpectatorState = {
   isLive: false,
   fatal: null,
   cadenceMs: SPECTATOR_RUNNING_POLL_MS,
+  freshnessMs: null,
+  retrying: false,
 };
 
 /** Le monde extérieur, injecté : le navigateur en production, des doubles en test. */
@@ -120,12 +127,14 @@ export function createSpectatorPoller(
         return;
       }
       if (response.status !== 200 && response.status !== 304) {
-        commit({ ...current, isLive: false });
+        commit({ ...current, isLive: false, retrying: current.detail === null });
         schedule(spectatorRetryDelayMs(lastWaitMs, response.headers.get("retry-after")));
         return;
       }
 
       const cadenceMs = parsePollAfterMs(response.headers.get(SPECTATOR_POLL_HEADER));
+      const freshnessHeader = Number(response.headers.get(SPECTATOR_FRESHNESS_HEADER));
+      const freshnessMs = Number.isFinite(freshnessHeader) && freshnessHeader > 0 ? freshnessHeader : null;
       let detail = current.detail;
       if (response.status === 200) {
         const snapshot = (await response.json()) as TournamentSnapshot;
@@ -135,12 +144,12 @@ export function createSpectatorPoller(
         const shared = detail ? shareUnchanged(detail, snapshot) : snapshot;
         detail = { ...shared, ...SPECTATOR_VIEWER_CONTEXT };
       }
-      commit({ detail, isLive: true, fatal: null, cadenceMs });
+      commit({ detail, isLive: true, fatal: null, cadenceMs, freshnessMs, retrying: false });
       schedule(cadenceMs);
     } catch {
       if (disposed) return;
       // Réseau coupé : on garde ce qui est affiché, et on recule.
-      commit({ ...current, isLive: false });
+      commit({ ...current, isLive: false, retrying: current.detail === null });
       schedule(spectatorRetryDelayMs(lastWaitMs, null));
     } finally {
       inflight = false;
