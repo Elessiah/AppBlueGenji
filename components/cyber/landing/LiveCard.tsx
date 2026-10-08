@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { ChevronLeft, ChevronRight, Eye, Pause, Play } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
@@ -234,6 +235,17 @@ function MatchSlide({ match, clock }: Readonly<{ match: LandingLiveMatch; clock:
  */
 function CarouselControls({ carousel }: Readonly<{ carousel: MatchCarousel }>) {
   const { t } = useLandingText();
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const pauseButton = useRef<HTMLButtonElement | null>(null);
+  const pauseFocused = useRef(false);
+  // La pause disparaît sous un gel durable — y compris page regardée, quand la
+  // mesure de cadence constate un ralenti. Si elle avait le focus, il tomberait
+  // sur `<body>` : on le rend au bouton voisin, dans la carte.
+  useEffect(() => {
+    if (carousel.autoRotates || !pauseFocused.current) return;
+    pauseFocused.current = false;
+    nextRef.current?.focus();
+  }, [carousel.autoRotates]);
   return (
     <div className={`${styles.carouselControls} ${styles.nested}`} data-tap-zone>
       <button type="button" className={styles.carouselButton} onClick={() => carousel.go(-1)} aria-label={t("live.carousel.previous")}>
@@ -245,7 +257,13 @@ function CarouselControls({ carousel }: Readonly<{ carousel: MatchCarousel }>) {
           {carousel.index + 1} / {carousel.count}
         </span>
       </span>
-      <button type="button" className={styles.carouselButton} onClick={() => carousel.go(1)} aria-label={t("live.carousel.next")}>
+      <button
+        ref={nextRef}
+        type="button"
+        className={styles.carouselButton}
+        onClick={() => carousel.go(1)}
+        aria-label={t("live.carousel.next")}
+      >
         <ChevronRight size={14} aria-hidden="true" />
       </button>
       {/* Rendu tant que le défilement automatique existe pour ce lecteur, même
@@ -258,6 +276,13 @@ function CarouselControls({ carousel }: Readonly<{ carousel: MatchCarousel }>) {
           type="button"
           className={styles.carouselButton}
           onClick={carousel.togglePaused}
+          ref={(button) => {
+            // Détaché juste avant le retrait du DOM : le focus y est encore
+            // lisible (un `blur` émis au retrait n'est pas fiable d'un
+            // navigateur à l'autre).
+            if (button) pauseButton.current = button;
+            else pauseFocused.current = document.activeElement === pauseButton.current;
+          }}
           aria-label={carousel.paused ? t("live.carousel.play") : t("live.carousel.pause")}
         >
           {carousel.paused ? <Play size={12} aria-hidden="true" /> : <Pause size={12} aria-hidden="true" />}

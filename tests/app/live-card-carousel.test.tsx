@@ -183,3 +183,12 @@ describe("carouselCanAutoRotate", () => {
     expect(carouselCanAutoRotate(input({ performanceLimited: true }))).toBe(false);
   });
 });
+
+describe("LiveCard — focus du bouton de pause", () => {
+  const source = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
+
+  it("rend le focus au bouton suivant quand la pause disparaît en l'ayant", () => {
+    expect(source).toContain("else pauseFocused.current = document.activeElement === pauseButton.current;");
+    expect(source).toContain("nextRef.current?.focus();");
+  });
+});
