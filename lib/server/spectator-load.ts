@@ -113,9 +113,16 @@ function loopDelayMs(now: number): number | null {
 function rollWindow(now: number): void {
   const elapsed = now - windowStartedAt;
   if (elapsed < SPECTATOR_READ_WINDOW_MS) return;
-  previousReads = elapsed < 2 * SPECTATOR_READ_WINDOW_MS ? currentReads : 0;
+  if (elapsed < 2 * SPECTATOR_READ_WINDOW_MS) {
+    // La fenêtre close dure exactement une minute : la suivante part de sa fin,
+    // pas de la première lecture qui la referme.
+    previousReads = currentReads;
+    windowStartedAt += SPECTATOR_READ_WINDOW_MS;
+  } else {
+    previousReads = 0;
+    windowStartedAt = now;
+  }
   currentReads = 0;
-  windowStartedAt = now;
 }
 
 /** Compte une lecture publique, et repousse le désarmement de la sonde. */

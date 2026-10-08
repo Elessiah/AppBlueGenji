@@ -302,17 +302,18 @@ export function parsePollAfterMs(header: string | null): number {
 }
 
 /**
- * Attente après un échec (réseau, 429, 503) : le `Retry-After` du serveur s'il
- * en donne un, sinon le **double de la dernière attente** — échec après échec,
- * le visiteur sans compte recule jusqu'au plafond.
+ * Attente après un échec (réseau, 429, 503) : le **double de la dernière
+ * attente**, et jamais moins que le `Retry-After` du serveur — échec après
+ * échec, le visiteur sans compte recule jusqu'au plafond, même quand chaque
+ * réponse redonne la même attente minimale.
  *
  * @param lastWaitMs Dernière attente : la cadence après un succès, l'attente
  *   précédente après un échec.
  */
 export function spectatorRetryDelayMs(lastWaitMs: number, retryAfterHeader: string | null): number {
   const seconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
-  if (Number.isFinite(seconds) && seconds > 0) return clampPoll(seconds * 1000);
-  return clampPoll(lastWaitMs * 2);
+  const floorMs = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 0;
+  return clampPoll(Math.max(floorMs, lastWaitMs * 2));
 }
 
 /**
