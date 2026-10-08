@@ -84,7 +84,9 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
   `SPECTATOR_HIDDEN_USER_ID` (−1) : la fiche sait qu'un caster est inscrit (son
   pseudo s'affiche, il compte dans les « prêts » du lancement) sans savoir qui.
   Sur une sanction BlueGenji Survie, l'arbitre et le motif (texte libre du
-  staff) partent, et la case du motif n'est pas rendue ;
+  staff) partent, et la case du motif n'est pas rendue (engagé, manche et
+  points restent, déclarés). Le lien de rediffusion passe par
+  `visibleReplayUrl` : celui que l'interface masque (match rouvert) ne part pas ;
 - **en-tête** : « Accueil » au lieu de « Tous les tournois », pastille
   « Spectateur » (qui dit pourquoi aucun bouton n'apparaît, explication aussi
   hors écran pour le toucher, le clavier et les lecteurs d'écran), témoin qui annonce
@@ -110,7 +112,7 @@ haut de trois signaux :
 | --- | --- |
 | Retard de la boucle d'évènements (p99 sur 10 s, pas de 20 ms de la sonde retranché) | 50 / 100 / 200 ms |
 | Flux SSE ouverts (membres) | 100 / 200 / 300 |
-| Lectures publiques par minute (fenêtres d'une minute exacte, la précédente au prorata) | 600 / 1 200 / 2 400 |
+| Lectures publiques par minute (fenêtres d'une minute exacte, la précédente au prorata ; au plus 10 par adresse IP et par fenêtre, `SPECTATOR_READS_PER_CLIENT`, pour qu'une poignée d'adresses ne ralentisse pas tout le monde) | 600 / 1 200 / 2 400 |
 
 La cadence est multipliée par 1, 2, 4 puis 10, plafonnée à 10 min. Sous la
 charge, ce sont donc les visiteurs sans compte qui reculent, jamais le staff ni
@@ -185,7 +187,7 @@ tournoi sur la page sans compte.
 Changement de **qui lit** la fiche : entrée `2026-10-suivi-tournoi-sans-compte`
 de `PRIVACY_CHANGES` (et son anglais), paragraphe « Suivre un tournoi sans
 compte » de `/rgpd` (`#suivi-sans-compte`), sous-finalité ajoutée au registre
-(T03). Les codes de replay restent aux membres, comme l'arbitre et le motif d'une
+(T03, avec l'adresse IP du visiteur, gardée en mémoire le temps du plafond). Les codes de replay restent aux membres, comme l'arbitre et le motif d'une
 sanction et l'identité du caster. Le numéro de compte interne d'un joueur engagé
 en individuel est public (`soloUserIds`, il porte sa marque du podium, publique)
 et déclaré comme tel, comme les logos des équipes et l'avatar d'un joueur solo
