@@ -85,7 +85,23 @@
   transition: color 0.15s, background 0.15s;
 }
 
-.item:hover:not(:disabled),
+/* Survol réservé aux pointeurs qui survolent : au toucher, l'entrée tapée
+   resterait éclairée à la réouverture du menu. */
+@media (hover: hover) {
+  .item:hover:not(:disabled) {
+    color: var(--ink);
+    background: rgba(90, 200, 255, 0.08);
+  }
+
+  .item:hover:not(:disabled) .itemIcon {
+    opacity: 1;
+  }
+
+  .logout:hover:not(:disabled) .itemIcon {
+    color: var(--ink);
+  }
+}
+
 .item:focus-visible {
   color: var(--ink);
   background: rgba(90, 200, 255, 0.08);
@@ -97,7 +113,6 @@
   opacity: 0.8;
 }
 
-.item:hover:not(:disabled) .itemIcon,
 .item:focus-visible .itemIcon {
   opacity: 1;
 }
@@ -136,7 +151,6 @@
   color: var(--ink-mute);
 }
 
-.logout:hover:not(:disabled) .itemIcon,
 .logout:focus-visible .itemIcon {
   color: var(--ink);
 }

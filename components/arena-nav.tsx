@@ -78,7 +78,7 @@ export function ArenaNav({
           })}
         </div>
 
-        <LocaleLink href="/" className={s.navLogo} aria-label={t("nav.home")}>
+        <LocaleLink href="/" className={s.navLogo} aria-label={t("nav.home")} title={t("nav.home")}>
           <LogoWithGlow
             src="/logo_bg.webp"
             alt={t("nav.logoAlt")}

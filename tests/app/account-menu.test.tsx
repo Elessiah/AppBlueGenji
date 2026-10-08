@@ -117,7 +117,8 @@ describe("mise en page de la navigation", () => {
 
   it("n'éclaire pas la déconnexion désactivée au survol", () => {
     const css = readSource("components/account-menu.module.css");
-    expect(css).toContain(".item:hover:not(:disabled),");
+    // Survol réservé aux pointeurs qui survolent, et jamais sur l'entrée désactivée.
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.item:hover:not\(:disabled\) \{/);
     expect(css).toMatch(/\.logout:disabled \.itemIcon\s*\{[^}]*color: var\(--ink-dim\);/);
   });
 

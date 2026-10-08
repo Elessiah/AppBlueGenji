@@ -74,7 +74,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(html).not.toContain("navHome");
     expect(html).not.toContain('href="/equipes/3"');
     expect(html.match(/<a [^>]*href="\/"/g)).toHaveLength(1);
-    expect(html).toContain('<a class="navLogo" aria-label="Accueil" href="/">');
+    expect(html).toContain('<a class="navLogo" aria-label="Accueil" title="Accueil" href="/">');
   });
 
   it("réduit les signalements à un drapeau nommé, compteur en pastille", () => {
@@ -91,7 +91,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(html).toContain('<span class="sr-only">, </span><span class="navBadge">2</span><span class="sr-only"> à traiter</span>');
     const css = readSource("components/arena-nav.module.css");
     // Libellé visible dès 1150 px, comme l'était l'ancien bouton en toutes lettres.
-    expect(css).toMatch(/@media \(max-width: 1149px\) \{\s*\.navReportsLabel\s*\{[^}]*clip: rect\(0, 0, 0, 0\)/);
+    expect(css).toMatch(/@media \(max-width: 1149\.98px\) \{\s*\.navReportsLabel\s*\{[^}]*clip: rect\(0, 0, 0, 0\)/);
   });
 
   it("plafonne la pastille à « 99+ », lue telle qu'affichée (WCAG 2.5.3)", () => {
@@ -123,6 +123,8 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     const css = readSource("components/arena-nav.module.css");
     expect(css).toMatch(/\.navReports\[aria-current="page"\]\s*\{[^}]*border-color: var\(--blue-500\);/);
     expect(css).toMatch(/\.navReportsPending\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
+    // Contraste forcé : un contour système remplace fond et halo.
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.navTools \.navReports\[aria-current="page"\]\s*\{\s*outline: 2px solid CanvasText;/);
   });
 
   it("ne rend pas de groupe d'outils vide sur une route pas encore traduite", () => {
