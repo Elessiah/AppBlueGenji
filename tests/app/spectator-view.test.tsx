@@ -164,7 +164,7 @@ describe("page sans compte — mise en page", () => {
   it("a sa version anglaise et son image d'aperçu", () => {
     expect(isMigratedRoute("/suivre/tournois/12")).toBe(true);
     const og = readSource("app/suivre/tournois/[id]/opengraph-image.tsx");
-    expect(og).toContain('export { default } from "@/app/(secured)/tournois/[id]/opengraph-image";');
+    expect(og).toContain('export { default, alt, size, contentType } from "@/app/(secured)/tournois/[id]/opengraph-image";');
     expect(og).toContain("export const revalidate = 300");
   });
 
