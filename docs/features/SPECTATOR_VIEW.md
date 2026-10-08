@@ -155,7 +155,8 @@ lui-même).
   répétés à l'identique ne figent pas l'attente.
 
 **Côté client** (`app/suivre/tournois/[id]/_lib/spectator-poller.ts`, hors
-React, testé sans navigateur) : ±10 % de gigue, rien n'est lu **onglet
+React, testé sans navigateur) : ±10 % de gigue, un `304` sans nouveauté ne republie
+aucun état (la fiche ne se redessine pas) ; rien n'est lu **onglet
 caché** (`useClientPower`), pas même la première lecture d'un lien ouvert en
 arrière-plan : la lecture due part au retour ; le témoin dit « Hors ligne »
 (jamais « Reconnexion… », il n'y a pas de flux) après un échec ; après un échec, le
