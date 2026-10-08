@@ -25,7 +25,8 @@ de liste publique.
   `/tournois/creer`, `/tournois/[id]/modifier` gardent la carte « Connexion
   requise ». Un **préchargement** de la fiche arrive sans `x-pathname` (le
   `matcher` du middleware les exclut) : `AuthGate` le relaie côté client
-  (`router.replace`, ancre `#match-…` comprise) ;
+  (`router.replace`, ancre `#match-…` comprise), sans rendre la carte
+  « Connexion requise » le temps du relais ;
 - membre **connecté** sur `/suivre/tournois/[id]` → `/tournois/[id]`
   (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions. L'encart de la
   page sans compte ne lit alors pas la carte du tournoi (session mémoïsée pour
@@ -151,7 +152,8 @@ caché** (`useClientPower`), la lecture due part au retour ; après un échec, l
 cumulatif jusqu'à 10 min, jamais moins que le `Retry-After`, la cadence reprend
 au premier succès). Si la toute
 première lecture échoue, le squelette de chargement le dit (« La page réessaie
-seule… ») au lieu de sembler figé. Un `404` arrête tout (tournoi supprimé ou pas encore publié — même réponse, comme partout).
+seule… ») au lieu de sembler figé. Un `404` arrête tout (tournoi supprimé ou pas encore publié — même réponse, comme partout). Le
+démontage coupe la lecture en vol (`AbortController`).
 
 ## Visibilité
 
@@ -171,7 +173,8 @@ compte » de `/rgpd` (`#suivi-sans-compte`), sous-finalité ajoutée au registre
 (T03). Les codes de replay restent aux membres, comme l'arbitre et le motif d'une
 sanction et l'identité du caster. Le numéro de compte interne d'un joueur engagé
 en individuel est public (`soloUserIds`, il porte sa marque du podium, publique)
-et déclaré comme tel.
+et déclaré comme tel, comme les logos des équipes et l'avatar d'un joueur solo
+(copié dans son entrée, et absent s'il l'a masqué : `visibleAvatarUrl`).
 La visite est comptée par la mesure d'audience comme sur toute page (sauf
 opposition) ; l'adresse IP ne sert par ailleurs qu'au plafond de débit, en
 mémoire.
