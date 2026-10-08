@@ -354,8 +354,8 @@ describe("Autres écrans — noms cliquables", () => {
     // Le match à l'antenne peut opposer des joueurs (tournoi individuel) : la
     // carte de l'accueil n'a pas de quoi trancher, le serveur l'a déjà fait.
     const code = stripComments(read("components/cyber/landing/LiveCard.tsx"));
-    expect(code).toContain("href={currentMatch.team1Href}");
-    expect(code).toContain("href={currentMatch.team2Href}");
+    expect(code).toContain("href={match.team1Href}");
+    expect(code).toContain("href={match.team2Href}");
     expect(code).not.toContain("/equipes/");
     // Une place vide (bye, adversaire à désigner) ne mène nulle part.
     expect(code).toContain("if (!href) return <>{name}</>;");

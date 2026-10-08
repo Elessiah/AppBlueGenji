@@ -272,12 +272,75 @@ l'hydratation s'en tient à la phase du serveur.
 valeur d'un nouveau rendu serveur (`router.refresh()`, retour sur l'accueil)
 au lieu de garder la première jusqu'au sondage suivant.
 
+## 8. Carrousel des matchs
+
+La carte ne montrait que le match mis en avant. Elle fait désormais **défiler
+tous les matchs du tournoi dans l'ordre chronologique**, en s'ouvrant sur le
+match mis en avant (§ 7).
+
+**Quels matchs, dans quel ordre.** `carouselMatchOrder` (`lib/shared/landing.ts`)
+retient les mêmes candidats que la mise en avant — à l'antenne, lancé, en
+lancement ou daté ; jamais « À planifier », terminé ou sans adversaire — et les
+range par horaire croissant. Un match qui se joue sans horaire passe devant (il
+a commencé) ; à horaire égal, l'ordre du plateau départage. La liste est
+plafonnée à `LANDING_CAROUSEL_MAX_MATCHES` (12) : au-delà, un tour complet
+dépasserait la minute ; la fenêtre se décale pour toujours contenir le match mis
+en avant. Le serveur l'envoie dans `LandingLive.matches` ; `currentMatch` en est
+un élément (même objet). Sans `matches`, la carte retombe sur `currentMatch`.
+
+**Hauteur stable.** Les matchs sont empilés dans la même case de grille
+(`.slides` / `.slide`), un seul visible (`visibility` + fondu d'opacité) : la
+carte prend la hauteur du plus haut — bandeau de diffusion, seeds — et le hero
+ne saute pas d'un match à l'autre. Les matchs masqués sont `aria-hidden` et hors
+tabulation. Avec un seul match, la carte est rendue exactement comme avant
+(ni pile ni commandes).
+
+**Défilement** (`useMatchCarousel`, `components/cyber/landing/`) : un match toutes
+les 7 s (`LANDING_CAROUSEL_INTERVAL_MS`), par un `setTimeout` relancé à chaque
+changement — un geste du lecteur redonne le délai entier. Il ne tourne qu'avec
+`decorativeMotion` (régime de charge : figé onglet caché, page sans focus,
+mouvement réduit, machine à la peine — `CLIENT_POWER_MODES.md`) et s'arrête sous
+la souris ou le focus **clavier** (`:focus-visible`) **de toute la carte** — ni
+le toucher ni le focus laissé par un clic, que rien ne viendrait relâcher : le
+carrousel resterait figé, bouton « Pause » affiché. L'enveloppe `.hold`
+(`display: contents`) porte les écouteurs, la plaque de lien couvrant les
+matchs. Le match affiché est suivi **par identifiant** (`resolveCarouselIndex`) :
+un sondage de `useLandingLive` qui retire un match terminé ne décale pas la
+carte sur son voisin.
+
+**Commandes** (pied de carte, au-dessus de la plaque) : précédent, position
+« 2 / 5 », suivant, et pause (WCAG 2.2.2). La pause reste rendue sous un gel
+**passager** (fenêtre sans focus, onglet caché) — un bouton qui disparaîtrait à
+chaque perte de focus ferait perdre le focus clavier — mais pas sous un gel
+**durable** (`carouselCanAutoRotate` : mouvement réduit, rencontre en cours,
+machine à la peine), où « Pause » nommerait un mouvement qui n'a pas lieu.
+
+**Match figé sous le lecteur.** Tant qu'il n'a ni défilé ni navigué, la carte
+suit le match mis en avant, qu'un sondage peut changer. Le survol à la souris et
+le focus clavier **figent** donc le match affiché (`heldId`) : le match qu'on
+allait ouvrir n'est pas remplacé sous les yeux. Le temps de la prise seulement —
+gardé au-delà, il empêcherait la carte de suivre le match mis en avant chez qui
+rien ne défile (mouvement réduit) : un match entré à l'antenne n'y paraîtrait
+jamais. Une navigation (précédent / suivant, défilement) écrit `activeId`, qui
+prime et reste.
+
+**Focus perdu par un retrait.** Un élément retiré sous le focus clavier — le
+match affiché, terminé entre deux sondages, le bouton de diffusion d'un match
+qui quitte l'antenne, la pause sous un ralenti constaté page regardée — n'émet
+aucun `blur` : la prise resterait posée pour toujours et le focus tomberait sur
+`<body>`. `useMatchCarousel` le relit après **chaque** rendu de la carte, donc
+dans celui du retrait : le focus revient au bouton « suivant »
+(`data-carousel-next`), à défaut à la plaque de lien, sans défiler la page ;
+parti ailleurs, ou carte démontée, il relâche la prise. La position n'est annoncée (`aria-live="polite"`) que
+défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
+
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
 | `lib/shared/match-anchor.ts` | Module pur : identifiant, chemin, relecture, phase à révéler. |
-| `components/cyber/landing/LiveCard.tsx` | Plaque de lien, bouton de direct, seeds. |
+| `components/cyber/landing/LiveCard.tsx` | Plaque de lien, bouton de direct, seeds, carrousel. |
+| `components/cyber/landing/useMatchCarousel.ts` | Match affiché, défilement automatique, pause. |
 | `lib/server/landing-service.ts` | Seeds des deux engagés, sous condition de `seedingSource`. |
 | `lib/shared/landing.ts` | `LandingLiveMatch.team1Seed` / `team2Seed`. |
 | `app/(secured)/tournois/[id]/_hooks/useMatchAnchor.ts` | Lecture du fragment, phase, défilement, surlignage. |
@@ -292,8 +355,9 @@ au lieu de garder la première jusqu'au sondage suivant.
 |---|---|
 | `tests/lib/shared/match-anchor.test.ts` | Réciprocité écriture/relecture, refus des formes convertibles, résolution de phase. |
 | `tests/app/live-card-featured-match.test.tsx` | Cible du lien, intitulé accessible, bouton de direct réservé à `LIVE`, plus aucune donnée inventée, pastille du match distincte de l'état du tournoi. |
-| `tests/lib/shared/landing.test.ts` | `featuredMatchPill` : libellé par section, cas « En direct », bascule par l'horloge. |
-| `tests/lib/server/landing-live.test.ts` | Seeds exposés format par format, seed aberrant écarté. |
+| `tests/lib/shared/landing.test.ts` | `featuredMatchPill` : libellé par section, cas « En direct », bascule par l'horloge ; `carouselMatchOrder` : ordre, exclusions, plafond. |
+| `tests/lib/server/landing-live.test.ts` | Seeds exposés format par format, seed aberrant écarté ; liste chronologique du carrousel. |
+| `tests/app/live-card-carousel.test.tsx` | Pile des matchs, ouverture sur le match mis en avant, commandes, repli à un seul match. |
 | `tests/tournois/match-anchor-wiring.test.ts` | Points de passage (l'ancre est dans `MatchRow`, le hook est branché) et unicité du préfixe. |
 
 ## Notes reprises de CLAUDE.md
