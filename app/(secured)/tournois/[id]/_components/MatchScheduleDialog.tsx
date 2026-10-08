@@ -12,6 +12,7 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import {
   MATCH_ENTRY_DEFAULT_TIME,
+  matchEntryDefaultMonth,
   matchEntryMonths,
   formatMatchStartEntryPreview,
   localMatchTimeIfDifferent,
@@ -154,9 +155,12 @@ export function MatchScheduleDialog({
   const fieldErrors = useFieldErrors(MATCH_SCHEDULE_FIELD_ERRORS, FIELD_IDS);
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
   const [day, setDay] = useState(initial ? String(initial.day) : "");
-  const [month, setMonth] = useState(initial ? String(initial.month) : "");
-  // Une liste de demi-heures, 21:00 par défaut ; une heure déjà posée entre
-  // deux demi-heures (posée par un autre chemin) y reste proposée telle quelle.
+  // Sans date posée, le mois courant (Paris) est présélectionné : reste le jour.
+  const [month, setMonth] = useState(() =>
+    initial ? String(initial.month) : String(matchEntryDefaultMonth(Date.now())),
+  );
+  // Une liste de quarts d'heure, 21:00 par défaut ; une heure déjà posée entre
+  // deux quarts d'heure (posée par un autre chemin) y reste proposée telle quelle.
   const [time, setTime] = useState(initial ? matchEntryTimeValue(initial) : MATCH_ENTRY_DEFAULT_TIME);
   const [timeOptions] = useState(() => matchEntryTimeOptions(initial ? matchEntryTimeValue(initial) : null));
   // Figée à l'ouverture : l'année déduite ne doit pas changer pendant la saisie.
