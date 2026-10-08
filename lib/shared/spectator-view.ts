@@ -192,9 +192,10 @@ export function spectatorFreshnessMs(pollMs: number, level: SpectatorLoadLevel):
  * propositions en attente est déjà vide dans l'instantané diffusé ; il l'est
  * ici aussi, explicitement.
  *
- * Les **identifiants de comptes** partent aussi (minimisation) : la page sans
- * compte ne lie vers aucune fiche de joueur (`soloUserIds`) et ne reconnaît
- * aucun caster (`casterUserId`) — elle n'affiche que des noms et des pseudos.
+ * L'identifiant du **caster** part aussi (`casterUserId`) : la page sans compte
+ * ne reconnaît personne, seul son pseudo, à l'antenne, reste. `soloUserIds`
+ * reste en revanche : il porte la marche du podium d'un joueur engagé en
+ * individuel (`useEntrantPodiumClass`), et le podium est public.
  *
  * Les **sanctions** (BlueGenji Survie) gardent l'équipe, la manche et les
  * points, mais ni l'arbitre qui les a prononcées (le staff reste anonyme hors de
@@ -204,7 +205,6 @@ export function spectatorFreshnessMs(pollMs: number, level: SpectatorLoadLevel):
 export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnapshot {
   return {
     ...snapshot,
-    soloUserIds: {},
     endurance: snapshot.endurance
       ? {
           ...snapshot.endurance,
