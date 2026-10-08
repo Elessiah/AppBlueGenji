@@ -30,9 +30,9 @@ de liste publique.
   (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions.
 
 La langue suit l'adresse (`localeHref`). L'ancre `#match-[id]` traverse la
-redirection serveur (le navigateur la conserve) ; la requête (`?utm=…`) non —
-le serveur ne connaît que le chemin (`x-pathname`) —, seul le relais client la
-garde.
+redirection serveur (le navigateur la conserve), la requête (`?utm=…`) aussi :
+le middleware la pose à côté du chemin (`x-search`, toujours remplacé), et seule
+une valeur qui commence par `?` est reprise. Le relais client garde les deux.
 
 **Liens qui évitent le détour** — la vitrine sait qui la lit : pour un
 visiteur sans session, le tableau des tournois, la carte « en direct » et
