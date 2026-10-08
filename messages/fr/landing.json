@@ -76,6 +76,15 @@
       "semi": "Demi-finale",
       "quarter": "Quarts de finale",
       "round": "Manche {n}"
+    },
+    "carousel": {
+      "role": "carrousel",
+      "label": "Matchs de {tournament}",
+      "position": "Match {n} sur {total}",
+      "previous": "Match précédent",
+      "next": "Match suivant",
+      "pause": "Mettre en pause le défilement des matchs",
+      "play": "Reprendre le défilement des matchs"
     }
   },
   "ticker": {

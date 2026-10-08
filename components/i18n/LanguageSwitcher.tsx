@@ -1,7 +1,8 @@
 "use client";
 
+import { Globe } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LOCALE_NATIVE_NAME, isMigratedRoute, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
+import { isMigratedRoute, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 import { useAppLocale } from "./locale-context";
 import styles from "./LanguageSwitcher.module.css";
 
@@ -23,11 +24,23 @@ import styles from "./LanguageSwitcher.module.css";
  *   code client de `next-intl` n'est chargé pour un lien qui ne s'affiche pas.
  */
 export function LanguageSwitcher({ label, className }: Readonly<{ label: string; className?: string }>) {
-  const path = splitLocalePrefix(usePathname() ?? "/").path;
+  const path = useSwitchablePath();
   const locale = useAppLocale();
-  if (!isMigratedRoute(path)) return null;
+  if (path === null) return null;
   const target: Locale = locale === "fr" ? "en" : "fr";
-  return <SwitcherLink href={localeHref(path, target)} target={target} label={label} className={className} />;
+  return (
+    <SwitcherLink href={localeHref(path, target)} target={target} label={label} className={className} />
+  );
+}
+
+/**
+ * Le chemin courant (sans préfixe de langue) s'il a une autre langue, sinon
+ * `null` : la seule décision « le sélecteur parle-t-il ? », partagée avec qui
+ * doit savoir d'avance s'il sera rendu (groupe d'outils de `ArenaNav`).
+ */
+export function useSwitchablePath(): string | null {
+  const path = splitLocalePrefix(usePathname() ?? "/").path;
+  return isMigratedRoute(path) ? path : null;
 }
 
 /** L'adresse de l'autre langue, avec la requête (`a=1`) et l'ancre (`#x`) de la page courante. */
@@ -65,15 +78,10 @@ function SwitcherLink({
       onFocus={withAnchor}
       onClick={withAnchor}
     >
-      {/* Sur un écran étroit, le code (« EN ») remplace le nom : la ligne
-          d'actions de l'en-tête passait sinon à la ligne et poussait le menu du
-          compte sous le logo. Le nom accessible garde le code visible en tête. */}
-      <span lang={target} className={styles.full}>
-        {LOCALE_NATIVE_NAME[target]}
-      </span>
-      <span lang={target} className={styles.short}>
-        {target.toUpperCase()}
-      </span>
+      {/* Globe et code de la langue visée (« EN »), le même bouton dans toutes
+          les barres. Le nom accessible commence par ce code visible. */}
+      <Globe size={16} strokeWidth={2} aria-hidden="true" className={styles.globe} />
+      <span lang={target}>{target.toUpperCase()}</span>
       <span className="sr-only"> — {label}</span>
     </a>
   );

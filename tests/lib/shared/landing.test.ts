@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   activeTournamentCards,
+  carouselMatchOrder,
   chooseFeaturedTournament,
   compareByStartAt,
   FEATURED_TOURNAMENT_STATE_LABEL,
@@ -290,5 +291,46 @@ describe("featuredMatchPill", () => {
         expect(pill(phase, null, NOW, liveState).label).not.toBe(FEATURED_TOURNAMENT_STATE_LABEL);
       }
     }
+  });
+});
+
+describe("carouselMatchOrder", () => {
+  const at = (
+    phase: FeaturedMatchCandidate["phase"],
+    startAt: string | null = null,
+    onAir = false,
+  ): FeaturedMatchCandidate => ({ onAir, phase, startAt });
+
+  it("range les matchs datés par horaire croissant", () => {
+    const candidates = [
+      at("SCHEDULED", "2026-10-05T21:00:00Z"),
+      at("SCHEDULED", "2026-10-05T19:00:00Z"),
+      at("SCHEDULED", "2026-10-05T20:00:00Z"),
+    ];
+    expect(carouselMatchOrder(candidates, 1)).toEqual([1, 2, 0]);
+  });
+
+  it("place un match qui se joue sans horaire devant les matchs datés", () => {
+    const candidates = [at("SCHEDULED", "2026-10-05T19:00:00Z"), at("LAUNCHED"), at("TO_PLAN", null, true)];
+    expect(carouselMatchOrder(candidates, 2)).toEqual([1, 2, 0]);
+  });
+
+  it("écarte les matchs à planifier, terminés ou sans adversaire (`NONE`)", () => {
+    const candidates = [at("TO_PLAN"), at("NONE"), at("LOBBY", "2026-10-05T18:00:00Z")];
+    expect(carouselMatchOrder(candidates, 2)).toEqual([2]);
+    expect(carouselMatchOrder([at("TO_PLAN")], -1)).toEqual([]);
+  });
+
+  it("garde l'ordre du plateau à horaire égal", () => {
+    const same = "2026-10-05T19:00:00Z";
+    expect(carouselMatchOrder([at("SCHEDULED", same), at("SCHEDULED", same), at("LAUNCHED")], 2)).toEqual([2, 0, 1]);
+  });
+
+  it("plafonne la liste sans jamais en retirer le match mis en avant", () => {
+    const candidates = Array.from({ length: 6 }, (_, hour) => at("SCHEDULED", `2026-10-05T1${hour}:00:00Z`));
+    expect(carouselMatchOrder(candidates, 0, 3)).toEqual([0, 1, 2]);
+    expect(carouselMatchOrder(candidates, 4, 3)).toEqual([2, 3, 4]);
+    // Aucun match mis en avant : les premiers.
+    expect(carouselMatchOrder(candidates, -1, 3)).toEqual([0, 1, 2]);
   });
 });

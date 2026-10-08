@@ -1,40 +1,56 @@
-/* Sélecteur de langue : un lien discret, en capitales mono comme les autres
-   libellés d'en-tête. Cible d'au moins 44 px de haut (WCAG 2.5.8 / confort). */
+/* Sélecteur de langue : le même bouton-outil dans toutes les barres (vitrine
+   et espace connecté) — globe et code de la langue visée, capitales mono,
+   cadre qui n'apparaît qu'au survol. Cible de 44 px (WCAG 2.5.8 / confort). */
 .link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 44px;
   min-height: 44px;
   padding: 0 10px;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-cy-sm);
+  background: transparent;
   color: var(--ink-soft);
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-decoration: none;
   white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.link:hover {
-  color: var(--blue-300);
+.globe {
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
-/* Nom complet (« English ») sur grand écran, code (« EN ») sur téléphone :
-   `display: none` retire aussi l'autre forme de l'arbre d'accessibilité. */
-.short {
-  display: none;
+/* Survol réservé aux pointeurs fins : collé après un tap, il passerait pour
+   un état. */
+@media (hover: hover) and (pointer: fine) {
+  .link:hover {
+    color: var(--blue-300);
+    border-color: rgba(90, 200, 255, 0.35);
+    background: rgba(90, 200, 255, 0.06);
+  }
 }
 
-@media (max-width: 720px) {
-  .full {
+/* Retour à l'appui (toucher, clavier). */
+.link:active {
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+/* Très petit écran : le code seul, la place manque aux barres (outils, CTA,
+   menu du compte). */
+@media (max-width: 380px) {
+  .globe {
     display: none;
-  }
-
-  .short {
-    display: inline;
-  }
-
-  .link {
-    padding: 0 8px;
   }
 }

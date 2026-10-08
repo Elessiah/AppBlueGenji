@@ -76,6 +76,15 @@
       "semi": "Semifinal",
       "quarter": "Quarterfinal",
       "round": "Round {n}"
+    },
+    "carousel": {
+      "role": "carousel",
+      "label": "{tournament} matches",
+      "position": "Match {n} of {total}",
+      "previous": "Previous match",
+      "next": "Next match",
+      "pause": "Pause the match carousel",
+      "play": "Resume the match carousel"
     }
   },
   "ticker": {

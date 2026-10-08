@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { UserAvatar } from "./user-avatar";
 import { useToast } from "./ui/toast";
@@ -129,7 +130,8 @@ export function AccountMenuPanel({
   return (
     <div id={id} className={s.panel}>
       <LocaleLink href="/profil" className={s.item} onClick={onNavigate}>
-        {t("account.profile")}
+        <UserRound className={s.itemIcon} size={16} aria-hidden="true" />
+        <span className={s.itemText}>{t("account.profile")}</span>
       </LocaleLink>
       {activeTeam && (
         <LocaleLink
@@ -138,15 +140,21 @@ export function AccountMenuPanel({
           onClick={onNavigate}
           aria-label={t("nav.myTeamLabel", { team: activeTeam.teamName })}
         >
-          {t("nav.myTeam")}
-          {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
-          <span className={s.itemHint} aria-hidden="true">
-            {activeTeam.teamName}
+          <Shield className={s.itemIcon} size={16} aria-hidden="true" />
+          <span className={s.itemText}>
+            {t("nav.myTeam")}
+            {/* `title` : le nom complet au survol quand il est rogné ; muet, le
+                rappel étant masqué aux technologies d'assistance. */}
+            {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
+            <span className={s.itemHint} aria-hidden="true" title={activeTeam.teamName}>
+              {activeTeam.teamName}
+            </span>
           </span>
         </LocaleLink>
       )}
       <button type="button" className={`${s.item} ${s.logout}`} onClick={onLogout} disabled={leaving}>
-        {leaving ? t("account.loggingOut") : t("account.logout")}
+        <LogOut className={s.itemIcon} size={16} aria-hidden="true" />
+        <span className={s.itemText}>{leaving ? t("account.loggingOut") : t("account.logout")}</span>
       </button>
     </div>
   );

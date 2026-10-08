@@ -378,7 +378,7 @@ describe("liens publics vers un tournoi", () => {
     const calendar = readSource("components/cyber/landing/CalendarCard.tsx");
     expect(calendar).toContain("<LocaleLink className={styles.link} href={tournamentHref(event.tournamentId, spectator)}>");
     expect(readSource("components/cyber/landing/LiveCard.tsx")).toContain(
-      "tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null, spectator)",
+      "tournamentMatchHref(live.tournament.id, shown?.id ?? null, spectator)",
     );
   });
 

@@ -23,9 +23,16 @@
   transition: border-color 0.15s;
 }
 
-.trigger:hover,
 .triggerOpen {
   border-color: rgba(90, 200, 255, 0.45);
+}
+
+/* Survol réservé aux pointeurs fins : collé après un tap, il ferait croire
+   le menu encore ouvert. */
+@media (hover: hover) and (pointer: fine) {
+  .trigger:hover {
+    border-color: rgba(90, 200, 255, 0.45);
+  }
 }
 
 .trigger:focus-visible {
@@ -66,12 +73,10 @@
 
 .item {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: center;
+  gap: 12px;
   width: 100%;
   min-height: 44px;
-  justify-content: center;
   padding: 10px 14px;
   border: 0;
   border-radius: var(--r-cy-sm, 8px);
@@ -87,15 +92,60 @@
   transition: color 0.15s, background 0.15s;
 }
 
-.item:hover,
-.item:focus-visible {
-  color: var(--ink);
-  background: rgba(90, 200, 255, 0.08);
+/* Survol réservé aux pointeurs qui survolent : au toucher, l'entrée tapée
+   resterait éclairée à la réouverture du menu. */
+@media (hover: hover) and (pointer: fine) {
+  .item:hover:not(:disabled) {
+    color: var(--ink);
+    background: rgba(90, 200, 255, 0.08);
+  }
+
+  .item:hover:not(:disabled) .itemIcon {
+    opacity: 1;
+  }
+
+  .logout:hover:not(:disabled) .itemIcon {
+    color: var(--ink);
+  }
+}
+
+.itemIcon {
+  flex-shrink: 0;
+  color: var(--blue-300);
+  opacity: 0.8;
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .item:focus-visible {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.08);
   outline: 2px solid var(--blue-500);
   outline-offset: -2px;
+}
+
+.item:focus-visible .itemIcon {
+  opacity: 1;
+}
+
+/* Retour à l'appui (toucher, Espace) : après le focus pour l'emporter à
+   spécificité égale. */
+.item:active:not(:disabled) {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.12);
+}
+
+.item:active:not(:disabled) .itemIcon {
+  opacity: 1;
+}
+
+.logout:active:not(:disabled) .itemIcon {
+  color: var(--ink);
 }
 
 .itemHint {
@@ -114,6 +164,19 @@
   margin-top: 4px;
   border-top: 1px solid var(--line-soft);
   border-radius: 0 0 var(--r-cy-sm, 8px) var(--r-cy-sm, 8px);
+}
+
+.logout .itemIcon {
+  color: var(--ink-mute);
+}
+
+.logout:focus-visible .itemIcon {
+  color: var(--ink);
+}
+
+.logout:disabled .itemIcon {
+  color: var(--ink-dim);
+  opacity: 1;
 }
 
 .logout:disabled {
