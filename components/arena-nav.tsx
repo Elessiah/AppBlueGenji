@@ -55,9 +55,8 @@ export function ArenaNav({
   // lui) : le savoir d'avance évite un groupe d'outils vide au filet orphelin.
   const switchable = useSwitchablePath() !== null;
   const languageLabel = switchable && languageSwitcherLabel ? languageSwitcherLabel : null;
-  // Au-delà de 99, la pastille déborderait du drapeau.
-  const badge = openReports !== null && openReports > 99 ? "99+" : String(openReports);
   const pending = openReports !== null && openReports > 0;
+  const badge = pending ? reportsBadge(openReports) : null;
 
   return (
     <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
@@ -107,13 +106,13 @@ export function ArenaNav({
                   aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
                 >
                   <Flag size={16} strokeWidth={2} aria-hidden="true" />
-                  {/* Libellé visible sur grand écran, lu seul en dessous de 1280 px. */}
+                  {/* Libellé visible dès 1150 px, lu seul en dessous. */}
                   <span className={s.navReportsLabel}>{t("nav.reports")}</span>
                   {pending && (
                     <>
                       {/* Le nom lu contient le compte affiché (« 99+ » compris) :
                           « Signalements, 2 à traiter ». */}
-                      <span className="sr-only">, </span>
+                      <span className="sr-only">{t("nav.reportsCountLead")}</span>
                       <span className={s.navBadge}>{badge}</span>
                       <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
                     </>
@@ -128,4 +127,9 @@ export function ArenaNav({
       </div>
     </nav>
   );
+}
+
+/** Texte de la pastille : au-delà de 99, elle déborderait du drapeau. */
+function reportsBadge(count: number): string {
+  return count > 99 ? "99+" : String(count);
 }

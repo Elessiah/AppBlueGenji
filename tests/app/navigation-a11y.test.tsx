@@ -89,6 +89,9 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="navReportsLabel">Signalements<\/span>/);
     // Compte lu tel qu'affiché, séparé du libellé (« Signalements, 2 à traiter »).
     expect(html).toContain('<span class="sr-only">, </span><span class="navBadge">2</span><span class="sr-only"> à traiter</span>');
+    const css = readSource("components/arena-nav.module.css");
+    // Libellé visible dès 1150 px, comme l'était l'ancien bouton en toutes lettres.
+    expect(css).toMatch(/@media \(max-width: 1149px\) \{\s*\.navReportsLabel\s*\{[^}]*clip: rect\(0, 0, 0, 0\)/);
   });
 
   it("plafonne la pastille à « 99+ », lue telle qu'affichée (WCAG 2.5.3)", () => {

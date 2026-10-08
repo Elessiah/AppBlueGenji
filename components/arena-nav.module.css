@@ -345,15 +345,15 @@
   box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(var(--amber-rgb), 0.35);
 }
 
-/* Libellé « Signalements » visible sur grand écran seulement ; en dessous,
-   lu par les technologies d'assistance (nom accessible inchangé). */
+/* Libellé « Signalements » visible dès 1150 px ; en dessous, la barre n'a
+   plus la place : lu par les technologies d'assistance (nom inchangé). */
 .navReportsLabel {
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1149px) {
   .navReportsLabel {
     position: absolute;
     width: 1px;
