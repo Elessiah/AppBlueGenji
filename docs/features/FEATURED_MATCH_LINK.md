@@ -309,9 +309,11 @@ un sondage de `useLandingLive` qui retire un match terminé ne décale pas la
 carte sur son voisin.
 
 **Commandes** (pied de carte, au-dessus de la plaque) : précédent, position
-« 2 / 5 », suivant, et pause (WCAG 2.2.2) — toujours rendue dès deux matchs :
-le régime de charge fige le défilement à chaque perte de focus de la fenêtre, et
-un bouton qui disparaîtrait alors ferait perdre le focus clavier. La position n'est annoncée (`aria-live="polite"`) que
+« 2 / 5 », suivant, et pause (WCAG 2.2.2). La pause reste rendue sous un gel
+**passager** (fenêtre sans focus, onglet caché) — un bouton qui disparaîtrait à
+chaque perte de focus ferait perdre le focus clavier — mais pas sous un gel
+**durable** (`carouselCanAutoRotate` : mouvement réduit, rencontre en cours,
+machine à la peine), où « Pause » nommerait un mouvement qui n'a pas lieu. La position n'est annoncée (`aria-live="polite"`) que
 défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
 
 ## Fichiers

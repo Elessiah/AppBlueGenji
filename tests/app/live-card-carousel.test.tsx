@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
-import { resolveCarouselIndex } from "@/components/cyber/landing/useMatchCarousel";
+import { carouselCanAutoRotate, resolveCarouselIndex } from "@/components/cyber/landing/useMatchCarousel";
+import type { ClientPowerInput } from "@/lib/shared/client-power";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
 import { tournamentCard } from "../helpers/tournament-card";
 
@@ -156,5 +157,29 @@ describe("useMatchCarousel — régime de charge", () => {
     expect(source).toContain('if (event.pointerType === "mouse") setHovered(true);');
     expect(source).toContain('setFocused(event.target.matches(":focus-visible"))');
     expect(source).not.toContain("onMouseEnter");
+  });
+});
+
+describe("carouselCanAutoRotate", () => {
+  const input = (overrides: Partial<ClientPowerInput> = {}): ClientPowerInput => ({
+    attention: "FOCUSED",
+    matchFocus: false,
+    reducedMotion: false,
+    motionSetting: false,
+    performanceLimited: false,
+    ...overrides,
+  });
+
+  it("garde le défilement sous un gel passager : la pause reste rendue", () => {
+    expect(carouselCanAutoRotate(input())).toBe(true);
+    expect(carouselCanAutoRotate(input({ attention: "BACKGROUND" }))).toBe(true);
+    expect(carouselCanAutoRotate(input({ attention: "HIDDEN" }))).toBe(true);
+  });
+
+  it("le retire sous un gel durable : pas de « Pause » sans mouvement", () => {
+    expect(carouselCanAutoRotate(input({ reducedMotion: true }))).toBe(false);
+    expect(carouselCanAutoRotate(input({ motionSetting: true }))).toBe(false);
+    expect(carouselCanAutoRotate(input({ matchFocus: true }))).toBe(false);
+    expect(carouselCanAutoRotate(input({ performanceLimited: true }))).toBe(false);
   });
 });

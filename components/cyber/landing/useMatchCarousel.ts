@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
-import { useClientPower } from "@/lib/shared/hooks/useClientPower";
+import { useClientPower, useClientPowerInput } from "@/lib/shared/hooks/useClientPower";
+import type { ClientPowerInput } from "@/lib/shared/client-power";
 
 /** Durée d'affichage d'un match avant de passer au suivant. */
 export const LANDING_CAROUSEL_INTERVAL_MS = 7_000;
@@ -23,11 +24,26 @@ export function resolveCarouselIndex(
   return Math.max(featured, 0);
 }
 
+/**
+ * Le défilement automatique peut-il reprendre sans que le lecteur change de
+ * réglage ? Non sous un gel **durable** — mouvement réduit (système ou menu
+ * d'accessibilité), rencontre en cours, machine à la peine. Un gel passager
+ * (fenêtre sans focus, onglet caché) ne compte pas : il se lève seul.
+ */
+export function carouselCanAutoRotate(input: ClientPowerInput): boolean {
+  return !input.reducedMotion && !input.motionSetting && !input.matchFocus && !input.performanceLimited;
+}
+
 export type MatchCarousel = {
   index: number;
   count: number;
   /** Le défilement tourne réellement en ce moment. */
   rotating: boolean;
+  /**
+   * Le défilement automatique existe pour ce lecteur (gel passager compris) :
+   * sinon, un bouton « Pause » nommerait un mouvement qui n'a pas lieu.
+   */
+  autoRotates: boolean;
   /** Le lecteur a mis le défilement en pause (bouton). */
   paused: boolean;
   go: (delta: number) => void;
@@ -61,6 +77,7 @@ export type MatchCarousel = {
  */
 export function useMatchCarousel(ids: readonly number[], featuredId: number | null): MatchCarousel {
   const { decorativeMotion } = useClientPower();
+  const autoRotates = carouselCanAutoRotate(useClientPowerInput());
   const [activeId, setActiveId] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -82,6 +99,7 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
     index,
     count,
     rotating,
+    autoRotates: count > 1 && autoRotates,
     paused,
     go: (delta) => {
       if (count === 0) return;
