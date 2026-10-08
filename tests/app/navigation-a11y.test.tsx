@@ -117,6 +117,10 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(badgeRule).toContain("min-height: 18px;");
     // Sous 720 px, l'écart laisse la place au contour de focus (2 px + 2 px).
     expect(css).toMatch(/\.navTools \{\s*gap: 6px;/);
+    // Filet centré sous 900 px : marge des outils = écart du groupe de droite.
+    expect(css).toMatch(/\.navRight \{\s*gap: 10px;\s*\}\s*\/\*[^*]*\*\/\s*\.navTools \{\s*padding-right: 10px;/);
+    // Les liens de section ne gardent pas un survol collé au toucher.
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.navLink:hover/);
   });
 
   it("marque la page des signalements comme courante", () => {
@@ -131,7 +135,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(css).toMatch(/\.navReports\[aria-current="page"\]\s*\{[^}]*border-color: var\(--blue-500\);/);
     expect(css).toMatch(/\.navReportsPending\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
     // Contraste forcé : un contour système remplace fond et halo.
-    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.navTools \.navReports\[aria-current="page"\]\s*\{\s*outline: 2px solid CanvasText;/);
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.navTools \.navReports\[aria-current="page"\]\s*\{\s*border-color: Highlight;/);
   });
 
   it("ne rend pas de groupe d'outils vide sur une route pas encore traduite", () => {

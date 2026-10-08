@@ -69,8 +69,12 @@
   transition: background 0.2s, opacity 0.2s;
 }
 
-.navLink:hover {
-  color: rgb(var(--nav-rgb));
+/* Survol réservé aux pointeurs fins : collé après un tap, il ferait passer
+   le lien touché pour la section courante. */
+@media (hover: hover) and (pointer: fine) {
+  .navLink:hover {
+    color: rgb(var(--nav-rgb));
+  }
 }
 
 .navLinkActive {
@@ -184,6 +188,11 @@
   }
 }
 
+/* Retour au toucher (le survol est réservé aux pointeurs fins). */
+.navTools .navTool:active {
+  background: rgba(90, 200, 255, 0.1);
+}
+
 .navTools .navTool:focus-visible {
   outline: 2px solid var(--blue-500);
   outline-offset: 2px;
@@ -211,6 +220,11 @@
 
   .navRight {
     gap: 10px;
+  }
+
+  /* Filet centré : même écart de part et d'autre. */
+  .navTools {
+    padding-right: 10px;
   }
 }
 
@@ -298,7 +312,6 @@
      bouton voisin. */
   .navTools {
     gap: 6px;
-    padding-right: 8px;
   }
 }
 
@@ -342,12 +355,12 @@
   box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(90, 200, 255, 0.3);
 }
 
-/* Contraste forcé (Windows) : fonds et halos disparaissent ; un contour
-   système garde la page courante distincte. */
+/* Contraste forcé (Windows) : fonds et halos disparaissent ; la bordure
+   passe en couleur système de sélection pour la page courante — le contour
+   de focus, lui, reste libre et donc visible. */
 @media (forced-colors: active) {
   .navTools .navReports[aria-current="page"] {
-    outline: 2px solid CanvasText;
-    outline-offset: 2px;
+    border-color: Highlight;
   }
 }
 
