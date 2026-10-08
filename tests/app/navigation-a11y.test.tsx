@@ -135,7 +135,9 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(css).toMatch(/\.navReports\[aria-current="page"\]\s*\{[^}]*border-color: var\(--blue-500\);/);
     expect(css).toMatch(/\.navReportsPending\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
     // Contraste forcé : un contour système remplace fond et halo.
-    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.navTools \.navReports\[aria-current="page"\]\s*\{\s*border-color: Highlight;/);
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.navTools \.navReports\[aria-current="page"\],\s*\.navTools \.navReportsPending\[aria-current="page"\]\s*\{\s*border-color: Highlight;/);
+    // Après la règle ambre, à spécificité égale : sinon elle l'emporterait.
+    expect(css.indexOf("@media (forced-colors: active)")).toBeGreaterThan(css.indexOf('.navTools .navReportsPending[aria-current="page"] {'));
   });
 
   it("ne rend pas de groupe d'outils vide sur une route pas encore traduite", () => {

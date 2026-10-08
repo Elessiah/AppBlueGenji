@@ -355,20 +355,22 @@
   box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(90, 200, 255, 0.3);
 }
 
-/* Contraste forcé (Windows) : fonds et halos disparaissent ; la bordure
-   passe en couleur système de sélection pour la page courante — le contour
-   de focus, lui, reste libre et donc visible. */
-@media (forced-colors: active) {
-  .navTools .navReports[aria-current="page"] {
-    border-color: Highlight;
-  }
-}
-
 .navTools .navReportsPending[aria-current="page"] {
   color: var(--amber);
   border-color: var(--amber);
   background: rgba(var(--amber-rgb), 0.14);
   box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(var(--amber-rgb), 0.35);
+}
+
+/* Contraste forcé (Windows) : fonds et halos disparaissent ; la bordure
+   passe en couleur système de sélection pour la page courante — le contour
+   de focus, lui, reste libre et donc visible. Placé après les règles
+   d'état, à spécificité égale, pour l'emporter. */
+@media (forced-colors: active) {
+  .navTools .navReports[aria-current="page"],
+  .navTools .navReportsPending[aria-current="page"] {
+    border-color: Highlight;
+  }
 }
 
 /* Libellé « Signalements » visible dès 1150 px ; en dessous, la barre n'a
