@@ -155,7 +155,10 @@ bg_match_maps (
   des deux engagées — celle qui confirme —, ou report seul à l'échéance), ou
   écrit par l'arbitrage. Un forfait l'efface toujours (arbitrage ou engagée :
   son score plein pourrait sinon coïncider avec un détail noté plus tôt) ; une
-  saisie d'arbitrage le remplace par ses maps.
+  saisie d'arbitrage le remplace par ses maps ; un tour d'arbre final BG Survie
+  réécrit sur place (`writePlayoffRound`, résultat remis à zéro) l'efface — le
+  détail n'est plus filtré sur le score à l'affichage, il doit donc partir avec
+  le résultat qu'il documente.
 - Le dialogue d'arbitrage compte les maps dans « saisie en cours » : corriger
   un code ou ajouter une map nulle, qui ne changent pas le score, n'est pas
   écrasé par une proposition arrivée par le flux.
@@ -307,8 +310,9 @@ le tait.
 Un code de replay mène aux identifiants de jeu des joueurs présents (BattleTag
 masqué sur le site compris) : traité comme donnée personnelle. Une correction
 d'arbitrage remplace le détail retenu par le sien ; un code omis par l'arbitrage
-n'est pas collecté (précisé sur `/rgpd` et au registre le 2026-10-08, sans
-entrée `PRIVACY_CHANGES` : rien de nouveau n'est collecté) ; l'export RGPD rend les maps saisies par le titulaire
+n'est pas collecté (précisé sur `/rgpd`, au registre et dans l'entrée
+`2026-10-code-replay-facultatif-arbitrage` de `PRIVACY_CHANGES`, 2026-10-08) ;
+l'export RGPD rend les maps saisies par le titulaire
 (`mapEntries`, `lib/server/match-map-entries.ts`). La suppression d'un compte
 délie la saisie mais garde les codes (la partie est conservée par l'éditeur du
 jeu) — dit sur `/rgpd`, dans l'entrée `PRIVACY_CHANGES` (datée du 2026-10-06,
