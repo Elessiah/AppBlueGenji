@@ -153,14 +153,14 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(html).not.toContain("navTools");
   });
 
-  it("rend le sélecteur compact dans le groupe d'outils sur une route traduite", () => {
+  it("rend le sélecteur dans le groupe d'outils sur une route traduite", () => {
     mockPathname = "/tournois";
     const html = renderToStaticMarkup(
       <ToastProvider>
         <ArenaNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />
       </ToastProvider>,
     );
-    expect(html).toMatch(/<div class="navTools"><a href="\/en\/tournois"[^>]*class="link navTool"/);
+    expect(html).toMatch(/<div class="navTools"><a href="\/en\/tournois" hrefLang="en" class="link">/);
   });
 
   it("ne rend ni drapeau ni groupe d'outils sans permission de modération ni langue", () => {

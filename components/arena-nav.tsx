@@ -98,7 +98,7 @@ export function ArenaNav({
           {(languageLabel || openReports !== null) && (
             <div className={s.navTools}>
               {/* Même page dans l'autre langue — seulement sur une route traduite. */}
-              {languageLabel && <LanguageSwitcher label={languageLabel} compact className={s.navTool} />}
+              {languageLabel && <LanguageSwitcher label={languageLabel} />}
               {openReports !== null && (
                 <LocaleLink
                   href={REPORTS_ADMIN_PATH}
