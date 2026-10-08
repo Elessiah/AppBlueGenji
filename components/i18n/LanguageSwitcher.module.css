@@ -15,8 +15,25 @@
   white-space: nowrap;
 }
 
-.link:hover {
-  color: var(--blue-300);
+.globe {
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+/* Très petit écran : le code seul, la place manque à la barre connectée
+   (outils, filet, avatar) dès qu'un modérateur a dix signalements. */
+@media (max-width: 380px) {
+  .globe {
+    display: none;
+  }
+}
+
+/* Survol réservé aux pointeurs qui survolent : collé après un tap, il
+   passerait pour un état. */
+@media (hover: hover) and (pointer: fine) {
+  .link:hover {
+    color: var(--blue-300);
+  }
 }
 
 /* Nom complet (« English ») sur grand écran, code (« EN ») sur téléphone :

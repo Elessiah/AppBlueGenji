@@ -52,7 +52,14 @@ describe("AccountMenuPanel", () => {
     expect(html).toContain('href="/profil"');
     expect(html).toContain('href="/equipes/7"');
     expect(html).toContain('aria-label="Mon équipe : Les Ours"');
-    expect(html).toMatch(/<button type="button"[^>]*>Déconnexion<\/button>/);
+    // Nom complet au survol s'il est rogné, sans rien ajouter à la lecture.
+    expect(html).toContain('<span class="itemHint" aria-hidden="true" title="Les Ours">Les Ours</span>');
+    expect(html).toMatch(/<button type="button"[^>]*><svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="itemText">Déconnexion<\/span><\/button>/);
+  });
+
+  it("garde ses pictogrammes hors du nom accessible", () => {
+    const html = panel({ teamId: 7, teamName: "Les Ours" });
+    expect(html.match(/<svg[^>]*aria-hidden="true"/g)).toHaveLength(3);
   });
 
   it("n'affiche pas d'entrée d'équipe à qui n'en a pas", () => {
@@ -62,7 +69,7 @@ describe("AccountMenuPanel", () => {
   });
 
   it("désactive la déconnexion pendant la requête", () => {
-    expect(panel(null, true)).toMatch(/<button[^>]*disabled=""[^>]*>Déconnexion…<\/button>/);
+    expect(panel(null, true)).toMatch(/<button[^>]*disabled=""[^>]*>.*<span class="itemText">Déconnexion…<\/span><\/button>/);
   });
 });
 
@@ -101,15 +108,33 @@ describe("mise en page de la navigation", () => {
     }
   });
 
-  it("réduit « Accueil » / « Mon équipe » au pictogramme entre 721 et 1150 px", () => {
-    const block = arenaCss.slice(arenaCss.indexOf("@media (max-width: 1150px)"));
-    expect(block).toMatch(/\.navHomeLabel\s*\{[^}]*clip: rect\(0, 0, 0, 0\)/);
+  it("tient les quatre liens sur une ligne sous 1000 px en retirant leur losange", () => {
+    const block = arenaCss.slice(arenaCss.indexOf("@media (max-width: 1000px)"));
+    expect(block).toMatch(/^@media \(max-width: 1000px\) \{\s*\.navLink::before\s*\{\s*display: none;/);
   });
 
-  it("masque le libellé « Signalements » au même seuil que les autres raccourcis", () => {
-    // Le lien partage la classe `.navHome` : à un seuil plus bas, il s'affichait
-    // en toutes lettres, agrandi, dans la plage même que l'on compacte.
-    const labelRule = arenaCss.slice(0, arenaCss.indexOf(".navReportsLabel {"));
-    expect(labelRule.slice(labelRule.lastIndexOf("@media"))).toContain("(max-width: 1150px)");
+  it("garde aux outils une cible de 44 px, comme le sélecteur de langue", () => {
+    expect(arenaCss).toMatch(/\.navTools \.navTool\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
+  });
+
+  it("n'éclaire pas la déconnexion désactivée au survol", () => {
+    const css = readSource("components/account-menu.module.css");
+    // Survol réservé aux pointeurs qui survolent, et jamais sur l'entrée désactivée.
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.item:hover:not\(:disabled\) \{/);
+    expect(css).toMatch(/\.logout:disabled \.itemIcon\s*\{[^}]*color: var\(--ink-dim\);/);
+  });
+
+  it("garde le retour à l'appui visible après le focus", () => {
+    const css = readSource("components/account-menu.module.css");
+    expect(css.indexOf(".item:active:not(:disabled) {")).toBeGreaterThan(css.indexOf(".item:focus-visible {"));
+  });
+
+  it("dessine la pastille des signalements en contraste forcé", () => {
+    const badge = arenaCss.slice(arenaCss.indexOf(".navBadge {")).split("}")[0];
+    expect(badge).toContain("border: 1px solid transparent;");
+  });
+
+  it("sépare les outils du compte par un filet", () => {
+    expect(arenaCss).toMatch(/\.navTools\s*\{[^}]*border-right: 1px solid var\(--line-strong-cy\);/);
   });
 });

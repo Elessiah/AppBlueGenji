@@ -64,6 +64,20 @@ describe("LanguageSwitcher — même page, autre langue", () => {
     expect(html).toContain("read this page in French");
   });
 
+  it("en mode compact, montre le globe et le code seul, nom accessible en tête", () => {
+    mockPathname = "/regles";
+    const label = messagesFor("fr").common.languageSwitcher.label;
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="fr">
+        <LanguageSwitcher label={label} compact className="navTool" />
+      </AppLocaleProvider>,
+    );
+    expect(html).toContain('class="link navTool"');
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"/);
+    expect(html).not.toContain("English");
+    expect(html).toContain('<span lang="en">EN</span><span class="sr-only"> — lire cette page en anglais</span>');
+  });
+
   it("vise l'accueil anglais depuis /", () => {
     mockPathname = "/";
     expect(renderSwitcher()).toContain('href="/en"');

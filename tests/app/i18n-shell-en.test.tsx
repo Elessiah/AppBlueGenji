@@ -105,19 +105,18 @@ describe("coquille en anglais — composants client", () => {
     expect(accessibilityButtonLabel(2)).toBe("Réglages d'accessibilité (2 actifs)");
   });
 
-  it("barre des connectés : sections, équipe, signalements — liens sans préfixe vers des routes non traduites", () => {
+  it("barre des connectés : sections, signalements — liens sans préfixe vers des routes non traduites", () => {
     mockPathname = "/en/equipes/12";
     const html = english(
       <ArenaNav pseudo="Nova" avatarUrl={null} activeTeam={{ teamId: 7, teamName: "Les Ours" }} openReports={2} />,
     );
     expect(html).toContain('aria-label="Main navigation"');
     expect(html).toMatch(/aria-current="page"[^>]*>Teams<\/a>/);
-    for (const label of ["Players", "Tournaments", "Ranking", "Home", "My team", "Reports"]) expect(html).toContain(label);
-    expect(html).toContain('aria-label="My team: Les Ours"');
-    expect(html).toContain('<span class="sr-only"> to review</span>');
+    for (const label of ["Players", "Tournaments", "Ranking", "Home", "Reports"]) expect(html).toContain(label);
+    expect(html).toContain('<span class="sr-only">, </span><span class="navBadge">2</span><span class="sr-only"> to review</span>');
     expect(html).toContain('aria-label="Nova, account menu"');
-    // Le nom d'équipe n'est jamais traduit ; aucune route n'est encore traduite.
-    expect(html).toContain('href="/equipes/7"');
+    // « My team » vit dans le menu du compte (AccountMenuPanel), plus dans la barre.
+    expect(html).not.toContain('href="/equipes/7"');
     expect(html).not.toMatch(FRENCH_LEFTOVERS);
   });
 

@@ -19,6 +19,7 @@
     "myTeam": "My team",
     "myTeamLabel": "My team: {team}",
     "reports": "Reports",
+    "reportsCountLead": ", ",
     "reportsPending": "{count, plural, other {to review}}",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",

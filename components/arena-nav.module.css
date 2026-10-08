@@ -69,8 +69,12 @@
   transition: background 0.2s, opacity 0.2s;
 }
 
-.navLink:hover {
-  color: rgb(var(--nav-rgb));
+/* Survol réservé aux pointeurs fins : collé après un tap, il ferait passer
+   le lien touché pour la section courante. */
+@media (hover: hover) and (pointer: fine) {
+  .navLink:hover {
+    color: rgb(var(--nav-rgb));
+  }
 }
 
 .navLinkActive {
@@ -138,30 +142,57 @@
 .navRight {
   display: flex;
   justify-content: flex-end;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
+  min-width: 0;
 }
 
-.navHome {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--blue-300);
-  padding: 8px 14px;
-  border: 1px solid rgba(90, 200, 255, 0.45);
-  background: rgba(90, 200, 255, 0.08);
+/* Outils (langue, modération) : boutons carrés discrets, regroupés et séparés
+   du compte par un filet vertical — la barre ne porte plus qu'un seul bouton
+   « fort », celui du compte. */
+.navTools {
+  display: flex;
+  align-items: center;
+  /* 6 px à toutes les largeurs : le contour de focus (2 px, décalé de 2 px)
+     ne déborde pas sur le bouton voisin. */
+  gap: 6px;
+  padding-right: 14px;
+  border-right: 1px solid var(--line-strong-cy);
+}
+
+.navTools .navTool {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid transparent;
   border-radius: var(--r-cy-sm);
-  box-shadow: 0 0 12px rgba(90, 200, 255, 0.18), inset 0 0 0 1px rgba(90, 200, 255, 0.04);
-  transition: all 0.15s;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-decoration: none;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.navHome:hover {
-  color: var(--blue-200, #8ddcff);
-  border-color: rgba(90, 200, 255, 0.65);
-  background: rgba(90, 200, 255, 0.14);
-  box-shadow: 0 0 18px rgba(90, 200, 255, 0.35);
+/* Survol réservé aux pointeurs qui survolent : au toucher, l'état resterait
+   collé après le tap et passerait pour la page courante. */
+@media (hover: hover) and (pointer: fine) {
+  .navTools .navTool:hover {
+    color: var(--blue-300);
+    border-color: rgba(90, 200, 255, 0.35);
+    background: rgba(90, 200, 255, 0.06);
+  }
+}
+
+.navTools .navTool:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
 }
 
 /* Hauteur de la barre : elle reste collée en haut de l'écran, chaque pixel
@@ -171,35 +202,6 @@
 @media (max-height: 500px) {
   .nav {
     position: relative;
-  }
-}
-
-/* ── Portable, tablette : « Accueil » / « Mon équipe » en pictogramme seul ──
-   Entre 721 et 1150 px les libellés passaient sur deux lignes et rognaient le
-   pseudo. Le libellé reste lu par les technologies d'assistance (le nom
-   accessible du lien ne change pas). */
-@media (max-width: 1150px) {
-  .navHomeLabel {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .navHome {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 40px;
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 14px;
-    letter-spacing: 0;
   }
 }
 
@@ -216,14 +218,20 @@
   .navRight {
     gap: 10px;
   }
+
+  /* Filet centré : même écart de part et d'autre. */
+  .navTools {
+    padding-right: 10px;
+  }
 }
 
 /* ── Tablette étroite (721–1000 px) : quatre liens dans la colonne de gauche ──
    Avec « Classement », les liens à 0,2 em débordaient de leur tiers de grille
    et décentraient le logo en rognant la droite. Interlettrage et écarts
-   resserrés ; en dernier recours, les liens passent à la ligne plutôt que de
-   déborder, et le trait du lien actif remonte sous son libellé (comme en
-   mobile) pour ne pas barrer la ligne suivante. */
+   resserrés et losanges retirés (bloc suivant) : ils tiennent sur une ligne.
+   Le repli reste un filet de sécurité (pseudo très long, zoom), et le trait
+   du lien actif remonte sous son libellé pour ne pas barrer la ligne
+   suivante. */
 @media (min-width: 721px) and (max-width: 1000px) {
   .navLeft {
     min-width: 0;
@@ -240,9 +248,16 @@
   }
 }
 
+/* Sous 1000 px, le losange cède sa place au libellé : le trait sous le lien
+   actif suffit à marquer la section, et les quatre liens tiennent sur une
+   ligne au lieu de se replier. */
+@media (max-width: 1000px) {
+  .navLink::before {
+    display: none;
+  }
+}
+
 /* ── Mobile : passage sur deux lignes (logo + avatar en haut, liens en bas) ──
-   Les raccourcis « Accueil » / « Mon équipe » sont masqués : l'accueil reste
-   accessible par le logo, l'équipe par le menu du compte (sous l'avatar).
    Espacements resserrés : collante, la barre prenait 110 px. */
 @media (max-width: 720px) {
   .navInner {
@@ -289,10 +304,6 @@
   .navLink {
     letter-spacing: 0.06em;
   }
-
-  .navHome {
-    display: none;
-  }
 }
 
 /* ── Très petits écrans : liens plus compacts ── */
@@ -307,40 +318,72 @@
   }
 }
 
-/* Lien de la modération : ambre, comme tout ce qui attend une décision. */
-.navReports {
+/* Lien de la modération : drapeau, libellé, compteur en pastille alignée à
+   la suite — dans le bouton, sans rien recouvrir ni le contour de focus. */
+.navTools .navReports {
+  gap: 8px;
+}
+
+/* Ambre seulement quand un signalement attend : l'ambre est réservé aux
+   avertissements. À zéro, le drapeau reste un outil neutre. */
+.navTools .navReportsPending {
   color: var(--amber);
-  border-color: rgba(var(--amber-rgb), 0.45);
-  background: rgba(var(--amber-rgb), 0.08);
-  box-shadow: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
-.navReports:hover {
-  color: #ffc566;
-  border-color: rgba(var(--amber-rgb), 0.7);
+@media (hover: hover) and (pointer: fine) {
+  .navTools .navReportsPending:hover {
+    color: var(--amber);
+    border-color: rgba(var(--amber-rgb), 0.45);
+    background: rgba(var(--amber-rgb), 0.08);
+  }
+}
+
+/* Page courante : cadre plein et halo, distinct du simple survol. */
+.navTools .navReports[aria-current="page"] {
+  color: var(--blue-300);
+  border-color: var(--blue-500);
+  background: rgba(90, 200, 255, 0.12);
+  box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(90, 200, 255, 0.3);
+}
+
+.navTools .navReportsPending[aria-current="page"] {
+  color: var(--amber);
+  border-color: var(--amber);
   background: rgba(var(--amber-rgb), 0.14);
-  box-shadow: none;
+  box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(var(--amber-rgb), 0.35);
 }
 
-.navBadge {
-  min-width: 18px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--amber);
-  color: #111;
+/* Retour au toucher (le survol est réservé aux pointeurs fins), après les
+   règles d'état pour l'emporter à spécificité égale ; ambre sur le drapeau
+   en attente, comme son survol. */
+.navTools .navTool:active {
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.navTools .navReportsPending:active {
+  background: rgba(var(--amber-rgb), 0.2);
+}
+
+/* Contraste forcé (Windows) : fonds et halos disparaissent ; la bordure
+   passe en couleur système de sélection pour la page courante — le contour
+   de focus, lui, reste libre et donc visible. Placé après les règles
+   d'état, à spécificité égale, pour l'emporter. */
+@media (forced-colors: active) {
+  .navTools .navReports[aria-current="page"],
+  .navTools .navReportsPending[aria-current="page"] {
+    border-color: Highlight;
+  }
+}
+
+/* Libellé « Signalements » visible dès 1150 px ; en dessous, la barre n'a
+   plus la place : lu par les technologies d'assistance (nom inchangé). */
+.navReportsLabel {
   font-size: 11px;
-  letter-spacing: 0;
-  text-align: center;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
-/* Sous 1150 px — même seuil que les pictogrammes d'« Accueil » —, la barre ne
-   tient plus ce lien en toutes lettres : le libellé passe en lecture seule pour les technologies
-   d'assistance (le nom accessible reste « Signalements »), le drapeau et le
-   compteur restent visibles. */
-@media (max-width: 1150px) {
+@media (max-width: 1149.98px) {
   .navReportsLabel {
     position: absolute;
     width: 1px;
@@ -352,4 +395,22 @@
     white-space: nowrap;
     border: 0;
   }
+}
+
+.navBadge {
+  min-width: 20px;
+  min-height: 18px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  /* Transparente d'ordinaire, la bordure dessine la pastille en contraste forcé. */
+  border: 1px solid transparent;
+  background: var(--amber);
+  color: var(--cyber-bg-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
 }

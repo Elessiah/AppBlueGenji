@@ -1,9 +1,10 @@
 ﻿"use client";
 
+import { Flag } from "lucide-react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { LogoWithGlow } from "./logo-with-glow";
 import { AccountMenu } from "./account-menu";
-import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
+import { LanguageSwitcher, useSwitchablePath } from "./i18n/LanguageSwitcher";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import type { ShellKey } from "@/lib/shared/shell-text";
@@ -50,6 +51,12 @@ export function ArenaNav({
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
   const { t } = useShellText();
+  // Le sélecteur se tait sur une route pas encore traduite (même décision que
+  // lui) : le savoir d'avance évite un groupe d'outils vide au filet orphelin.
+  const switchable = useSwitchablePath() !== null;
+  const languageLabel = switchable && languageSwitcherLabel ? languageSwitcherLabel : null;
+  const pending = openReports !== null && openReports > 0;
+  const badge = pending ? reportsBadge(openReports) : null;
 
   return (
     <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
@@ -71,7 +78,7 @@ export function ArenaNav({
           })}
         </div>
 
-        <LocaleLink href="/" className={s.navLogo} aria-label={t("nav.home")}>
+        <LocaleLink href="/" className={s.navLogo} aria-label={t("nav.home")} title={t("nav.home")}>
           <LogoWithGlow
             src="/logo_bg.webp"
             alt={t("nav.logoAlt")}
@@ -84,43 +91,45 @@ export function ArenaNav({
         </LocaleLink>
 
         <div className={s.navRight}>
-          {/* Les pictogrammes sont décoratifs : lus à voix haute, « ⌂ » et
-              « 🛡 » précédaient le nom du lien d'un mot sans rapport. */}
-          <LocaleLink href="/" className={s.navHome}>
-            <span aria-hidden="true">⌂</span> <span className={s.navHomeLabel}>{t("nav.home")}</span>
-          </LocaleLink>
-          {activeTeam && (
-            <LocaleLink
-              href={`/equipes/${activeTeam.teamId}`}
-              className={s.navHome}
-              aria-label={t("nav.myTeamLabel", { team: activeTeam.teamName })}
-              title={activeTeam.teamName}
-            >
-              <span aria-hidden="true">🛡</span> <span className={s.navHomeLabel}>{t("nav.myTeam")}</span>
-            </LocaleLink>
-          )}
-          {openReports !== null && (
-            <LocaleLink
-              href={REPORTS_ADMIN_PATH}
-              className={`${s.navHome} ${s.navReports}`}
-              aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
-            >
-              <span aria-hidden="true">⚑</span> <span className={s.navReportsLabel}>{t("nav.reports")}</span>
-              {openReports > 0 && (
-                <span className={s.navBadge}>
-                  {openReports}
-                  <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
-                </span>
+          {/* Barre allégée : l'accueil passe par le logo, « Mon équipe » par le
+              menu du compte. Restent les outils (langue, modération) et le
+              compte, séparés par un filet — le groupe n'est rendu que s'il a
+              quelque chose à montrer (sinon le filet resterait seul). */}
+          {(languageLabel || openReports !== null) && (
+            <div className={s.navTools}>
+              {/* Même page dans l'autre langue — seulement sur une route traduite. */}
+              {languageLabel && <LanguageSwitcher label={languageLabel} compact className={s.navTool} />}
+              {openReports !== null && (
+                <LocaleLink
+                  href={REPORTS_ADMIN_PATH}
+                  className={[s.navTool, s.navReports, pending && s.navReportsPending].filter(Boolean).join(" ")}
+                  aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
+                >
+                  <Flag size={16} strokeWidth={2} aria-hidden="true" />
+                  {/* Libellé visible dès 1150 px, lu seul en dessous. */}
+                  <span className={s.navReportsLabel}>{t("nav.reports")}</span>
+                  {pending && (
+                    <>
+                      {/* Le nom lu contient le compte affiché (« 99+ » compris) :
+                          « Signalements, 2 à traiter ». */}
+                      <span className="sr-only">{t("nav.reportsCountLead")}</span>
+                      <span className={s.navBadge}>{badge}</span>
+                      <span className="sr-only">{` ${t("nav.reportsPending", { count: openReports })}`}</span>
+                    </>
+                  )}
+                </LocaleLink>
               )}
-            </LocaleLink>
+            </div>
           )}
-          {/* Profil, équipe et déconnexion, à portée de main sur toutes les
-              largeurs — sous 720 px, c'est le seul chemin vers sa propre équipe. */}
-          {/* Même page dans l'autre langue — muet tant que la route n'est pas traduite. */}
-          {languageSwitcherLabel && <LanguageSwitcher label={languageSwitcherLabel} />}
+          {/* Profil, équipe et déconnexion, à portée de main sur toutes les largeurs. */}
           <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
       </div>
     </nav>
   );
+}
+
+/** Texte de la pastille : au-delà de 99, elle déborderait du drapeau. */
+function reportsBadge(count: number): string {
+  return count > 99 ? "99+" : String(count);
 }
