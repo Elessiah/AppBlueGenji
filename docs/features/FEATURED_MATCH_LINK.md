@@ -272,12 +272,52 @@ l'hydratation s'en tient à la phase du serveur.
 valeur d'un nouveau rendu serveur (`router.refresh()`, retour sur l'accueil)
 au lieu de garder la première jusqu'au sondage suivant.
 
+## 8. Carrousel des matchs
+
+La carte ne montrait que le match mis en avant. Elle fait désormais **défiler
+tous les matchs du tournoi dans l'ordre chronologique**, en s'ouvrant sur le
+match mis en avant (§ 7).
+
+**Quels matchs, dans quel ordre.** `carouselMatchOrder` (`lib/shared/landing.ts`)
+retient les mêmes candidats que la mise en avant — à l'antenne, lancé, en
+lancement ou daté ; jamais « À planifier », terminé ou sans adversaire — et les
+range par horaire croissant. Un match qui se joue sans horaire passe devant (il
+a commencé) ; à horaire égal, l'ordre du plateau départage. La liste est
+plafonnée à `LANDING_CAROUSEL_MAX_MATCHES` (12) : au-delà, un tour complet
+dépasserait la minute ; la fenêtre se décale pour toujours contenir le match mis
+en avant. Le serveur l'envoie dans `LandingLive.matches` ; `currentMatch` en est
+un élément (même objet). Sans `matches`, la carte retombe sur `currentMatch`.
+
+**Hauteur stable.** Les matchs sont empilés dans la même case de grille
+(`.slides` / `.slide`), un seul visible (`visibility` + fondu d'opacité) : la
+carte prend la hauteur du plus haut — bandeau de diffusion, seeds — et le hero
+ne saute pas d'un match à l'autre. Les matchs masqués sont `aria-hidden` et hors
+tabulation. Avec un seul match, la carte est rendue exactement comme avant
+(ni pile ni commandes).
+
+**Défilement** (`useMatchCarousel`, `components/cyber/landing/`) : un match toutes
+les 7 s (`LANDING_CAROUSEL_INTERVAL_MS`), par un `setTimeout` relancé à chaque
+changement — un geste du lecteur redonne le délai entier. Il ne tourne qu'avec
+`decorativeMotion` (régime de charge : figé onglet caché, page sans focus,
+mouvement réduit, machine à la peine — `CLIENT_POWER_MODES.md`) et s'arrête sous
+le pointeur ou le focus **de toute la carte** : l'enveloppe `.hold`
+(`display: contents`) porte les écouteurs, la plaque de lien couvrant les
+matchs. Le match affiché est suivi **par identifiant** (`resolveCarouselIndex`) :
+un sondage de `useLandingLive` qui retire un match terminé ne décale pas la
+carte sur son voisin.
+
+**Commandes** (pied de carte, au-dessus de la plaque) : précédent, position
+« 2 / 5 », suivant, et pause (WCAG 2.2.2) — affichée seulement quand le défilement
+automatique est permis. La position n'est annoncée (`aria-live="polite"`) que
+défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
+
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
 | `lib/shared/match-anchor.ts` | Module pur : identifiant, chemin, relecture, phase à révéler. |
-| `components/cyber/landing/LiveCard.tsx` | Plaque de lien, bouton de direct, seeds. |
+| `components/cyber/landing/LiveCard.tsx` | Plaque de lien, bouton de direct, seeds, carrousel. |
+| `components/cyber/landing/useMatchCarousel.ts` | Match affiché, défilement automatique, pause. |
 | `lib/server/landing-service.ts` | Seeds des deux engagés, sous condition de `seedingSource`. |
 | `lib/shared/landing.ts` | `LandingLiveMatch.team1Seed` / `team2Seed`. |
 | `app/(secured)/tournois/[id]/_hooks/useMatchAnchor.ts` | Lecture du fragment, phase, défilement, surlignage. |
@@ -292,8 +332,9 @@ au lieu de garder la première jusqu'au sondage suivant.
 |---|---|
 | `tests/lib/shared/match-anchor.test.ts` | Réciprocité écriture/relecture, refus des formes convertibles, résolution de phase. |
 | `tests/app/live-card-featured-match.test.tsx` | Cible du lien, intitulé accessible, bouton de direct réservé à `LIVE`, plus aucune donnée inventée, pastille du match distincte de l'état du tournoi. |
-| `tests/lib/shared/landing.test.ts` | `featuredMatchPill` : libellé par section, cas « En direct », bascule par l'horloge. |
-| `tests/lib/server/landing-live.test.ts` | Seeds exposés format par format, seed aberrant écarté. |
+| `tests/lib/shared/landing.test.ts` | `featuredMatchPill` : libellé par section, cas « En direct », bascule par l'horloge ; `carouselMatchOrder` : ordre, exclusions, plafond. |
+| `tests/lib/server/landing-live.test.ts` | Seeds exposés format par format, seed aberrant écarté ; liste chronologique du carrousel. |
+| `tests/app/live-card-carousel.test.tsx` | Pile des matchs, ouverture sur le match mis en avant, commandes, repli à un seul match. |
 | `tests/tournois/match-anchor-wiring.test.ts` | Points de passage (l'ancre est dans `MatchRow`, le hook est branché) et unicité du préfixe. |
 
 ## Notes reprises de CLAUDE.md
