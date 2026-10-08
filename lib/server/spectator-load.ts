@@ -1,0 +1,106 @@
+/**
+ * Charge du serveur, telle que la lisent les lectures publiques d'un tournoi
+ * (`/api/spectator/tournaments/[id]`).
+ *
+ * Trois signaux, tous lus **en mémoire** — mesurer la charge ne doit pas en
+ * ajouter : le retard de la boucle d'évènements, les flux SSE ouverts et le
+ * rythme des lectures publiques. La décision (seuils, cadences) vit dans le
+ * module pur `lib/shared/spectator-view.ts`.
+ */
+import { monitorEventLoopDelay, type IntervalHistogram } from "node:perf_hooks";
+import { openStreamCount } from "@/lib/server/tournament-broadcast";
+import {
+  spectatorLoadLevel,
+  type SpectatorLoadLevel,
+  type SpectatorLoadSignals,
+} from "@/lib/shared/spectator-view";
+
+/**
+ * Fenêtre d'échantillonnage du retard de boucle. Le centile est relu puis remis
+ * à zéro au plus une fois par fenêtre : il décrit les dix dernières secondes,
+ * pas toute la vie du processus.
+ */
+export const LOOP_DELAY_SAMPLE_MS = 10_000;
+
+/** Fenêtre du compte des lectures publiques. */
+export const SPECTATOR_READ_WINDOW_MS = 60_000;
+
+let histogram: IntervalHistogram | null = null;
+let lastSampleAt = 0;
+let lastLoopDelayMs: number | null = null;
+
+/** Les lectures de la fenêtre courante et de la précédente (compte glissant approché). */
+let windowStartedAt = 0;
+let currentReads = 0;
+let previousReads = 0;
+
+/**
+ * Retard de boucle au 99ᵉ centile, en millisecondes. La sonde n'est armée qu'à
+ * la première lecture publique : un serveur sans visiteur anonyme n'en paie
+ * rien. `null` tant qu'aucune fenêtre n'est close.
+ */
+function loopDelayMs(now: number): number | null {
+  if (histogram === null) {
+    histogram = monitorEventLoopDelay({ resolution: 20 });
+    histogram.enable();
+    lastSampleAt = now;
+    return lastLoopDelayMs;
+  }
+  if (now - lastSampleAt >= LOOP_DELAY_SAMPLE_MS) {
+    // Le centile est en nanosecondes.
+    const p99 = histogram.percentile(99) / 1e6;
+    lastLoopDelayMs = Number.isFinite(p99) && p99 > 0 ? p99 : 0;
+    histogram.reset();
+    lastSampleAt = now;
+  }
+  return lastLoopDelayMs;
+}
+
+function rollWindow(now: number): void {
+  const elapsed = now - windowStartedAt;
+  if (elapsed < SPECTATOR_READ_WINDOW_MS) return;
+  previousReads = elapsed < 2 * SPECTATOR_READ_WINDOW_MS ? currentReads : 0;
+  currentReads = 0;
+  windowStartedAt = now;
+}
+
+/** Compte une lecture publique. */
+export function recordSpectatorRead(now: number = Date.now()): void {
+  rollWindow(now);
+  currentReads += 1;
+}
+
+/**
+ * Lectures publiques sur la dernière minute, approchées : la fenêtre
+ * précédente compte au prorata de ce qu'il en reste dans la minute glissante.
+ */
+export function spectatorReadsPerMinute(now: number = Date.now()): number {
+  rollWindow(now);
+  const remaining = Math.max(0, 1 - (now - windowStartedAt) / SPECTATOR_READ_WINDOW_MS);
+  return Math.round(currentReads + previousReads * remaining);
+}
+
+/** Les trois signaux, à l'instant. */
+export function spectatorLoadSignals(now: number = Date.now()): SpectatorLoadSignals {
+  return {
+    eventLoopDelayMs: loopDelayMs(now),
+    openStreams: openStreamCount(),
+    spectatorReadsPerMinute: spectatorReadsPerMinute(now),
+  };
+}
+
+/** Niveau de charge courant (`lib/shared/spectator-view.ts`). */
+export function currentSpectatorLoadLevel(now: number = Date.now()): SpectatorLoadLevel {
+  return spectatorLoadLevel(spectatorLoadSignals(now));
+}
+
+/** Remet les mesures à zéro. Réservé aux tests. */
+export function resetSpectatorLoad(): void {
+  histogram?.disable();
+  histogram = null;
+  lastSampleAt = 0;
+  lastLoopDelayMs = null;
+  windowStartedAt = 0;
+  currentReads = 0;
+  previousReads = 0;
+}

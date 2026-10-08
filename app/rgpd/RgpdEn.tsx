@@ -309,6 +309,15 @@ export function RgpdEn({
             account here does not erase your in-game identifiers from a replay, and the codes remain attached to
             the result they document. The maps you entered appear in the export of your data.
           </p>
+          <p id="suivi-sans-compte">
+            <strong>Following a tournament without an account.</strong> Since October 2026, the page of a
+            published tournament can also be viewed without logging in, at <code>/suivre/tournois/…</code>:
+            bracket, scores, rankings, names of the teams and usernames of the players taking part, username of a
+            match&apos;s caster — what streams and Discord already show. Replay codes are not shown there: they
+            remain reserved to logged-in members. This page is excluded from search engines (<code>noindex</code>)
+            and opens no session; the visitor&apos;s IP address is only used there, in memory, to limit the number
+            of reads, and is not recorded. You can object to your username being displayed (see “Your rights”).
+          </p>
         </div>
         <div className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>What this means in practice:</strong> statistics (number of tournaments played, scores,

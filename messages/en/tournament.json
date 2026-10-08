@@ -39,7 +39,8 @@
       "expiredText": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
       "notFoundText": "This tournament isn't available. It may have been deleted, or isn't open to the public yet.",
       "relogin": "Log in again",
-      "back": "Back to tournaments"
+      "back": "Back to tournaments",
+      "backHome": "Back to home"
     },
     "noMatches": "No matches available yet.",
     "noMatchesShort": "No matches yet.",
@@ -57,8 +58,11 @@
   "header": {
     "back": "Back",
     "allTournaments": "All tournaments",
+    "backHome": "Home",
     "admin": "⚙ Admin",
     "adminTitle": "You have organizer rights on this tournament.",
+    "spectator": "Spectator",
+    "spectatorTitle": "You are following this tournament without an account: the page is read-only and updates itself, more or less often depending on traffic on the site.",
     "officialChannel": "Official channel",
     "officialChannelOn": "Official channel · {platform}",
     "meta": {
@@ -98,9 +102,12 @@
     "reconnecting": "Reconnecting…",
     "offline": "Offline",
     "reconnectingTitle": "Connection to the real-time feed lost. The page reconnects on its own and keeps updating, more slowly.",
+    "retryTitle": "The last update did not go through. The page tries again by itself, a little later; what is shown remains valid until then.",
     "upToDateTitle": "Automatic updates {cadence}. No need to reload the page.",
+    "finishedTitle": "Tournament over: the page no longer updates, the result is final.",
     "cadenceSecond": "every second",
     "cadenceSeconds": "at most every {seconds} seconds",
+    "cadenceMinute": "at most every minute",
     "cadenceMinutes": "at most every {minutes, plural, one {# minute} other {# minutes}}",
     "fatal": {
       "UNAUTHORIZED": "Your session has expired: automatic updates have stopped. Log in again to resume them.",

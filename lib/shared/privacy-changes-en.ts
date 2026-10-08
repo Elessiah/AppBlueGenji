@@ -325,6 +325,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: [READ_POLICY],
   },
+  "2026-10-suivi-tournoi-sans-compte": {
+    title: "Tournaments: the page can also be followed without an account",
+    summary:
+      "The page of a published tournament can now be viewed without logging in: bracket, scores, rankings, names of the teams and usernames of the players taking part.",
+    details: [
+      "A visitor without an account follows the tournament at /suivre/tournois/…: they read there what streams and Discord already show — team names, usernames of the players taking part, scores, rankings, username of a match's caster.",
+      "Replay codes are not shown there: they remain reserved to logged-in members.",
+      "The page is excluded from search engines and opens no session; the visitor's IP address is only used to limit the number of reads, in memory, without being recorded.",
+      "You can object to your username being displayed, as for match streaming.",
+    ],
+    linkLabels: ["Read the paragraph “Following a tournament without an account”"],
+  },
 };
 
 /**

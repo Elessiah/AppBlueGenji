@@ -15,15 +15,23 @@ type LiveIndicatorProps = {
   isLive: boolean;
   /** Palier de fraîcheur accordé par le serveur. */
   tier: RefreshTier;
+  /**
+   * Cadence de relecture, quand elle ne suit pas le palier : celle que le
+   * serveur accorde à la page sans compte. `null` : plus de relecture.
+   */
+  cadenceMs?: number | null;
   /** Échec définitif : la page a cessé de réessayer. */
   fatal?: LiveFailure | null;
 };
 
-function cadenceLabel(text: TournamentPageText, tier: RefreshTier): string {
-  const seconds = Math.round(REFRESH_CADENCE[tier].pushCoalesceMs / 1000);
+function cadenceLabel(text: TournamentPageText, cadenceMs: number): string {
+  const seconds = Math.round(cadenceMs / 1000);
   if (seconds <= 1) return text.t("live.cadenceSecond");
   if (seconds < 60) return text.t("live.cadenceSeconds", { seconds: String(seconds) });
-  return text.t("live.cadenceMinutes", { minutes: Math.round(seconds / 60) });
+  // Arrondi vers le haut : la phrase promet un délai « au plus ».
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes === 1) return text.t("live.cadenceMinute");
+  return text.t("live.cadenceMinutes", { minutes });
 }
 
 /**
@@ -48,20 +56,25 @@ function cadenceLabel(text: TournamentPageText, tier: RefreshTier): string {
  * `aria-label` portant toute l'explication ferait réciter une phrase entière à
  * la moindre coupure réseau. L'explication vit dans `title`.
  */
-export function LiveIndicator({ isLive, tier, fatal = null }: Readonly<LiveIndicatorProps>) {
+export function LiveIndicator({ isLive, tier, cadenceMs, fatal = null }: Readonly<LiveIndicatorProps>) {
   // Témoin de flux (glossaire) : « À jour / Reconnexion… / Hors ligne » →
   // « Up to date / Reconnecting… / Offline ». L'état vient du flux, le texte
   // de la page : rien de localisé ne passe par l'instantané.
   const text = useTournamentPageText();
   const { t } = text;
   let label = t("live.reconnecting");
-  let title = t("live.reconnectingTitle");
+  // Une cadence imposée vient de la page sans compte : pas de flux à rouvrir,
+  // une relecture qui réessaiera plus tard.
+  let title = cadenceMs === undefined ? t("live.reconnectingTitle") : t("live.retryTitle");
   if (fatal) {
     label = t("live.offline");
     title = t(`live.fatal.${fatal}`);
   } else if (isLive) {
     label = t("live.upToDate");
-    title = t("live.upToDateTitle", { cadence: cadenceLabel(text, tier) });
+    title =
+      cadenceMs === null
+        ? t("live.finishedTitle")
+        : t("live.upToDateTitle", { cadence: cadenceLabel(text, cadenceMs ?? REFRESH_CADENCE[tier].pushCoalesceMs) });
   }
 
   return (

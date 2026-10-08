@@ -827,6 +827,16 @@ export function tournamentAudience(tournamentId: number): number {
   return rooms.get(tournamentId)?.subscribers.size ?? 0;
 }
 
+/**
+ * Flux ouverts, tous tournois confondus — un des signaux de charge qui règlent
+ * la cadence des visiteurs sans compte (`lib/server/spectator-load.ts`).
+ */
+export function openStreamCount(): number {
+  let total = 0;
+  for (const room of rooms.values()) total += room.subscribers.size;
+  return total;
+}
+
 /** Remet la diffusion à zéro. Réservé aux tests. */
 export function resetTournamentBroadcast(): void {
   for (const [tournamentId, room] of rooms) closeRoom(tournamentId, room);

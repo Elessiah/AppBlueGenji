@@ -9,6 +9,7 @@ import type { Locale } from "@/lib/shared/locales";
 import { INTL_LOCALE } from "@/lib/shared/locales";
 import { CyberButton, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
+import { useSpectatorView } from "@/components/spectator-view";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
@@ -55,6 +56,8 @@ interface TournamentHeaderProps {
   /** Le flux temps réel est-il établi ? */
   isLive: boolean;
   tier: RefreshTier;
+  /** Cadence de relecture de la page sans compte (`TournamentSheetSource.cadenceMs`). */
+  cadenceMs?: number | null;
   fatal: LiveFailure | null;
   /** Suivi arrêté : les actions sont retirées plutôt que laissées à échouer. */
   frozen: boolean;
@@ -92,6 +95,7 @@ export function TournamentHeader({
   detail,
   isLive,
   tier,
+  cadenceMs,
   fatal,
   frozen,
   onRegister,
@@ -123,6 +127,11 @@ export function TournamentHeader({
   // est décorative et n'engage aucune règle du moteur.
   const showImageEdit = detail.isAdmin && !frozen;
   const router = useLocaleRouter();
+  // Sans compte, la liste des tournois est derrière la connexion : le lien
+  // mène à l'accueil, dont le tableau des tournois tient lieu de liste.
+  const spectator = useSpectatorView();
+  const backHref = spectator ? "/" : "/tournois";
+  const backFallback = spectator ? t("header.backHome") : t("header.allTournaments");
   // Figé au premier rendu : l'en-tête n'est rendu que côté client (la page
   // attend le flux), et la page précédente ne change pas tant qu'on reste ici.
   const [backInSite] = useState(() => canReturnInSite(readSiteBackInput()));
@@ -141,15 +150,20 @@ export function TournamentHeader({
     <div className={`ds-header ${s.header}`}>
       <div className={`ds-header-body ${s.shell}`}>
         <div className={s.utility}>
-          <LocaleLink href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>
-            <span aria-hidden="true">←</span> {backInSite ? t("header.back") : t("header.allTournaments")}
+          <LocaleLink href={backHref} onClick={onBackClick} className={`${s.back} tap-target`}>
+            <span aria-hidden="true">←</span> {backInSite ? t("header.back") : backFallback}
           </LocaleLink>
           <div className={s.viewer}>
             {/* Dit que la page se tient à jour seule : sans ce repère, on
                 recharge par précaution même quand tout arrive tout seul. */}
-            <LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />
+            <LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
             {detail.isAdmin && !frozen && (
               <Pill variant="accent" title={t("header.adminTitle")}>{t("header.admin")}</Pill>
+            )}
+            {/* Dit pourquoi aucun bouton n'apparaît, sans en ajouter un vers la
+                connexion : la page sans compte est faite pour regarder. */}
+            {spectator && (
+              <Pill variant="neutral" title={t("header.spectatorTitle")}>{t("header.spectator")}</Pill>
             )}
           </div>
         </div>

@@ -1,7 +1,10 @@
 "use client";
 
-import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useEffect } from "react";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { usePathname, useSearchParams } from "next/navigation";
+import { splitLocalePrefix } from "@/lib/shared/locales";
+import { spectatorTournamentPath, tournamentIdFromMemberPath } from "@/lib/shared/spectator-view";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import frLogin from "@/messages/fr/login.json";
 import styles from "./AuthGate.module.css";
@@ -39,6 +42,17 @@ export type AuthGateText = typeof frLogin.authGate;
 export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGateText }>) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useLocaleRouter();
+
+  // La fiche d'un tournoi se suit sans compte (`docs/features/SPECTATOR_VIEW.md`).
+  // L'espace sécurisé redirige déjà côté serveur ; ce relais couvre la carte
+  // venue d'un **préchargement**, que Next sert sans le chemin demandé
+  // (`x-pathname`) et réutilise à la navigation. L'ancre `#match-…` suit.
+  const spectatorId = tournamentIdFromMemberPath(splitLocalePrefix(pathname).path);
+  useEffect(() => {
+    if (spectatorId === null) return;
+    router.replace(`${spectatorTournamentPath(spectatorId)}${globalThis.location.hash}`);
+  }, [spectatorId, router]);
 
   // On ne reconstitue qu'un chemin **du site** : il vient de `usePathname`, pas
   // d'un paramètre d'URL, donc il ne peut pas désigner un autre domaine.

@@ -418,6 +418,17 @@ function RgpdFr({
             les codes restent attachés au résultat qu'ils documentent. Les maps que vous avez
             saisies figurent dans l'export de vos données.
           </p>
+          <p id="suivi-sans-compte">
+            <strong>Suivre un tournoi sans compte.</strong> Depuis octobre 2026, la fiche d&apos;un
+            tournoi publié se consulte aussi sans se connecter, à l&apos;adresse{" "}
+            <code>/suivre/tournois/…</code> : plateau, scores, classements, noms des équipes et
+            pseudos des joueurs engagés, pseudo du caster d&apos;un match — ce que les retransmissions
+            et Discord montrent déjà. Les codes de replay n&apos;y figurent pas : ils restent réservés
+            aux membres connectés. Cette page est exclue des moteurs de recherche (<code>noindex</code>)
+            et n&apos;ouvre aucune session ; l&apos;adresse IP du visiteur n&apos;y sert qu&apos;à limiter le
+            nombre de lectures, en mémoire, sans être enregistrée. Vous pouvez vous opposer à
+            l&apos;affichage de votre pseudo (voir « Vos droits »).
+          </p>
         </div>
         <div className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>Ce que cela signifie concrètement :</strong> les statistiques
