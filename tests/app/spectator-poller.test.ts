@@ -343,6 +343,16 @@ describe("relecteur de la page sans compte", () => {
     expect(h.timers.size).toBe(0);
   });
 
+  it("ne republie rien sur un 304 sans nouveauté", async () => {
+    const h = harness([ok(tournamentSnapshot()), notModified()]);
+    await h.poller.start();
+    const published = h.states.length;
+    await h.advance(SPECTATOR_RUNNING_POLL_MS);
+
+    expect(h.fetchMock).toHaveBeenCalledTimes(2);
+    expect(h.states).toHaveLength(published);
+  });
+
   it("ne publie plus rien une fois démonté", async () => {
     const h = harness([ok(tournamentSnapshot())]);
     const pending = h.poller.start();
