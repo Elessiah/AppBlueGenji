@@ -48,6 +48,8 @@ export type MatchCarousel = {
   paused: boolean;
   go: (delta: number) => void;
   togglePaused: () => void;
+  /** Enveloppe de la carte, pour retrouver le focus qu'un retrait a perdu. */
+  holdRef: RefObject<HTMLDivElement>;
   /**
    * Survol à la souris ou focus clavier dans la carte : on ne fait pas défiler
    * sous le lecteur. Ni le toucher ni le focus laissé par un clic ne retiennent
@@ -55,8 +57,6 @@ export type MatchCarousel = {
    * doigt, focus gardé tant qu'on ne clique pas ailleurs), et le bouton
    * « Reprendre » paraîtrait sans effet.
    */
-  /** Enveloppe de la carte, pour retrouver le focus qu'un retrait a perdu. */
-  holdRef: RefObject<HTMLDivElement>;
   holdHandlers: {
     onPointerEnter: (event: PointerEvent<HTMLElement>) => void;
     onPointerLeave: (event: PointerEvent<HTMLElement>) => void;
