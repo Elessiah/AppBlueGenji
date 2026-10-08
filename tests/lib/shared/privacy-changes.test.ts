@@ -758,6 +758,8 @@ describe("PRIVACY_CHANGES — suivi d'un tournoi sans compte", () => {
     expect(text()).toMatch(/numéro de compte interne/);
     // Déclarés aussi : les logos, et l'avatar d'un joueur solo (copié dans son entrée).
     expect(text()).toMatch(/logos des équipes/);
+    // Les pénalités publiques, sans motif ni arbitre.
+    expect(text()).toMatch(/pénalités d'une BlueGenji Survie \(engagé, manche, points\), sans leur motif ni l'arbitre/);
     expect(text()).toMatch(/avatar de chaque joueur engagé \(sauf s'il l'a masqué\)/);
     expect(text()).toMatch(/codes de replay n'y figurent pas/);
     // Le délai de la copie partagée (150 s au pire) est dit, suppression de compte comprise.

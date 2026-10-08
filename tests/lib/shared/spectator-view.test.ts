@@ -249,6 +249,20 @@ describe("ce que lit le visiteur sans compte", () => {
   ];
   const report = { team1Score: 1, team2Score: 0, reportedAt: "2026-10-01T10:00:00.000Z", maps };
 
+  it("ne publie que le lien de rediffusion que l'interface montre", () => {
+    const url = "https://www.youtube.com/watch?v=abcdefghijk";
+    const snapshot = tournamentSnapshot({
+      matches: [
+        // Rouvert par un retour en arrière : plus joué, le lien est masqué.
+        bracketMatch({ id: 1, status: "READY", team1Id: 1, team2Id: 2, replayUrl: url }),
+        bracketMatch({ id: 2, status: "COMPLETED", team1Id: 1, team2Id: 2, winnerTeamId: 1, replayUrl: url }),
+      ],
+    });
+    const [reopened, played] = spectatorSnapshot(snapshot).matches;
+    expect(reopened.replayUrl).toBeNull();
+    expect(played.replayUrl).toBe(url);
+  });
+
   it("retire les codes de replay, réservés aux membres connectés", () => {
     const snapshot = tournamentSnapshot({
       matches: [bracketMatch({ id: 1, maps, team1Report: report, team2Report: null })],

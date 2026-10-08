@@ -10,6 +10,7 @@ import {
   recordSpectatorRead,
   resetSpectatorLoad,
   SPECTATOR_READ_WINDOW_MS,
+  SPECTATOR_READS_PER_CLIENT,
   spectatorLoadSignals,
   spectatorReadsPerMinute,
 } from "@/lib/server/spectator-load";
@@ -45,6 +46,18 @@ describe("lectures publiques par minute", () => {
     // courante a déjà 30 s — les dix lectures ne comptent plus que pour moitié.
     recordSpectatorRead(T0 + 1.5 * SPECTATOR_READ_WINDOW_MS);
     expect(spectatorReadsPerMinute(T0 + 1.5 * SPECTATOR_READ_WINDOW_MS)).toBe(6);
+  });
+
+  it("plafonne la part d'un même client dans la fenêtre", () => {
+    for (let i = 0; i < 100; i += 1) recordSpectatorRead(T0, "203.0.113.7");
+    expect(spectatorReadsPerMinute(T0)).toBe(SPECTATOR_READS_PER_CLIENT);
+    // Un autre client compte à part ; sans adresse, une part commune.
+    recordSpectatorRead(T0, "198.51.100.2");
+    for (let i = 0; i < 100; i += 1) recordSpectatorRead(T0, null);
+    expect(spectatorReadsPerMinute(T0)).toBe(2 * SPECTATOR_READS_PER_CLIENT + 1);
+    // La fenêtre suivante rend sa part à chacun.
+    recordSpectatorRead(T0 + SPECTATOR_READ_WINDOW_MS, "203.0.113.7");
+    expect(spectatorReadsPerMinute(T0 + SPECTATOR_READ_WINDOW_MS)).toBe(2 * SPECTATOR_READS_PER_CLIENT + 2);
   });
 
   it("oublie tout après deux minutes sans lecture", () => {
@@ -115,7 +128,8 @@ describe("signaux et niveau", () => {
   });
 
   it("ralentit quand les lectures publiques affluent", () => {
-    for (let i = 0; i < SPECTATOR_LOAD_THRESHOLDS.spectatorReadsPerMinute[0]; i += 1) recordSpectatorRead(T0);
+    // Des clients distincts : la part de chacun est plafonnée.
+    for (let i = 0; i < SPECTATOR_LOAD_THRESHOLDS.spectatorReadsPerMinute[0]; i += 1) recordSpectatorRead(T0, `client-${i}`);
     expect(currentSpectatorLoadLevel(T0 + 1)).toBe(1);
   });
 });
