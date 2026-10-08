@@ -35,11 +35,11 @@ le serveur ne connaît que le chemin (`x-pathname`) —, seul le relais client l
 garde.
 
 **Liens qui évitent le détour** — la vitrine sait qui la lit : pour un
-visiteur sans session, le tableau des tournois et la carte « en direct » mènent
-directement à `/suivre/tournois/[id]` (`tournamentMatchHref(…, spectator)`),
-sans passer par la carte « Connexion requise » d'un préchargement. Le calendrier
-(lien `<a>`, chargement complet) et les liens externes (Discord, ICS, push)
-passent par la redirection serveur. Pour un visiteur sans session, la fiche
+visiteur sans session, le tableau des tournois, la carte « en direct » et
+l'agenda mènent directement à `/suivre/tournois/[id]`
+(`tournamentMatchHref(…, spectator)`), sans passer par la carte « Connexion
+requise » d'un préchargement. Les liens externes (Discord, ICS, push) passent
+par la redirection serveur. Pour un visiteur sans session, la fiche
 connectée ne lit même pas la carte du tournoi pour son encart : la redirection
 jetterait la requête.
 
@@ -67,7 +67,9 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
 - **codes de replay masqués** (`MatchMapDetails`) — et retirés de la réponse
   publique (`spectatorSnapshot`) : la politique de confidentialité les réserve
   aux membres connectés. La réponse publique perd aussi les identifiants de
-  comptes (`soloUserIds`, `casterUserId`) : elle ne montre que des noms ;
+  comptes (`soloUserIds`, `casterUserId`) et, sur une sanction BlueGenji
+  Survie, l'arbitre et le motif (texte libre du staff) : elle ne montre que des
+  noms d'engagés, des points et des pseudos à l'antenne ;
 - **en-tête** : « Accueil » au lieu de « Tous les tournois », pastille
   « Spectateur » (qui dit pourquoi aucun bouton n'apparaît), témoin qui annonce
   la cadence accordée par le serveur. **Aucun bouton vers la connexion** n'est
@@ -97,17 +99,22 @@ haut de trois signaux :
 La cadence est multipliée par 1, 2, 4 puis 10, plafonnée à 10 min. Sous la
 charge, ce sont donc les visiteurs sans compte qui reculent, jamais le staff ni
 les engagés. La sonde de boucle n'est armée qu'avec les lectures publiques et se
-désarme après 5 min sans visiteur sans compte.
+désarme après 5 min sans activité publique (un seul minuteur, qui se relance
+lui-même).
 
 **Coût côté serveur** :
 
 - la réponse publique est **mutualisée** par tournoi
   (`lib/server/spectator-snapshot.ts`, `cached`) : au plus une reconstruction
   par durée de vie (15 s au calme, ×1 à ×10 selon la charge), quel que soit le
-  nombre de visiteurs, et sérialisée une fois. Aucune invalidation : une
-  écriture ne réveille pas les visiteurs sans compte. Un « introuvable » n'est
-  **pas** gardé (des identifiants parcourus au hasard ne chassent pas les clés
-  chaudes du cache partagé, un tournoi publié s'ouvre aussitôt) ;
+  nombre de visiteurs. Une écriture ne **réveille** pas les visiteurs sans
+  compte, mais elle **invalide** cette réponse avec l'instantané des membres
+  (`invalidateTournamentSnapshot`) : un tournoi supprimé ou corrigé n'est pas
+  resservi. Un « introuvable » n'entre **pas** dans le cache (le chargeur lève
+  une sentinelle, `cached` ne garde jamais un échec) ;
+- en-tête `x-bg-fresh-within-ms` : l'âge maximal de l'affichage (attente entre
+  deux lectures, gigue comprise, **plus** la durée de vie du cache) — c'est lui
+  que le témoin annonce, pour ne pas promettre mieux que le cache ;
 - `ETag` = empreinte du **corps public** (et non la version des membres, qui
   bouge avec les champs retirés) ; une relecture sans nouveauté répond **`304`
   sans corps** ;
@@ -120,8 +127,9 @@ désarme après 5 min sans visiteur sans compte.
 React, testé sans navigateur) : ±10 % de gigue, rien n'est relu **onglet
 caché** (`useClientPower`), la lecture due part au retour ; après un échec, le
 `Retry-After` du serveur ou le **double de la dernière attente** (recul
-cumulatif jusqu'à 10 min, la cadence reprend au premier succès). Un `404` arrête
-tout (tournoi supprimé ou pas encore publié — même réponse, comme partout).
+cumulatif jusqu'à 10 min, la cadence reprend au premier succès). Si la toute
+première lecture échoue, le squelette de chargement le dit (« La page réessaie
+seule… ») au lieu de sembler figé. Un `404` arrête tout (tournoi supprimé ou pas encore publié — même réponse, comme partout).
 
 ## Visibilité
 
