@@ -10,9 +10,11 @@ type LeaderCalProps = {
   events: LandingCalendarEvent[];
   /** Langue de la page (`requestLocale()`), français par défaut. */
   locale?: Locale;
+  /** Visiteur sans session : l'agenda mène à la page sans compte (`SPECTATOR_VIEW.md`). */
+  spectator?: boolean;
 };
 
-export function LeaderCal({ leaderboard, events, locale = DEFAULT_LOCALE }: Readonly<LeaderCalProps>) {
+export function LeaderCal({ leaderboard, events, locale = DEFAULT_LOCALE, spectator = false }: Readonly<LeaderCalProps>) {
   const { t } = landingServerText(locale);
   const rankedCount = leaderboard.length;
   return (
@@ -24,7 +26,7 @@ export function LeaderCal({ leaderboard, events, locale = DEFAULT_LOCALE }: Read
 
       <div className={styles.grid}>
         <Leaderboard initialRows={leaderboard} />
-        <CalendarCard events={events} locale={locale} />
+        <CalendarCard events={events} locale={locale} spectator={spectator} />
       </div>
     </section>
   );

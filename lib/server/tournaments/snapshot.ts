@@ -108,9 +108,30 @@ function cacheKey(tournamentId: number): string {
   return `tournament-snapshot:${tournamentId}`;
 }
 
-/** Oublie l'instantané d'un tournoi. Appelé à chaque publication d'événement. */
+/**
+ * Clé de la réponse publique d'un tournoi (`lib/server/spectator-snapshot.ts`).
+ * Posée ici pour que l'invalidation ci-dessous l'atteigne sans dépendance
+ * circulaire.
+ */
+export function spectatorSnapshotCacheKey(tournamentId: number): string {
+  return `spectator-snapshot:${tournamentId}`;
+}
+
+/**
+ * Oublie l'instantané d'un tournoi. Appelé à chaque publication d'événement.
+ *
+ * La réponse publique, elle, **reste** : sa durée de vie, allongée sous la
+ * charge, est précisément ce qui protège la machine d'un tournoi animé — chaque
+ * score la reconstruirait sinon. Elle ne part qu'avec le tournoi
+ * ({@link invalidateSpectatorSnapshot}, à la suppression).
+ */
 export function invalidateTournamentSnapshot(tournamentId: number): void {
   invalidateCached(cacheKey(tournamentId));
+}
+
+/** Oublie la réponse publique d'un tournoi : il vient d'être supprimé. */
+export function invalidateSpectatorSnapshot(tournamentId: number): void {
+  invalidateCached(spectatorSnapshotCacheKey(tournamentId));
 }
 
 /**

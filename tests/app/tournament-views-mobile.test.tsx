@@ -18,7 +18,7 @@ const ROOT = join(__dirname, "..", "..");
 const DIR = join(ROOT, "app", "(secured)", "tournois", "[id]");
 const read = (...parts: string[]) => readFileSync(join(DIR, ...parts), "utf8");
 
-const page = read("page.tsx");
+const page = read("_components/TournamentSheet.tsx");
 const swiss = read("_components", "SwissView.tsx");
 const survival = read("_components", "SurvivalView.tsx");
 const rounds = read("_components", "RoundColumns.tsx");
@@ -120,7 +120,7 @@ describe("Phase survie d'un multi-phases", () => {
     expect(survival).toMatch(/export function SurvivalRounds\b/);
     expect(survival).toContain("<SurvivalRounds");
     expect(page).toContain(
-      'const SurvivalRounds = dynamic(() => orReload(import("./_components/SurvivalView").then((m) => m.SurvivalRounds)), { ssr: false });',
+      'const SurvivalRounds = dynamic(() => orReload(import("./SurvivalView").then((m) => m.SurvivalRounds)), { ssr: false });',
     );
   });
 });
@@ -216,7 +216,7 @@ describe("Phase suisse d'un multi-phases", () => {
   it("les rondes sont un export du module de la vue suisse, chargé à la demande", () => {
     expect(swiss).toMatch(/export function SwissRounds\b/);
     expect(page).toContain(
-      'const SwissRounds = dynamic(() => orReload(import("./_components/SwissView").then((m) => m.SwissRounds)), { ssr: false });',
+      'const SwissRounds = dynamic(() => orReload(import("./SwissView").then((m) => m.SwissRounds)), { ssr: false });',
     );
   });
 });

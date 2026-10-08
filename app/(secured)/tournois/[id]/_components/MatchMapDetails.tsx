@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Copy } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { useSpectatorView } from "@/components/spectator-view";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { mapWinnerSide, type MatchMapResult } from "@/lib/shared/match-maps";
@@ -19,6 +20,10 @@ import { versusText } from "@/lib/shared/tournament-page-text";
  * score de chaque map et son code de replay, copiable — c'est lui que les
  * arbitres vérifient en jeu. Une map posée sans code par l'arbitrage le dit
  * (« Pas de code de replay »).
+ *
+ * Sans compte (`useSpectatorView`), les codes ne s'affichent pas : la politique
+ * de confidentialité les réserve aux membres connectés, et la lecture publique
+ * ne les transmet de toute façon pas (`spectatorSnapshot`).
  */
 export function MapResultList({
   maps,
@@ -33,6 +38,7 @@ export function MapResultList({
 }>) {
   const { showError, showSuccess } = useToast();
   const { t } = useTournamentPageText();
+  const spectator = useSpectatorView();
   const copy = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
@@ -56,10 +62,12 @@ export function MapResultList({
               {map.team1Score} – {map.team2Score}
               <span className="sr-only"> : {outcome}</span>
             </span>
-            {/* L'arbitrage peut poser une map sans code (replay perdu) : rien à copier. */}
-            {map.replayCode === "" ? (
+            {/* L'arbitrage peut poser une map sans code (replay perdu) : rien à
+                copier. Sans compte, la colonne n'existe pas. */}
+            {!spectator && map.replayCode === "" && (
               <span className={styles.noCode}>{t("match.maps.noReplayCode")}</span>
-            ) : (
+            )}
+            {!spectator && map.replayCode !== "" && (
               <>
                 <code className={styles.code}>{map.replayCode}</code>
                 <button

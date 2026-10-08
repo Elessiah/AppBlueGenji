@@ -4,6 +4,7 @@ import {
   matchAnchorId,
   parseMatchAnchor,
   phaseRevealingMatch,
+  tournamentHref,
   tournamentMatchHref,
 } from "@/lib/shared/match-anchor";
 
@@ -72,9 +73,22 @@ describe("parseMatchAnchor", () => {
   });
 });
 
+describe("tournamentHref", () => {
+  it("mène à la fiche des membres, ou à la page sans compte", () => {
+    expect(tournamentHref(7)).toBe("/tournois/7");
+    expect(tournamentHref(7, true)).toBe("/suivre/tournois/7");
+  });
+});
+
 describe("tournamentMatchHref", () => {
   it("ancre le chemin sur le match désigné", () => {
     expect(tournamentMatchHref(7, 42)).toBe("/tournois/7#match-42");
+  });
+
+  it("mène à la page sans compte pour un visiteur sans session, ancre comprise", () => {
+    expect(tournamentMatchHref(7, 42, true)).toBe("/suivre/tournois/7#match-42");
+    expect(tournamentMatchHref(7, null, true)).toBe("/suivre/tournois/7");
+    expect(tournamentMatchHref(7, 42, false)).toBe("/tournois/7#match-42");
   });
 
   it("se réduit au tournoi sans match à désigner", () => {

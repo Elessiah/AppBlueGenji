@@ -15,7 +15,7 @@ import { readSource } from "../helpers/read-source";
 const DIR = "app/(secured)/tournois/[id]";
 const hook = readSource(`${DIR}/_hooks/useTournamentLive.ts`);
 const connection = readSource(`${DIR}/_lib/live-connection.ts`);
-const page = readSource(`${DIR}/page.tsx`);
+const page = readSource(`${DIR}/_components/TournamentSheet.tsx`);
 const header = readSource(`${DIR}/_components/TournamentHeader.tsx`);
 // Le lancement forcé et sa confirmation vivent dans le pied d'action de la carte.
 const launchStrip = readSource(`${DIR}/_components/MatchCardActions.tsx`);
@@ -64,18 +64,21 @@ describe("squelette de chargement", () => {
   });
 
   it("remplace le texte nu de la page", () => {
-    expect(page).toContain("return <TournamentLoading />;");
+    expect(page).toContain("return <TournamentLoading retrying={retrying} />;");
   });
 });
 
 describe("retour", () => {
   it("est un lien vers la liste, qui ne revient dans l'historique que sur le site", () => {
-    expect(header).toContain('<LocaleLink href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>');
+    expect(header).toContain('<LocaleLink href={backHref} onClick={onBackClick} className={`${s.back} tap-target`}>');
+    // Sans compte, la liste est derrière la connexion : le lien mène à l'accueil.
+    expect(header).toContain('const backHref = spectator ? "/" : "/tournois";');
     expect(header).toContain(
       "if (!isPlainLeftClick(event) || !canReturnInSite(readSiteBackInput())) return;",
     );
     expect(header).toContain("router.back();");
-    expect(header).toContain('{backInSite ? t("header.back") : t("header.allTournaments")}');
+    expect(header).toContain('{backInSite ? t("header.back") : backFallback}');
+    expect(header).toContain('const backFallback = spectator ? t("header.backHome") : t("header.allTournaments");');
   });
 
   it("n'est plus un bouton piloté par la page", () => {

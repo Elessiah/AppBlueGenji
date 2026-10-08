@@ -174,7 +174,7 @@ describe("marches du podium — écrans où elles s'effacent", () => {
   });
 
   it("garde sobre l'aperçu des têtes de série du staff", () => {
-    const page = readSource("app/(secured)/tournois/[id]/page.tsx");
+    const page = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     expect(page).toMatch(/<PodiumTiersOff>\s*<BracketPreview/);
   });
 

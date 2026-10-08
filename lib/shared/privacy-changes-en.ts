@@ -325,6 +325,19 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: [READ_POLICY],
   },
+  "2026-10-suivi-tournoi-sans-compte": {
+    title: "Tournaments: the page can also be followed without an account",
+    summary:
+      "The page of a published tournament can now be viewed without logging in: bracket, scores, rankings, names of the teams and usernames of the players taking part.",
+    details: [
+      "A visitor without an account follows the tournament at /suivre/tournois/…: they read there what streams and Discord already show — team names, usernames of the players taking part, scores, rankings, username of a match's caster —, as well as team logos and, for a solo tournament, the avatar of each player taking part (unless they hid it) and their internal account number, which carries their podium mark, as well as BlueGenji Survival penalties (entrant, round, points), without their reason or the referee who imposed them.",
+      "Replay codes are not shown there: they remain reserved to logged-in members.",
+      "The page is served from a shared copy, renewed at least every two and a half minutes: a username change, a hidden avatar or an account deletion may show up there with that delay.",
+      "The page is excluded from search engines and opens no session. Like any page of the site, its visit is counted by the audience measurement, unless you object; beyond that, the visitor's IP address is only used there, in memory, to limit the number of reads.",
+      "You can object to your username being displayed, as for match streaming.",
+    ],
+    linkLabels: ["Read the paragraph “Following a tournament without an account”"],
+  },
 };
 
 /**

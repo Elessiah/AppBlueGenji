@@ -214,7 +214,7 @@ describe("libellés de l'aperçu", () => {
 describe("aperçu — câblage", () => {
   const ROOT = join(__dirname, "..", "..");
   const DIR = join(ROOT, "app", "(secured)", "tournois", "[id]");
-  const PAGE = readFileSync(join(DIR, "page.tsx"), "utf8");
+  const PAGE = readFileSync(join(DIR, "_components/TournamentSheet.tsx"), "utf8");
   const VIEW = readFileSync(join(DIR, "_components", "EnduranceView.tsx"), "utf8");
 
   it("n'est ouvert qu'à l'arbitrage, sur un tournoi en cours", () => {

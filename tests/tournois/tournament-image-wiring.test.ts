@@ -65,7 +65,7 @@ describe("écrans", () => {
   });
 
   it("la page monte le dialogue pour le staff seulement, et le referme au changement de tournoi", () => {
-    const page = read("app/(secured)/tournois/[id]/page.tsx");
+    const page = read("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     expect(page).toContain("{imageDialogOpen && detail.isAdmin && !frozen && (");
     expect(page).toMatch(/<TournamentImageDialog[\s\S]{0,200}image=\{detail\.card\.image\}/);
     expect(page).toContain("useEffect(() => setImageDialogOpen(false), [tournamentId]);");

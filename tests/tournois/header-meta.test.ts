@@ -304,7 +304,7 @@ describe("en-tête de tournoi — mise en page", () => {
     join(ROOT, "app/(secured)/tournois/[id]/_components/TournamentHeader.tsx"),
     "utf8",
   );
-  const PAGE = readFileSync(join(ROOT, "app/(secured)/tournois/[id]/page.tsx"), "utf8");
+  const PAGE = readFileSync(join(ROOT, "app/(secured)/tournois/[id]/_components/TournamentSheet.tsx"), "utf8");
   const PHASE_TIMELINE = readFileSync(
     join(ROOT, "app/(secured)/tournois/[id]/_components/PhaseTimeline.tsx"),
     "utf8",

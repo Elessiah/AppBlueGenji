@@ -111,6 +111,7 @@
     "body": "Cette page fait partie de l'espace compétitif. Connecte-toi pour la consulter : tu reviendras ici automatiquement.",
     "login": "Se connecter",
     "home": "Retour à l'accueil",
-    "rules": "Découvrir les règles des tournois"
+    "rules": "Découvrir les règles des tournois",
+    "redirecting": "Ouverture du tournoi…"
   }
 }

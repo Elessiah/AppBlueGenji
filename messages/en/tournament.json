@@ -38,8 +38,10 @@
       "notFoundTitle": "Tournament not found",
       "expiredText": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
       "notFoundText": "This tournament isn't available. It may have been deleted, or isn't open to the public yet.",
+      "spectatorRecheck": "The page checks again on its own at most every {minutes} minutes: if the tournament becomes available, it will show up.",
       "relogin": "Log in again",
-      "back": "Back to tournaments"
+      "back": "Back to tournaments",
+      "backHome": "Back to home"
     },
     "noMatches": "No matches available yet.",
     "noMatchesShort": "No matches yet.",
@@ -57,8 +59,11 @@
   "header": {
     "back": "Back",
     "allTournaments": "All tournaments",
+    "backHome": "Home",
     "admin": "⚙ Admin",
     "adminTitle": "You have organizer rights on this tournament.",
+    "spectator": "Spectator",
+    "spectatorTitle": "You are following this tournament without an account: the page is read-only and updates itself, more or less often depending on traffic on the site.",
     "officialChannel": "Official channel",
     "officialChannelOn": "Official channel · {platform}",
     "meta": {
@@ -98,14 +103,18 @@
     "reconnecting": "Reconnecting…",
     "offline": "Offline",
     "reconnectingTitle": "Connection to the real-time feed lost. The page reconnects on its own and keeps updating, more slowly.",
+    "retryTitle": "The last update did not go through. The page tries again by itself, a little later; what is shown remains valid until then.",
+    "loadingRetry": "The tournament cannot be loaded right now. The page tries again by itself, a little later: no need to reload it.",
     "upToDateTitle": "Automatic updates {cadence}. No need to reload the page.",
     "cadenceSecond": "every second",
     "cadenceSeconds": "at most every {seconds} seconds",
+    "cadenceMinute": "at most every minute",
     "cadenceMinutes": "at most every {minutes, plural, one {# minute} other {# minutes}}",
     "fatal": {
       "UNAUTHORIZED": "Your session has expired: automatic updates have stopped. Log in again to resume them.",
       "TOURNAMENT_NOT_FOUND": "This tournament is no longer available: there's nothing left to follow."
     },
+    "spectatorNotFoundTitle": "This tournament isn't available right now. The page checks again on its own at most every {minutes} minutes.",
     "alerts": {
       "SCORE_TO_CONFIRM": "Score to confirm",
       "MATCH_READY": "Your match is ready",

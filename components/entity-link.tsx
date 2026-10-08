@@ -2,6 +2,7 @@
 
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
+import { useSpectatorView } from "@/components/spectator-view";
 import { podiumTierClass, type PodiumTier } from "@/lib/shared/podium-tiers";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -28,6 +29,11 @@ import type { CSSProperties, ReactNode } from "react";
  * (`.podium-tier-N`) sur chaque `TeamLink`, ses membres une version adoucie
  * (`.podium-member-N`) sur chaque `PlayerLink` — lue dans le contexte posé par
  * la mise en page racine (`components/podium-tiers.tsx`, `PODIUM_TIERS.md`).
+ *
+ * **Sans compte** (`useSpectatorView`, `/suivre/tournois/[id]`), le nom reste
+ * un nom : les fiches d'équipe et de joueur sont dans l'espace connecté, un
+ * lien n'y mènerait qu'à la carte « Connexion requise ». La marche du podium,
+ * elle, reste.
  */
 export interface EntityLinkProps {
   children: ReactNode;
@@ -62,6 +68,16 @@ export function EntityLink({
   className,
   ...rest
 }: Readonly<EntityLinkProps & { href: string }>) {
+  const spectator = useSpectatorView();
+  if (spectator) {
+    // Pas d'`aria-label` sur un `<span>` sans rôle (`aria-prohibited-attr`) :
+    // le nom affiché suffit, il n'annonce plus de destination.
+    return (
+      <span className={className ? `entity-name ${className}` : "entity-name"} style={rest.style} title={rest.title}>
+        {children}
+      </span>
+    );
+  }
   return (
     <LocaleLink href={href} className={className ? `entity-link ${className}` : "entity-link"} {...rest}>
       {children}

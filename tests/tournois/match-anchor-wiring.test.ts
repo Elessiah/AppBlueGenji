@@ -20,7 +20,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
 const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
-const PAGE = read(join(TOURNAMENT_DIR, "page.tsx"));
+const PAGE = read(join(TOURNAMENT_DIR, "_components/TournamentSheet.tsx"));
 const HOOK = read(join(TOURNAMENT_DIR, "_hooks", "useMatchAnchor.ts"));
 const GLOBALS = read("app/globals.css");
 const SECTIONS = read(join(TOURNAMENT_DIR, "_components", "BracketSections.tsx"));

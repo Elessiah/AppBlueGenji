@@ -1,4 +1,5 @@
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { tournamentHref } from "@/lib/shared/match-anchor";
 import { CyberButton, CyberCard, MiniBracket, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
@@ -16,6 +17,8 @@ type TournamentBoardProps = {
   miniBracket: { a: string; b: string; sa: number | string; sb: number | string }[];
   /** Langue de la page (`requestLocale()`), français par défaut. */
   locale?: Locale;
+  /** Visiteur sans session : les cartes mènent à la page sans compte (`SPECTATOR_VIEW.md`). */
+  spectator?: boolean;
 };
 
 /** Action d'une carte : elle mène toujours à la fiche, seul le libellé change (`boardActionKey`). */
@@ -24,7 +27,7 @@ function actionLabel({ t }: LandingText, card: TournamentCard, now: number): str
   return key === "view" ? t("common.viewTournament") : t(`board.action.${key}`);
 }
 
-export function TournamentBoard({ buckets, featured, miniBracket, locale = DEFAULT_LOCALE }: Readonly<TournamentBoardProps>) {
+export function TournamentBoard({ buckets, featured, miniBracket, locale = DEFAULT_LOCALE, spectator = false }: Readonly<TournamentBoardProps>) {
   const text = landingServerText(locale);
   const { t } = text;
   // Une seule horloge pour toute la section : deux cartes lues à deux instants
@@ -71,7 +74,7 @@ export function TournamentBoard({ buckets, featured, miniBracket, locale = DEFAU
 
               <div className={styles.footerRow}>
                 <CyberButton variant="primary" asChild>
-                  <LocaleLink href={`/tournois/${featured.id}`}>{actionLabel(text, featured, now)} →</LocaleLink>
+                  <LocaleLink href={tournamentHref(featured.id, spectator)}>{actionLabel(text, featured, now)} →</LocaleLink>
                 </CyberButton>
               </div>
             </>
@@ -126,7 +129,7 @@ export function TournamentBoard({ buckets, featured, miniBracket, locale = DEFAU
 
               <div className={styles.footerRow}>
                 <CyberButton variant="ghost" asChild>
-                  <LocaleLink href={`/tournois/${card.id}`}>{actionLabel(text, card, now)}</LocaleLink>
+                  <LocaleLink href={tournamentHref(card.id, spectator)}>{actionLabel(text, card, now)}</LocaleLink>
                 </CyberButton>
               </div>
             </CyberCard>

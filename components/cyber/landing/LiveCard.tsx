@@ -42,6 +42,8 @@ function phaseText(text: LandingText, match: LandingLiveMatch): string {
 const LIVE_CARD_CLOCK_MS = 30_000;
 
 type LiveCardProps = {
+  /** Visiteur sans session : la carte mène à la page sans compte (`SPECTATOR_VIEW.md`). */
+  spectator?: boolean;
   /**
    * État du direct, tenu par le `Hero` (`useLandingLive`). La carte est
    * volontairement contrôlée : elle partage sa source avec le bouton
@@ -334,7 +336,7 @@ function carouselMatches(live: LandingLive | null): LandingLiveMatch[] {
  * la carte prend la hauteur du plus haut et ne bouge pas d'un match à l'autre —
  * le hero, en dessous, ne saute pas toutes les sept secondes.
  */
-export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
+export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<LiveCardProps>) {
   const matches = carouselMatches(live);
   // Seule l'horloge fait passer un match daté en lancement : sans elle, la
   // carte annoncerait « En attente de lancement » jusqu'au sondage suivant.
@@ -360,7 +362,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   const shown = matches[carousel.index] ?? null;
   const title = live.tournament.name.toUpperCase();
   const visibleViewers = visibleLiveViewerCount(live.viewers);
-  const href = tournamentMatchHref(live.tournament.id, shown?.id ?? null);
+  const href = tournamentMatchHref(live.tournament.id, shown?.id ?? null, spectator);
   const tournament = live.tournament.name;
   const openLabel = shown
     ? t("live.openMatch", {

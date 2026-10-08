@@ -29,9 +29,11 @@ type HeroProps = {
   copy: SiteCopy;
   /** Le viewer peut-il éditer les textes (permission `showcase`) ? */
   canEditCopy: boolean;
+  /** Visiteur sans session : les liens de tournoi mènent à la page sans compte. */
+  spectator?: boolean;
 };
 
-export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy }: Readonly<HeroProps>) {
+export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy, spectator = false }: Readonly<HeroProps>) {
   // Une seule source pour la carte live et le bouton « Regarder le live » :
   // deux sondages séparés les feraient diverger le temps d'un tick.
   const live = useLandingLive(initialLive);
@@ -123,7 +125,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
         </div>
 
         <div className={styles.right}>
-          <LiveCard live={live} nextUpcomingISO={nextUpcoming?.startAt ?? null} />
+          <LiveCard live={live} nextUpcomingISO={nextUpcoming?.startAt ?? null} spectator={spectator} />
           {nextUpcoming && (
             <CountdownStrip targetISO={nextUpcoming.startAt} label={t("hero.nextTournament", { name: nextUpcoming.name })} />
           )}

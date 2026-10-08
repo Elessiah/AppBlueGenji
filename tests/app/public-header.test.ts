@@ -30,7 +30,8 @@ describe("PublicHeader — bouton « partie compétitive »", () => {
     expect(connectedJsx).toContain('t("competitionFull")');
     // Pas de fuite du CTA côté déconnecté (qui ne propose que Connexion/Rejoindre).
     expect(loggedOutJsx).not.toContain('t("competition');
-    expect(loggedOutJsx).toContain("/connexion");
+    expect(loggedOutJsx).toContain("<JoinLink href={joinHref}>");
+    expect(source).toContain("const joinHref = joinHrefFor(path, search);");
   });
 
   it("pose le menu du compte (profil, équipe, déconnexion) à côté du CTA", () => {

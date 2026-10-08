@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { headers } from "next/headers";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import Image from "next/image";
 import { AccountMenu } from "@/components/account-menu";
@@ -7,8 +8,25 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
+import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
+import { joinHrefFor } from "@/lib/shared/spectator-view";
 import { PublicNavMenu } from "./PublicNavMenu";
+import { JoinLink } from "./JoinLink";
 import styles from "./PublicHeader.module.css";
+
+/**
+ * Chemin et requête demandés, posés par le middleware (`x-pathname`,
+ * `x-search`). Vides hors requête (rendu de test) : « Rejoindre » mène alors à
+ * la page de connexion seule.
+ */
+async function requestedLocation(): Promise<{ path: string | null; search: string | null }> {
+  try {
+    const requestHeaders = await headers();
+    return { path: requestHeaders.get(PATHNAME_HEADER), search: requestHeaders.get(SEARCH_HEADER) };
+  } catch {
+    return { path: null, search: null };
+  }
+}
 
 /**
  * En-tête public des pages vitrine (landing, asso, bot…).
@@ -21,7 +39,8 @@ import styles from "./PublicHeader.module.css";
  *   l'espace sécurisé) suivi du menu du compte (`AccountMenu` : profil,
  *   équipe, déconnexion).
  * - **Déconnecté** : un seul bouton « Rejoindre » (primary) vers `/connexion`,
- *   qui sert aussi de page de connexion.
+ *   qui sert aussi de page de connexion. Sur la page sans compte d'un tournoi,
+ *   il ramène après connexion à la fiche connectée (`joinHrefFor`).
  *
  * Server component : lit la session via `getCurrentUser()` (retombe sur `null`
  * si la session est absente ou invalide).
@@ -34,6 +53,8 @@ export async function PublicHeader() {
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
   const switcherLabel = await languageSwitcherLabel();
   const t = await getTranslations("shell.header");
+  const { path, search } = await requestedLocation();
+  const joinHref = joinHrefFor(path, search);
 
   return (
     <header className={styles.root} data-sticky-header>
@@ -78,7 +99,7 @@ export async function PublicHeader() {
             </>
           ) : (
             <CyberButton variant="primary" asChild>
-              <LocaleLink href="/connexion">{t("join")}</LocaleLink>
+              <JoinLink href={joinHref}>{t("join")}</JoinLink>
             </CyberButton>
           )}
         </div>

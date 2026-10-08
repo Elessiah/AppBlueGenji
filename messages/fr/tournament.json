@@ -38,8 +38,10 @@
       "notFoundTitle": "Tournoi introuvable",
       "expiredText": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
       "notFoundText": "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public.",
+      "spectatorRecheck": "La page revérifie seule toutes les {minutes} minutes au plus : si le tournoi devient accessible, il s'affichera.",
       "relogin": "Se reconnecter",
-      "back": "Retour aux tournois"
+      "back": "Retour aux tournois",
+      "backHome": "Retour à l'accueil"
     },
     "noMatches": "Aucun match disponible pour l'instant.",
     "noMatchesShort": "Aucun match pour l'instant.",
@@ -57,8 +59,11 @@
   "header": {
     "back": "Retour",
     "allTournaments": "Tous les tournois",
+    "backHome": "Accueil",
     "admin": "⚙ Admin",
     "adminTitle": "Tu disposes des droits d'organisation sur ce tournoi.",
+    "spectator": "Spectateur",
+    "spectatorTitle": "Tu suis ce tournoi sans compte : la page est en lecture seule et se met à jour d'elle-même, plus ou moins souvent selon l'affluence sur le site.",
     "officialChannel": "Chaîne officielle",
     "officialChannelOn": "Chaîne officielle · {platform}",
     "meta": {
@@ -98,14 +103,18 @@
     "reconnecting": "Reconnexion…",
     "offline": "Hors ligne",
     "reconnectingTitle": "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.",
+    "retryTitle": "La dernière mise à jour n'a pas abouti. La page réessaie seule, un peu plus tard ; ce qui est affiché reste valable jusque-là.",
+    "loadingRetry": "Le tournoi ne peut pas être chargé pour l'instant. La page réessaie seule, un peu plus tard : inutile de la recharger.",
     "upToDateTitle": "Mise à jour automatique {cadence}. Inutile de recharger la page.",
     "cadenceSecond": "à la seconde",
     "cadenceSeconds": "toutes les {seconds} secondes au plus",
+    "cadenceMinute": "toutes les minutes au plus",
     "cadenceMinutes": "toutes les {minutes} minutes au plus",
     "fatal": {
       "UNAUTHORIZED": "Ta session a expiré : la mise à jour automatique est arrêtée. Reconnecte-toi pour la reprendre.",
       "TOURNAMENT_NOT_FOUND": "Ce tournoi n'est plus accessible : il n'y a plus rien à suivre."
     },
+    "spectatorNotFoundTitle": "Ce tournoi n'est pas accessible pour l'instant. La page revérifie seule toutes les {minutes} minutes au plus.",
     "alerts": {
       "SCORE_TO_CONFIRM": "Score à confirmer",
       "MATCH_READY": "Ton match est prêt",

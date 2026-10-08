@@ -25,6 +25,7 @@ jest.mock("next/navigation", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
 import DetailLayout, { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";
+import { TournamentSheetText } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
 import { TournamentHeader } from "@/app/(secured)/tournois/[id]/_components/TournamentHeader";
 import { TournamentProgress, stageCountdownText } from "@/app/(secured)/tournois/[id]/_components/TournamentProgress";
 import { LiveIndicator } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
@@ -50,6 +51,8 @@ import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text"
 import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 import { ToastProvider } from "@/components/ui/toast";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
+import { getCurrentUser } from "@/lib/server/auth";
+import { authUser } from "../helpers/auth-user";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { lowerWinnerPlaceholder, upperLoserPlaceholder, UPPER_FINAL_WINNER_PLACEHOLDER } from "@/lib/shared/bracket-placeholders";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
@@ -289,6 +292,8 @@ describe("route et référencement", () => {
   });
 
   it("métadonnées dans la langue de l'adresse, hreflang réciproques", async () => {
+    // Un membre : sans session, la fiche redirige vers /suivre et ne lit pas la carte.
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
     jest.mocked(getVisibleTournamentCard).mockResolvedValue(
       tournamentCard({ id: 12, name: "Cup", state: "REGISTRATION", registeredTeams: 3, maxTeams: 8, ...DATES }),
     );
@@ -306,17 +311,22 @@ describe("route et référencement", () => {
     mockLocale = "en";
     jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
     expect((await generateMetadata({ params: Promise.resolve({ id: "12" }) })).title).toBe("Tournament");
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
   });
 
   it("la mise en page ne sérialise que les espaces client, sous /en seulement", async () => {
-    const en = await DetailLayout({ children: <TournamentLoading /> });
+    // La mise en page délègue aux textes communs aux deux espaces de la fiche.
+    const layout = await DetailLayout({ children: <TournamentLoading /> });
+    expect(layout.type).toBe(TournamentSheetText);
+    const sheetText = (props: unknown) => TournamentSheetText(props as Parameters<typeof TournamentSheetText>[0]);
+    const en = sheetText(layout.props);
     const messages = (en.props as { messages?: Record<string, unknown> }).messages;
     expect(messages).toBeDefined();
     for (const serverOnly of ["meta", "settings", "share"]) expect(messages).not.toHaveProperty(serverOnly);
     expect(JSON.stringify(messages).length).toBeLessThan(20_000);
     expect(renderToStaticMarkup(en)).toContain("Loading the tournament…");
     mockLocale = "fr";
-    const fr = await DetailLayout({ children: <TournamentLoading /> });
+    const fr = sheetText((await DetailLayout({ children: <TournamentLoading /> })).props);
     expect((fr.props as { messages?: unknown }).messages).toBeUndefined();
     expect(renderToStaticMarkup(fr)).toContain("Chargement du tournoi…");
   });

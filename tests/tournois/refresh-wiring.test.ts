@@ -27,7 +27,7 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
  */
 const stream = read("app/api/tournaments/[id]/stream/route.ts");
 const hook = read("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
-const detailPage = read("app/(secured)/tournois/[id]/page.tsx");
+const detailPage = read("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
 const detailHeader = read("app/(secured)/tournois/[id]/_components/TournamentHeader.tsx");
 const listPage = read("app/(secured)/tournois/TournamentsList.tsx");
 const index = read("lib/server/tournaments/index.ts");
@@ -117,7 +117,8 @@ describe("page de tournoi — ce que voit le lecteur", () => {
     // Sans ce cas, la page resterait sur « Chargement… » pour toujours : le seul
     // état où il ne reste que le F5, et où il ne sert à rien.
     expect(detailPage).toContain("if (fatal && !detail) {");
-    expect(detailPage).toContain('<LocaleLink href={expired ? "/connexion" : "/tournois"}>');
+    expect(detailPage).toContain('backHref = "/connexion";');
+    expect(detailPage).toContain("<LocaleLink href={backHref}>{backLabel}</LocaleLink>");
   });
 
   it("retire les actions quand le suivi est arrêté", () => {
@@ -140,7 +141,7 @@ describe("page de tournoi — ce que voit le lecteur", () => {
     expect(detailPage).toMatch(/<TournamentHeader[\s\S]{0,400}isLive=\{isLive\}/);
     expect(detailPage).toMatch(/<TournamentHeader[\s\S]{0,400}tier=\{tier\}/);
     expect(detailPage).toMatch(/<TournamentHeader[\s\S]{0,400}fatal=\{fatal\}/);
-    expect(detailHeader).toContain("<LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />");
+    expect(detailHeader).toContain("<LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />");
   });
 });
 

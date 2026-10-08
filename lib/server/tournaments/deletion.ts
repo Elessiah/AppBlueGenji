@@ -38,6 +38,7 @@ import { deleteStoredImage } from "@/lib/server/image-upload";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { publishUpdatedEvent } from "./notifications";
+import { invalidateSpectatorSnapshot } from "./snapshot";
 
 /** Identité du tournoi effacé, pour le message de confirmation et les logs. */
 export type DeletedTournament = { id: number; name: string };
@@ -192,6 +193,9 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
     // Aucun événement dédié n'est nécessaire : le flux ne dit jamais pourquoi
     // il tombe, c'est la lecture REST de secours qui voit le 404.
     publishUpdatedEvent(tournamentId);
+    // La page sans compte ne garde pas un tournoi qui n'existe plus : sa réponse
+    // publique, que les écritures n'invalident pas, part ici.
+    invalidateSpectatorSnapshot(tournamentId);
 
     return deleted;
   } catch (error) {

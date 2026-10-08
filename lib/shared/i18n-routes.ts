@@ -74,6 +74,9 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // entier : `/tournois/creer` n'est pas une fiche. Ses gestes (inscription,
   // score, litiges, outils du staff) sont traduits au lot 8b-1.
   "/tournois/[id]",
+  // Suivi sans compte d'un tournoi (`docs/features/SPECTATOR_VIEW.md`) : la
+  // même fiche, mêmes textes que `/tournois/[id]`. `noindex`, hors sitemap.
+  "/suivre/tournois/[id]",
   // Lot 8b-2 — création et édition d'un tournoi (staff, `noindex`, hors
   // sitemap). Restent français, annoncés `lang="fr"` : la modale de
   // recadrage commune au site et le réglage des notifications (lot 9).

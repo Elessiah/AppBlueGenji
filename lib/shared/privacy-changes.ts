@@ -627,6 +627,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/rgpd", label: "Lire la politique de confidentialité" }],
   },
+  // Qui lit la fiche d'un tournoi : plus seulement les membres connectés, tout
+  // visiteur (`/suivre/tournois/[id]`, docs/features/SPECTATOR_VIEW.md). Daté
+  // du lendemain de la mise en ligne, comme les précédentes.
+  {
+    id: "2026-10-suivi-tournoi-sans-compte",
+    publishedAt: "2026-10-09",
+    title: "Tournois : la fiche se suit aussi sans compte",
+    summary:
+      "La fiche d'un tournoi publié se consulte désormais sans se connecter : plateau, scores, classements, noms des équipes et pseudos des joueurs engagés.",
+    details: [
+      "Un visiteur sans compte suit le tournoi à l'adresse /suivre/tournois/… : il y lit ce que les retransmissions et Discord montrent déjà — noms des équipes, pseudos des joueurs engagés, scores, classements, pseudo du caster d'un match —, ainsi que les logos des équipes et, pour un tournoi individuel, l'avatar de chaque joueur engagé (sauf s'il l'a masqué) et son numéro de compte interne, qui porte sa marque du podium, ainsi que les pénalités d'une BlueGenji Survie (engagé, manche, points), sans leur motif ni l'arbitre qui les a posées.",
+      "Les codes de replay n'y figurent pas : ils restent réservés aux membres connectés.",
+      "La page est servie depuis une copie partagée, renouvelée au plus tard toutes les deux minutes et demie : un changement de pseudo, un avatar masqué ou une suppression de compte peut y apparaître avec ce délai.",
+      "La page est exclue des moteurs de recherche et n'ouvre aucune session. Comme toute page du site, sa visite est comptée par la mesure d'audience, sauf opposition ; l'adresse IP du visiteur n'y sert par ailleurs qu'à limiter le nombre de lectures, en mémoire.",
+      "Tu peux t'opposer à l'affichage de ton pseudo, comme pour la retransmission des matchs.",
+    ],
+    links: [{ href: "/rgpd#suivi-sans-compte", label: "Lire le paragraphe « Suivre un tournoi sans compte »" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -130,6 +130,15 @@ export const CSP_REPORT_PATH = "/api/csp-report";
  */
 export const PATHNAME_HEADER = "x-pathname";
 
+/**
+ * Requête de l'adresse demandée (`?…`, vide sans paramètre), posée par le
+ * middleware à côté de {@link PATHNAME_HEADER} : une redirection rendue côté
+ * serveur la fait suivre (`/tournois/[id]` → `/suivre/tournois/[id]`,
+ * `docs/features/SPECTATOR_VIEW.md`). Toujours remplacée : seul le middleware
+ * l'écrit.
+ */
+export const SEARCH_HEADER = "x-search";
+
 /** Nom de l'en-tête de requête par lequel le nonce atteint les composants serveur. */
 export const CSP_NONCE_HEADER = "x-nonce";
 

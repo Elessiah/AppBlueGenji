@@ -309,6 +309,22 @@ export function RgpdEn({
             account here does not erase your in-game identifiers from a replay, and the codes remain attached to
             the result they document. The maps you entered appear in the export of your data.
           </p>
+          <p id="suivi-sans-compte">
+            <strong>Following a tournament without an account.</strong> Since October 2026, the page of a
+            published tournament can also be viewed without logging in, at <code>/suivre/tournois/…</code>:
+            bracket, scores, rankings, names of the teams and usernames of the players taking part, username of a
+            match&apos;s caster — what streams and Discord already show —, as well as team logos and, for a solo
+            tournament, the avatar of each player taking part (unless they hid it) and their internal account
+            number, which carries their podium mark, and BlueGenji Survival penalties (entrant, round, points),
+            without their reason or the referee who imposed them. Replay codes are not shown there: they
+            remain reserved to logged-in members. The page is served from a shared copy, renewed at
+            least every two and a half minutes: a username change, a hidden avatar or an account deletion
+            may show up there with that delay. This page is excluded from search engines (<code>noindex</code>)
+            and opens no session. Like any page of the site, its visit is counted by the audience measurement,
+            unless you object (see “Audience measurement”); beyond that, the visitor&apos;s IP address is only used
+            there, in memory, to limit the number of reads. You can object to your username being displayed (see
+            “Your rights”).
+          </p>
         </div>
         <div className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>What this means in practice:</strong> statistics (number of tournaments played, scores,

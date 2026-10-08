@@ -1,6 +1,8 @@
 "use client";
 
 import { Pill } from "@/components/cyber";
+import { useSpectatorView } from "@/components/spectator-view";
+import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { LiveFailure } from "../_lib/live-state";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -15,15 +17,23 @@ type LiveIndicatorProps = {
   isLive: boolean;
   /** Palier de fraîcheur accordé par le serveur. */
   tier: RefreshTier;
+  /**
+   * Cadence de relecture, quand elle ne suit pas le palier : celle que le
+   * serveur accorde à la page sans compte (`null` n'arrive qu'avec `fatal`).
+   */
+  cadenceMs?: number | null;
   /** Échec définitif : la page a cessé de réessayer. */
   fatal?: LiveFailure | null;
 };
 
-function cadenceLabel(text: TournamentPageText, tier: RefreshTier): string {
-  const seconds = Math.round(REFRESH_CADENCE[tier].pushCoalesceMs / 1000);
+function cadenceLabel(text: TournamentPageText, cadenceMs: number): string {
+  const seconds = Math.round(cadenceMs / 1000);
   if (seconds <= 1) return text.t("live.cadenceSecond");
   if (seconds < 60) return text.t("live.cadenceSeconds", { seconds: String(seconds) });
-  return text.t("live.cadenceMinutes", { minutes: Math.round(seconds / 60) });
+  // Arrondi vers le haut : la phrase promet un délai « au plus ».
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes === 1) return text.t("live.cadenceMinute");
+  return text.t("live.cadenceMinutes", { minutes });
 }
 
 /**
@@ -48,20 +58,27 @@ function cadenceLabel(text: TournamentPageText, tier: RefreshTier): string {
  * `aria-label` portant toute l'explication ferait réciter une phrase entière à
  * la moindre coupure réseau. L'explication vit dans `title`.
  */
-export function LiveIndicator({ isLive, tier, fatal = null }: Readonly<LiveIndicatorProps>) {
+export function LiveIndicator({ isLive, tier, cadenceMs, fatal = null }: Readonly<LiveIndicatorProps>) {
   // Témoin de flux (glossaire) : « À jour / Reconnexion… / Hors ligne » →
   // « Up to date / Reconnecting… / Offline ». L'état vient du flux, le texte
   // de la page : rien de localisé ne passe par l'instantané.
   const text = useTournamentPageText();
   const { t } = text;
-  let label = t("live.reconnecting");
-  let title = t("live.reconnectingTitle");
+  // Page sans compte : pas de flux à rouvrir, une relecture qui réessaiera
+  // plus tard — « Hors ligne », jamais « Reconnexion… » (glossaire).
+  const spectator = useSpectatorView();
+  let label = spectator ? t("live.offline") : t("live.reconnecting");
+  let title = spectator ? t("live.retryTitle") : t("live.reconnectingTitle");
   if (fatal) {
     label = t("live.offline");
-    title = t(`live.fatal.${fatal}`);
+    // Sans compte, un introuvable est relu au plafond : rien n'est fini.
+    title =
+      spectator && fatal === "TOURNAMENT_NOT_FOUND"
+        ? t("live.spectatorNotFoundTitle", { minutes: SPECTATOR_NOT_FOUND_RECHECK_MINUTES })
+        : t(`live.fatal.${fatal}`);
   } else if (isLive) {
     label = t("live.upToDate");
-    title = t("live.upToDateTitle", { cadence: cadenceLabel(text, tier) });
+    title = t("live.upToDateTitle", { cadence: cadenceLabel(text, cadenceMs ?? REFRESH_CADENCE[tier].pushCoalesceMs) });
   }
 
   return (

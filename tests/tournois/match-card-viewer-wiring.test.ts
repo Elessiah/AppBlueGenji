@@ -21,7 +21,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
 const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
 const BRACKET_TREE = read(join(TOURNAMENT_DIR, "_components", "BracketTree.tsx"));
-const PAGE = read(join(TOURNAMENT_DIR, "page.tsx"));
+const PAGE = read(join(TOURNAMENT_DIR, "_components/TournamentSheet.tsx"));
 const PLAYER_DIALOG = read(join(TOURNAMENT_DIR, "_components", "PlayerScoreDialog.tsx"));
 const ADMIN_DIALOG = read(join(TOURNAMENT_DIR, "_components", "AdminScoreDialog.tsx"));
 const ISSUE_REPORT_CONTEXT = read(join(TOURNAMENT_DIR, "_lib", "issue-report-context.tsx"));

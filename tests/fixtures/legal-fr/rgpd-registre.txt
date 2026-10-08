@@ -5,7 +5,7 @@ Le registre décrit les traitements de données personnelles du site et du bot D
 Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
 Télécharger le registre (tableur CSV)← Politique de confidentialité
 RESPONSABLE
-ActeursMIS À JOUR LE 08/10/2026
+ActeursMIS À JOUR LE 09/10/2026
 Responsable du traitement
 Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
 Contact
@@ -95,14 +95,17 @@ Constituer des équipes (membres, rôles, invitations)
 Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)
 Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores
 Publier résultats, classements, statistiques et palmarès
+Laisser suivre sans compte la fiche d'un tournoi publié (/suivre/tournois/…) : plateau, scores, classements, noms et logos des équipes et pseudos des engagés (et, en tournoi individuel, leur avatar s'il n'est pas masqué et leur numéro de compte interne, pour la marque du podium), pénalités d'une BlueGenji Survie sans motif ni arbitre, sans les codes de replay ; page exclue des moteurs de recherche
 Base légale
 Intérêt légitime (organisation des compétitions, mémoire sportive de la scène)
 Personnes concernées
 Joueurs inscrits
 Membres d'équipe
 Staff d'arbitrage
+Visiteurs sans compte de la fiche publique d'un tournoi
 Données
 Appartenance à une équipe et rôles d'équipe
+Adresse IP d'un visiteur sans compte, en mémoire seulement, pour plafonner ses lectures de la fiche publique
 Inscriptions, scores, forfaits, pénalités (avec motif et arbitre auteur), classements
 Détail map par map d'un match : score et code de replay de chaque map (facultatif quand l'arbitrage saisit la map, replay perdu ; le replay montre en jeu les identifiants des joueurs, BattleTag masqué compris), compte qui l'a saisi
 Données sensibles
@@ -111,6 +114,7 @@ Conservation
 Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)
 Codes de replay : gardés avec le résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le lien vers le compte qui les a saisis est effacé à la suppression du compte, les codes restent (la partie est conservée par l'éditeur du jeu)
 Droit d'opposition ouvert sur demande
+Adresse IP d'un visiteur sans compte : en mémoire, le temps de la fenêtre du plafond de lecture (une minute), jamais conservée
 Destinataires
 Public du site
 Staff d'arbitrage et d'administration

@@ -102,6 +102,22 @@ export const LANDING_READ_RULE: RateLimitRule = {
 };
 
 /**
+ * Lectures publiques d'un tournoi (`/suivre/tournois/[id]`), par IP.
+ *
+ * Un onglet en relit une toutes les 27 s au plus vite (30 s, gigue de −10 %
+ * comprise) : un peu plus de deux par minute, sans compter les ouvertures et
+ * les retours sur l'onglet. Le plafond laisse passer une salle de LAN entière
+ * derrière une même adresse — une centaine d'écrans (≈ 222 lectures par
+ * minute), avec la marge des ouvertures et des reprises — et ne borne que la
+ * boucle d'un client déréglé. Une lecture de trop ne coûte qu'un cache.
+ */
+export const SPECTATOR_READ_RULE: RateLimitRule = {
+  name: "spectator-read",
+  limit: 360,
+  windowMs: 60_000,
+};
+
+/**
  * Lectures de l'annuaire et des fiches, par utilisateur : `/api/players`,
  * `/api/teams` et la fiche de chacun.
  *

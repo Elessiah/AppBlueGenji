@@ -17,7 +17,7 @@ const ROOT = join(__dirname, "..", "..");
 const DIR = "app/(secured)/tournois/[id]";
 const MATCH_ROW = readSource(`${DIR}/_components/MatchRow.tsx`);
 const MATCH_ROW_CSS = readSource(`${DIR}/_components/MatchRow.module.css`);
-const PAGE = readSource(`${DIR}/page.tsx`);
+const PAGE = readSource(`${DIR}/_components/TournamentSheet.tsx`);
 const PAGE_CSS = readSource(`${DIR}/page.module.css`);
 const BLOCK = readSource(`${DIR}/_components/PhaseStandingsBlock.tsx`);
 const BLOCK_CSS = readSource(`${DIR}/_components/PhaseStandingsBlock.module.css`);
@@ -52,7 +52,7 @@ const sheets: Record<string, string> = {
 describe("carte de match et fiche de tournoi — aucun style en ligne", () => {
   it.each<[string, string]>([
     ["MatchRow.tsx", MATCH_ROW],
-    ["page.tsx", PAGE],
+    ["_components/TournamentSheet.tsx", PAGE],
     ["PhaseStandingsBlock.tsx", BLOCK],
   ])("%s ne porte ni `style={{…}}` ni couleur littérale", (_name, source) => {
     const code = source.replace(/\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
@@ -99,7 +99,7 @@ describe("feuilles de la carte et de la fiche — jetons définis", () => {
 
 describe("classement d'une phase terminée — un seul bloc, un vrai titre", () => {
   it("la page le rend par PhaseStandingsBlock, jamais par trois copies", () => {
-    expect(PAGE).toContain('import("./_components/PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock)');
+    expect(PAGE).toContain('import("./PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock)');
     expect(PAGE.match(/<PhaseStandingsBlock /g)).toHaveLength(1);
     expect(PAGE).not.toContain("<PhaseStandingsTable");
     // Rendu sous les vues qui n'en portent pas : manches seules d'une phase
