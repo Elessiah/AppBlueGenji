@@ -2,7 +2,7 @@
 
 import { Globe } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LOCALE_NATIVE_NAME, isMigratedRoute, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
+import { isMigratedRoute, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 import { useAppLocale } from "./locale-context";
 import styles from "./LanguageSwitcher.module.css";
 
@@ -23,17 +23,13 @@ import styles from "./LanguageSwitcher.module.css";
  *   rend (`languageSwitcherLabel()`) : sur une page sans rien de traduit, aucun
  *   code client de `next-intl` n'est chargé pour un lien qui ne s'affiche pas.
  */
-export function LanguageSwitcher({
-  label,
-  className,
-  compact = false,
-}: Readonly<{ label: string; className?: string; compact?: boolean }>) {
+export function LanguageSwitcher({ label, className }: Readonly<{ label: string; className?: string }>) {
   const path = useSwitchablePath();
   const locale = useAppLocale();
   if (path === null) return null;
   const target: Locale = locale === "fr" ? "en" : "fr";
   return (
-    <SwitcherLink href={localeHref(path, target)} target={target} label={label} className={className} compact={compact} />
+    <SwitcherLink href={localeHref(path, target)} target={target} label={label} className={className} />
   );
 }
 
@@ -63,8 +59,7 @@ function SwitcherLink({
   target,
   label,
   className,
-  compact,
-}: Readonly<{ href: string; target: Locale; label: string; className?: string; compact: boolean }>) {
+}: Readonly<{ href: string; target: Locale; label: string; className?: string }>) {
   // La requête suit (un filtre, un onglet, le `?redirect=` de la connexion) :
   // changer de langue ne doit pas perdre l'état de la page.
   const query = useSearchParams()?.toString() ?? "";
@@ -83,19 +78,10 @@ function SwitcherLink({
       onFocus={withAnchor}
       onClick={withAnchor}
     >
-      {/* Sur un écran étroit, le code (« EN ») remplace le nom : la ligne
-          d'actions de l'en-tête passait sinon à la ligne et poussait le menu du
-          compte sous le logo. Le nom accessible garde le code visible en tête. */}
-      {/* `compact` (barre connectée) : globe et code, à toutes les largeurs. */}
-      {compact && <Globe size={16} strokeWidth={2} aria-hidden="true" className={styles.globe} />}
-      {!compact && (
-        <span lang={target} className={styles.full}>
-          {LOCALE_NATIVE_NAME[target]}
-        </span>
-      )}
-      <span lang={target} className={compact ? undefined : styles.short}>
-        {target.toUpperCase()}
-      </span>
+      {/* Globe et code de la langue visée (« EN »), le même bouton dans toutes
+          les barres. Le nom accessible commence par ce code visible. */}
+      <Globe size={16} strokeWidth={2} aria-hidden="true" className={styles.globe} />
+      <span lang={target}>{target.toUpperCase()}</span>
       <span className="sr-only"> — {label}</span>
     </a>
   );
