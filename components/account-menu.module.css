@@ -23,9 +23,16 @@
   transition: border-color 0.15s;
 }
 
-.trigger:hover,
 .triggerOpen {
   border-color: rgba(90, 200, 255, 0.45);
+}
+
+/* Survol réservé aux pointeurs fins : collé après un tap, il ferait croire
+   le menu encore ouvert. */
+@media (hover: hover) and (pointer: fine) {
+  .trigger:hover {
+    border-color: rgba(90, 200, 255, 0.45);
+  }
 }
 
 .trigger:focus-visible {
@@ -87,7 +94,7 @@
 
 /* Survol réservé aux pointeurs qui survolent : au toucher, l'entrée tapée
    resterait éclairée à la réouverture du menu. */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .item:hover:not(:disabled) {
     color: var(--ink);
     background: rgba(90, 200, 255, 0.08);
@@ -102,19 +109,10 @@
   }
 }
 
-.item:focus-visible {
-  color: var(--ink);
-  background: rgba(90, 200, 255, 0.08);
-}
-
 .itemIcon {
   flex-shrink: 0;
   color: var(--blue-300);
   opacity: 0.8;
-}
-
-.item:focus-visible .itemIcon {
-  opacity: 1;
 }
 
 .itemText {
@@ -125,8 +123,14 @@
 }
 
 .item:focus-visible {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.08);
   outline: 2px solid var(--blue-500);
   outline-offset: -2px;
+}
+
+.item:focus-visible .itemIcon {
+  opacity: 1;
 }
 
 .itemHint {

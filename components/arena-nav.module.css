@@ -176,7 +176,7 @@
 
 /* Survol réservé aux pointeurs qui survolent : au toucher, l'état resterait
    collé après le tap et passerait pour la page courante. */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .navTools .navTool:hover {
     color: var(--blue-300);
     border-color: rgba(90, 200, 255, 0.35);
@@ -312,7 +312,8 @@
   }
 }
 
-/* Lien de la modération : drapeau, compteur en pastille sur le coin. */
+/* Lien de la modération : drapeau, libellé, compteur en pastille alignée à
+   la suite — dans le bouton, sans rien recouvrir ni le contour de focus. */
 .navTools .navReports {
   gap: 8px;
 }
@@ -323,7 +324,7 @@
   color: var(--amber);
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .navTools .navReportsPending:hover {
     color: var(--amber);
     border-color: rgba(var(--amber-rgb), 0.45);
@@ -378,16 +379,12 @@
 }
 
 .navBadge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 18px;
+  min-width: 20px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 6px;
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
-  border: 2px solid var(--cyber-bg-1);
   background: var(--amber);
   color: var(--cyber-bg-1);
   font-family: var(--font-mono);

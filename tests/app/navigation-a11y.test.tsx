@@ -106,10 +106,12 @@ describe("ArenaNav — page courante et pictogrammes", () => {
 
   it("réserve le survol des outils aux pointeurs qui survolent", () => {
     const css = readSource("components/arena-nav.module.css");
-    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.navTools \.navTool:hover/);
-    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.navTools \.navReportsPending:hover/);
-    expect(readSource("components/i18n/LanguageSwitcher.module.css")).toMatch(/@media \(hover: hover\) \{\s*\.link:hover/);
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.navTools \.navTool:hover/);
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.navTools \.navReportsPending:hover/);
+    expect(readSource("components/i18n/LanguageSwitcher.module.css")).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.link:hover/);
     expect(css).toMatch(/\.navBadge\s*\{[^}]*color: var\(--cyber-bg-1\);/);
+    // Pastille à la suite du libellé : elle ne recouvre ni le drapeau ni le focus.
+    expect(css.slice(css.indexOf(".navBadge {")).split("}")[0]).not.toContain("position: absolute");
   });
 
   it("marque la page des signalements comme courante", () => {
