@@ -423,8 +423,9 @@ function RgpdFr({
             tournoi publié se consulte aussi sans se connecter, à l&apos;adresse{" "}
             <code>/suivre/tournois/…</code> : plateau, scores, classements, noms des équipes et
             pseudos des joueurs engagés, pseudo du caster d&apos;un match — ce que les retransmissions
-            et Discord montrent déjà —, ainsi que, pour un tournoi individuel, le numéro de compte
-            interne de chaque joueur engagé, qui porte sa marque du podium. Les codes de replay n&apos;y figurent pas : ils restent réservés
+            et Discord montrent déjà —, ainsi que les logos des équipes et, pour un tournoi individuel,
+            l&apos;avatar de chaque joueur engagé (sauf s&apos;il l&apos;a masqué) et son numéro de compte
+            interne, qui porte sa marque du podium. Les codes de replay n&apos;y figurent pas : ils restent réservés
             aux membres connectés. Cette page est exclue des moteurs de recherche (<code>noindex</code>)
             et n&apos;ouvre aucune session. Comme toute page du site, sa visite est comptée par la
             mesure d&apos;audience, sauf opposition (voir « Mesure d&apos;audience ») ; l&apos;adresse IP

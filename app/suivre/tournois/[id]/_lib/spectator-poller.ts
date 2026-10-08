@@ -76,6 +76,8 @@ export function createSpectatorPoller(
   let timer: unknown = null;
   let inflight = false;
   let disposed = false;
+  /** Coupe la lecture en vol au démontage : rien à télécharger pour personne. */
+  const abort = new AbortController();
 
   const commit = (next: SpectatorState) => {
     state = next;
@@ -116,7 +118,11 @@ export function createSpectatorPoller(
     try {
       const headers: Record<string, string> = {};
       if (etag) headers["if-none-match"] = etag;
-      const response = await env.fetch(`/api/spectator/tournaments/${tournamentId}`, { cache: "no-store", headers });
+      const response = await env.fetch(`/api/spectator/tournaments/${tournamentId}`, {
+        cache: "no-store",
+        headers,
+        signal: abort.signal,
+      });
       if (disposed) return;
 
       if (response.status === 404 || response.status === 400) {
@@ -169,6 +175,7 @@ export function createSpectatorPoller(
     },
     dispose() {
       disposed = true;
+      abort.abort();
       clearTimer();
       dueAt = null;
     },

@@ -55,6 +55,9 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
     const { search, hash } = globalThis.location;
     router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);
   }, [spectatorId, router]);
+  // Pendant le relais, aucune carte « Connexion requise » : la fiche se lit
+  // sans compte, l'annoncer fermée le temps d'un rendu serait faux.
+  if (spectatorId !== null) return null;
 
   // On ne reconstitue qu'un chemin **du site** : il vient de `usePathname`, pas
   // d'un paramètre d'URL, donc il ne peut pas désigner un autre domaine.

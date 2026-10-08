@@ -313,8 +313,9 @@ export function RgpdEn({
             <strong>Following a tournament without an account.</strong> Since October 2026, the page of a
             published tournament can also be viewed without logging in, at <code>/suivre/tournois/…</code>:
             bracket, scores, rankings, names of the teams and usernames of the players taking part, username of a
-            match&apos;s caster — what streams and Discord already show —, as well as, for a solo tournament, the
-            internal account number of each player taking part, which carries their podium mark. Replay codes are not shown there: they
+            match&apos;s caster — what streams and Discord already show —, as well as team logos and, for a solo
+            tournament, the avatar of each player taking part (unless they hid it) and their internal account
+            number, which carries their podium mark. Replay codes are not shown there: they
             remain reserved to logged-in members. This page is excluded from search engines (<code>noindex</code>)
             and opens no session. Like any page of the site, its visit is counted by the audience measurement,
             unless you object (see “Audience measurement”); beyond that, the visitor&apos;s IP address is only used

@@ -385,7 +385,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)",
       "Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores",
       "Publier résultats, classements, statistiques et palmarès",
-      "Laisser suivre sans compte la fiche d'un tournoi publié (/suivre/tournois/…) : plateau, scores, classements, noms des équipes et pseudos des engagés (et, en tournoi individuel, leur numéro de compte interne, pour la marque du podium), sans les codes de replay ; page exclue des moteurs de recherche",
+      "Laisser suivre sans compte la fiche d'un tournoi publié (/suivre/tournois/…) : plateau, scores, classements, noms et logos des équipes et pseudos des engagés (et, en tournoi individuel, leur avatar s'il n'est pas masqué et leur numéro de compte interne, pour la marque du podium), sans les codes de replay ; page exclue des moteurs de recherche",
     ],
     legalBasis: "Intérêt légitime (organisation des compétitions, mémoire sportive de la scène)",
     dataSubjects: ["Joueurs inscrits", "Membres d'équipe", "Staff d'arbitrage"],
