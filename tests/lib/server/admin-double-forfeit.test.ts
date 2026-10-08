@@ -6,6 +6,7 @@ jest.mock("@/lib/server/tournaments/byes");
 
 import { adminResolveMatch } from "@/lib/server/tournaments/admin";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * L'arbitrage d'un double forfait : la rencontre se clôt sans vainqueur, sans
@@ -61,7 +62,7 @@ describe("adminResolveMatch — double forfait", () => {
   it("clôt la rencontre sans vainqueur, sans perdant et sans score", async () => {
     const { conn, writes } = fakeConnection();
 
-    await adminResolveMatch(conn, 10, undefined, undefined, undefined, true);
+    await adminResolveMatch(conn, 10, { doubleForfeit: true });
 
     expect(finalizeMatch).toHaveBeenCalledWith(conn, 1, expect.objectContaining({ id: 10 }), {
       team1Score: null,
@@ -76,7 +77,7 @@ describe("adminResolveMatch — double forfait", () => {
   it("efface le drapeau quand un double forfait est corrigé en résultat", async () => {
     const { conn, writes } = fakeConnection();
 
-    await adminResolveMatch(conn, 10, 3, 1);
+    await adminResolveMatch(conn, 10, { maps: mapsFor(3, 1), userId: 1 });
 
     const flag = writes.find((w) => w.sql.includes("double_forfeit = ?"));
     expect(flag?.params).toEqual([null, 0, 10]);
@@ -85,29 +86,15 @@ describe("adminResolveMatch — double forfait", () => {
   it("garde le forfait nominatif exclusif du double forfait", async () => {
     const { conn, writes } = fakeConnection();
 
-    await adminResolveMatch(conn, 10, undefined, undefined, 200);
+    await adminResolveMatch(conn, 10, { forfeitTeamId: 200 });
 
     const flag = writes.find((w) => w.sql.includes("double_forfeit = ?"));
     expect(flag?.params).toEqual([200, 0, 10]);
   });
 
-  it("refuse un double forfait mêlé à un score ou à une équipe", async () => {
-    const { conn } = fakeConnection();
-
-    await expect(adminResolveMatch(conn, 10, 1, 0, undefined, true)).rejects.toThrow(
-      "INVALID_REQUEST",
-    );
-    await expect(adminResolveMatch(conn, 10, undefined, undefined, 100, true)).rejects.toThrow(
-      "INVALID_REQUEST",
-    );
-    expect(finalizeMatch).not.toHaveBeenCalled();
-  });
-
   it("refuse un match qui n'a pas ses deux engagées", async () => {
     const { conn } = fakeConnection({ team2_id: null });
 
-    await expect(adminResolveMatch(conn, 10, undefined, undefined, undefined, true)).rejects.toThrow(
-      "MATCH_NOT_READY",
-    );
+    await expect(adminResolveMatch(conn, 10, { doubleForfeit: true })).rejects.toThrow("MATCH_NOT_READY");
   });
 });

@@ -471,9 +471,12 @@ describe("adminSaveMatchScoresPublic", () => {
   it("réconcilie le tournoi du match et rafraîchit sans condition", async () => {
     connection.execute.mockResolvedValue([[{ tournament_id: "8" }], undefined]);
 
-    await adminSaveMatchScoresPublic(70, 2, 1, undefined);
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
 
-    expect(adminSaveMatchScores).toHaveBeenCalledWith(expect.anything(), 70, 2, 1, undefined, undefined);
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(expect.anything(), 70, {
+      maps: mapsFor(2, 1),
+      userId: 1,
+    });
     for (const fn of [reconcileSurvival, reconcileSwiss, reconcileEndurance, reconcilePhases]) {
       expect(fn).toHaveBeenCalledWith(8, expect.anything());
     }
@@ -483,7 +486,7 @@ describe("adminSaveMatchScoresPublic", () => {
   });
 
   it("ne réconcilie ni ne publie rien quand le match a disparu", async () => {
-    await adminSaveMatchScoresPublic(70, 2, 1);
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
 
     expect(reconcileSurvival).not.toHaveBeenCalled();
     expect(publishScoreResolvedEvent).not.toHaveBeenCalled();
@@ -494,7 +497,7 @@ describe("adminSaveMatchScoresPublic", () => {
   it("défait la sauvegarde refusée", async () => {
     jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("DOWNSTREAM_SCORES"));
 
-    await expect(adminSaveMatchScoresPublic(70, 2, 1)).rejects.toThrow("DOWNSTREAM_SCORES");
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("DOWNSTREAM_SCORES");
     expectRolledBack();
   });
 });
@@ -503,9 +506,9 @@ describe("adminResolveMatchPublic", () => {
   it("tranche le match, enchaîne la chaîne entière puis publie", async () => {
     connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
 
-    await adminResolveMatchPublic(70, undefined, undefined, 3, false);
+    await adminResolveMatchPublic(70, { forfeitTeamId: 3 });
 
-    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, undefined, undefined, 3, false, undefined);
+    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, { forfeitTeamId: 3 });
     expect(tryAutoResolveByes).toHaveBeenCalledWith(expect.anything(), 8);
     expect(finalizeTournamentIfDone).toHaveBeenCalledWith(expect.anything(), 8);
     expect(order(jest.mocked(finalizeTournamentIfDone))).toBeGreaterThan(order(jest.mocked(reconcilePhases)));
@@ -517,9 +520,9 @@ describe("adminResolveMatchPublic", () => {
   it("transmet le double forfait au moteur", async () => {
     connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
 
-    await adminResolveMatchPublic(70, undefined, undefined, undefined, true);
+    await adminResolveMatchPublic(70, { doubleForfeit: true });
 
-    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, undefined, undefined, undefined, true, undefined);
+    expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, { doubleForfeit: true });
   });
 
   it("rejoue un arbitrage annulé par un interblocage (MAP_SCORES.md)", async () => {
@@ -527,14 +530,14 @@ describe("adminResolveMatchPublic", () => {
     const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
     jest.mocked(adminResolveMatch).mockRejectedValueOnce(deadlock).mockResolvedValueOnce(undefined);
 
-    await adminResolveMatchPublic(70, 2, 1);
+    await adminResolveMatchPublic(70, { maps: mapsFor(2, 1), userId: 1 });
 
     expect(adminResolveMatch).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
   });
 
   it("lève MATCH_NOT_FOUND sans rien trancher", async () => {
-    await expect(adminResolveMatchPublic(70, 1, 0)).rejects.toThrow("MATCH_NOT_FOUND");
+    await expect(adminResolveMatchPublic(70, { maps: mapsFor(1, 0), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
 
     expect(adminResolveMatch).not.toHaveBeenCalled();
     expectRolledBack();

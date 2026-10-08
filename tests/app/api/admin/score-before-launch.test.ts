@@ -8,6 +8,7 @@ import { PATCH as scoresRoute } from "@/app/api/admin/matches/[matchId]/scores/r
 import { getCurrentUser } from "@/lib/server/auth";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
+import { mapsFor } from "../../../helpers/match-maps";
 
 /**
  * Aucun score avant le lancement, arbitrage compris : le refus du service
@@ -34,14 +35,14 @@ beforeEach(() => {
 describe("routes d'arbitrage — score avant le lancement", () => {
   it("« Enregistrer » refusé en 409 MATCH_NOT_IN_LAUNCH", async () => {
     jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("MATCH_NOT_IN_LAUNCH"));
-    const res = await scoresRoute(req("PATCH", { team1Score: 1, team2Score: 0 }), params);
+    const res = await scoresRoute(req("PATCH", { maps: mapsFor(1, 0) }), params);
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toBe("MATCH_NOT_IN_LAUNCH");
   });
 
   it("« Valider le résultat » refusé en 409 MATCH_NOT_IN_LAUNCH", async () => {
     jest.mocked(adminResolveMatch).mockRejectedValue(new Error("MATCH_NOT_IN_LAUNCH"));
-    const res = await resolveRoute(req("POST", { team1Score: 3, team2Score: 0 }), params);
+    const res = await resolveRoute(req("POST", { maps: mapsFor(3, 0) }), params);
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toBe("MATCH_NOT_IN_LAUNCH");
   });

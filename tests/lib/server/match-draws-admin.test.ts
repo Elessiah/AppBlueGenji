@@ -8,6 +8,7 @@ import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournament
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * Arbitrage d'un tournoi « BlueGenji Survie », le seul mode à jouer **deux**
@@ -97,7 +98,9 @@ describe("adminResolveMatch — match nul en qualification", () => {
   });
 
   it("clôt la rencontre sans vainqueur ni perdant", async () => {
-    await adminResolveMatch(fakeConnection({ round: 3 }), 10, 2, 2);
+    // Égalités ouvertes : une map nulle consomme une map du BO — le 2-2 se
+    // justifie par une cinquième map nulle.
+    await adminResolveMatch(fakeConnection({ round: 3 }), 10, { maps: mapsFor(2, 2, 1), userId: 1 });
 
     expect(finalizeMatch).toHaveBeenCalledTimes(1);
     // Ni vainqueur ni perdant : `finalizeMatch` écrit deux colonnes vides et ne
@@ -111,7 +114,7 @@ describe("adminResolveMatch — match nul en qualification", () => {
   });
 
   it("accepte un score sous l'objectif : une map nulle a arrêté la rencontre", async () => {
-    await adminResolveMatch(fakeConnection({ round: 3 }), 10, 2, 1);
+    await adminResolveMatch(fakeConnection({ round: 3 }), 10, { maps: mapsFor(2, 1, 2), userId: 1 });
 
     expect(jest.mocked(finalizeMatch).mock.calls[0][3]).toMatchObject({
       winnerTeamId: 100,
@@ -120,9 +123,10 @@ describe("adminResolveMatch — match nul en qualification", () => {
   });
 
   it("garde le plafond du format", async () => {
-    await expect(adminResolveMatch(fakeConnection({ round: 3 }), 10, 4, 0)).rejects.toThrow(
-      "SCORE_EXCEEDS_MATCH_FORMAT",
-    );
+    // Une quatrième victoire en FT3 se joue après la décision : refusée sur sa map.
+    await expect(
+      adminResolveMatch(fakeConnection({ round: 3 }), 10, { maps: mapsFor(4, 0), userId: 1 }),
+    ).rejects.toThrow("MAP_AFTER_DECISION");
     expect(finalizeMatch).not.toHaveBeenCalled();
   });
 });
@@ -138,14 +142,14 @@ describe("adminResolveMatch — l'arbre final exige un vainqueur", () => {
     // fermées** : le refus dit « score incomplet », le vainqueur doit atteindre
     // l'objectif.
     await expect(
-      adminResolveMatch(fakeConnection({ round: PLAYOFF_ROUND_OFFSET }), 10, 2, 2),
+      adminResolveMatch(fakeConnection({ round: PLAYOFF_ROUND_OFFSET }), 10, { maps: mapsFor(2, 2, 1), userId: 1 }),
     ).rejects.toThrow("SCORE_BELOW_MATCH_FORMAT");
     expect(finalizeMatch).not.toHaveBeenCalled();
   });
 
   it("refuse aussi un score sous l'objectif en play-off", async () => {
     await expect(
-      adminResolveMatch(fakeConnection({ round: PLAYOFF_ROUND_OFFSET + 1 }), 10, 2, 1),
+      adminResolveMatch(fakeConnection({ round: PLAYOFF_ROUND_OFFSET + 1 }), 10, { maps: mapsFor(2, 1, 1), userId: 1 }),
     ).rejects.toThrow("SCORE_BELOW_MATCH_FORMAT");
   });
 
@@ -157,7 +161,7 @@ describe("adminResolveMatch — l'arbre final exige un vainqueur", () => {
     });
 
     // FT2 : l'objectif est 2, et 2-1 est donc un résultat plein.
-    await adminResolveMatch(conn, 10, 2, 1);
+    await adminResolveMatch(conn, 10, { maps: mapsFor(2, 1), userId: 1 });
     expect(jest.mocked(finalizeMatch).mock.calls[0][3]).toMatchObject({ winnerTeamId: 100 });
   });
 
@@ -168,7 +172,10 @@ describe("adminResolveMatch — l'arbre final exige un vainqueur", () => {
       playoff: { type: "FT", value: 2 },
     });
 
-    await expect(adminResolveMatch(conn, 10, 3, 0)).rejects.toThrow("SCORE_EXCEEDS_MATCH_FORMAT");
+    // La troisième victoire se joue après la décision du FT2.
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(3, 0), userId: 1 })).rejects.toThrow(
+      "MAP_AFTER_DECISION",
+    );
   });
 });
 
@@ -187,7 +194,9 @@ describe("adminResolveMatch — les autres formats ferment les égalités de for
       qualification: { type: "FT", value: 3, draws: true },
     });
 
-    await expect(adminResolveMatch(conn, 10, 2, 2)).rejects.toThrow("SCORE_BELOW_MATCH_FORMAT");
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(2, 2, 1), userId: 1 })).rejects.toThrow(
+      "SCORE_BELOW_MATCH_FORMAT",
+    );
   });
 });
 
@@ -245,14 +254,16 @@ describe("adminSaveMatchScores — un match nul est tranché", () => {
     // côté, soit zéro point net au lieu de +3 / −3.
     const { conn, writes } = drawnConnection();
 
-    await expect(adminSaveMatchScores(conn, 10, 3, 0)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(3, 0), userId: 1 })).rejects.toThrow(
+      "MATCH_ALREADY_COMPLETED",
+    );
     expect(writes).toHaveLength(0);
   });
 
   it("refuse aussi un forfait par-dessus un match nul", async () => {
     const { conn, writes } = drawnConnection();
 
-    await expect(adminSaveMatchScores(conn, 10, undefined, undefined, 100)).rejects.toThrow(
+    await expect(adminSaveMatchScores(conn, 10, { forfeitTeamId: 100 })).rejects.toThrow(
       "MATCH_ALREADY_COMPLETED",
     );
     expect(writes).toHaveLength(0);
@@ -261,6 +272,8 @@ describe("adminSaveMatchScores — un match nul est tranché", () => {
   it("laisse enregistrer un score sur une rencontre encore en cours", async () => {
     // Le contre-exemple qui rend la garde lisible : l'arbitrage note bien un
     // 1-1 pendant que le match se joue.
-    await expect(adminSaveMatchScores(fakeConnection({ round: 3 }), 10, 1, 1)).resolves.toBeUndefined();
+    await expect(
+      adminSaveMatchScores(fakeConnection({ round: 3 }), 10, { maps: mapsFor(1, 1), userId: 1 }),
+    ).resolves.toBeUndefined();
   });
 });

@@ -8,6 +8,7 @@ import { PATCH as scoresRoute } from "@/app/api/admin/matches/[matchId]/scores/r
 import { getCurrentUser } from "@/lib/server/auth";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
+import { mapsFor } from "../../../helpers/match-maps";
 
 const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
 const player = authUser({ id: 2, isAdmin: false, roles: [] });
@@ -33,7 +34,7 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
     const res = await resolveRoute(req("POST", { doubleForfeit: true }), params);
 
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, undefined, undefined, undefined, true, { maps: [], userId: 3 });
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, { doubleForfeit: true });
   });
 
   it("refuse un double forfait accompagné d'un score", async () => {
@@ -42,6 +43,13 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
       params,
     );
 
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("DOUBLE_FORFEIT_EXCLUSIVE");
+    expect(adminResolveMatch).not.toHaveBeenCalled();
+  });
+
+  it("refuse un double forfait accompagné de maps", async () => {
+    const res = await resolveRoute(req("POST", { doubleForfeit: true, maps: mapsFor(2, 0) }), params);
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("DOUBLE_FORFEIT_EXCLUSIVE");
     expect(adminResolveMatch).not.toHaveBeenCalled();
@@ -61,20 +69,20 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
 
   it("traite `doubleForfeit: null` comme une absence, comme les autres champs", async () => {
     const res = await resolveRoute(
-      req("POST", { doubleForfeit: null, forfeitTeamId: null, team1Score: 3, team2Score: 1 }),
+      req("POST", { doubleForfeit: null, forfeitTeamId: null, maps: mapsFor(3, 1) }),
       params,
     );
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false, { maps: [], userId: 3 });
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, { maps: mapsFor(3, 1), userId: 3 });
   });
 
   it("traite `doubleForfeit: false` comme une saisie ordinaire", async () => {
     const res = await resolveRoute(
-      req("POST", { doubleForfeit: false, team1Score: 3, team2Score: 1 }),
+      req("POST", { doubleForfeit: false, maps: mapsFor(3, 1) }),
       params,
     );
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false, { maps: [], userId: 3 });
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, { maps: mapsFor(3, 1), userId: 3 });
   });
 
   it("réserve le geste à la permission tournois", async () => {

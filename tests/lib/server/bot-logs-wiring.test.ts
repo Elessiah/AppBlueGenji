@@ -251,6 +251,19 @@ describe("reportMatchScore", () => {
             },
           ];
         }
+        // Proposition adverse relue sous verrou (`loadMatchMaps`) : celle du
+        // report concordant, mêmes maps que celles envoyées — sans elle, aucune
+        // concordance (MAP_SCORES.md).
+        if (opponentReport && q.startsWith("SELECT match_id, source, map_number, replay_code, team1_score, team2_score FROM bg_match_maps WHERE match_id = ? AND source = ?")) {
+          return mapsFor(2, 1).map((m, i) => ({
+            match_id: 31,
+            source: "TEAM2",
+            map_number: i + 1,
+            replay_code: m.replayCode,
+            team1_score: m.team1Score,
+            team2_score: m.team2Score,
+          }));
+        }
         return [];
       },
     });

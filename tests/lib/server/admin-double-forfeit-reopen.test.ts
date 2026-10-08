@@ -8,7 +8,8 @@ jest.mock("@/lib/server/tournaments/repository");
 
 import { adminResolveMatch } from "@/lib/server/tournaments/admin";
 import { detachDownstreamOutcome } from "@/lib/server/tournaments/bracket-cascade";
-import { reopenTournament } from "@/lib/server/tournaments/repository";
+import { loadTournamentMatchRules, reopenTournament } from "@/lib/server/tournaments/repository";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * Corriger un double forfait qui avait **clos** le tournoi : la cascade rouvre
@@ -62,6 +63,8 @@ const phaseReopen = (writes: { sql: string; params: unknown[] }[]) =>
 describe("adminResolveMatch — correction qui rouvre une exemption", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Ni format ni jeu : les maps de l'arbitre ne passent que le motif permissif.
+    jest.mocked(loadTournamentMatchRules).mockResolvedValue({ format: null, game: null });
   });
 
   it("rouvre le tournoi quand la cascade a rouvert une rencontre close", async () => {
@@ -69,7 +72,7 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
     jest.mocked(reopenTournament).mockResolvedValue(true);
     const { conn, writes } = fakeConnection();
 
-    await adminResolveMatch(conn, 10, 3, 0);
+    await adminResolveMatch(conn, 10, { maps: mapsFor(3, 0), userId: 1 });
 
     expect(reopenTournament).toHaveBeenCalledWith(conn, 1);
     // Hors multi-phases, aucune phase à rouvrir.
@@ -81,7 +84,7 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
     jest.mocked(reopenTournament).mockResolvedValue(true);
     const { conn, writes } = fakeConnection(42);
 
-    await adminResolveMatch(conn, 10, 3, 0);
+    await adminResolveMatch(conn, 10, { maps: mapsFor(3, 0), userId: 1 });
 
     expect(phaseReopen(writes)?.params).toEqual([42]);
   });
@@ -91,7 +94,7 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
     jest.mocked(reopenTournament).mockResolvedValue(false);
     const { conn, writes } = fakeConnection(42, "RUNNING");
 
-    await adminResolveMatch(conn, 10, 3, 0);
+    await adminResolveMatch(conn, 10, { maps: mapsFor(3, 0), userId: 1 });
 
     expect(phaseReopen(writes)).toBeUndefined();
   });
@@ -103,7 +106,7 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
     jest.mocked(reopenTournament).mockResolvedValue(false);
     const { conn, writes } = fakeConnection(42, "FINISHED");
 
-    await expect(adminResolveMatch(conn, 10, 3, 0)).rejects.toThrow(
+    await expect(adminResolveMatch(conn, 10, { maps: mapsFor(3, 0), userId: 1 })).rejects.toThrow(
       "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
     );
     expect(phaseReopen(writes)).toBeUndefined();
@@ -113,7 +116,7 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
     jest.mocked(detachDownstreamOutcome).mockResolvedValue(0);
     const { conn } = fakeConnection();
 
-    await adminResolveMatch(conn, 10, undefined, undefined, undefined, true);
+    await adminResolveMatch(conn, 10, { doubleForfeit: true });
 
     expect(reopenTournament).not.toHaveBeenCalled();
   });
