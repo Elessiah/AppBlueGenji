@@ -134,8 +134,9 @@ describe("espace sécurisé — visiteur sans session", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
     expect(gate).toContain("tournamentIdFromMemberPath(splitLocalePrefix(pathname).path)");
     expect(gate).toContain("router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);");
-    // Pas de carte « Connexion requise » le temps du relais.
-    expect(gate).toContain("if (spectatorId !== null) return null;");
+    // Pas de carte « Connexion requise » le temps du relais, mais un état annoncé.
+    expect(gate).toMatch(/if \(spectatorId !== null\) \{\s*return \(\s*<output className=\{styles.shell\}>/);
+    expect(gate).toContain("{text.redirecting}");
   });
 });
 
@@ -339,6 +340,8 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(html).not.toContain('href="/tournois"');
     expect(html).toContain(frTournament.header.backHome);
     expect(html).toContain(frTournament.header.spectator);
+    // L'explication de la pastille est aussi lisible hors survol.
+    expect(html).toContain(`<span class="sr-only"> — ${frTournament.header.spectatorTitle.replaceAll("'", "&#x27;")}</span>`);
     expect(html).not.toContain("<button");
     expect(html).not.toContain("/connexion");
     expect(html).toContain("toutes les 2 minutes au plus");
@@ -346,7 +349,10 @@ describe("fiche commune sous SpectatorViewProvider", () => {
 
   it("dit que la page réessaiera quand la première lecture a échoué", () => {
     expect(member(<TournamentLoading />)).toContain(frTournament.loading);
+    expect(member(<TournamentLoading />)).toContain('aria-busy="true"');
     const retrying = member(<TournamentLoading retrying />);
+    // Plus `aria-busy` : sinon la phrase du réessai ne serait jamais annoncée.
+    expect(retrying).toContain('aria-busy="false"');
     expect(retrying).toContain("ne peut pas être chargé pour l");
     expect(retrying).not.toContain(frTournament.loading);
   });

@@ -212,14 +212,18 @@ describe("relecteur de la page sans compte", () => {
     expect(h.last()).toMatchObject({ fatal: null, isLive: true });
   });
 
-  it("n'annonce plus de fraîcheur une fois le tournoi introuvable", async () => {
+  it("retire la fiche et sa fraîcheur une fois le tournoi introuvable", async () => {
     const reply = ok(tournamentSnapshot()) as { status: number; headers: Record<string, string>; body: unknown };
     reply.headers["x-bg-fresh-within-ms"] = "48000";
-    const h = harness([reply, { status: 404, body: { error: "TOURNAMENT_NOT_FOUND" } }]);
+    const h = harness([reply, { status: 404, body: { error: "TOURNAMENT_NOT_FOUND" } }, ok(tournamentSnapshot())]);
     await h.poller.start();
     await h.advance(SPECTATOR_RUNNING_POLL_MS);
 
-    expect(h.last()).toMatchObject({ fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null, freshnessMs: null });
+    // Un tournoi supprimé ne reste pas à l'écran : la carte « introuvable » prend sa place.
+    expect(h.last()).toMatchObject({ detail: null, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null, freshnessMs: null });
+    // Plus rien en main : la relecture ne demande pas de `304`.
+    await h.advance(SPECTATOR_NOT_FOUND_RETRY_MS);
+    expect(h.fetchMock.mock.calls[2][1]).toMatchObject({ headers: {} });
   });
 
   it("relit aussi au plafond une adresse illisible (400)", async () => {
