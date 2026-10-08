@@ -104,7 +104,10 @@ describe("relecteur de la page sans compte", () => {
 
     await h.poller.start();
 
-    expect(h.fetchMock).toHaveBeenCalledWith("/api/spectator/tournaments/5", { cache: "no-store", headers: {} });
+    expect(h.fetchMock).toHaveBeenCalledWith(
+      "/api/spectator/tournaments/5",
+      expect.objectContaining({ cache: "no-store", headers: {} }),
+    );
     expect(h.last()).toMatchObject({ isLive: true, fatal: null, cadenceMs: SPECTATOR_RUNNING_POLL_MS });
     expect(h.last().detail).toMatchObject({ version: "v1", ...SPECTATOR_VIEWER_CONTEXT });
   });
@@ -118,7 +121,7 @@ describe("relecteur de la page sans compte", () => {
     await h.advance(1);
 
     expect(h.fetchMock).toHaveBeenCalledTimes(2);
-    expect(h.fetchMock.mock.calls[1][1]).toEqual({ cache: "no-store", headers: { "if-none-match": '"v1"' } });
+    expect(h.fetchMock.mock.calls[1][1]).toMatchObject({ cache: "no-store", headers: { "if-none-match": '"v1"' } });
   });
 
   it("garde le même plateau sur un 304", async () => {
@@ -306,5 +309,16 @@ describe("relecteur de la page sans compte", () => {
 
     expect(h.states).toHaveLength(0);
     expect(h.timers.size).toBe(0);
+  });
+
+  it("coupe la lecture en vol au démontage", async () => {
+    const h = harness([ok(tournamentSnapshot())]);
+    const pending = h.poller.start();
+    const signal = h.fetchMock.mock.calls[0][1].signal;
+    expect(signal?.aborted).toBe(false);
+    h.poller.dispose();
+    await pending;
+
+    expect(signal?.aborted).toBe(true);
   });
 });

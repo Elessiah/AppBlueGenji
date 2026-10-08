@@ -756,6 +756,9 @@ describe("PRIVACY_CHANGES — suivi d'un tournoi sans compte", () => {
     expect(text()).toMatch(/pseudos des joueurs engagés/);
     // Déclaré : le numéro de compte d'un joueur solo, qui porte sa marque du podium.
     expect(text()).toMatch(/numéro de compte interne/);
+    // Déclarés aussi : les logos, et l'avatar d'un joueur solo (copié dans son entrée).
+    expect(text()).toMatch(/logos des équipes/);
+    expect(text()).toMatch(/avatar de chaque joueur engagé \(sauf s'il l'a masqué\)/);
     expect(text()).toMatch(/codes de replay n'y figurent pas/);
     expect(text()).toMatch(/exclue des moteurs de recherche/);
     // La visite reste comptée comme partout : la page ne prétend pas le contraire.

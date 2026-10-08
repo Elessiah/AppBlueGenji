@@ -134,6 +134,8 @@ describe("espace sécurisé — visiteur sans session", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
     expect(gate).toContain("tournamentIdFromMemberPath(splitLocalePrefix(pathname).path)");
     expect(gate).toContain("router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);");
+    // Pas de carte « Connexion requise » le temps du relais.
+    expect(gate).toContain("if (spectatorId !== null) return null;");
   });
 });
 
