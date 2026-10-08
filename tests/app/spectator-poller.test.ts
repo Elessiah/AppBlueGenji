@@ -211,6 +211,16 @@ describe("relecteur de la page sans compte", () => {
     expect(h.last()).toMatchObject({ fatal: null, isLive: true });
   });
 
+  it("n'annonce plus de fraîcheur une fois le tournoi introuvable", async () => {
+    const reply = ok(tournamentSnapshot()) as { status: number; headers: Record<string, string>; body: unknown };
+    reply.headers["x-bg-fresh-within-ms"] = "48000";
+    const h = harness([reply, { status: 404, body: { error: "TOURNAMENT_NOT_FOUND" } }]);
+    await h.poller.start();
+    await h.advance(SPECTATOR_RUNNING_POLL_MS);
+
+    expect(h.last()).toMatchObject({ fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null, freshnessMs: null });
+  });
+
   it("s'arrête sur un identifiant illisible (400)", async () => {
     const h = harness([{ status: 400, body: { error: "INVALID_TOURNAMENT_ID" } }]);
     await h.poller.start();

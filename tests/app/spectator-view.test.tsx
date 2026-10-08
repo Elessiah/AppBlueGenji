@@ -293,6 +293,15 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(member(<LiveIndicator isLive tier="STANDARD" />)).toContain("toutes les 20 secondes au plus");
   });
 
+  it("dit qu'un tournoi introuvable est revérifié, sans compte seulement", () => {
+    const notFound = <LiveIndicator isLive={false} tier="STANDARD" cadenceMs={null} fatal="TOURNAMENT_NOT_FOUND" />;
+    expect(spectator(notFound)).toContain("revérifie seule toutes les 10 minutes");
+    expect(member(notFound)).toContain("plus rien à suivre");
+    const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
+    expect(sheet).toContain("{spectator && !expired ? (");
+    expect(sheet).toContain('t("page.fatal.spectatorRecheck", { minutes: SPECTATOR_NOT_FOUND_RECHECK_MINUTES })');
+  });
+
   it("n'offre aucun geste dans l'en-tête, et ramène à l'accueil", () => {
     const detail = {
       ...tournamentSnapshot({ card: tournamentCard({ id: 12, state: "REGISTRATION", maxTeams: 8, registeredTeams: 2 }) }),
@@ -348,6 +357,8 @@ describe("fiche commune sous SpectatorViewProvider", () => {
       expect(messages.live.cadenceMinute).toBeTruthy();
       expect(messages.live.loadingRetry).toBeTruthy();
       expect(messages.page.fatal.backHome).toBeTruthy();
+      expect(messages.page.fatal.spectatorRecheck).toContain("{minutes}");
+      expect(messages.live.spectatorNotFoundTitle).toContain("{minutes}");
     }
   });
 });
@@ -376,7 +387,11 @@ describe("liens publics vers un tournoi", () => {
     expect(header).toContain("const joinHref = joinHrefFor(path, search);");
     expect(header).toContain("return { path: requestHeaders.get(PATHNAME_HEADER), search: requestHeaders.get(SEARCH_HEADER) };");
     expect(header).toContain("<JoinLink href={joinHref}>{t(\"join\")}</JoinLink>");
-    expect(readSource("components/cyber/landing/JoinLink.tsx")).toContain("withRedirectAnchor(href, globalThis.location.hash)");
+    const join = readSource("components/cyber/landing/JoinLink.tsx");
+    expect(join).toContain("withRedirectAnchor(href, globalThis.location.hash)");
+    // `pushState` ne déclenche pas `hashchange` : l'ancre est relue avant le geste.
+    expect(join).toMatch(/onPointerDown=\{\(event\) => \{\s*update\(\);/);
+    expect(join).toMatch(/onFocus=\{\(event\) => \{\s*update\(\);/);
   });
 });
 
