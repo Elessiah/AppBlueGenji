@@ -156,9 +156,11 @@ cumulatif jusqu'à 10 min, jamais moins que le `Retry-After`, la cadence reprend
 au premier succès). Si la toute
 première lecture échoue, le squelette de chargement le dit (« La page réessaie
 seule… ») au lieu de sembler figé. Un `404` (tournoi supprimé ou pas encore publié — même réponse, comme partout)
-n'est plus relu qu'au plafond (10 min) : un lien partagé avant la publication
-s'ouvre seul ensuite, et la page le dit (« revérifie seule toutes les 10
-minutes ») ; un `400` (identifiant illisible) arrête tout. Le
+ou un `400` (adresse fabriquée) n'est plus relu qu'au plafond
+(`SPECTATOR_NOT_FOUND_RETRY_MS`, 10 min) : un lien partagé avant la publication
+s'ouvre seul ensuite, et la page le dit (« revérifie seule toutes les 11
+minutes au plus », gigue comprise). Un onglet oublié sur un tournoi supprimé
+coûte une requête indexée toutes les dix minutes, et rien onglet caché. Le
 démontage coupe la lecture en vol (`AbortController`).
 
 ## Visibilité
