@@ -252,14 +252,12 @@ describe("détail map par map — saisie du code et confirmation sans détail", 
 
   it("seules les mêmes maps confirment la proposition adverse ; sans détail, l'envoi reste une proposition", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain("const confirmsAsIs = confirmsTheirs && confirmsProposalMaps(maps, view?.theirs?.maps ?? []);");
-    expect(dialog).toContain("return theirMaps.length > 0 && sameMapLists(maps, theirMaps);");
-    expect(dialog).not.toContain("if (theirMaps.length === 0) return !detailLoading;");
-  });
-
-  it("un détail adverse encore en lecture ne fait pas de l'envoi une confirmation (pas de faux PROPOSAL_STALE)", () => {
-    const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog.indexOf("const detailLoading = ")).toBeLessThan(dialog.indexOf("const confirmsAsIs ="));
+    // Une seule règle, celle du serveur : `sameReportedScore` exige des maps identiques et non vides.
+    expect(dialog).toContain("const { unchangedMine, confirmsTheirs: confirmsAsIs } = relation;");
+    expect(dialog).not.toContain("confirmsProposalMaps");
+    const report = readSource("lib/shared/player-score-report.ts");
+    expect(report).toContain("return aMaps.length > 0 && sameMapLists(aMaps, b.maps ?? []);");
+    expect(report).not.toContain("aMaps.length === 0 || bMaps.length === 0");
   });
 });
 

@@ -4,7 +4,12 @@ import type { PoolConnection } from "mysql2/promise";
 jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/byes");
 
-import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
+import {
+  adminResolveMatch,
+  adminSaveMatchScores,
+  type AdminResolveEntry,
+  type AdminScoreEntry,
+} from "@/lib/server/tournaments/admin";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 
@@ -205,4 +210,30 @@ describe("arbitrage — code de replay facultatif", () => {
     ).rejects.toThrow("MAP_REPLAY_CODE_DUPLICATE");
     expect(updates).toHaveLength(0);
   });
+});
+
+describe("arbitrage — garde d'exécution sur la saisie", () => {
+  // Un corps non typé (appelant JS, conversion) : le type ne le voit pas, la garde si.
+  const untyped = <T,>(json: string): T => JSON.parse(json) as T;
+
+  it.each(['{}', '{"doubleForfeit": false}', '{"maps": "x", "userId": 3}', '{"maps": []}'])(
+    "« Valider » refuse %s en INVALID_REQUEST, sans rien écrire",
+    async (json) => {
+      const { conn, updates, maps } = fakeConnection({ type: "BO", value: 3 });
+      await expect(adminResolveMatch(conn, 10, untyped<AdminResolveEntry>(json))).rejects.toThrow("INVALID_REQUEST");
+      expect(updates).toHaveLength(0);
+      expect(maps).toHaveLength(0);
+      expect(finalizeMatch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['{}', '{"doubleForfeit": true}', '{"maps": [], "userId": "3"}'])(
+    "« Enregistrer » refuse %s en INVALID_REQUEST, sans rien écrire",
+    async (json) => {
+      const { conn, updates, maps } = fakeConnection({ type: "BO", value: 3 });
+      await expect(adminSaveMatchScores(conn, 10, untyped<AdminScoreEntry>(json))).rejects.toThrow("INVALID_REQUEST");
+      expect(updates).toHaveLength(0);
+      expect(maps).toHaveLength(0);
+    },
+  );
 });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  adminFormStateFor,
   decideScoreForm,
-  isUntouched,
+  sameScoreFormState,
+  scoresFromMaps,
   parseScoreInput,
   scoreBlockerMessage,
   scoreFormStateFor,
@@ -10,6 +12,8 @@ import {
 } from "@/app/(secured)/tournois/[id]/_lib/score-form";
 import type { BracketMatch } from "@/lib/shared/types";
 import type { MatchFormat } from "@/lib/shared/match-format";
+import { emptyMap } from "@/lib/shared/match-maps";
+import { mapsFor } from "../helpers/match-maps";
 
 const BO5: MatchFormat = { type: "BO", value: 5 };
 
@@ -78,7 +82,7 @@ describe("parseScoreInput", () => {
   });
 });
 
-describe("storedResultSignature / isUntouched", () => {
+describe("storedResultSignature / sameScoreFormState", () => {
   it("change dès que le résultat enregistré bouge", () => {
     const before = storedResultSignature(match());
     expect(storedResultSignature(match({ team1Score: 2, team2Score: 1 }))).not.toBe(before);
@@ -97,11 +101,36 @@ describe("storedResultSignature / isUntouched", () => {
     expect(storedResultSignature(null)).toBe("");
   });
 
-  it("reconnaît un formulaire resté sur les valeurs du match", () => {
-    const m = match({ team1Score: 2, team2Score: 1 });
-    expect(isUntouched(form({ score1: "2", score2: "1" }), m)).toBe(true);
-    expect(isUntouched(form({ score1: "3", score2: "1" }), m)).toBe(false);
-    expect(isUntouched(form({ score1: "2", score2: "1", forfeitTeamId: 10 }), m)).toBe(false);
+  it("reconnaît un formulaire resté sur ses valeurs d'ouverture", () => {
+    const opening = adminFormStateFor(match({ team1Score: 2, team2Score: 1 }), mapsFor(2, 1));
+    expect(sameScoreFormState(form({ score1: "2", score2: "1" }), opening)).toBe(true);
+    expect(sameScoreFormState(form({ score1: "3", score2: "1" }), opening)).toBe(false);
+    expect(sameScoreFormState(form({ score1: "2", score2: "1", forfeitTeamId: 10 }), opening)).toBe(false);
+  });
+});
+
+describe("adminFormStateFor / scoresFromMaps — le score se lit sur les maps", () => {
+  it("dérive le score des maps renseignées, lignes vierges ignorées", () => {
+    expect(scoresFromMaps([...mapsFor(2, 1, 1), emptyMap()])).toEqual({ score1: "2", score2: "1" });
+    expect(scoresFromMaps([emptyMap()])).toEqual({ score1: "", score2: "" });
+    expect(scoresFromMaps([])).toEqual({ score1: "", score2: "" });
+  });
+
+  it("suit les maps plutôt que le score stocké qu'elles ne portent pas", () => {
+    // Avancement enregistré à 1-0 : les maps d'ouverture font le score, pas un chiffre stocké.
+    expect(adminFormStateFor(match({ team1Score: 2, team2Score: 1 }), mapsFor(1, 0))).toMatchObject({
+      score1: "1",
+      score2: "0",
+    });
+    expect(adminFormStateFor(match({ team1Score: 2, team2Score: 1 }), [emptyMap()])).toMatchObject({
+      score1: "",
+      score2: "",
+    });
+  });
+
+  it("garde un forfait enregistré tel quel", () => {
+    const forfeit = match({ forfeitTeamId: 10, team1Score: 0, team2Score: 3 });
+    expect(adminFormStateFor(forfeit, [emptyMap()])).toEqual(scoreFormStateFor(forfeit));
   });
 });
 
