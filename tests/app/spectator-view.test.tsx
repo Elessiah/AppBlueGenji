@@ -358,14 +358,14 @@ describe("liens publics vers un tournoi", () => {
     expect(page).toContain("canEditCopy={isAdmin} spectator={!user} />");
     expect(page).toContain("locale={locale} spectator={!user} />");
     const board = readSource("components/cyber/landing/TournamentBoard.tsx");
-    expect(board).toContain("tournamentMatchHref(featured.id, null, spectator)");
-    expect(board).toContain("tournamentMatchHref(card.id, null, spectator)");
+    expect(board).toContain("tournamentHref(featured.id, spectator)");
+    expect(board).toContain("tournamentHref(card.id, spectator)");
     expect(board).not.toMatch(/href=\{`\/tournois\/\$\{/);
     expect(readSource("components/cyber/landing/Hero.tsx")).toContain("spectator={spectator} />");
     expect(page).toContain("locale={locale} spectator={!user} />");
     expect(readSource("components/cyber/landing/LeaderCal.tsx")).toContain("spectator={spectator} />");
     const calendar = readSource("components/cyber/landing/CalendarCard.tsx");
-    expect(calendar).toContain("<LocaleLink className={styles.link} href={tournamentMatchHref(event.tournamentId, null, spectator)}>");
+    expect(calendar).toContain("<LocaleLink className={styles.link} href={tournamentHref(event.tournamentId, spectator)}>");
     expect(readSource("components/cyber/landing/LiveCard.tsx")).toContain(
       "tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null, spectator)",
     );

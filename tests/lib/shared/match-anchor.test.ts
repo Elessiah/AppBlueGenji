@@ -4,6 +4,7 @@ import {
   matchAnchorId,
   parseMatchAnchor,
   phaseRevealingMatch,
+  tournamentHref,
   tournamentMatchHref,
 } from "@/lib/shared/match-anchor";
 
@@ -69,6 +70,13 @@ describe("parseMatchAnchor", () => {
     // `Number("9007199254740993")` rend 9007199254740992 : un identifiant qui
     // n'est plus celui qu'on a lu.
     expect(parseMatchAnchor("#match-9007199254740993")).toBeNull();
+  });
+});
+
+describe("tournamentHref", () => {
+  it("mène à la fiche des membres, ou à la page sans compte", () => {
+    expect(tournamentHref(7)).toBe("/tournois/7");
+    expect(tournamentHref(7, true)).toBe("/suivre/tournois/7");
   });
 });
 

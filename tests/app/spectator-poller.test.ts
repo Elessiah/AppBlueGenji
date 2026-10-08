@@ -199,11 +199,23 @@ describe("relecteur de la page sans compte", () => {
     expect(h.last().freshnessMs).toBe(48_000);
   });
 
-  it("s'arrête sur un tournoi introuvable", async () => {
-    const h = harness([{ status: 404, body: { error: "TOURNAMENT_NOT_FOUND" } }]);
+  it("relit au plafond un tournoi introuvable, qui s'ouvre à sa publication", async () => {
+    const h = harness([{ status: 404, body: { error: "TOURNAMENT_NOT_FOUND" } }, ok(tournamentSnapshot())]);
     await h.poller.start();
 
     expect(h.last()).toMatchObject({ fatal: "TOURNAMENT_NOT_FOUND", isLive: false, cadenceMs: null });
+    await h.advance(SPECTATOR_MAX_POLL_MS - 1);
+    expect(h.fetchMock).toHaveBeenCalledTimes(1);
+    await h.advance(1);
+    expect(h.fetchMock).toHaveBeenCalledTimes(2);
+    expect(h.last()).toMatchObject({ fatal: null, isLive: true });
+  });
+
+  it("s'arrête sur un identifiant illisible (400)", async () => {
+    const h = harness([{ status: 400, body: { error: "INVALID_TOURNAMENT_ID" } }]);
+    await h.poller.start();
+
+    expect(h.last()).toMatchObject({ fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null });
     expect(h.timers.size).toBe(0);
   });
 
