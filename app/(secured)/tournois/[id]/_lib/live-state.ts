@@ -119,6 +119,8 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     // Droit de suppression : administrateur strict, accordé à la connexion.
     // Comme les autres droits, il tient à la personne et non au plateau.
     canDelete: state.detail.canDelete,
+    // Annuler un abandon : administrateur strict, tient à la personne.
+    canCancelForfeit: state.detail.canCancelForfeit,
     // Droit de diffusion : comme les autres droits, il tient à la personne et
     // non au plateau — un instantané ne peut ni l'accorder ni le retirer.
     canManageLive: state.detail.canManageLive,

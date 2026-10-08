@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  canCancelForfeits,
   canForfeitTeam,
   type ForfeitContext,
 } from "@/app/(secured)/tournois/[id]/_lib/forfeit";
@@ -135,5 +136,23 @@ describe("abandon — câblage des vues à classement", () => {
     const css = read("app/(secured)/tournois/[id]/_components/EnduranceView.module.css");
     expect(css).toContain("@media (max-width: 920px)");
     expect(css).toContain("grid-template-columns: 1fr;");
+  });
+});
+
+describe("annulation d'abandon — éligibilité des boutons", () => {
+  it("ouvre les boutons à un administrateur sur un tournoi en cours", () => {
+    expect(canCancelForfeits({ canCancelForfeit: true, state: "RUNNING", frozen: false })).toBe(true);
+  });
+
+  it("les ferme à qui n'a pas le droit (arbitre compris)", () => {
+    expect(canCancelForfeits({ canCancelForfeit: false, state: "RUNNING", frozen: false })).toBe(false);
+  });
+
+  it("les ferme sur un tournoi terminé : il ne se rouvre pas", () => {
+    expect(canCancelForfeits({ canCancelForfeit: true, state: "FINISHED", frozen: false })).toBe(false);
+  });
+
+  it("les ferme quand le suivi est arrêté", () => {
+    expect(canCancelForfeits({ canCancelForfeit: true, state: "RUNNING", frozen: true })).toBe(false);
   });
 });

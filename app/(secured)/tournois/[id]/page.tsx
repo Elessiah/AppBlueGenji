@@ -30,7 +30,7 @@ import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { canOpenPlayerScoreDialog } from "@/lib/shared/player-score-report";
 import { isPreLaunchState } from "@/lib/shared/seeding";
 import { planRoundRollback } from "@/lib/shared/tournament-rollback";
-import { canForfeitTeam } from "./_lib/forfeit";
+import { canCancelForfeits, canForfeitTeam, requestForfeitCancellation } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { PlayerScoreProvider } from "./_lib/player-score-context";
@@ -622,6 +622,37 @@ export default function TournamentDetailPage() {
     );
   };
 
+  // Annuler un abandon : administrateur strict (`canCancelForfeit`), et le
+  // match perdu par forfait reste perdu — la modale le dit
+  // (`docs/features/FORFEIT_CANCELLATION.md`).
+  const canCancelForfeit = canCancelForfeits({
+    canCancelForfeit: detail.canCancelForfeit,
+    state: detail.card.state,
+    frozen,
+  });
+
+  const performCancelForfeit = async (teamId: number, teamName: string) => {
+    try {
+      await requestForfeitCancellation(tournamentId, teamId);
+      showSuccess(a("forfeitCancel.success", { name: teamName }));
+      void refresh();
+      return true;
+    } catch (e) {
+      showError(mapError((e as Error).message));
+      return false;
+    }
+  };
+
+  const cancelForfeit = (teamId: number, teamName: string) => {
+    setPendingConfirm({
+      title: a("forfeitCancel.title", { name: teamName }),
+      body: [a(`forfeitCancel.body.${entrantType}`)],
+      confirmLabel: a("forfeitCancel.confirm"),
+      pendingLabel: a("forfeitCancel.pending"),
+      run: () => performCancelForfeit(teamId, teamName),
+    });
+  };
+
   const performLiftPenalty = async (penalty: EndurancePenaltyRow) => {
     try {
       const response = await fetch(
@@ -789,6 +820,8 @@ export default function TournamentDetailPage() {
             onOpenAdminModal={openAdminScore}
             canForfeit={canForfeit}
             onForfeit={forfeitTeam}
+            canCancelForfeit={canCancelForfeit}
+            onCancelForfeit={cancelForfeit}
             emptyLabel={noMatchesLabel}
           />
           {/* Pas de `finishedPhaseStandings` ici, comme pour la vue suisse :
@@ -826,6 +859,8 @@ export default function TournamentDetailPage() {
           myTeamId={detail.myTeamId}
           canForfeit={canForfeit}
           onForfeit={forfeitTeam}
+          canCancelForfeit={canCancelForfeit}
+          onCancelForfeit={cancelForfeit}
           // La sanction est un geste d'**arbitrage** : elle ne suit pas
           // `canForfeit`, qu'un capitaine porte aussi pour son propre
           // engagé. On ne se pénalise pas soi-même.
@@ -864,6 +899,8 @@ export default function TournamentDetailPage() {
             onOpenAdminModal={openAdminScore}
             canForfeit={canForfeit}
             onForfeit={forfeitTeam}
+            canCancelForfeit={canCancelForfeit}
+            onCancelForfeit={cancelForfeit}
             emptyLabel={noMatchesLabel}
           />
           {/* Pas de `finishedPhaseStandings` ici : la phase en cours ne

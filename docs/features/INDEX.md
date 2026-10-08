@@ -21,6 +21,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `MATCH_PLANNING.md` — Planification des matchs par l'arbitrage (`TO_PLAN`).
 - `SCORE_EDIT_LOCK.md` — Verrouillage d'un score dès que la manche suivante porte une saisie, **y compris pour un admin**.
 - `DOUBLE_FORFEIT.md` — Double forfait et ses cascades dans un arbre.
+- `FORFEIT_CANCELLATION.md` — Annuler l'abandon d'un engagé (administrateur strict) : remis en lice, le match perdu par forfait reste perdu.
 - `FINISHED_TOURNAMENT_RECONCILIATION.md` — Corriger un tournoi terminé : le classement se rejoue, le tournoi ne se rouvre pas.
 - `SCORE_EDIT_DIALOG.md` — Dialogue d'arbitrage : « Enregistrer » (avancement) vs « Valider le résultat » (propagation).
 - `PLAYER_SCORE_ENTRY.md` — Saisie, confirmation et contestation du score par un joueur ; forfait sur la manche.

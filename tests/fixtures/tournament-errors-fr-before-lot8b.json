@@ -1,5 +1,5 @@
 {
-  "count": 162,
+  "count": 166,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "MATCH_NOT_FOUND": "Match introuvable.",
@@ -163,6 +163,10 @@
     "NOT_BG_SURVIE": "Les pénalités d'endurance n'existent qu'en mode BlueGenji Survie.",
     "PENALTY_FAILED": "Erreur lors de l'enregistrement de la pénalité.",
     "PENALTIES_UNAVAILABLE": "Les pénalités sont indisponibles sur ce serveur : leur table n'existe pas. Prévenez un administrateur.",
-    "PENALTY_LIFT_FAILED": "Erreur lors du retrait de la pénalité."
+    "PENALTY_LIFT_FAILED": "Erreur lors du retrait de la pénalité.",
+    "FORMAT_WITHOUT_FORFEIT": "Ce format de tournoi ne connaît pas l'abandon.",
+    "TEAM_NOT_FORFEITED": "Cette équipe n'a pas abandonné : il n'y a rien à annuler.",
+    "FORFEIT_CANCEL_FAILED": "Erreur lors de l'annulation de l'abandon.",
+    "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre l'équipe en lice lui épargnerait les manches qu'elle a manquées. Revenez d'abord en arrière."
   }
 }

@@ -961,6 +961,11 @@ export type TournamentViewerRights = {
    * tournoi, il ne l'efface pas (`docs/features/TOURNAMENT_DELETION.md`).
    */
   canDelete?: boolean;
+  /**
+   * Droit d'annuler l'abandon d'un engagé : administrateur strict, comme la
+   * suppression (`docs/features/FORFEIT_CANCELLATION.md`).
+   */
+  canCancelForfeit?: boolean;
 };
 
 /**
@@ -982,6 +987,7 @@ export async function getTournamentViewerContext(
     canPreview = canManage,
     canManageLive = canManage,
     canDelete = false,
+    canCancelForfeit = false,
   } = rights;
   const isSolo = isSoloTournament(snapshot.card.participantType);
 
@@ -1075,6 +1081,7 @@ export async function getTournamentViewerContext(
     canCreateReportsForTeamIds: reportTeamIds,
     isAdmin: canManage,
     canDelete,
+    canCancelForfeit,
     canManageLive,
     viewerUserId: userId,
     castBlock,

@@ -36,6 +36,7 @@ import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/pre
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";
+import { FORFEIT_CANCEL_BUTTON_STYLE } from "./RoundColumns";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { BracketSections } from "./BracketSections";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
@@ -51,6 +52,12 @@ interface EnduranceViewProps {
   /** L'abandon est-il proposé pour cette équipe ? (cf. `_lib/forfeit.ts`) */
   canForfeit?: (teamId: number) => boolean;
   onForfeit?: (teamId: number, teamName: string) => void;
+  /**
+   * Annulation d'un abandon (administrateur strict), sur une ligne `FORFEIT`
+   * de la phase qualificative (`docs/features/FORFEIT_CANCELLATION.md`).
+   */
+  canCancelForfeit?: boolean;
+  onCancelForfeit?: (teamId: number, teamName: string) => void;
   /**
    * La pénalité d'endurance est-elle proposée ? Elle ne dépend que du lecteur
    * (permission `tournaments`) : le statut de l'équipe et l'état des play-offs
@@ -360,6 +367,8 @@ export function EnduranceView({
   myTeamId = null,
   canForfeit,
   onForfeit,
+  canCancelForfeit = false,
+  onCancelForfeit,
   canPenalize = false,
   onPenalize,
   onLiftPenalty,
@@ -443,8 +452,17 @@ export function EnduranceView({
     canPenalize &&
     onPenalize !== undefined;
 
+  // Annuler un abandon : même fenêtre. Une fois l'arbre final posé, l'équipe
+  // ne pourrait plus y entrer — le serveur refuse aussi.
+  const canCancelRow = (status: string): boolean =>
+    !isFinished &&
+    !endurance.playoffsStarted &&
+    status === "FORFEIT" &&
+    canCancelForfeit &&
+    onCancelForfeit !== undefined;
+
   const showActions = endurance.standings.some(
-    (s) => canForfeitRow(s.teamId, s.status) || canPenalizeRow(s.status),
+    (s) => canForfeitRow(s.teamId, s.status) || canPenalizeRow(s.status) || canCancelRow(s.status),
   );
   const showPenaltyAction = endurance.standings.some((s) => canPenalizeRow(s.status));
   const rowClassName = rowClass(showActions, showPenaltyAction);
@@ -601,6 +619,18 @@ export function EnduranceView({
                         forfait-là se pose sur le match).
                       */}
                       {isMine ? a("forfeit.button.label") : a("forfeit.endurance.other")}
+                    </button>
+                  )}
+                  {canCancelRow(standing.status) && onCancelForfeit !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() => onCancelForfeit(standing.teamId, standing.teamName)}
+                      className="btn tap-target"
+                      title={a("forfeitCancel.buttonTitle", { name: standing.teamName })}
+                      aria-label={a("forfeitCancel.buttonAria", { name: standing.teamName })}
+                      style={FORFEIT_CANCEL_BUTTON_STYLE}
+                    >
+                      {a("forfeitCancel.button")}
                     </button>
                   )}
                 </span>

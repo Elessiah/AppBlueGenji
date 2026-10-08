@@ -706,6 +706,12 @@ export type TournamentViewerContext = {
    */
   canDelete: boolean;
   /**
+   * Droit d'annuler l'abandon d'un engagé (`docs/features/FORFEIT_CANCELLATION.md`).
+   * Administrateur strict, comme `canDelete` : un arbitre déclare un abandon,
+   * seul un administrateur remet en lice l'équipe qui l'a déclaré.
+   */
+  canCancelForfeit: boolean;
+  /**
    * Le viewer porte-t-il la permission `live` (ADMIN, ARBITRE, CASTER) ? Ouvre
    * les contrôles de diffusion des matchs, distincts des droits d'arbitrage.
    */

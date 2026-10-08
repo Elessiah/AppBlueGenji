@@ -4,6 +4,7 @@ import {
   formatEndurancePenaltyLiftedLog,
   formatEndurancePenaltyLog,
   formatEntrantRemovedLog,
+  formatForfeitCancelledLog,
   formatForfeitLog,
   formatMatchResultLog,
   formatPlayerSignupLog,
@@ -511,6 +512,7 @@ describe("confidentialité : aucun pseudo de joueur, aucun membre du staff nomm�
     const lines = [
       formatRegistrationLog({ tournament: TOURNAMENT, entrant: SOLO("Nova"), registeredTeams: 1, maxTeams: 8, byStaff: false }),
       formatForfeitLog({ tournament: TOURNAMENT, entrant: SOLO("Nova") }),
+      formatForfeitCancelledLog({ tournament: TOURNAMENT, entrant: SOLO("Nova") }),
       formatEntrantRemovedLog({ tournament: TOURNAMENT, entrant: SOLO("Nova"), registeredTeams: 1, maxTeams: 8 }),
       formatMatchResultLog({
         tournament: TOURNAMENT,
@@ -571,5 +573,24 @@ describe("entrantLabel / staffAuditLine", () => {
     expect(audit.startsWith("[staff-audit] ")).toBe(true);
     expect(audit).toContain(discord);
     expect(audit).toContain("Kiro (#3)");
+  });
+});
+
+describe("formatForfeitCancelledLog", () => {
+  it("annonce le retour en lice, auteur anonyme", () => {
+    const line = formatForfeitCancelledLog({
+      tournament: TOURNAMENT,
+      entrant: { name: "Les Renards", participantType: "TEAM" },
+    });
+    expect(line).toContain("Abandon annulé");
+    expect(line).toContain("Les Renards");
+    expect(line).toContain("le staff");
+  });
+
+  it("ne se confond pas avec la ligne d'abandon", () => {
+    const entrant = { name: "Les Renards", participantType: "TEAM" as const };
+    const cancelled = formatForfeitCancelledLog({ tournament: TOURNAMENT, entrant });
+    const forfeit = formatForfeitLog({ tournament: TOURNAMENT, entrant });
+    expect(cancelled.split(" ")[0]).not.toBe(forfeit.split(" ")[0]);
   });
 });

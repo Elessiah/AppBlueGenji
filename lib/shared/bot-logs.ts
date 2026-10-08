@@ -216,6 +216,22 @@ export function formatForfeitLog(context: {
 }
 
 /**
+ * Abandon annulé par un administrateur : l'engagé revient en lice
+ * (`docs/features/FORFEIT_CANCELLATION.md`).
+ *
+ * Le canal a annoncé l'abandon ({@link formatForfeitLog}) : il doit annoncer
+ * aussi son annulation, sans quoi la dernière ligne lue y décrirait une équipe
+ * sortie qui joue pourtant la manche suivante. L'auteur y est « le staff »,
+ * nommé dans pm2 (`publishStaffAction`).
+ */
+export function formatForfeitCancelledLog(context: {
+  tournament: BotLogTournament;
+  entrant: LogEntrant;
+}): string {
+  return `${lead("🔙", "Abandon annulé", context.tournament)} : ${entrantLabel(context.entrant)} revient en lice, par ${ANONYMOUS_STAFF_LABEL}.`;
+}
+
+/**
  * Retrait d'une inscription par le staff, avant le coup d'envoi
  * (`lib/shared/entrant-removal.ts`).
  *

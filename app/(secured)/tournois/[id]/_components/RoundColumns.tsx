@@ -34,6 +34,18 @@ export const FORFEIT_BUTTON_STYLE: CSSProperties = {
 };
 
 /**
+ * Bouton « Annuler l'abandon » d'une ligne forfait (administrateur strict).
+ * Bleu glacier et non ambre : le geste remet une équipe en lice, il n'avertit
+ * de rien (`--amber` = avertissement seulement).
+ */
+export const FORFEIT_CANCEL_BUTTON_STYLE: CSSProperties = {
+  ...FORFEIT_BUTTON_STYLE,
+  background: "rgba(var(--blue-rgb), 0.12)",
+  borderColor: "rgba(var(--blue-rgb), 0.4)",
+  color: "var(--blue-300)",
+};
+
+/**
  * Marque rose néon (rehaut, `--pink-400`) accolée à l'intitulé d'une manche
  * (barrage, coupe, dernière) : une information, pas un avertissement — l'ambre
  * reste à « Abandonner » et aux forfaits.

@@ -45,3 +45,34 @@ export function canForfeitTeam(context: ForfeitContext, teamId: number): boolean
   if (!context.canActForEntrant) return false;
   return context.myTeamId === teamId && context.canCreateReportsForTeamIds.includes(teamId);
 }
+
+/**
+ * Les boutons « Annuler l'abandon » du classement doivent-ils être proposés ?
+ *
+ * **Administrateur strict** (`TournamentViewerContext.canCancelForfeit`), sur
+ * un tournoi **en cours** dont le suivi n'est pas arrêté (`frozen`) : un
+ * tournoi terminé ne se rouvre pas, et le serveur refuse de même
+ * (`TOURNAMENT_NOT_RUNNING`). L'appelant n'affiche le bouton que sur une ligne
+ * `FORFEIT` — la vue sait seule quelle ligne porte ce statut.
+ */
+export function canCancelForfeits(context: {
+  canCancelForfeit: boolean;
+  state: TournamentState;
+  frozen: boolean;
+}): boolean {
+  return context.canCancelForfeit && context.state === "RUNNING" && !context.frozen;
+}
+
+/**
+ * Annule l'abandon d'un engagé (administrateur strict) : il revient en lice,
+ * le match perdu par forfait reste perdu (`docs/features/FORFEIT_CANCELLATION.md`).
+ *
+ * @throws le code d'erreur rendu par la route, à traduire par `mapError`.
+ */
+export async function requestForfeitCancellation(tournamentId: number, teamId: number): Promise<void> {
+  const response = await fetch(`/api/admin/tournaments/${tournamentId}/forfeits/${teamId}`, {
+    method: "DELETE",
+  });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) throw new Error(payload.error || "FORFEIT_CANCEL_FAILED");
+}
