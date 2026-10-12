@@ -33,6 +33,7 @@ import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { TargetPicker } from "./TargetPicker";
 import { richNodes } from "@/components/i18n/shell-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
+import { cached } from "@/lib/shared/intl-cache";
 import {
   legalBasisText,
   reportErrorText,
@@ -45,10 +46,14 @@ import {
 import { ReportsTextProvider } from "./reports-text-provider";
 import styles from "./ReportProblem.module.css";
 
-/** Formateurs construits une fois : `toLocaleDateString` en bâtirait un par option. */
-const CONTEST_OPTION_DATE: Readonly<Record<Locale, Intl.DateTimeFormat>> = {
-  fr: new Intl.DateTimeFormat(INTL_LOCALE.fr, { timeZone: "Europe/Paris" }),
-  en: new Intl.DateTimeFormat(INTL_LOCALE.en, { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }),
+/**
+ * Formateurs construits une fois, et seulement pour la langue lue (`cached`) :
+ * `toLocaleDateString` en bâtirait un par option.
+ */
+const CONTEST_OPTION_DATE = new Map<Locale, Intl.DateTimeFormat>();
+const CONTEST_OPTION_DATE_OPTIONS: Readonly<Record<Locale, Intl.DateTimeFormatOptions>> = {
+  fr: { timeZone: "Europe/Paris" },
+  en: { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" },
 };
 
 /**
@@ -59,7 +64,8 @@ const CONTEST_OPTION_DATE: Readonly<Record<Locale, Intl.DateTimeFormat>> = {
  * deux écrans donnent le même jour.
  */
 function contestOptionDate(iso: string, locale: Locale): string {
-  return CONTEST_OPTION_DATE[locale].format(new Date(iso));
+  const format = cached(CONTEST_OPTION_DATE, locale, (key) => new Intl.DateTimeFormat(INTL_LOCALE[key], CONTEST_OPTION_DATE_OPTIONS[key]));
+  return format.format(new Date(iso));
 }
 
 export interface ReportProblemDialogProps {

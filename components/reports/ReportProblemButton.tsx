@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
-import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
 import { useOptionalToast } from "@/components/ui/toast";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import { isChunkLoadError } from "@/lib/shared/lazy-component";
+import { splitLocalePrefix } from "@/lib/shared/locales";
 import { englishReports } from "@/components/i18n/english-loaders";
 import { loadedReportForm, loadReportForm, preloadReportForm } from "./report-form-loader";
 import s from "./ReportProblemButton.module.css";
@@ -68,14 +68,21 @@ export function ReportProblemButton({
   // Toujours posé par la mise en page racine ; `null` seulement pour un pied de
   // page rendu seul (tests) : l'échec reste alors dit par la région d'état.
   const toast = useOptionalToast();
-  // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
-  // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
-  const { path: pathname } = useLocalePathname();
+  // La page d'où l'on signale, lue **à l'ouverture** (revue de performance du
+  // lot 9-2 : le bouton, au pied de chaque page, ne s'abonne pas au chemin et
+  // n'est pas rendu à chaque navigation). Route sans préfixe de langue : la
+  // cible se reconnaît sous `/en/equipes/5` comme sous `/equipes/5`, et le
+  // journal retient une seule adresse par page.
+  const [pathname, setPathname] = useState("/");
+  const show = () => {
+    setPathname(splitLocalePrefix(window.location.pathname).path);
+    setOpen(true);
+  };
 
   const openDialog = () => {
     // Déjà là : chargé par un autre bouton, ou préchargé au survol.
     if (loadedReportForm(locale)) {
-      setOpen(true);
+      show();
       return;
     }
     if (pending) return;
@@ -87,7 +94,7 @@ export function ReportProblemButton({
         setStatus("");
         // Ouvert même si le lecteur a changé de page entre-temps : c'est la
         // suite attendue de son clic, et le formulaire retient la page affichée.
-        setOpen(true);
+        show();
       })
       .catch((error: unknown) => {
         const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");
