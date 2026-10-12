@@ -230,7 +230,7 @@ describe("revue UI/UX, quatrième passe", () => {
   it("date d'un signalement à contester : français inchangé, mois nommé en anglais", () => {
     const dialog = source("components/reports/ReportProblemDialog.tsx");
     expect(dialog).toContain("date: contestOptionDate(option.createdAt, text.locale),");
-    expect(dialog).toContain('fr: new Intl.DateTimeFormat(INTL_LOCALE.fr, { timeZone: "Europe/Paris" }),');
+    expect(dialog).toContain('fr: { timeZone: "Europe/Paris" },');
     expect(dialog).toContain('{ day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }');
   });
 });

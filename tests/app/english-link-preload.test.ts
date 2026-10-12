@@ -206,3 +206,11 @@ describe("revue performance, vingt-deuxième passe", () => {
     expect(readSource("components/reports/report-form-loader.ts")).toContain('if (typeof window !== "undefined") dialogLoader.prime(dialog);');
   });
 });
+
+describe("revue performance, vingt-troisième passe", () => {
+  it("le bouton du pied de page lit la page à l'ouverture, sans s'abonner au chemin", () => {
+    const button = readSource("components/reports/ReportProblemButton.tsx");
+    expect(button).not.toContain("useLocalePathname");
+    expect(button).toContain("setPathname(splitLocalePrefix(window.location.pathname).path);");
+  });
+});

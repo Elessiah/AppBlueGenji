@@ -265,7 +265,8 @@ describe("dates en heure de Paris, formateur réutilisé", () => {
 
   it("les dates du formulaire de contestation se forment une fois par langue", () => {
     const dialog = readSource("components/reports/ReportProblemDialog.tsx");
-    expect(dialog).toContain("return CONTEST_OPTION_DATE[locale].format(new Date(iso));");
+    // Seulement pour la langue lue (`cached`).
+    expect(dialog).toContain("const format = cached(CONTEST_OPTION_DATE, locale,");
     expect(dialog).not.toContain("date.toLocaleDateString(");
   });
 });
