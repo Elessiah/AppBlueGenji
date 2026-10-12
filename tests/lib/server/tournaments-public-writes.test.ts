@@ -279,6 +279,19 @@ describe("createTournament", () => {
     expect(insertedTournament().endurance_playoff_format_type).toBeNull();
   });
 
+  it("écrit la sortie anticipée en BG Survie seulement, et seulement sur un vrai `true`", async () => {
+    await createTournament(9, { ...base, format: "BG_SURVIE", enduranceEarlyExit: true });
+    expect(insertedTournament().endurance_early_exit).toBe(1);
+
+    connection.execute.mockClear();
+    await createTournament(9, { ...base, format: "BG_SURVIE" });
+    expect(insertedTournament().endurance_early_exit).toBe(0);
+
+    connection.execute.mockClear();
+    await createTournament(9, { ...base, enduranceEarlyExit: true });
+    expect(insertedTournament().endurance_early_exit).toBe(0);
+  });
+
   it("refuse des jalons dans le désordre, sans rien écrire", async () => {
     await expect(
       createTournament(9, { ...base, startAt: DATES.startVisibilityAt, startVisibilityAt: DATES.startAt }),
