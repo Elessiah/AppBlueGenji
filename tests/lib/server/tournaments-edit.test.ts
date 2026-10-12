@@ -280,3 +280,44 @@ describe("updateTournament", () => {
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 });
+
+describe("sortie anticipée « hors course » (BG Survie)", () => {
+  const bgsRow = (over: Record<string, unknown> = {}) =>
+    hiddenRow({ format: "BG_SURVIE", endurance_max_rounds: 5, ...over });
+
+  it("se lit éteinte sur une ligne d'avant la colonne (défaut 0)", async () => {
+    rowToReturn = bgsRow({ endurance_early_exit: 0 });
+    expect((await loadEditableTournament(1))?.values.enduranceEarlyExit).toBe(false);
+    expect(executed.some((q) => /endurance_early_exit/.test(q.sql))).toBe(true);
+  });
+
+  it("se lit allumée", async () => {
+    rowToReturn = bgsRow({ endurance_early_exit: 1 });
+    expect((await loadEditableTournament(1))?.values.enduranceEarlyExit).toBe(true);
+  });
+
+  it("s'écrit à l'édition", async () => {
+    rowToReturn = bgsRow({ endurance_early_exit: 0 });
+    await updateTournament(1, { enduranceEarlyExit: true });
+    const update = executed.find((q) => /UPDATE bg_tournaments/i.test(q.sql));
+    expect(update!.sql).toMatch(/endurance_early_exit = \?/);
+    const index = update!.sql.split("?").findIndex((part) => /endurance_early_exit = $/.test(part));
+    expect(update!.params[index]).toBe(1);
+  });
+
+  it("se décoche à l'édition", async () => {
+    rowToReturn = bgsRow({ endurance_early_exit: 1 });
+    await updateTournament(1, { enduranceEarlyExit: false });
+    const update = executed.find((q) => /UPDATE bg_tournaments/i.test(q.sql));
+    const index = update!.sql.split("?").findIndex((part) => /endurance_early_exit = $/.test(part));
+    expect(update!.params[index]).toBe(0);
+  });
+
+  // Comme le reste du barème d'endurance : figée dès la publication.
+  it("est refusée sur un tournoi publié", async () => {
+    rowToReturn = bgsRow({ start_visibility_at: past });
+    await expect(updateTournament(1, { enduranceEarlyExit: true })).rejects.toThrow(
+      "FIELD_NOT_EDITABLE:enduranceEarlyExit",
+    );
+  });
+});

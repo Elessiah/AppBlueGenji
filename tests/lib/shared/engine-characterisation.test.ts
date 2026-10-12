@@ -116,6 +116,9 @@ function enduranceConfig(r: Rng): EnduranceConfig {
     lossDelta: r.pick([1, 1, 2]),
     playoffSize: r.pick([2, 4, 8]),
     maxRounds: r.pick([null, null, 1, 2, 3, 5, 8]),
+    // Option cochée, sans tirage supplémentaire : l'instantané d'avant l'option
+    // reste la référence — cochée, la sortie anticipée ne change rien.
+    earlyExit: true,
   };
 }
 

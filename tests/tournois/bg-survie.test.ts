@@ -74,6 +74,7 @@ describe("resolveEnduranceConfig", () => {
         lossDelta: 3,
         playoffSize: 4,
         maxRounds: 6,
+        earlyExit: true,
       }),
     ).toEqual({
       startPoints: 12,
@@ -81,6 +82,7 @@ describe("resolveEnduranceConfig", () => {
       lossDelta: 3,
       playoffSize: 4,
       maxRounds: 6,
+      earlyExit: true,
     });
   });
 

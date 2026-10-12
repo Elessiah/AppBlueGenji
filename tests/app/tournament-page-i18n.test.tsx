@@ -253,6 +253,7 @@ const endurance: EnduranceMeta = {
   forfeitMaps: 3,
   playoffSize: 4,
   maxRounds: 6,
+  earlyExit: false,
   currentRound: 2,
   playoffsStarted: false,
   rounds: [1, 2],
@@ -638,7 +639,7 @@ describe("français inchangé — les messages égalent les tables d'origine", (
       card: tournamentCard({ format, participantType: format === "SWISS" ? "SOLO" : "TEAM", matchFormat: { type: "BO", value: 3 }, survivalRoundsBeforeFirstCut: 2, survivalRoundsPerCut: 1, hasThirdPlaceMatch: true }),
       phases: [phase({ id: 1, name: "Pools" }), phase({ id: 2, position: 2, format: "SURVIVAL", survivalRoundsBeforeFirstCut: 2, survivalRoundsPerCut: 2, qualifierMode: "PERCENT", qualifierValue: 50 }), phase({ id: 3, position: 3, format: "SINGLE", hasThirdPlaceMatch: true })],
       swiss: { totalRounds: 0, pointsForWin: 3, pointsForDraw: 1, pointsForLoss: 0, pointsForBye: 3 },
-      endurance: { startPoints: 1, winDelta: 1, lossDelta: 1, playoffSize: 4, maxRounds: null },
+      endurance: { startPoints: 1, winDelta: 1, lossDelta: 1, playoffSize: 4, maxRounds: null, earlyExit: false },
       seedingSource: "RANKING",
     });
     for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI", "BG_SURVIE"] as const) {
@@ -647,6 +648,23 @@ describe("français inchangé — les messages égalent les tables d'origine", (
       const en = localizedTournamentSettingsGroups(input, "en", messagesFor("en"));
       expect(JSON.stringify(en)).not.toMatch(ACCENTED);
       expect(en[0].title).toBe("Tournament");
+    }
+  });
+
+  it("réglages des règles : la sortie anticipée de BG Survie, sous plafond, dans les deux langues", () => {
+    for (const earlyExit of [false, true]) {
+      const input: TournamentSettingsInput = {
+        card: tournamentCard({ format: "BG_SURVIE", matchFormat: { type: "BO", value: 5 } }),
+        phases: null,
+        swiss: null,
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 5, earlyExit },
+        seedingSource: "RANKING",
+      };
+      const fr = settingsGroupsFrom(input, "fr", messagesFor("fr"));
+      expect(fr).toEqual(tournamentSettingsGroups(input));
+      expect(JSON.stringify(fr)).toContain(`"Sortie anticipée « hors course »","value":"${earlyExit ? "Oui" : "Non"}"`);
+      const en = JSON.stringify(localizedTournamentSettingsGroups(input, "en", messagesFor("en")));
+      expect(en).toContain(`"Early “out of contention” exit","value":"${earlyExit ? "Yes" : "No"}"`);
     }
   });
 

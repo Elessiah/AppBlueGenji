@@ -216,7 +216,7 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     expect(frForm.form.referee.description).toBe(REFEREE_SCHEDULING_DESCRIPTION);
     expect(frForm.form.referee.warning).toBe(ENABLE_PLANNING_WHILE_RUNNING_WARNING);
     expect(frForm.edit.fields.maxTeams).toBe("Nombre de places");
-    expect(Object.keys(frForm.edit.fields)).toHaveLength(28);
+    expect(Object.keys(frForm.edit.fields)).toHaveLength(29);
   });
 
   it("image : modes, refus, réussites", () => {
@@ -440,4 +440,54 @@ it("pluriels français : 0 et 1 au singulier, comme `> 1`", () => {
   expect(fr(frForm.phases.plan.teams, { count: 1 })).toBe("1 équipe");
   expect(fr(frForm.phases.plan.teams, { count: 0 })).toBe("0 équipe");
   expect(fr(frForm.phases.plan.teams, { count: 2 })).toBe("2 équipes");
+});
+
+describe("BG Survie — case « sortie anticipée hors course »", () => {
+  const ui = (over: Partial<ReturnType<typeof defaultTournamentFormValues>> = {}) => (
+    <TournamentForm
+      mode="create"
+      initialValues={{ ...defaultTournamentFormValues(), format: "BG_SURVIE", ...over }}
+      editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
+      submitLabel="Create"
+      onSubmit={async () => undefined}
+    />
+  );
+
+  it("décochée par défaut, libellée et expliquée en français et en anglais", () => {
+    const fr = render("fr", ui());
+    const en = render("en", ui());
+    expect(fr).toMatch(/<input id="endurance-early-exit" type="checkbox"(?![^>]*checked)[^>]*aria-describedby="endurance-early-exit-hint"/);
+    expect(fr).toContain("Sortir avant la fin les équipes qui ne peuvent plus être qualifiées");
+    expect(en).toContain("Remove teams that can no longer qualify before the end");
+    expect(en).toContain("Unticked (default), every team plays until the end of the stage.");
+    expectNoFrench(en);
+  });
+
+  it("cochée, elle se relit cochée", () => {
+    expect(render("en", ui({ enduranceEarlyExit: true }))).toMatch(/id="endurance-early-exit" type="checkbox"[^>]*checked/);
+  });
+
+  it("prévient qu'elle est sans effet sans plafond de manches", () => {
+    expect(render("fr", ui({ enduranceMaxRounds: 0 }))).toContain("Sans effet tant qu&#x27;aucun plafond de manches n&#x27;est fixé.");
+    expect(render("en", ui({ enduranceMaxRounds: 0 }))).toContain("No effect until a round cap is set.");
+    expect(render("en", ui())).not.toContain("No effect until a round cap is set.");
+  });
+
+  it("n'apparaît qu'en BG Survie", () => {
+    expect(render("en", ui({ format: "SURVIVAL" }))).not.toContain("endurance-early-exit");
+  });
+
+  it("figée hors de la fenêtre complète, comme le reste du barème", () => {
+    const html = renderEdit(
+      <TournamentForm
+        mode="edit"
+        initialValues={{ ...defaultTournamentFormValues(), format: "BG_SURVIE" }}
+        editableFields={editableFieldsForWindow("RESTRICTED")}
+        submitLabel="Save changes"
+        explanationId="lock"
+        onSubmit={async () => undefined}
+      />,
+    );
+    expect(html).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""[^>]*aria-describedby="lock endurance-early-exit-hint"/);
+  });
 });

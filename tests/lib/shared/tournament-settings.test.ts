@@ -150,7 +150,7 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
           matchFormat: { type: "BO", value: 5, drawsAllowed: true, maxMaps: 4 },
           endurancePlayoffFormat: null,
         }),
-        endurance: { startPoints: 7, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: null },
+        endurance: { startPoints: 7, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: null, earlyExit: false },
       }),
     );
     const settings = group(groups, "BlueGenji Survie");
@@ -173,13 +173,34 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
           matchFormat: { type: "BO", value: 5 },
           endurancePlayoffFormat: { type: "FT", value: 3 },
         }),
-        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 6 },
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 6, earlyExit: true },
       }),
     );
     expect(group(groups, "BlueGenji Survie")).toMatchObject({
       "Plafond de manches qualificatives": "6",
+      "Sortie anticipée « hors course »": "Oui",
       "Format des play-offs": "FT3",
     });
+  });
+
+  it("BlueGenji Survie : la sortie anticipée, décochée, se lit « Non » sous plafond", () => {
+    const groups = tournamentSettingsGroups(
+      input({
+        card: tournamentCard({ format: "BG_SURVIE", matchFormat: { type: "BO", value: 5 } }),
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 4, earlyExit: false },
+      }),
+    );
+    expect(group(groups, "BlueGenji Survie")["Sortie anticipée « hors course »"]).toBe("Non");
+  });
+
+  it("BlueGenji Survie : sans plafond, la sortie anticipée n'est pas affichée", () => {
+    const groups = tournamentSettingsGroups(
+      input({
+        card: tournamentCard({ format: "BG_SURVIE", matchFormat: { type: "BO", value: 5 } }),
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: null, earlyExit: true },
+      }),
+    );
+    expect(group(groups, "BlueGenji Survie")).not.toHaveProperty("Sortie anticipée « hors course »");
   });
 
   it("multi-phases : une ligne par phase, dans l'ordre, la dernière désignant la championne", () => {

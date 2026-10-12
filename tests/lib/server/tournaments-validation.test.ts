@@ -656,3 +656,27 @@ describe("validateTournamentInput — caractérisation des refus", () => {
     ]);
   });
 });
+
+describe("validateTournamentInput — sortie anticipée « hors course » (BG Survie)", () => {
+  const bgs = { ...base, format: "BG_SURVIE" as const, enduranceMaxRounds: 5 };
+
+  it("est éteinte par défaut", () => {
+    expect(value(bgs).enduranceEarlyExit).toBe(false);
+    expect(value({ ...bgs, enduranceEarlyExit: null }).enduranceEarlyExit).toBe(false);
+  });
+
+  it("s'allume sur un vrai booléen", () => {
+    expect(value({ ...bgs, enduranceEarlyExit: true }).enduranceEarlyExit).toBe(true);
+    expect(value({ ...bgs, enduranceEarlyExit: false }).enduranceEarlyExit).toBe(false);
+  });
+
+  it("reste éteinte hors BG Survie", () => {
+    expect(value({ ...base, format: "SINGLE", enduranceEarlyExit: true }).enduranceEarlyExit).toBe(false);
+  });
+
+  it.each(["true", 1, "1", {}])("refuse une valeur qui n'est pas un booléen (%j)", (raw) => {
+    const body: Parameters<typeof validateTournamentInput>[0] = { ...bgs };
+    Object.assign(body, { enduranceEarlyExit: raw });
+    expect(validateTournamentInput(body)).toEqual({ error: "INVALID_ENDURANCE_EARLY_EXIT" });
+  });
+});
