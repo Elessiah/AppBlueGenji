@@ -324,7 +324,7 @@ describe("revue UI/UX, huitième passe", () => {
     expect(rgpd).not.toContain("other —,");
     const enProfile = (await import("@/messages/en/profile.json")).default;
     expect(JSON.stringify(enProfile)).not.toContain("Of age");
-    expect(enProfile.identity.adult).toBe("Age status");
+    expect(enProfile.identity.adult).toBe("Of legal age");
   });
 });
 
@@ -346,7 +346,8 @@ describe("revue UI/UX, neuvième passe", () => {
     const { verifiedBadgeLabels, FR_PROFILE } = await import("@/app/(secured)/profil/_lib/profile-text");
     expect(verifiedBadgeLabels(FR_PROFILE)).toEqual({ alt: FR_PROFILE.t("discord.verifiedAlt"), title: FR_PROFILE.t("discord.verifiedTitle") });
     expect(source("app/(secured)/profil/page.tsx")).toContain("<VerifiedBadge labels={verifiedBadgeLabels(text)} />");
-    expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).toContain("labels={verifiedBadgeLabels(text)}");
+    // Le dialogue reprend le titre du badge ; son `alt` y est vide (douzième passe).
+    expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).toContain("title: verifiedBadgeLabels(text).title");
   });
 });
 
@@ -380,5 +381,34 @@ describe("revue UI/UX, onzième passe", () => {
     const frReports = (await import("@/messages/fr/reports.json")).default;
     expect(frReports.dialog).not.toHaveProperty("portalLink");
     expect(enReports.dialog).not.toHaveProperty("portalLink");
+  });
+});
+
+describe("revue UI/UX, douzième passe", () => {
+  it("dialogue de certification : « Annuler » bloqué pendant la requête, badge décoratif dans le titre", () => {
+    const dialog = source("app/(secured)/profil/DiscordVerificationDialog.tsx");
+    expect(dialog.match(/<CyberButton variant="ghost" type="button" disabled=\{loading\} onClick=\{onClose\}>/g)).toHaveLength(4);
+    expect(dialog).not.toContain('type="button" onClick={onClose}>');
+    expect(dialog).toContain('<VerifiedBadge size={20} labels={{ alt: "", title: verifiedBadgeLabels(text).title }} />');
+  });
+
+  it("liens juridiques du formulaire : nouvel onglet annoncé", () => {
+    const dialog = source("components/reports/ReportProblemDialog.tsx");
+    expect(dialog).toMatch(/\{t\("dialog\.privacyPolicy"\)\}\s*\{\/\*[^*]*\*\/\}\s*<span className="sr-only">\{` \$\{t\("dialog\.newTab"\)\}`\}<\/span>/);
+    expect(dialog).toMatch(/\{t\("dialog\.terms"\)\}\s*\{\/\*[^*]*\*\/\}\s*<span className="sr-only">\{` \$\{t\("dialog\.newTab"\)\}`\}<\/span>/);
+  });
+
+  it("anglais : notifications « appeal », statut « Pending », « Of legal age »", async () => {
+    const enPush = (await import("@/messages/en/push.json")).default;
+    expect(JSON.stringify(enPush)).not.toMatch(/contest/i);
+    expect(enReports.status.OPEN).toBe("Pending");
+    const enPlayers = (await import("@/messages/en/players.json")).default;
+    expect(JSON.stringify(enPlayers)).not.toContain("Age status");
+  });
+
+  it("applications connectées : la langue du texte, une seule source", () => {
+    const apps = source("app/(secured)/profil/ConnectedAppsSection.tsx");
+    expect(apps).not.toContain("useAppLocale");
+    expect(apps).toContain("const locale = text.locale;");
   });
 });
