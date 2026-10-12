@@ -8,7 +8,7 @@ import { statsPanelMessages } from "@/lib/shared/stats-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { StatsPanelGate } from "@/components/i18n/english-gates";
-import { isDocumentLoad } from "@/lib/server/layout-messages";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -55,8 +55,7 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
 export default async function PlayerDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
   // L'anglais au chargement complet seulement (revue de performance du lot 9-2).
-  const all = messagesFor(locale);
-  const stats = locale === "en" && (await isDocumentLoad()) ? statsPanelMessages(all) : undefined;
+  const stats = await englishOnDocumentLoad(locale, statsPanelMessages);
   return (
     <StatsPanelGate
       locale={locale}

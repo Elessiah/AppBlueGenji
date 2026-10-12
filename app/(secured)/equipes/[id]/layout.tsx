@@ -8,7 +8,7 @@ import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { TeamPageTextGate } from "@/components/i18n/english-gates";
-import { isDocumentLoad } from "@/lib/server/layout-messages";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 import { statsPanelMessages } from "@/lib/shared/stats-text";
 
 type MetadataProps = {
@@ -64,13 +64,12 @@ export default async function TeamDetailLayout({ children }: Readonly<{ children
   const locale = await requestLocale();
   // L'anglais au chargement complet seulement (revue de performance du lot 9-2) : la fiche
   // rafraîchit après chaque réglage, et une réponse du routeur n'est jamais gardée en cache.
-  const all = messagesFor(locale);
-  const send = locale === "en" && (await isDocumentLoad());
+  const english = await englishOnDocumentLoad(locale, (all) => ({ team: all.team, stats: statsPanelMessages(all) }));
   return (
     <TeamPageTextGate
       locale={locale}
-      messages={send ? all.team : undefined}
-      stats={send ? statsPanelMessages(all) : undefined}
+      messages={english?.team}
+      stats={english?.stats}
     >
       {children}
     </TeamPageTextGate>

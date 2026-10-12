@@ -12,6 +12,7 @@ import { DISCORD_VERIFICATION_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
 import { INTL_LOCALE } from "@/lib/shared/locales";
+import { visibleText } from "@/lib/shared/visible-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
@@ -209,7 +210,7 @@ export function DiscordVerificationDialog({
               est faite, ce clic ne donne que le consentement. Le tag est
               montré tel qu'il sera exposé — c'est lui, et rien d'autre. */}
           <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
-            {richNodes(text.rich("verify.attested", { tag: initialTag }, { strong: (chunks) => <strong>{chunks}</strong> }))}
+            {richNodes(text.rich("verify.attested", { tag: visibleText(initialTag) }, { strong: (chunks) => <strong>{chunks}</strong> }))}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>

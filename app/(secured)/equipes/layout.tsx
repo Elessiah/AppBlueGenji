@@ -3,7 +3,7 @@ import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadat
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { TeamErrorsTextGate } from "@/components/i18n/english-gates";
-import { isDocumentLoad } from "@/lib/server/layout-messages";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 
 /**
  * Titre de l'annuaire des équipes et, faute de mieux, de ses sous-pages —
@@ -29,8 +29,7 @@ export default async function TeamsLayout({ children }: Readonly<{ children: Rea
   const locale = await requestLocale();
   // L'anglais au chargement complet seulement (revue de performance du lot 9-2) : jamais
   // dans une réponse du routeur (navigation, préchargement, `router.refresh()`).
-  const all = messagesFor(locale);
-  const messages = locale === "en" && (await isDocumentLoad()) ? all.teamErrors : undefined;
+  const messages = await englishOnDocumentLoad(locale, (all) => all.teamErrors);
   return (
     <TeamErrorsTextGate
       locale={locale}

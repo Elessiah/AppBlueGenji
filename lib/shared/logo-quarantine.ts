@@ -139,9 +139,12 @@ export function canAutoPurgeLogo(input: {
  * Date lisible d'une échéance, **en heure de Paris** : le message part d'un
  * serveur pour des lecteurs dont on ne connaît pas le fuseau, il est rédigé une
  * fois pour tous. En français par défaut (messages du serveur) ; un écran passe
- * la langue de sa page (`INTL_LOCALE`), toujours en heure de Paris.
+ * la langue de sa page (`INTL_LOCALE`), toujours en heure de Paris. Une date
+ * illisible rend une chaîne vide : `Intl.DateTimeFormat#format` lève là où
+ * `toLocaleDateString` rendait « Invalid Date », et une page entière tomberait.
  */
 export function formatQuarantineDate(date: Date, intlLocale = "fr-FR"): string {
+  if (Number.isNaN(date.getTime())) return "";
   return quarantineDateFormat(intlLocale).format(date);
 }
 

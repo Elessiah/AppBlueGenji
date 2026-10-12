@@ -4,7 +4,7 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { isDocumentLoad } from "@/lib/server/layout-messages";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 import { ConcernedReportsText } from "@/components/reports/concerned-reports-text";
 
 type MetadataProps = {
@@ -32,14 +32,13 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
 /**
  * Pose les textes de la page et du formulaire de contestation : rien en
  * français, déjà dans le paquet de la page (`reports-text.ts`) ; l'anglais
- * sous `/en` seulement, et au chargement complet seulement (`isDocumentLoad`,
+ * sous `/en` seulement, et au chargement complet seulement (`englishOnDocumentLoad`,
  * comme `/profil`) — le client garde ce qu'il a reçu, ou le charge par son
  * morceau (`ConcernedReportsText`).
  */
 export default async function ConcernedReportLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const all = messagesFor(locale);
-  const messages = locale === "en" && (await isDocumentLoad()) ? all.reports : undefined;
+  const messages = await englishOnDocumentLoad(locale, (all) => all.reports);
   return (
     <ConcernedReportsText
       locale={locale}
