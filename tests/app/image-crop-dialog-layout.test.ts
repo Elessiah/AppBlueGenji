@@ -72,7 +72,8 @@ describe("modale de recadrage — petits écrans", () => {
 describe("modale de recadrage — langue d'un écran du staff sous /en", () => {
   it("portée dans body, elle porte la langue que l'écran lui passe", () => {
     expect(tsx).toMatch(/role="dialog"[^>]*lang=\{lang\}/);
-    expect(tsx).toMatch(/useImageCropper\(options: Readonly<\{ lang\?: string \}> = \{\}\)/);
+    // Seul le français s'impose (lot 9-2) : un `lang` qui ne suivrait pas le texte serait faux (WCAG 3.1.2).
+    expect(tsx).toMatch(/useImageCropper\(options: Readonly<\{ lang\?: "fr" \}> = \{\}\)/);
   });
 
   it("les éditeurs de la vitrine (français, D4) la disent en français sous /en", () => {

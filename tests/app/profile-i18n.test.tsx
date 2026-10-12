@@ -339,7 +339,7 @@ describe("français inchangé — signalements et notifications", () => {
       label: OFF_SITE_CONDUCT_ENTRY.label,
       hint: OFF_SITE_CONDUCT_ENTRY.hint,
       // Même phrase, lien compris : `<portal>` porte le libellé du lien, le point suit.
-      notice: `${OFF_SITE_CONDUCT_NOTICE} <portal>${fr.reports.dialog.portalLink}</portal>.`,
+      notice: `${OFF_SITE_CONDUCT_NOTICE} <portal>portail de support BlueGenji</portal>.`,
     });
   });
 

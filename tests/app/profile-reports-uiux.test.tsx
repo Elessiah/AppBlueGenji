@@ -97,10 +97,13 @@ describe("revue UI/UX, deuxième passe", () => {
     expect(reportsText("en").t("dialog.tooShort", { count: 4 })).toBe("At least 4 more characters.");
   });
 
-  it("lien d'invitation Discord : nouvel onglet annoncé aux lecteurs d'écran", () => {
+  it("lien d'invitation Discord : nouvel onglet annoncé aux lecteurs d'écran, un seul rendu", () => {
+    const link = source("app/(secured)/profil/_components/DiscordInviteLink.tsx");
+    expect(link).toMatch(/target="_blank"[\s\S]{0,600}<span className="sr-only">\{` \$\{t\("verify\.newTab"\)\}`\}<\/span>/);
     for (const dialog of ["DiscordBotHandleDialog", "DiscordVerificationDialog"]) {
       const text = source(`app/(secured)/profil/${dialog}.tsx`);
-      expect(text).toMatch(/target="_blank"[\s\S]{0,600}<span className="sr-only">\{` \$\{t\("verify\.newTab"\)\}`\}<\/span>/);
+      expect(text).toContain("join: (chunks) => <DiscordInviteLink>{richNodes(chunks)}</DiscordInviteLink>,");
+      expect(text).not.toContain('target="_blank"');
     }
   });
 
@@ -344,5 +347,38 @@ describe("revue UI/UX, neuvième passe", () => {
     expect(verifiedBadgeLabels(FR_PROFILE)).toEqual({ alt: FR_PROFILE.t("discord.verifiedAlt"), title: FR_PROFILE.t("discord.verifiedTitle") });
     expect(source("app/(secured)/profil/page.tsx")).toContain("<VerifiedBadge labels={verifiedBadgeLabels(text)} />");
     expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).toContain("labels={verifiedBadgeLabels(text)}");
+  });
+});
+
+describe("revue UI/UX, onzième passe", () => {
+  it("anglais : « appeal » pour le geste de contestation, d'un bout à l'autre du parcours", () => {
+    // Les phrases juridiques (`privacy.followUp`, base légale du DSA) gardent « contest » ; l'écran dit « appeal ».
+    const screen = [
+      enReports.dialog.contestAnon,
+      enReports.dialog.nothingToContest,
+      enReports.categories.CONTEST.hint,
+      enReports.errors.REPORT_PARENT_REQUIRED,
+      enReports.errors.REPORT_CONTEST_LOGIN_REQUIRED,
+      enReports.errors.REPORT_NOT_CONCERNED,
+      ...Object.values(enReports.concerned),
+    ];
+    for (const sentence of screen) expect(sentence).not.toMatch(/\bcontest/i);
+    expect(enReports.dialog.contested).toBe("Appealed report");
+  });
+
+  it("bouton « Déconnexion » occupé : état dit par les couleurs, sans survol ni opacité", () => {
+    const css = source("components/logout-button.module.css");
+    expect(css).toContain(":global(.btn).leaving:hover");
+    expect(css).toContain("color: var(--ink-mute);");
+    expect(css).not.toMatch(/opacity\s*:/);
+    expect(source("components/logout-button.tsx")).toContain("className={leaving ? s.leaving : undefined}");
+  });
+
+  it("alertes d'image du signalement : sans région d'annonce, clé morte du portail retirée", async () => {
+    const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
+    expect(view).not.toContain('className={styles.alert} role="status"');
+    const frReports = (await import("@/messages/fr/reports.json")).default;
+    expect(frReports.dialog).not.toHaveProperty("portalLink");
+    expect(enReports.dialog).not.toHaveProperty("portalLink");
   });
 });
