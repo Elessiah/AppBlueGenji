@@ -27,6 +27,12 @@ const cropDialogLoader = onceLoader<CropDialog>(() => import("./image-crop-dialo
 const englishCropLoader = onceLoader<ImageCropMessages>(() => import("@/messages/en/imageCrop.json").then((module) => module.default));
 
 const preloadCropDialog = quietPreload(() => cropDialogLoader.load());
+const preloadCropEnglish = quietPreload(() => englishCropLoader.load());
+
+/** La langue de la page, lue sur `<html lang>` (posé par la mise en page racine). */
+function pageIsEnglish(): boolean {
+  return typeof document !== "undefined" && document.documentElement.lang === "en";
+}
 
 /**
  * Précharge la modale : à poser sur le `<input type="file">` qui la précède
@@ -36,8 +42,9 @@ const preloadCropDialog = quietPreload(() => cropDialogLoader.load());
  * (`quietPreload`) : l'ouverture, elle, retente et le dit.
  */
 export function preloadImageCropDialog(): void {
-  if (cropDialogLoader.loaded()) return;
-  preloadCropDialog();
+  if (!cropDialogLoader.loaded()) preloadCropDialog();
+  // Sous `/en`, l'anglais aussi — un écran du staff en français l'aura pour rien, quelques centaines d'octets.
+  if (pageIsEnglish() && !englishCropLoader.loaded()) preloadCropEnglish();
 }
 
 /** Une image choisie et sa zone gardée, prête à partir. */

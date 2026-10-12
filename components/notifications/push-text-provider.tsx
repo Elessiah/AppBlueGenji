@@ -1,15 +1,20 @@
 "use client";
 
 import type frPush from "@/messages/fr/push.json";
-import { createScopedTextSlot } from "@/components/i18n/scoped-text-context";
+import { englishPush } from "@/components/i18n/english-loaders";
+import { createScopedTextSlot, type ScopedTextProvider } from "@/components/i18n/scoped-text-context";
 
 /**
  * Le fournisseur des textes `push`, **sans** leur français (revue de
- * performance du lot 9-2) : posé par la mise en page de `/profil` (anglais
- * sérialisé sous `/en` seulement) et par la fenêtre de lancement d'un match
- * (anglais dans son morceau chargé à la demande). Le français voyage avec le
- * panneau (`push-text.ts`).
+ * performance du lot 9-2) : posé par `/profil` (`ProfileTextProviders`) et
+ * par la fenêtre de lancement d'un match. Le français voyage avec le panneau
+ * (`push-text.ts`) ; l'anglais reçu ici amorce le chargeur partagé
+ * (`englishPush`) — la fenêtre de lancement ne le télécharge pas une seconde
+ * fois.
  */
 export const pushTextSlot = createScopedTextSlot<typeof frPush>();
 
-export const PushTextProvider = pushTextSlot.Provider;
+export const PushTextProvider: ScopedTextProvider<typeof frPush> = (props) => {
+  if (props.locale === "en" && props.messages) englishPush.prime(props.messages);
+  return <pushTextSlot.Provider {...props} />;
+};

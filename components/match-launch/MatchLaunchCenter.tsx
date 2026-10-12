@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { PushTextProvider } from "@/components/notifications/push-text-provider";
 import type frPush from "@/messages/fr/push.json";
-import { onceLoader } from "@/lib/shared/lazy-component";
+import { englishPush } from "@/components/i18n/english-loaders";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -478,13 +478,11 @@ export function MatchLaunchCenter({
   );
 }
 
-/** L'anglais du réglage des notifications, chargé une fois, sous `/en` seulement. */
-const englishPush = onceLoader<typeof frPush>(() => import("@/messages/en/push.json").then((module) => module.default));
-
 /**
  * Le réglage compact des notifications : un lecteur français ne télécharge pas
  * son anglais (revue de performance du lot 9-2). Sous `/en`, il paraît quand
- * l'anglais est là ; un échec le laisse caché — réglage facultatif, offert
+ * l'anglais est là (`englishPush`, partagé : déjà reçu par `/profil`, il ne
+ * repart pas) ; un échec le laisse caché — réglage facultatif, offert
  * aussi par `/profil` — plutôt que de le montrer en français. Monté avec la
  * fenêtre ouverte seulement (refermée, elle cède la place au bouton flottant),
  * il retente à la réouverture suivante (`onceLoader` ne garde pas un échec).

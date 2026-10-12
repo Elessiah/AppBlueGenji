@@ -130,6 +130,8 @@ export function onceLoader<T>(start: () => Promise<T>): OnceLoader<T> {
   let pending: Promise<T> | null = null;
   return {
     load() {
+      // Déjà là — chargé, ou fourni d'avance (`prime`) : rien ne repart.
+      if (result) return Promise.resolve(result.value);
       pending ??= start().then(
         (value) => {
           result = { value };

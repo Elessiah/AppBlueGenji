@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { preloadProfileEnglish } from "@/components/i18n/english-loaders";
 import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
@@ -111,10 +112,12 @@ export function AccountMenuPanel({
   onNavigate: () => void;
   onLogout: () => void;
 }>) {
-  const { t } = useShellText();
+  const { t, locale } = useShellText();
+  // Sous `/en`, l'anglais de `/profil` part au survol : il arrive avec la page.
+  const preload = () => preloadProfileEnglish(locale);
   return (
     <div id={id} className={s.panel}>
-      <LocaleLink href="/profil" className={s.item} onClick={onNavigate}>
+      <LocaleLink href="/profil" className={s.item} onClick={onNavigate} onPointerEnter={preload} onFocus={preload}>
         <UserRound className={s.itemIcon} size={16} aria-hidden="true" />
         <span className={s.itemText}>{t("account.profile")}</span>
       </LocaleLink>

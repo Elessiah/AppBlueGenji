@@ -1,9 +1,9 @@
 "use client";
 
 import type { ComponentType } from "react";
+import { englishReports as englishLoader } from "@/components/i18n/english-loaders";
 import { onceLoader, quietPreload } from "@/lib/shared/lazy-component";
 import type { Locale } from "@/lib/shared/locales";
-import type frReports from "@/messages/fr/reports.json";
 import type { ReportProblemDialogProps } from "./ReportProblemDialog";
 
 /**
@@ -18,19 +18,20 @@ export type ReportDialog = ComponentType<ReportProblemDialogProps>;
 const dialogLoader = onceLoader<ReportDialog>(() => import("./ReportProblemDialog").then((module) => module.ReportProblemDialog));
 
 /**
- * L'anglais du formulaire, sous `/en` seulement. Une page qui le sert déjà
- * (mise en page de `/signalements/[id]`) le fournit d'avance par
- * `primeEnglishReports` — posé par son `ReportsTextProvider` : le pied de page
- * ne le télécharge pas une seconde fois.
+ * Une page qui importe déjà le formulaire (`/signalements/[id]`, formulaire de
+ * contestation) le remet au chargeur : le pied de page ne le télécharge pas
+ * une seconde fois.
  */
-const englishLoader = onceLoader<typeof frReports>(() => import("@/messages/en/reports.json").then((module) => module.default));
-
-export function primeEnglishReports(messages: typeof frReports): void {
-  englishLoader.prime(messages);
+export function primeReportDialog(dialog: ReportDialog): void {
+  dialogLoader.prime(dialog);
 }
 
-/** L'anglais déjà là, ou `null`. */
-export function loadedEnglishReports(): typeof frReports | null {
+/**
+ * L'anglais du formulaire (`englishReports`, partagé : une page qui l'a déjà
+ * reçu — mise en page de `/signalements/[id]` — l'a amorcé par son
+ * `ReportsTextProvider`), ou `null`.
+ */
+export function loadedEnglishReports(): ReturnType<typeof englishLoader.loaded> {
   return englishLoader.loaded();
 }
 

@@ -152,6 +152,20 @@ function isDocumentRequest(request: NextRequest): boolean {
 }
 
 /**
+ * Chargement complet d'une page, pour `DOCUMENT_REQUEST_HEADER` : `Sec-Fetch-Dest`
+ * quand le navigateur l'envoie ; sinon (Safari avant 16.4, certaines vues web)
+ * l'en-tête `Accept` — un document demande `text/html`, le routeur de Next
+ * (`fetch`) non. Plus strict que `isDocumentRequest` : sans aucun des deux,
+ * la page sert le texte par son propre morceau plutôt que de renvoyer le
+ * dictionnaire à chaque rafraîchissement.
+ */
+function isDocumentLoad(request: NextRequest): boolean {
+  const dest = request.headers.get("sec-fetch-dest");
+  if (dest !== null) return dest === "document";
+  return request.headers.get("accept")?.includes("text/html") ?? false;
+}
+
+/**
  * Les en-têtes de requête que voit le rendu : la langue, et le chemin sans
  * préfixe.
  *
@@ -169,7 +183,7 @@ function localizedRequestHeaders(request: NextRequest, locale: Locale, path: str
   requestHeaders.set(LOCALE_HEADER, locale);
   requestHeaders.set(PATHNAME_HEADER, path);
   requestHeaders.set(SEARCH_HEADER, request.nextUrl.search);
-  requestHeaders.set(DOCUMENT_REQUEST_HEADER, isDocumentRequest(request) ? "1" : "0");
+  requestHeaders.set(DOCUMENT_REQUEST_HEADER, isDocumentLoad(request) ? "1" : "0");
   return requestHeaders;
 }
 

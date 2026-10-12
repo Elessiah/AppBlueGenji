@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { segmentTitle } from "@/lib/shared/page-metadata";
-import { localeAlternates, localeHref } from "@/lib/shared/locales";
+import { DOCUMENT_REQUEST_HEADER, localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { ReportsTextProvider } from "@/components/reports/reports-text-provider";
+import { headers } from "next/headers";
+import { ConcernedReportsText } from "@/components/reports/concerned-reports-text";
+import { SecuredLoadingView } from "../../_shared/SecuredLoading";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -31,13 +33,21 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
 /**
  * Pose les textes de la page et du formulaire de contestation : rien en
  * français, déjà dans le paquet de la page (`reports-text.ts`) ; l'anglais
- * sous `/en` seulement — jamais dans le JavaScript d'un lecteur français.
+ * sous `/en` seulement, et au chargement complet d'une page seulement (comme
+ * `/profil`) — une navigation d'un signalement à l'autre, un préchargement ou
+ * un rafraîchissement n'en portent aucun (`ConcernedReportsText`).
  */
 export default async function ConcernedReportLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
+  const documentRequest = (await headers()).get(DOCUMENT_REQUEST_HEADER) !== "0";
+  const all = messagesFor(locale);
   return (
-    <ReportsTextProvider locale={locale} messages={locale === "en" ? messagesFor(locale).reports : undefined}>
+    <ConcernedReportsText
+      locale={locale}
+      messages={locale === "en" && documentRequest ? all.reports : undefined}
+      fallback={<SecuredLoadingView label={all.shell.loading} />}
+    >
       {children}
-    </ReportsTextProvider>
+    </ConcernedReportsText>
   );
 }

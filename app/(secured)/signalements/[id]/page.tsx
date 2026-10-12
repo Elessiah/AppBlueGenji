@@ -7,11 +7,15 @@ import { useParams } from "next/navigation";
 // lit) ; chargé à l'ouverture, le formulaire ajouterait une attente et un échec
 // possible à ce geste pour ~4 Ko de code.
 import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
+import { primeReportDialog } from "@/components/reports/report-form-loader";
 import type { ConcernedReportView } from "@/lib/shared/content-reports";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useReportsText } from "@/components/reports/reports-text";
 import { ConcernedReport } from "./_components/ConcernedReport";
 import styles from "./concerned.module.css";
+
+// Le pied de page de cette page ne retélécharge pas le formulaire qu'elle porte déjà.
+primeReportDialog(ReportProblemDialog);
 
 type LoadState = { status: "loading" } | { status: "missing" } | { status: "ready"; report: ConcernedReportView };
 
