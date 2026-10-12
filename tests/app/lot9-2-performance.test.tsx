@@ -56,7 +56,7 @@ describe("aucun anglais importé d'office", () => {
     expect(launch).toContain('const hidden = locale === "en" && !english;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
     // Un échec vaut jusqu'à la réouverture, pas à chaque navigation.
-    expect(launch).toContain("const { english } = useEnglishMessagesUntilRemount(locale, englishPush);");
+    expect(launch).toContain("const { english, failed } = useEnglishMessagesUntilRemount(locale, englishPush);");
     // Le crochet partagé ; préchargé au survol du bouton flottant, rien pour qui n'ouvre pas la fenêtre.
     expect(launch).toContain("const preload = () => preloadEnglishPush(locale);");
     expect(launch).not.toContain("hasLaunches");

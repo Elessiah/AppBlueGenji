@@ -77,7 +77,7 @@ describe("bouton du formulaire de signalement", () => {
 
   it("précharge au survol et au focus, se dit occupé pendant le chargement", () => {
     const button = source("components/reports/ReportProblemButton.tsx");
-    expect(button).toContain("onPointerEnter: () => preloadReportForm(locale),");
+    expect(button).toContain("onPointerEnter: (event: PointerEvent<HTMLElement>) => {");
     expect(button).toContain("onFocus: () => preloadReportForm(locale),");
     expect(button).toContain('"aria-busy": pending || undefined');
     // Un seul chargement partagé, retenté après un échec, qui le dit.

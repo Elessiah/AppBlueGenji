@@ -240,7 +240,10 @@ describe("revue performance, vingt-huitième passe", () => {
   it("un tap précharge aussi (clic en capture) ; le réglage push lit son état pendant que l'anglais arrive", () => {
     expect(readSource("components/i18n/english-link-preload-install.ts")).toContain('document.addEventListener("click", onIntent, { capture: true });');
     const launch = readSource("components/match-launch/MatchLaunchCenter.tsx");
-    expect(launch).toContain("<div hidden={hidden}>");
+    expect(launch).toContain("<div className={styles.pushSlot} data-waiting={hidden || undefined}>");
+    // Échec : rien de monté ; sans boîte, aucun écart dans la colonne.
+    expect(launch).toContain('if (locale === "en" && failed) return null;');
+    expect(readSource("components/match-launch/MatchLaunchCenter.module.css")).toMatch(/\.pushSlot \{\s*display: contents;/);
     expect(readSource("components/i18n/scoped-text-context.tsx")).toContain(
       "if (state.locale !== locale || (state.value === undefined && messages !== undefined)) setState(read());",
     );
@@ -250,5 +253,12 @@ describe("revue performance, vingt-huitième passe", () => {
     const hook = readSource("components/ui/image-crop-dialog.tsx");
     expect(hook).toContain("if (mountedRef.current) showError(");
     expect(hook.match(/mountedRef\.current = false;/g)).toHaveLength(1);
+  });
+});
+
+describe("revue performance, vingt-neuvième passe", () => {
+  it("bouton du pied et bouton flottant : le survol au toucher ne précharge rien", () => {
+    expect(readSource("components/reports/ReportProblemButton.tsx")).toContain('if (event.pointerType !== "touch") preloadReportForm(locale);');
+    expect(readSource("components/match-launch/MatchLaunchCenter.tsx")).toContain('if (event.pointerType !== "touch") preload();');
   });
 });
