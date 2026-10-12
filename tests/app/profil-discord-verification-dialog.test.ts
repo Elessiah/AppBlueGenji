@@ -43,7 +43,7 @@ describe("certification d'un compte relié dont Discord a nommé le pseudo", () 
   });
 
   it("montre le tag qui sera exposé, et rien d'autre", () => {
-    expect(oneClickBranch()).toContain('text.rich("verify.attested", { tag: initialTag }');
+    expect(oneClickBranch()).toContain('text.rich("verify.attested", { tag: visibleText(initialTag) }');
     expect(frProfile.verify.attested).toContain("<strong>{tag}</strong>");
   });
 

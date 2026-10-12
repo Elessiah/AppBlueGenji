@@ -227,6 +227,12 @@ describe("revue UI/UX, quatrième passe", () => {
     expect(view).toContain('<TeamLink teamId={target.id}>{label}</TeamLink>');
   });
 
+  it("invitations du profil : le nom affiché est celui du nom accessible des boutons (visibleText, revue de sécurité du lot 9-2)", () => {
+    const page = source("app/(secured)/profil/page.tsx");
+    expect(page).toContain("<TeamLink teamId={inv.teamId}>{visibleText(inv.teamName)}</TeamLink>");
+    expect(page).not.toContain("{inv.teamName}</TeamLink>");
+  });
+
   it("date d'un signalement à contester : français inchangé, mois nommé en anglais", () => {
     const dialog = source("components/reports/ReportProblemDialog.tsx");
     expect(dialog).toContain("date: contestOptionDate(option.createdAt, text.locale),");

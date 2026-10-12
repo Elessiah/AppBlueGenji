@@ -453,6 +453,16 @@ describe("anglais — écrans", () => {
       expectEnglish(html);
     }
     expect(inEnglish(<ConnectedAppsSection connections={null} reload={async () => undefined} />)).toContain("Loading…");
+    // Pseudo du fournisseur et pseudo vu par le bot, nettoyés (commande de direction, largeur nulle) : revue de sécurité du lot 9-2.
+    const trapped = inEnglish(
+      <ConnectedAppsSection
+        connections={[connection("GOOGLE", { linked: true }), connection("DISCORD", { linked: true, method: "OAUTH", handle: "no‮va​" }), connection("BLIZZARD", { linked: true, handle: "‮Nova#1234" })]}
+        reload={async () => undefined}
+      />,
+    );
+    expect(trapped).not.toMatch(/[‮​]/u);
+    expect(trapped).toContain("nova");
+    expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "kery‮an", refusalCode: null }).note).not.toMatch(/‮/u);
     const linkHtml = inEnglish(<ConnectedAppsSection connections={CONNECTION_SETS[0]} reload={async () => undefined} />);
     // Le rattachement emporte la langue : retour sur `/en/profil`.
     expect(linkHtml).toContain("/api/auth/google/start?lang=en&amp;intent=link");
