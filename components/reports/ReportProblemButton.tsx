@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType, type CSSProperties } from "react";
+import { useState, type ComponentType } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
@@ -9,6 +9,7 @@ import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import { isChunkLoadError } from "@/lib/shared/lazy-component";
 import type { ReportProblemDialogProps } from "./ReportProblemDialog";
+import s from "./ReportProblemButton.module.css";
 
 /**
  * Le formulaire, chargé **au clic** (lot 9-2) : le bouton est au pied de chaque
@@ -18,7 +19,8 @@ import type { ReportProblemDialogProps } from "./ReportProblemDialog";
  * Chargement à la main plutôt que `next/dynamic` : un échec ne doit pas rester
  * en mémoire sous la forme d'un composant vide (le bouton ne ferait plus rien).
  * Le morceau part dès le survol ou le focus du bouton ; le bouton se dit occupé
- * (`aria-busy`, « … », région d'état) tant qu'il n'est pas arrivé ; un échec
+ * (`aria-busy`, couleurs, région d'état — libellé inchangé) tant qu'il n'est
+ * pas arrivé ; un échec
  * le dit (toast) et se retente au clic suivant. Un morceau disparu (déploiement
  * entre la page et le clic) invite à recharger la page, sans la recharger
  * d'office : une saisie en cours ailleurs sur la page serait perdue.
@@ -41,7 +43,6 @@ function loadDialog(): Promise<Dialog> {
 const preloadDialog = () => {
   loadDialog().catch(() => undefined);
 };
-const BUSY_STYLE: CSSProperties = { cursor: "progress" };
 
 interface ReportProblemButtonProps {
   /** Visiteur connecté : il peut désigner des cibles par leur nom. */
@@ -119,30 +120,25 @@ export function ReportProblemButton({
   };
   const triggerProps = {
     type: "button" as const,
-    className,
+    className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,
     onClick: openDialog,
     onPointerEnter: preloadDialog,
     onFocus: preloadDialog,
     "aria-haspopup": "dialog" as const,
     "aria-busy": pending || undefined,
-    style: pending ? BUSY_STYLE : undefined,
   };
-  // Le chargement se voit (le libellé devient « Ouverture du formulaire… ») et
-  // s'annonce (région d'état, toujours présente pour qu'un lecteur d'écran lise
-  // son changement).
-  const visibleLabel = pending ? t("footer.reportLoading") : label;
 
   return (
     <>
       {cyber ? (
         <CyberButton variant="ghost" {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
-          {visibleLabel}
+          {label}
         </CyberButton>
       ) : (
         <button {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
-          {visibleLabel}
+          {label}
         </button>
       )}
       <output className="sr-only">{status}</output>

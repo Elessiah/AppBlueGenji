@@ -218,7 +218,6 @@ function ConnectionRow({
 }>): React.ReactElement {
   const text = useProfileText();
   const { t } = text;
-  // Langue scellée dans l'aller-retour : le retour se fait sur `/en/profil`.
   // La langue du texte posé : une seule source pour la ligne et son aller-retour OAuth.
   const locale = text.locale;
   // Discord a deux lignes pour une seule identité : la ligne du bouton

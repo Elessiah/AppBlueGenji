@@ -1,0 +1,13 @@
+/*
+ * Bouton « Signaler un problème » pendant le chargement du formulaire : le
+ * libellé ne change pas (pas de saut de largeur dans le pied de page) ; l'état
+ * se dit par les couleurs (jamais `opacity`) et sans effet de survol, l'annonce
+ * passe par la région d'état du bouton.
+ */
+.pending[aria-busy="true"],
+.pending[aria-busy="true"]:hover {
+  cursor: progress;
+  color: var(--ink-mute);
+  transform: none;
+  box-shadow: none;
+}
