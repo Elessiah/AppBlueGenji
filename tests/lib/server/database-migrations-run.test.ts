@@ -95,6 +95,7 @@ function healthyRules(): Rule[] {
   return [
     { match: /^SELECT DELETE_RULE/, reply: () => [[{ deleteRule: "SET NULL" }], undefined] },
     { match: /^ALTER TABLE bg_matches ADD COLUMN launched_at/, reply: () => { throw mysqlError("ER_DUP_FIELDNAME"); } },
+    { match: /^ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit/, reply: () => { throw mysqlError("ER_DUP_FIELDNAME"); } },
     { match: /^SELECT COLUMN_DEFAULT/, reply: () => [[{ columnDefault: "0" }], undefined] },
     { match: /DROP COLUMN/, reply: () => { throw mysqlError("ER_CANT_DROP_FIELD_OR_KEY"); } },
     { match: /^UPDATE bg_site_visits SET authenticated/, reply: () => { throw mysqlError("ER_BAD_FIELD_ERROR"); } },
@@ -396,6 +397,40 @@ describe("backfillLaunchedAt", () => {
     await getDatabase();
 
     expect(errors()).toContain("ADD COLUMN launched_at DATETIME NULL AFTER lobby_opened_at");
+  });
+});
+
+describe("addEnduranceEarlyExit", () => {
+  const ADD = /^ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit/;
+  const FILL = /^UPDATE bg_tournaments SET endurance_early_exit = 1/;
+
+  it("garde la sortie anticipée des tournois BG Survie plafonnés existants, une fois, quand la colonne vient d'être ajoutée", async () => {
+    on(ADD, () => OK);
+
+    await getDatabase();
+
+    const fill = issued[rank(FILL)];
+    expect(rank(FILL)).toBeGreaterThan(rank(ADD));
+    expect(fill).toContain("format = 'BG_SURVIE'");
+    expect(fill).toContain("endurance_max_rounds IS NOT NULL");
+  });
+
+  it("ne remplit rien quand la colonne existe déjà (un tournoi décoché depuis le reste)", async () => {
+    fail(ADD, "ER_DUP_FIELDNAME");
+
+    await getDatabase();
+
+    expect(count(FILL)).toBe(0);
+    expect(errors()).not.toContain("endurance_early_exit");
+  });
+
+  it("dit l'échec du remplissage sous le nom de l'ALTER", async () => {
+    on(ADD, () => OK);
+    fail(FILL, "ER_LOCK_WAIT_TIMEOUT");
+
+    await getDatabase();
+
+    expect(errors()).toContain("ADD COLUMN endurance_early_exit TINYINT(1) NOT NULL DEFAULT 0");
   });
 });
 

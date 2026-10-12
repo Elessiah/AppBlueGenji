@@ -461,7 +461,8 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     expect(en).toContain("Early “out of contention” exit");
     // Utilisable par défaut (plafond et format de match posés) : pas grisée.
     expect(fr).not.toMatch(/id="endurance-early-exit" type="checkbox" disabled/);
-    expect(en).toContain("Unticked (default), every team plays until the end of the stage.");
+    expect(en).toContain("Unticked (default), no team is dropped in advance: only a pool at zero or the last-round cut takes a team out.");
+    expect(fr).toContain("Décochée (par défaut), personne n&#x27;est écarté d&#x27;avance : seuls un capital à zéro et le trait de la dernière manche font sortir.");
     expectNoFrench(en);
   });
 

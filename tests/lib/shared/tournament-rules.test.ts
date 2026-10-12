@@ -125,11 +125,17 @@ describe("tournament-rules — Survie par coupes et BlueGenji Survie", () => {
     const fr = endOfQualifier(frRules);
     expect(fr).toContain("sortie anticipée « hors course »");
     expect(fr).toContain("option décochée par défaut");
-    expect(fr).toContain("toutes jouent jusqu'à la dernière manche");
+    // Décochée, personne n'est écarté d'avance — mais le capital à zéro et le
+    // trait final font toujours sortir : « toutes jouent jusqu'au bout » serait faux.
+    expect(fr).toContain("personne n'est écarté d'avance : seuls un capital à zéro et le trait de la dernière manche font sortir");
+    expect(fr).toContain("Dans ce cas, le calcul est prudent");
+    expect(fr).not.toContain("toutes jouent jusqu'à la dernière manche");
     const en = endOfQualifier(enRules);
     expect(en).toContain("early “out of contention” exit");
     expect(en).toContain("off by default");
-    expect(en).toContain("every team plays until the last round");
+    expect(en).toContain("no team is dropped in advance: only a pool at zero or the last-round cut takes a team out");
+    expect(en).toContain("In that case, the math is cautious");
+    expect(en).not.toContain("every team plays until the last round");
   });
 });
 
