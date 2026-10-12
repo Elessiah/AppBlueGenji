@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Image from "next/image";
 import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
@@ -30,7 +31,7 @@ import s from "./TeamCard.module.css";
  * `TeamListItem.logoUrl` voyageait bien de `listTeams` jusqu'ici, mais aucun
  * rendu ne le lisait — le logo n'apparaissait donc que sur `/equipes/[id]`.
  */
-export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
+function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
   const text = useTeamsText();
   const { t } = text;
   const color = getPaletteColor(team.id);
@@ -151,30 +152,33 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
 
       <div className={s.roster}>
         <span className={s.rosterLbl}>{t("card.roster")}</span>
-        {team.rosterPreview.slice(0, 5).map((m) => (
-          <PlayerLink
-            key={m.userId}
-            userId={m.userId}
-            className={s.rosterItem}
-            // Lien-avatar sans texte : la marche peinte sur le texte effacerait
-            // l'initiale de repli. Le nom de l'équipe, au-dessus, la porte déjà.
-            podiumTier={null}
-            title={t("card.viewProfile", { name: m.pseudo })}
-            aria-label={t("card.viewProfile", { name: m.pseudo })}
-          >
-            {m.avatarUrl ? (
-              <Image
-                src={m.avatarUrl}
-                alt=""
-                width={26}
-                height={26}
-                className={s.avatar}
-              />
-            ) : (
-              <span className={s.avatar}>{m.pseudo[0].toUpperCase()}</span>
-            )}
-          </PlayerLink>
-        ))}
+        {team.rosterPreview.slice(0, 5).map((m) => {
+          const viewProfile = t("card.viewProfile", { name: m.pseudo });
+          return (
+            <PlayerLink
+              key={m.userId}
+              userId={m.userId}
+              className={s.rosterItem}
+              // Lien-avatar sans texte : la marche peinte sur le texte effacerait
+              // l'initiale de repli. Le nom de l'équipe, au-dessus, la porte déjà.
+              podiumTier={null}
+              title={viewProfile}
+              aria-label={viewProfile}
+            >
+              {m.avatarUrl ? (
+                <Image
+                  src={m.avatarUrl}
+                  alt=""
+                  width={26}
+                  height={26}
+                  className={s.avatar}
+                />
+              ) : (
+                <span className={s.avatar}>{m.pseudo[0].toUpperCase()}</span>
+              )}
+            </PlayerLink>
+          );
+        })}
         {team.rosterPreview.length > 5 && (
           <span className={`${s.rosterItem} ${s.avatar} ${s.avatarMore}`}>
             +{team.rosterPreview.length - 5}
@@ -203,3 +207,10 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
     </article>
   );
 }
+
+/**
+ * Mémoïsée : la grille se rend à chaque frappe (recherche différée) et chaque
+ * carte formate une trentaine de messages ; l'équipe vient de l'état, même
+ * référence d'un rendu à l'autre.
+ */
+export const TeamCard = memo(TeamCardView);

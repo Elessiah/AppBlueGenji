@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Image from "next/image";
 import { PlayerPodiumName } from "@/components/podium-tiers";
 import { UserX } from "lucide-react";
@@ -30,7 +31,7 @@ function cardRoleLabel(text: PlayersText, role: string): string {
  * transparente posée par-dessus (`.cardOverlay`), que le lien d'équipe traverse
  * en repassant au-dessus d'elle (`.aboveOverlay`).
  */
-export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) {
+function PlayerCardView({ player }: Readonly<{ player: PublicUserProfile }>) {
   const text = usePlayersText();
   const { t } = text;
   // Le statut d'un compte sans équipe est une **invitation à recruter** —
@@ -40,8 +41,9 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
   // « Compte supprimé », il envoyait le recruteur vers un refus. Le roster,
   // lui, se garde : l'anonymisation retire l'identité, pas l'appartenance —
   // c'est un fait, pas une offre.
+  const rosterStatus = playerRosterStatus(player);
   const noTeamStatus = player.isDeleted ? null : (
-    <span className={s.plNoTeam}>{t(`card.rosterStatus.${playerRosterStatus(player)}`)}</span>
+    <span className={s.plNoTeam}>{t(`card.rosterStatus.${rosterStatus}`)}</span>
   );
   const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
@@ -87,7 +89,7 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
           {/* Le statut est demandé **une fois** : brancher ici sur `player.team`
               et là sur le statut partagé remettrait la règle à deux endroits,
               ce que le module existe justement pour éviter. */}
-          {playerRosterStatus(player) === "ROSTER" && player.team ? (
+          {rosterStatus === "ROSTER" && player.team ? (
             <>
               {t("card.rosterStatus.ROSTER")} ·{" "}
               {/* Carte d'un compte supprimé : ligne d'équipe en retrait, sans marche. */}
@@ -141,3 +143,6 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
     </article>
   );
 }
+
+/** Mémoïsée, comme `TeamCard` : le joueur vient de l'état, même référence d'un rendu à l'autre. */
+export const PlayerCard = memo(PlayerCardView);
