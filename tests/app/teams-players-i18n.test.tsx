@@ -461,9 +461,12 @@ describe("anglais", () => {
     expectEnglish(html);
   });
 
-  it("frontière de chargement de l'espace connecté", () => {
-    expect(inEnglish(<SecuredLoading />)).toContain("Loading…");
-    expect(renderToStaticMarkup(<SecuredLoading />)).toContain("Chargement…");
+  it("frontière de chargement de l'espace connecté : le libellé lu sur le serveur", async () => {
+    mockLocale = "en";
+    expect(renderToStaticMarkup(await SecuredLoading())).toContain("Loading…");
+    mockLocale = "fr";
+    expect(renderToStaticMarkup(await SecuredLoading())).toContain("Chargement…");
+    mockLocale = "en";
   });
 });
 
