@@ -467,6 +467,18 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   dossier (`minimatch` y lit une classe de caractères) — la règle des textes en dur ne s'y applique
   pas. Ce lot écrit `[[]id]` ; la correction des lots 8 est laissée à part.
 
+### Ce que le lot 9-2 a établi (2026-10-12) — écarts au plan
+
+- **Empilé sur 9-1** (fournisseur générique, table des refus d'équipe). `/profil` et
+  `/signalements/[id]` ouverts sous `/en` ; formulaire « Signaler un problème », modale de
+  recadrage et réglage des notifications traduits partout (ils suivent la page). Détail :
+  `I18N.md` § Profil, signalements, fenêtres communes.
+- **Formulaire de signalement chargé au clic** : il porte ses deux langues ; importé par le
+  bouton du pied de page, il aurait alourdi le premier chargement de tout le site.
+- **Seul changement serveur** : un rattachement d'application parti de `/en/profil` y revient
+  (langue déjà scellée dans l'état OAuth depuis le lot 6).
+- **Langue du compte** et notifications push par langue : lot 9-3.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -505,7 +517,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 7b ✅ (7b-1, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a ✅ (8a-1, 8a-2) | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b ✅ (8b-1, 8b-2) | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
-| 9 (9-1 ✅, 9-2, 9-3) | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
+| 9 (9-1 ✅, 9-2 ✅, 9-3) | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
 | ~~10~~ | ~~Admin~~ | **Abandonné** : l'admin reste en français (D4) | — | — | — |
 
 **Ordre** : 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7a/7b (en parallèle possible) → 8a → 8b → 9. Les lots
