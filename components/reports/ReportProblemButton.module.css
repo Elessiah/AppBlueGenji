@@ -12,7 +12,6 @@
   opacity: 1;
   cursor: progress;
   color: var(--ink-mute);
-  background: transparent;
   transform: none;
   box-shadow: none;
 }
