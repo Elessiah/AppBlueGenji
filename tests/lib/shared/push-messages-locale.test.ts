@@ -128,7 +128,6 @@ describe("notifications push — anglais", () => {
   it("mène aux pages anglaises, sauf le panneau du staff resté français (D4)", () => {
     for (const [name, content] of Object.entries(en)) {
       if (name.startsWith("staffReport.")) expect(content.url).toBe("/admin/signalements");
-      else if (name === "refereeAlert.url") expect(content.url).toBe("https://site.test/tournois/7#match-31");
       else expect({ name, url: content.url.startsWith("/en/") }).toEqual({ name, url: true });
     }
   });
@@ -180,5 +179,11 @@ describe("notifications push — anglais", () => {
     expect(en["refereeAlert.url"].body).toBe("A score conflict is waiting for a referee.");
     expect(en["refereeAlert.nourl"].body).toBe("A score has been waiting too long for confirmation: a referee needs to decide.");
     expect(refereeAlertPush(REFEREE_LINE, "k", "en").body).toBe("An alert is waiting for a referee.");
+  });
+
+  it("mène l'arbitre anglais à la page anglaise du tournoi, l'URL absolue du texte Discord ramenée à son chemin", () => {
+    expect(en["refereeAlert.url"].url).toBe("/en/tournois/7#match-31");
+    expect(en["refereeAlert.nourl"].url).toBe("/en/tournois");
+    expect(fr["refereeAlert.url"].url).toBe("https://site.test/tournois/7#match-31");
   });
 });

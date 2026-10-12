@@ -432,7 +432,8 @@ describe("langue du compte (lot 9-3)", () => {
   it("en anglais : libellé, règle dite, chaque langue nommée dans sa langue", () => {
     const html = inEnglish(<AccountLocaleField initial="en" />);
     expect(html).toContain(">Notification language</label>");
-    expect(html).toContain("It follows the page&#x27;s language at every login");
+    expect(html).toContain("It follows the page&#x27;s language each time you log in");
+    expect(html).toContain("until you next log in from a page in the other language");
     expect(html).toContain('<option value="fr" lang="fr">Français</option>');
     expect(html).toContain('<option value="en" lang="en" selected="">English</option>');
     expect(html).toContain('aria-describedby="profile-account-locale-hint"');
@@ -455,6 +456,27 @@ describe("langue du compte (lot 9-3)", () => {
     const html = renderToStaticMarkup(<AccountLocaleField initial="fr" />);
     expect(html).not.toContain("aria-busy");
     expect(html).not.toContain("disabled");
+  });
+
+  it("pendant l'envoi : apparence d'un champ désactivé, sans perdre le focus", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
+    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\] \{\s*opacity: 0\.6;\s*cursor: progress;/);
+    // Le commentaire de `.hint` reste collé à sa règle.
+    expect(css).toMatch(/12 px et `--ink-soft`[^*]*avant\. \*\/\s*\.hint \{/);
+  });
+
+  it("une langue refusée : phrase dans la langue de la page, rattachée au champ", async () => {
+    expect(profileErrorMessage("INVALID_LOCALE", EN_PROFILE)).toBe("The language sent is invalid. Reload the page, then try again.");
+    expect(profileErrorMessage("INVALID_LOCALE")).toBe("La langue envoyée est invalide. Recharge la page puis réessaie.");
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const field = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/AccountLocaleField.tsx"), "utf8");
+    expect(field).toContain('{ INVALID_LOCALE: "locale" }');
+    expect(field).toContain("fieldErrors.report(code, message);");
+    expect(field).toContain('{...fieldErrors.aria("locale", HINT_ID)}');
+    expect(field).toContain('<FieldErrorText fieldId={FIELD_ID} message={fieldErrors.message("locale")} />');
   });
 
   it("en français : libellé et règle", () => {
