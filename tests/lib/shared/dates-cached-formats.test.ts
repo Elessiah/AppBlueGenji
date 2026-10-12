@@ -117,3 +117,16 @@ describe("modules légers", () => {
     expect(code).toMatch(/from "[^"]*intl-cache"/);
   });
 });
+
+describe("date invalide : le repli de toLocale*String, jamais une exception", () => {
+  it.each(LOCALES)("%s", (locale) => {
+    for (const bad of ["", "pas une date", new Date(Number.NaN)]) {
+      expect(formatLocalDate(bad, locale)).toBe(new Date(bad).toLocaleDateString(INTL_LOCALE[locale]));
+      expect(formatLocalDateTime(bad, locale)).toBe(new Date(bad).toLocaleString(INTL_LOCALE[locale]));
+      expect(formatMonthYear(bad, locale)).toBe(
+        new Date(bad).toLocaleDateString(INTL_LOCALE[locale], { month: "short", year: "numeric" }),
+      );
+      expect(formatLocalDate(bad, locale)).toBe("Invalid Date");
+    }
+  });
+});
