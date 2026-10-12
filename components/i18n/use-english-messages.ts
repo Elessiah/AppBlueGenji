@@ -20,20 +20,39 @@ import { inBrowser } from "./english-loaders";
  * Rien n'est rechargé pour un écran déjà affiché en français : une bascule en
  * cours de saisie la perdrait.
  */
+export type EnglishMessagesState<T> = { english: T | null; failed: boolean; waiting: boolean };
+
 export function useEnglishMessages<T>(
   locale: Locale,
   loader: Pick<OnceLoader<T>, "load" | "loaded">,
   provided: T | undefined,
-  /** `"remount"` : un échec vaut jusqu'au prochain montage (fenêtre rouverte), pas à la navigation suivante. */
-  retry: "navigation" | "remount" = "navigation",
-): { english: T | null; failed: boolean; waiting: boolean } {
+): EnglishMessagesState<T> {
+  // L'adresse où le chargement a échoué : l'échec ne vaut que pour elle.
+  return useEnglishMessagesIn(locale, loader, provided, usePathname());
+}
+
+/**
+ * Variante dont un échec vaut **jusqu'au prochain montage** (fenêtre de
+ * lancement rouverte), pas à la navigation suivante — sans abonnement au
+ * chemin : rien n'est rendu à chaque changement de page.
+ */
+export function useEnglishMessagesUntilRemount<T>(
+  locale: Locale,
+  loader: Pick<OnceLoader<T>, "load" | "loaded">,
+): EnglishMessagesState<T> {
+  return useEnglishMessagesIn(locale, loader, undefined, "");
+}
+
+function useEnglishMessagesIn<T>(
+  locale: Locale,
+  loader: Pick<OnceLoader<T>, "load" | "loaded">,
+  provided: T | undefined,
+  scope: string | null,
+): EnglishMessagesState<T> {
   const [english, setEnglish] = useState<T | null>(() => {
     if (locale !== "en") return null;
     return provided ?? (inBrowser() ? loader.loaded() : null);
   });
-  // L'adresse où le chargement a échoué : l'échec ne vaut que pour elle.
-  const pathname = usePathname();
-  const scope = retry === "remount" ? "" : pathname;
   const [failedAt, setFailedAt] = useState<string | null | undefined>(undefined);
   const failed = failedAt !== undefined && failedAt === scope;
   const waiting = locale === "en" && !english && !failed;

@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { PushTextProvider } from "@/components/notifications/push-text-provider";
 import { englishPush } from "@/components/i18n/english-loaders-account";
-import { useEnglishMessages } from "@/components/i18n/use-english-messages";
+import { useEnglishMessagesUntilRemount } from "@/components/i18n/use-english-messages";
 import { quietPreload } from "@/lib/shared/lazy-component";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
@@ -486,7 +486,7 @@ export function MatchLaunchCenter({
  * sans rien déplacer de ce qui se lit au-dessus.
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
-  const { english } = useEnglishMessages(locale, englishPush, undefined, "remount");
+  const { english } = useEnglishMessagesUntilRemount(locale, englishPush);
   // Pas d'écran d'attente ici : rien tant que l'anglais manque (attente ou échec).
   if (locale === "en" && !english) return null;
   return (
