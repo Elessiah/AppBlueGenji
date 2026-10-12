@@ -80,8 +80,66 @@ describe("bouton du formulaire de signalement", () => {
     expect(button).toContain("onPointerEnter: preloadDialog");
     expect(button).toContain("onFocus: preloadDialog");
     expect(button).toContain('"aria-busy": pending || undefined');
-    // Un seul chargement partagé, retenté après un échec.
-    expect(button).toContain("dialogLoad ??= loadDialogModule()");
+    // Un seul chargement partagé, retenté après un échec, qui le dit.
+    expect(button).toContain("dialogLoad ??= import(");
     expect(button).toContain("dialogLoad = null;");
+    expect(button).toContain('toast?.showError(t("footer.reportLoadFailed"))');
+    expect(button).not.toContain('from "next/dynamic"');
+  });
+});
+
+describe("revue UI/UX, deuxième passe", () => {
+  it("compteur de caractères manquants accordé au singulier", async () => {
+    const { reportsText } = await import("@/components/reports/reports-text");
+    expect(reportsText("fr").t("dialog.tooShort", { count: 1 })).toBe("Encore 1 caractère au moins.");
+    expect(reportsText("fr").t("dialog.tooShort", { count: 4 })).toBe("Encore 4 caractères au moins.");
+    expect(reportsText("en").t("dialog.tooShort", { count: 1 })).toBe("At least 1 more character.");
+    expect(reportsText("en").t("dialog.tooShort", { count: 4 })).toBe("At least 4 more characters.");
+  });
+
+  it("lien d'invitation Discord : nouvel onglet annoncé aux lecteurs d'écran", () => {
+    for (const dialog of ["DiscordBotHandleDialog", "DiscordVerificationDialog"]) {
+      const text = source(`app/(secured)/profil/${dialog}.tsx`);
+      expect(text).toMatch(/target="_blank"[\s\S]{0,600}<span className="sr-only">\{t\("verify\.newTab"\)\}<\/span>/);
+    }
+  });
+
+  it("dates d'une image : heure de Paris, langue de la page, une seule fonction", async () => {
+    const { formatQuarantineDate } = await import("@/lib/shared/logo-quarantine");
+    // 23 h 30 UTC le 31 décembre = 1er janvier à Paris, quel que soit le fuseau du lecteur.
+    const date = new Date("2026-12-31T23:30:00Z");
+    expect(formatQuarantineDate(date)).toBe("1 janvier 2027");
+    expect(formatQuarantineDate(date, "en-US")).toBe("January 1, 2027");
+    const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
+    expect(view).not.toContain("formatPurgeDate");
+    expect(view).not.toMatch(/formatDate\(quarantine\./);
+  });
+
+  it("identifiant d'un fournisseur : le registre décide, chaque libellé est traduit", async () => {
+    const { OAUTH_PROVIDER_HANDLE_LABELS } = await import("@/lib/shared/oauth-providers");
+    const enProfile = (await import("@/messages/en/profile.json")).default;
+    const frProfile = (await import("@/messages/fr/profile.json")).default;
+    const withHandle = Object.entries(OAUTH_PROVIDER_HANDLE_LABELS)
+      .filter(([, label]) => label !== null)
+      .map(([provider]) => provider)
+      .sort((a, b) => a.localeCompare(b));
+    expect(Object.keys(enProfile.connections.handleLabels).sort((a, b) => a.localeCompare(b))).toEqual(withHandle);
+    expect(Object.keys(frProfile.connections.handleLabels).sort((a, b) => a.localeCompare(b))).toEqual(withHandle);
+    expect(source("app/(secured)/profil/ConnectedAppsSection.tsx")).not.toContain('provider !== "GOOGLE"');
+  });
+
+  it("ligne du bot : chaque cas traduit depuis son code, sans redécider", async () => {
+    const { discordBotRowText, FR_PROFILE } = await import("@/app/(secured)/profil/_lib/profile-text");
+    const { scopedText } = await import("@/lib/shared/scoped-text");
+    const enProfile = (await import("@/messages/en/profile.json")).default;
+    const en = scopedText("en", enProfile);
+    const codes = ["HANDLE", "LINKED_BY_CODE", "LINKED_BY_BUTTON", "LINKED_ELSEWHERE", "NOT_LINKED"] as const;
+    const notes = codes.map((noteCode) => discordBotRowText(en, { noteCode, handle: "gamer", refusal: null }).note);
+    expect(new Set(notes).size).toBe(codes.length);
+    expect(notes[0]).toContain("gamer");
+    expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "gamer", refusal: "x" }).refusal).toBe(
+      FR_PROFILE.t("connections.bot.lastConnection"),
+    );
+    expect(source("app/(secured)/profil/_lib/profile-text.ts")).not.toContain("checkConnectionUnlink");
   });
 });

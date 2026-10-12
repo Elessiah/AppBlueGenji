@@ -45,7 +45,7 @@ jest.mock("@/components/notifications/usePushNotifications", () => ({ usePushNot
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
 import ProfileLayout, { generateMetadata as profileMetadata } from "@/app/(secured)/profil/layout";
-import { generateMetadata as reportsMetadata } from "@/app/(secured)/signalements/layout";
+import { generateMetadata as reportMetadata } from "@/app/(secured)/signalements/[id]/layout";
 import ProfilePage from "@/app/(secured)/profil/page";
 import { ProfileSection } from "@/app/(secured)/profil/_components/ProfileSection";
 import { ConnectedAppsSection } from "@/app/(secured)/profil/ConnectedAppsSection";
@@ -214,10 +214,18 @@ describe("liste blanche et métadonnées", () => {
     const en = await profileMetadata();
     expect(en.title).toEqual(expect.objectContaining({ default: "My profile" }));
     expect(en.alternates).toEqual({ canonical: "/en/profil", languages: { fr: "/profil", en: "/en/profil", "x-default": "/profil" } });
-    expect((await reportsMetadata()).title).toEqual(expect.objectContaining({ default: "Report" }));
+    const report = await reportsMetadata("12");
+    expect(report.title).toEqual(expect.objectContaining({ default: "Report" }));
+    expect(report.alternates).toEqual({
+      canonical: "/en/signalements/12",
+      languages: { fr: "/signalements/12", en: "/en/signalements/12", "x-default": "/signalements/12" },
+    });
+    // Identifiant invalide : le titre seul, aucune adresse inventée.
+    expect((await reportsMetadata("abc")).alternates).toBeUndefined();
     mockLocale = "fr";
     expect((await profileMetadata()).title).toEqual(expect.objectContaining({ default: "Mon profil" }));
-    expect((await reportsMetadata()).title).toEqual(expect.objectContaining({ default: "Signalement" }));
+    expect((await reportsMetadata("12")).title).toEqual(expect.objectContaining({ default: "Signalement" }));
+    expect((await reportsMetadata("12")).alternates).toEqual(expect.objectContaining({ canonical: "/signalements/12" }));
   });
 
   it("la mise en page ne sérialise l'anglais que sous /en", async () => {
@@ -286,7 +294,7 @@ describe("français inchangé — profil", () => {
     for (const set of CONNECTION_SETS) {
       for (const item of set) expect(connectionMethodText(FR_PROFILE, item)).toBe(connectionMethodLabel(item));
       const row = discordBotRowState(set);
-      expect(discordBotRowText(FR_PROFILE, set)).toEqual({ note: row.note, refusal: row.refusal });
+      expect(discordBotRowText(FR_PROFILE, row)).toEqual({ note: row.note, refusal: row.refusal });
     }
   });
 });
@@ -501,6 +509,10 @@ describe("anglais — écrans", () => {
     expect(inEnglish(<PushNotificationsPanel />)).toContain("2 devices subscribed to your account");
   });
 });
+
+function reportsMetadata(id: string) {
+  return reportMetadata({ params: Promise.resolve({ id }) });
+}
 
 describe("équivalence avec next-intl, message par message", () => {
   function leaves(tree: object, prefix = ""): Array<{ key: string; source: string }> {
