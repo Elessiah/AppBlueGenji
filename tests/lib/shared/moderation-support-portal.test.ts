@@ -1,11 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
-  OFF_SITE_CONDUCT_ENTRY,
-  OFF_SITE_CONDUCT_NOTICE,
   REPORT_CATEGORIES,
 } from "@/lib/shared/content-reports";
-import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
+import { REPORT_CATEGORY_DEFINITIONS, OFF_SITE_CONDUCT_ENTRY, OFF_SITE_CONDUCT_NOTICE } from "@/lib/shared/content-report-categories";
 import { readSource } from "../../helpers/read-source";
 
 describe("renvoi de la modération hors site vers le portail de support", () => {
