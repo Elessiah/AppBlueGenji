@@ -159,7 +159,10 @@ describe("revue UI/UX, troisième passe", () => {
     // Libellé inchangé (pas de saut de largeur) ; l'attente se voit par la classe, s'annonce par la région.
     expect(button).not.toContain("visibleLabel");
     expect(button).toContain('className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,');
-    expect(source("components/reports/ReportProblemButton.module.css")).toContain("pointer-events: none;");
+    const pendingCss = source("components/reports/ReportProblemButton.module.css");
+    expect(pendingCss).toContain('.pending[aria-busy="true"]:hover');
+    expect(pendingCss).toContain("cursor: progress;");
+    expect(pendingCss).not.toContain("pointer-events");
     expect(button).toContain('setStatus(t("footer.reportLoading"));');
     // L'échec s'annonce aussi dans la région d'état (hors toast, il resterait muet).
     expect(button).toMatch(/if \(toast\) \{\s*setStatus\(""\);\s*toast\.showError\(message\);\s*\} else \{\s*setStatus\(message\);/);
@@ -195,11 +198,11 @@ describe("revue UI/UX, troisième passe", () => {
     expect(source("components/account-menu.tsx")).toContain("useLogout(() => setOpen(false))");
     const menu = source("components/use-logout.ts");
     // `leaving` ne retombe qu'après un échec, qui se dit.
-    expect(menu).toMatch(/if \(!\(await requestLogout\(\)\)\) \{\s*setLeaving\(false\);\s*showError\(t\("account\.logoutFailed"\)\);/);
+    expect(menu).toMatch(/if \(!\(await requestLogout\(\)\)\) \{\s*inFlight\.current = false;\s*setLeaving\(false\);\s*showError\(t\("account\.logoutFailed"\)\);/);
     // Le bouton du profil garde le focus pendant la requête.
     expect(button).toContain("aria-disabled={leaving || undefined}");
     expect(button).not.toMatch(/\sdisabled=\{leaving\}/);
-    expect(menu).toContain("if (leaving) return;");
+    expect(menu).toContain("if (inFlight.current) return;");
   });
 });
 
@@ -349,8 +352,8 @@ describe("revue UI/UX, neuvième passe", () => {
     const { verifiedBadgeLabels, FR_PROFILE } = await import("@/app/(secured)/profil/_lib/profile-text");
     expect(verifiedBadgeLabels(FR_PROFILE)).toEqual({ alt: FR_PROFILE.t("discord.verifiedAlt"), title: FR_PROFILE.t("discord.verifiedTitle") });
     expect(source("app/(secured)/profil/page.tsx")).toContain("<VerifiedBadge labels={verifiedBadgeLabels(text)} />");
-    // Le dialogue reprend le titre du badge ; son `alt` y est vide (douzième passe).
-    expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).toContain("title: verifiedBadgeLabels(text).title");
+    // Dans le titre du dialogue, le badge est décoratif (`alt` et `title` vides).
+    expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).not.toContain("verifiedBadgeLabels");
   });
 });
 
@@ -394,7 +397,7 @@ describe("revue UI/UX, douzième passe", () => {
     expect(dialog.match(/<CyberButton variant="ghost" type="button" aria-disabled=\{loading \|\| undefined\} onClick=\{cancel\}>/g)).toHaveLength(4);
     expect(dialog).toContain("if (!loading) onClose();");
     expect(dialog).not.toContain('type="button" onClick={onClose}>');
-    expect(dialog).toContain('<VerifiedBadge size={20} labels={{ alt: "", title: verifiedBadgeLabels(text).title }} />');
+    expect(dialog).toContain('<VerifiedBadge size={20} labels={{ alt: "", title: "" }} />');
   });
 
   it("liens juridiques du formulaire : nouvel onglet annoncé", () => {
@@ -429,8 +432,21 @@ describe("revue UI/UX, treizième passe", () => {
 });
 
 describe("revue UI/UX, quatorzième passe", () => {
-  it("« Déconnexion en cours… » : l'attente se lit, pas seulement trois points", async () => {
+  it("« Déconnexion » : libellé fixe, attente dite par aria-busy et les couleurs", async () => {
+    // Quinzième passe : libellé fixe sur le bouton du profil (pas de saut de largeur) ; le menu garde « Déconnexion… ».
     const frShell = (await import("@/messages/fr/shell.json")).default;
-    expect(frShell.account.loggingOut).toBe("Déconnexion en cours…");
+    expect(frShell.account.loggingOut).toBe("Déconnexion…");
+    expect(source("components/logout-button.tsx")).not.toContain("loggingOut");
+  });
+});
+
+describe("revue UI/UX, quinzième passe", () => {
+  it("dialogues Discord : plus aucun `disabled` pendant l'envoi, garde dans les gestionnaires", () => {
+    for (const dialog of ["DiscordVerificationDialog", "DiscordBotHandleDialog"]) {
+      const text = source(`app/(secured)/profil/${dialog}.tsx`);
+      expect(text).not.toContain("disabled={loading}");
+      expect(text.match(/if \(loading\) return;/g)).toHaveLength(2);
+      expect(text).toContain("aria-disabled={loading || undefined}");
+    }
   });
 });
