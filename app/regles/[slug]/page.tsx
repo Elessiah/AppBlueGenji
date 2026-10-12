@@ -26,10 +26,8 @@ import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
-import {
-  parseRulesTournamentParam,
-  type TournamentSettingsGroup,
-} from "@/lib/shared/tournament-settings";
+import { parseRulesTournamentParam } from "@/lib/shared/rules-tournament-link";
+import type { TournamentSettingsGroup } from "@/lib/shared/tournament-settings";
 import { localizedTournamentSettingsGroups } from "@/lib/shared/tournament-settings-text";
 import {
   RULES_PAGE_ANCHORS,

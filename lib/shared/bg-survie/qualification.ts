@@ -80,16 +80,19 @@ export function enduranceEliminationCut(
   remainingRounds: number,
   format: MatchFormat | null | undefined,
 ): number[] {
-  const active = rankActiveTeams(standings);
-
   // Plus de manche à jouer : la coupe est un simple trait sous la cible.
-  if (remainingRounds <= 0) return active.slice(config.playoffSize).map((s) => s.teamId);
+  if (remainingRounds <= 0) {
+    return rankActiveTeams(standings).slice(config.playoffSize).map((s) => s.teamId);
+  }
 
-  // Option décochée : personne n'est écarté avant la dernière manche.
+  // Option décochée (le défaut) : personne n'est écarté avant la dernière
+  // manche — sortie avant le tri, appelée à chaque manche close de chaque rejeu.
   if (!config.earlyExit) return [];
 
   const swing = enduranceRoundSwing(config, format);
   if (!swing) return [];
+
+  const active = rankActiveTeams(standings);
 
   const gain = swing.gain * remainingRounds;
   const loss = swing.loss * remainingRounds;
