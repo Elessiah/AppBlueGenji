@@ -18,6 +18,8 @@ import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
 import { onceLoader } from "@/lib/shared/lazy-component";
 import enReports from "@/messages/en/reports.json";
 import enPush from "@/messages/en/push.json";
+import FR_SHELL from "@/messages/fr/shell.json";
+import EN_SHELL from "@/messages/en/shell.json";
 
 const valueImports = (path: string) =>
   readSource(path)
@@ -48,6 +50,8 @@ describe("aucun anglais importé d'office", () => {
     expect(launch).toContain('if (locale !== "en" || english) return;');
     expect(launch).toContain('if (locale === "en" && !english) return null;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
+    // La documentation de la cadence reste collée à sa fonction.
+    expect(launch).toContain("/** Cadence de relève selon la phase la plus pressante de la liste. */\nfunction launchPollInterval(");
   });
 });
 
@@ -69,11 +73,16 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
     );
   });
 
-  it("la page d'un signalement charge le formulaire de contestation à l'ouverture", () => {
+  it("la page d'un signalement ouvre la contestation sans attente : formulaire importé avec elle", () => {
     const page = "app/(secured)/signalements/[id]/page.tsx";
-    expect(valueImports(page)).not.toContain("@/components/reports/ReportProblemDialog");
-    expect(dynamicImports(page)).toEqual(["@/components/reports/ReportProblemDialog"]);
-    expect(readSource(page)).toContain("{ ssr: false }");
+    expect(valueImports(page)).toContain("@/components/reports/ReportProblemDialog");
+    expect(dynamicImports(page)).toEqual([]);
+  });
+
+  it("un préchargement raté ne se relance pas à chaque survol ; le clic retente", () => {
+    expect(button).toContain("if (preloadFailed) return;");
+    expect(button).toMatch(/loadForm\(locale\)\.catch\(\(\) => \{\s*preloadFailed = true;/);
+    expect(button).toContain("loadForm(locale)\n      .then((loaded) => {");
   });
 
   it("la page d'un signalement : anglais sérialisé sous /en seulement", () => {
@@ -124,11 +133,33 @@ describe("modale de recadrage chargée à la demande", () => {
 
   it("le crochet ne charge la modale qu'à l'ouverture", () => {
     expect(dynamicImports("components/ui/image-crop-dialog.tsx")).toEqual(["./image-crop-dialog-view"]);
-    expect(hook).toContain("() => orReload(loadImageCropDialog()),");
     expect(hook).toContain('import type { ImageCropDialogProps } from "./image-crop-dialog-view";');
     expect(valueImports("components/ui/image-crop-dialog.tsx")).not.toContain("./image-crop-dialog-view");
-    expect(hook).toContain("{ ssr: false }");
-    expect(hook).toContain("orReload(");
+  });
+
+  it("un échec de chargement est dit, ne recharge jamais la page et ne reste pas en mémoire", () => {
+    // Pas de `next/dynamic` (il garderait un composant vide), pas d'`orReload` (il rechargerait un formulaire en cours).
+    expect(hook).not.toContain('from "next/dynamic"');
+    expect(valueImports("components/ui/image-crop-dialog.tsx")).not.toContain("next/dynamic");
+    expect(hook).not.toContain("orReload }");
+    expect(hook).not.toContain("orReload,");
+    expect(hook).toContain("await cropDialogLoader.load();");
+    expect(hook).toContain('showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));');
+    expect(hook).toMatch(/imageCropLoad\.failed"\)\);\s*return null;/);
+    expect(hook).toContain("const cropDialog = request && ImageCropDialog ? (");
+    // Le préchargement raté ne se relance pas à chaque clic.
+    expect(hook).toContain("if (preloadFailed) return;");
+  });
+
+  it("messages d'échec du recadrage dans les deux langues", () => {
+    expect(FR_SHELL.imageCropLoad).toEqual({
+      failed: "La fenêtre de recadrage n'a pas pu s'ouvrir. Réessaie dans un instant.",
+      reloading: "Le site vient d'être mis à jour : recharge la page pour recadrer ton image.",
+    });
+    expect(EN_SHELL.imageCropLoad).toEqual({
+      failed: "The crop window couldn't open. Try again in a moment.",
+      reloading: "The site has just been updated: reload the page to crop your image.",
+    });
   });
 
   it("chaque sélecteur de fichier précharge la modale pendant le choix du fichier", () => {
