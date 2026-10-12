@@ -28,7 +28,7 @@ import { formatMatchStart } from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
-import { DEFAULT_LOCALE, localeHref, type Locale } from "./locales";
+import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import type { PushContent } from "./push-notifications";
 
@@ -109,7 +109,7 @@ export function pushRoundLabel(bracket: string, roundNumber: number, locale: Loc
 function pushMatchStart(startAt: string | Date, locale: Locale): string {
   if (locale === "fr") return formatMatchStart(startAt);
   const date = startAt instanceof Date ? startAt : new Date(startAt);
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -261,42 +261,55 @@ export function privacyChangePush(titles: readonly string[], locale: Locale = DE
   };
 }
 
-/** Chemin d'une URL absolue (`https://hôte/x?y#z` → `/x?y#z`) ; un chemin reste tel quel. */
-function absoluteUrlPath(url: string): string {
-  if (url.startsWith("/")) return url;
-  try {
-    const parsed = new URL(url);
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return "/tournois";
-  }
-}
-
 /** Nature d'une alerte d'arbitrage, pour la rédiger sans le texte Discord (français, D6). */
 export type RefereeAlertKind = "score_conflict" | "score_report_stalled" | "other";
+
+/** La manche en cause, quand l'alerte en a une : de quoi la nommer et y mener. */
+export type RefereeAlertMatch = {
+  tournamentId: number;
+  tournamentName: string;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+};
 
 /**
  * Alerte d'arbitrage. En français, le texte Discord porte déjà l'essentiel en
  * une ligne : le push en reprend la phrase, sans la mise en forme Markdown
  * qu'une notification afficherait telle quelle. Dans une autre langue, ce
  * texte (français, D6) n'est pas repris : une phrase de la nature de l'alerte
- * le remplace, le détail restant sur Discord et sur la page du tournoi.
+ * le remplace, avec le tournoi et la manche quand l'alerte en a une — deux
+ * alertes de deux tournois ne se lisent pas pareil.
+ *
+ * Le lien mène à la manche (`match`) dans la langue du destinataire. Sans
+ * manche, le français garde la première URL de la ligne, comme avant ; une
+ * autre langue mène à la liste des tournois — une URL lue dans la ligne peut
+ * venir d'un nom d'équipe, et préfixer son chemin mènerait n'importe où.
  */
 export function refereeAlertPush(
   message: string,
   key: string,
   locale: Locale = DEFAULT_LOCALE,
   kind: RefereeAlertKind = "other",
+  match: RefereeAlertMatch | null = null,
 ): PushContent {
   const text = TEXT[locale];
-  // Le lien du tournoi est dans la ligne (URL absolue) : c'est là qu'on
-  // arbitre. `buildPushPayload` le ramène à un chemin du site. Dans une autre
-  // langue, il est ramené ici à son chemin pour recevoir le préfixe de langue.
-  const url = /https?:\/\/\S+/.exec(message)?.[0] ?? "/tournois";
+  let url: string;
+  if (match) url = localeHref(tournamentMatchHref(match.tournamentId, match.matchId), locale);
+  else if (locale === DEFAULT_LOCALE) url = /https?:\/\/\S+/.exec(message)?.[0] ?? "/tournois";
+  else url = localeHref("/tournois", locale);
+  let body: string;
+  if (locale === "fr") body = stripMarkdown(message);
+  else if (match) {
+    body = text.t(`refereeAlert.${kind}Match`, {
+      tournament: match.tournamentName,
+      round: pushRoundLabel(match.bracket, match.roundNumber, locale),
+    });
+  } else body = text.t(`refereeAlert.${kind}`);
   return {
     title: text.t("refereeAlert.title"),
-    body: locale === "fr" ? stripMarkdown(message) : text.t(`refereeAlert.${kind}`),
-    url: locale === DEFAULT_LOCALE ? url : localeHref(absoluteUrlPath(url), locale),
+    body,
+    url,
     // Une étiquette **par alerte** (nature et manche) : deux conflits d'un même
     // tournoi ne se remplacent pas, et une même alerte renvoyée après un échec
     // du bot remplace la précédente sans resonner.

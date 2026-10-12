@@ -5,12 +5,9 @@ import { useProfileText } from "@/components/i18n/profile-text";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { isLocale, LOCALES, type Locale } from "@/lib/shared/locales";
+import { isLocale, LOCALE_NATIVE_NAME, LOCALES, type Locale } from "@/lib/shared/locales";
 import { profileErrorMessage } from "../profile-errors";
 import s from "../profil.module.css";
-
-/** Nom de chaque langue **dans cette langue** : on reconnaît la sienne sans lire l'autre. */
-const LOCALE_AUTONYMS: Record<Locale, string> = { fr: "Français", en: "English" };
 
 const FIELD_ID = "profile-account-locale";
 const HINT_ID = "profile-account-locale-hint";
@@ -73,9 +70,10 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
         onChange={(e) => void save(e.target.value)}
         {...fieldErrors.aria("locale", HINT_ID)}
       >
+        {/* Chaque langue nommée dans sa langue : on reconnaît la sienne sans lire l'autre. */}
         {LOCALES.map((code) => (
           <option key={code} value={code} lang={code}>
-            {LOCALE_AUTONYMS[code]}
+            {LOCALE_NATIVE_NAME[code]}
           </option>
         ))}
       </select>
