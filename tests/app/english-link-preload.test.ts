@@ -281,6 +281,21 @@ describe("revue performance, trentième passe", () => {
   it("clic : rien pour un nouvel onglet ou un téléchargement", () => {
     const install = readSource("components/i18n/english-link-preload-install.ts");
     expect(install).toContain("if (click.button !== 0 || click.ctrlKey || click.metaKey || click.shiftKey || click.altKey) return;");
-    expect(install).toContain('if (link.hasAttribute("download") || (link.getAttribute("target") ?? "_self") !== "_self") return;');
+    expect(install).toContain('if (link.hasAttribute("download") || !opensHere(link)) return;');
+  });
+});
+
+describe("revue performance, trente et unième passe", () => {
+  it("annuaire des joueurs : la lecture ne repart pas sur un changement de texte", () => {
+    const list = readSource("app/(secured)/joueurs/PlayersList.tsx");
+    expect(list).toContain("  }, [showError]);");
+    expect(list).toContain("playerErrorMessage(textRef.current,");
+  });
+
+  it("écouteur : adresse résolue (même origine), cibles « cet onglet » normalisées", () => {
+    const install = readSource("components/i18n/english-link-preload-install.ts");
+    expect(install).toContain("if (link.origin !== window.location.origin) return;");
+    expect(install).toContain("const href = link.pathname;");
+    expect(install).toContain('const target = (link.getAttribute("target") ?? "").trim().toLowerCase();');
   });
 });
