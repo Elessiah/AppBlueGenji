@@ -137,16 +137,17 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
     expect(res.status).toBe(200);
     expect(verifyMock).toHaveBeenCalledWith(VICTIM_CHALLENGE, "424242");
     expect(createSessionMock).toHaveBeenCalledWith(42, "LOGIN_DISCORD_CODE");
-    // Sans langue envoyée : le français (lot 9-3).
-    expect(recordLoginLocale).toHaveBeenCalledWith(42, "fr");
+    // Sans langue envoyée (page d'avant le lot) : rien d'écrit, le compte garde la sienne (lot 9-3).
+    expect(recordLoginLocale).not.toHaveBeenCalled();
   });
 
-  it("retient la langue de la page de connexion, et le français pour une valeur inconnue (lot 9-3)", async () => {
+  it("retient la langue de la page de connexion, et n'écrit rien pour une valeur inconnue (lot 9-3)", async () => {
     verifyMock.mockResolvedValue({ discordId: VICTIM_DISCORD, handle: "keryan" });
     expect((await request({ challenge: VICTIM_CHALLENGE, code: "424242", locale: "en" })).status).toBe(200);
     expect(recordLoginLocale).toHaveBeenLastCalledWith(42, "en");
+    expect(recordLoginLocale).toHaveBeenCalledTimes(1);
     expect((await request({ challenge: VICTIM_CHALLENGE, code: "424242", locale: "de" })).status).toBe(200);
-    expect(recordLoginLocale).toHaveBeenLastCalledWith(42, "fr");
+    expect(recordLoginLocale).toHaveBeenCalledTimes(1);
   });
 
   it("ouvre le compte **du défi** et transmet le tag prouvé", async () => {

@@ -101,6 +101,11 @@ describe("buildPushPayload", () => {
     expect(payload.topic).toBe("MATCH_START");
   });
 
+  it("déclare la langue du texte, le français par défaut (lot 9-3)", () => {
+    expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "/" }).lang).toBe("fr");
+    expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "/" }, null, "en").lang).toBe("en");
+  });
+
   it("replie les espaces et retombe sur le nom du site sans titre", () => {
     const payload = buildPushPayload("MATCH_START", { title: "   ", body: "a\n\n b", url: "/", tag: "x" });
     expect(payload.title).toBe("BlueGenji Esport");

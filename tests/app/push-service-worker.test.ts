@@ -183,6 +183,16 @@ describe("service worker du site", () => {
     expect(options).toMatchObject({ body: "Déclare-toi prêt.", tag: "t", data: { url: "/tournois/4#match-9" } });
   });
 
+  it("déclare la langue de la charge, le français sans langue ou pour une valeur inconnue (lot 9-3)", async () => {
+    const worker = loadWorker();
+    worker.fire("push", { data: { json: () => ({ title: "Your match is starting", lang: "en" }) } });
+    worker.fire("push", { data: { json: () => ({ title: "Ton match commence" }) } });
+    worker.fire("push", { data: { json: () => ({ title: "x", lang: "<script>" }) } });
+    await Promise.all(worker.waited);
+    const calls = worker.showNotification.mock.calls as unknown as [string, { lang: string }][];
+    expect(calls.map(([, options]) => options.lang)).toEqual(["en", "fr", "fr"]);
+  });
+
   it("porte l'icône de l'app déclarée au manifeste", async () => {
     const { APP_ICONS } = await import("@/lib/shared/web-manifest");
     const worker = loadWorker();

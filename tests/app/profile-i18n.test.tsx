@@ -462,9 +462,15 @@ describe("langue du compte (lot 9-3)", () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
-    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\] \{\s*opacity: 0\.6;\s*cursor: progress;/);
-    // Le survol n'invite pas à un second choix ; le focus garde son anneau.
-    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\]\[aria-disabled="true"\]:hover:not\(:focus\) \{\s*border-color: var\(--line-strong\);/);
+    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\]\[aria-disabled="true"\] \{\s*cursor: progress;/);
+    // L'apparence désactivée et l'absence d'invitation au survol viennent de la règle globale du champ.
+    const globals = readFileSync(join(__dirname, "..", "..", "app/globals.css"), "utf8");
+    expect(globals).toContain('.field select:hover:not(:disabled):not([aria-disabled="true"]) {');
+    expect(globals).toMatch(/\.field select:disabled,\s*\.field select\[aria-disabled="true"\] \{\s*opacity: 0\.6;/);
+    // Une langue changée ailleurs (connexion dans un autre onglet) remonte le champ.
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
+      "<AccountLocaleField key={data.accountLocale} initial={data.accountLocale} />",
+    );
     // Le commentaire de `.hint` reste collé à sa règle.
     expect(css).toMatch(/12 px et `--ink-soft`[^*]*avant\. \*\/\s*\.hint \{/);
   });

@@ -118,7 +118,9 @@ describe("pushToUsers", () => {
 
     expect(query.mock.calls[0][0]).toMatch(/SELECT s\.id, s\.endpoint, s\.p256dh, s\.auth, u\.locale/);
     expect(content.mock.calls.map(([locale]) => locale).sort()).toEqual(["en", "fr"]);
-    const sent = jest.mocked(sendWebPush).mock.calls.map((call) => JSON.parse(call[2]) as { title: string; url: string });
+    const sent = jest
+      .mocked(sendWebPush)
+      .mock.calls.map((call) => JSON.parse(call[2]) as { title: string; url: string; lang: string });
     expect(sent.map((payload) => payload.title)).toEqual([
       "Your match is starting",
       "Ton match commence",
@@ -126,6 +128,8 @@ describe("pushToUsers", () => {
       "Ton match commence",
     ]);
     expect(sent[0].url).toBe("/en/tournois/4");
+    // La charge déclare sa langue : le service worker la donne à la notification.
+    expect(sent.map((payload) => payload.lang)).toEqual(["en", "fr", "en", "fr"]);
   });
 
   it("ne lève jamais : une panne rend zéro", async () => {

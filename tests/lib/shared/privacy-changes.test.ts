@@ -798,7 +798,7 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
     expect(text()).toMatch(/le temps du compte/);
     expect(text()).toMatch(/export de tes données/);
     expect(text()).toMatch(/revient au français si le compte est anonymisé/);
-    expect(text()).toMatch(/messages Discord, eux, restent français/);
+    expect(text()).toMatch(/messages Discord, eux, restent en français/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications"]);
   });
 
