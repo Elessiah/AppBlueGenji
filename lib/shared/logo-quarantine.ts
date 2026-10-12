@@ -137,10 +137,11 @@ export function canAutoPurgeLogo(input: {
 /**
  * Date lisible d'une échéance, **en heure de Paris** : le message part d'un
  * serveur pour des lecteurs dont on ne connaît pas le fuseau, il est rédigé une
- * fois pour tous.
+ * fois pour tous. En français par défaut (messages du serveur) ; un écran passe
+ * la langue de sa page (`INTL_LOCALE`), toujours en heure de Paris.
  */
-export function formatQuarantineDate(date: Date): string {
-  return date.toLocaleDateString("fr-FR", {
+export function formatQuarantineDate(date: Date, intlLocale = "fr-FR"): string {
+  return date.toLocaleDateString(intlLocale, {
     day: "numeric",
     month: "long",
     year: "numeric",

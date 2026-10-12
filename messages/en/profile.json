@@ -344,6 +344,7 @@
     "linkedNoTag": "Your account is linked to Discord, but no username provided by Discord is saved. Go through its authorization page, with the Discord account already linked: it will provide your username, which you can then verify here in one click. A username made only of digits can't be verified.",
     "continueWithDiscord": "Continue with Discord →",
     "tag": "Discord tag",
+    "newTab": " (new tab)",
     "tagPlaceholder": "your_username",
     "tagHelp": "The bot must share a server with you to find your account: <join>join the BlueGenji server</join> before verifying. You'll receive a six-digit code by direct message.",
     "code": "Code received by direct message",

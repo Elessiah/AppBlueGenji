@@ -344,6 +344,7 @@
     "linkedNoTag": "Ton compte est relié à Discord, mais aucun pseudo donné par Discord n'est enregistré. Passe par sa page d'autorisation, avec le compte Discord déjà relié : il nommera ton pseudo, que tu pourras ensuite certifier ici d'un clic. Un pseudo fait uniquement de chiffres n'est pas certifiable.",
     "continueWithDiscord": "Continuer avec Discord →",
     "tag": "Tag Discord",
+    "newTab": " (nouvel onglet)",
     "tagPlaceholder": "ton_pseudo",
     "tagHelp": "Le bot doit partager un serveur avec toi pour retrouver ton compte : <join>rejoins le serveur BlueGenji</join> avant de certifier. Tu recevras un code à six chiffres en message privé.",
     "code": "Code reçu en message privé",

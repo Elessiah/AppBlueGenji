@@ -11,7 +11,7 @@
     "portalLink": "BlueGenji support portal",
     "newTab": " (new tab)",
     "description": "Description",
-    "tooShort": "At least {count} more characters.",
+    "tooShort": "{count, plural, one {At least 1 more character.} other {At least {count} more characters.}}",
     "counter": "{length}/{max}",
     "consent": "I agree that the Bluegenji Esport association processes this data to follow up on my report, under the conditions above.",
     "cancel": "Cancel",

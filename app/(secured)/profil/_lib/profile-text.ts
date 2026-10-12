@@ -12,11 +12,11 @@
 import frProfile from "@/messages/fr/profile.json";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import type { ConfirmationSubject } from "@/lib/shared/account-deletion";
-import {
-  checkConnectionUnlink,
-  discordBotLinked,
-  type AccountConnection,
-  type ConnectionUnlinkRefusal,
+import type {
+  AccountConnection,
+  ConnectionUnlinkRefusal,
+  DiscordBotNoteCode,
+  DiscordBotRowState,
 } from "@/lib/shared/account-connections";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "@/lib/shared/oauth-providers";
@@ -117,26 +117,22 @@ export function connectionMethodText(text: ProfileText, connection: AccountConne
   return text.t(connection.method === "OAUTH" ? "connections.method.OAUTH" : "connections.method.DM_CODE");
 }
 
-/** Ce que la ligne du bot dit (`discordBotRowState().note` / `.refusal`), dans la langue du texte. */
+/** Ce que la ligne du bot dit, dans la langue du texte : la traduction des codes de `discordBotRowState`. */
 export function discordBotRowText(
   text: ProfileText,
-  connections: readonly AccountConnection[],
+  row: Pick<DiscordBotRowState, "noteCode" | "handle" | "refusal">,
 ): { note: string; refusal: string | null } {
   const { t } = text;
-  const discord = connections.find((connection) => connection.provider === "DISCORD");
-  const anyLinked = Boolean(discord?.linked);
-  const linked = discordBotLinked(discord);
-  const unlinkRefusal = linked ? checkConnectionUnlink(connections, "DISCORD") : null;
-  let note: string;
-  if (linked) {
-    note = discord?.handle ? t("connections.bot.handleNote", { handle: discord.handle }) : t("connections.bot.linkedByCode");
-  } else if (anyLinked) {
-    note = discord?.method === "OAUTH" ? t("connections.bot.linkedByButton") : t("connections.bot.linkedElsewhere");
-  } else {
-    note = t("connections.bot.notLinked");
-  }
+  const notes: Record<DiscordBotNoteCode, () => string> = {
+    HANDLE: () => t("connections.bot.handleNote", { handle: row.handle ?? "" }),
+    LINKED_BY_CODE: () => t("connections.bot.linkedByCode"),
+    LINKED_BY_BUTTON: () => t("connections.bot.linkedByButton"),
+    LINKED_ELSEWHERE: () => t("connections.bot.linkedElsewhere"),
+    NOT_LINKED: () => t("connections.bot.notLinked"),
+  };
   return {
-    note,
-    refusal: unlinkRefusal === "LAST_CONNECTION" ? t("connections.bot.lastConnection") : null,
+    note: notes[row.noteCode](),
+    // Le seul refus de la ligne : le dernier moyen de connexion.
+    refusal: row.refusal === null ? null : t("connections.bot.lastConnection"),
   };
 }

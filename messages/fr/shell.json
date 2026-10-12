@@ -73,6 +73,7 @@
       "NONE": "non conforme"
     },
     "reportProblem": "Signaler un problème",
+    "reportLoadFailed": "Le formulaire n'a pas pu s'ouvrir. Réessaie dans un instant.",
     "copyright": "© 2026 {association}",
     "contact": {
       "email": "Email",

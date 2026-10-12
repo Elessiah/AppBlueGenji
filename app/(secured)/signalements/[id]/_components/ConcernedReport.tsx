@@ -8,7 +8,7 @@ import {
   reportTargetHref,
   type ConcernedReportView,
 } from "@/lib/shared/content-reports";
-import { isImmediateLogoRemoval } from "@/lib/shared/logo-quarantine";
+import { formatQuarantineDate, isImmediateLogoRemoval } from "@/lib/shared/logo-quarantine";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
@@ -20,14 +20,13 @@ function formatDate(iso: string, locale: Locale): string {
   return new Date(iso).toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "long", year: "numeric" });
 }
 
-/** L'échéance d'une suppression, **en heure de Paris** (`formatQuarantineDate`), dans la langue de la page. */
-function formatPurgeDate(iso: string, locale: Locale): string {
-  return new Date(iso).toLocaleDateString(INTL_LOCALE[locale], {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Paris",
-  });
+/**
+ * Une date de la vie d'une image (masquage, échéance, suppression), **en heure
+ * de Paris** comme partout ailleurs (`formatQuarantineDate`), dans la langue
+ * de la page : les deux dates d'une même phrase se lisent sur le même fuseau.
+ */
+function formatQuarantineDay(iso: string, locale: Locale): string {
+  return formatQuarantineDate(new Date(iso), INTL_LOCALE[locale]);
 }
 
 const strong = { strong: (chunks: React.ReactNode[]) => <strong>{chunks}</strong> };
@@ -64,8 +63,8 @@ export function ConcernedReport({
                 "concerned.logoHidden",
                 {
                   name: quarantine.targetName,
-                  since: formatDate(quarantine.hiddenAt, locale),
-                  purge: formatPurgeDate(quarantine.purgeAfter, locale),
+                  since: formatQuarantineDay(quarantine.hiddenAt, locale),
+                  purge: formatQuarantineDay(quarantine.purgeAfter, locale),
                 },
                 strong,
               ),
@@ -76,7 +75,7 @@ export function ConcernedReport({
             {richNodes(
               text.rich(
                 "concerned.avatarHidden",
-                { since: formatDate(quarantine.hiddenAt, locale), purge: formatPurgeDate(quarantine.purgeAfter, locale) },
+                { since: formatQuarantineDay(quarantine.hiddenAt, locale), purge: formatQuarantineDay(quarantine.purgeAfter, locale) },
                 strong,
               ),
             )}
@@ -90,7 +89,7 @@ export function ConcernedReport({
             {richNodes(
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.logoRemovedImmediately" : "concerned.logoRemoved",
-                { name: quarantine.targetName, date: formatDate(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
+                { name: quarantine.targetName, date: formatQuarantineDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
                 strong,
               ),
             )}
@@ -100,7 +99,7 @@ export function ConcernedReport({
             {richNodes(
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.avatarRemovedImmediately" : "concerned.avatarRemoved",
-                { date: formatDate(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
+                { date: formatQuarantineDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
                 strong,
               ),
             )}

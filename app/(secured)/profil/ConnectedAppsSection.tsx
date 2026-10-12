@@ -30,6 +30,7 @@ import {
   type AccountConnection,
 } from "@/lib/shared/account-connections";
 import {
+  OAUTH_PROVIDER_HANDLE_LABELS,
   OAUTH_PROVIDER_LABELS,
   OAUTH_PROVIDER_SLUGS,
   oauthProviderFromSlug,
@@ -346,9 +347,11 @@ function ConnectionRow({
 function connectionDetails(text: ProfileText, connection: AccountConnection, discordByCode: boolean): string {
   const { t } = text;
   if (connection.linked) {
-    // Google n'a pas d'identifiant à montrer (`OAUTH_PROVIDER_HANDLE_LABELS`).
-    if (connection.handle && connection.provider !== "GOOGLE") {
-      return t("connections.handleLine", { label: t(`connections.handleLabels.${connection.provider}`), handle: connection.handle });
+    // Le registre dit quel fournisseur a un identifiant à montrer (Google : aucun) ;
+    // chacun a son libellé traduit sous `connections.handleLabels` (testé).
+    if (connection.handle && OAUTH_PROVIDER_HANDLE_LABELS[connection.provider] !== null) {
+      const labelKey = `connections.handleLabels.${connection.provider}` as Parameters<typeof t>[0];
+      return t("connections.handleLine", { label: t(labelKey), handle: connection.handle });
     }
     return t("connections.linked");
   }
@@ -379,7 +382,7 @@ function DiscordBotRow({
   const text = useProfileText();
   const { t } = text;
   const row = discordBotRowState(connections);
-  const words = discordBotRowText(text, connections);
+  const words = discordBotRowText(text, row);
   const detailsId = "connection-details-discord-bot";
   return (
     <div className="table-row" style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}>

@@ -43,7 +43,7 @@ import {
 } from "./reports-text";
 import styles from "./ReportProblem.module.css";
 
-interface ReportProblemDialogProps {
+export interface ReportProblemDialogProps {
   /** Chemin de la page d'où l'on signale : il accompagne le signalement. */
   pathname: string;
   /** Visiteur connecté : lui seul peut désigner des cibles par leur nom. */

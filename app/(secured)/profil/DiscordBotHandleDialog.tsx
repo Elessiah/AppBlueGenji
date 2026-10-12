@@ -254,6 +254,8 @@ export function DiscordBotHandleDialog({
                         style={{ color: "var(--blue-300)", textDecoration: "underline" }}
                       >
                         {chunks}
+                        {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
+                        <span className="sr-only">{t("verify.newTab")}</span>
                       </a>
                     ),
                   }),

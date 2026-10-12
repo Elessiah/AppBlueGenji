@@ -1,41 +1,45 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useState, type CSSProperties } from "react";
+import { useState, type ComponentType, type CSSProperties } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
+import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
+import { useOptionalToast } from "@/components/ui/toast";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { orReload } from "@/lib/shared/lazy-component";
+import { isChunkLoadError, reloadAfterChunkError } from "@/lib/shared/lazy-component";
+import type { ReportProblemDialogProps } from "./ReportProblemDialog";
 
 /**
  * Le formulaire, chargé **au clic** (lot 9-2) : le bouton est au pied de chaque
  * page, et le formulaire porte ses deux langues (`reports-text.ts`) — les
  * importer ici les aurait mises dans le premier chargement de tout le site.
- * Un morceau disparu (déploiement entre la page et le clic) recharge la page
- * quand c'est sûr (`orReload`). Le morceau part dès le survol ou le focus du
- * bouton ; le bouton se dit occupé (`aria-busy`) tant qu'il n'est pas arrivé.
+ *
+ * Chargement à la main plutôt que `next/dynamic` : un échec ne doit pas rester
+ * en mémoire sous la forme d'un composant vide (le bouton ne ferait plus rien).
+ * Le morceau part dès le survol ou le focus du bouton ; le bouton se dit occupé
+ * (`aria-busy`) tant qu'il n'est pas arrivé ; un échec le dit (toast), se
+ * retente au clic suivant, et un morceau disparu (déploiement entre la page et
+ * le clic) recharge la page quand c'est sûr (`reloadAfterChunkError`).
  */
-let dialogLoaded = false;
-let dialogLoad: ReturnType<typeof loadDialogModule> | null = null;
-function loadDialogModule() {
-  return import("./ReportProblemDialog").then((module) => {
-    dialogLoaded = true;
-    return module.ReportProblemDialog;
-  });
-}
+type Dialog = ComponentType<ReportProblemDialogProps>;
+let loadedDialog: Dialog | null = null;
+let dialogLoad: Promise<Dialog> | null = null;
+
 /** Un seul chargement, partagé par le préchargement et l'ouverture ; un échec se retente. */
-function loadDialog() {
-  dialogLoad ??= loadDialogModule().catch((error: unknown) => {
-    dialogLoad = null;
-    throw error;
-  });
+function loadDialog(): Promise<Dialog> {
+  dialogLoad ??= import("./ReportProblemDialog").then(
+    (module) => (loadedDialog = module.ReportProblemDialog),
+    (error: unknown) => {
+      dialogLoad = null;
+      throw error;
+    },
+  );
   return dialogLoad;
 }
 const preloadDialog = () => {
   loadDialog().catch(() => undefined);
 };
-const ReportProblemDialog = dynamic(() => orReload(loadDialog()), { ssr: false });
 const BUSY_STYLE: CSSProperties = { cursor: "progress" };
 
 interface ReportProblemButtonProps {
@@ -69,13 +73,26 @@ export function ReportProblemButton({
   cyber = false,
 }: Readonly<ReportProblemButtonProps>) {
   const [open, setOpen] = useState(false);
+  const [ReportProblemDialog, setDialog] = useState<Dialog | null>(() => loadedDialog);
   const [pending, setPending] = useState(false);
+  const { t } = useShellText();
+  const toast = useOptionalToast();
   const openDialog = () => {
-    setOpen(true);
-    if (dialogLoaded) return;
+    if (ReportProblemDialog) {
+      setOpen(true);
+      return;
+    }
+    if (pending) return;
     setPending(true);
     loadDialog()
-      .catch(() => undefined)
+      .then((loaded) => {
+        setDialog(() => loaded);
+        setOpen(true);
+      })
+      .catch((error: unknown) => {
+        if (isChunkLoadError(error)) reloadAfterChunkError();
+        toast?.showError(t("footer.reportLoadFailed"));
+      })
       .finally(() => setPending(false));
   };
   const triggerProps = {
@@ -105,7 +122,7 @@ export function ReportProblemButton({
           {label}
         </button>
       )}
-      {open && (
+      {open && ReportProblemDialog && (
         <ReportProblemDialog
           pathname={pathname}
           authenticated={authenticated}
