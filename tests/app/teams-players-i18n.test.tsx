@@ -48,6 +48,7 @@ import { MembershipActions } from "@/app/(secured)/equipes/[id]/_components/Memb
 import { TeamSettings } from "@/app/(secured)/equipes/[id]/_components/TeamSettings";
 import { RolePicker } from "@/app/(secured)/equipes/[id]/_components/RolePicker";
 import { ModerationLogoBar } from "@/app/(secured)/equipes/[id]/_components/ModerationLogoBar";
+import { rolesErrorMessage } from "@/app/(secured)/joueurs/[id]/_components/PlayerRolesPanel";
 import { SecuredLoading } from "@/app/(secured)/_shared/SecuredLoading";
 import { localizedFinalRank } from "@/app/(secured)/equipes/[id]/_lib/team-history";
 import { teamPointsHint } from "@/app/(secured)/equipes/_lib/team-points";
@@ -511,6 +512,29 @@ describe("revue UI/UX", () => {
     // Le libellé de cellule (mobile) reste séparé de sa valeur sans espace dans le message.
     expect(teamHtml).toMatch(/Record<\/span> 3 W/);
     expect(teamHtml).toMatch(/Placement<\/span> 3rd/);
+  });
+
+  it("forme d'une carte : singulier dit au singulier", () => {
+    for (const locale of LOCALES) {
+      const source = messagesFor(locale).teams.card.formSpoken;
+      expect(formatMessage(locale, source, { count: 1, results: "W" })).toBe(locale === "fr" ? "Dernier match : W" : "Last match: W");
+      expect(formatMessage(locale, source, { count: 3, results: "W" })).toBe(
+        locale === "fr" ? "3 derniers matchs, du plus récent au plus ancien : W" : "Last 3 matches, most recent first: W",
+      );
+    }
+  });
+
+  it("fiche d'équipe : un échec de chargement n'est pas « introuvable »", () => {
+    for (const locale of LOCALES) {
+      const page = messagesFor(locale).team.page;
+      expect(page.loadError).not.toBe(page.notFound);
+    }
+  });
+
+  it("rôles de plateforme : refus en phrase française, jamais le code (D4)", () => {
+    expect(rolesErrorMessage("CANNOT_MODIFY_SELF")).toBe("Tu ne peux pas modifier tes propres rôles.");
+    expect(rolesErrorMessage("ROLES_UPDATE_FAILED")).toBe("La mise à jour des rôles a échoué.");
+    expect(rolesErrorMessage("constructor")).toBe("La mise à jour des rôles a échoué.");
   });
 
   it("fiche joueur en français : « 3e », « 3 V – 1 D »", () => {

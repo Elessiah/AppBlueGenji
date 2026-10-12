@@ -233,6 +233,14 @@ describe("correctifs de la première revue", () => {
     expect(hook).toMatch(/loading: status === "loading" \|\| redirecting/);
   });
 
+  it("un échec de chargement garde sa phrase et sa notification, pas « introuvable »", () => {
+    const hook = stripComments(read("_hooks", "useTeamDetail.ts"));
+    expect(hook).toContain('loadFailed: !redirecting && status === "error"');
+    const page = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "[id]", "page.tsx"), "utf8"));
+    expect(page).toContain('loadFailed ? t("page.loadError") : t("page.notFound")');
+    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(loadFailed\) showError\(t\("page\.loadError"\)\)/);
+  });
+
   it("la piste d'actions du roster a une largeur fixe, jamais `auto`", () => {
     const withActions = block(".withActions");
     expect(withActions).toMatch(/grid-template-columns:[^;]*\d+px;/);
