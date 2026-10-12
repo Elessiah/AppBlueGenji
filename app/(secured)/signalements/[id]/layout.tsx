@@ -4,6 +4,7 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
+import { ReportsTextProvider } from "@/components/reports/reports-text-provider";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -13,9 +14,7 @@ type MetadataProps = {
  * Titre de la page d'un signalement, lue par les personnes qu'il vise — voir
  * `app/(secured)/tournois/layout.tsx` pour la raison d'une mise en page —,
  * dans la langue de l'adresse (lot 9-2), avec canonique et `hreflang` de
- * **ce** signalement, comme les autres routes migrées. Les textes de la page
- * voyagent avec elle (`components/reports/reports-text.ts`), comme ceux du
- * formulaire.
+ * **ce** signalement, comme les autres routes migrées.
  */
 export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const { id } = await params;
@@ -29,6 +28,16 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
   return { title, alternates: languages ? { canonical, languages } : { canonical } };
 }
 
-export default function ConcernedReportLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}</>;
+/**
+ * Pose les textes de la page et du formulaire de contestation : rien en
+ * français, déjà dans le paquet de la page (`reports-text.ts`) ; l'anglais
+ * sous `/en` seulement — jamais dans le JavaScript d'un lecteur français.
+ */
+export default async function ConcernedReportLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await requestLocale();
+  return (
+    <ReportsTextProvider locale={locale} messages={locale === "en" ? messagesFor(locale).reports : undefined}>
+      {children}
+    </ReportsTextProvider>
+  );
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import enReports from "@/messages/en/reports.json";
 import frReports from "@/messages/fr/reports.json";
-import { useAppLocale } from "@/components/i18n/locale-context";
+import { withFrenchFallback } from "@/components/i18n/scoped-text-context";
 import {
   REPORT_DESCRIPTION_MAX_LENGTH,
   REPORT_DESCRIPTION_MIN_LENGTH,
@@ -12,17 +11,19 @@ import {
   type ReportCategory,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
-import type { Locale } from "@/lib/shared/locales";
-import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
+import type { Leaves, ScopedText } from "@/lib/shared/scoped-text";
+import { reportsTextSlot } from "./reports-text-provider";
 
 /**
  * Textes du formulaire « Signaler un problème » et de la page d'un signalement
  * vu par la personne visée (espace `reports`, lot 9-2).
  *
  * Le formulaire s'ouvre depuis le pied de **chaque** page : il est chargé à la
- * demande (`ReportProblemButton`), et ses **deux** langues voyagent avec son
- * morceau — servies par la mise en page, elles partiraient avec chaque page,
- * formulaire ouvert ou non. La langue vient du contexte de la page.
+ * demande (`ReportProblemButton`), son français avec lui — servi par la mise en
+ * page, il partirait avec chaque page, formulaire ouvert ou non. L'anglais
+ * n'arrive que sous `/en` (revue de performance) : chargé au clic avec le
+ * formulaire, ou sérialisé par la mise en page de `/signalements/[id]`, posé par
+ * le fournisseur de `reports-text-provider.tsx`. Hors fournisseur : le français.
  *
  * Les phrases engagent l'association (ce qui est collecté, pourquoi, qui le
  * lit, combien de temps) : le français est celui de `content-reports.ts`, mot
@@ -32,16 +33,13 @@ import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-te
 export type ReportsMessages = typeof frReports;
 export type ReportsText = ScopedText<Leaves<ReportsMessages>>;
 
-export const FR_REPORTS_TEXT: ReportsText = scopedText("fr", frReports);
-const EN_REPORTS_TEXT: ReportsText = scopedText("en", enReports);
+const context = withFrenchFallback(reportsTextSlot, frReports);
 
-export function reportsText(locale: Locale): ReportsText {
-  return locale === "en" ? EN_REPORTS_TEXT : FR_REPORTS_TEXT;
-}
+export const FR_REPORTS_TEXT: ReportsText = context.fr;
 
-/** Les textes dans la langue de la page. */
+/** Les textes posés par le fournisseur, le français à défaut. */
 export function useReportsText(): ReportsText {
-  return reportsText(useAppLocale());
+  return context.useText();
 }
 
 /** `reportErrorMessage` dans la langue du texte : jamais le jeton. */

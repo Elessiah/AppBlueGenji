@@ -5,6 +5,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { ProfileTextProvider } from "@/components/i18n/profile-text-provider";
 import { TeamErrorsTextProvider } from "@/components/i18n/team-errors-text-provider";
+import { PushTextProvider } from "@/components/notifications/push-text-provider";
 
 /**
  * Titre de l'écran « Mon profil » — voir `app/(secured)/tournois/layout.tsx`
@@ -23,9 +24,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Pose les textes du profil et la table des refus d'équipe (réponses aux
- * invitations, refus d'une image) : rien en français, déjà dans le paquet ;
- * l'anglais sous `/en` seulement.
+ * Pose les textes du profil, ceux du réglage des notifications et la table des
+ * refus d'équipe (réponses aux invitations, refus d'une image) : rien en
+ * français, déjà dans le paquet ; l'anglais sous `/en` seulement.
  */
 export default async function ProfileLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
@@ -33,7 +34,9 @@ export default async function ProfileLayout({ children }: Readonly<{ children: R
   return (
     <TeamErrorsTextProvider locale={locale} messages={messages?.teamErrors}>
       <ProfileTextProvider locale={locale} messages={messages?.profile}>
-        {children}
+        <PushTextProvider locale={locale} messages={messages?.push}>
+          {children}
+        </PushTextProvider>
       </ProfileTextProvider>
     </TeamErrorsTextProvider>
   );

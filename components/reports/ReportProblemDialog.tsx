@@ -39,9 +39,17 @@ import {
   retentionText,
   rightsText,
   useReportsText,
+  type ReportsMessages,
   type ReportsText,
 } from "./reports-text";
+import { ReportsTextProvider } from "./reports-text-provider";
 import styles from "./ReportProblem.module.css";
+
+/** Formateurs construits une fois : `toLocaleDateString` en bâtirait un par option. */
+const CONTEST_OPTION_DATE: Readonly<Record<Locale, Intl.DateTimeFormat>> = {
+  fr: new Intl.DateTimeFormat(INTL_LOCALE.fr, { timeZone: "Europe/Paris" }),
+  en: new Intl.DateTimeFormat(INTL_LOCALE.en, { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }),
+};
 
 /**
  * Date d'un signalement dans la liste à contester : courte (le texte d'une
@@ -51,10 +59,7 @@ import styles from "./ReportProblem.module.css";
  * deux écrans donnent le même jour.
  */
 function contestOptionDate(iso: string, locale: Locale): string {
-  const date = new Date(iso);
-  return locale === "fr"
-    ? date.toLocaleDateString(INTL_LOCALE.fr, { timeZone: "Europe/Paris" })
-    : date.toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" });
+  return CONTEST_OPTION_DATE[locale].format(new Date(iso));
 }
 
 export interface ReportProblemDialogProps {
@@ -77,6 +82,14 @@ export interface ReportProblemDialogProps {
   initialCategory?: Exclude<ReportCategory, "CONTEST">;
   /** Appelé après un envoi réussi (la page d'un signalement relit ses contestations). */
   onSubmitted?: () => void;
+  /**
+   * L'anglais du formulaire, chargé au clic sous `/en` par `ReportProblemButton`
+   * (revue de performance du lot 9-2) : le formulaire pose alors lui-même son
+   * fournisseur, dans son morceau — le bouton, au pied de chaque page, n'en
+   * porte pas la mécanique. Absent : les textes du fournisseur au-dessus (page
+   * d'un signalement), le français à défaut.
+   */
+  englishMessages?: ReportsMessages;
 }
 
 type Selection = Record<ReportTargetType, ReportTargetOption[]>;
@@ -109,14 +122,23 @@ function replyChannelHint(text: ReportsText, requiresReplyChannel: boolean, auth
  * formulaire la désigne déjà (`reportTargetFromPath`), si la catégorie le
  * permet : c'est presque toujours d'elle qu'on veut parler.
  */
-export function ReportProblemDialog({
+export function ReportProblemDialog({ englishMessages, ...props }: Readonly<ReportProblemDialogProps>) {
+  if (!englishMessages) return <ReportForm {...props} />;
+  return (
+    <ReportsTextProvider locale="en" messages={englishMessages}>
+      <ReportForm {...props} />
+    </ReportsTextProvider>
+  );
+}
+
+function ReportForm({
   pathname,
   authenticated,
   onClose,
   contestOf,
   initialCategory,
   onSubmitted,
-}: Readonly<ReportProblemDialogProps>) {
+}: Readonly<Omit<ReportProblemDialogProps, "englishMessages">>) {
   const { showError, showSuccess } = useToast();
   const text = useReportsText();
   const { t } = text;

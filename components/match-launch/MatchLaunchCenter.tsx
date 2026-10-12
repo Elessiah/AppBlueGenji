@@ -6,6 +6,8 @@ import { useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
+import { PushTextProvider } from "@/components/notifications/push-text-provider";
+import enPush from "@/messages/en/push.json";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -357,8 +359,11 @@ export function MatchLaunchCenter({
               que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
               fois l'appareil abonné. */}
           {/* Réglage des notifications : dans la langue de la page depuis le
-              lot 9-2 (`push`). */}
-          <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={t("pushLead")} />
+              lot 9-2 (`push`) ; son anglais voyage dans ce morceau, chargé à
+              la demande, comme celui de la fenêtre. */}
+          <PushTextProvider locale={text.locale} messages={text.locale === "en" ? enPush : undefined}>
+            <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={t("pushLead")} />
+          </PushTextProvider>
         </ScrollArea>
 
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps

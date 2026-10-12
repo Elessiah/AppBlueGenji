@@ -20,12 +20,13 @@ import type {
 } from "@/lib/shared/account-connections";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "@/lib/shared/oauth-providers";
-import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
+import { messageAt, type Leaves } from "@/lib/shared/scoped-text";
+import { FR_PROFILE_TEXT, type ProfileText } from "@/components/i18n/profile-text";
 
-export type ProfileText = ScopedText<Leaves<typeof frProfile>>;
+export type { ProfileText } from "@/components/i18n/profile-text";
 
-/** Le français du paquet — hors fournisseur, tests. */
-export const FR_PROFILE: ProfileText = scopedText("fr", frProfile);
+/** Le français du paquet — hors fournisseur, tests ; le même objet que celui du fournisseur. */
+export const FR_PROFILE: ProfileText = FR_PROFILE_TEXT;
 
 type Key = Leaves<typeof frProfile>;
 
@@ -100,9 +101,11 @@ export function lookupCode(
   values?: Record<string, string | number>,
 ): string | null {
   if (!code) return null;
-  const node = table.split(".").reduce<unknown>((tree, segment) => (tree as Record<string, unknown>)[segment], frProfile);
-  if (!Object.hasOwn(node as object, code)) return null;
-  return text.t(`${table}.${code}` as Key, values);
+  const key = `${table}.${code}`;
+  // `messageAt` ne rend qu'une phrase : `constructor`, `__proto__` ou une
+  // sous-table ne passent pas pour un code connu.
+  if (messageAt(frProfile, key) === undefined) return null;
+  return text.t(key as Key, values);
 }
 
 /** `connectionUnlinkRefusalMessage` dans la langue du texte. */

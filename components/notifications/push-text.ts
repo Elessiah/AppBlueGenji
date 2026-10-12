@@ -1,33 +1,30 @@
 "use client";
 
-import enPush from "@/messages/en/push.json";
 import frPush from "@/messages/fr/push.json";
-import { useAppLocale } from "@/components/i18n/locale-context";
-import type { Locale } from "@/lib/shared/locales";
+import { withFrenchFallback } from "@/components/i18n/scoped-text-context";
 import type { PushSupport, PushTopic } from "@/lib/shared/push-notifications";
-import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
+import type { Leaves, ScopedText } from "@/lib/shared/scoped-text";
+import { pushTextSlot } from "./push-text-provider";
 
 /**
  * Textes du réglage des notifications push (espace `push`, lot 9-2).
  *
  * Le panneau sert `/profil` et la fenêtre de lancement d'un match (chargée à
- * la demande, sur toutes les pages d'un compte connecté) : ses deux langues
- * voyagent avec lui — quelques centaines d'octets — plutôt que par une mise en
- * page. Les libellés des sujets restent aussi dans `PUSH_TOPICS` (registre,
+ * la demande, sur toutes les pages d'un compte connecté) : son français voyage
+ * avec lui ; l'anglais n'arrive que sous `/en`, posé par le fournisseur de
+ * `push-text-provider.tsx` (mise en page de `/profil`, fenêtre de lancement) —
+ * jamais dans le JavaScript d'une page française. Les libellés des sujets restent aussi dans `PUSH_TOPICS` (registre,
  * français) ; le français de ce fichier les égale (testé).
  */
 export type PushText = ScopedText<Leaves<typeof frPush>>;
 
-export const FR_PUSH_TEXT: PushText = scopedText("fr", frPush);
-const EN_PUSH_TEXT: PushText = scopedText("en", enPush);
+const context = withFrenchFallback(pushTextSlot, frPush);
 
-export function pushText(locale: Locale): PushText {
-  return locale === "en" ? EN_PUSH_TEXT : FR_PUSH_TEXT;
-}
+export const FR_PUSH_TEXT: PushText = context.fr;
 
-/** Le texte dans la langue de la page. */
+/** Le texte posé par le fournisseur, le français à défaut. */
 export function usePushText(): PushText {
-  return pushText(useAppLocale());
+  return context.useText();
 }
 
 /** `pushErrorMessage` dans la langue du texte : jamais le jeton. */

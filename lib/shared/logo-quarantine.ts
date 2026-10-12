@@ -141,12 +141,19 @@ export function canAutoPurgeLogo(input: {
  * la langue de sa page (`INTL_LOCALE`), toujours en heure de Paris.
  */
 export function formatQuarantineDate(date: Date, intlLocale = "fr-FR"): string {
-  return date.toLocaleDateString(intlLocale, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Paris",
-  });
+  return quarantineDateFormat(intlLocale).format(date);
+}
+
+/** Un formateur par langue, construit une fois : `toLocaleDateString` en bâtirait un à chaque date. */
+const QUARANTINE_DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
+
+function quarantineDateFormat(intlLocale: string): Intl.DateTimeFormat {
+  let format = QUARANTINE_DATE_FORMATS.get(intlLocale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(intlLocale, { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });
+    QUARANTINE_DATE_FORMATS.set(intlLocale, format);
+  }
+  return format;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
