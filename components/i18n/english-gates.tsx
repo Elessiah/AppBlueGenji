@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useLocalePathname } from "./locale-navigation";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
@@ -31,11 +31,19 @@ type GateProps<T> = Readonly<{ locale: Locale; messages?: T; fallback: ReactNode
  * donc aussi, en même temps, l'anglais de la fiche visée — sans quoi les deux
  * morceaux partiraient l'un après l'autre.
  */
-function useNestedEnglish(locale: Locale, routes: ReadonlyArray<readonly [RegExp, ReadonlyArray<{ load(): Promise<unknown> }>]>): void {
+function useNestedEnglish(
+  locale: Locale,
+  routes: ReadonlyArray<readonly [RegExp, ReadonlyArray<{ load(): Promise<unknown> }>]>,
+  received: boolean,
+): void {
   // Le chemin suivi : une navigation par le code sous une porte déjà montée la relance.
   const { path } = useLocalePathname();
+  // Chargement complet (anglais reçu) : la fiche d'arrivée a reçu le sien aussi
+  // et l'amorce à son hydratation — le lancer ici le téléchargerait deux fois.
+  const arrival = useRef(received ? path : null);
   useEffect(() => {
-    if (locale !== "en") return;
+    if (locale !== "en" || path === arrival.current) return;
+    arrival.current = null;
     const match = routes.find(([pattern]) => pattern.test(path));
     for (const loader of match?.[1] ?? []) loader.load().catch(() => undefined);
   }, [locale, path, routes]);
@@ -50,7 +58,7 @@ const PLAYER_ROUTES = [[/^\/joueurs\/\d+\/?$/, [englishStatsPanel]]] as const;
 /** `/equipes` et ses sous-pages : la table des refus d'équipe. */
 export function TeamErrorsTextGate({ locale, messages, fallback, children }: GateProps<Messages["teamErrors"]>) {
   const { english, failed } = useEnglishMessages(locale, englishTeamErrors, messages);
-  useNestedEnglish(locale, TEAM_ROUTES);
+  useNestedEnglish(locale, TEAM_ROUTES, messages !== undefined);
   if (locale === "en" && !english && !failed) return <>{fallback}</>;
   return (
     <TeamErrorsTextProvider locale={locale} messages={english ?? undefined}>
@@ -62,7 +70,7 @@ export function TeamErrorsTextGate({ locale, messages, fallback, children }: Gat
 /** `/joueurs` et la fiche d'un joueur : l'espace `players`. */
 export function PlayersTextGate({ locale, messages, fallback, children }: GateProps<Messages["players"]>) {
   const { english, failed } = useEnglishMessages(locale, englishPlayers, messages);
-  useNestedEnglish(locale, PLAYER_ROUTES);
+  useNestedEnglish(locale, PLAYER_ROUTES, messages !== undefined);
   if (locale === "en" && !english && !failed) return <>{fallback}</>;
   return (
     <PlayersTextProvider locale={locale} messages={english ?? undefined}>

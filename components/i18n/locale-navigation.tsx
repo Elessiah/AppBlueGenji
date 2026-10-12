@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { forwardRef, useMemo, type AnchorHTMLAttributes } from "react";
 import { crossesLocale, localeHref, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 import { useAppLocale } from "./locale-context";
-import { preloadEnglishRoute } from "./english-route-preload";
+import { preloadRoute } from "./route-preload";
 
 /**
  * Navigation interne dans la langue de la page (`docs/features/I18N.md`).
@@ -81,7 +81,7 @@ export function useLocaleRouter(): LocaleRouter {
         if (crossesLocale(href, locale)) globalThis.location.assign(target);
         else {
           // Sous `/en`, l'anglais de la page visée part avec la navigation (revue de performance du lot 9-2).
-          if (locale === "en") preloadEnglishRoute(href);
+          if (locale === "en") preloadRoute(href);
           router.push(target, options);
         }
       },
@@ -89,7 +89,7 @@ export function useLocaleRouter(): LocaleRouter {
         const target = localeHref(href, locale);
         if (crossesLocale(href, locale)) globalThis.location.replace(target);
         else {
-          if (locale === "en") preloadEnglishRoute(href);
+          if (locale === "en") preloadRoute(href);
           router.replace(target, options);
         }
       },

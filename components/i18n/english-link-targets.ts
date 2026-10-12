@@ -3,6 +3,7 @@
 import { quietPreload } from "@/lib/shared/lazy-component";
 import { englishReports } from "./english-loaders";
 import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
+import { barePath } from "./english-route-preload";
 import { preloadProfileEnglish } from "./profile-english";
 
 /**
@@ -29,7 +30,7 @@ const REPORT = group(englishReports);
 
 /** Le chemin sans préfixe (`/equipes/5`), requête et ancre ôtées. */
 export function preloadEnglishFor(path: string): void {
-  const bare = path.split(/[?#]/)[0];
+  const bare = barePath(path);
   if (bare === "/profil") preloadProfileEnglish("en");
   else if (/^\/equipes\/\d+$/.test(bare)) TEAM_PAGE();
   else if (/^\/equipes(\/creer)?$/.test(bare)) TEAMS();
