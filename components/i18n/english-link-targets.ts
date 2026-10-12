@@ -1,8 +1,7 @@
 "use client";
 
-import { quietPreload } from "@/lib/shared/lazy-component";
 import { englishPageOf, type EnglishPage } from "./english-route-preload";
-import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";
+import { PAGE_PRELOADS } from "./english-page-loaders";
 import { preloadProfileEnglish } from "./profile-english";
 
 /**
@@ -11,21 +10,9 @@ import { preloadProfileEnglish } from "./profile-english";
  * performance du lot 9-2) : l'anglais de la page visée part avant la réponse
  * du routeur. Chargé lui-même au premier besoin.
  */
-function group(...loaders: PageLoader[]): () => void {
-  const preload = quietPreload(() => Promise.all(loaders.map((loader) => loader.load())));
-  return () => {
-    if (loaders.every((loader) => loader.loaded() !== null)) return;
-    preload();
-  };
-}
-
 const PRELOADS: Record<EnglishPage, () => void> = {
   profile: () => preloadProfileEnglish("en"),
-  teamPage: group(...PAGE_LOADERS.teamPage),
-  teams: group(...PAGE_LOADERS.teams),
-  playerPage: group(...PAGE_LOADERS.playerPage),
-  players: group(...PAGE_LOADERS.players),
-  report: group(...PAGE_LOADERS.report),
+  ...PAGE_PRELOADS,
 };
 
 export function preloadEnglishPage(page: EnglishPage): void {
