@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
-import { teamErrorMessage } from "../../_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 
 /**
@@ -22,6 +23,8 @@ export type RefusalListener = (code: string, message: string) => void;
  */
 export function useMemberManagement(teamId: number, onChanged: () => void) {
   const { showError, showSuccess } = useToast();
+  const { t } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
 
   const run = useCallback(
     async (action: () => Promise<string>, onRefused?: RefusalListener): Promise<boolean> => {
@@ -38,7 +41,7 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
         return false;
       }
     },
-    [onChanged, showError, showSuccess],
+    [onChanged, showError, showSuccess, teamErrorMessage],
   );
 
   const addMember = useCallback(
@@ -50,37 +53,37 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
           "TEAM_MEMBER_ADD_FAILED",
         );
         return payload.result === "JOINED"
-          ? `${pseudo} avait demandé à rejoindre l'équipe : c'est fait.`
-          : `Invitation envoyée à ${pseudo}.`;
+          ? t("members.invitedJoined", { pseudo })
+          : t("members.invitationSent", { pseudo });
       }, onRefused),
-    [run, teamId],
+    [run, teamId, t],
   );
 
   const removeMember = useCallback(
     (userId: number, pseudo: string) =>
       run(async () => {
         await teamApi(`/api/teams/${teamId}/members`, jsonRequest("DELETE", { userId }), "TEAM_MEMBER_REMOVE_FAILED");
-        return `${pseudo} ne fait plus partie de l'équipe.`;
+        return t("members.removed", { pseudo });
       }),
-    [run, teamId],
+    [run, teamId, t],
   );
 
   const updateRoles = useCallback(
     (userId: number, roles: TeamRole[]) =>
       run(async () => {
         await teamApi(`/api/teams/${teamId}/members`, jsonRequest("PATCH", { userId, roles }), "TEAM_MEMBER_UPDATE_FAILED");
-        return "Rôles mis à jour.";
+        return t("members.rolesUpdated");
       }),
-    [run, teamId],
+    [run, teamId, t],
   );
 
   const cancelInvitation = useCallback(
     (invitationId: number, pseudo: string) =>
       run(async () => {
         await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
-        return `Invitation de ${pseudo} retirée.`;
+        return t("members.invitationWithdrawn", { pseudo });
       }),
-    [run],
+    [run, t],
   );
 
   return { addMember, removeMember, updateRoles, cancelInvitation };

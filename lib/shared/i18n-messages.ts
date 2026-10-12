@@ -33,8 +33,13 @@ import type frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
 import type frTournamentImage from "@/messages/fr/tournamentImage.json";
 import type frTournamentForm from "@/messages/fr/tournamentForm.json";
 import type frLaunchModal from "@/messages/fr/launchModal.json";
+import type frTeams from "@/messages/fr/teams.json";
+import type frTeam from "@/messages/fr/team.json";
+import type frTeamErrors from "@/messages/fr/teamErrors.json";
+import type frTeamRoles from "@/messages/fr/teamRoles.json";
+import type frPlayers from "@/messages/fr/players.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "teams", "team", "teamErrors", "teamRoles", "players"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -93,6 +98,16 @@ export type Messages = {
    * langues voyagent avec son morceau — `components/match-launch/launch-text.ts`.
    */
   launchModal: typeof frLaunchModal;
+  /** Annuaire `/equipes`, ses cartes et la création d'une équipe (lot 9) — `components/i18n/teams-text.tsx`. */
+  teams: typeof frTeams;
+  /** Fiche `/equipes/[id]` et ses fenêtres (lot 9) — `components/i18n/team-page-text.tsx`. */
+  team: typeof frTeam;
+  /** Refus des routes d'équipe : un code d'API → une phrase (lot 9) — `app/(secured)/equipes/_lib/team-errors.ts`. */
+  teamErrors: typeof frTeamErrors;
+  /** Libellés des rôles d'équipe (lot 9) : ses deux langues voyagent avec qui les lit — `lib/shared/team-role-display.ts`. */
+  teamRoles: typeof frTeamRoles;
+  /** Annuaire `/joueurs` et fiche `/joueurs/[id]` (lot 9) — `components/i18n/players-text.tsx`. */
+  players: typeof frPlayers;
 };
 
 /**

@@ -160,6 +160,31 @@ const I18N_MIGRATED_FILES = [
   "app/(secured)/tournois/[id]/modifier/**",
   "app/(secured)/tournois/_components/**",
   "components/match-launch/**",
+  // Lot 9-1 — équipes et joueurs : annuaires, cartes, création, fiches. Les
+  // outils de la modération (`ModerationLogoBar`, `PlayerModerationBar`) et
+  // l'attribution des rôles de plateforme (`PlayerRolesPanel`) n'y sont pas :
+  // ils restent français (D4), annoncés `lang="fr"` ; leurs liens passent tout
+  // de même par `LocaleLink` (`I18N_LOCALE_LINK_FILES`).
+  "app/(secured)/_shared/**",
+  "app/(secured)/equipes/*.tsx",
+  "app/(secured)/equipes/cards/**",
+  "app/(secured)/equipes/creer/**",
+  "app/(secured)/equipes/[[]id]/*.tsx",
+  "app/(secured)/equipes/[[]id]/_components/ClaimGhostTeamDialog.tsx",
+  "app/(secured)/equipes/[[]id]/_components/MembersSection.tsx",
+  "app/(secured)/equipes/[[]id]/_components/MembershipActions.tsx",
+  "app/(secured)/equipes/[[]id]/_components/PlayerPseudoCombobox.tsx",
+  "app/(secured)/equipes/[[]id]/_components/RolePicker.tsx",
+  "app/(secured)/equipes/[[]id]/_components/RolePills.tsx",
+  "app/(secured)/equipes/[[]id]/_components/RolesDialog.tsx",
+  "app/(secured)/equipes/[[]id]/_components/TeamDialog.tsx",
+  "app/(secured)/equipes/[[]id]/_components/TeamHeader.tsx",
+  "app/(secured)/equipes/[[]id]/_components/TeamHistory.tsx",
+  "app/(secured)/equipes/[[]id]/_components/TeamSettings.tsx",
+  "app/(secured)/equipes/[[]id]/_components/TransferOwnershipDialog.tsx",
+  "app/(secured)/joueurs/*.tsx",
+  "app/(secured)/joueurs/cards/**",
+  "app/(secured)/joueurs/[[]id]/*.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */
@@ -192,6 +217,9 @@ const I18N_LOCALE_LINK_FILES = [
   // Lot 8a-2 — fiche d'un tournoi : tout le dossier, gestes du lot 8b compris.
   "app/(secured)/tournois/[id]/page.tsx",
   "app/(secured)/tournois/[id]/_components/**",
+  // Lot 9-1 — outils de la modération et des rôles, restés français (D4).
+  "app/(secured)/equipes/[[]id]/_components/**",
+  "app/(secured)/joueurs/[[]id]/_components/**",
 ];
 
 const eslintConfig = [

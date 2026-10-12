@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "title": "Teams",
+    "description": "The directory of teams registered on BlueGenji: rosters, ranking, recent form.",
+    "createTitle": "Create a team"
+  },
+  "list": {
+    "eyebrow": "COMMUNITY · ROSTERS",
+    "title": "Registered <em>teams</em>",
+    "subtitle": "DIRECTORY · ROSTERS · OVERALL RANKING",
+    "ghostTeam": "Ghost team",
+    "createTeam": "Create a team",
+    "metrics": {
+      "teams": "Active teams",
+      "members": "Rostered players",
+      "overwatch": "Overwatch teams",
+      "marvelRivals": "Marvel Rivals teams"
+    },
+    "searchLabel": "Search for a team",
+    "searchPlaceholder": "Search for a team, a tag, a region…",
+    "filters": {
+      "all": "All",
+      "ow": "Overwatch",
+      "mr": "Marvel Rivals"
+    },
+    "count": "{count, plural, one {# team} other {# teams}}",
+    "sortBy": "Sort:",
+    "sort": {
+      "rank": "Ranking",
+      "name": "Name",
+      "wins": "Wins",
+      "members": "Roster size"
+    },
+    "sectionTitle": "ROSTERS",
+    "sectionAccent": "· CURRENT SEASON",
+    "sectionCount": "{count, plural, one {# TEAM} other {# TEAMS}}",
+    "showMore": "Show more ({step} of {hidden} remaining)",
+    "showMoreNoun": "teams"
+  },
+  "ticker": {
+    "roster": "ROSTER · Directory updated daily",
+    "ranking": "RANKING · Calculated from all validated matches",
+    "community": "COMMUNITY · Register your team to join the season",
+    "label": "News feed",
+    "resume": "Resume the scrolling banner",
+    "pause": "Pause the scrolling banner",
+    "resumeShort": "Resume",
+    "pauseShort": "Pause"
+  },
+  "card": {
+    "viewProfile": "View {name}'s profile",
+    "ghostTitle": "Ghost team, created by the staff",
+    "ghostBadge": "GHOST",
+    "form": "Form",
+    "formOrder": "· recent → older",
+    "formSpoken": "Last {count} matches, most recent first: {results}",
+    "formResult": {
+      "w": "win",
+      "l": "loss",
+      "d": "draw"
+    },
+    "pointsShort": "Pts",
+    "winsShort": "W",
+    "wins": "Wins",
+    "lossesShort": "L",
+    "losses": "Losses",
+    "roster": "Roster",
+    "founded": "FOUNDED · {date}",
+    "cta": "View the team →",
+    "record": "{wins}W – <loss>{losses}L</loss>",
+    "ptsShort": "PTS"
+  },
+  "points": {
+    "label": "Ranking points",
+    "unrankedShort": "No matches",
+    "hint": "Base {base} · the more unlikely the win, the more it pays · final tournament placements hand out points too (floor {floor})",
+    "unrankedHint": "No matches played: starting rating",
+    "placementOnlyHint": "No matches played · rating from tournament placements"
+  },
+  "game": {
+    "OW": "Overwatch",
+    "MR": "Marvel Rivals"
+  },
+  "identity": {
+    "name": "Team name",
+    "nameHelp": "{min} to {max} characters, unique on the site.",
+    "tag": "Tag",
+    "tagOptional": "Tag (optional)",
+    "tagHelp": "{min} to {max} letters or numbers, unique on the site",
+    "description": "Description",
+    "descriptionOptional": "Description (optional)",
+    "tagPlaceholder": "BG"
+  },
+  "ghostDialog": {
+    "title": "New ghost team",
+    "lede": "A team with no linked player, run by the staff. It can be registered for a tournament, then handed over to a real player.",
+    "cancel": "Cancel",
+    "submit": "Create the team",
+    "pending": "Creating…",
+    "created": "Ghost team created."
+  },
+  "create": {
+    "back": "← Teams",
+    "title": "Create my team",
+    "lede": "The Owner role is automatically given to the creator.",
+    "name": "Team name",
+    "namePlaceholder": "My team",
+    "tag": "Tag (optional)",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "Introduce your team, your goals, your vibe…",
+    "logo": "Logo (optional)",
+    "chooseLogo": "Choose a logo",
+    "recrop": "Crop again",
+    "remove": "Remove",
+    "logoHint": "PNG, JPEG or WebP — {max} MB max",
+    "cropTitle": "Crop the logo",
+    "logoRights": "I certify that I hold the rights to this logo: the team created it, it's under a free license, or its author has authorized its use.",
+    "learnMore": "Learn more",
+    "terms": "I have read and accept the terms of use (<terms>read the terms</terms>) — in particular the warranty of rights over the team's name, logo and description.",
+    "cancel": "Cancel",
+    "submit": "Create the team",
+    "pending": "Creating...",
+    "createdWithoutLogo": "Team created, but without a logo: {reason}"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "OWNER": "Owner",
+  "MANAGER": "Manager",
+  "CAPITAINE": "Captain",
+  "COACH": "Coach",
+  "TANK": "Tank",
+  "DPS": "DPS",
+  "HEAL": "Support"
+}

@@ -18,7 +18,8 @@
  * lot 5b : l'association, les bénévoles, le recrutement ; lot 7a : les
  * documents légaux du bot ; lot 7b-1 : conditions, mentions légales,
  * déclaration d'accessibilité ; lot 7b-2 : politique de confidentialité et
- * registre des traitements).
+ * registre des traitements ; lots 8 : tournois ; lot 9-1 : équipes et
+ * joueurs).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
@@ -82,4 +83,14 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // recadrage commune au site et le réglage des notifications (lot 9).
   "/tournois/creer",
   "/tournois/[id]/modifier",
+  // Lot 9-1 — équipes et joueurs : annuaires, cartes, création d'une équipe,
+  // fiches (bloc de statistiques compris). `[id]` n'accepte qu'un entier :
+  // `/equipes/creer` a sa propre entrée. Les outils de la modération et
+  // l'attribution des rôles de plateforme restent français, annoncés
+  // `lang="fr"` (D4). Espace sécurisé : `noindex`, hors sitemap.
+  "/equipes",
+  "/equipes/creer",
+  "/equipes/[id]",
+  "/joueurs",
+  "/joueurs/[id]",
 ];

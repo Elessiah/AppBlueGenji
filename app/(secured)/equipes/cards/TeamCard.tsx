@@ -1,26 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import type { TeamListItem } from "@/lib/shared/types";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
 import { TeamPodiumName } from "@/components/podium-tiers";
 import { displayTeamTag } from "@/lib/shared/team-tag";
-import {
-  isRankedTeam,
-  RANKING_POINTS_LABEL,
-  RANKING_UNRANKED_SHORT,
-  rankingPointsHint,
-} from "@/lib/shared/ranking";
+import { isRankedTeam } from "@/lib/shared/ranking";
+import { INTL_LOCALE } from "@/lib/shared/locales";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useTeamsText } from "@/components/i18n/teams-text";
+import { teamPointsHint } from "../_lib/team-points";
 import s from "./TeamCard.module.css";
-
-/** Issue d'un match, lue par l'infobulle de la barre de forme. */
-const FORM_RESULT_LABELS: Record<TeamListItem["form"][number], string> = {
-  w: "victoire",
-  l: "défaite",
-  d: "nul",
-};
 
 /**
  * Carte d'annuaire d'une équipe.
@@ -40,16 +31,18 @@ const FORM_RESULT_LABELS: Record<TeamListItem["form"][number], string> = {
  * rendu ne le lisait — le logo n'apparaissait donc que sur `/equipes/[id]`.
  */
 export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
+  const text = useTeamsText();
+  const { t } = text;
   const color = getPaletteColor(team.id);
   const isTop3 = team.rank <= 3;
   const ranked = isRankedTeam(team);
 
   return (
     <article className={s.card} style={{ "--c": color } as React.CSSProperties}>
-      <Link
+      <LocaleLink
         href={`/equipes/${team.id}`}
         className={s.cardOverlay}
-        aria-label={`Voir la fiche de ${team.name}`}
+        aria-label={t("card.viewProfile", { name: team.name })}
       />
 
       <div className={`${s.rank} ${isTop3 ? s.rankTop : ""}`}>
@@ -81,8 +74,8 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
           <div className={s.name}>
             <TeamPodiumName teamId={team.id}>{team.name}</TeamPodiumName>
             {team.isGhost && (
-              <span className={s.ghostBadge} title="Équipe fantôme, créée par le staff">
-                FANTÔME
+              <span className={s.ghostBadge} title={t("card.ghostTitle")}>
+                {t("card.ghostBadge")}
               </span>
             )}
           </div>
@@ -99,14 +92,15 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
       {team.form.length > 0 && (
         <div className={s.form}>
           <div className={s.formLbl} aria-hidden="true">
-            Forme <span className={s.formOrder}>· récent → ancien</span>
+            {t("card.form")} <span className={s.formOrder}>{t("card.formOrder")}</span>
           </div>
           <div
             className={s.formBar}
             role="img"
-            aria-label={`${team.form.length} derniers matchs, du plus récent au plus ancien : ${team.form
-              .map((r) => FORM_RESULT_LABELS[r])
-              .join(", ")}`}
+            aria-label={t("card.formSpoken", {
+              count: team.form.length,
+              results: team.form.map((r) => t(`card.formResult.${r}`)).join(", "),
+            })}
           >
             {team.form.map((r, i) => (
               <div key={i} /* NOSONAR S6479 — liste positionnelle (du plus récent au plus ancien), sans état ni identifiant propre */ className={`${s.formCell} ${s[r]}`} />
@@ -128,35 +122,35 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
             classée, entière pour les lecteurs d'écran. */}
         <div>
           <div className={s.statLbl}>
-            <span aria-hidden="true">Pts</span>
-            <span className="sr-only">{RANKING_POINTS_LABEL}</span>
+            <span aria-hidden="true">{t("card.pointsShort")}</span>
+            <span className="sr-only">{t("points.label")}</span>
           </div>
           <div className={s.statVal}>{team.points}</div>
           {!ranked && (
             <div className={s.statHint} aria-hidden="true">
-              {RANKING_UNRANKED_SHORT}
+              {t("points.unrankedShort")}
             </div>
           )}
-          <span className="sr-only">{rankingPointsHint(ranked, team.points)}</span>
+          <span className="sr-only">{teamPointsHint(text, ranked, team.points)}</span>
         </div>
         <div>
           <div className={s.statLbl}>
-            <span aria-hidden="true">Vict.</span>
-            <span className="sr-only">Victoires</span>
+            <span aria-hidden="true">{t("card.winsShort")}</span>
+            <span className="sr-only">{t("card.wins")}</span>
           </div>
           <div className={`${s.statVal} ${s.win}`}>{team.wins}</div>
         </div>
         <div>
           <div className={s.statLbl}>
-            <span aria-hidden="true">Déf.</span>
-            <span className="sr-only">Défaites</span>
+            <span aria-hidden="true">{t("card.lossesShort")}</span>
+            <span className="sr-only">{t("card.losses")}</span>
           </div>
           <div className={`${s.statVal} ${s.loss}`}>{team.losses}</div>
         </div>
       </div>
 
       <div className={s.roster}>
-        <span className={s.rosterLbl}>Roster</span>
+        <span className={s.rosterLbl}>{t("card.roster")}</span>
         {team.rosterPreview.slice(0, 5).map((m) => (
           <PlayerLink
             key={m.userId}
@@ -165,8 +159,8 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
             // Lien-avatar sans texte : la marche peinte sur le texte effacerait
             // l'initiale de repli. Le nom de l'équipe, au-dessus, la porte déjà.
             podiumTier={null}
-            title={`Voir la fiche de ${m.pseudo}`}
-            aria-label={`Voir la fiche de ${m.pseudo}`}
+            title={t("card.viewProfile", { name: m.pseudo })}
+            aria-label={t("card.viewProfile", { name: m.pseudo })}
           >
             {m.avatarUrl ? (
               <Image
@@ -192,7 +186,7 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
         <div className={s.games}>
           {team.games.map((g) => (
             <span key={g} className={`${s.gamePill} ${g === "OW" ? s.ow : s.mr}`}>
-              {g === "OW" ? "Overwatch" : "Marvel Rivals"}
+              {t(g === "OW" ? "game.OW" : "game.MR")}
             </span>
           ))}
         </div>
@@ -200,9 +194,13 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
 
       <div className={s.foot}>
         <span className={s.footMeta}>
-          FONDÉE · {new Date(team.createdAt).toLocaleDateString("fr-FR", { month: "short", year: "numeric" }).toUpperCase()}
+          {t("card.founded", {
+            date: new Date(team.createdAt)
+              .toLocaleDateString(INTL_LOCALE[text.locale], { month: "short", year: "numeric" })
+              .toUpperCase(),
+          })}
         </span>
-        <span className={s.cta}>Voir l&apos;équipe →</span>
+        <span className={s.cta}>{t("card.cta")}</span>
       </div>
     </article>
   );

@@ -1,29 +1,25 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { PlayerPodiumName } from "@/components/podium-tiers";
 import { UserX } from "lucide-react";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { getPaletteColor } from "@/lib/shared/palette";
-import {
-  PLAYER_ROSTER_STATUS_LABEL,
-  playerRosterStatus,
-} from "@/lib/shared/player-roster-status";
+import { playerRosterStatus } from "@/lib/shared/player-roster-status";
 import { TeamLink } from "@/components/entity-link";
 import { teamRoleTone } from "@/lib/shared/team-role-display";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { usePlayersText, type PlayersText } from "@/components/i18n/players-text";
 import s from "../../_shared/annuaire.module.css";
 
-const ROLE_LABEL: Record<string, string> = {
-  DPS: "DPS",
-  TANK: "TANK",
-  HEAL: "HEAL",
-  COACH: "COACH",
-  CAPITAINE: "CAP",
-  OWNER: "OWNER",
-  MANAGER: "MANAGER",
-};
+const CARD_ROLES = ["DPS", "TANK", "HEAL", "COACH", "CAPITAINE", "OWNER", "MANAGER"] as const;
+
+/** Libellé court d'un rôle sur la carte ; un code inconnu reste tel quel. */
+function cardRoleLabel(text: PlayersText, role: string): string {
+  const known = CARD_ROLES.find((code) => code === role);
+  return known ? text.t(`card.role.${known}`) : role;
+}
 
 /**
  * Carte d'annuaire d'un joueur.
@@ -35,6 +31,8 @@ const ROLE_LABEL: Record<string, string> = {
  * en repassant au-dessus d'elle (`.aboveOverlay`).
  */
 export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) {
+  const text = usePlayersText();
+  const { t } = text;
   // Le statut d'un compte sans équipe est une **invitation à recruter** —
   // « FREE AGENT » ouvertement, « SANS ÉQUIPE » par défaut —, et un compte
   // supprimé est justement celui qu'on ne peut plus rattacher :
@@ -43,7 +41,7 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
   // lui, se garde : l'anonymisation retire l'identité, pas l'appartenance —
   // c'est un fait, pas une offre.
   const noTeamStatus = player.isDeleted ? null : (
-    <span className={s.plNoTeam}>{PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}</span>
+    <span className={s.plNoTeam}>{t(`card.rosterStatus.${playerRosterStatus(player)}`)}</span>
   );
   const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
@@ -52,10 +50,10 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
       className={`${s.plCard} ${player.isDeleted ? s.plCardDeleted : ""}`}
       style={{ "--c": teamColor } as React.CSSProperties}
     >
-      <Link
+      <LocaleLink
         href={`/joueurs/${player.id}`}
         className={s.cardOverlay}
-        aria-label={`Voir la fiche de ${player.pseudo}`}
+        aria-label={t("card.viewProfile", { name: player.pseudo })}
       />
       <div className={s.plHead}>
         <div className={s.plAvatarWrap}>
@@ -82,7 +80,7 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
         {player.isDeleted && (
           <div className={s.plDeletedMark}>
             <UserX size={10} aria-hidden="true" />
-            Compte supprimé
+            {t("card.deleted")}
           </div>
         )}
         <div className={s.plTeam}>
@@ -91,13 +89,13 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
               ce que le module existe justement pour éviter. */}
           {playerRosterStatus(player) === "ROSTER" && player.team ? (
             <>
-              {PLAYER_ROSTER_STATUS_LABEL.ROSTER} ·{" "}
+              {t("card.rosterStatus.ROSTER")} ·{" "}
               {/* Carte d'un compte supprimé : ligne d'équipe en retrait, sans marche. */}
               <TeamLink
                 teamId={player.team.id}
                 podiumTier={player.isDeleted ? null : undefined}
                 className={`${s.aboveOverlay} tap-target`}
-                title={`Voir la fiche de ${player.team.name}`}
+                title={t("card.viewProfile", { name: player.team.name })}
               >
                 <em>{player.team.name.toUpperCase()}</em>
               </TeamLink>
@@ -112,7 +110,7 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
         <div className={s.plRoles}>
           {(player.roles || []).slice(0, 4).map((r) => (
             <span key={r} className={s.plRole} data-tone={teamRoleTone(r)}>
-              {ROLE_LABEL[r] || r}
+              {cardRoleLabel(text, r)}
             </span>
           ))}
         </div>
@@ -120,11 +118,11 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
 
       <div className={s.plStats}>
         <div>
-          <div className={s.plStatLbl}>Tournois</div>
+          <div className={s.plStatLbl}>{t("card.tournaments")}</div>
           <div className={s.plStatVal}>{player.tournamentsCount || 0}</div>
         </div>
         <div>
-          <div className={s.plStatLbl}>V – D</div>
+          <div className={s.plStatLbl}>{t("card.record")}</div>
           <div className={s.plStatVal}>
             {player.wins || 0}–<span className="result-loss">{player.losses || 0}</span>
           </div>

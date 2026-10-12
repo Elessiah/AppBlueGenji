@@ -56,12 +56,22 @@ import enTournamentForm from "@/messages/en/tournamentForm.json";
 import frTournamentForm from "@/messages/fr/tournamentForm.json";
 import enLaunchModal from "@/messages/en/launchModal.json";
 import frLaunchModal from "@/messages/fr/launchModal.json";
+import enTeams from "@/messages/en/teams.json";
+import frTeams from "@/messages/fr/teams.json";
+import enTeam from "@/messages/en/team.json";
+import frTeam from "@/messages/fr/team.json";
+import enTeamErrors from "@/messages/en/teamErrors.json";
+import frTeamErrors from "@/messages/fr/teamErrors.json";
+import enTeamRoles from "@/messages/en/teamRoles.json";
+import frTeamRoles from "@/messages/fr/teamRoles.json";
+import enPlayers from "@/messages/en/players.json";
+import frPlayers from "@/messages/fr/players.json";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 
 const CATALOG: Readonly<Record<Locale, Messages>> = {
-  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels, share: frShare, login: frLogin, bot: frBot, association: frAssociation, volunteers: frVolunteers, recruitment: frRecruitment, legal: frLegal, tournaments: frTournaments, tournament: frTournament, tournamentViews: frTournamentViews, tournamentErrors: frTournamentErrors, tournamentActions: frTournamentActions, tournamentDialogs: frTournamentDialogs, tournamentImage: frTournamentImage, tournamentForm: frTournamentForm, launchModal: frLaunchModal },
-  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels, share: enShare, login: enLogin, bot: enBot, association: enAssociation, volunteers: enVolunteers, recruitment: enRecruitment, legal: enLegal, tournaments: enTournaments, tournament: enTournament, tournamentViews: enTournamentViews, tournamentErrors: enTournamentErrors, tournamentActions: enTournamentActions, tournamentDialogs: enTournamentDialogs, tournamentImage: enTournamentImage, tournamentForm: enTournamentForm, launchModal: enLaunchModal },
+  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels, share: frShare, login: frLogin, bot: frBot, association: frAssociation, volunteers: frVolunteers, recruitment: frRecruitment, legal: frLegal, tournaments: frTournaments, tournament: frTournament, tournamentViews: frTournamentViews, tournamentErrors: frTournamentErrors, tournamentActions: frTournamentActions, tournamentDialogs: frTournamentDialogs, tournamentImage: frTournamentImage, tournamentForm: frTournamentForm, launchModal: frLaunchModal, teams: frTeams, team: frTeam, teamErrors: frTeamErrors, teamRoles: frTeamRoles, players: frPlayers },
+  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels, share: enShare, login: enLogin, bot: enBot, association: enAssociation, volunteers: enVolunteers, recruitment: enRecruitment, legal: enLegal, tournaments: enTournaments, tournament: enTournament, tournamentViews: enTournamentViews, tournamentErrors: enTournamentErrors, tournamentActions: enTournamentActions, tournamentDialogs: enTournamentDialogs, tournamentImage: enTournamentImage, tournamentForm: enTournamentForm, launchModal: enLaunchModal, teams: enTeams, team: enTeam, teamErrors: enTeamErrors, teamRoles: enTeamRoles, players: enPlayers },
 };
 
 export function messagesFor(locale: Locale): Messages {

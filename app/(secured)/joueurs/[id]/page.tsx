@@ -1,62 +1,78 @@
 "use client";
 
-import Link from "next/link";
 import { TeamLink } from "@/components/entity-link";
 import { PlayerPodiumName } from "@/components/podium-tiers";
 import { DiscordTag } from "@/components/discord-tag";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { UserX } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { FullProfileResponse } from "@/lib/shared/types";
-import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import { PlayerModerationBar } from "./_components/PlayerModerationBar";
 import { PlayerRolesPanel } from "./_components/PlayerRolesPanel";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { richNodes } from "@/components/i18n/shell-text";
+import { usePlayersText, type PlayersText } from "@/components/i18n/players-text";
+import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
+import { formatTeamRoles } from "@/lib/shared/team-role-display";
+import type { TeamRole } from "@/lib/shared/types";
+import { playerErrorMessage } from "../_lib/player-errors";
 import styles from "./player.module.css";
 
 /** Majorité telle que la fiche l'affiche : `null` est une donnée masquée (ou absente). */
-function adultLabel(isAdult: boolean | null): string {
-  if (isAdult === null) return "Masqué";
-  return isAdult ? "Oui (18+)" : "Non (mineur)";
+function adultLabel(text: PlayersText, isAdult: boolean | null): string {
+  if (isAdult === null) return text.t("page.hidden");
+  return isAdult ? text.t("page.adultYes") : text.t("page.adultNo");
+}
+
+const TOURNAMENT_STATES = ["UPCOMING", "REGISTRATION", "RUNNING", "FINISHED"] as const;
+
+/** État d'un tournoi de l'historique : il s'affichait en code brut (`FINISHED`). */
+function tournamentStateLabel(text: PlayersText, state: string): string {
+  const known = TOURNAMENT_STATES.find((code) => code === state);
+  return known ? text.t(`page.state.${known}`) : state;
 }
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const router = useLocaleRouter();
   const { showError } = useToast();
+  const text = usePlayersText();
+  const { t, locale } = text;
+  const statsI18n = useStatsPanelI18n();
   const { status, data, error, refresh } = useResourceLoader<FullProfileResponse>(
     `/api/players/${params.id}`,
     {
       onNotFoundRedirect: () => {
-        showError("PLAYER_NOT_FOUND");
+        showError(playerErrorMessage(text, "PLAYER_NOT_FOUND"));
         setTimeout(() => router.push("/joueurs"), 1500);
       },
     },
   );
   if (status === "loading")
-    return <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>Chargement du profil joueur...</section>;
+    return <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>{t("page.loading")}</section>;
 
   if (status === "not-found")
     return (
       <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>
-        Joueur non trouvé.{" "}
-        <Link href="/joueurs" style={{ color: "var(--blue-100)" }}>
-          Retour aux joueurs
-        </Link>
+        {t("page.notFound")}{" "}
+        <LocaleLink href="/joueurs" style={{ color: "var(--blue-100)" }}>
+          {t("page.backToPlayers")}
+        </LocaleLink>
       </section>
     );
 
   if (status === "error") {
-    showError(error ?? "PLAYER_LOAD_FAILED");
+    showError(playerErrorMessage(text, error, "PLAYER_LOAD_FAILED"));
     return (
       <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>
-        Erreur lors du chargement du joueur.{" "}
-        <Link href="/joueurs" style={{ color: "var(--blue-100)" }}>
-          Retour aux joueurs
-        </Link>
+        {t("page.loadError")}{" "}
+        <LocaleLink href="/joueurs" style={{ color: "var(--blue-100)" }}>
+          {t("page.backToPlayers")}
+        </LocaleLink>
       </section>
     );
   }
@@ -65,9 +81,7 @@ export default function PlayerDetailPage() {
 
   // Un BattleTag masqué au public n'arrive jusqu'ici que pour son titulaire, ou
   // pour un lecteur que la règle d'exposition autorise (même match, arbitrage).
-  const hiddenBattletagHint = data.isSelf
-    ? "Masqué au public : seuls les joueurs de tes matchs et l'arbitrage le lisent, tant que le tournoi n'est pas terminé."
-    : "Masqué au public : tu le lis pour jouer ou arbitrer un tournoi qui n'est pas terminé. Ne le diffuse pas.";
+  const hiddenBattletagHint = data.isSelf ? t("page.battletagHiddenSelf") : t("page.battletagHiddenOther");
   const battletagHint =
     data.profile.overwatchBattletag && !data.profile.visibility.overwatch ? hiddenBattletagHint : null;
 
@@ -108,7 +122,7 @@ export default function PlayerDetailPage() {
                 {deleted && (
                   <span className={styles.deletedBadge}>
                     <UserX size={12} aria-hidden="true" />
-                    Compte supprimé
+                    {t("page.deletedBadge")}
                   </span>
                 )}
                 <h1
@@ -128,21 +142,21 @@ export default function PlayerDetailPage() {
                   // élément qui a un rôle (`aria-prohibited-attr`), et c'en est
                   // un — l'équipe et les rôles du joueur, lus ensemble.
                   className="native-group"
-                  aria-label="Équipe et rôles du joueur"
+                  aria-label={t("page.teamAndRoles")}
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >
                   {activeTeam ? (
-                    <Link
+                    <LocaleLink
                       href={`/equipes/${activeTeam.teamId}`}
                       className="badge"
                       style={{ fontSize: 11 }}
-                      title={`Voir la fiche de ${activeTeam.teamName}`}
+                      title={t("page.viewTeam", { name: activeTeam.teamName })}
                     >
                       {activeTeam.teamName}
-                    </Link>
+                    </LocaleLink>
                   ) : (
-                    <span className="badge" style={{ fontSize: 11, opacity: 0.7 }} title="Ce joueur n'est dans aucune équipe">
-                      Sans équipe
+                    <span className="badge" style={{ fontSize: 11, opacity: 0.7 }} title={t("page.noTeamTitle")}>
+                      {t("page.noTeam")}
                     </span>
                   )}
                   {data.displayRoles.map((role) => (
@@ -150,25 +164,21 @@ export default function PlayerDetailPage() {
                       key={role}
                       className="pill pill-accent"
                       style={{ fontSize: 11 }}
-                      title={ROLE_DESCRIPTIONS[role]}
+                      title={t(`platformRoles.${role}.description`)}
                     >
-                      {ROLE_LABELS[role]}
+                      {t(`platformRoles.${role}.label`)}
                     </span>
                   ))}
                 </fieldset>
               </div>
             </div>
-            <Link href="/joueurs" className={`btn ghost ${styles.back}`}>
-              ← Joueurs
-            </Link>
+            <LocaleLink href="/joueurs" className={`btn ghost ${styles.back}`}>
+              {t("page.back")}
+            </LocaleLink>
           </div>
 
           {deleted && (
-            <p className={styles.deletedNotice}>
-              Ce joueur a supprimé son compte. Ses informations personnelles ont été effacées et son
-              pseudo remplacé par un pseudo d'emprunt ; ses résultats restent, parce qu'ils appartiennent
-              aussi aux équipes qu'il a affrontées.
-            </p>
+            <p className={styles.deletedNotice}>{t("page.deletedNotice")}</p>
           )}
           {/* Pas de rangée de chiffres ici : elle recopiait les tuiles du bloc
               « Statistiques » juste dessous (≈ 500 px de doublon sur mobile),
@@ -181,9 +191,9 @@ export default function PlayerDetailPage() {
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
         <div className="ds-section-title blue">
-          <h2>Statistiques</h2>
+          <h2>{t("page.statsTitle")}</h2>
         </div>
-        <StatsPanel stats={data.stats} accent="blue" />
+        <StatsPanel stats={data.stats} accent="blue" i18n={statsI18n} />
       </div>
 
       {/* Un compte supprimé n'a plus rien à montrer ici : tags et majorité ont
@@ -191,14 +201,14 @@ export default function PlayerDetailPage() {
       {!deleted && (
         <div className="ds-block" style={{ marginBottom: 20 }}>
           <div className="ds-section-title blue">
-            <h2>Informations</h2>
+            <h2>{t("page.infoTitle")}</h2>
           </div>
           <div className="form-grid">
             <div className="field">
-              <label htmlFor="player-battletag">BattleTag Overwatch</label>
+              <label htmlFor="player-battletag">{t("page.battletag")}</label>
               <input
                 id="player-battletag"
-                value={data.profile.overwatchBattletag || "Masqué"}
+                value={data.profile.overwatchBattletag || t("page.hidden")}
                 readOnly
                 aria-describedby={battletagHint ? "player-battletag-hint" : undefined}
               />
@@ -214,8 +224,8 @@ export default function PlayerDetailPage() {
               )}
             </div>
             <div className="field">
-              <label htmlFor="player-marvel-rivals-tag">Tag Marvel Rivals</label>
-              <input id="player-marvel-rivals-tag" value={data.profile.marvelRivalsTag || "Masqué"} readOnly />
+              <label htmlFor="player-marvel-rivals-tag">{t("page.marvelRivalsTag")}</label>
+              <input id="player-marvel-rivals-tag" value={data.profile.marvelRivalsTag || t("page.hidden")} readOnly />
             </div>
             {/*
               Même convention que ses deux voisins : « Masqué » couvre aussi bien
@@ -229,7 +239,7 @@ export default function PlayerDetailPage() {
               « tous les Discord vérifiés » d'un tournoi.
             */}
             <div className="field">
-              <span className="field-label">Discord</span>
+              <span className="field-label">{t("page.discord")}</span>
               <div
                 style={{
                   display: "flex",
@@ -241,15 +251,16 @@ export default function PlayerDetailPage() {
                 <DiscordTag
                   tag={data.profile.discordPseudo}
                   verified={data.profile.discordVerified}
-                  fallback="Masqué"
+                  fallback={t("page.hidden")}
+                  badgeLabels={{ alt: t("page.verifiedAlt"), title: t("page.verifiedTitle") }}
                 />
               </div>
             </div>
             <div className="field">
-              <label htmlFor="player-adult">Majorité</label>
+              <label htmlFor="player-adult">{t("page.adult")}</label>
               <input
                 id="player-adult"
-                value={adultLabel(data.profile.isAdult)}
+                value={adultLabel(text, data.profile.isAdult)}
                 readOnly
               />
             </div>
@@ -264,21 +275,23 @@ export default function PlayerDetailPage() {
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
         <div className="ds-section-title blue">
-          <h2>Historique équipes</h2>
+          <h2>{t("page.teamsTitle")}</h2>
         </div>
         <div className="table-like">
           <div className="table-row table-header">
-            <span>Équipe</span>
-            <span>Rôles</span>
-            <span>Début</span>
-            <span>Fin</span>
+            <span>{t("page.teamsColumn.team")}</span>
+            <span>{t("page.teamsColumn.roles")}</span>
+            <span>{t("page.teamsColumn.start")}</span>
+            <span>{t("page.teamsColumn.end")}</span>
           </div>
           {data.teamsTimeline.map((entry) => (
             <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
               <TeamLink teamId={entry.teamId} podiumTier={deleted ? null : undefined}>{entry.teamName}</TeamLink>
-              <span data-label="Rôles">{entry.roles.join(", ")}</span>
-              <span data-label="Début">{formatLocalDate(entry.joinedAt)}</span>
-              <span data-label="Fin">{entry.leftAt ? formatLocalDate(entry.leftAt) : "Actif"}</span>
+              <span data-label={t("page.teamsColumn.roles")}>{formatTeamRoles(entry.roles as TeamRole[], locale)}</span>
+              <span data-label={t("page.teamsColumn.start")}>{formatLocalDate(entry.joinedAt, locale)}</span>
+              <span data-label={t("page.teamsColumn.end")}>
+                {entry.leftAt ? formatLocalDate(entry.leftAt, locale) : t("page.active")}
+              </span>
             </div>
           ))}
         </div>
@@ -286,23 +299,27 @@ export default function PlayerDetailPage() {
 
       <div className="ds-block">
         <div className="ds-section-title blue">
-          <h2>Historique tournois</h2>
+          <h2>{t("page.tournamentsTitle")}</h2>
         </div>
         <div className="table-like">
           <div className="table-row table-header">
-            <span>Tournoi</span>
-            <span>Statut</span>
-            <span>Bilan</span>
-            <span>Classement</span>
+            <span>{t("page.tournamentsColumn.tournament")}</span>
+            <span>{t("page.tournamentsColumn.state")}</span>
+            <span>{t("page.tournamentsColumn.record")}</span>
+            <span>{t("page.tournamentsColumn.rank")}</span>
           </div>
           {data.tournaments.map((entry) => (
             <div className="table-row" key={`${entry.tournamentId}-${entry.playedAt}`}>
-              <Link href={`/tournois/${entry.tournamentId}`}>{entry.tournamentName}</Link>
-              <span data-label="Statut">{entry.state}</span>
-              <span data-label="Bilan">
-                {entry.wins}W / <span className="result-loss">{entry.losses}L</span>
+              <LocaleLink href={`/tournois/${entry.tournamentId}`}>{entry.tournamentName}</LocaleLink>
+              <span data-label={t("page.tournamentsColumn.state")}>{tournamentStateLabel(text, entry.state)}</span>
+              <span data-label={t("page.tournamentsColumn.record")}>
+                {richNodes(
+                  text.rich("page.record", { wins: entry.wins, losses: entry.losses }, {
+                    loss: (chunks) => <span className="result-loss">{chunks}</span>,
+                  }),
+                )}
               </span>
-              <span data-label="Classement">{entry.finalRank ?? "-"}</span>
+              <span data-label={t("page.tournamentsColumn.rank")}>{entry.finalRank ?? "-"}</span>
             </div>
           ))}
         </div>

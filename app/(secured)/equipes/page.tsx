@@ -1,255 +1,36 @@
-"use client";
+import type { Metadata } from "next";
+import { localeAlternates, localeHref } from "@/lib/shared/locales";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
+import { TeamsTextProvider } from "@/components/i18n/teams-text";
+import TeamsList from "./TeamsList";
 
-import Link from "next/link";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { TeamListItem } from "@/lib/shared/types";
-import { useToast } from "@/components/ui/toast";
-import { Ticker } from "@/components/cyber/Ticker";
-import { BgCanvas } from "../_shared/BgCanvas";
-import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
-import { DirectoryShowMore } from "../_shared/DirectoryShowMore";
-import { useProgressiveList } from "@/lib/shared/hooks/useProgressiveList";
-import { TeamCard } from "./cards/TeamCard";
-import { HighlightStrip } from "./cards/HighlightStrip";
-import { GhostTeamDialog } from "./GhostTeamDialog";
-import { teamErrorMessage } from "./_lib/team-errors";
-import s from "../_shared/annuaire.module.css";
+/**
+ * `/equipes` et `/en/equipes` (lot 9) : la page reste cliente (`TeamsList`) ;
+ * cette enveloppe serveur déclare ses métadonnées dans la langue de l'adresse —
+ * titre, canonique et `hreflang` réciproques — et pose les textes de
+ * l'annuaire (l'anglais sous `/en` seulement). `noindex` vient de la mise en
+ * page de l'espace sécurisé, et la page reste hors sitemap.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await requestLocale();
+  const { meta } = messagesFor(locale).teams;
+  const path = "/equipes";
+  const languages = localeAlternates(path);
+  const canonical = localeHref(path, locale);
+  return {
+    title: meta.title,
+    description: meta.description,
+    alternates: languages ? { canonical, languages } : { canonical },
+  };
+}
 
-// Violet néon (`--violet-400-rgb`, littéral : le canevas de fond ne lit pas les variables CSS).
-const ACCENT_RGB = "167, 139, 250";
-const ACCENT_300 = "var(--violet-300)";
-const ACCENT_500 = "var(--violet-400)";
-
-type GameFilter = "all" | "ow" | "mr";
-type SortKey = "rank" | "name" | "wins" | "members";
-
-const TICKER_ITEMS = [
-  "ROSTER · Annuaire mis à jour quotidiennement",
-  "CLASSEMENT · Calculé sur l'ensemble des matchs validés",
-  "COMMUNAUTÉ · Inscris ton équipe pour rejoindre la saison",
-];
-
-export default function TeamsPage() {
-  const { showError } = useToast();
-  const [teams, setTeams] = useState<TeamListItem[]>([]);
-  const [activeTeam, setActiveTeam] = useState<{ teamId: number; teamName: string } | null>(null);
-  const [query, setQuery] = useState("");
-  const [gameFilter, setGameFilter] = useState<GameFilter>("all");
-  const [sort, setSort] = useState<SortKey>("rank");
-  // Staff `tournaments` : peut créer et administrer les équipes fantômes.
-  const [canManageGhostTeams, setCanManageGhostTeams] = useState(false);
-  const [ghostDialogOpen, setGhostDialogOpen] = useState(false);
-
-  const loadTeams = useCallback(() => {
-    fetch("/api/teams", { cache: "no-store" })
-      .then(async (response) => {
-        const payload = (await response.json()) as {
-          error?: string;
-          teams?: TeamListItem[];
-          activeTeam?: { teamId: number; teamName: string } | null;
-          canManageGhostTeams?: boolean;
-        };
-        if (!response.ok || !payload.teams) {
-          throw new Error(payload.error || "TEAMS_LOAD_FAILED");
-        }
-        setTeams(payload.teams);
-        setActiveTeam(payload.activeTeam || null);
-        setCanManageGhostTeams(payload.canManageGhostTeams === true);
-      })
-      .catch((e) => showError(teamErrorMessage((e as Error).message)));
-  }, [showError]);
-
-  useEffect(() => {
-    loadTeams();
-  }, [loadTeams]);
-
-  // Recherche différée : le champ suit la frappe, la grille suit sans la bloquer.
-  const deferredQuery = useDeferredValue(query);
-  const filtered = useMemo(() => {
-    const q = deferredQuery.trim().toLowerCase();
-    let r = teams.filter((t) => {
-      // Le sigle est un nom court : on cherche une équipe par « BG » comme par
-      // son nom complet.
-      if (q && !`${t.name} ${t.tag || ""} ${t.region || ""}`.toLowerCase().includes(q)) return false;
-      if (gameFilter === "all") return true;
-      if (gameFilter === "ow") return t.games.includes("OW");
-      if (gameFilter === "mr") return t.games.includes("MR");
-      return true;
-    });
-    r = [...r];
-    if (sort === "rank") r.sort((a, b) => a.rank - b.rank);
-    if (sort === "name") r.sort((a, b) => a.name.localeCompare(b.name, "fr"));
-    if (sort === "wins") r.sort((a, b) => b.wins - a.wins);
-    if (sort === "members") r.sort((a, b) => b.membersCount - a.membersCount);
-    return r;
-  }, [teams, deferredQuery, gameFilter, sort]);
-
-  // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
-  const gridRef = useRef<HTMLDivElement>(null);
-  const page = useProgressiveList(
-    filtered,
-    JSON.stringify([deferredQuery.trim().toLowerCase(), gameFilter, sort]),
-  );
-
-  const totalMembers = teams.reduce((sum, t) => sum + t.membersCount, 0);
-  const countOw = teams.filter((t) => t.games.includes("OW")).length;
-  const countMr = teams.filter((t) => t.games.includes("MR")).length;
-
-  const accentStyle = {
-    "--g-rgb": ACCENT_RGB,
-    "--g-300": ACCENT_300,
-    "--g-500": ACCENT_500,
-  } as React.CSSProperties;
-
+export default async function TeamsPage() {
+  const locale = await requestLocale();
+  const messages = locale === "en" ? messagesFor(locale).teams : undefined;
   return (
-    <div className="page-wide" style={accentStyle}>
-      <BgCanvas rgb={ACCENT_RGB} />
-
-      <header className={s.page}>
-        <div className="fabric" />
-        <div className={`container ${s.pageInner}`}>
-          <div className={s.pageHead}>
-            <div>
-              <span className="eyebrow">COMMUNAUTÉ · ROSTERS</span>
-              <h1 className={s.title}>
-                Équipes <em>inscrites</em>
-              </h1>
-              <div className={s.subtitle}>ANNUAIRE · ROSTERS · CLASSEMENT GÉNÉRAL</div>
-            </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              {canManageGhostTeams && (
-                <button
-                  type="button"
-                  className={s.ctaGhost}
-                  onClick={() => setGhostDialogOpen(true)}
-                >
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                  Équipe fantôme
-                </button>
-              )}
-              {!activeTeam && (
-                <Link href="/equipes/creer" className={s.cta}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                  Créer une équipe
-                </Link>
-              )}
-            </div>
-          </div>
-
-          <div className={s.metrics}>
-            <div className={s.metric}>
-              <div className={s.metricNum}>
-                <em>{teams.length}</em>
-              </div>
-              <div className={s.metricLbl}>Équipes actives</div>
-            </div>
-            <div className={s.metric}>
-              <div className={s.metricNum}>{totalMembers}</div>
-              <div className={s.metricLbl}>Joueurs sous roster</div>
-            </div>
-            <div className={s.metric}>
-              <div className={s.metricNum}>{countOw}</div>
-              <div className={s.metricLbl}>Équipes Overwatch</div>
-            </div>
-            <div className={s.metric}>
-              <div className={s.metricNum}>{countMr}</div>
-              <div className={s.metricLbl}>Équipes Marvel Rivals</div>
-            </div>
-          </div>
-
-          {/* Recherche, jeux et tri : deux rangées, une seule sur grand écran. */}
-          <div className={s.controls}>
-            <div className={s.toolbar}>
-              <AnnuaireSearchField
-                label="Rechercher une équipe"
-                placeholder="Rechercher une équipe, un tag, une région…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <div className={s.filters}>
-                {(
-                  [
-                    ["all", "Toutes", teams.length],
-                    ["ow", "Overwatch", countOw],
-                    ["mr", "Marvel Rivals", countMr],
-                  ] as const
-                ).map(([k, label, n]) => (
-                  <button
-                    key={k}
-                    className={`${s.chip} ${gameFilter === k ? s.chipOn : ""}`}
-                    onClick={() => setGameFilter(k)}
-                  >
-                    {label}
-                    <span className={s.num}>{n}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={s.sortRow}>
-              <span>{filtered.length} équipe{filtered.length > 1 ? "s" : ""}</span>
-              <div className={s.sortOpts}>
-                <span style={{ color: "var(--ink-dim)" }}>Trier :</span>
-                {(
-                  [
-                    ["rank", "Classement"],
-                    ["name", "Nom"],
-                    ["wins", "Victoires"],
-                    ["members", "Effectif"],
-                  ] as const
-                ).map(([k, l]) => (
-                  <button
-                    key={k}
-                    className={`${s.sortBtn} ${sort === k ? s.sortBtnOn : ""}`}
-                    onClick={() => setSort(k)}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <Ticker items={TICKER_ITEMS} />
-
-      <section className={`container ${s.sections}`}>
-        {sort === "rank" && filtered.length >= 3 && <HighlightStrip teams={filtered} />}
-
-        <div className={s.section}>
-          <div className={s.sectionHead}>
-            <span className={s.sectionIx}>01</span>
-            <span className={s.sectionTtl}>
-              ROSTERS <span className={s.sectionAccent}>· SAISON ACTUELLE</span>
-            </span>
-            <span className={s.sectionCount}>{filtered.length} ÉQUIPES</span>
-          </div>
-
-          <div style={{ paddingTop: 24 }}>
-            <div className={s.tmGrid} ref={gridRef}>
-              {page.visible.map((t) => (
-                <TeamCard key={t.id} team={t} />
-              ))}
-            </div>
-            <DirectoryShowMore
-              hidden={page.hidden}
-              shown={page.visible.length}
-              noun="équipes"
-              gridRef={gridRef}
-              onShowMore={page.showMore}
-            />
-          </div>
-        </div>
-      </section>
-
-      {ghostDialogOpen && (
-        <GhostTeamDialog onClose={() => setGhostDialogOpen(false)} onCreated={loadTeams} />
-      )}
-    </div>
+    <TeamsTextProvider locale={locale} messages={messages}>
+      <TeamsList />
+    </TeamsTextProvider>
   );
 }

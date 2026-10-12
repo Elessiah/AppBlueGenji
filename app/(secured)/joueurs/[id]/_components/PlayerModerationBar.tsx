@@ -15,6 +15,7 @@ import {
 } from "@/lib/shared/account-suspension";
 import { moderationReasonErrorMessage } from "@/lib/shared/logo-quarantine";
 import type { FullProfileResponse } from "@/lib/shared/types";
+import { useStaffLang } from "@/components/i18n/staff-lang";
 import styles from "../player.module.css";
 
 /**
@@ -26,6 +27,9 @@ import styles from "../player.module.css";
  * au joueur avec la décision (DSA, art. 17). Rien n'est rendu pour un compte
  * supprimé, ni hors modération (`canModerate`, dont découlent les deux
  * drapeaux du profil).
+ *
+ * Outil de la modération : il reste **français** sous `/en` (D4), annoncé
+ * `lang="fr"` — bandeau, fenêtres de confirmation et notifications.
  */
 export function PlayerModerationBar({
   profile,
@@ -37,6 +41,7 @@ export function PlayerModerationBar({
   onChanged: () => void;
 }>) {
   const [dialog, setDialog] = useState<"avatar" | "suspend" | "lift" | null>(null);
+  const staffLang = useStaffLang();
   const suspension = profile.moderationSuspension;
   const showAvatar = profile.moderationAvatarPresent;
   const showSuspension = suspension !== null || profile.moderationSuspendable;
@@ -50,7 +55,7 @@ export function PlayerModerationBar({
   };
 
   return (
-    <fieldset className={`native-group ${styles.moderationBar}`} aria-label="Modération">
+    <fieldset className={`native-group ${styles.moderationBar}`} aria-label="Modération" lang={staffLang}>
       <span className={styles.moderationLabel}>MODÉRATION</span>
       {suspension && (
         <span className={styles.moderationStatus}>
@@ -122,10 +127,13 @@ function AvatarRemovalDialog({
   onDone: () => void;
 }>) {
   const { showError, showSuccess } = useToast();
+  const staffLang = useStaffLang();
+  const lang = staffLang ? { lang: staffLang } : undefined;
   const [reason, setReason] = useState("");
   const pseudo = profile.profile.pseudo;
   return (
     <ConfirmActionDialog
+      contentLang={staffLang}
       title={`Retirer l'avatar de ${pseudo} ?`}
       confirmLabel="Retirer l'avatar"
       pendingLabel="Retrait…"
@@ -136,10 +144,10 @@ function AvatarRemovalDialog({
       onConfirm={async () => {
         const error = await moderationRequest(`/api/admin/users/${profile.profile.id}/avatar`, "DELETE", { reason });
         if (error) {
-          showError(avatarErrorMessage(error));
+          showError(avatarErrorMessage(error), lang);
           return false;
         }
-        showSuccess("Avatar retiré. Le joueur s'affiche désormais avec l'initiale de son pseudo.");
+        showSuccess("Avatar retiré. Le joueur s'affiche désormais avec l'initiale de son pseudo.", lang);
         onDone();
         return true;
       }}
@@ -163,6 +171,8 @@ function SuspendDialog({
   onDone: () => void;
 }>) {
   const { showError, showSuccess } = useToast();
+  const staffLang = useStaffLang();
+  const lang = staffLang ? { lang: staffLang } : undefined;
   const groundId = useId();
   const durationId = useId();
   const [reason, setReason] = useState("");
@@ -174,6 +184,7 @@ function SuspendDialog({
 
   return (
     <ConfirmActionDialog
+      contentLang={staffLang}
       title={`Suspendre le compte de ${pseudo} ?`}
       confirmLabel="Suspendre le compte"
       pendingLabel="Suspension…"
@@ -188,10 +199,10 @@ function SuspendDialog({
           durationDays: duration === "indefinite" ? null : Number(duration),
         });
         if (error) {
-          showError(suspensionErrorMessage(error));
+          showError(suspensionErrorMessage(error), lang);
           return false;
         }
-        showSuccess("Compte suspendu. Ses sessions sont fermées et le joueur est prévenu.");
+        showSuccess("Compte suspendu. Ses sessions sont fermées et le joueur est prévenu.", lang);
         onDone();
         return true;
       }}
@@ -250,8 +261,11 @@ function LiftDialog({
   onDone: () => void;
 }>) {
   const { showError, showSuccess } = useToast();
+  const staffLang = useStaffLang();
+  const lang = staffLang ? { lang: staffLang } : undefined;
   return (
     <ConfirmActionDialog
+      contentLang={staffLang}
       title="Lever la suspension ?"
       confirmLabel="Lever la suspension"
       pendingLabel="Levée…"
@@ -260,10 +274,10 @@ function LiftDialog({
       onConfirm={async () => {
         const error = await moderationRequest(`/api/admin/users/${profile.profile.id}/suspension`, "DELETE");
         if (error) {
-          showError(suspensionErrorMessage(error));
+          showError(suspensionErrorMessage(error), lang);
           return false;
         }
-        showSuccess("Suspension levée. Le joueur peut de nouveau se connecter et en est prévenu.");
+        showSuccess("Suspension levée. Le joueur peut de nouveau se connecter et en est prévenu.", lang);
         onDone();
         return true;
       }}

@@ -26,6 +26,12 @@ export const PLAYER_PAGE_FALLBACK_TITLE = "Joueur";
 export const DELETED_PLAYER_PAGE_TITLE = "Compte supprimé";
 
 export type TeamPageIdentity = { name: string };
+
+/**
+ * Les mots du titre dans la langue de la page (lot 9 : `team.meta`,
+ * `players.meta`) ; par défaut, le français ci-dessus.
+ */
+export type EntityTitleWords = { fallback: string; deleted?: string };
 export type PlayerPageIdentity = { pseudo: string; isDeleted: boolean };
 
 /**
@@ -33,20 +39,26 @@ export type PlayerPageIdentity = { pseudo: string; isDeleted: boolean };
  * pas de fiche d'équipe : la page mène au profil du joueur) ou lecteur non
  * connecté — retombe sur le titre générique, qui ne nomme personne.
  */
-export function teamPageTitle(team: TeamPageIdentity | null): string {
+export function teamPageTitle(
+  team: TeamPageIdentity | null,
+  words: EntityTitleWords = { fallback: TEAM_PAGE_FALLBACK_TITLE },
+): string {
   const name = team?.name.trim();
-  return name ? `${name} · ${TEAM_PAGE_FALLBACK_TITLE}` : TEAM_PAGE_FALLBACK_TITLE;
+  return name ? `${name} · ${words.fallback}` : words.fallback;
 }
 
 /**
  * Titre de `/joueurs/[id]`. Le pseudo n'a pas de réglage de visibilité — la
  * fiche l'affiche à tout lecteur connecté —, seul un compte anonymisé est tu.
  */
-export function playerPageTitle(player: PlayerPageIdentity | null): string {
-  if (!player) return PLAYER_PAGE_FALLBACK_TITLE;
-  if (player.isDeleted) return `${DELETED_PLAYER_PAGE_TITLE} · ${PLAYER_PAGE_FALLBACK_TITLE}`;
+export function playerPageTitle(
+  player: PlayerPageIdentity | null,
+  words: EntityTitleWords = { fallback: PLAYER_PAGE_FALLBACK_TITLE, deleted: DELETED_PLAYER_PAGE_TITLE },
+): string {
+  if (!player) return words.fallback;
+  if (player.isDeleted) return `${words.deleted ?? DELETED_PLAYER_PAGE_TITLE} · ${words.fallback}`;
   const pseudo = player.pseudo.trim();
-  return pseudo ? `${pseudo} · ${PLAYER_PAGE_FALLBACK_TITLE}` : PLAYER_PAGE_FALLBACK_TITLE;
+  return pseudo ? `${pseudo} · ${words.fallback}` : words.fallback;
 }
 
 /**

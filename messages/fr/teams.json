@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "title": "Équipes",
+    "description": "L'annuaire des équipes inscrites sur BlueGenji : rosters, classement, forme récente.",
+    "createTitle": "Créer une équipe"
+  },
+  "list": {
+    "eyebrow": "COMMUNAUTÉ · ROSTERS",
+    "title": "Équipes <em>inscrites</em>",
+    "subtitle": "ANNUAIRE · ROSTERS · CLASSEMENT GÉNÉRAL",
+    "ghostTeam": "Équipe fantôme",
+    "createTeam": "Créer une équipe",
+    "metrics": {
+      "teams": "Équipes actives",
+      "members": "Joueurs sous roster",
+      "overwatch": "Équipes Overwatch",
+      "marvelRivals": "Équipes Marvel Rivals"
+    },
+    "searchLabel": "Rechercher une équipe",
+    "searchPlaceholder": "Rechercher une équipe, un tag, une région…",
+    "filters": {
+      "all": "Toutes",
+      "ow": "Overwatch",
+      "mr": "Marvel Rivals"
+    },
+    "count": "{count, plural, one {# équipe} other {# équipes}}",
+    "sortBy": "Trier :",
+    "sort": {
+      "rank": "Classement",
+      "name": "Nom",
+      "wins": "Victoires",
+      "members": "Effectif"
+    },
+    "sectionTitle": "ROSTERS",
+    "sectionAccent": "· SAISON ACTUELLE",
+    "sectionCount": "{count} ÉQUIPES",
+    "showMore": "Voir plus ({step} sur {hidden, plural, one {# restant} other {# restants}})",
+    "showMoreNoun": "équipes"
+  },
+  "ticker": {
+    "roster": "ROSTER · Annuaire mis à jour quotidiennement",
+    "ranking": "CLASSEMENT · Calculé sur l'ensemble des matchs validés",
+    "community": "COMMUNAUTÉ · Inscris ton équipe pour rejoindre la saison",
+    "label": "Fil d'actualité",
+    "resume": "Relancer le défilement du bandeau",
+    "pause": "Mettre en pause le défilement du bandeau",
+    "resumeShort": "Relancer",
+    "pauseShort": "Pause"
+  },
+  "card": {
+    "viewProfile": "Voir la fiche de {name}",
+    "ghostTitle": "Équipe fantôme, créée par le staff",
+    "ghostBadge": "FANTÔME",
+    "form": "Forme",
+    "formOrder": "· récent → ancien",
+    "formSpoken": "{count} derniers matchs, du plus récent au plus ancien : {results}",
+    "formResult": {
+      "w": "victoire",
+      "l": "défaite",
+      "d": "nul"
+    },
+    "pointsShort": "Pts",
+    "winsShort": "Vict.",
+    "wins": "Victoires",
+    "lossesShort": "Déf.",
+    "losses": "Défaites",
+    "roster": "Roster",
+    "founded": "FONDÉE · {date}",
+    "cta": "Voir l'équipe →",
+    "record": "{wins}V – <loss>{losses}D</loss>",
+    "ptsShort": "PTS"
+  },
+  "points": {
+    "label": "Points de classement",
+    "unrankedShort": "Aucun match",
+    "hint": "Base {base} · plus la victoire est improbable, plus elle rapporte · le rang final d'un tournoi en redistribue aussi (plancher {floor})",
+    "unrankedHint": "Aucun match joué : cote de départ",
+    "placementOnlyHint": "Aucun match joué · cote issue de ses classements de tournoi"
+  },
+  "game": {
+    "OW": "Overwatch",
+    "MR": "Marvel Rivals"
+  },
+  "identity": {
+    "name": "Nom de l'équipe",
+    "nameHelp": "{min} à {max} caractères, unique sur le site.",
+    "tag": "Sigle",
+    "tagOptional": "Sigle (facultatif)",
+    "tagHelp": "{min} à {max} lettres ou chiffres, unique sur le site",
+    "description": "Description",
+    "descriptionOptional": "Description (facultatif)",
+    "tagPlaceholder": "BG"
+  },
+  "ghostDialog": {
+    "title": "Nouvelle équipe fantôme",
+    "lede": "Une équipe sans joueur rattaché, administrée par le staff. Elle peut être inscrite à un tournoi puis attribuée à un joueur réel.",
+    "cancel": "Annuler",
+    "submit": "Créer l'équipe",
+    "pending": "Création…",
+    "created": "Équipe fantôme créée."
+  },
+  "create": {
+    "back": "← Équipes",
+    "title": "Créer mon équipe",
+    "lede": "Le rôle Owner est automatiquement attribué au créateur.",
+    "name": "Nom d'équipe",
+    "namePlaceholder": "Mon équipe",
+    "tag": "Sigle (optionnel)",
+    "description": "Description (optionnel)",
+    "descriptionPlaceholder": "Présente ton équipe, vos objectifs, votre ambiance…",
+    "logo": "Logo (optionnel)",
+    "chooseLogo": "Choisir un logo",
+    "recrop": "Recadrer",
+    "remove": "Retirer",
+    "logoHint": "PNG, JPEG ou WebP — {max} Mo max",
+    "cropTitle": "Recadrer le logo",
+    "logoRights": "Je certifie détenir les droits sur ce logo : l'équipe l'a créé elle-même, il est sous licence libre, ou son auteur en a autorisé l'usage.",
+    "learnMore": "En savoir plus",
+    "terms": "J'ai lu et j'accepte les conditions d'utilisation (<terms>lire les conditions</terms>) — notamment la garantie des droits sur le nom, le logo et la description de l'équipe.",
+    "cancel": "Annuler",
+    "submit": "Créer l'équipe",
+    "pending": "Création...",
+    "createdWithoutLogo": "Équipe créée, mais sans logo : {reason}"
+  }
+}

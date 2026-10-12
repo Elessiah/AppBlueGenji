@@ -1,3 +1,6 @@
+"use client";
+
+import { useShellText } from "@/components/i18n/shell-text";
 import styles from "./SecuredLoading.module.css";
 
 /**
@@ -20,11 +23,16 @@ import styles from "./SecuredLoading.module.css";
  * Pas d'`aria-busy` : la frontière est remplacée d'un bloc par la page, la
  * zone ne cesserait donc jamais d'être « occupée » et le lecteur d'écran
  * attendrait indéfiniment pour l'annoncer.
+ *
+ * Composant client (lot 9) : son unique texte vient de la coquille
+ * (`shell.loading`), dans la langue de la page — il restait « Chargement… »
+ * sous `/en/tournois`.
  */
 export function SecuredLoading() {
+  const { t } = useShellText();
   return (
     <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.shell} role="status" aria-live="polite">
-      <span className="sr-only">Chargement…</span>
+      <span className="sr-only">{t("loading")}</span>
       <div className={`${styles.bar} ${styles.title}`} aria-hidden="true" />
       <div className={`${styles.bar} ${styles.line}`} aria-hidden="true" />
       <div className={styles.grid} aria-hidden="true">

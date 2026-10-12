@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import type { TeamDetailResponse, TeamSentInvitation } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
@@ -13,11 +12,13 @@ import {
 } from "@/components/ui/image-crop-dialog";
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, checkTeamTag, normalizeTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
-import { teamErrorMessage } from "../../_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { richNodes } from "@/components/i18n/shell-text";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
-import { LOGO_RIGHTS_FIELD, LOGO_RIGHTS_LABEL, LOGO_RIGHTS_TERMS_ANCHOR } from "@/lib/shared/terms-of-use";
-import Link from "next/link";
+import { LOGO_RIGHTS_FIELD, LOGO_RIGHTS_TERMS_ANCHOR } from "@/lib/shared/terms-of-use";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
@@ -47,7 +48,9 @@ interface TeamSettingsProps {
  */
 export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
   const { showError, showSuccess } = useToast();
-  const router = useRouter();
+  const router = useLocaleRouter();
+  const { t } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
   const managedAsGhost = team.managedAsGhost;
   const ownsIdentity = team.viewerMembership === "OWNER" || managedAsGhost;
   // Reprises proposées par le staff et encore sans réponse : elles se voient et
@@ -60,7 +63,7 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
     setWithdrawingClaimId(invitationId);
     try {
       await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
-      showSuccess(`Proposition à ${pseudo} retirée.`);
+      showSuccess(t("settings.claimWithdrawn", { pseudo }));
     } catch (e) {
       showError(teamErrorMessage((e as Error).message));
     } finally {
@@ -77,9 +80,7 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
   const deleteTeam = async (): Promise<boolean> => {
     try {
       await teamApi(`/api/teams/${team.team.id}`, { method: "DELETE" }, "TEAM_DELETE_FAILED");
-      showSuccess(
-        managedAsGhost ? "Équipe fantôme supprimée." : "Équipe dissoute. Ses statistiques restent consultables.",
-      );
+      showSuccess(managedAsGhost ? t("settings.ghostDeleted") : t("settings.dissolved"));
       router.push("/equipes");
       // La barre ne doit plus annoncer une équipe dissoute.
       router.refresh();
@@ -94,16 +95,14 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
     <section className={`ds-block ${styles.block}`} aria-labelledby="team-settings-title">
       {cropDialog}
       <div className="ds-section-title purple">
-        <h2 id="team-settings-title">Paramètres de l&apos;équipe</h2>
+        <h2 id="team-settings-title">{t("settings.title")}</h2>
       </div>
 
       <div className={styles.settingsGrid}>
         {ownsIdentity ? (
           <TeamIdentityForm team={team} onChanged={onChanged} />
         ) : (
-          <p className={`${styles.notice} ${styles.fullWidth}`}>
-            Le nom, le sigle et la description de l&apos;équipe sont réservés à son propriétaire.
-          </p>
+          <p className={`${styles.notice} ${styles.fullWidth}`}>{t("settings.ownerOnly")}</p>
         )}
 
         <TeamLogoField team={team} ownsIdentity={ownsIdentity} cropImage={cropImage} onChanged={onChanged} />
@@ -144,20 +143,17 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
 
       {deleteOpen && (
         <ConfirmActionDialog
-          title={managedAsGhost ? "Supprimer l'équipe fantôme ?" : "Dissoudre l'équipe ?"}
-          confirmLabel={managedAsGhost ? "Supprimer" : "Dissoudre"}
-          pendingLabel={managedAsGhost ? "Suppression…" : "Dissolution…"}
+          title={managedAsGhost ? t("settings.deleteGhostTitle") : t("settings.dissolveTitle")}
+          confirmLabel={managedAsGhost ? t("settings.deleteGhostConfirm") : t("settings.dissolveConfirm")}
+          pendingLabel={managedAsGhost ? t("settings.deleteGhostPending") : t("settings.dissolvePending")}
           requireText={team.team.name}
           onClose={() => setDeleteOpen(false)}
           closeOnSuccess={false}
           onConfirm={deleteTeam}
         >
+          <p>{t("settings.deleteBody")}</p>
           <p>
-            Le nom, le sigle, la description et le logo sont effacés, et tous les membres sont
-            détachés. Les statistiques et l&apos;historique de tournois restent consultables.
-          </p>
-          <p>
-            <strong>Action irréversible.</strong>
+            <strong>{t("settings.irreversible")}</strong>
           </p>
         </ConfirmActionDialog>
       )}
@@ -171,7 +167,9 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
  */
 function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
   const { showError, showSuccess } = useToast();
-  const router = useRouter();
+  const router = useLocaleRouter();
+  const { t } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
   const saved = {
     name: team.team.name,
     tag: team.team.tag ?? "",
@@ -214,7 +212,7 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
         }),
         "TEAM_UPDATE_FAILED",
       );
-      showSuccess("Équipe mise à jour.");
+      showSuccess(t("settings.updated"));
       onChanged();
       // Le menu du compte (« Mon équipe ») rappelle le nom : il doit suivre.
       router.refresh();
@@ -231,10 +229,10 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
   };
 
   return (
-    <form onSubmit={saveMeta} className={styles.fullWidth} aria-label="Identité de l'équipe">
+    <form onSubmit={saveMeta} className={styles.fullWidth} aria-label={t("settings.identityLabel")}>
       <div className={styles.settingsGrid}>
         <div className="field">
-          <label htmlFor="team-meta-name">Nom de l&apos;équipe</label>
+          <label htmlFor="team-meta-name">{t("settings.name")}</label>
           <input
             id="team-meta-name"
             value={name}
@@ -254,11 +252,11 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
           />
           <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
           <p id="team-meta-name-help" className={styles.help}>
-            {TEAM_NAME_MIN_LENGTH} à {TEAM_NAME_MAX_LENGTH} caractères, unique sur le site.
+            {t("settings.nameHelp", { min: TEAM_NAME_MIN_LENGTH, max: TEAM_NAME_MAX_LENGTH })}
           </p>
         </div>
         <div className="field">
-          <label htmlFor="team-meta-tag">Sigle</label>
+          <label htmlFor="team-meta-tag">{t("settings.tag")}</label>
           <input
             id="team-meta-tag"
             className={styles.tagInput}
@@ -270,24 +268,23 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
             minLength={TEAM_TAG_MIN_LENGTH}
             maxLength={TEAM_TAG_MAX_LENGTH}
             pattern="[A-Za-z0-9]*"
-            placeholder="BG"
+            placeholder={t("settings.tagPlaceholder")}
             {...fieldErrors.aria("tag", "team-meta-tag-help")}
             aria-invalid={!tagCheck.ok || fieldErrors.invalidField === "tag"}
           />
           <FieldErrorText fieldId={FIELD_IDS.tag} message={fieldErrors.message("tag")} />
           <p id="team-meta-tag-help" className={styles.help}>
-            {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le
-            site — laisser vide pour ne pas en avoir.
+            {t("settings.tagHelp", { min: TEAM_TAG_MIN_LENGTH, max: TEAM_TAG_MAX_LENGTH })}
           </p>
         </div>
         <div className={`field ${styles.fullWidth}`}>
-          <label htmlFor="team-meta-description">Description</label>
+          <label htmlFor="team-meta-description">{t("settings.description")}</label>
           <textarea
             id="team-meta-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            placeholder="Présente ton équipe…"
+            placeholder={t("settings.descriptionPlaceholder")}
           />
         </div>
       </div>
@@ -303,11 +300,11 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
               setDescription(saved.description);
             }}
           >
-            Annuler les modifications
+            {t("settings.discard")}
           </button>
         ) : null}
         <button type="submit" className={`btn ${styles.primaryButton}`} disabled={!canSave}>
-          {saving ? "Enregistrement…" : "Enregistrer"}
+          {saving ? t("settings.saving") : t("settings.save")}
         </button>
       </div>
     </form>
@@ -326,6 +323,9 @@ interface TeamLogoFieldProps {
 /** Logo de l'équipe : ouvert à toute la gestion. */
 function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<TeamLogoFieldProps>) {
   const { showError, showSuccess } = useToast();
+  const text = useTeamPageText();
+  const { t } = text;
+  const teamErrorMessage = useTeamErrorMessage();
   const [logoBusy, setLogoBusy] = useState(false);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
   // Le logo s'envoie en deux temps : choisir le fichier, puis certifier en
@@ -347,7 +347,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
       showError(teamErrorMessage(refusal));
       return;
     }
-    const cropped = await cropImage(file, "team-logo", "Recadrer le logo");
+    const cropped = await cropImage(file, "team-logo", t("settings.cropTitle"));
     if (!cropped) return;
     // Un nouveau fichier appelle une nouvelle garantie.
     setPendingLogo(cropped);
@@ -358,7 +358,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   // pas sur la zone gardée, elle reste acquise.
   const onLogoRecrop = async () => {
     if (!pendingLogo) return;
-    const cropped = await cropImage(pendingLogo.file, "team-logo", "Recadrer le logo");
+    const cropped = await cropImage(pendingLogo.file, "team-logo", t("settings.cropTitle"));
     if (cropped) setPendingLogo(cropped);
   };
 
@@ -381,7 +381,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
       appendCroppedImage(formData, pendingLogo);
       formData.append(LOGO_RIGHTS_FIELD, "1");
       await teamApi(`/api/teams/${team.team.id}/logo`, { method: "POST", body: formData }, "LOGO_UPLOAD_FAILED");
-      showSuccess("Logo mis à jour.");
+      showSuccess(t("settings.logoUpdated"));
       cancelPendingLogo();
       onChanged();
     } catch (e) {
@@ -395,7 +395,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
     setLogoBusy(true);
     try {
       await teamApi(`/api/teams/${team.team.id}/logo`, { method: "DELETE" }, "LOGO_DELETE_FAILED");
-      showSuccess("Logo supprimé.");
+      showSuccess(t("settings.logoDeleted"));
       onChanged();
     } catch (e) {
       showError(teamErrorMessage((e as Error).message));
@@ -409,12 +409,12 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   ) : (
     "🛡"
   );
-  const savedLogoLabel = team.team.logoUrl ? "Changer le logo" : "Ajouter un logo";
+  const savedLogoLabel = team.team.logoUrl ? t("settings.changeLogo") : t("settings.addLogo");
 
   return (
     <div className={`field ${styles.fullWidth} ${ownsIdentity ? styles.divider : ""}`}>
       <span id="team-logo-label" className={styles.roleGroupLegend}>
-        Logo
+        {t("settings.logo")}
       </span>
       <div className={styles.logoRow}>
         <div className={styles.logoPreview} aria-hidden>
@@ -443,21 +443,24 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
             disabled={logoBusy}
             onClick={() => logoFileRef.current?.click()}
           >
-            {pendingLogo ? "Choisir un autre fichier" : savedLogoLabel}
+            {pendingLogo ? t("settings.chooseAnother") : savedLogoLabel}
           </button>
           {team.team.logoUrl && !pendingLogo ? (
             <button type="button" className="btn ghost" disabled={logoBusy} onClick={onLogoDelete}>
-              Retirer le logo
+              {t("settings.removeLogo")}
             </button>
           ) : null}
         </fieldset>
       </div>
-      <p className={styles.help}>PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo au maximum.</p>
+      <p className={styles.help}>{t("settings.logoHint", { max: IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024) })}</p>
       {pendingLogo ? (
         <>
           <p className={styles.help}>
-            Fichier choisi : <strong>{pendingLogo.file.name}</strong> — l&apos;aperçu montre la zone
-            gardée.
+            {richNodes(
+              text.rich("settings.fileChosen", { file: pendingLogo.file.name }, {
+                strong: (chunks) => <strong>{chunks}</strong>,
+              }),
+            )}
           </p>
           <label className="consent-check">
             <input
@@ -468,21 +471,21 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
               onChange={(e) => setLogoRights(e.target.checked)}
             />
             <span>
-              {LOGO_RIGHTS_LABEL}{" "}
-              <Link href={LOGO_RIGHTS_TERMS_ANCHOR} target="_blank" rel="noreferrer">
-                En savoir plus
-              </Link>
+              {t("settings.logoRights")}{" "}
+              <LocaleLink href={LOGO_RIGHTS_TERMS_ANCHOR} target="_blank" rel="noreferrer">
+                {t("settings.learnMore")}
+              </LocaleLink>
             </span>
           </label>
           <div className={styles.actionsRow}>
             <button type="button" className="btn" disabled={logoBusy} onClick={onLogoSend}>
-              {logoBusy ? "Envoi…" : "Envoyer le logo"}
+              {logoBusy ? t("settings.sending") : t("settings.sendLogo")}
             </button>
             <button type="button" className="btn ghost" disabled={logoBusy} onClick={() => void onLogoRecrop()}>
-              Recadrer
+              {t("settings.recrop")}
             </button>
             <button type="button" className="btn ghost" disabled={logoBusy} onClick={cancelPendingLogo}>
-              Annuler
+              {t("settings.cancel")}
             </button>
           </div>
         </>
@@ -511,20 +514,22 @@ function TeamDangerZone({
   onTransfer,
   onDelete,
 }: Readonly<TeamDangerZoneProps>) {
+  const text = useTeamPageText();
+  const { t } = text;
   return (
     <div className={`${styles.dangerZone} ${styles.fullWidth}`}>
-      <h3 className={styles.dangerTitle}>Zone sensible</h3>
-      <p className={styles.help}>
-        {managedAsGhost
-          ? "Proposer l'équipe à un joueur lui envoie une invitation : s'il l'accepte, elle devient une équipe ordinaire dont il est propriétaire."
-          : "Pour quitter l'équipe, transfère d'abord sa propriété à un autre membre."}
-      </p>
+      <h3 className={styles.dangerTitle}>{t("settings.dangerTitle")}</h3>
+      <p className={styles.help}>{managedAsGhost ? t("settings.dangerGhostHelp") : t("settings.dangerHelp")}</p>
       {managedAsGhost && claims.length > 0 ? (
-        <ul className={styles.claimList} aria-label="Propositions de reprise en attente">
+        <ul className={styles.claimList} aria-label={t("settings.pendingClaims")}>
           {claims.map((claim) => (
             <li key={claim.id} className={styles.actionsRow}>
               <span className={styles.help}>
-                Proposée à <strong>{claim.pseudo}</strong> — en attente de sa réponse.
+                {richNodes(
+                  text.rich("settings.claimPending", { pseudo: claim.pseudo }, {
+                    strong: (chunks) => <strong>{chunks}</strong>,
+                  }),
+                )}
               </span>
               <button
                 type="button"
@@ -532,7 +537,7 @@ function TeamDangerZone({
                 disabled={withdrawingClaimId !== null}
                 onClick={() => void onWithdraw(claim.id, claim.pseudo)}
               >
-                Retirer
+                {t("settings.withdraw")}
               </button>
             </li>
           ))}
@@ -541,15 +546,15 @@ function TeamDangerZone({
       <div className={`${styles.actionsRow} ${styles.dangerActions}`}>
         {managedAsGhost ? (
           <button type="button" className="btn ghost" onClick={() => onPropose()}>
-            Proposer à un joueur
+            {t("settings.propose")}
           </button>
         ) : (
           <button type="button" className="btn ghost" onClick={() => onTransfer()}>
-            Transférer la propriété
+            {t("settings.transfer")}
           </button>
         )}
         <button type="button" className={`btn ghost ${styles.dangerButton}`} onClick={() => onDelete()}>
-          {managedAsGhost ? "Supprimer l'équipe fantôme" : "Dissoudre l'équipe"}
+          {managedAsGhost ? t("settings.deleteGhost") : t("settings.dissolve")}
         </button>
       </div>
     </div>
