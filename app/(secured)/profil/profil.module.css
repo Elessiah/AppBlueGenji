@@ -229,15 +229,22 @@
 
 /* ── Champs ───────────────────────────────────────────────────────────────── */
 
-/* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
-   mention légale. 12 px et `--ink-soft`, contre 11 px et `--ink-quiet` partout
-   avant. */
 /* Langue du compte, sous le réglage des notifications : détachée de son
    dernier paragraphe par l'écart du panneau lui-même (14 px). */
 .accountLocale {
   margin-top: 14px;
 }
 
+/* Pendant l'enregistrement, le champ garde le focus (`aria-disabled`, pas
+   `disabled`) : il en prend l'apparence, comme `.field select:disabled`. */
+.accountLocale select[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
+   mention légale. 12 px et `--ink-soft`, contre 11 px et `--ink-quiet` partout
+   avant. */
 .hint {
   font-size: 12px;
   line-height: 1.65;
