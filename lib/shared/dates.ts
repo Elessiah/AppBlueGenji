@@ -7,13 +7,33 @@
  * près. Un écran traduit passe la sienne (`useAppLocale()`, `requestLocale()`).
  */
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "./locales";
+import { cached } from "./message-format";
+
+// Formateurs gardés par langue (lot 9-1, revue performance) : un tableau
+// d'historique en demandait deux par ligne et par rendu. Mêmes options que
+// `toLocaleDateString` / `toLocaleString` sans argument (date ; date et heure,
+// en chiffres) : le rendu ne change pas d'un octet.
+const dateFormats = new Map<Locale, Intl.DateTimeFormat>();
+const dateTimeFormats = new Map<Locale, Intl.DateTimeFormat>();
 
 export function formatLocalDate(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  return new Date(date).toLocaleDateString(INTL_LOCALE[locale]);
+  return cached(dateFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l])).format(new Date(date));
 }
 
 export function formatLocalDateTime(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  return new Date(date).toLocaleString(INTL_LOCALE[locale]);
+  return cached(
+    dateTimeFormats,
+    locale,
+    (l) =>
+      new Intl.DateTimeFormat(INTL_LOCALE[l], {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+      }),
+  ).format(new Date(date));
 }
 
 const monthFormats = new Map<Locale, Intl.DateTimeFormat>();
@@ -27,11 +47,7 @@ export function shortMonthLabel(month: string, locale: Locale = DEFAULT_LOCALE):
   const year = Number(month.slice(0, 4));
   const index = Number(month.slice(5, 7)) - 1;
   if (!/^\d{4}-\d{2}$/.test(month) || index < 0 || index > 11) return month;
-  let format = monthFormats.get(locale);
-  if (!format) {
-    format = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "short", timeZone: "UTC" });
-    monthFormats.set(locale, format);
-  }
+  const format = cached(monthFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l], { month: "short", timeZone: "UTC" }));
   return format.format(new Date(Date.UTC(year, index, 15)));
 }
 
@@ -44,12 +60,9 @@ const monthYearFormats = new Map<Locale, Intl.DateTimeFormat>();
  * chaque carte et chaque frappe).
  */
 export function formatMonthYear(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  let format = monthYearFormats.get(locale);
-  if (!format) {
-    format = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "short", year: "numeric" });
-    monthYearFormats.set(locale, format);
-  }
-  return format.format(new Date(date));
+  return cached(monthYearFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l], { month: "short", year: "numeric" })).format(
+    new Date(date),
+  );
 }
 
 const collators = new Map<Locale, Intl.Collator>();
@@ -60,12 +73,7 @@ const collators = new Map<Locale, Intl.Collator>();
  * en résout un à chaque comparaison.
  */
 export function compareLocalText(locale: Locale = DEFAULT_LOCALE): (a: string, b: string) => number {
-  let collator = collators.get(locale);
-  if (!collator) {
-    collator = new Intl.Collator(INTL_LOCALE[locale]);
-    collators.set(locale, collator);
-  }
-  return collator.compare;
+  return cached(collators, locale, (l) => new Intl.Collator(INTL_LOCALE[l])).compare;
 }
 
 /** Nombre dans la langue de la page (`1 500` / `1,500`, `1,5` / `1.5`). */

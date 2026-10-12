@@ -30,6 +30,19 @@ export default function TeamsList() {
   const { showError } = useToast();
   const text = useTeamsText();
   const { t } = text;
+  // Bandeau mémoïsé (`Ticker`) : ses libellés gardent leur référence d'une
+  // frappe à l'autre — le texte ne change qu'avec la langue.
+  const tickerItems = useMemo(() => [t("ticker.roster"), t("ticker.ranking"), t("ticker.community")], [t]);
+  const tickerLabels = useMemo(
+    () => ({
+      label: t("ticker.label"),
+      resume: t("ticker.resume"),
+      pause: t("ticker.pause"),
+      resumeShort: t("ticker.resumeShort"),
+      pauseShort: t("ticker.pauseShort"),
+    }),
+    [t],
+  );
   const teamErrorMessage = useTeamErrorMessage();
   const [teams, setTeams] = useState<TeamListItem[]>([]);
   const [activeTeam, setActiveTeam] = useState<{ teamId: number; teamName: string } | null>(null);
@@ -221,16 +234,7 @@ export default function TeamsList() {
         </div>
       </header>
 
-      <Ticker
-        items={[t("ticker.roster"), t("ticker.ranking"), t("ticker.community")]}
-        labels={{
-          label: t("ticker.label"),
-          resume: t("ticker.resume"),
-          pause: t("ticker.pause"),
-          resumeShort: t("ticker.resumeShort"),
-          pauseShort: t("ticker.pauseShort"),
-        }}
-      />
+      <Ticker items={tickerItems} labels={tickerLabels} />
 
       <section className={`container ${s.sections}`}>
         {sort === "rank" && filtered.length >= 3 && <HighlightStrip teams={filtered} />}

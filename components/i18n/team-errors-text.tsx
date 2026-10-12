@@ -1,14 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
-import frTeamErrors from "@/messages/fr/teamErrors.json";
 import {
+  FR_TEAM_ERRORS_TEXT,
   membershipErrorMessage,
   teamErrorMessage,
-  type TeamErrorsMessages,
   type TeamErrorsText,
 } from "@/app/(secured)/equipes/_lib/team-errors";
-import { withFrenchFallback } from "./scoped-text-context";
 import { teamErrorsTextSlot } from "./team-errors-text-provider";
 
 /**
@@ -18,13 +16,12 @@ import { teamErrorsTextSlot } from "./team-errors-text-provider";
  * `team-errors-text-provider.tsx`, sans ce français (une mise en page qui
  * importerait ce module-ci l'enverrait une seconde fois).
  */
-const context = withFrenchFallback<TeamErrorsMessages>(teamErrorsTextSlot, frTeamErrors);
-
 /** Pour une **page** ; une mise en page importe `team-errors-text-provider.tsx`. */
-export const TeamErrorsTextProvider = context.Provider;
+export const TeamErrorsTextProvider = teamErrorsTextSlot.Provider;
 
+/** La table posée, la française du registre (`FR_TEAM_ERRORS_TEXT`) à défaut. */
 export function useTeamErrorsText(): TeamErrorsText {
-  return context.useText();
+  return teamErrorsTextSlot.useProvided() ?? FR_TEAM_ERRORS_TEXT;
 }
 
 /** `teamErrorMessage` dans la langue de la page. */

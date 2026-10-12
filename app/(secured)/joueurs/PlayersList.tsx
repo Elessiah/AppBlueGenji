@@ -28,6 +28,19 @@ export default function PlayersList() {
   const { showError } = useToast();
   const text = usePlayersText();
   const { t } = text;
+  // Bandeau mémoïsé (`Ticker`) : ses libellés gardent leur référence d'une
+  // frappe à l'autre — le texte ne change qu'avec la langue.
+  const tickerItems = useMemo(() => [t("ticker.directory"), t("ticker.roster"), t("ticker.tournaments")], [t]);
+  const tickerLabels = useMemo(
+    () => ({
+      label: t("ticker.label"),
+      resume: t("ticker.resume"),
+      pause: t("ticker.pause"),
+      resumeShort: t("ticker.resumeShort"),
+      pauseShort: t("ticker.pauseShort"),
+    }),
+    [t],
+  );
   const [players, setPlayers] = useState<PublicUserProfile[]>([]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -241,16 +254,7 @@ export default function PlayersList() {
         </div>
       </header>
 
-      <Ticker
-        items={[t("ticker.directory"), t("ticker.roster"), t("ticker.tournaments")]}
-        labels={{
-          label: t("ticker.label"),
-          resume: t("ticker.resume"),
-          pause: t("ticker.pause"),
-          resumeShort: t("ticker.resumeShort"),
-          pauseShort: t("ticker.pauseShort"),
-        }}
-      />
+      <Ticker items={tickerItems} labels={tickerLabels} />
 
       <section className={`container ${s.sections}`}>
         <div className={s.section}>

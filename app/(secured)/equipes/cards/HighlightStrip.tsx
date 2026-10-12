@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
 import { isRankedTeam } from "@/lib/shared/ranking";
 import { TeamPodiumName } from "@/components/podium-tiers";
@@ -19,7 +20,7 @@ import s from "./HighlightStrip.module.css";
  * tout le texte de la carte mis bout à bout. Le bloc des points repasse
  * au-dessus d'elle pour garder son `title`, seule explication visible de la cote.
  */
-export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
+function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
   const text = useTeamsText();
   const { t } = text;
   const top = teams.slice(0, 3);
@@ -70,3 +71,6 @@ export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
     </div>
   );
 }
+
+/** Mémoïsé, comme les cartes : la liste filtrée garde sa référence tant que la recherche différée n'a pas suivi. */
+export const HighlightStrip = memo(HighlightStripView);

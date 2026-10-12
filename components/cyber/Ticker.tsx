@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useLandingText } from "@/components/i18n/landing-text";
 import styles from "./Ticker.module.css";
 
@@ -31,7 +31,7 @@ interface TickerProps {
  * est masquée aux technologies d'assistance, sans quoi chaque élément serait lu
  * deux fois.
  */
-export function Ticker({ items, labels }: Readonly<TickerProps>) {
+function TickerView({ items, labels }: Readonly<TickerProps>) {
   const [paused, setPaused] = useState(false);
   const landing = useLandingText();
   const t = (key: `ticker.${keyof TickerLabels}`) => (labels ? labels[key.slice("ticker.".length) as keyof TickerLabels] : landing.t(key));
@@ -64,3 +64,9 @@ export function Ticker({ items, labels }: Readonly<TickerProps>) {
     </div>
   );
 }
+
+/**
+ * Mémoïsé : un annuaire le rend au-dessus de sa recherche, qui se rend à
+ * chaque frappe ; ses libellés y sont gardés (`useMemo`) d'un rendu à l'autre.
+ */
+export const Ticker = memo(TickerView);
