@@ -1,6 +1,5 @@
-"use client";
-
-import { useShellText } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestLocale } from "@/lib/server/request-locale";
 import styles from "./SecuredLoading.module.css";
 
 /**
@@ -24,15 +23,21 @@ import styles from "./SecuredLoading.module.css";
  * zone ne cesserait donc jamais d'être « occupée » et le lecteur d'écran
  * attendrait indéfiniment pour l'annoncer.
  *
- * Composant client (lot 9) : son unique texte vient de la coquille
- * (`shell.loading`), dans la langue de la page — il restait « Chargement… »
- * sous `/en/tournois`.
+ * Son unique texte vient de la coquille (`shell.loading`), dans la langue de
+ * l'adresse (lot 9 — il restait « Chargement… » sous `/en/tournois`). Lu **sur
+ * le serveur** (revue performance) : en composant client, la frontière
+ * ajoutait un morceau de JavaScript à chaque segment pour une seule phrase.
  */
-export function SecuredLoading() {
-  const { t } = useShellText();
+export async function SecuredLoading() {
+  const { shell } = messagesFor(await requestLocale());
+  return <SecuredLoadingView label={shell.loading} />;
+}
+
+/** Le squelette, son libellé donné (rendu pur, sans requête). */
+export function SecuredLoadingView({ label }: Readonly<{ label: string }>) {
   return (
     <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.shell} role="status" aria-live="polite">
-      <span className="sr-only">{t("loading")}</span>
+      <span className="sr-only">{label}</span>
       <div className={`${styles.bar} ${styles.title}`} aria-hidden="true" />
       <div className={`${styles.bar} ${styles.line}`} aria-hidden="true" />
       <div className={styles.grid} aria-hidden="true">
