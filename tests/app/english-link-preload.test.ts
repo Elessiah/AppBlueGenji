@@ -75,7 +75,7 @@ describe("écouteur délégué", () => {
     expect(route).toContain("if (pending.has(page)) return;");
     expect(route).not.toMatch(/wanted|warming/);
     expect(readSource("components/i18n/use-english-messages.ts")).toMatch(
-      /export function useEnglishMessagesUntilRemount<T>\([^)]*\): EnglishMessagesState<T> \{\s*return useEnglishMessagesIn\(locale, loader, undefined, ""\);/,
+      /export function useEnglishMessagesUntilRemount<T>\([^)]*\): EnglishMessagesState<T> \{\s*return useEnglishMessagesAt\(locale, loader, undefined, ""\);/,
     );
     expect(listener).toContain("preloadEnglishRoute(href.slice(3));");
     // Un même lien une fois par seconde au plus (enfants traversés), nouvel essai possible ensuite.
@@ -177,5 +177,21 @@ describe("revue performance, quinzième passe", () => {
   it("bloc de statistiques : un seul morceau ; date de quarantaine par le cache commun", () => {
     expect(readSource("components/i18n/english-loaders-account.ts")).toContain('import("./stats-panel-en")');
     expect(readSource("lib/shared/logo-quarantine.ts")).toContain("return cached(QUARANTINE_DATE_FORMATS, intlLocale, (locale) =>");
+  });
+});
+
+describe("revue performance, vingt et unième passe", () => {
+  it("annuaires : clé de recherche calculée une fois par liste, pas de copie redondante", () => {
+    for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"]) {
+      const list = readSource(path);
+      expect(list).toContain("const searchKeys = useMemo(");
+      expect(list).toContain('if (q && !(searchKeys.get(');
+      expect(list).not.toContain("r = [...r];");
+    }
+  });
+
+  it("une porte à plusieurs espaces lit le chemin une fois", () => {
+    expect(readSource("components/i18n/profile-text-providers.tsx").match(/usePathname\(\)/g)).toHaveLength(1);
+    expect(readSource("components/i18n/english-gates.tsx")).toContain("const team = useEnglishMessagesAt(locale, englishTeam, messages, pathname);");
   });
 });

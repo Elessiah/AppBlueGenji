@@ -84,7 +84,7 @@ describe("profil : fournisseurs sans français, anglais une seule fois", () => {
     }
     // Chaque espace pour soi : un échec n'emporte pas les deux autres en français.
     for (const loader of ["englishProfile", "englishTeamErrors", "englishPush"]) {
-      expect(source(module)).toContain(`useEnglishMessages(locale, ${loader}, messages?.`);
+      expect(source(module)).toContain(`useEnglishMessagesAt(locale, ${loader}, messages?.`);
     }
     // Au pied de chaque page, le module des chargeurs reste sans crochet ni préchargement.
     expect(source("components/i18n/english-loaders.ts")).not.toMatch(/useState|useEffect|quietPreload/);
