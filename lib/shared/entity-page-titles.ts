@@ -34,6 +34,12 @@ export type TeamPageIdentity = { name: string };
 export type EntityTitleWords = { fallback: string; deleted?: string };
 export type PlayerPageIdentity = { pseudo: string; isDeleted: boolean };
 
+const FR_TEAM_TITLE_WORDS: Readonly<EntityTitleWords> = { fallback: TEAM_PAGE_FALLBACK_TITLE };
+const FR_PLAYER_TITLE_WORDS: Readonly<EntityTitleWords> = {
+  fallback: PLAYER_PAGE_FALLBACK_TITLE,
+  deleted: DELETED_PLAYER_PAGE_TITLE,
+};
+
 /**
  * Titre de `/equipes/[id]`. `null` — équipe introuvable, entrée solo (qui n'a
  * pas de fiche d'équipe : la page mène au profil du joueur) ou lecteur non
@@ -41,7 +47,7 @@ export type PlayerPageIdentity = { pseudo: string; isDeleted: boolean };
  */
 export function teamPageTitle(
   team: TeamPageIdentity | null,
-  words: EntityTitleWords = { fallback: TEAM_PAGE_FALLBACK_TITLE },
+  words: Readonly<EntityTitleWords> = FR_TEAM_TITLE_WORDS,
 ): string {
   const name = team?.name.trim();
   return name ? `${name} · ${words.fallback}` : words.fallback;
@@ -53,7 +59,7 @@ export function teamPageTitle(
  */
 export function playerPageTitle(
   player: PlayerPageIdentity | null,
-  words: EntityTitleWords = { fallback: PLAYER_PAGE_FALLBACK_TITLE, deleted: DELETED_PLAYER_PAGE_TITLE },
+  words: Readonly<EntityTitleWords> = FR_PLAYER_TITLE_WORDS,
 ): string {
   if (!player) return words.fallback;
   if (player.isDeleted) return `${words.deleted ?? DELETED_PLAYER_PAGE_TITLE} · ${words.fallback}`;
