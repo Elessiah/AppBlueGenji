@@ -99,9 +99,11 @@ création / d'édition (BG Survie seulement), **décochée par défaut**.
   La phase s'arrête comme avant sur un capital à zéro, un effectif retombé à la
   cible, ou le plafond — où le trait sous la cible (point 1) tombe, option ou
   non : sans lui la phase n'aurait pas de fin. Avant la dernière manche,
-  `applyRoundCut` (rejeu) n'y copie pas le classement et
-  `enduranceEliminationCut` répond sans le trier (appelés à chaque manche close
-  de chaque rejeu, flux comme REST).
+  le rejeu n'appelle même pas la coupe (ni copie ni tri du classement à chaque
+  manche close, flux comme REST). La règle « trait final toujours, coupe
+  anticipée option cochée seulement » n'est écrite qu'une fois,
+  `roundCutMayFire` (`config.ts`), lue par le rejeu, `enduranceEliminationCut`
+  et l'aperçu de la manche suivante (`withEliminationCut`).
 - **Cochée** : comportement d'origine, à l'identique (critère mathématique et
   règle de parité ci-dessous). L'instantané de caractérisation du moteur
   (`engine-characterisation.test.ts`) tourne option cochée et n'a pas bougé.
