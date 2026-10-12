@@ -62,13 +62,15 @@ describe("Carte d'annuaire — « free agent » n'est pas « sans équipe »", (
   });
 
   it("dérive le libellé du statut partagé", () => {
-    expect(playerCard).toContain("t(`card.rosterStatus.${playerRosterStatus(player)}`)");
+    expect(playerCard).toContain("const rosterStatus = playerRosterStatus(player);");
+    expect(playerCard).toContain("t(`card.rosterStatus.${rosterStatus}`)");
   });
 
   it("demande le statut une seule fois — le roster aussi passe par lui", () => {
     // Brancher ici sur `player.team` et là sur le statut partagé remettrait la
     // règle à deux endroits, ce que le module existe pour éviter.
-    expect(playerCard).toContain('playerRosterStatus(player) === "ROSTER"');
+    expect(playerCard).toContain('rosterStatus === "ROSTER"');
+    expect(playerCard.match(/playerRosterStatus\(/g)).toHaveLength(1);
     expect(playerCard).not.toContain("ROSTER ·");
   });
 

@@ -213,7 +213,7 @@ describe("Cartes d'annuaire — deux destinations, sans ancre imbriquée", () =>
       const code = stripComments(read(path));
       expect(code).toContain("className={s.cardOverlay}");
       // La plaque n'a pas de texte : son seul intitulé est ce nom accessible.
-      expect(code).toMatch(/aria-label=\{t\("card\.viewProfile", \{ name: [^}]+ \}\)\}/);
+      expect(code).toMatch(/className=\{s\.cardOverlay\}\s+aria-label=\{t\("card\.view(?:Team|Profile)", \{ name: [^}]+ \}\)\}/);
     });
   }
 

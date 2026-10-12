@@ -101,3 +101,15 @@ describe("emplacement et repli français", () => {
     ).toBe("aB");
   });
 });
+
+describe("cartes des annuaires mémoïsées", () => {
+  // La grille se rend à chaque frappe (recherche différée) ; une carte dont
+  // l'équipe ou le joueur n'a pas changé de référence ne reformate rien.
+  it("TeamCard et PlayerCard sont des composants `memo`", async () => {
+    const { TeamCard } = await import("@/app/(secured)/equipes/cards/TeamCard");
+    const { PlayerCard } = await import("@/app/(secured)/joueurs/cards/PlayerCard");
+    const memoType = Symbol.for("react.memo");
+    expect((TeamCard as unknown as { $$typeof: symbol }).$$typeof).toBe(memoType);
+    expect((PlayerCard as unknown as { $$typeof: symbol }).$$typeof).toBe(memoType);
+  });
+});
