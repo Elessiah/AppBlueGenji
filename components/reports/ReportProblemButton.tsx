@@ -1,12 +1,34 @@
 "use client";
 
-import { useState } from "react";
-import { useLocalePathname } from "@/components/i18n/locale-navigation";
+import { useState, type PointerEvent } from "react";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
+import { useOptionalToast } from "@/components/ui/toast";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { ReportProblemDialog } from "./ReportProblemDialog";
+import { isChunkLoadError } from "@/lib/shared/lazy-component";
+import { splitLocalePrefix } from "@/lib/shared/locales";
+import { englishReports } from "@/components/i18n/english-loaders";
+import { loadedReportForm, loadReportForm, preloadReportForm } from "./report-form-loader";
+import s from "./ReportProblemButton.module.css";
 
+/**
+ * Le formulaire, chargé **au clic** (lot 9-2) : le bouton est au pied de chaque
+ * page, et le formulaire porte son français (`reports-text.ts`) — l'importer
+ * ici l'aurait mis dans le premier chargement de tout le site. Sous `/en`, son
+ * anglais part avec lui, dans un morceau à part : un lecteur français ne le
+ * télécharge jamais.
+ *
+ * Chargement à la main plutôt que `next/dynamic` : un échec ne doit pas rester
+ * en mémoire sous la forme d'un composant vide (le bouton ne ferait plus rien).
+ * Le morceau part dès le survol ou le focus du bouton ; le bouton se dit occupé
+ * (`aria-busy`, couleurs, région d'état — libellé inchangé) tant qu'il n'est
+ * pas arrivé ; un échec
+ * le dit (toast) et se retente au clic suivant. Un morceau disparu (déploiement
+ * entre la page et le clic) invite à recharger la page, sans la recharger
+ * d'office : une saisie en cours ailleurs sur la page serait perdue.
+ */
 interface ReportProblemButtonProps {
   /** Visiteur connecté : il peut désigner des cibles par leur nom. */
   authenticated: boolean;
@@ -38,35 +60,93 @@ export function ReportProblemButton({
   cyber = false,
 }: Readonly<ReportProblemButtonProps>) {
   const [open, setOpen] = useState(false);
-  // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
-  // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
-  const { path: pathname } = useLocalePathname();
+  const locale = useAppLocale();
+  const [pending, setPending] = useState(false);
+  // Ce que la région d'état annonce : l'attente, et l'échec quand aucun toast ne le dit.
+  const [status, setStatus] = useState("");
+  const { t } = useShellText();
+  // Toujours posé par la mise en page racine ; `null` seulement pour un pied de
+  // page rendu seul (tests) : l'échec reste alors dit par la région d'état.
+  const toast = useOptionalToast();
+  // La page d'où l'on signale, lue **à l'ouverture** (revue de performance du
+  // lot 9-2 : le bouton, au pied de chaque page, ne s'abonne pas au chemin et
+  // n'est pas rendu à chaque navigation). Route sans préfixe de langue : la
+  // cible se reconnaît sous `/en/equipes/5` comme sous `/equipes/5`, et le
+  // journal retient une seule adresse par page.
+  const [pathname, setPathname] = useState("/");
+  const show = () => {
+    setPathname(splitLocalePrefix(window.location.pathname).path);
+    setOpen(true);
+  };
+
+  const openDialog = () => {
+    // Déjà là : chargé par un autre bouton, ou préchargé au survol.
+    if (loadedReportForm(locale)) {
+      show();
+      return;
+    }
+    if (pending) return;
+    setPending(true);
+    // Un nouvel essai efface l'échec précédent de la région d'état.
+    setStatus(t("footer.reportLoading"));
+    loadReportForm(locale)
+      .then(() => {
+        setStatus("");
+        // Ouvert même si le lecteur a changé de page entre-temps : c'est la
+        // suite attendue de son clic, et le formulaire retient la page affichée.
+        show();
+      })
+      .catch((error: unknown) => {
+        const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");
+        // Dit une fois : par le toast (sa propre région d'annonce), sinon par la région d'état.
+        if (toast) {
+          setStatus("");
+          toast.showError(message);
+        } else {
+          setStatus(message);
+        }
+      })
+      .finally(() => setPending(false));
+  };
+  const triggerProps = {
+    type: "button" as const,
+    className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,
+    onClick: openDialog,
+    // Au toucher, `pointerenter` part aussi au début d'un défilement : seul un vrai survol précharge.
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== "touch") preloadReportForm(locale);
+    },
+    onFocus: () => preloadReportForm(locale),
+    "aria-haspopup": "dialog" as const,
+    "aria-busy": pending || undefined,
+    // Clic ignoré pendant l'attente ; écarte aussi le survol du bouton du système de design.
+    "aria-disabled": pending || undefined,
+  };
+
+  // Lu du chargeur à chaque rendu : `setOpen(true)` suit toujours son arrivée.
+  const ReportProblemDialog = open ? loadedReportForm(locale) : null;
 
   return (
     <>
       {cyber ? (
-        <CyberButton
-          type="button"
-          variant="ghost"
-          className={className}
-          onClick={() => setOpen(true)}
-          aria-haspopup="dialog"
-        >
+        <CyberButton variant="ghost" {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
           {label}
         </CyberButton>
       ) : (
-        <button type="button" className={className} onClick={() => setOpen(true)} aria-haspopup="dialog">
+        <button {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
           {label}
         </button>
       )}
-      {open && (
+      <output className="sr-only">{status}</output>
+      {ReportProblemDialog && (
         <ReportProblemDialog
           pathname={pathname}
           authenticated={authenticated}
           initialCategory={initialCategory}
           onClose={() => setOpen(false)}
+          englishMessages={locale === "en" ? (englishReports.loaded() ?? undefined) : undefined}
         />
       )}
     </>

@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { StatsPanelI18n } from "@/lib/shared/stats-text";
+import { primeEnglish } from "./english-loaders";
+import { englishStatsPanel } from "./english-loaders-account";
 
 /**
  * Langue et messages du bloc de statistiques (`StatsPanel`, prop `i18n` prévue
@@ -14,6 +16,8 @@ export function StatsPanelI18nProvider({ value, children }: Readonly<{ value?: S
   // Figé au premier rendu : un `router.refresh()` renvoie un objet neuf au
   // contenu identique, que le bloc prendrait pour une autre langue.
   const [stable] = useState(value);
+  // L'anglais reçu amorce le chargeur partagé (revue de performance du lot 9-2).
+  primeEnglish(englishStatsPanel, value?.locale ?? "fr", value?.messages);
   return <StatsPanelI18nContext.Provider value={stable}>{children}</StatsPanelI18nContext.Provider>;
 }
 

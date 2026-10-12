@@ -7,7 +7,7 @@ jest.mock("@/lib/shared/i18n-routes", () => ({
 import { NextRequest } from "next/server";
 import { LEGACY_SUSPENSION_NOTICE_PATH, config, middleware } from "@/middleware";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
-import { LOCALE_HEADER } from "@/lib/shared/locales";
+import { DOCUMENT_REQUEST_HEADER, LOCALE_HEADER } from "@/lib/shared/locales";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 
 const ORIGIN = "https://bluegenji.test";
@@ -183,5 +183,24 @@ describe("middleware — avis de suspension sous /en/connexion", () => {
     const response = call("/en/regles", { headers: { cookie: `${SUSPENSION_NOTICE_COOKIE}=abc` } });
     expect(forwarded(response, SUSPENSION_NOTICE_HEADER)).toBeNull();
     expect(response.headers.get("set-cookie")).toBeNull();
+  });
+});
+
+describe("middleware — chargement complet ou requête du routeur (revue de performance du lot 9-2)", () => {
+  it("dit au rendu un chargement complet, et une requête du routeur (navigation, router.refresh())", () => {
+    expect(forwarded(call("/en/regles", { headers: { "sec-fetch-dest": "document" } }), DOCUMENT_REQUEST_HEADER)).toBe("1");
+    // Sans `Sec-Fetch-Dest` (Safari < 16.4) : `Accept` décide — un document demande du HTML, le routeur non.
+    expect(forwarded(call("/en/regles", { headers: { accept: "text/html,application/xhtml+xml" } }), DOCUMENT_REQUEST_HEADER)).toBe("1");
+    expect(forwarded(call("/en/regles", { headers: { accept: "*/*" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
+    // `text/html` ailleurs qu'en tête (client qui l'ajoute à `*/*`) : pas un document.
+    expect(forwarded(call("/en/regles", { headers: { accept: "*/*, text/html" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
+    expect(forwarded(call("/en/regles"), DOCUMENT_REQUEST_HEADER)).toBe("0");
+    expect(forwarded(call("/en/regles", { headers: { "sec-fetch-dest": "empty" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
+    expect(forwarded(call("/regles", { headers: { "sec-fetch-dest": "empty" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
+  });
+
+  it("remplace toujours la valeur annoncée par le client", () => {
+    const response = call("/en/regles", { headers: { "sec-fetch-dest": "document", [DOCUMENT_REQUEST_HEADER]: "0" } });
+    expect(forwarded(response, DOCUMENT_REQUEST_HEADER)).toBe("1");
   });
 });

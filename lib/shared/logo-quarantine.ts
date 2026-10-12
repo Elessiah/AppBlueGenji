@@ -34,6 +34,8 @@ import { discordInline } from "./discord-text";
 import { SUSPENSION_REASON_MAX_LENGTH, SUSPENSION_REASON_MIN_LENGTH, cleanModerationReason } from "./account-suspension";
 // Type seul : `content-reports.ts` importe les valeurs de ce module.
 import type { ReportCategory } from "./content-reports";
+import { cached } from "./intl-cache";
+import { UNREADABLE_DATE } from "./dates";
 
 /** Durée de la quarantaine avant suppression définitive, en mois civils. */
 export const LOGO_QUARANTINE_MONTHS = 6;
@@ -137,15 +139,24 @@ export function canAutoPurgeLogo(input: {
 /**
  * Date lisible d'une échéance, **en heure de Paris** : le message part d'un
  * serveur pour des lecteurs dont on ne connaît pas le fuseau, il est rédigé une
- * fois pour tous.
+ * fois pour tous. En français par défaut (messages du serveur) ; un écran passe
+ * la langue de sa page (`INTL_LOCALE`), toujours en heure de Paris. Une date
+ * illisible rend un tiret visible (`UNREADABLE_DATE`), signe d'une donnée
+ * abîmée : `Intl.DateTimeFormat#format` lève là où `toLocaleDateString` rendait
+ * « Invalid Date », et une page entière tomberait.
  */
-export function formatQuarantineDate(date: Date): string {
-  return date.toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Paris",
-  });
+export function formatQuarantineDate(date: Date, intlLocale = "fr-FR"): string {
+  if (Number.isNaN(date.getTime())) return UNREADABLE_DATE;
+  return quarantineDateFormat(intlLocale).format(date);
+}
+
+/** Un formateur par langue, construit une fois (`cached`) : `toLocaleDateString` en bâtirait un à chaque date. */
+const QUARANTINE_DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
+
+function quarantineDateFormat(intlLocale: string): Intl.DateTimeFormat {
+  return cached(QUARANTINE_DATE_FORMATS, intlLocale, (locale) =>
+    new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

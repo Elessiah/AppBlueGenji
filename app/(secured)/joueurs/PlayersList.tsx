@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
 import { useToast } from "@/components/ui/toast";
@@ -52,6 +52,13 @@ export default function PlayersList() {
   // — c'est le seul moyen de retrouver un adversaire d'un tournoi passé.
   const [showDeleted, setShowDeleted] = useState(false);
 
+  // Le texte par une référence : l'annuaire ne se relit jamais sur un simple
+  // changement de texte (revue de performance du lot 9-2).
+  const textRef = useRef(text);
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
+
   useEffect(() => {
     fetch("/api/players", { cache: "no-store" })
       .then(async (response) => {
@@ -61,8 +68,8 @@ export default function PlayersList() {
         }
         setPlayers(payload.players);
       })
-      .catch((e) => showError(playerErrorMessage(text, (e as Error).message, "PLAYERS_LOAD_FAILED")));
-  }, [showError, text]);
+      .catch((e) => showError(playerErrorMessage(textRef.current, (e as Error).message, "PLAYERS_LOAD_FAILED")));
+  }, [showError]);
 
   // L'annuaire, comptes supprimés compris ou non : tout ce que la page montre
   // ou compte en descend, sinon la case à cocher changerait la liste sans
@@ -75,24 +82,41 @@ export default function PlayersList() {
   // La recherche filtre sur une valeur **différée** : la frappe met le champ à
   // jour tout de suite, le refiltrage de la grille suit sans la bloquer.
   const deferredQuery = useDeferredValue(query);
-  const filtered = useMemo(() => {
-    const q = deferredQuery.trim().toLowerCase();
-    let r = listed.filter((p) => {
-      if (q && !`${p.pseudo} ${p.team?.name || ""}`.toLowerCase().includes(q)) return false;
-      if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
-      // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
-      // décoché « ouvert aux propositions » ne veut pas être démarché.
-      if (statusFilter === "free" && !isFreeAgent(p)) return false;
-      return true;
-    });
-    r = [...r];
+  // Clé de recherche de chaque joueur : calculée à la première recherche qui le
+  // lit, puis gardée pour l'annuaire chargé — rien sans recherche, rien à
+  // chaque frappe ni au cochage des comptes supprimés (revue de performance du lot 9-2).
+  // Table faible pour la vie de l'écran : une liste rechargée apporte des entrées neuves.
+  const [searchKeys] = useState(() => new WeakMap<(typeof players)[number], string>());
+  const searchKeyOf = useCallback((p: (typeof players)[number]): string => {
+    let key = searchKeys.get(p);
+    if (key === undefined) {
+      key = `${p.pseudo} ${p.team?.name || ""}`.toLowerCase();
+      searchKeys.set(p, key);
+    }
+    return key;
+  }, [searchKeys]);
+  // Trié une fois par liste et par ordre choisi ; la recherche ne fait ensuite
+  // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2).
+  const sorted = useMemo(() => {
+    const r = [...listed];
     if (sort === "pseudo") {
       const compare = compareLocalText(text.locale);
       r.sort((a, b) => compare(a.pseudo, b.pseudo));
     }
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
     return r;
-  }, [listed, deferredQuery, roleFilter, statusFilter, sort, text.locale]);
+  }, [listed, sort, text.locale]);
+  const filtered = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    return sorted.filter((p) => {
+      if (q && !searchKeyOf(p).includes(q)) return false;
+      if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
+      // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
+      // décoché « ouvert aux propositions » ne veut pas être démarché.
+      if (statusFilter === "free" && !isFreeAgent(p)) return false;
+      return true;
+    });
+  }, [searchKeyOf, sorted, deferredQuery, roleFilter, statusFilter]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);
@@ -106,12 +130,18 @@ export default function PlayersList() {
   // remplace l'autre — « free agent » se lit toujours sur l'ouverture au
   // recrutement, et un compteur qui ne suivrait pas la case « comptes
   // supprimés » contredirait la liste qu'il surmonte.
-  const freeAgents = listed.filter(isFreeAgent).length;
-  const owCount = listed.filter((p) => (p.games || []).includes("OW")).length;
-  const mrCount = listed.filter((p) => (p.games || []).includes("MR")).length;
+  // Comptés une fois par liste, pas à chaque frappe dans la recherche (revue de performance du lot 9-2).
+  const { freeAgents, owCount, mrCount } = useMemo(
+    () => ({
+      freeAgents: listed.filter(isFreeAgent).length,
+      owCount: listed.filter((p) => (p.games || []).includes("OW")).length,
+      mrCount: listed.filter((p) => (p.games || []).includes("MR")).length,
+    }),
+    [listed],
+  );
   // Celui-ci se compte sur **tout** l'annuaire : c'est l'étiquette de la case,
   // et elle doit dire combien de comptes elle ferait apparaître.
-  const deletedCount = players.filter((p) => p.isDeleted).length;
+  const deletedCount = useMemo(() => players.filter((p) => p.isDeleted).length, [players]);
 
   const accentStyle = {
     "--g-rgb": ACCENT_RGB,

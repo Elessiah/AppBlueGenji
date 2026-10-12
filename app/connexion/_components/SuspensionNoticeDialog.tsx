@@ -91,13 +91,8 @@ export function SuspensionNoticeDialog({ notice, onClose }: Readonly<{ notice: S
           </dd>
           <dt style={{ color: "var(--ink)", fontWeight: 600 }}>{t("suspension.appeal")}</dt>
           <dd style={{ margin: 0 }}>
-            {/* « Autre » : libellé du formulaire de signalement, encore en français (lot 9). */}
-            {richNodes(
-              text.rich("suspension.appealText", { reference: notice.reference }, {
-                fr: (children) =>
-                  frenchContentLang ? <span lang={frenchContentLang}>{richNodes(children)}</span> : richNodes(children),
-              }),
-            )}
+            {/* Catégorie du formulaire dans la langue de la page : il est traduit depuis le lot 9-2. */}
+            {t("suspension.appealText", { reference: notice.reference })}
           </dd>
         </dl>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>

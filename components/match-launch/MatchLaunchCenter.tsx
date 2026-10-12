@@ -6,6 +6,10 @@ import { useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
+import { PushTextProvider } from "@/components/notifications/push-text-provider";
+import { englishPush } from "@/components/i18n/english-loaders-account";
+import { useEnglishMessagesUntilRemount } from "@/components/i18n/use-english-messages";
+import { preloadMissing } from "@/lib/shared/lazy-component";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -356,17 +360,9 @@ export function MatchLaunchCenter({
           {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici
               que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
               fois l'appareil abonné. */}
-          {/* Réglage des notifications : français jusqu'au lot 9 (langue du
-              compte), annoncé comme tel sous `/en`. L'enveloppe ne fait pas de
-              boîte (`display: contents`) : panneau muet, aucun écart en plus. */}
-          <div className={styles.pushLang} lang={text.locale === "fr" ? undefined : "fr"}>
-            <PushNotificationsPanel
-              variant="compact"
-              topics={["MATCH_START"]}
-              toastLang={text.locale === "fr" ? undefined : "fr"}
-              lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
-            />
-          </div>
+          {/* Réglage des notifications : dans la langue de la page depuis le
+              lot 9-2 (`push`) ; son anglais chargé sous `/en` seulement. */}
+          <LaunchPushPanel locale={text.locale} lead={t("pushLead")} />
         </ScrollArea>
 
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
@@ -476,6 +472,43 @@ export function MatchLaunchCenter({
   );
 }
 
+/**
+ * Le réglage compact des notifications : un lecteur français ne télécharge pas
+ * son anglais (revue de performance du lot 9-2). Sous `/en`, il paraît quand
+ * l'anglais est là (`englishPush`, partagé : déjà reçu par `/profil`, il ne
+ * repart pas) ; un échec le laisse caché — réglage facultatif, offert
+ * aussi par `/profil` — plutôt que de le montrer en français. Monté avec la
+ * fenêtre ouverte seulement (refermée, elle cède la place au bouton flottant),
+ * il retente à la réouverture suivante (`onceLoader` ne garde pas un échec) —
+ * jamais par une boucle de fond.
+ * Dernier élément de la zone défilante : paru après coup (fenêtre ouverte sans
+ * survol du bouton — ouverture d'office, carte d'un match), il allonge la zone
+ * sans rien déplacer de ce qui se lit au-dessus.
+ */
+function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
+  const { english, failed } = useEnglishMessagesUntilRemount(locale, englishPush);
+  // Échec : rien (pas de lecture d'état pour un réglage qui ne paraîtra pas).
+  if (locale === "en" && failed) return null;
+  // Monté tout de suite, caché tant que l'anglais arrive : la lecture de l'état
+  // des notifications part en même temps que lui, pas après. Rien de français
+  // ne se montre ; sans boîte (`display: contents`), aucun écart dans la colonne.
+  const hidden = locale === "en" && !english;
+  return (
+    <div className={styles.pushSlot} data-waiting={hidden || undefined}>
+      <PushTextProvider locale={locale} messages={locale === "en" ? (english ?? undefined) : undefined}>
+        <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={lead} />
+      </PushTextProvider>
+    </div>
+  );
+}
+
+const preloadPush = preloadMissing([englishPush]);
+
+/** Précharge l'anglais du réglage des notifications (bouton de la fenêtre de lancement). */
+function preloadEnglishPush(locale: Locale): void {
+  if (locale === "en") preloadPush();
+}
+
 /** Cadence de relève selon la phase la plus pressante de la liste. */
 function launchPollInterval(launches: readonly MatchLaunchInfo[]): number {
   const hasLobby = launches.some((info) => info.phase === "LOBBY");
@@ -575,15 +608,23 @@ function LaunchFab({
   pending,
   onOpen,
 }: Readonly<{ pending: readonly MatchLaunchInfo[]; onOpen: (matchId: number) => void }>) {
-  const { t } = useLaunchText();
+  const { t, locale } = useLaunchText();
   const lobby = pending.find((info) => info.phase === "LOBBY");
   const target = lobby ?? pending[0];
+  // Sous `/en`, l'anglais du réglage des notifications part au survol : il est
+  // là quand la fenêtre s'ouvre, sans rien télécharger pour qui ne l'ouvre pas.
+  const preload = () => preloadEnglishPush(locale);
   return (
     <button
       type="button"
       className={styles.fab}
       data-phase={target.phase}
       onClick={() => onOpen(target.matchId)}
+      onPointerEnter={(event) => {
+        // Au toucher, `pointerenter` part aussi au début d'un défilement : seul un vrai survol compte.
+        if (event.pointerType !== "touch") preload();
+      }}
+      onFocus={preload}
     >
       <span aria-hidden="true">{lobby ? "⏳" : "▶"}</span>
       {lobby ? t("fabLobby") : t("fabMine")}

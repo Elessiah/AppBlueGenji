@@ -24,10 +24,10 @@ describe("barre de navigation — rafraîchie après les gestes qui la changent"
   };
 
   it.each<[string, string]>([
-    ["app/(secured)/profil/page.tsx", 'showSuccess("Profil mis à jour.")'],
-    ["app/(secured)/profil/page.tsx", 'showSuccess("Avatar mis à jour.")'],
-    ["app/(secured)/profil/page.tsx", 'showSuccess("Avatar supprimé.")'],
-    ["app/(secured)/profil/page.tsx", 'Invitation acceptée.'],
+    ["app/(secured)/profil/page.tsx", 'showSuccess(t("saved"))'],
+    ["app/(secured)/profil/page.tsx", 'showSuccess(t("avatarUpdated"))'],
+    ["app/(secured)/profil/page.tsx", 'showSuccess(t("avatarDeleted"))'],
+    ["app/(secured)/profil/page.tsx", 't("invitations.accepted")'],
     ["app/(secured)/equipes/[id]/_components/MembershipActions.tsx", "showSuccess(await request())"],
     ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'showSuccess(t("settings.updated"))'],
     ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'router.push("/equipes")'],
@@ -37,7 +37,7 @@ describe("barre de navigation — rafraîchie après les gestes qui la changent"
   });
 
   it("l'invitation refusée ne relance pas la mise en page pour rien", () => {
-    expect(gesture(read("app/(secured)/profil/page.tsx"), "Invitation acceptée.")).toContain(
+    expect(gesture(read("app/(secured)/profil/page.tsx"), 't("invitations.accepted")')).toContain(
       "if (accept) router.refresh()",
     );
   });

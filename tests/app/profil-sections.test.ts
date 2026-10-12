@@ -16,6 +16,9 @@ const SECTIONS: readonly ProfileSection[] = PROFILE_SECTIONS;
 
 const ROOT = join(__dirname, "..", "..");
 const page = readFileSync(join(ROOT, "app/(secured)/profil/page.tsx"), "utf8");
+// Lot 9-2 : les phrases vivent dans les messages (`profile`) ; le français
+// égale celui des sources partagées (`tests/app/profile-i18n.test.tsx`).
+const frProfile = JSON.parse(readFileSync(join(ROOT, "messages/fr/profile.json"), "utf8")) as typeof import("@/messages/fr/profile.json");
 const connectedApps = readFileSync(
   join(ROOT, "app/(secured)/profil/ConnectedAppsSection.tsx"),
   "utf8",
@@ -119,11 +122,11 @@ describe("La page descend du registre", () => {
 
 describe("La page dit ce qu'elle fait des identifiants", () => {
   it("prévient que Blizzard réécrit le BattleTag", () => {
-    expect(page).toContain("BLIZZARD_BATTLETAG_NOTICE");
+    expect(page).toContain('t("games.blizzardNotice")');
   });
 
   it("énonce l'exposition du tag Discord par la source partagée avec /connexion", () => {
-    expect(page).toContain("DISCORD_TAG_UNVERIFIED_AUDIENCE");
+    expect(page).toContain('t("discord.unverifiedAudience")');
   });
 
   it("n'écrit pas de branche que l'état ne peut pas atteindre", () => {
@@ -135,9 +138,9 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
     // et « lecture échouée » se confondaient en un seul `linked: null`, et le
     // verrou annonçait une panne pendant le temps normal d'un aller-retour.
     expect(page).toContain(
-      "discordTagLockNotice({ ...discordState, pending: discordStateBusy })",
+      "discordTagLockText(text, { ...discordState, pending: discordStateBusy })",
     );
-    expect(page).toContain("DISCORD_TAG_UNVERIFIED_AUDIENCE");
+    expect(page).toContain('t("discord.unverifiedAudience")');
   });
 
   it("ne recopie pas à la main l'exposition d'un tag certifié", () => {
@@ -147,7 +150,7 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
   });
 
   it("ne recopie plus l'aide des tags de jeu deux fois", () => {
-    expect(page).toContain("GAME_TAG_NOTICE");
+    expect(page.match(/t\("games\.gameTagNotice"\)/g) ?? []).toHaveLength(2);
     expect(page).not.toContain("jamais pour des statistiques");
   });
 });
@@ -238,7 +241,8 @@ describe("Aucune section ne se dessine deux fois", () => {
   });
 
   it("garde son texte d'aide, que le registre ne porte pas", () => {
-    expect(connectedApps).toContain("la dernière ne peut pas être retirée");
+    expect(connectedApps).toContain('text.t("connections.intro")');
+    expect(frProfile.connections.intro).toContain("la dernière ne peut pas être retirée");
   });
 });
 
@@ -340,6 +344,7 @@ describe("Le groupe « Avatar » porte un nom", () => {
 
   it("lève l'ambiguïté du second « Supprimer » sans perdre son texte visible", () => {
     // WCAG 2.5.3 : le nom accessible commence par le texte affiché.
-    expect(page).toContain('aria-label="Supprimer mon avatar"');
+    expect(page).toContain('aria-label={t("identity.deleteAvatarLabel")}');
+    expect(frProfile.identity.deleteAvatarLabel.startsWith(frProfile.identity.deleteAvatar)).toBe(true);
   });
 });

@@ -79,6 +79,14 @@
   transform: none;
 }
 
+/* En **attente** (`aria-busy`, lot 9-2) plutôt que refusé : le bouton garde
+   le focus et son libellé d'attente (« Envoi… ») doit se lire — pas
+   d'opacité (contraste ≥ 4,5:1), curseur d'attente. */
+.root[aria-disabled="true"][aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+}
+
 /* Mouvement réduit (préférence système ou menu d'accessibilité) : le bouton
    s'éclaire au survol sans se déplacer. */
 :global(:root[data-a11y~="motion"]) .primary:hover:not(:disabled):not([aria-disabled="true"]),

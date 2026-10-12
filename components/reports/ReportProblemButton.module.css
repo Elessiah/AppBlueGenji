@@ -1,0 +1,21 @@
+/*
+ * Bouton « Signaler un problème » pendant le chargement du formulaire : le
+ * libellé ne change pas (pas de saut de largeur dans le pied de page) ; l'état
+ * se dit par les couleurs (jamais `opacity`) et un curseur d'attente, sans
+ * effet de survol quel que soit son habillage (lien du pied, bouton du système
+ * de design). L'annonce passe par la région d'état du bouton.
+ */
+/* Doublée, la classe passe devant `.root[aria-disabled="true"]` du bouton du
+   système de design (opacité, curseur interdit) quel que soit l'ordre des feuilles. */
+.pending.pending[aria-busy="true"],
+.pending.pending[aria-busy="true"]:hover {
+  opacity: 1;
+  cursor: progress;
+  color: var(--ink-mute);
+  transform: none;
+  box-shadow: none;
+}
+
+.pending.pending[aria-busy="true"]::before {
+  display: none;
+}

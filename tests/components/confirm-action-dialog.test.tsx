@@ -241,9 +241,10 @@ describe("plus de window.confirm", () => {
     expect(page).toContain("onDiscordTagRemove={() => setConfirmingTagRemoval(true)}");
     expect(page).toContain("onConfirm={onDiscordTagRemove}");
     expect(page).toContain("setPendingDeletion({ subject, previewed });");
-    expect(page).toContain("title={ACCOUNT_DELETION_QUESTION}");
-    expect(page).toContain("{accountDeletionConsequences(pendingDeletion.subject)}");
-    expect(page).toContain("{deleteAccountLabel(deleting, pendingDeletion !== null)}");
+    // Lot 9-2 : textes de la langue de la page (`profile.deletion`).
+    expect(page).toContain('title={t("deletion.question")}');
+    expect(page).toContain("{deletionConsequencesText(text, pendingDeletion.subject)}");
+    expect(page).toContain("{deleteAccountLabel(text, deleting, pendingDeletion !== null)}");
     // Annuler rouvre le bouton « Supprimer mon compte ».
     expect(page).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);/);
     // … et lui rend le focus, perdu sur `body` quand il s'est désarmé.

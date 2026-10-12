@@ -39,10 +39,14 @@
   padding: var(--modal-pad) var(--modal-pad) 18px;
 }
 
-/* Porte seulement la langue du réglage des notifications : sans boîte, un
-   panneau qui se tait (appareil abonné) ne laisse pas d'écart de 18 px. */
-.pushLang {
+/* Le réglage des notifications : sans boîte (un panneau qui se tait, appareil
+   abonné, ne laisse pas d'écart de 18 px), caché tant que son anglais manque. */
+.pushSlot {
   display: contents;
+}
+
+.pushSlot[data-waiting] {
+  display: none;
 }
 
 .modal[data-phase="LOBBY"] {

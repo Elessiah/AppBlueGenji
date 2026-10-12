@@ -21,15 +21,12 @@
  * (`lib/shared/account-connections.ts`), si bien qu'un bouton actif mène
  * toujours quelque part.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   checkConnectionUnlink,
-  connectionMethodLabel,
-  DISCORD_BOT_CONNECTION_LABEL,
   discordBotRowState,
   discordButtonLinked,
-  connectionUnlinkRefusalMessage,
   type AccountConnection,
 } from "@/lib/shared/account-connections";
 import {
@@ -40,17 +37,21 @@ import {
   oauthStartPath,
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
+import { useProfileText } from "@/components/i18n/profile-text";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import {
+  connectionMethodText,
+  connectionRefusalText,
+  discordBotRowText,
+  type ProfileText,
+} from "./_lib/profile-text";
 import { DiscordBotHandleDialog } from "./DiscordBotHandleDialog";
 import { connectionErrorMessage, connectionSuccessMessage, unlinkSuccessMessage } from "./connection-errors";
 import { OtherSessionsPanel } from "./OtherSessionsPanel";
 import s from "./profil.module.css";
+import { busyAriaLabel } from "@/lib/shared/busy-aria-label";
+import { visibleText } from "@/lib/shared/visible-text";
 
-/** Ce que chaque porte apporte au compte, en plus d'une session. */
-const PROVIDER_NOTES: Record<OAuthProvider, string> = {
-  GOOGLE: "Connexion en un clic. Aucune adresse n'est enregistrée.",
-  DISCORD: "Connexion, certification de ton tag, et rappels de match en message privé.",
-  BLIZZARD: "Connexion, et ton BattleTag tenu à jour par Blizzard.",
-};
 
 export function ConnectedAppsSection({
   /**
@@ -90,7 +91,9 @@ export function ConnectedAppsSection({
   onDiscordTagChanged?: (tag: string) => void;
 }>): React.ReactElement {
   const { showError, showSuccess } = useToast();
+  const text = useProfileText();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
+  const unlinking = useRef(false);
   // Le dialogue « Mettre à jour mon pseudo » de la ligne du bot, s'il est ouvert.
   const [botDialog, setBotDialog] = useState<"UPDATE" | "LINK" | null>(null);
   // Un retrait ferme les autres sessions : le compte d'à côté doit être relu.
@@ -108,11 +111,11 @@ export function ConnectedAppsSection({
 
     if (connected) {
       showSuccess(
-        connectionSuccessMessage(oauthProviderFromSlug(connected), params.get("refreshed") === "1"),
+        connectionSuccessMessage(oauthProviderFromSlug(connected), params.get("refreshed") === "1", text),
       );
       onChanged?.();
     } else {
-      showError(connectionErrorMessage(failed));
+      showError(connectionErrorMessage(failed, text));
     }
 
     params.delete("connected");
@@ -126,9 +129,13 @@ export function ConnectedAppsSection({
     // parent et change à chaque rendu, ce qui rejouerait ce message à l'infini.
     // Le nettoyage de l'URL, lui, garantit qu'il ne part qu'une fois.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showError, showSuccess]);
+  }, [showError, showSuccess, text]);
 
   const unlink = async (provider: OAuthProvider) => {
+    // Garde par référence, lue sans attendre de rendu : deux activations rapprochées
+    // n'envoient qu'un retrait (revue de sécurité du lot 9-2).
+    if (unlinking.current) return;
+    unlinking.current = true;
     setBusy(provider);
     try {
       const res = await fetch(`/api/profile/connections/${OAUTH_PROVIDER_SLUGS[provider]}`, {
@@ -136,15 +143,16 @@ export function ConnectedAppsSection({
       });
       const payload = (await res.json()) as { error?: string; revokedSessions?: number | null };
       if (!res.ok) throw new Error(payload.error ?? "");
-      showSuccess(unlinkSuccessMessage(provider, payload.revokedSessions ?? null));
+      showSuccess(unlinkSuccessMessage(provider, payload.revokedSessions ?? null, text));
       setSessionsVersion((version) => version + 1);
       await reload();
       onChanged?.();
     } catch (e) {
       // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
       // dont le message anglais partait sinon tel quel dans la notification.
-      showError(connectionErrorMessage((e as Error).message));
+      showError(connectionErrorMessage((e as Error).message, text));
     } finally {
+      unlinking.current = false;
       setBusy(null);
     }
   };
@@ -161,13 +169,11 @@ export function ConnectedAppsSection({
   return (
     <>
       <p className={`${s.hint} ${s.hintMuted}`} style={{ marginTop: 0, marginBottom: 16 }}>
-        Ton compte n&apos;a pas de mot de passe : il s&apos;ouvre par les applications
-        rattachées ci-dessous. Tu peux en ajouter plusieurs pour ne jamais rester à la porte —
-        la dernière ne peut pas être retirée.
+        {text.t("connections.intro")}
       </p>
 
       {connections === null ? (
-        <p style={{ fontSize: 13, color: "var(--ink-quiet)", margin: 0 }}>Chargement…</p>
+        <p style={{ fontSize: 13, color: "var(--ink-quiet)", margin: 0 }}>{text.t("connections.loading")}</p>
       ) : (
         <div className="table-like">
           {connections.map((rawConnection) => (
@@ -218,6 +224,12 @@ function ConnectionRow({
   onUnlink: (provider: OAuthProvider) => void;
   onBotDialog: (mode: "UPDATE" | "LINK") => void;
 }>): React.ReactElement {
+  const text = useProfileText();
+  const { t } = text;
+  // La langue de l'adresse (seule l'URL dit la langue) pour l'aller-retour OAuth : si
+  // l'anglais du profil n'a pas pu se charger, le texte retombe sur le français, mais
+  // le lecteur de `/en/profil` doit y revenir (revue de sécurité du lot 9-2).
+  const locale = useAppLocale();
   // Discord a deux lignes pour une seule identité : la ligne du bouton
   // ne se dit rattachée que si ce n'est pas le code qui porte le
   // rattachement (`discordButtonLinked`) — sinon, c'est la ligne du bot
@@ -230,15 +242,14 @@ function ConnectionRow({
     rawConnection.provider === "DISCORD" && rawConnection.linked && !connection.linked;
   const refusal = checkConnectionUnlink(connections, connection.provider);
   const label = OAUTH_PROVIDER_LABELS[connection.provider];
-  const handleLabel = OAUTH_PROVIDER_HANDLE_LABELS[connection.provider];
   const slug = OAUTH_PROVIDER_SLUGS[connection.provider];
   const detailsId = `connection-details-${slug}`;
   const methodId = `connection-method-${slug}`;
   // Calculé une fois : la condition et le rendu doivent dire la même
   // chose, et le module est la seule autorité sur « y a-t-il quelque
   // chose à dire ? ».
-  const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
-  const details = connectionDetails(connection, discordByCode, handleLabel);
+  const methodLabel = connection.linked ? connectionMethodText(text, connection) : null;
+  const details = connectionDetails(text, connection, discordByCode);
   return (
     <>
       <div
@@ -289,7 +300,7 @@ function ConnectionRow({
           */}
           {connection.linked && refusal === "LAST_CONNECTION" ? (
             <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
-              {connectionUnlinkRefusalMessage(refusal, connection.provider)}
+              {connectionRefusalText(text, refusal, connection.provider)}
             </span>
           ) : null}
         </span>
@@ -299,9 +310,10 @@ function ConnectionRow({
             <button
               type="button"
               className="btn ghost"
-              disabled={busy !== null}
-              onClick={() => onUnlink(connection.provider)}
-              aria-label={`Retirer ${label} de mon compte`}
+              /* `aria-disabled`, pas `disabled` : le focus reste sur le bouton pendant le geste. */
+              aria-disabled={busy !== null || undefined}
+              onClick={() => busy === null && onUnlink(connection.provider)}
+              aria-label={busyAriaLabel(busy === connection.provider, t("connections.unlinkLabel", { label }))}
               /* La **porte** fait partie de ce qui décrit ce bouton :
                  laissée hors de la description, elle n'était lue par
                  personne au clavier — un lecteur d'écran qui parcourt
@@ -309,14 +321,14 @@ function ConnectionRow({
               aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
               style={{ padding: "4px 12px", fontSize: 12 }}
             >
-              {busy === connection.provider ? "Retrait…" : "Retirer"}
+              {busy === connection.provider ? t("connections.unlinking") : t("connections.unlink")}
             </button>
           ) : null}
           {connection.linked ? null : (
             <a
               className="btn"
-              href={oauthStartPath(connection.provider, { intent: "LINK" })}
-              aria-label={`Rattacher ${label} à mon compte`}
+              href={oauthStartPath(connection.provider, { intent: "LINK", locale })}
+              aria-label={t("connections.linkLabel", { label })}
               /* Ce que le fournisseur apporte tient dans la ligne d'à
                  côté : `aria-describedby` la rattache au contrôle plutôt
                  que de la laisser en texte voisin, qu'un lecteur d'écran
@@ -324,7 +336,7 @@ function ConnectionRow({
               aria-describedby={detailsId}
               style={{ padding: "4px 12px", fontSize: 12 }}
             >
-              Rattacher
+              {t("connections.link")}
             </a>
           )}
         </span>
@@ -343,18 +355,19 @@ function ConnectionRow({
 }
 
 /** Ce que la ligne dit du rattachement, sous le nom du fournisseur. */
-function connectionDetails(
-  connection: AccountConnection,
-  discordByCode: boolean,
-  handleLabel: string | null | undefined,
-): string {
+function connectionDetails(text: ProfileText, connection: AccountConnection, discordByCode: boolean): string {
+  const { t } = text;
   if (connection.linked) {
-    return connection.handle && handleLabel ? `${handleLabel} : ${connection.handle}` : "Rattaché";
+    // Le registre dit quel fournisseur a un identifiant à montrer (Google : aucun) ;
+    // chacun a son libellé traduit sous `connections.handleLabels` (testé).
+    if (connection.handle && OAUTH_PROVIDER_HANDLE_LABELS[connection.provider] !== null) {
+      const labelKey = `connections.handleLabels.${connection.provider}` as Parameters<typeof t>[0];
+      return t("connections.handleLine", { label: t(labelKey), handle: visibleText(connection.handle) });
+    }
+    return t("connections.linked");
   }
-  if (discordByCode) {
-    return "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord.";
-  }
-  return PROVIDER_NOTES[connection.provider];
+  if (discordByCode) return t("connections.discordByCode");
+  return t(`connections.notes.${connection.provider}`);
 }
 
 /**
@@ -377,18 +390,21 @@ function DiscordBotRow({
   onUpdate: (mode: "UPDATE" | "LINK") => void;
   onDisconnect: () => void;
 }>): React.ReactElement {
+  const text = useProfileText();
+  const { t } = text;
   const row = discordBotRowState(connections);
+  const words = discordBotRowText(text, row);
   const detailsId = "connection-details-discord-bot";
   return (
     <div className="table-row" style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <strong style={{ fontSize: 14 }}>{DISCORD_BOT_CONNECTION_LABEL}</strong>
+        <strong style={{ fontSize: 14 }}>{t("connections.bot.label")}</strong>
         <span id={detailsId} style={{ fontSize: 11, color: "var(--ink-quiet)", lineHeight: 1.5 }}>
-          {row.note}
+          {words.note}
         </span>
-        {row.refusal ? (
+        {words.refusal ? (
           <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
-            {row.refusal}
+            {words.refusal}
           </span>
         ) : null}
       </span>
@@ -398,24 +414,24 @@ function DiscordBotRow({
         <button
           type="button"
           className={row.handleAction === "LINK" ? "btn" : "btn ghost"}
-          disabled={busy}
-          onClick={() => onUpdate(row.handleAction)}
+          aria-disabled={busy || undefined}
+          onClick={() => !busy && onUpdate(row.handleAction)}
           aria-describedby={detailsId}
           style={{ padding: "4px 12px", fontSize: 12 }}
         >
-          {row.handleAction === "LINK" ? "Rattacher par code" : "Mettre à jour mon pseudo"}
+          {row.handleAction === "LINK" ? t("connections.bot.linkByCode") : t("connections.bot.updateHandle")}
         </button>
         {row.canDisconnect ? (
           <button
             type="button"
             className="btn ghost"
-            disabled={busy}
-            onClick={onDisconnect}
-            aria-label="Se déconnecter du bot Discord"
+            aria-disabled={busy || undefined}
+            onClick={() => !busy && onDisconnect()}
+            aria-label={busyAriaLabel(disconnecting, t("connections.bot.disconnectLabel"))}
             aria-describedby={detailsId}
             style={{ padding: "4px 12px", fontSize: 12 }}
           >
-            {disconnecting ? "Déconnexion…" : "Se déconnecter"}
+            {disconnecting ? t("connections.bot.disconnecting") : t("connections.bot.disconnect")}
           </button>
         ) : null}
       </span>

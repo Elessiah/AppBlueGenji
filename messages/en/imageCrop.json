@@ -1,0 +1,22 @@
+{
+  "handles": {
+    "nw": "top-left corner",
+    "ne": "top-right corner",
+    "sw": "bottom-left corner",
+    "se": "bottom-right corner"
+  },
+  "resizeBy": "Resize by the {handle}",
+  "frame": "Kept area",
+  "frameDetail": "Kept area: {width}% of the width, {height}% of the height, {left}% from the left edge and {top}% from the top",
+  "frameRole": "crop frame",
+  "failed": "This image can't be displayed here. Choose another one.",
+  "hint": "Drag the frame to choose the kept area, pull a corner to resize it.",
+  "hintFixed": "Drag the frame to choose the kept area, pull a corner to resize it (fixed proportions).",
+  "hintKeys": "With the keyboard: arrows to move it (Shift to go faster), + and − to enlarge or shrink it, Home to go back to the suggested frame.",
+  "preview": "Preview",
+  "shrink": "Shrink",
+  "grow": "Enlarge",
+  "reset": "Reset",
+  "cancel": "Cancel",
+  "confirm": "Confirm crop"
+}

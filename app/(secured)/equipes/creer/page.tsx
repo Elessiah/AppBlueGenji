@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { TeamsTextProvider } from "@/components/i18n/teams-text";
+import { TeamsTextGate } from "@/components/i18n/teams-text-gate";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 import CreateTeamForm from "./CreateTeamForm";
 
 /**
@@ -21,10 +22,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CreateTeamPage() {
   const locale = await requestLocale();
-  const messages = locale === "en" ? messagesFor(locale).teams : undefined;
+  // L'anglais au chargement complet seulement (revue de performance du lot 9-2).
+  const messages = await englishOnDocumentLoad(locale, (all) => all.teams);
   return (
-    <TeamsTextProvider locale={locale} messages={messages}>
+    <TeamsTextGate locale={locale} messages={messages}>
       <CreateTeamForm />
-    </TeamsTextProvider>
+    </TeamsTextGate>
   );
 }

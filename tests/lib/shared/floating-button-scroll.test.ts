@@ -111,7 +111,7 @@ describe("le menu d'accessibilité reste offert pendant une modale", () => {
       ':global(html:has([aria-modal="true"]:not([hidden]) [data-handle])) .root',
     ]);
     // Le repère est bien porté par les poignées du recadrage.
-    expect(readSource("components/ui/image-crop-dialog.tsx")).toContain("data-handle={handle}");
+    expect(readSource("components/ui/image-crop-dialog-view.tsx")).toContain("data-handle={handle}");
   });
 
   it("passe au-dessus de tous les voiles, remonté dans le coin haut gauche", () => {

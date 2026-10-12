@@ -518,10 +518,10 @@ describe("gestes traduits au lot 8b — plus de blocs français sur la fiche", (
     }
     const scoreForm = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
     expect(scoreForm).not.toContain("useFrenchBlockToast");
-    // Lot 8b-2 : le sélecteur d'image suit la page ; seule la modale de
-    // recadrage, commune au site (lot 9), reste française et le redit.
+    // Lot 8b-2 : le sélecteur d'image suit la page ; la modale de recadrage
+    // commune au site aussi, depuis le lot 9-2.
     const picker = readFileSync(join(process.cwd(), "app/(secured)/tournois/_components/TournamentImagePicker.tsx"), "utf8");
-    expect(picker).toContain("useImageCropper({ lang: cropLang })");
+    expect(picker).toContain("useImageCropper()");
   });
 
   it("lien « Modifier » vers l'édition, traduite au lot 8b-2 : même langue, sans hrefLang", () => {

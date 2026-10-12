@@ -237,3 +237,12 @@ export function useToast() {
   if (!ctx) throw new Error("useToast doit être utilisé dans ToastProvider");
   return ctx;
 }
+
+/**
+ * `useToast` pour un composant aussi rendu hors du `ToastProvider` racine
+ * (pieds de page rendus seuls en test, pages d'erreur) : `null` plutôt qu'une
+ * exception.
+ */
+export function useOptionalToast() {
+  return useContext(ToastContext);
+}

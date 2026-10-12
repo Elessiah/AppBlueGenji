@@ -34,7 +34,7 @@ export function copyrightNoticeElementsTextEn(): string {
 
 /** `NOTIFIER_FOLLOW_UP` (`content-reports.ts`). */
 export const NOTIFIER_FOLLOW_UP_EN =
-  "The author of a notice receives, at the address they provide (required for copyright, optional otherwise), an acknowledgment of receipt, then the decision taken on it and the means of redress available to them. If they reported from their account, they can contest that decision — including a decision not to act — through the “Appeal” category (« Contestation ») of the same form, once the report has been archived.";
+  "The author of a notice receives, at the address they provide (required for copyright, optional otherwise), an acknowledgment of receipt, then the decision taken on it and the means of redress available to them. If they reported from their account, they can contest that decision — including a decision not to act — through the “Appeal” category of the same form, once the report has been archived.";
 
 /** `STREAM_NOTICE_SHOWN` (`stream-notice.ts`). */
 export const STREAM_NOTICE_SHOWN_EN =
@@ -42,7 +42,7 @@ export const STREAM_NOTICE_SHOWN_EN =
 
 /** `STREAM_NOTICE_OBJECTION` (`stream-notice.ts`). */
 export const STREAM_NOTICE_OBJECTION_EN =
-  "Any player can object: they then appear under a neutral name. The request is made through the “Report a problem” button, GDPR category (« RGPD »).";
+  "Any player can object: they then appear under a neutral name. The request is made through the “Report a problem” button, GDPR category.";
 
 /** `AUTHORITY_CONTACT_LANGUAGES` (`legal-contact.ts`), same order. */
 export const AUTHORITY_CONTACT_LANGUAGES_EN: readonly string[] = ["French", "English"];

@@ -1,0 +1,76 @@
+{
+  "topics": {
+    "MATCH_START": {
+      "label": "Match start",
+      "description": "Your match is entering its launch: mark yourself ready, or it has just been launched."
+    },
+    "SCORE_TO_CONFIRM": {
+      "label": "Score to confirm",
+      "description": "The opposing team entered a score that you need to confirm or dispute."
+    },
+    "TOURNAMENT_START": {
+      "label": "Tournament kickoff",
+      "description": "A tournament your team is registered for has just started."
+    },
+    "MATCH_REMINDER": {
+      "label": "Match reminders",
+      "description": "One week, 24 h and then 1 h before a scheduled match, and the announcement of its time."
+    },
+    "TEAM_JOIN_REQUEST": {
+      "label": "Join requests",
+      "description": "A player asks to join a team you manage."
+    },
+    "CONTENT_REPORT": {
+      "label": "Reports about you",
+      "description": "A report targets your account or your team: you can appeal it."
+    },
+    "MODERATION": {
+      "label": "Moderation decisions",
+      "description": "Your avatar or your team's logo was hidden, deleted or restored, or your account suspended."
+    },
+    "PRIVACY_CHANGE": {
+      "label": "Processing of your data",
+      "description": "The site changes what it collects or how it keeps it."
+    },
+    "REFEREE_ALERT": {
+      "label": "Referee alerts",
+      "description": "A score conflict, an unresolved reschedule or a reported problem is waiting for a referee."
+    },
+    "STAFF_REPORT": {
+      "label": "Incoming reports",
+      "description": "A new report, or an appeal, reaches moderation."
+    }
+  },
+  "panel": {
+    "retry": "Try again",
+    "loading": "Loading notifications…",
+    "compactLead": "Get notified even when the site is closed.",
+    "devices": "{count, plural, one {1 device subscribed} other {{count} devices subscribed}} to your account. The settings below apply to all of them.",
+    "legend": "Notify me about",
+    "discordHint": "Discord direct messages don't depend on these settings: they follow your Discord tag.",
+    "notConfigured": "Push notifications aren't enabled on the site yet.",
+    "checking": "Checking this device…",
+    "enabledHere": "Enabled on this device",
+    "disable": "Disable on this device",
+    "disabled": "Notifications disabled on this device.",
+    "enable": "Enable notifications on this device",
+    "enabling": "Enabling…",
+    "enabled": "Notifications enabled on this device."
+  },
+  "support": {
+    "UNSUPPORTED": "This browser can't receive push notifications.",
+    "IOS_NEEDS_INSTALL": "On iPhone and iPad, first add the site to your Home Screen (Share button, then “Add to Home Screen”, with “Open as Web App” ticked), then open it from its icon.",
+    "DENIED": "You blocked this site's notifications in your browser. Allow them in its settings (icon to the left of the address), then reload the page."
+  },
+  "errors": {
+    "INVALID_PUSH_SUBSCRIPTION": "This device returned an unreadable subscription. Try again, or switch browsers.",
+    "PUSH_SERVICE_NOT_ALLOWED": "This browser's notification service isn't supported.",
+    "PUSH_NOT_CONFIGURED": "Push notifications aren't enabled on the site yet.",
+    "PUSH_SUBSCRIPTION_CLAIMED": "This device already receives another account's notifications. Disable them from that account, then try again.",
+    "PUSH_PERMISSION_DENIED": "Your browser blocks this site's notifications. Allow them in its settings, then try again.",
+    "PUSH_UNSUPPORTED": "This browser can't receive push notifications.",
+    "INVALID_PUSH_TOPICS": "Unreadable notification settings.",
+    "PUSH_LOAD_FAILED": "The notification settings couldn't be read.",
+    "fallback": "The notifications couldn't be set. Try again in a moment."
+  }
+}

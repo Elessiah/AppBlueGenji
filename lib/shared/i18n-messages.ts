@@ -38,8 +38,12 @@ import type frTeam from "@/messages/fr/team.json";
 import type frTeamErrors from "@/messages/fr/teamErrors.json";
 import type frTeamRoles from "@/messages/fr/teamRoles.json";
 import type frPlayers from "@/messages/fr/players.json";
+import type frProfile from "@/messages/fr/profile.json";
+import type frReports from "@/messages/fr/reports.json";
+import type frImageCrop from "@/messages/fr/imageCrop.json";
+import type frPush from "@/messages/fr/push.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "teams", "team", "teamErrors", "teamRoles", "players"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -108,6 +112,18 @@ export type Messages = {
   teamRoles: typeof frTeamRoles;
   /** Annuaire `/joueurs` et fiche `/joueurs/[id]` (lot 9) — `components/i18n/players-text.tsx`. */
   players: typeof frPlayers;
+  /** Page `/profil` et ses fenêtres (lot 9-2) — `components/i18n/profile-text.tsx`. */
+  profile: typeof frProfile;
+  /**
+   * Formulaire « Signaler un problème » et page d'un signalement pour la
+   * personne visée (lot 9-2) : ses deux langues voyagent avec le formulaire,
+   * chargé au clic — `components/reports/reports-text.ts`.
+   */
+  reports: typeof frReports;
+  /** Modale de recadrage commune au site (lot 9-2), deux langues dans son module — `components/ui/image-crop-dialog.tsx`. */
+  imageCrop: typeof frImageCrop;
+  /** Réglage des notifications push (lot 9-2), deux langues dans son module — `components/notifications/push-text.ts`. */
+  push: typeof frPush;
 };
 
 /**

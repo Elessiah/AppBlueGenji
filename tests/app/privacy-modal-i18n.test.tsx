@@ -49,8 +49,9 @@ describe("PrivacyChangesModal — langue de la page", () => {
     for (const change of PRIVACY_CHANGES) expect(text).toContain(PRIVACY_CHANGES_EN[change.id].title);
     expect(text).not.toContain(PRIVACY_CHANGES[0].title);
     expect(html).toContain('href="/en/rgpd"');
-    // Les liens d'action gardent leur cible ; les pages encore françaises (profil) gardent leur adresse.
-    expect(html).toContain('href="/profil#identite"');
+    // Les liens d'action gardent leur cible, dans la langue de la page : le
+    // profil est traduit depuis le lot 9-2.
+    expect(html).toContain('href="/en/profil#identite"');
     expect(text).toContain("Change my username or avatar");
     expect(text).not.toMatch(/\b(tes|ton|aucun accord|J'ai pris)\b/);
   });
@@ -63,11 +64,11 @@ describe("PrivacyChangesModal — langue de la page", () => {
     expect(render("fr")).not.toContain('lang="fr"');
   });
 
-  it("sous /en : un lien vers une page encore française le dit (hrefLang, « (in French) ») ; pas en français", () => {
+  it("sous /en : le profil, traduit au lot 9-2, ne se dit plus français ; pas de mention en français", () => {
     const html = render("en");
-    expect(html).toMatch(/<a [^>]*href="\/profil#identite"[^>]*hrefLang="fr"|<a [^>]*hrefLang="fr"[^>]*href="\/profil#identite"/);
-    expect(legalPageText(html)).toContain("Change my username or avatar (in French)");
-    expect(legalPageText(html)).not.toContain("Read the privacy policy (in French)");
+    expect(html).not.toMatch(/<a [^>]*href="[^"]*profil#identite"[^>]*hrefLang="fr"/);
+    expect(legalPageText(html)).toContain("Change my username or avatar");
+    expect(legalPageText(html)).not.toContain("(in French)");
     expect(render("fr")).not.toMatch(/hrefLang|en français/);
   });
 

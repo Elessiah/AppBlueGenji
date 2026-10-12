@@ -7,8 +7,8 @@ import { teamShareCardKey } from "@/lib/shared/page-share-cards";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { TeamPageTextProvider } from "@/components/i18n/team-page-text-provider";
-import { StatsPanelI18nProvider } from "@/components/i18n/stats-panel-i18n";
+import { TeamPageTextGate } from "@/components/i18n/english-gates";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 import { statsPanelMessages } from "@/lib/shared/stats-text";
 
 type MetadataProps = {
@@ -62,12 +62,16 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
  */
 export default async function TeamDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? messagesFor(locale) : undefined;
+  // L'anglais au chargement complet seulement (revue de performance du lot 9-2) : la fiche
+  // rafraîchit après chaque réglage, et une réponse du routeur n'est jamais gardée en cache.
+  const english = await englishOnDocumentLoad(locale, (all) => ({ team: all.team, stats: statsPanelMessages(all) }));
   return (
-    <TeamPageTextProvider locale={locale} messages={messages?.team}>
-      <StatsPanelI18nProvider value={messages ? { locale, messages: statsPanelMessages(messages) } : undefined}>
-        {children}
-      </StatsPanelI18nProvider>
-    </TeamPageTextProvider>
+    <TeamPageTextGate
+      locale={locale}
+      messages={english?.team}
+      stats={english?.stats}
+    >
+      {children}
+    </TeamPageTextGate>
   );
 }

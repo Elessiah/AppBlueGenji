@@ -72,5 +72,6 @@
   "caster": "Caster",
   "noCaster": "No caster signed up: the match starts as soon as both teams are ready.",
   "vs": "VS",
-  "fabTeams": "{team1} vs {team2}"
+  "fabTeams": "{team1} vs {team2}",
+  "pushLead": "Get notified when your next matches start, even with the site closed."
 }

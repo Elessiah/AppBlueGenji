@@ -2,11 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { LogOut, Shield, UserRound } from "lucide-react";
-import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { UserAvatar } from "./user-avatar";
-import { useToast } from "./ui/toast";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
+import { useLogout } from "./use-logout";
 import s from "./account-menu.module.css";
 
 export type AccountMenuTeam = { teamId: number; teamName: string };
@@ -31,11 +31,8 @@ type AccountMenuProps = {
  * tabulation en sort — mêmes règles que le menu de la vitrine.
  */
 export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<AccountMenuProps>) {
-  const router = useLocaleRouter();
-  const { showError } = useToast();
   const { t } = useShellText();
   const [open, setOpen] = useState(false);
-  const [leaving, setLeaving] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -58,19 +55,7 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<A
     };
   }, [open]);
 
-  const onLogout = async () => {
-    if (leaving) return;
-    setLeaving(true);
-    const done = await requestLogout();
-    setLeaving(false);
-    if (!done) {
-      showError(t("account.logoutFailed"));
-      return;
-    }
-    setOpen(false);
-    router.push("/");
-    router.refresh();
-  };
+  const { leaving, logout: onLogout } = useLogout(() => setOpen(false));
 
   const close = () => setOpen(false);
 
@@ -158,18 +143,4 @@ export function AccountMenuPanel({
       </button>
     </div>
   );
-}
-
-/**
- * Ferme la session côté serveur. Rend `false` si la requête échoue ou est
- * refusée : l'appelant le dit (toast) au lieu de ramener à l'accueil un
- * joueur toujours connecté.
- */
-export async function requestLogout(fetchImpl: typeof fetch = fetch): Promise<boolean> {
-  try {
-    const res = await fetchImpl("/api/auth/logout", { method: "POST" });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }

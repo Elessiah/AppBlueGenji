@@ -12,7 +12,9 @@ import { stripComments } from "./_lib/style-sweep";
  */
 const ROOT = process.cwd();
 const css = stripComments(readFileSync(join(ROOT, "components/ui/image-crop-dialog.module.css"), "utf8"));
-const tsx = readFileSync(join(ROOT, "components/ui/image-crop-dialog.tsx"), "utf8");
+const tsx = readFileSync(join(ROOT, "components/ui/image-crop-dialog-view.tsx"), "utf8");
+/** Le crochet qui ouvre la modale, chargée à la demande (revue de performance du lot 9-2). */
+const hook = readFileSync(join(ROOT, "components/ui/image-crop-dialog.tsx"), "utf8");
 const SMALL = "(max-width: 640px), (max-height: 560px)";
 
 /** Contenu d'un `@media` dont la condition contient `condition`. */
@@ -62,15 +64,18 @@ describe("modale de recadrage — petits écrans", () => {
     const keys = tsx.slice(tsx.indexOf("className={s.hintKeys}"));
     expect(keys.length).toBeLessThan(tsx.length);
     // La phrase du geste au doigt n'est pas dans la partie masquée.
-    expect(keys).not.toContain("Fais glisser le cadre");
-    expect(tsx).toContain("Fais glisser le cadre");
+    // Lot 9-2 : la phrase du geste au doigt vient des messages (`hint`,
+    // `hintFixed`), rendue hors de la partie masquée.
+    expect(keys).not.toContain('t("hint")');
+    expect(tsx).toContain('{aspect !== null ? t("hintFixed") : t("hint")}');
   });
 });
 
 describe("modale de recadrage — langue d'un écran du staff sous /en", () => {
   it("portée dans body, elle porte la langue que l'écran lui passe", () => {
     expect(tsx).toMatch(/role="dialog"[^>]*lang=\{lang\}/);
-    expect(tsx).toMatch(/useImageCropper\(options: Readonly<\{ lang\?: string \}> = \{\}\)/);
+    // Seul le français s'impose (lot 9-2) : un `lang` qui ne suivrait pas le texte serait faux (WCAG 3.1.2).
+    expect(hook).toMatch(/useImageCropper\(options: Readonly<\{ lang\?: "fr" \}> = \{\}\)/);
   });
 
   it("les éditeurs de la vitrine (français, D4) la disent en français sous /en", () => {

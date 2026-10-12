@@ -1,11 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
-  OFF_SITE_CONDUCT_ENTRY,
-  OFF_SITE_CONDUCT_NOTICE,
   REPORT_CATEGORIES,
-  REPORT_CATEGORY_DEFINITIONS,
 } from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS, OFF_SITE_CONDUCT_ENTRY, OFF_SITE_CONDUCT_NOTICE } from "@/lib/shared/content-report-categories";
 import { readSource } from "../../helpers/read-source";
 
 describe("renvoi de la modération hors site vers le portail de support", () => {
@@ -48,7 +46,13 @@ describe("ReportProblemDialog — lien vers le portail", () => {
   });
 
   it("annonce le nouvel onglet aux technologies d'assistance", () => {
-    expect(source.match(/nouvel onglet\)<\/span>/g) ?? []).toHaveLength(2);
+    // Lot 9-2 : la mention vient des messages (`dialog.newTab`, `dialog.portalSuffix`) ;
+    // l'espace qui la sépare du lien est dans le code, pas dans la traduction.
+    expect(source).toContain('<span className="sr-only">{` ${t("dialog.newTab")}`}</span>');
+    expect(source).toContain('<span className="sr-only">{` ${t("dialog.portalSuffix")}`}</span>');
+    const fr = JSON.parse(readSource("messages/fr/reports.json")) as { dialog: { newTab: string; portalSuffix: string } };
+    expect(fr.dialog.newTab).toBe("(nouvel onglet)");
+    expect(fr.dialog.portalSuffix).toBe("(portail de support, nouvel onglet)");
   });
 
   it("place la carte juste après la catégorie Modération, et le rappel dans son étape", () => {

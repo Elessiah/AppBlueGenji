@@ -73,6 +73,9 @@
       "NONE": "non-compliant"
     },
     "reportProblem": "Report a problem",
+    "reportLoadFailed": "The form couldn't open. Try again in a moment.",
+    "reportReloading": "The site has just been updated: reload the page to open the form.",
+    "reportLoading": "Opening the form…",
     "copyright": "© 2026 {association}",
     "contact": {
       "email": "Email",
@@ -195,5 +198,9 @@
     "replay": "Your reading couldn't be saved: this information will be shown to you again.",
     "inFrench": "(in French)"
   },
-  "loading": "Loading…"
+  "loading": "Loading…",
+  "imageCropLoad": {
+    "failed": "The crop window couldn't open. Try again in a moment.",
+    "reloading": "The site has just been updated: reload the page to crop your image."
+  }
 }

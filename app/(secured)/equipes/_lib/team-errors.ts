@@ -64,6 +64,17 @@ function lookup(text: TeamErrorsText, table: CodeTable, code: string): string | 
 }
 
 /**
+ * La phrase d'un refus d'**image** (table `image`), ou `null` si le code n'en
+ * est pas un — partagée avec l'avatar de `/profil`, qui a son propre repli.
+ */
+export function imageErrorMessage(
+  code: string | null | undefined,
+  text: TeamErrorsText = FR_TEAM_ERRORS_TEXT,
+): string | null {
+  return code ? lookup(text, "image", code) : null;
+}
+
+/**
  * Message à afficher pour un code de refus.
  *
  * Les refus de forme du sigle ont leur propre table (`tag`), ceux d'une image

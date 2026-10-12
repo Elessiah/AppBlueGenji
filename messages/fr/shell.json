@@ -73,6 +73,9 @@
       "NONE": "non conforme"
     },
     "reportProblem": "Signaler un problème",
+    "reportLoadFailed": "Le formulaire n'a pas pu s'ouvrir. Réessaie dans un instant.",
+    "reportReloading": "Le site vient d'être mis à jour : recharge la page pour ouvrir le formulaire.",
+    "reportLoading": "Ouverture du formulaire…",
     "copyright": "© 2026 {association}",
     "contact": {
       "email": "Email",
@@ -195,5 +198,9 @@
     "replay": "Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.",
     "inFrench": "(en français)"
   },
-  "loading": "Chargement…"
+  "loading": "Chargement…",
+  "imageCropLoad": {
+    "failed": "La fenêtre de recadrage n'a pas pu s'ouvrir. Réessaie dans un instant.",
+    "reloading": "Le site vient d'être mis à jour : recharge la page pour recadrer ton image."
+  }
 }

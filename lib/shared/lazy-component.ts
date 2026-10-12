@@ -110,6 +110,91 @@ export function isChunkLoadError(error: unknown): boolean {
   );
 }
 
+/** Un chargement à la demande, fait une fois et gardé (`onceLoader`). */
+export interface OnceLoader<T> {
+  /** Lance le chargement, ou rend celui en cours ; un échec se retente à l'appel suivant. */
+  load(): Promise<T>;
+  /** Le résultat, s'il est arrivé ; `null` sinon. */
+  loaded(): T | null;
+  /** Fournit le résultat d'avance (déjà reçu autrement) : aucun chargement ne partira. */
+  prime(value: T): void;
+}
+
+/**
+ * Un seul chargement, partagé par le préchargement (survol, focus) et
+ * l'ouverture : la requête en cours sert tous les appels, le résultat est
+ * gardé, un échec n'est **pas** gardé — le geste suivant retente.
+ */
+export function onceLoader<T>(start: () => Promise<T>): OnceLoader<T> {
+  let result: { value: T } | null = null;
+  let pending: Promise<T> | null = null;
+  return {
+    load() {
+      // Déjà là — chargé, ou fourni d'avance (`prime`) : rien ne repart.
+      if (result) return Promise.resolve(result.value);
+      pending ??= start().then(
+        (value) => {
+          result = { value };
+          return value;
+        },
+        (error: unknown) => {
+          pending = null;
+          throw error;
+        },
+      );
+      return pending;
+    },
+    loaded: () => (result ? result.value : null),
+    prime(value) {
+      result ??= { value };
+    },
+  };
+}
+
+/** Silence d'un préchargement raté avant qu'un geste le relance. */
+export const PRELOAD_RETRY_MS = 30_000;
+
+/**
+ * Un préchargement (survol, focus, clic sur un sélecteur de fichier) qui, raté
+ * — hors ligne, déploiement —, se tait `PRELOAD_RETRY_MS` au lieu de repartir
+ * à chaque geste, puis se relance de lui-même au geste suivant : une coupure
+ * passagère n'éteint pas le préchargement pour toute la session. L'ouverture,
+ * elle, retente toujours et dit l'échec.
+ */
+export function quietPreload(load: () => Promise<unknown>, now: () => number = Date.now): () => boolean {
+  let failedAt: number | null = null;
+  // `true` : le chargement est parti (ou en cours) ; `false` : silence après un échec.
+  return () => {
+    if (failedAt !== null && now() - failedAt < PRELOAD_RETRY_MS) return false;
+    load().then(
+      () => {
+        failedAt = null;
+      },
+      () => {
+        failedAt = now();
+      },
+    );
+    return true;
+  };
+}
+
+/** Ce qu'il faut d'un chargeur pour le précharger. */
+export type PreloadableLoader = { load(): Promise<unknown>; loaded(): unknown };
+
+/**
+ * Précharge **ce qui manque** : rien si chaque chargeur a déjà son résultat
+ * (aucune promesse créée), sinon les charge ensemble, silence `PRELOAD_RETRY_MS`
+ * après un échec (`quietPreload`). La seule écriture de cette règle pour tous
+ * les préchargements (survol, focus, clic sur un sélecteur de fichier).
+ */
+export function preloadMissing(loaders: readonly PreloadableLoader[]): () => void {
+  const preload = quietPreload(() => Promise.all(loaders.map((loader) => loader.load())));
+  return () => {
+    if (loaders.every((loader) => loader.loaded() !== null)) return;
+    preload();
+  };
+}
+
 /** Programme le rechargement de la page après un chargement raté, dès qu'il est sûr. */
 export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): void {
   if (!env) return;

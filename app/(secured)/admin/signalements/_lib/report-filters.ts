@@ -7,12 +7,12 @@
  */
 import {
   PRIMARY_REPORT_CATEGORIES,
-  REPORT_CATEGORY_DEFINITIONS,
   REPORT_TARGET_LABELS,
   type ReportCategory,
   type ReportStatus,
   type ReportView,
 } from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 
 /** Onglet de catégorie : une catégorie d'origine, ou toutes. */
 export type CategoryTab = "ALL" | Exclude<ReportCategory, "CONTEST">;

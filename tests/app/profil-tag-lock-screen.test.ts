@@ -42,19 +42,19 @@ describe("champ Discord — un état illisible garde une sortie", () => {
     // mais faire disparaître tous les gestes ferait disparaître « Retirer mon
     // tag » — la seule annulation d'exposition que le site offre.
     expect(page).toContain("discordState.linked !== true ?");
-    expect(page).toContain('aria-label="Réessayer la lecture de l\'état Discord"');
-    expect(page).toContain("onClick={() => void loadDiscordState()}");
+    expect(page).toContain('aria-label={busyAriaLabel(discordStateBusy, t("discord.retryLabel"))}');
+    expect(page).toContain("onClick={() => !discordStateBusy && void loadDiscordState()}");
   });
 
-  it("désarme le bouton pendant la lecture", () => {
-    expect(page).toContain("disabled={discordStateBusy}");
+  it("désarme le bouton pendant la lecture (aria-disabled : le focus reste, clic ignoré)", () => {
+    expect(page).toContain("aria-disabled={discordStateBusy || undefined}");
   });
 
   it("ne propose jamais un geste sur un état inconnu", () => {
     // Ni certifier, ni retirer : on ignore s'ils auraient un objet.
     const unknown = page.slice(
       page.indexOf("discordState.linked !== true ?"),
-      page.indexOf("Réessayer la lecture"),
+      page.indexOf('t("discord.retryLabel")'),
     );
     expect(unknown).not.toContain("onDiscordTagRemove");
     expect(unknown).not.toContain("setVerifyOpen(true)");
@@ -105,7 +105,7 @@ describe("champ Discord — un retrait ne laisse pas la pastille mentir", () => 
 
 describe("profil — un échec de lecture ne s'annonce pas comme un échec de sauvegarde", () => {
   it("le chargement a son propre repli", () => {
-    expect(page).toContain("profileLoadErrorMessage((e as Error).message)");
+    expect(page).toContain("profileLoadErrorMessage((e as Error).message, textRef.current)");
   });
 
   it("et les écritures gardent le leur", () => {
@@ -140,7 +140,7 @@ describe("champ Discord — l'attente ne se dit pas comme une panne", () => {
   });
 
   it("passe l'attente à la phrase, qui ne la devine pas", () => {
-    expect(page).toContain("discordTagLockNotice({ ...discordState, pending: discordStateBusy })");
+    expect(page).toContain("discordTagLockText(text, { ...discordState, pending: discordStateBusy })");
   });
 });
 

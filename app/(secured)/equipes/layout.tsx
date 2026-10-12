@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { TeamErrorsTextProvider } from "@/components/i18n/team-errors-text-provider";
+import { TeamErrorsTextGate } from "@/components/i18n/english-gates";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 
 /**
  * Titre de l'annuaire des équipes et, faute de mieux, de ses sous-pages —
@@ -26,10 +27,15 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function TeamsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? messagesFor(locale).teamErrors : undefined;
+  // L'anglais au chargement complet seulement (revue de performance du lot 9-2) : jamais
+  // dans une réponse du routeur (navigation, préchargement, `router.refresh()`).
+  const messages = await englishOnDocumentLoad(locale, (all) => all.teamErrors);
   return (
-    <TeamErrorsTextProvider locale={locale} messages={messages}>
+    <TeamErrorsTextGate
+      locale={locale}
+      messages={messages}
+    >
       {children}
-    </TeamErrorsTextProvider>
+    </TeamErrorsTextGate>
   );
 }

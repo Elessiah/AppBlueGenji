@@ -1,0 +1,389 @@
+{
+  "meta": {
+    "title": "Mon profil"
+  },
+  "loading": "Chargement du profil…",
+  "header": {
+    "eyebrow": "Espace joueur",
+    "title": "Mon profil",
+    "subtitle": "Ton pseudo et ton avatar sont publics ; tout le reste se règle ici, champ par champ."
+  },
+  "navLabel": "Sections du profil",
+  "sections": {
+    "identite": {
+      "title": "Identité",
+      "lead": "Ton pseudo et ton avatar, visibles partout où tu joues."
+    },
+    "jeux": {
+      "title": "Comptes de jeu",
+      "lead": "Les identifiants qui permettent aux autres joueurs de t'ajouter."
+    },
+    "discord": {
+      "title": "Discord",
+      "lead": "Le tag par lequel l'organisation te joint pendant un tournoi."
+    },
+    "confidentialite": {
+      "title": "Confidentialité",
+      "lead": "Ce que les autres voient de toi, et si les équipes peuvent te démarcher."
+    },
+    "connexions": {
+      "title": "Applications connectées",
+      "lead": "Les portes par lesquelles tu entres sur le site, et les sessions encore ouvertes."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "lead": "Être prévenu sur ton téléphone ou ton ordinateur, même le site fermé."
+    },
+    "invitations": {
+      "title": "Invitations d'équipe",
+      "lead": "Les équipes qui t'ont proposé de les rejoindre."
+    },
+    "statistiques": {
+      "title": "Statistiques",
+      "lead": "Ton bilan sur la plateforme."
+    },
+    "compte": {
+      "title": "Mon compte",
+      "lead": "Exporter tes données, te déconnecter, ou tout effacer."
+    }
+  },
+  "identity": {
+    "pseudo": "Pseudo site",
+    "pseudoHint": "C'est lui qui t'identifie dans les brackets, les rosters et les feuilles de match. Il n'est pas masquable ({max} caractères au plus).",
+    "avatar": "Avatar",
+    "changeAvatar": "Changer l'avatar",
+    "sending": "Envoi…",
+    "deleteAvatar": "Supprimer",
+    "deleteAvatarLabel": "Supprimer mon avatar",
+    "avatarHint": "PNG, JPEG ou WebP — {max} Mo max.",
+    "cropTitle": "Recadrer ton avatar",
+    "adult": "Statut majeur",
+    "adultUnknown": "Non renseigné",
+    "adultYes": "Oui (18+)",
+    "adultNo": "Non (mineur)",
+    "adultHint": "Certains tournois distinguent les catégories d'âge. Masquable ci-dessous."
+  },
+  "games": {
+    "battletag": "BattleTag Overwatch",
+    "battletagPlaceholder": "Pseudo#1234",
+    "marvel": "Tag Marvel Rivals",
+    "gameTagNotice": "Sert uniquement à ce que les autres joueurs puissent t'ajouter en jeu — jamais pour des statistiques.",
+    "blizzardNotice": "Si tu rattaches Battle.net, Blizzard renseigne ce BattleTag et le remet à jour à chaque connexion — ta saisie est alors remplacée par celle de la source."
+  },
+  "battletagLock": {
+    "pending": "Lecture de tes applications connectées… Le champ reste en lecture seule le temps de savoir si Blizzard renseigne ce BattleTag.",
+    "unknown": "Impossible de lire tes applications connectées pour l'instant : le champ reste en lecture seule, pour ne pas écraser un BattleTag que Blizzard aurait renseigné. Recharge la page pour réessayer.",
+    "change": "Pour en changer, retire Blizzard depuis « Applications connectées », puis rattache le bon compte.",
+    "noTag": "Ton compte Blizzard est rattaché, mais il n'a donné aucun BattleTag. Le champ reste en lecture seule : Blizzard le renseignera à ta prochaine connexion, et écraserait une saisie faite ici. {change}",
+    "tagged": "Ton compte Blizzard est rattaché : c'est lui qui donne ce BattleTag, et Blizzard le remet à jour à chaque connexion — une correction saisie ici serait effacée au passage suivant. {change} Pour cesser de le publier, décoche « BattleTag OW » plus bas."
+  },
+  "discord": {
+    "label": "Pseudo Discord",
+    "placeholder": "ton_pseudo",
+    "certify": "Certifier mon tag",
+    "certifyLabel": "Certifier mon tag Discord",
+    "recertify": "Recertifier",
+    "recertifyLabel": "Recertifier mon tag Discord",
+    "register": "Enregistrer mon tag",
+    "registerLabel": "Enregistrer mon tag Discord",
+    "remove": "Retirer mon tag",
+    "removeLabel": "Retirer mon tag Discord",
+    "removing": "Retrait…",
+    "retry": "Réessayer",
+    "retryLabel": "Réessayer la lecture de l'état Discord",
+    "reading": "Lecture…",
+    "unverifiedHint": "Tag non certifié : {audience} Certifie-le pour qu'elle puisse le faire.",
+    "unverifiedAudience": "personne ne le voit, pas même les administrateurs. L'organisation ne peut donc pas te joindre pendant un tournoi.",
+    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les joueurs et le caster de ton match le temps de la rencontre, à partir de son lancement ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
+    "removed": "Tag Discord retiré.",
+    "lock": {
+      "pending": "Lecture de l'état de ton compte Discord… Le champ reste en lecture seule le temps de savoir si Discord a nommé ce pseudo.",
+      "unknown": "Impossible de lire l'état de ton compte Discord pour l'instant : le champ reste en lecture seule, pour ne pas écraser un pseudo que Discord aurait nommé. Réessaie, ou recharge la page.",
+      "rename": "Pour en changer, renomme-toi sur Discord puis utilise « Mettre à jour mon pseudo » (ligne « Bot Discord » des applications connectées).",
+      "noTag": "Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Utilise « Enregistrer mon tag » ou « Mettre à jour mon pseudo », ou reconnecte-toi par Discord.",
+      "unverified": "Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié : {audience} Te connecter par Discord ne le certifie pas : c'est « Certifier mon tag » qui le fait. {rename} Tu peux aussi le retirer.",
+      "verified": "Ton compte Discord est rattaché et ce pseudo est certifié : {audience} {rename} Un nouveau pseudo arrive non certifié, à certifier de nouveau. Pour cesser d'être joignable, retire-le."
+    },
+    "removalTitle": "Retirer ton tag Discord ?",
+    "removalConfirm": "Retirer mon tag",
+    "removalPending": "Retrait…",
+    "removalBody": "L'organisation ne pourra plus te joindre sur Discord pendant un tournoi, et ta certification est perdue.",
+    "removalBody2": "Ta prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera invisible de tous tant que tu ne le certifieras pas de nouveau.",
+    "verifiedAlt": "Tag Discord vérifié",
+    "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord."
+  },
+  "privacy": {
+    "visibleTitle": "Visible par les autres joueurs",
+    "visibility": {
+      "avatar": "Avatar",
+      "overwatch": "BattleTag OW",
+      "marvel": "Tag Marvel",
+      "discord": "Tag Discord",
+      "major": "Majorité"
+    },
+    "pseudoAlwaysVisible": "Ton pseudo reste toujours visible : c'est lui qui t'identifie dans les brackets, les rosters et les feuilles de match.",
+    "discordNotice": "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé), pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.",
+    "discordPending": "Ton tag n'est pas certifié : il restera masqué aux autres joueurs tant que tu ne l'auras pas certifié.",
+    "discordNoTag": "Tu n'as pas encore de tag Discord : enregistre-le puis certifie-le pour que les autres joueurs le voient.",
+    "recruitmentTitle": "Recrutement",
+    "openToOffers": "Ouvert aux propositions d'équipe",
+    "recruitmentHint": "Décochée par défaut. Cochée, tu apparais dans le filtre « Free agents » de l'annuaire et ta carte annonce « FREE AGENT » tant que tu es sans équipe."
+  },
+  "save": "Sauvegarder",
+  "saved": "Profil mis à jour.",
+  "avatarUpdated": "Avatar mis à jour.",
+  "avatarDeleted": "Avatar supprimé.",
+  "invitations": {
+    "ownership": "· tu en deviendras propriétaire",
+    "accept": "Accepter",
+    "refuse": "Refuser",
+    "accepted": "Invitation acceptée.",
+    "refused": "Invitation refusée.",
+    "acceptLabel": "Accepter l'invitation de {team}",
+    "refuseLabel": "Refuser l'invitation de {team}"
+  },
+  "stats": {
+    "tournamentsPlayed": "Tournois joués",
+    "tournamentsWon": "Tournois gagnés",
+    "wins": "Victoires",
+    "losses": "Défaites",
+    "bestRank": "Meilleur rang"
+  },
+  "account": {
+    "export": "Exporter mes données",
+    "delete": "Supprimer mon compte",
+    "deleting": "Suppression…"
+  },
+  "deletion": {
+    "question": "Supprimer définitivement ton compte ?",
+    "confirm": "Supprimer mon compte",
+    "pending": "Suppression…",
+    "residual": "Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site ({backupDays} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins {journalDays} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité, tes données de connexion (adresse IP, date, moyen de connexion), que la loi impose de garder {logDays} jours, et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.",
+    "irreversible": "Cette action est irréversible.",
+    "consequences": {
+      "TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées.",
+      "SOLO_REGISTRATIONS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es inscrit à un tournoi individuel, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt.",
+      "ORGANIZED_TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire.",
+      "OWNED_TEAMS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet.",
+      "NONE": "Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement.",
+      "UNKNOWN": "Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement."
+    },
+    "outcome": {
+      "TOURNAMENTS": "Compte supprimé. Tes statistiques restent conservées sous un pseudo d'emprunt.",
+      "SOLO_REGISTRATIONS": "Compte supprimé. Tes inscriptions en tournoi individuel portent désormais un pseudo d'emprunt.",
+      "ORGANIZED_TOURNAMENTS": "Compte supprimé. Tes tournois gardent un organisateur anonyme.",
+      "OWNED_TEAMS": "Compte supprimé. Ton équipe garde un propriétaire anonyme.",
+      "NONE": "Compte effacé. Ton compte et ton profil ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).",
+      "UNKNOWN": "Compte supprimé."
+    },
+    "errors": {
+      "ACCOUNT_STILL_REFERENCED": "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.",
+      "fallback": "La suppression du compte a échoué. Réessaie dans un instant."
+    }
+  },
+  "errors": {
+    "write": {
+      "INVALID_PSEUDO": "Le pseudo envoyé est invalide. Recharge la page puis réessaie.",
+      "PSEUDO_EMPTY": "Ton pseudo ne peut pas être vide.",
+      "PSEUDO_TOO_LONG": "Ton pseudo doit tenir en {max} caractères au plus.",
+      "INVALID_DISCORD_PSEUDO": "Le tag Discord doit être du texte. Ressaisis-le.",
+      "INVALID_OVERWATCH_BATTLETAG": "Le BattleTag doit être du texte. Ressaisis-le.",
+      "PSEUDO_ALREADY_USED": "Ce pseudo est déjà pris. Choisis-en un autre.",
+      "DISCORD_TAG_LOCKED": "Ton compte Discord est rattaché : ce tag vient de lui. Renomme-toi sur Discord puis reconnecte-toi pour en changer, ou retire-le.",
+      "BATTLETAG_LOCKED": "Ton compte Blizzard est rattaché : ce BattleTag vient de lui. Retire Blizzard depuis « Applications connectées » pour en changer, ou décoche « BattleTag OW » pour cesser de le publier.",
+      "ACCOUNT_DELETED": "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée."
+    },
+    "shared": {
+      "UNAUTHORIZED": "Ta session a expiré. Reconnecte-toi.",
+      "PROFILE_NOT_FOUND": "Ton compte est introuvable. Reconnecte-toi."
+    },
+    "saveFallback": "La sauvegarde a échoué. Réessaie dans un instant.",
+    "loadFallback": "Impossible de charger ton profil. Réessaie dans un instant.",
+    "avatarUploadFallback": "L'avatar n'a pas pu être envoyé. Réessaie dans un instant.",
+    "avatarDeleteFallback": "L'avatar n'a pas pu être supprimé. Réessaie dans un instant."
+  },
+  "verification": {
+    "errors": {
+      "INVALID_DISCORD_HANDLE": "Renseigne un tag Discord (un pseudo, pas un identifiant numérique) : c'est lui qui sera certifié.",
+      "INVALID_CODE": "Le code doit contenir 6 chiffres.",
+      "CODE_INVALID_OR_EXPIRED": "Code invalide ou expiré. Recommence la certification.",
+      "INVALID_CHALLENGE": "Demande de code introuvable. Recommence la certification.",
+      "DISCORD_ID_MISMATCH": "Ce tag appartient à un autre compte Discord que celui relié à ton compte BlueGenji. Corrige le tag, ou contacte l'organisation.",
+      "DISCORD_ALREADY_LINKED": "Ce compte Discord est déjà certifié par un autre compte du site. Contacte l'organisation si c'est bien le tien.",
+      "DISCORD_NOT_LINKED": "Ton compte n'est plus relié à Discord. Recharge la page pour certifier ton tag par code.",
+      "DISCORD_TAG_MISSING": "Aucun tag n'est enregistré : reconnecte Discord pour qu'il nomme ton pseudo, puis certifie-le.",
+      "DISCORD_TAG_NOT_ATTESTED": "Ce tag n'a pas été donné par Discord : reconnecte Discord pour qu'il nomme ton pseudo, puis certifie-le.",
+      "DISCORD_TAG_CHANGED": "Ton tag Discord vient de changer. Recharge la page pour voir celui que tu certifies.",
+      "DISCORD_USER_NOT_FOUND": "Tag introuvable : le bot doit partager un serveur avec toi. Rejoins le serveur BlueGenji, puis réessaie.",
+      "DISCORD_DM_FAILED": "Impossible de t'envoyer le code en message privé : ouvre tes DM sur un serveur que tu partages avec le bot (le serveur BlueGenji, par exemple), puis réessaie.",
+      "BOT_INTERNAL_UNREACHABLE": "Certification indisponible pour le moment (bot non joignable). Réessaie plus tard.",
+      "BOT_INTERNAL_UNAUTHORIZED": "Certification indisponible (configuration interne). Signale-le à l'organisation.",
+      "BOT_RESOLVE_TIMEOUT": "La recherche de ton tag par le bot n'a pas abouti à temps : le tag n'est peut-être sur aucun de ses serveurs, ou le bot est surchargé. Vérifie ton tag et rejoins le serveur BlueGenji, puis réessaie.",
+      "TOO_MANY_CODE_REQUESTS": "Trop de codes demandés pour ce compte Discord. Attends une quinzaine de minutes.",
+      "TOO_MANY_CODE_REQUESTS_TODAY": "Trop de codes demandés pour ce compte Discord aujourd'hui. Réessaie demain.",
+      "TOO_MANY_REQUESTS": "Trop de tentatives. Attends une quinzaine de minutes.",
+      "PROFILE_NOT_FOUND": "Ton compte est introuvable. Reconnecte-toi.",
+      "UNAUTHORIZED": "Reconnecte-toi pour certifier ton tag."
+    },
+    "fallback": "La certification a échoué. Réessaie dans un instant."
+  },
+  "handleUpdate": {
+    "errors": {
+      "INVALID_DISCORD_HANDLE": "Renseigne ton pseudo Discord (un pseudo, pas un identifiant numérique).",
+      "CODE_INVALID_OR_EXPIRED": "Code invalide ou expiré. Demande un nouveau code.",
+      "INVALID_CHALLENGE": "Demande de code introuvable. Demande un nouveau code.",
+      "DISCORD_ID_MISMATCH": "Ce pseudo appartient à un autre compte Discord que celui rattaché à ton compte BlueGenji. Vérifie le pseudo : on ne remplace pas un compte Discord par un autre.",
+      "DISCORD_ALREADY_LINKED": "Ce compte Discord est déjà rattaché à un autre compte du site. Contacte l'organisation si c'est bien le tien.",
+      "BOT_INTERNAL_UNREACHABLE": "Mise à jour indisponible pour le moment (bot non joignable). Réessaie plus tard.",
+      "BOT_INTERNAL_UNAUTHORIZED": "Mise à jour indisponible (configuration interne). Signale-le à l'organisation.",
+      "UNAUTHORIZED": "Reconnecte-toi pour mettre ton pseudo à jour."
+    },
+    "fallback": "La mise à jour de ton pseudo a échoué. Réessaie dans un instant."
+  },
+  "connections": {
+    "intro": "Ton compte n'a pas de mot de passe : il s'ouvre par les applications rattachées ci-dessous. Tu peux en ajouter plusieurs pour ne jamais rester à la porte — la dernière ne peut pas être retirée.",
+    "loading": "Chargement…",
+    "notes": {
+      "GOOGLE": "Connexion en un clic. Aucune adresse n'est enregistrée.",
+      "DISCORD": "Connexion, certification de ton tag, et rappels de match en message privé.",
+      "BLIZZARD": "Connexion, et ton BattleTag tenu à jour par Blizzard."
+    },
+    "linked": "Rattaché",
+    "handleLine": "{label} : {handle}",
+    "handleLabels": {
+      "DISCORD": "Tag Discord",
+      "BLIZZARD": "BattleTag"
+    },
+    "discordByCode": "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord.",
+    "method": {
+      "OAUTH": "Rattaché par le bouton Discord",
+      "DM_CODE": "Rattaché par code en message privé"
+    },
+    "refusal": {
+      "NOT_LINKED": "Aucun compte {label} n'est rattaché.",
+      "LAST_CONNECTION": "Impossible de retirer {label} : c'est ton dernier moyen de connexion. Ajoutes-en un autre d'abord."
+    },
+    "unlink": "Retirer",
+    "unlinking": "Retrait…",
+    "unlinkLabel": "Retirer {label} de mon compte",
+    "link": "Rattacher",
+    "linkLabel": "Rattacher {label} à mon compte",
+    "bot": {
+      "label": "Bot Discord (code par message privé)",
+      "handleNote": "Pseudo Discord : {handle}",
+      "linkedByCode": "Rattaché par code en message privé",
+      "linkedByButton": "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour.",
+      "linkedElsewhere": "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour.",
+      "notLinked": "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
+      "linkByCode": "Rattacher par code",
+      "updateHandle": "Mettre à jour mon pseudo",
+      "disconnect": "Se déconnecter",
+      "disconnectLabel": "Se déconnecter du bot Discord",
+      "disconnecting": "Déconnexion…",
+      "lastConnection": "Impossible de te déconnecter du bot : c'est ton dernier moyen de connexion. Ajoutes-en un autre d'abord."
+    },
+    "errors": {
+      "PROVIDER_ALREADY_LINKED": "Le compte avec lequel tu viens de passer chez ce fournisseur n'est pas celui rattaché à ton profil. Connecte-toi chez lui avec le bon compte, puis recommence. Pour changer de compte, retire d'abord l'ancien.",
+      "IDENTITY_ALREADY_LINKED": "Ce compte est déjà rattaché à un autre profil BlueGenji. Contacte l'organisation si les deux sont bien à toi.",
+      "LAST_CONNECTION": "C'est ton dernier moyen de connexion : rattache-en un autre avant de le retirer.",
+      "NOT_LINKED": "Cette application n'est pas rattachée à ton compte.",
+      "UNKNOWN_PROVIDER": "Application inconnue.",
+      "OAUTH_FAILED": "Le rattachement a échoué chez le fournisseur. Réessaie dans un instant.",
+      "LINK_FAILED": "Le rattachement n'a pas abouti. Réessaie dans un instant.",
+      "LINK_CANCELLED": "Rattachement annulé : rien n'a été modifié.",
+      "LINK_STATE_MISMATCH": "Le rattachement n'a pas pu être vérifié (une autre tentative l'a peut-être remplacé). Recommence depuis ce bouton.",
+      "NOT_CONFIGURED": "Ce moyen de connexion n'est pas configuré sur le site. Signale-le à l'organisation.",
+      "PROFILE_NOT_FOUND": "Ton compte est introuvable. Reconnecte-toi.",
+      "UNAUTHORIZED": "Reconnecte-toi pour gérer tes applications.",
+      "SESSIONS_READ_FAILED": "Tes autres sessions n'ont pas pu être comptées. Réessaie dans un instant.",
+      "SESSIONS_REVOKE_FAILED": "Tes autres sessions n'ont pas pu être fermées. Réessaie dans un instant."
+    },
+    "fallback": "L'opération a échoué. Réessaie dans un instant.",
+    "success": {
+      "linkedAny": "Application rattachée.",
+      "refreshedAny": "Application reconfirmée.",
+      "linked": "{label} est maintenant rattaché à ton compte.",
+      "refreshedDiscord": "Discord reconfirmé : ton pseudo a été relu auprès de Discord. S'il a changé, il n'est plus certifié : certifie-le de nouveau pour rester joignable.",
+      "refreshed": "{label} reconfirmé : les informations de ton compte ont été relues."
+    },
+    "unlinked": "{label} a été retiré de ton compte.",
+    "unlinkedSessionsFailed": "{removed} Tes autres sessions n'ont pas pu être fermées : utilise « Déconnecter mes autres sessions ».",
+    "sessions": {
+      "unknown": "Les sessions ouvertes sur tes autres appareils n'ont pas encore été comptées.",
+      "none": "Aucune autre session n'est ouverte : seul cet appareil est connecté à ton compte.",
+      "open": "{count, plural, one {1 autre session est ouverte} other {{count} autres sessions sont ouvertes}} sur d'autres navigateurs ou appareils.",
+      "revokedNone": "Aucune autre session n'était ouverte.",
+      "revoked": "{count, plural, one {1 autre session a été fermée} other {{count} autres sessions ont été fermées}}.",
+      "revoke": "Déconnecter mes autres sessions",
+      "revoking": "Fermeture…"
+    }
+  },
+  "battletagNotice": {
+    "eyebrow": "VISIBILITÉ · BATTLETAG",
+    "title": "Masqué, mais pas pour tout le monde",
+    "intro": "Ton BattleTag n'apparaîtra plus sur ta fiche publique ni dans l'annuaire des joueurs. Il reste en revanche lisible là où il sert à jouer :",
+    "players": "<strong>Les autres joueurs de chaque match que tu disputes</strong>, le temps du tournoi — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
+    "caster": "<strong>Le caster de ton match</strong>, de son lancement à sa fin, si tu fais partie des contacts présentés.",
+    "staff": "<strong>Les arbitres et les administrateurs</strong>, tant que tu es inscrit à un tournoi qui n'est pas terminé — dès l'ouverture des inscriptions.",
+    "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord.",
+    "ok": "J'ai compris"
+  },
+  "verify": {
+    "eyebrow": "CERTIFICATION · DISCORD",
+    "title": "Certifier mon tag Discord",
+    "purpose": "L'organisation doit pouvoir te joindre pendant un tournoi : reprogrammation d'une manche, litige de score, forfait.",
+    "intro": "{purpose} La certification est <strong>facultative</strong> et ne se fait que par ce geste — se connecter par Discord ne la donne pas : sans elle, ton tag reste invisible pour tout le monde, administrateurs compris.",
+    "exposureTitle": "Ce que la certification expose",
+    "exposure": {
+      "admins": "Les administrateurs du site voient ton tag Discord en permanence.",
+      "referees": "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
+      "match": "Les joueurs et le caster de ton match le voient le temps de la rencontre, à partir de son lancement — pour s'ajouter et créer le salon.",
+      "players": "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique.",
+      "undo": "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie."
+    },
+    "attested": "Pseudo donné par Discord à ta dernière connexion : <strong>{tag}</strong>. Il suffit de confirmer — ni code, ni nouvelle autorisation Discord.",
+    "linkedNoTag": "Ton compte est relié à Discord, mais aucun pseudo donné par Discord n'est enregistré. Passe par sa page d'autorisation, avec le compte Discord déjà relié : il nommera ton pseudo, que tu pourras ensuite certifier ici d'un clic. Un pseudo fait uniquement de chiffres n'est pas certifiable.",
+    "continueWithDiscord": "Continuer avec Discord →",
+    "tag": "Tag Discord",
+    "newTab": "(nouvel onglet)",
+    "tagPlaceholder": "ton_pseudo",
+    "tagHelp": "Le bot doit partager un serveur avec toi pour retrouver ton compte : <join>rejoins le serveur BlueGenji</join> avant de certifier. Tu recevras un code à six chiffres en message privé.",
+    "code": "Code reçu en message privé",
+    "codePlaceholder": "123456",
+    "codeHelp": "Cinq essais, puis le code est brûlé — demande-en un nouveau si tu te trompes.",
+    "cancel": "Annuler",
+    "certifyThis": "Certifier ce tag",
+    "certifying": "Certification…",
+    "requestCode": "Recevoir un code →",
+    "checking": "Vérification…",
+    "newCode": "Nouveau code",
+    "certifyMine": "Certifier mon tag",
+    "certified": "Tag Discord certifié.",
+    "codeSent": "Code envoyé en message privé Discord (expiration : {time}).",
+    "bodyLabel": "Certification du tag Discord"
+  },
+  "botHandle": {
+    "eyebrow": "BOT DISCORD · CODE PAR MESSAGE PRIVÉ",
+    "titleLink": "Rattacher Discord par code",
+    "titleUpdate": "Mettre à jour mon pseudo Discord",
+    "intro": "Saisis ton pseudo Discord : le bot BlueGenji t'envoie un code à six chiffres en message privé, et le code prouve que ce pseudo est le tien.",
+    "introUpdate": "Seul le pseudo du compte Discord déjà rattaché est accepté.",
+    "introOutro": "Un pseudo qui change perd sa certification : tu pourras la redonner d'un clic avec « Certifier mon tag ».",
+    "handle": "Pseudo Discord",
+    "handlePlaceholder": "ton_pseudo",
+    "handleHelp": "Le bot doit partager un serveur avec toi : <join>rejoins le serveur BlueGenji</join> si ce n'est pas déjà fait.",
+    "code": "Code reçu en message privé",
+    "codePlaceholder": "123456",
+    "codeHelp": "Cinq essais, puis le code est brûlé — demande-en un nouveau si tu te trompes.",
+    "cancel": "Annuler",
+    "sending": "Envoi…",
+    "requestCode": "Recevoir un code →",
+    "newCode": "Nouveau code",
+    "checking": "Vérification…",
+    "validate": "Valider le code",
+    "linked": "Discord rattaché par code.",
+    "updated": "Pseudo Discord mis à jour.",
+    "codeSent": "Code envoyé en message privé Discord (expiration : {time}).",
+    "bodyLabel": "Pseudo Discord du bot"
+  }
+}

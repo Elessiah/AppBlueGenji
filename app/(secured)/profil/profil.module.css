@@ -347,29 +347,44 @@
   transform: none;
 }
 
+/* `[aria-disabled="true"]` : un bouton qui garde le focus pendant son geste
+   (lot 9-2 — « Retirer », « Réessayer », « Retirer mon tag », « Déconnexion »)
+   et dont le libellé d'attente doit se lire : couleurs atténuées par jeton,
+   jamais `opacity` (contraste ≥ 4,5:1), curseur d'attente, sans survol. */
+.page :global(.btn[aria-disabled="true"]) {
+  color: var(--ink-mute);
+  cursor: progress;
+  box-shadow: none;
+  transform: none;
+}
+
 /* Le survol du `.btn` global éclaircit le fond : il faut le rendre à chaque
    variante, et non poser le bleu du bouton principal pour tout le monde — la
    règle, plus spécifique que `.btn.ghost`, **bleuissait** au survol les boutons
    en retrait (« Retirer mon tag », « Supprimer » l'avatar, « Retirer » une
    application), c'est-à-dire qu'un bouton refusé se faisait plus voyant que le
    même bouton actif. */
-.page :global(.btn:disabled:hover) {
+.page :global(.btn:disabled:hover),
+.page :global(.btn[aria-disabled="true"]:hover) {
   background: rgba(89, 212, 255, 0.14);
   transform: none;
   box-shadow: none;
 }
 
-.page :global(.btn.ghost:disabled:hover) {
+.page :global(.btn.ghost:disabled:hover),
+.page :global(.btn.ghost[aria-disabled="true"]:hover) {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.page :global(.btn.danger:disabled:hover) {
+.page :global(.btn.danger:disabled:hover),
+.page :global(.btn.danger[aria-disabled="true"]:hover) {
   background: rgba(var(--danger-rgb), 0.14);
 }
 
 /* Le reflet balayant du `.btn` global se déclenche au survol : il donne, seul,
    l'impression d'un bouton vivant. */
-.page :global(.btn:disabled:hover)::before {
+.page :global(.btn:disabled:hover)::before,
+.page :global(.btn[aria-disabled="true"]:hover)::before {
   left: -100%;
 }
 

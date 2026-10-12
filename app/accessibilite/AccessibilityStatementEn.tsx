@@ -27,8 +27,7 @@ function ContactList() {
         By email: <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="of the association" />
       </li>
       <li>
-        Through the “{REPORT_FORM_NAME_EN}” form, at the bottom of every page (“Other” category,{" "}
-        <span lang="fr">« Autre »</span>)
+        Through the “{REPORT_FORM_NAME_EN}” form, at the bottom of every page (“Other” category)
       </li>
       <li>
         On Discord, by direct message: <strong>{LEGAL_CONTACT_DISCORD}</strong>

@@ -9,6 +9,11 @@ import type { ReactElement, ReactNode } from "react";
 
 let mockLocale: "fr" | "en" = "en";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
+// Lecteur connecté : sans session, les mises en page ne sérialisent pas l'anglais (`isDocumentLoad`).
+jest.mock("@/lib/server/auth", () => ({ ...jest.requireActual<object>("@/lib/server/auth"), getCurrentUser: async () => ({ id: 1 }) }));
+// Chargement complet par défaut ; `"0"` : requête du routeur (navigation, `router.refresh()`).
+let mockDocument = "1";
+jest.mock("next/headers", () => ({ headers: async () => new Headers({ "x-bg-document": mockDocument }) }));
 jest.mock("next/navigation", () => ({
   usePathname: () => "/en/equipes/1",
   useParams: () => ({ id: "5" }),
@@ -204,6 +209,15 @@ describe("liste blanche et métadonnées", () => {
       mockLocale = "en";
       const english = (await layout({ children: child })) as ReactElement<{ messages?: unknown; value?: unknown }>;
       expect(english.props.messages ?? english.props.value).toBeDefined();
+      // Revue performance du lot 9-2 : jamais dans une réponse du routeur — le client garde le sien.
+      mockDocument = "0";
+      try {
+        const routed = (await layout({ children: child })) as ReactElement<{ messages?: unknown; stats?: unknown }>;
+        expect(routed.props.messages).toBeUndefined();
+        expect(routed.props.stats).toBeUndefined();
+      } finally {
+        mockDocument = "1";
+      }
     }
     for (const page of [TeamsPage, CreateTeamPage]) {
       mockLocale = "en";
@@ -438,8 +452,8 @@ describe("anglais", () => {
     expect(html).toContain("Registered <em>players</em>");
     expect(html).toContain("SUPPORT");
     expect(html).toContain("Deleted account");
-    // `/profil` n'est pas encore traduite (lot 9-2) : le lien reste français.
-    expect(html).toContain('href="/profil"');
+    // `/profil` est traduite au lot 9-2 : le lien suit la langue.
+    expect(html).toContain('href="/en/profil"');
     expectEnglish(html);
   });
 

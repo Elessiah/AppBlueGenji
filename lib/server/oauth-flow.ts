@@ -140,15 +140,19 @@ function isMissingConfiguration(error: unknown): boolean {
  * pour qui est parti de la page anglaise (lot 6). Sans cookie d'état lisible
  * (expiré, navigateur qui l'isole), la langue n'est plus connue : le français.
  */
-function loginFailure(base: string, provider: OAuthProvider, kind: string, locale: Locale = DEFAULT_LOCALE): NextResponse {
+function loginFailure(base: string, provider: OAuthProvider, kind: string, locale: Locale): NextResponse {
   const url = new URL(localeHref("/connexion", locale), base);
   url.searchParams.set("error", kind);
   url.searchParams.set("provider", OAUTH_PROVIDER_SLUGS[provider]);
   return NextResponse.redirect(url);
 }
 
-function linkFailure(base: string, provider: OAuthProvider, code: string): NextResponse {
-  const url = new URL(PROFILE_PATH, base);
+/**
+ * Retour d'un rattachement refusé sur `/profil`, dans la langue du départ
+ * (`/en/profil` depuis le lot 9-2 — même langue scellée que la connexion).
+ */
+function linkFailure(base: string, provider: OAuthProvider, code: string, locale: Locale): NextResponse {
+  const url = new URL(localeHref(PROFILE_PATH, locale), base);
   url.searchParams.set("connection_error", code);
   url.searchParams.set("provider", OAUTH_PROVIDER_SLUGS[provider]);
   return NextResponse.redirect(url);
@@ -192,7 +196,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
     // sauté, et lui ferait perdre l'écran où il était. Seul le défaut de session
     // ci-dessus mène ailleurs, et pour cause.
     if (intent === "LINK") {
-      return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED");
+      return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED", locale);
     }
     return loginFailure(base, provider, missing ? "not_configured" : "unavailable", locale);
   }
@@ -231,10 +235,10 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
   // rappel, fixée chez le fournisseur) ; sans cookie, le français.
   const locale = sealedReturnLocale(saved?.redirectTo);
   if (!code || !state) {
-    return linking ? linkFailure(base, provider, "LINK_CANCELLED") : loginFailure(base, provider, "params", locale);
+    return linking ? linkFailure(base, provider, "LINK_CANCELLED", locale) : loginFailure(base, provider, "params", locale);
   }
   if (saved?.state !== state || saved.provider !== provider) {
-    return linking ? linkFailure(base, provider, "LINK_STATE_MISMATCH") : loginFailure(base, provider, "state", locale);
+    return linking ? linkFailure(base, provider, "LINK_STATE_MISMATCH", locale) : loginFailure(base, provider, "state", locale);
   }
 
   let identity: OAuthIdentity;
@@ -244,7 +248,7 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
     return identityFailure(base, provider, saved.intent, error, locale);
   }
 
-  if (saved.intent === "LINK") return completeLink(base, provider, identity);
+  if (saved.intent === "LINK") return completeLink(base, provider, identity, locale);
   return completeLogin(base, provider, identity, saved, locale);
 }
 
@@ -258,7 +262,7 @@ function identityFailure(
 ): NextResponse {
   const missing = isMissingConfiguration(error);
   if (intent === "LINK") {
-    return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED");
+    return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED", locale);
   }
   return loginFailure(base, provider, missing ? "not_configured" : "oauth", locale);
 }
@@ -268,13 +272,14 @@ async function completeLink(
   base: string,
   provider: OAuthProvider,
   identity: OAuthIdentity,
+  locale: Locale,
 ): Promise<NextResponse> {
   // Relue ici et pas seulement au départ : dix minutes séparent les deux, et
   // la session a pu expirer ou changer entre-temps. Rattacher sur la foi du
   // seul cookie d'état poserait une porte d'entrée sur un compte que plus rien
   // ne prouve être celui de l'appelant.
   const user = await getCurrentUser();
-  if (!user) return loginFailure(base, provider, "session");
+  if (!user) return loginFailure(base, provider, "session", locale);
 
   let outcome: OAuthLinkOutcome;
   try {
@@ -287,10 +292,10 @@ async function completeLink(
     // joueur, lui, ne verrait rien : le registre français retombe sur sa
     // phrase générique, ce qui rend la fuite parfaitement discrète.
     const message = (error as Error).message;
-    return linkFailure(base, provider, isLinkRefusal(message) ? message : "LINK_FAILED");
+    return linkFailure(base, provider, isLinkRefusal(message) ? message : "LINK_FAILED", locale);
   }
 
-  const url = new URL(PROFILE_PATH, base);
+  const url = new URL(localeHref(PROFILE_PATH, locale), base);
   url.searchParams.set("connected", OAUTH_PROVIDER_SLUGS[provider]);
   // Une identité **déjà** rattachée vient d'être relue, pas ajoutée : le
   // profil le dit autrement (« rattaché » serait faux, il l'était déjà).

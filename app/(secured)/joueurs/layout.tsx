@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { PlayersTextProvider } from "@/components/i18n/players-text-provider";
+import { PlayersTextGate } from "@/components/i18n/english-gates";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 
 /**
  * Titre de l'annuaire des joueurs et, faute de mieux, de ses sous-pages —
@@ -24,10 +25,14 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function PlayersLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? messagesFor(locale).players : undefined;
+  // L'anglais au chargement complet seulement (revue de performance du lot 9-2).
+  const messages = await englishOnDocumentLoad(locale, (all) => all.players);
   return (
-    <PlayersTextProvider locale={locale} messages={messages}>
+    <PlayersTextGate
+      locale={locale}
+      messages={messages}
+    >
       {children}
-    </PlayersTextProvider>
+    </PlayersTextGate>
   );
 }

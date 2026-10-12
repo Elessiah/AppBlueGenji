@@ -3,21 +3,16 @@
 import { KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
 import {
-  REPORT_TARGET_LABELS,
   REPORT_TARGET_SEARCH_MIN_LENGTH,
   type ReportTargetOption,
   type ReportTargetType,
 } from "@/lib/shared/content-reports";
+import { visibleText } from "@/lib/shared/visible-text";
+import { targetDetailText, useReportsText } from "./reports-text";
 import styles from "./ReportProblem.module.css";
 
 /** Temporisation de la recherche : une requête par pause de frappe, pas par touche. */
 const SEARCH_DEBOUNCE_MS = 250;
-
-const PLACEHOLDERS: Record<ReportTargetType, string> = {
-  USER: "Pseudo d'un joueur…",
-  TEAM: "Nom ou sigle d'une équipe…",
-  TOURNAMENT: "Nom d'un tournoi…",
-};
 
 interface TargetPickerProps {
   type: ReportTargetType;
@@ -36,7 +31,7 @@ export function TargetThumb({ option }: Readonly<{ option: Pick<ReportTargetOpti
   }
   return (
     <span className={styles.chipThumb} aria-hidden="true">
-      {Array.from(option.label.trim())[0]?.toUpperCase() ?? "?"}
+      {Array.from(visibleText(option.label))[0]?.toUpperCase() ?? "?"}
     </span>
   );
 }
@@ -51,6 +46,8 @@ export function TargetThumb({ option }: Readonly<{ option: Pick<ReportTargetOpti
  * formulaire vit sur toutes les pages, il ne télécharge rien d'avance.
  */
 export function TargetPicker({ type, selected, onChange, full }: Readonly<TargetPickerProps>) {
+  const text = useReportsText();
+  const { t } = text;
   const inputId = useId();
   const listId = useId();
   const [query, setQuery] = useState("");
@@ -121,22 +118,22 @@ export function TargetPicker({ type, selected, onChange, full }: Readonly<Target
     }
   };
 
-  const labels = REPORT_TARGET_LABELS[type];
+  const picker = t(`targets.${type}.picker`);
 
   return (
     <div className={`field ${styles.picker}`}>
-      <label htmlFor={inputId}>{labels.picker}</label>
+      <label htmlFor={inputId}>{picker}</label>
       {selected.length > 0 && (
-        <ul className={styles.chips} aria-label={`${labels.picker} (sélection)`}>
+        <ul className={styles.chips} aria-label={t("targets.selection", { picker })}>
           {selected.map((option) => (
             <li key={option.id} className={styles.chip}>
               <TargetThumb option={option} />
-              <span>{option.label}</span>
+              <span>{visibleText(option.label)}</span>
               <button
                 type="button"
                 className={styles.chipRemove}
                 onClick={() => remove(option.id)}
-                aria-label={`Retirer ${option.label}`}
+                aria-label={t("targets.remove", { label: visibleText(option.label) })}
               >
                 ×
               </button>
@@ -161,15 +158,15 @@ export function TargetPicker({ type, selected, onChange, full }: Readonly<Target
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
-          placeholder={full ? "Nombre maximal d'éléments atteint" : PLACEHOLDERS[type]}
+          placeholder={full ? t("targets.full") : t(`targets.${type}.placeholder`)}
           autoComplete="off"
           spellCheck={false}
         />
         {showList && (
-          <ul id={listId} role="listbox" aria-label={labels.picker} className={styles.suggestions}>
+          <ul id={listId} role="listbox" aria-label={picker} className={styles.suggestions}>
             {proposals.length === 0 ? (
               <li role="option" aria-selected={false} aria-disabled="true" className={styles.emptySuggestion}>
-                Aucun résultat.
+                {t("targets.empty")}
               </li>
             ) : (
               proposals.map((option, index) => (
@@ -188,8 +185,8 @@ export function TargetPicker({ type, selected, onChange, full }: Readonly<Target
                   onMouseEnter={() => setActive(index)}
                 >
                   <TargetThumb option={option} />
-                  <span>{option.label}</span>
-                  {option.detail && <span className={styles.suggestionDetail}>{option.detail}</span>}
+                  <span>{visibleText(option.label)}</span>
+                  {option.detail && <span className={styles.suggestionDetail}>{targetDetailText(text, option.detail)}</span>}
                 </li>
               ))
             )}

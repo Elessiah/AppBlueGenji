@@ -206,40 +206,40 @@ export type DiscordBotRowState = {
   handleAction: "UPDATE" | "LINK";
   /** « Se déconnecter » est-il offert ? */
   canDisconnect: boolean;
-  /** La phrase de la ligne, sous le libellé. */
-  note: string;
+  /**
+   * Le cas de la phrase de la ligne, sous le libellé : l'écran la rédige dans
+   * sa langue (`discordBotRowText`, `profile.json` de chaque langue).
+   */
+  noteCode: DiscordBotNoteCode;
   /** Un refus à dire en ambre (dernier moyen de connexion), sinon `null`. */
-  refusal: string | null;
+  refusalCode: "LAST_CONNECTION" | null;
 };
+
+/** Les cas de la phrase de la ligne « Bot Discord ». */
+export type DiscordBotNoteCode = "HANDLE" | "LINKED_BY_CODE" | "LINKED_BY_BUTTON" | "LINKED_ELSEWHERE" | "NOT_LINKED";
 
 export function discordBotRowState(connections: readonly AccountConnection[]): DiscordBotRowState {
   const discord = connections.find((connection) => connection.provider === "DISCORD");
   const anyLinked = Boolean(discord?.linked);
   const linked = discordBotLinked(discord);
   const unlinkRefusal = linked ? checkConnectionUnlink(connections, "DISCORD") : null;
-  let note: string;
+  let noteCode: DiscordBotNoteCode;
   if (linked) {
-    note = discord?.handle ? `Pseudo Discord : ${discord.handle}` : "Rattaché par code en message privé";
+    noteCode = discord?.handle ? "HANDLE" : "LINKED_BY_CODE";
   } else if (anyLinked) {
     // `null` = rattachement antérieur à la colonne : la porte est inconnue,
     // la phrase ne l'affirme donc pas — elle ne dit que où se retirer.
-    note =
-      discord?.method === "OAUTH"
-        ? "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour."
-        : "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour.";
+    noteCode = discord?.method === "OAUTH" ? "LINKED_BY_BUTTON" : "LINKED_ELSEWHERE";
   } else {
-    note = "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.";
+    noteCode = "NOT_LINKED";
   }
   return {
     linked,
     handle: linked ? (discord?.handle ?? null) : null,
     handleAction: anyLinked ? "UPDATE" : "LINK",
     canDisconnect: linked && unlinkRefusal === null,
-    note,
-    refusal:
-      unlinkRefusal === "LAST_CONNECTION"
-        ? "Impossible de te déconnecter du bot : c'est ton dernier moyen de connexion. Ajoutes-en un autre d'abord."
-        : null,
+    noteCode,
+    refusalCode: unlinkRefusal === "LAST_CONNECTION" ? "LAST_CONNECTION" : null,
   };
 }
 

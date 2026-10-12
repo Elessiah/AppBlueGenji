@@ -24,6 +24,18 @@ export const DEFAULT_LOCALE: Locale = "fr";
  */
 export const LOCALE_HEADER = "x-bg-locale";
 
+/**
+ * En-tête de **requête** par lequel le middleware dit au rendu s'il sert un
+ * chargement complet (`"1"`) ou une requête du routeur — navigation,
+ * préchargement, `router.refresh()` (`"0"`, `Sec-Fetch-Dest: empty`). Next
+ * retire son propre en-tête `RSC` de `headers()`. Une mise en page s'en sert
+ * pour ne sérialiser un dictionnaire qu'une fois (`app/(secured)/profil/layout.tsx`).
+ * Toujours remplacé, comme `LOCALE_HEADER` ; absent (requête qui n'est pas
+ * passée par le middleware) : **pas** un chargement complet — rien n'est
+ * sérialisé, le client charge son texte (revue de sécurité du lot 9-2).
+ */
+export const DOCUMENT_REQUEST_HEADER = "x-bg-document";
+
 /** Fuseau de tout formatage de date (`next-intl`), quelle que soit la langue. */
 export const SITE_TIME_ZONE = "Europe/Paris";
 

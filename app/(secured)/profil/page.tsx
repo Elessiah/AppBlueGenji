@@ -2,16 +2,11 @@
 
 import { UserAvatar } from "@/components/user-avatar";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
-import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
+import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
-  ACCOUNT_DELETION_QUESTION,
-  accountDeletionConsequences,
-  accountDeletionErrorMessage,
-  accountDeletionOutcome,
   RETENTION_UNKNOWN,
   type AccountDeletionPlan,
   type ConfirmationSubject,
@@ -19,11 +14,8 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
 import { VerifiedBadge } from "@/components/discord-tag";
-import {
-  discordTagLockNotice,
-  isDiscordTagLocked,
-} from "@/lib/shared/discord-tag-lock";
-import { battletagLockNotice, isBattletagLocked } from "@/lib/shared/battletag-lock";
+import { isDiscordTagLocked } from "@/lib/shared/discord-tag-lock";
+import { isBattletagLocked } from "@/lib/shared/battletag-lock";
 import {
   avatarDeleteErrorMessage,
   avatarUploadErrorMessage,
@@ -35,18 +27,25 @@ import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
-  BLIZZARD_BATTLETAG_NOTICE,
-  DISCORD_PLAYER_VISIBILITY_NO_TAG,
-  DISCORD_PLAYER_VISIBILITY_NOTICE,
-  DISCORD_PLAYER_VISIBILITY_PENDING,
-  DISCORD_TAG_UNVERIFIED_AUDIENCE,
-  GAME_TAG_NOTICE,
-} from "@/lib/shared/identity-sharing";
-import {
   PROFILE_SECTION_BY_ID,
   profileSectionIdFromHash,
   visibleProfileSections,
+  type ProfileSectionId,
 } from "./_lib/profile-sections";
+import {
+  battletagLockText,
+  deletionConsequencesText,
+  deletionErrorText,
+  deletionOutcomeText,
+  discordTagLockText,
+  verifiedBadgeLabels,
+  type ProfileText,
+} from "./_lib/profile-text";
+import { useProfileText } from "@/components/i18n/profile-text";
+import { useTeamErrorsText } from "@/components/i18n/team-errors-text";
+import { useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import { localeHref } from "@/lib/shared/locales";
 import { ProfileSection } from "./_components/ProfileSection";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
@@ -59,6 +58,8 @@ import { PROFILE_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { busyAriaLabel } from "@/lib/shared/busy-aria-label";
+import { visibleText } from "@/lib/shared/visible-text";
 
 /** Contrôles que peut désigner un refus de la sauvegarde du profil. */
 const PROFILE_FIELD_IDS = {
@@ -68,13 +69,13 @@ const PROFILE_FIELD_IDS = {
 } as const;
 
 // Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
-const VISIBILITY_LABELS: Record<string, string> = {
-  avatar: "Avatar",
-  overwatch: "BattleTag OW",
-  marvel: "Tag Marvel",
-  discord: "Tag Discord",
-  major: "Majorité",
-};
+const VISIBILITY_KEYS = ["avatar", "overwatch", "marvel", "discord", "major"] as const;
+
+/** Libellé d'une case de visibilité ; une clé inconnue reste telle quelle. */
+function visibilityLabel(text: ProfileText, key: string): string {
+  const known = VISIBILITY_KEYS.find((value) => value === key);
+  return known ? text.t(`privacy.visibility.${known}`) : key;
+}
 
 /** État Discord du compte, lu à part du formulaire (voir `discordState`). */
 interface DiscordState {
@@ -93,9 +94,9 @@ interface DiscordState {
  * lecture, ou quand elle échoue, `verified` vaut `false` par défaut et
  * l'avertissement accuserait à tort un joueur certifié.
  */
-function discordVisibilityWarning(visible: boolean, discordState: DiscordState): string | null {
+function discordVisibilityWarning(text: ProfileText, visible: boolean, discordState: DiscordState): string | null {
   if (!visible || discordState.linked === null || discordState.verified) return null;
-  const warning = discordState.tag ? DISCORD_PLAYER_VISIBILITY_PENDING : DISCORD_PLAYER_VISIBILITY_NO_TAG;
+  const warning = discordState.tag ? text.t("privacy.discordPending") : text.t("privacy.discordNoTag");
   return ` ${warning}`;
 }
 
@@ -119,8 +120,13 @@ function trimmedOrNull(value: string): string | null {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
+  const router = useLocaleRouter();
   const { showError, showSuccess } = useToast();
+  const text = useProfileText();
+  const { t } = text;
+  // Langue de l'adresse (le texte peut retomber sur le français) : après la suppression du compte, l'accueil de cette langue.
+  const pageLocale = useAppLocale();
+  const teamErrorsText = useTeamErrorsText();
   const { cropImage, cropDialog } = useImageCropper();
   const fieldErrors = useFieldErrors(PROFILE_FIELD_ERRORS, PROFILE_FIELD_IDS);
   const [data, setData] = useState<FullProfileResponse | null>(null);
@@ -183,6 +189,7 @@ export default function ProfilePage() {
   });
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const saving = useRef(false);
   const [invitations, setInvitations] = useState<{ id: number; teamId: number; teamName: string; ownership?: boolean }[]>([]);
 
   const loadInvitations = async () => {
@@ -249,7 +256,14 @@ export default function ProfilePage() {
     void loadDiscordState();
   }, []);
 
+  const [respondingInvitation, setRespondingInvitation] = useState<number | null>(null);
+  // Garde synchrone : deux clics dans le même rendu voient encore l'état d'avant.
+  const respondingRef = useRef(false);
   const respondInvitation = async (invitationId: number, accept: boolean) => {
+    // Une réponse à la fois : un double clic n'envoie pas deux réponses (ni deux rafraîchissements).
+    if (respondingRef.current) return;
+    respondingRef.current = true;
+    setRespondingInvitation(invitationId);
     try {
       const res = await fetch(`/api/invitations/${invitationId}`, {
         method: "POST",
@@ -258,7 +272,7 @@ export default function ProfilePage() {
       });
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "INVITATION_RESPOND_FAILED");
-      showSuccess(accept ? "Invitation acceptée." : "Invitation refusée.");
+      showSuccess(accept ? t("invitations.accepted") : t("invitations.refused"));
       await loadInvitations();
       // La barre de navigation vient de la mise en page serveur de l'espace
       // connecté, que l'App Router ne rejoue pas d'une page à l'autre : sans
@@ -269,10 +283,20 @@ export default function ProfilePage() {
       // `catch` : c'est aussi là qu'arrivent les échecs qui n'en sont pas un
       // (`TypeError` d'une coupure réseau, `SyntaxError` d'une réponse HTML), que
       // le registre ramène à son repli au lieu d'afficher leur message anglais.
-      showError(invitationResponseErrorMessage((e as Error).message));
+      showError(invitationResponseErrorMessage((e as Error).message, teamErrorsText));
+    } finally {
+      respondingRef.current = false;
+      setRespondingInvitation(null);
     }
   };
 
+  // Le texte par une référence : la lecture du profil (et la remise à zéro des
+  // champs qu'elle fait) ne repart jamais sur un simple changement de texte —
+  // une saisie en cours serait perdue (revue de performance du lot 9-2).
+  const textRef = useRef(text);
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
   useEffect(() => {
     const load = async () => {
       const response = await fetch("/api/profile", { cache: "no-store" });
@@ -285,7 +309,7 @@ export default function ProfilePage() {
           // aujourd'hui la même phrase — mais le jour où ce code en sortirait,
           // celle-ci annoncerait « La sauvegarde a échoué » à un visiteur qui
           // vient d'ouvrir la page, le défaut même que ce registre sépare.
-          showError(profileLoadErrorMessage(errorCode));
+          showError(profileLoadErrorMessage(errorCode, textRef.current));
           setTimeout(() => router.push("/"), 1500);
           return;
         }
@@ -316,7 +340,7 @@ export default function ProfilePage() {
     // visiteur qui vient d'ouvrir la page l'échec d'un geste qu'il n'a pas
     // fait. Les codes nommés (session expirée, compte introuvable) gardent
     // leur phrase, qui vaut des deux côtés.
-    load().catch((e) => showError(profileLoadErrorMessage((e as Error).message)));
+    load().catch((e) => showError(profileLoadErrorMessage((e as Error).message, textRef.current)));
   }, [showError, router]);
 
   /**
@@ -361,6 +385,10 @@ export default function ProfilePage() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    // Une sauvegarde à la fois (Entrée puis clic, double clic) : la seconde partirait
+    // avec des références pas encore réalignées (revue de sécurité du lot 9-2).
+    if (saving.current) return;
+    saving.current = true;
     fieldErrors.clear();
     try {
       // **On ne soumet que ce qu'on a changé.** Le formulaire renvoyait le tag
@@ -426,7 +454,7 @@ export default function ProfilePage() {
       // serveur : la pastille doit tomber dans le même geste, sinon l'écran
       // annonce une exposition qui n'existe plus.
       await loadDiscordState();
-      showSuccess("Profil mis à jour.");
+      showSuccess(t("saved"));
       // Le pseudo s'affiche aussi dans la barre de navigation.
       router.refresh();
     } catch (e) {
@@ -434,9 +462,11 @@ export default function ProfilePage() {
       // erreurs vers l'autre faisait annoncer « La certification a échoué » à un
       // pseudo déjà pris ou à une coupure réseau.
       const code = (e as Error).message;
-      const message = profileErrorMessage(code);
+      const message = profileErrorMessage(code, text);
       fieldErrors.report(code, message);
       showError(message);
+    } finally {
+      saving.current = false;
     }
   };
 
@@ -479,10 +509,10 @@ export default function ProfilePage() {
       // certification avec (toute modification du tag la défait).
       setDiscordState((prev) => ({ ...prev, tag: null, verified: false, attested: false }));
       await loadDiscordState();
-      showSuccess("Tag Discord retiré.");
+      showSuccess(t("discord.removed"));
       return true;
     } catch (e) {
-      showError(profileErrorMessage((e as Error).message));
+      showError(profileErrorMessage((e as Error).message, text));
       return false;
     } finally {
       setDiscordTagBusy(false);
@@ -543,13 +573,14 @@ export default function ProfilePage() {
       // serveur a bien répondu, là où un `??` sur le motif retomberait sur
       // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
       const applied: ConfirmationSubject = payload.mode ? payload.reason ?? null : previewed;
-      showSuccess(accountDeletionOutcome(applied));
+      showSuccess(deletionOutcomeText(text, applied));
       setTimeout(() => {
-        window.location.href = "/";
+        // L'accueil dans la langue de la page (`/en` sous `/en/profil`).
+        window.location.href = localeHref("/", pageLocale);
       }, 1200);
       return true;
     } catch (e) {
-      showError(accountDeletionErrorMessage((e as Error).message));
+      showError(deletionErrorText(text, (e as Error).message));
       return false;
     }
   };
@@ -561,11 +592,11 @@ export default function ProfilePage() {
 
     const refusal = precheckImageUpload(file);
     if (refusal) {
-      showError(avatarUploadErrorMessage(refusal));
+      showError(avatarUploadErrorMessage(refusal, text, teamErrorsText));
       return;
     }
 
-    const image = await cropImage(file, "avatar", "Recadrer ton avatar");
+    const image = await cropImage(file, "avatar", t("identity.cropTitle"));
     if (!image) return;
 
     setAvatarBusy(true);
@@ -583,10 +614,10 @@ export default function ProfilePage() {
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: payload.avatarUrl ?? null } } : prev,
       );
-      showSuccess("Avatar mis à jour.");
+      showSuccess(t("avatarUpdated"));
       router.refresh();
     } catch (e) {
-      showError(avatarUploadErrorMessage((e as Error).message));
+      showError(avatarUploadErrorMessage((e as Error).message, text, teamErrorsText));
     } finally {
       setAvatarBusy(false);
     }
@@ -603,10 +634,10 @@ export default function ProfilePage() {
       setData((prev) =>
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: null } } : prev,
       );
-      showSuccess("Avatar supprimé.");
+      showSuccess(t("avatarDeleted"));
       router.refresh();
     } catch (e) {
-      showError(avatarDeleteErrorMessage((e as Error).message));
+      showError(avatarDeleteErrorMessage((e as Error).message, text));
     } finally {
       setAvatarBusy(false);
     }
@@ -641,7 +672,7 @@ export default function ProfilePage() {
   if (!data) {
     return (
       <section className="ds-block" style={{ color: "var(--ink-soft)" }}>
-        Chargement du profil…
+        {t("loading")}
       </section>
     );
   }
@@ -699,12 +730,9 @@ export default function ProfilePage() {
         <div className={`ds-header-body ${s.header}`}>
           <UserAvatar src={data.profile.avatarUrl} pseudo={data.profile.pseudo} size={64} />
           <div className={s.headerText}>
-            <span className={`eyebrow ${s.eyebrow}`}>Espace joueur</span>
-            <h1 className={`ds-title ${s.title}`}>Mon profil</h1>
-            <p className={s.subtitle}>
-              Ton pseudo et ton avatar sont publics ; tout le reste se règle ici, champ par
-              champ.
-            </p>
+            <span className={`eyebrow ${s.eyebrow}`}>{t("header.eyebrow")}</span>
+            <h1 className={`ds-title ${s.title}`}>{t("header.title")}</h1>
+            <p className={s.subtitle}>{t("header.subtitle")}</p>
           </div>
         </div>
       </div>
@@ -712,10 +740,10 @@ export default function ProfilePage() {
       {/* Une page de réglages se parcourt rarement en entier : les ancres mènent
           droit à la section cherchée, et le bas de page — export et suppression —
           cesse d'exiger de traverser le reste. */}
-      <nav className={s.nav} aria-label="Sections du profil">
+      <nav className={s.nav} aria-label={t("navLabel")}>
         {sections.map((entry) => (
           <a key={entry.id} href={`#${entry.id}`} className={s.navLink} data-tone={entry.tone}>
-            {entry.title}
+            {t(`sections.${entry.id as ProfileSectionId}.title`)}
           </a>
         ))}
       </nav>
@@ -728,7 +756,7 @@ export default function ProfilePage() {
         <ProfileSection section={sectionById.identite}>
           <div className="form-grid">
             <div className="field">
-              <label htmlFor="profile-pseudo">Pseudo site</label>
+              <label htmlFor="profile-pseudo">{t("identity.pseudo")}</label>
               <input
                 id="profile-pseudo"
                 value={pseudo}
@@ -740,9 +768,7 @@ export default function ProfilePage() {
               />
               <FieldErrorText fieldId={PROFILE_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />
               <p id="profile-pseudo-hint" className={s.hint}>
-                C&apos;est lui qui t&apos;identifie dans les brackets, les rosters et les
-                feuilles de match. Il n&apos;est pas masquable ({PSEUDO_MAX_LENGTH} caractères
-                au plus).
+                {t("identity.pseudoHint", { max: PSEUDO_MAX_LENGTH })}
               </p>
             </div>
             {/* L'avatar n'a pas de champ à étiqueter — le `<input type="file">`
@@ -752,11 +778,12 @@ export default function ProfilePage() {
                 rapportaient les deux boutons). */}
             <fieldset className="field native-group" aria-labelledby="profile-avatar-label">
               <span id="profile-avatar-label" className={s.groupLabel}>
-                Avatar
+                {t("identity.avatar")}
               </span>
               <input
                 ref={fileInputRef}
                 type="file"
+                onClick={preloadImageCropDialog}
                 accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
                 onChange={onAvatarChange}
                 style={{ display: "none" }}
@@ -769,7 +796,7 @@ export default function ProfilePage() {
                   onClick={() => fileInputRef.current?.click()}
                   style={{ padding: "9px 18px", fontSize: 13 }}
                 >
-                  {avatarBusy ? "Envoi…" : "Changer l'avatar"}
+                  {avatarBusy ? t("identity.sending") : t("identity.changeAvatar")}
                 </button>
                 {data.profile.avatarUrl ? (
                   <button
@@ -781,31 +808,31 @@ export default function ProfilePage() {
                        2.5.3) et lève l'ambiguïté avec « Supprimer mon compte »,
                        plus bas : parcourus hors contexte, deux « Supprimer » ne
                        se distinguent pas. */
-                    aria-label="Supprimer mon avatar"
+                    aria-label={t("identity.deleteAvatarLabel")}
                     style={{ padding: "9px 18px", fontSize: 13 }}
                   >
-                    Supprimer
+                    {t("identity.deleteAvatar")}
                   </button>
                 ) : null}
               </div>
               <p className={`${s.hint} ${s.hintMuted}`}>
-                PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo max.
+                {t("identity.avatarHint", { max: IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024) })}
               </p>
             </fieldset>
             <div className="field">
-              <label htmlFor="profile-adult">Statut majeur</label>
+              <label htmlFor="profile-adult">{t("identity.adult")}</label>
               <select
                 id="profile-adult"
                 value={isAdult}
                 onChange={(e) => setIsAdult(e.target.value)}
                 aria-describedby="profile-adult-hint"
               >
-                <option value="unknown">Non renseigné</option>
-                <option value="yes">Oui (18+)</option>
-                <option value="no">Non (mineur)</option>
+                <option value="unknown">{t("identity.adultUnknown")}</option>
+                <option value="yes">{t("identity.adultYes")}</option>
+                <option value="no">{t("identity.adultNo")}</option>
               </select>
               <p id="profile-adult-hint" className={s.hint}>
-                Certains tournois distinguent les catégories d&apos;âge. Masquable ci-dessous.
+                {t("identity.adultHint")}
               </p>
             </div>
           </div>
@@ -814,7 +841,7 @@ export default function ProfilePage() {
         <ProfileSection section={sectionById.jeux}>
           <div className="form-grid">
             <div className="field">
-              <label htmlFor="profile-battletag">BattleTag Overwatch</label>
+              <label htmlFor="profile-battletag">{t("games.battletag")}</label>
               <input
                 id="profile-battletag"
                 value={overwatchBattletag}
@@ -822,7 +849,7 @@ export default function ProfilePage() {
                   setOverwatchBattletag(e.target.value);
                   fieldErrors.clear("battletag");
                 }}
-                placeholder="Pseudo#1234"
+                placeholder={t("games.battletagPlaceholder")}
                 {...fieldErrors.aria("battletag", "profile-battletag-hint")}
                 /* Un compte Blizzard rattaché possède son BattleTag : le champ
                    le montre, il ne le prend plus. `readOnly` et non `disabled`
@@ -837,16 +864,16 @@ export default function ProfilePage() {
                   et il l'est déjà. */}
               <p id="profile-battletag-hint" className={s.hint}>
                 {battletagLocked
-                  ? battletagLockNotice({
+                  ? battletagLockText(text, {
                       tag: overwatchBattletag.trim() || null,
                       linked: blizzardLinked,
                       pending: connectionsPending,
                     })
-                  : `${GAME_TAG_NOTICE} ${BLIZZARD_BATTLETAG_NOTICE}`}
+                  : `${t("games.gameTagNotice")} ${t("games.blizzardNotice")}`}
               </p>
             </div>
             <div className="field">
-              <label htmlFor="profile-marvel">Tag Marvel Rivals</label>
+              <label htmlFor="profile-marvel">{t("games.marvel")}</label>
               <input
                 id="profile-marvel"
                 value={marvelRivalsTag}
@@ -854,7 +881,7 @@ export default function ProfilePage() {
                 aria-describedby="profile-marvel-hint"
               />
               <p id="profile-marvel-hint" className={s.hint}>
-                {GAME_TAG_NOTICE}
+                {t("games.gameTagNotice")}
               </p>
             </div>
           </div>
@@ -864,8 +891,8 @@ export default function ProfilePage() {
           <div className="field">
             <label htmlFor="profile-discord">
               <span className={s.fieldLabelRow}>
-                Pseudo Discord
-                {discordState.verified ? <VerifiedBadge /> : null}
+                {t("discord.label")}
+                {discordState.verified ? <VerifiedBadge labels={verifiedBadgeLabels(text)} /> : null}
               </span>
             </label>
             <input
@@ -875,7 +902,7 @@ export default function ProfilePage() {
                 setDiscordPseudo(e.target.value);
                 fieldErrors.clear("discord");
               }}
-              placeholder="ton_pseudo"
+              placeholder={t("discord.placeholder")}
               {...fieldErrors.aria("discord", "profile-discord-hint")}
               /* Un compte Discord rattaché possède son tag : le champ le
                  montre, il ne le prend plus. `readOnly` et non `disabled` —
@@ -898,12 +925,12 @@ export default function ProfilePage() {
                      ajoute l'objet. */
                   aria-label={
                     discordState.verified
-                      ? "Recertifier mon tag Discord"
-                      : "Certifier mon tag Discord"
+                      ? t("discord.recertifyLabel")
+                      : t("discord.certifyLabel")
                   }
                   style={{ padding: "7px 14px", fontSize: 12 }}
                 >
-                  {discordState.verified ? "Recertifier" : "Certifier mon tag"}
+                  {discordState.verified ? t("discord.recertify") : t("discord.certify")}
                 </button>
               </div>
             )}
@@ -917,20 +944,20 @@ export default function ProfilePage() {
                 elle ne doit pas différer d'un écran à l'autre. */}
             <p id="profile-discord-hint" className={s.hint}>
               {discordLocked
-                ? discordTagLockNotice({ ...discordState, pending: discordStateBusy })
-                : `Tag non certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} Certifie-le pour qu'elle puisse le faire.`}
+                ? discordTagLockText(text, { ...discordState, pending: discordStateBusy })
+                : t("discord.unverifiedHint", { audience: t("discord.unverifiedAudience") })}
             </p>
           </div>
         </ProfileSection>
 
         <ProfileSection section={sectionById.confidentialite}>
           <div className={s.toggleGroup}>
-            <p className={s.toggleGroupTitle}>Visible par les autres joueurs</p>
+            <p className={s.toggleGroupTitle}>{t("privacy.visibleTitle")}</p>
             <div className={s.toggleRow}>
               {Object.entries(visibility).map(([key, value]) => (
                 <Coche
                   key={key}
-                  label={VISIBILITY_LABELS[key] ?? key}
+                  label={visibilityLabel(text, key)}
                   checked={value}
                   theme="joueur"
                   onChange={() => {
@@ -946,26 +973,22 @@ export default function ProfilePage() {
               ))}
             </div>
             <p className={s.hint}>
-              Ton pseudo reste toujours visible : c&apos;est lui qui t&apos;identifie dans les
-              brackets, les rosters et les feuilles de match. {DISCORD_PLAYER_VISIBILITY_NOTICE}
-              {discordVisibilityWarning(visibility.discord, discordState)}
+              {t("privacy.pseudoAlwaysVisible")} {t("privacy.discordNotice")}
+              {discordVisibilityWarning(text, visibility.discord, discordState)}
             </p>
           </div>
 
           <div className={s.toggleGroup}>
-            <p className={s.toggleGroupTitle}>Recrutement</p>
+            <p className={s.toggleGroupTitle}>{t("privacy.recruitmentTitle")}</p>
             <div className={s.toggleRow}>
               <Coche
-                label="Ouvert aux propositions d'équipe"
+                label={t("privacy.openToOffers")}
                 checked={openToRecruitment}
                 theme="joueur"
                 onChange={() => setOpenToRecruitment((v) => !v)}
               />
             </div>
-            <p className={s.hint}>
-              Décochée par défaut. Cochée, tu apparais dans le filtre « Free agents » de
-              l&apos;annuaire et ta carte annonce « FREE AGENT » tant que tu es sans équipe.
-            </p>
+            <p className={s.hint}>{t("privacy.recruitmentHint")}</p>
           </div>
 
         </ProfileSection>
@@ -976,7 +999,7 @@ export default function ProfilePage() {
             bas de la fenêtre, il reste atteignable depuis n'importe laquelle. */}
         <div className={s.formFoot}>
           <button type="submit" className={`btn ${s.save}`}>
-            Sauvegarder
+            {t("save")}
           </button>
         </div>
       </form>
@@ -1006,12 +1029,12 @@ export default function ProfilePage() {
             {invitations.map((inv) => (
               <div className="table-row" key={inv.id} style={{ alignItems: "center" }}>
                 <span>
-                  <TeamLink teamId={inv.teamId}>{inv.teamName}</TeamLink>
+                  <TeamLink teamId={inv.teamId}>{visibleText(inv.teamName)}</TeamLink>
                   {/* Reprise d'une équipe fantôme proposée par le staff : l'accepter
                       en fait le propriétaire, ce qu'une invitation ordinaire ne fait
                       jamais — le joueur doit le lire avant de cliquer. */}
                   {inv.ownership && (
-                    <span className={s.inviteOwnership}> · tu en deviendras propriétaire</span>
+                    <span className={s.inviteOwnership}>{` ${t("invitations.ownership")}`}</span>
                   )}
                 </span>
                 <span className={s.inviteActions}>
@@ -1019,15 +1042,21 @@ export default function ProfilePage() {
                     type="button"
                     className={`btn ${s.inviteButton}`}
                     onClick={() => respondInvitation(inv.id, true)}
+                    aria-label={t("invitations.acceptLabel", { team: visibleText(inv.teamName) })}
+                    aria-busy={respondingInvitation === inv.id || undefined}
+                    aria-disabled={respondingInvitation !== null || undefined}
                   >
-                    Accepter
+                    {t("invitations.accept")}
                   </button>
                   <button
                     type="button"
                     className={`btn ghost ${s.inviteButton}`}
                     onClick={() => respondInvitation(inv.id, false)}
+                    aria-label={t("invitations.refuseLabel", { team: visibleText(inv.teamName) })}
+                    aria-busy={respondingInvitation === inv.id || undefined}
+                    aria-disabled={respondingInvitation !== null || undefined}
                   >
-                    Refuser
+                    {t("invitations.refuse")}
                   </button>
                 </span>
               </div>
@@ -1039,11 +1068,11 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.statistiques}>
         <div className={s.stats}>
           {[
-            { label: "Tournois joués", value: data.stats.tournamentsPlayed, tone: "blue" },
-            { label: "Tournois gagnés", value: data.stats.tournamentsWon, tone: "pink" },
-            { label: "Victoires", value: data.stats.matchesWon, tone: "teal" },
-            { label: "Défaites", value: data.stats.matchesLost, tone: "loss" },
-            { label: "Meilleur rang", value: data.stats.bestRank ?? "—", tone: "cyan" },
+            { label: t("stats.tournamentsPlayed"), value: data.stats.tournamentsPlayed, tone: "blue" },
+            { label: t("stats.tournamentsWon"), value: data.stats.tournamentsWon, tone: "pink" },
+            { label: t("stats.wins"), value: data.stats.matchesWon, tone: "teal" },
+            { label: t("stats.losses"), value: data.stats.matchesLost, tone: "loss" },
+            { label: t("stats.bestRank"), value: data.stats.bestRank ?? "—", tone: "cyan" },
           ].map((stat) => (
             <div key={stat.label} className={s.stat} data-tone={stat.tone}>
               <div className={s.statLabel}>{stat.label}</div>
@@ -1057,7 +1086,7 @@ export default function ProfilePage() {
         <div className={s.accountActions}>
           <div className={s.accountActionsLeft}>
             <a href="/api/profile/export" download className={`btn ghost ${s.accountButton}`}>
-              Exporter mes données
+              {t("account.export")}
             </a>
             <button
               type="button"
@@ -1066,7 +1095,7 @@ export default function ProfilePage() {
               onClick={onDeleteAccount}
               disabled={deleting}
             >
-              {deleteAccountLabel(deleting, pendingDeletion !== null)}
+              {deleteAccountLabel(text, deleting, pendingDeletion !== null)}
             </button>
           </div>
           <LogoutButton />
@@ -1074,24 +1103,21 @@ export default function ProfilePage() {
       </ProfileSection>
       {confirmingTagRemoval ? (
         <ConfirmActionDialog
-          title="Retirer ton tag Discord ?"
-          confirmLabel="Retirer mon tag"
-          pendingLabel="Retrait…"
+          title={t("discord.removalTitle")}
+          confirmLabel={t("discord.removalConfirm")}
+          pendingLabel={t("discord.removalPending")}
           onClose={() => setConfirmingTagRemoval(false)}
           onConfirm={onDiscordTagRemove}
         >
-          <p>L&apos;organisation ne pourra plus te joindre sur Discord pendant un tournoi, et ta certification est perdue.</p>
-          <p>
-            Ta prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera
-            invisible de tous tant que tu ne le certifieras pas de nouveau.
-          </p>
+          <p>{t("discord.removalBody")}</p>
+          <p>{t("discord.removalBody2")}</p>
         </ConfirmActionDialog>
       ) : null}
       {pendingDeletion ? (
         <ConfirmActionDialog
-          title={ACCOUNT_DELETION_QUESTION}
-          confirmLabel="Supprimer mon compte"
-          pendingLabel="Suppression…"
+          title={t("deletion.question")}
+          confirmLabel={t("deletion.confirm")}
+          pendingLabel={t("deletion.pending")}
           closeOnSuccess={false}
           onClose={() => {
             setPendingDeletion(null);
@@ -1100,7 +1126,7 @@ export default function ProfilePage() {
           }}
           onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
         >
-          <p>{accountDeletionConsequences(pendingDeletion.subject)}</p>
+          <p>{deletionConsequencesText(text, pendingDeletion.subject)}</p>
         </ConfirmActionDialog>
       ) : null}
     </section>
@@ -1111,8 +1137,8 @@ export default function ProfilePage() {
  * « Suppression… » pendant l'aperçu seulement : modale ouverte, rien n'est
  * encore parti et le joueur peut renoncer.
  */
-function deleteAccountLabel(deleting: boolean, confirming: boolean): string {
-  return deleting && !confirming ? "Suppression…" : "Supprimer mon compte";
+function deleteAccountLabel(text: ProfileText, deleting: boolean, confirming: boolean): string {
+  return deleting && !confirming ? text.t("account.deleting") : text.t("account.delete");
 }
 
 /** Ce que les gestes d'un tag Discord verrouillé lisent et déclenchent. */
@@ -1146,17 +1172,18 @@ function DiscordLockedActions({
   onDiscordTagRemove,
   setVerifyOpen,
 }: Readonly<DiscordLockedActionsProps>) {
+  const { t } = useProfileText();
   return discordState.linked !== true ? (
     <div className={s.actionsRow}>
       <button
         type="button"
         className="btn ghost"
-        onClick={() => void loadDiscordState()}
-        disabled={discordStateBusy}
-        aria-label="Réessayer la lecture de l'état Discord"
+        onClick={() => !discordStateBusy && void loadDiscordState()}
+        aria-disabled={discordStateBusy || undefined}
+        aria-label={busyAriaLabel(discordStateBusy, t("discord.retryLabel"))}
         style={{ padding: "7px 14px", fontSize: 12 }}
       >
-        {discordStateBusy ? "Lecture…" : "Réessayer"}
+        {discordStateBusy ? t("discord.reading") : t("discord.retry")}
       </button>
     </div>
   ) : (
@@ -1176,14 +1203,15 @@ function DiscordLinkedActions({
   onDiscordTagRemove,
   setVerifyOpen,
 }: Readonly<Omit<DiscordLockedActionsProps, "discordStateBusy" | "loadDiscordState">>) {
+  const { t } = useProfileText();
   /* Sans tag enregistré il n'y a rien à *certifier* : le
      geste est d'en poser un — le dialogue renvoie alors
      chez Discord, qui nomme le pseudo, que le joueur
      certifie ensuite d'un clic. Avec un tag nommé par
      Discord, le dialogue certifie d'un clic. */
   const certify = discordState.tag
-    ? { label: "Certifier mon tag", ariaLabel: "Certifier mon tag Discord" }
-    : { label: "Enregistrer mon tag", ariaLabel: "Enregistrer mon tag Discord" };
+    ? { label: t("discord.certify"), ariaLabel: t("discord.certifyLabel") }
+    : { label: t("discord.register"), ariaLabel: t("discord.registerLabel") };
   return (
     <div className={s.actionsRow}>
       {discordState.verified ? null : (
@@ -1201,12 +1229,12 @@ function DiscordLinkedActions({
         <button
           type="button"
           className="btn ghost"
-          onClick={onDiscordTagRemove}
-          disabled={discordTagBusy}
-          aria-label="Retirer mon tag Discord"
+          onClick={() => !discordTagBusy && onDiscordTagRemove()}
+          aria-disabled={discordTagBusy || undefined}
+          aria-label={busyAriaLabel(discordTagBusy, t("discord.removeLabel"))}
           style={{ padding: "7px 14px", fontSize: 12 }}
         >
-          {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
+          {discordTagBusy ? t("discord.removing") : t("discord.remove")}
         </button>
       ) : null}
     </div>

@@ -26,13 +26,27 @@ const LAYOUT_PROVIDERS = [
   { layout: "app/(secured)/equipes/layout.tsx", provider: "components/i18n/team-errors-text-provider.tsx" },
 ];
 
+/** Les modules de textes (qui portent le JSON français) : jamais importés par une mise en page ni par les portes. */
+const TEXT_MODULES = ["@/components/i18n/team-page-text", "@/components/i18n/players-text", "@/components/i18n/team-errors-text", "@/lib/shared/stats-text"];
+
 describe("fournisseur posé par une mise en page : sans le français", () => {
-  it.each(LAYOUT_PROVIDERS)("$layout importe le fournisseur seul", ({ layout, provider }) => {
-    const target = `@/${provider.replace(/\.tsx$/, "")}`;
-    expect(importsOf(layout)).toContain(target);
-    // Ni le module de textes (qui porte le JSON) ni un JSON directement.
-    expect(importsOf(layout)).not.toContain(target.replace(/-provider$/, ""));
+  it.each(LAYOUT_PROVIDERS)("$layout passe par la porte de l'anglais, sans texte", ({ layout }) => {
+    // Revue performance du lot 9-2 : le fournisseur est posé par `english-gates.tsx`
+    // (anglais au chargement complet seulement, morceau à part sinon).
+    expect(importsOf(layout)).toContain("@/components/i18n/english-gates");
+    for (const text of TEXT_MODULES.filter((spec) => spec !== "@/lib/shared/stats-text")) expect(importsOf(layout)).not.toContain(text);
     expect(importsOf(layout).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+  });
+
+  it("english-gates.tsx : les fournisseurs seuls, ni texte ni JSON", () => {
+    const gates = "components/i18n/english-gates.tsx";
+    const values = source(gates)
+      .split("\n")
+      .filter((line) => line.startsWith("import ") && !line.startsWith("import type "))
+      .map((line) => /from\s+"([^"]+)"/.exec(line)?.[1] ?? "");
+    for (const provider of LAYOUT_PROVIDERS) expect(values).toContain(`./${provider.provider.split("/").pop()!.replace(/\.tsx$/, "")}`);
+    for (const text of TEXT_MODULES) expect(values).not.toContain(text.replace("@/components/i18n/", "./"));
+    expect(values.filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
   });
 
   it.each(LAYOUT_PROVIDERS)("$provider n'importe que l'emplacement", ({ provider }) => {
@@ -42,7 +56,62 @@ describe("fournisseur posé par une mise en page : sans le français", () => {
       .split("\n")
       .filter((line) => line.startsWith("import ") && !line.startsWith("import type "))
       .map((line) => /from\s+"([^"]+)"/.exec(line)?.[1]);
-    expect(valueImports).toEqual(["./scoped-text-context"]);
+    // La mécanique, et le chargeur partagé de l'anglais qu'il amorce (revue de performance du lot 9-2) — modules sans texte.
+    expect(valueImports.every((spec) => /(^|\/)(scoped-text-context|english-loaders|english-loaders-account)$/.test(spec ?? ""))).toBe(true);
+    expect(valueImports.some((spec) => /scoped-text-context$/.test(spec ?? ""))).toBe(true);
+  });
+});
+
+describe("profil : fournisseurs sans français, anglais une seule fois", () => {
+  const PROVIDERS = [
+    "components/i18n/profile-text-provider.tsx",
+    "components/i18n/team-errors-text-provider.tsx",
+    "components/notifications/push-text-provider.tsx",
+  ];
+
+  it("la mise en page n'importe que les fournisseurs, sans texte", () => {
+    const layout = "app/(secured)/profil/layout.tsx";
+    expect(importsOf(layout)).toContain("@/components/i18n/profile-text-providers");
+    expect(importsOf(layout).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+  });
+
+  it("ProfileTextProviders : aucun JSON, anglais par les chargeurs partagés", () => {
+    const module = "components/i18n/profile-text-providers.tsx";
+    expect(importsOf(module).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+    for (const provider of PROVIDERS) {
+      const name = provider.split("/").pop()!.replace(/\.tsx$/, "");
+      expect(importsOf(module).some((spec) => spec.endsWith(name))).toBe(true);
+    }
+    // Chaque espace pour soi : un échec n'emporte pas les deux autres en français.
+    for (const loader of ["englishProfile", "englishTeamErrors", "englishPush"]) {
+      expect(source(module)).toContain(`useEnglishMessagesAt(locale, ${loader}, messages?.`);
+    }
+    // Au pied de chaque page, le module des chargeurs reste sans crochet ni préchargement.
+    expect(source("components/i18n/english-loaders.ts")).not.toMatch(/useState|useEffect|quietPreload/);
+    // Les chargeurs : aucun JSON importé d'office, un `import()` par espace ; au pied de
+    // chaque page (`english-loaders.ts`), seuls ceux des écrans publics.
+    const loaders = "components/i18n/english-loaders.ts";
+    const account = "components/i18n/english-loaders-account.ts";
+    const dynamic = (path: string) => [...source(path).matchAll(/import\("([^"]+)"\)/g)].map((m) => m[1]);
+    for (const path of [loaders, account]) expect(importsOf(path).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+    expect(dynamic(loaders)).toEqual(["@/messages/en/reports.json", "@/messages/en/imageCrop.json"]);
+    expect(dynamic(account)).toEqual([
+      "@/messages/en/profile.json",
+      "@/messages/en/teamErrors.json",
+      "@/messages/en/push.json",
+      "@/messages/en/teams.json",
+      "@/messages/en/team.json",
+      "@/messages/en/players.json",
+      "./stats-panel-en",
+    ]);
+    // Rien sur le serveur : un module y est partagé entre requêtes.
+    expect(source(loaders)).toContain("if (inBrowser() && locale === \"en\" && messages) loader.prime(messages);");
+  });
+
+  it("la page d'un signalement : mise en page sans texte", () => {
+    const layout = "app/(secured)/signalements/[id]/layout.tsx";
+    expect(importsOf(layout)).toContain("@/components/reports/concerned-reports-text");
+    expect(importsOf(layout).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
   });
 });
 

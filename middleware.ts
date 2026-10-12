@@ -5,7 +5,7 @@ import { siteBaseUrl } from "@/lib/server/site-url";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
-import { LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
+import { DOCUMENT_REQUEST_HEADER, LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 
 /** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
 export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
@@ -152,6 +152,23 @@ function isDocumentRequest(request: NextRequest): boolean {
 }
 
 /**
+ * Chargement complet d'une page, pour `DOCUMENT_REQUEST_HEADER` : `Sec-Fetch-Dest`
+ * quand le navigateur l'envoie ; sinon (Safari avant 16.4, certaines vues web)
+ * l'en-tête `Accept` — un document demande `text/html` **en tête** de liste,
+ * le routeur de Next (`fetch`) non ; un client qui glisse `text/html` après une
+ * autre entrée n'est pas pris pour un document (revue de sécurité du lot 9-2).
+ * Plus strict que `isDocumentRequest` : sans aucun des deux, la page sert le texte par son propre morceau plutôt que de renvoyer le
+ * dictionnaire à chaque rafraîchissement.
+ */
+// Pas d'en-tête `RSC` : Next le retire, avec `Next-Router-State-Tree` et
+// `Next-Router-Prefetch`, de la requête qu'il remet au middleware (vérifié sur
+// `next dev`, revue de performance du lot 9-2) — d'où ces indices du navigateur.
+function loadsDocument(request: NextRequest): boolean {
+  if (request.headers.has("sec-fetch-dest")) return isDocumentRequest(request);
+  return request.headers.get("accept")?.trimStart().startsWith("text/html") ?? false;
+}
+
+/**
  * Les en-têtes de requête que voit le rendu : la langue, et le chemin sans
  * préfixe.
  *
@@ -169,6 +186,7 @@ function localizedRequestHeaders(request: NextRequest, locale: Locale, path: str
   requestHeaders.set(LOCALE_HEADER, locale);
   requestHeaders.set(PATHNAME_HEADER, path);
   requestHeaders.set(SEARCH_HEADER, request.nextUrl.search);
+  requestHeaders.set(DOCUMENT_REQUEST_HEADER, loadsDocument(request) ? "1" : "0");
   return requestHeaders;
 }
 

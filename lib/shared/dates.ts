@@ -9,6 +9,18 @@
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "./locales";
 import { cached } from "./intl-cache";
 
+/** Ce qu'affiche une date ou une heure illisible : visible, sans langue (jamais « Invalid Date »). */
+export const UNREADABLE_DATE = "—";
+
+/**
+ * L'heure d'une échéance proche (expiration d'un code), dans la langue de la
+ * page ; une valeur absente ou illisible rend {@link UNREADABLE_DATE}.
+ */
+export function formatExpiryTime(iso: string | undefined, locale: Locale = DEFAULT_LOCALE): string {
+  const date = new Date(iso ?? "");
+  return Number.isNaN(date.getTime()) ? UNREADABLE_DATE : date.toLocaleTimeString(INTL_LOCALE[locale]);
+}
+
 // Formateurs gardés par langue (lot 9-1, revue performance) : un tableau
 // d'historique en demandait deux par ligne et par rendu. Mêmes options que
 // `toLocaleDateString` / `toLocaleString` sans argument (date ; date et heure,

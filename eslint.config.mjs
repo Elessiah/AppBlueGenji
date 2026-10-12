@@ -185,6 +185,14 @@ const I18N_MIGRATED_FILES = [
   "app/(secured)/joueurs/*.tsx",
   "app/(secured)/joueurs/cards/**",
   "app/(secured)/joueurs/[[]id]/*.tsx",
+  // Lot 9-2 — profil, signalements, formulaire « Signaler un problème »,
+  // modale de recadrage, réglage des notifications, bouton de déconnexion.
+  "app/(secured)/profil/**",
+  "app/(secured)/signalements/**",
+  "components/reports/**",
+  "components/notifications/**",
+  "components/ui/image-crop-dialog.tsx",
+  "components/logout-button.tsx",
 ];
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */

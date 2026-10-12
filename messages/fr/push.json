@@ -1,0 +1,76 @@
+{
+  "topics": {
+    "MATCH_START": {
+      "label": "Départ de match",
+      "description": "Ton match entre en lancement : déclare-toi prêt, ou il vient d'être lancé."
+    },
+    "SCORE_TO_CONFIRM": {
+      "label": "Score à confirmer",
+      "description": "L'équipe adverse a saisi un score que tu dois confirmer ou contester."
+    },
+    "TOURNAMENT_START": {
+      "label": "Coup d'envoi d'un tournoi",
+      "description": "Un tournoi où ton équipe est inscrite vient de commencer."
+    },
+    "MATCH_REMINDER": {
+      "label": "Rappels de match",
+      "description": "Une semaine, 24 h puis 1 h avant un match programmé, et l'annonce de son horaire."
+    },
+    "TEAM_JOIN_REQUEST": {
+      "label": "Demandes d'adhésion",
+      "description": "Un joueur demande à rejoindre une équipe que tu gères."
+    },
+    "CONTENT_REPORT": {
+      "label": "Signalements te concernant",
+      "description": "Un signalement vise ton compte ou ton équipe : tu peux le contester."
+    },
+    "MODERATION": {
+      "label": "Décisions de modération",
+      "description": "Ton avatar ou le logo de ton équipe a été masqué, supprimé ou rétabli, ou ton compte suspendu."
+    },
+    "PRIVACY_CHANGE": {
+      "label": "Traitement de tes données",
+      "description": "Le site change ce qu'il collecte ou la façon dont il le garde."
+    },
+    "REFEREE_ALERT": {
+      "label": "Alertes d'arbitrage",
+      "description": "Un conflit de score, un report non tranché ou un problème signalé attend un arbitre."
+    },
+    "STAFF_REPORT": {
+      "label": "Signalements reçus",
+      "description": "Un nouveau signalement, ou une contestation, arrive à la modération."
+    }
+  },
+  "panel": {
+    "retry": "Réessayer",
+    "loading": "Chargement des notifications…",
+    "compactLead": "Sois prévenu même quand le site est fermé.",
+    "devices": "{count, plural, one {1 appareil abonné} other {{count} appareils abonnés}} à ton compte. Les réglages ci-dessous valent pour tous.",
+    "legend": "Me prévenir pour",
+    "discordHint": "Les messages privés Discord ne dépendent pas de ces réglages : ils suivent ton tag Discord.",
+    "notConfigured": "Les notifications push ne sont pas encore activées sur le site.",
+    "checking": "Vérification de cet appareil…",
+    "enabledHere": "Activées sur cet appareil",
+    "disable": "Désactiver sur cet appareil",
+    "disabled": "Notifications désactivées sur cet appareil.",
+    "enable": "Activer les notifications sur cet appareil",
+    "enabling": "Activation…",
+    "enabled": "Notifications activées sur cet appareil."
+  },
+  "support": {
+    "UNSUPPORTED": "Ce navigateur ne sait pas recevoir de notifications push.",
+    "IOS_NEEDS_INSTALL": "Sur iPhone et iPad, ajoute d'abord le site à l'écran d'accueil (bouton Partager, puis « Sur l'écran d'accueil », option « Ouvrir en tant qu'app web » cochée), puis ouvre-le depuis son icône.",
+    "DENIED": "Tu as bloqué les notifications de ce site dans ton navigateur. Autorise-les dans ses réglages (icône à gauche de l'adresse), puis recharge la page."
+  },
+  "errors": {
+    "INVALID_PUSH_SUBSCRIPTION": "Cet appareil a rendu un abonnement illisible. Réessaie, ou change de navigateur.",
+    "PUSH_SERVICE_NOT_ALLOWED": "Le service de notifications de ce navigateur n'est pas pris en charge.",
+    "PUSH_NOT_CONFIGURED": "Les notifications push ne sont pas encore activées sur le site.",
+    "PUSH_SUBSCRIPTION_CLAIMED": "Cet appareil reçoit déjà les notifications d'un autre compte. Désactive-les depuis ce compte, puis réessaie.",
+    "PUSH_PERMISSION_DENIED": "Ton navigateur bloque les notifications de ce site. Autorise-les dans ses réglages, puis réessaie.",
+    "PUSH_UNSUPPORTED": "Ce navigateur ne sait pas recevoir de notifications push.",
+    "INVALID_PUSH_TOPICS": "Réglages de notifications illisibles.",
+    "PUSH_LOAD_FAILED": "Les réglages de notifications n'ont pas pu être lus.",
+    "fallback": "Les notifications n'ont pas pu être réglées. Réessaie dans un instant."
+  }
+}
