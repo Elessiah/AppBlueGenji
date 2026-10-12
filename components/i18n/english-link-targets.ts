@@ -2,7 +2,7 @@
 
 import { englishPageOf, type EnglishPage } from "./english-pages";
 import { preloadMissing } from "@/lib/shared/lazy-component";
-import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";
+import { PAGE_LOADERS } from "./english-page-loaders";
 import { preloadProfileEnglish } from "./profile-english";
 
 /*
@@ -12,16 +12,14 @@ import { preloadProfileEnglish } from "./profile-english";
  * du routeur. Module chargé lui-même au premier besoin.
  */
 
-/** Précharge un groupe (`preloadMissing`) : rien s'il est déjà là, silence après un échec. */
-const group = (loaders: readonly PageLoader[]): (() => void) => preloadMissing(loaders);
 
 /** Le préchargement de chaque page (survol, navigation par le code) — dans ce morceau à la demande. */
 const PAGE_PRELOADS: Record<keyof typeof PAGE_LOADERS, () => void> = {
-  teamPage: group(PAGE_LOADERS.teamPage),
-  teams: group(PAGE_LOADERS.teams),
-  playerPage: group(PAGE_LOADERS.playerPage),
-  players: group(PAGE_LOADERS.players),
-  report: group(PAGE_LOADERS.report),
+  teamPage: preloadMissing(PAGE_LOADERS.teamPage),
+  teams: preloadMissing(PAGE_LOADERS.teams),
+  playerPage: preloadMissing(PAGE_LOADERS.playerPage),
+  players: preloadMissing(PAGE_LOADERS.players),
+  report: preloadMissing(PAGE_LOADERS.report),
 };
 
 const PRELOADS: Record<EnglishPage, () => void> = {

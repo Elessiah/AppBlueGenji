@@ -487,12 +487,16 @@ export function MatchLaunchCenter({
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
   const { english } = useEnglishMessagesUntilRemount(locale, englishPush);
-  // Pas d'écran d'attente ici : rien tant que l'anglais manque (attente ou échec).
-  if (locale === "en" && !english) return null;
+  // Monté tout de suite, caché tant que l'anglais manque (attente ou échec) :
+  // la lecture de l'état des notifications part en même temps que l'anglais,
+  // pas après lui. Rien de français ne se montre.
+  const hidden = locale === "en" && !english;
   return (
-    <PushTextProvider locale={locale} messages={locale === "en" ? (english ?? undefined) : undefined}>
-      <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={lead} />
-    </PushTextProvider>
+    <div hidden={hidden}>
+      <PushTextProvider locale={locale} messages={locale === "en" ? (english ?? undefined) : undefined}>
+        <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={lead} />
+      </PushTextProvider>
+    </div>
   );
 }
 

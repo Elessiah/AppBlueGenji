@@ -163,14 +163,9 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
 } {
   const [request, setRequest] = useState<CropRequest | null>(null);
   const requestRef = useRef<CropRequest | null>(null);
-  // Écran quitté pendant le chargement de la modale : la demande se résout en annulation.
+  // Écran quitté pendant le chargement de la modale : la demande se résout en
+  // annulation, sans toast sur une autre page.
   const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
   const { showError } = useToast();
   const { t } = useShellText();
   // Le français imposé (écran du staff) n'a pas besoin de l'anglais.
@@ -191,7 +186,7 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
         if (!ready) await Promise.all([cropDialogLoader.load(), english ? englishCropLoader.load() : null]);
       } catch (error) {
         // Rien ne part : l'écran garde sa saisie, le lecteur peut rechoisir.
-        showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));
+        if (mountedRef.current) showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));
         return null;
       }
       if (!mountedRef.current) return null;
@@ -208,7 +203,13 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
 
   // Écran quitté modale ouverte : l'attente se résout en annulation plutôt
   // que de rester pendante.
-  useEffect(() => () => requestRef.current?.resolve(null), []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestRef.current?.resolve(null);
+    };
+  }, []);
 
   // Toujours là quand une demande existe : `cropImage` l'attend avant de la poser.
   const ImageCropDialog = cropDialogLoader.loaded();

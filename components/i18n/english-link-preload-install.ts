@@ -28,10 +28,14 @@ export function installEnglishLinkPreload(): () => void {
   };
   document.addEventListener("pointerover", onIntent, { passive: true });
   document.addEventListener("focusin", onIntent);
+  // Un tap (iOS ne donne pas le focus au lien touché) : le clic, en phase de
+  // capture — avant la navigation du lien —, jamais un simple défilement.
+  document.addEventListener("click", onIntent, { capture: true });
   setRoutePreload(preloadEnglishRoute);
   return () => {
     document.removeEventListener("pointerover", onIntent);
     document.removeEventListener("focusin", onIntent);
+    document.removeEventListener("click", onIntent, { capture: true });
     setRoutePreload(null);
   };
 }

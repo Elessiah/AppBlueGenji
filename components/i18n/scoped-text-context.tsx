@@ -48,7 +48,8 @@ export function createScopedTextSlot<M extends object>(): ScopedTextSlot<M> {
     // relancerait les effets qui le lisent.
     const read = () => ({ locale, value: messages ? scopedText(locale, messages) : undefined });
     const [state, setState] = useState(read);
-    if (state.locale !== locale) setState(read());
+    // Ou des messages arrivés après coup (réglage push monté avant son anglais) : une seule fois.
+    if (state.locale !== locale || (state.value === undefined && messages !== undefined)) setState(read());
     return <Context.Provider value={state.value}>{children}</Context.Provider>;
   }
 

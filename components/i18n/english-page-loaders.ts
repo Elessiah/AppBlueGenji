@@ -1,5 +1,6 @@
 "use client";
 
+import type { PreloadableLoader } from "@/lib/shared/lazy-component";
 import { englishReports } from "./english-loaders";
 import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
 import type { EnglishPage } from "./english-pages";
@@ -10,7 +11,7 @@ import type { EnglishPage } from "./english-pages";
  * et les portes (`english-gates.tsx`) la lisent. `/profil` passe par son
  * chargeur composé (`profile-english.ts`).
  */
-export type PageLoader = { load(): Promise<unknown>; loaded(): unknown };
+export type PageLoader = PreloadableLoader;
 
 export const PAGE_LOADERS = {
   teamPage: [englishTeamErrors, englishTeam, englishStatsPanel],
