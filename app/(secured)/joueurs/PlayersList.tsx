@@ -106,12 +106,18 @@ export default function PlayersList() {
   // remplace l'autre — « free agent » se lit toujours sur l'ouverture au
   // recrutement, et un compteur qui ne suivrait pas la case « comptes
   // supprimés » contredirait la liste qu'il surmonte.
-  const freeAgents = listed.filter(isFreeAgent).length;
-  const owCount = listed.filter((p) => (p.games || []).includes("OW")).length;
-  const mrCount = listed.filter((p) => (p.games || []).includes("MR")).length;
+  // Comptés une fois par liste, pas à chaque frappe dans la recherche (revue de performance du lot 9-2).
+  const { freeAgents, owCount, mrCount } = useMemo(
+    () => ({
+      freeAgents: listed.filter(isFreeAgent).length,
+      owCount: listed.filter((p) => (p.games || []).includes("OW")).length,
+      mrCount: listed.filter((p) => (p.games || []).includes("MR")).length,
+    }),
+    [listed],
+  );
   // Celui-ci se compte sur **tout** l'annuaire : c'est l'étiquette de la case,
   // et elle doit dire combien de comptes elle ferait apparaître.
-  const deletedCount = players.filter((p) => p.isDeleted).length;
+  const deletedCount = useMemo(() => players.filter((p) => p.isDeleted).length, [players]);
 
   const accentStyle = {
     "--g-rgb": ACCENT_RGB,

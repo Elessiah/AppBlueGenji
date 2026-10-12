@@ -15,6 +15,7 @@ export const englishTeamErrors = /* @__PURE__ */ onceLoader<Messages["teamErrors
   import("@/messages/en/teamErrors.json").then((module) => module.default),
 );
 export const englishPush = /* @__PURE__ */ onceLoader<Messages["push"]>(() => import("@/messages/en/push.json").then((module) => module.default));
+export const englishTeams = /* @__PURE__ */ onceLoader<Messages["teams"]>(() => import("@/messages/en/teams.json").then((module) => module.default));
 export const englishTeam = /* @__PURE__ */ onceLoader<Messages["team"]>(() => import("@/messages/en/team.json").then((module) => module.default));
 export const englishPlayers = /* @__PURE__ */ onceLoader<Messages["players"]>(() => import("@/messages/en/players.json").then((module) => module.default));
 /**

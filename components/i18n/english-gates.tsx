@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { useLocalePathname } from "./locale-navigation";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { StatsPanelMessages } from "@/lib/shared/stats-text";
-import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors } from "./english-loaders-account";
+import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
 import { PlayersTextProvider } from "./players-text-provider";
 import { StatsPanelI18nProvider } from "./stats-panel-i18n";
 import { TeamErrorsTextProvider } from "./team-errors-text-provider";
@@ -30,22 +31,26 @@ type GateProps<T> = Readonly<{ locale: Locale; messages?: T; fallback: ReactNode
  * donc aussi, en même temps, l'anglais de la fiche visée — sans quoi les deux
  * morceaux partiraient l'un après l'autre.
  */
-function useNestedEnglish(locale: Locale, pattern: RegExp, loaders: ReadonlyArray<{ load(): Promise<unknown> }>): void {
+function useNestedEnglish(locale: Locale, routes: ReadonlyArray<readonly [RegExp, ReadonlyArray<{ load(): Promise<unknown> }>]>): void {
+  // Le chemin suivi : une navigation par le code sous une porte déjà montée la relance.
+  const { path } = useLocalePathname();
   useEffect(() => {
-    if (locale !== "en" || !pattern.test(window.location.pathname)) return;
-    for (const loader of loaders) loader.load().catch(() => undefined);
-  }, [locale, pattern, loaders]);
+    if (locale !== "en") return;
+    const match = routes.find(([pattern]) => pattern.test(path));
+    for (const loader of match?.[1] ?? []) loader.load().catch(() => undefined);
+  }, [locale, path, routes]);
 }
 
-const TEAM_PAGE_PATH = /^\/en\/equipes\/\d+\/?$/;
-const TEAM_PAGE_LOADERS = [englishTeam, englishStatsPanel];
-const PLAYER_PAGE_PATH = /^\/en\/joueurs\/\d+\/?$/;
-const PLAYER_PAGE_LOADERS = [englishStatsPanel];
+const TEAM_ROUTES = [
+  [/^\/equipes\/\d+\/?$/, [englishTeam, englishStatsPanel]],
+  [/^\/equipes(\/creer)?\/?$/, [englishTeams]],
+] as const;
+const PLAYER_ROUTES = [[/^\/joueurs\/\d+\/?$/, [englishStatsPanel]]] as const;
 
 /** `/equipes` et ses sous-pages : la table des refus d'équipe. */
 export function TeamErrorsTextGate({ locale, messages, fallback, children }: GateProps<Messages["teamErrors"]>) {
   const { english, failed } = useEnglishMessages(locale, englishTeamErrors, messages);
-  useNestedEnglish(locale, TEAM_PAGE_PATH, TEAM_PAGE_LOADERS);
+  useNestedEnglish(locale, TEAM_ROUTES);
   if (locale === "en" && !english && !failed) return <>{fallback}</>;
   return (
     <TeamErrorsTextProvider locale={locale} messages={english ?? undefined}>
@@ -57,7 +62,7 @@ export function TeamErrorsTextGate({ locale, messages, fallback, children }: Gat
 /** `/joueurs` et la fiche d'un joueur : l'espace `players`. */
 export function PlayersTextGate({ locale, messages, fallback, children }: GateProps<Messages["players"]>) {
   const { english, failed } = useEnglishMessages(locale, englishPlayers, messages);
-  useNestedEnglish(locale, PLAYER_PAGE_PATH, PLAYER_PAGE_LOADERS);
+  useNestedEnglish(locale, PLAYER_ROUTES);
   if (locale === "en" && !english && !failed) return <>{fallback}</>;
   return (
     <PlayersTextProvider locale={locale} messages={english ?? undefined}>

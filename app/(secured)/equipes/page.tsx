@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { TeamsTextProvider } from "@/components/i18n/teams-text";
+import { TeamsTextGate } from "@/components/i18n/teams-text-gate";
+import { isDocumentLoad } from "@/lib/server/layout-messages";
+import { SecuredLoadingView } from "../_shared/SecuredLoading";
 import TeamsList from "./TeamsList";
 
 /**
@@ -27,10 +29,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function TeamsPage() {
   const locale = await requestLocale();
-  const messages = locale === "en" ? messagesFor(locale).teams : undefined;
+  // L'anglais au chargement complet seulement (revue de performance du lot 9-2).
+  const all = messagesFor(locale);
+  const messages = locale === "en" && (await isDocumentLoad()) ? all.teams : undefined;
   return (
-    <TeamsTextProvider locale={locale} messages={messages}>
+    <TeamsTextGate locale={locale} messages={messages} fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}>
       <TeamsList />
-    </TeamsTextProvider>
+    </TeamsTextGate>
   );
 }

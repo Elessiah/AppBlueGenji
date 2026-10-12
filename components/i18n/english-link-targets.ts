@@ -2,7 +2,7 @@
 
 import { quietPreload } from "@/lib/shared/lazy-component";
 import { englishReports } from "./english-loaders";
-import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors } from "./english-loaders-account";
+import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
 import { preloadProfileEnglish } from "./profile-english";
 
 /**
@@ -22,7 +22,7 @@ function group(...loaders: Loader[]): () => void {
 }
 
 const TEAM_PAGE = group(englishTeamErrors, englishTeam, englishStatsPanel);
-const TEAMS = group(englishTeamErrors);
+const TEAMS = group(englishTeamErrors, englishTeams);
 const PLAYER_PAGE = group(englishPlayers, englishStatsPanel);
 const PLAYERS = group(englishPlayers);
 const REPORT = group(englishReports);
@@ -32,7 +32,7 @@ export function preloadEnglishFor(path: string): void {
   const bare = path.split(/[?#]/)[0];
   if (bare === "/profil") preloadProfileEnglish("en");
   else if (/^\/equipes\/\d+$/.test(bare)) TEAM_PAGE();
-  else if (bare === "/equipes" || bare.startsWith("/equipes/")) TEAMS();
+  else if (/^\/equipes(\/creer)?$/.test(bare)) TEAMS();
   else if (/^\/joueurs\/\d+$/.test(bare)) PLAYER_PAGE();
   else if (bare === "/joueurs") PLAYERS();
   else if (/^\/signalements\/\d+$/.test(bare)) REPORT();
