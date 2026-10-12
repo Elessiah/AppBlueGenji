@@ -110,7 +110,7 @@ describe("écouteur délégué", () => {
     // Une seule table des pages (`ENGLISH_PAGES`), lue aussi par les portes.
     expect(gates).toContain('const TEAM_ROUTES = ["teamPage", "teams"] as const;');
     // Une seule correspondance page → espaces, lue par le survol et par les portes.
-    expect(readSource("components/i18n/english-link-targets.ts")).toContain('import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";');
+    expect(readSource("components/i18n/english-link-targets.ts")).toContain('import { PAGE_LOADERS } from "./english-page-loaders";');
     expect(gates).toContain("const page = englishPageOf(splitLocalePrefix(path).path);");
     // Le chemin suivi : une navigation par le code sous une porte montée relance.
     expect(gates).toContain("}, [locale, waiting, path, pages, own]);");
@@ -233,5 +233,22 @@ describe("revue performance, vingt-sixième passe", () => {
   it("l'entrée « Comportement d'un joueur » : le formulaire n'emporte que son pictogramme", () => {
     expect(readSource("components/reports/ReportProblemDialog.tsx")).toContain("{OFF_SITE_CONDUCT_ICON}");
     expect(readSource("lib/shared/content-reports.ts")).not.toContain('label: "Comportement d\'un joueur"');
+  });
+});
+
+describe("revue performance, vingt-huitième passe", () => {
+  it("un tap précharge aussi (clic en capture) ; le réglage push lit son état pendant que l'anglais arrive", () => {
+    expect(readSource("components/i18n/english-link-preload-install.ts")).toContain('document.addEventListener("click", onIntent, { capture: true });');
+    const launch = readSource("components/match-launch/MatchLaunchCenter.tsx");
+    expect(launch).toContain("<div hidden={hidden}>");
+    expect(readSource("components/i18n/scoped-text-context.tsx")).toContain(
+      "if (state.locale !== locale || (state.value === undefined && messages !== undefined)) setState(read());",
+    );
+  });
+
+  it("recadrage : un seul effet de démontage, pas de toast après le départ", () => {
+    const hook = readSource("components/ui/image-crop-dialog.tsx");
+    expect(hook).toContain("if (mountedRef.current) showError(");
+    expect(hook.match(/mountedRef\.current = false;/g)).toHaveLength(1);
   });
 });

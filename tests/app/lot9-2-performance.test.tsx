@@ -52,7 +52,8 @@ describe("aucun anglais importé d'office", () => {
     // Le chargeur partagé (`english-loaders.ts`) : déjà reçu par `/profil`, l'anglais ne repart pas.
     expect(dynamicImports("components/match-launch/MatchLaunchCenter.tsx")).toEqual([]);
     expect(valueImports("components/match-launch/MatchLaunchCenter.tsx")).toContain("@/components/i18n/english-loaders-account");
-    expect(launch).toContain('if (locale === "en" && !english) return null;');
+    // Caché tant que l'anglais manque (attente ou échec), monté pour lire l'état en parallèle.
+    expect(launch).toContain('const hidden = locale === "en" && !english;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
     // Un échec vaut jusqu'à la réouverture, pas à chaque navigation.
     expect(launch).toContain("const { english } = useEnglishMessagesUntilRemount(locale, englishPush);");
