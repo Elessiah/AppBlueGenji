@@ -105,7 +105,7 @@ describe("champ Discord — un retrait ne laisse pas la pastille mentir", () => 
 
 describe("profil — un échec de lecture ne s'annonce pas comme un échec de sauvegarde", () => {
   it("le chargement a son propre repli", () => {
-    expect(page).toContain("profileLoadErrorMessage((e as Error).message, text)");
+    expect(page).toContain("profileLoadErrorMessage((e as Error).message, textRef.current)");
   });
 
   it("et les écritures gardent le leur", () => {

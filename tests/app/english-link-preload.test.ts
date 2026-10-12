@@ -182,8 +182,8 @@ describe("revue performance, vingt et unième passe", () => {
   it("annuaires : clé de recherche calculée une fois par liste, pas de copie redondante", () => {
     for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"]) {
       const list = readSource(path);
-      expect(list).toContain("const searchKeys = useMemo(");
-      expect(list).toContain('if (q && !(searchKeys.get(');
+      expect(list).toContain("const [searchKeys] = useState(");
+      expect(list).toContain("if (q && !searchKeyOf(");
       expect(list).not.toContain("r = [...r];");
     }
   });
@@ -260,5 +260,27 @@ describe("revue performance, vingt-neuvième passe", () => {
   it("bouton du pied et bouton flottant : le survol au toucher ne précharge rien", () => {
     expect(readSource("components/reports/ReportProblemButton.tsx")).toContain('if (event.pointerType !== "touch") preloadReportForm(locale);');
     expect(readSource("components/match-launch/MatchLaunchCenter.tsx")).toContain('if (event.pointerType !== "touch") preload();');
+  });
+});
+
+describe("revue performance, trentième passe", () => {
+  it("profil : la lecture ne repart pas sur un changement de texte", () => {
+    const page = readSource("app/(secured)/profil/page.tsx");
+    expect(page).toContain("}, [showError, router]);");
+    expect(page).toContain("showError(profileLoadErrorMessage((e as Error).message, textRef.current))");
+  });
+
+  it("annuaires : clés de recherche calculées à la demande", () => {
+    for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"]) {
+      const list = readSource(path);
+      expect(list).toMatch(/const \[searchKeys\] = useState\(\(\) => new WeakMap</);
+      expect(list).toContain("searchKeyOf(");
+    }
+  });
+
+  it("clic : rien pour un nouvel onglet ou un téléchargement", () => {
+    const install = readSource("components/i18n/english-link-preload-install.ts");
+    expect(install).toContain("if (click.button !== 0 || click.ctrlKey || click.metaKey || click.shiftKey || click.altKey) return;");
+    expect(install).toContain('if (link.hasAttribute("download") || (link.getAttribute("target") ?? "_self") !== "_self") return;');
   });
 });
