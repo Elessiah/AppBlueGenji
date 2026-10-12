@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { finalRankLabel, ordinalForm } from "@/lib/shared/ordinal";
+import { loadFailureMessage } from "@/app/(secured)/equipes/[id]/_lib/load-failure";
 import { jsonRequest, teamApi } from "@/app/(secured)/equipes/[id]/_lib/team-api";
 import { membershipErrorMessage, teamErrorMessage } from "@/app/(secured)/equipes/_lib/team-errors";
 
@@ -235,15 +236,22 @@ describe("correctifs de la première revue", () => {
 
   it("un échec de chargement garde sa phrase et sa notification, pas « introuvable »", () => {
     const hook = stripComments(read("_hooks", "useTeamDetail.ts"));
-    expect(hook).toContain('loadFailed: !redirecting && status === "error" && error !== "INVALID_TEAM_ID"');
+    expect(hook).toContain('loadFailed: !redirecting && status === "error"');
     const page = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "[id]", "page.tsx"), "utf8"));
-    // La notification et la page disent la même raison.
-    expect(page).toContain('{loadFailed ? failure : t("page.notFound")}');
-    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(loadFailed\) showError\(failure\);/);
-    // Session expirée ou droit manquant : la phrase qui dit quoi faire.
-    expect(page).toContain('new Set(["UNAUTHORIZED", "FORBIDDEN"])');
-    expect(page).toContain('AUTH_LOAD_ERRORS.has(error) ? teamErrorMessage(error) : t("page.loadError")');
+    // La notification et la page disent la même phrase, triée en un seul endroit.
+    expect(page).toContain('{failure ?? t("page.notFound")}');
+    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(failure\) showError\(failure\);/);
     expect(page.match(/page\.loadError/g)).toHaveLength(1);
+  });
+
+  it("phrase d'un échec : sa raison (session, droits, adresse invalide), sinon le repli", () => {
+    const say = (code: string) => `phrase:${code}`;
+    expect(loadFailureMessage("UNAUTHORIZED", say, "generic")).toBe("phrase:UNAUTHORIZED");
+    expect(loadFailureMessage("FORBIDDEN", say, "generic")).toBe("phrase:FORBIDDEN");
+    expect(loadFailureMessage("INVALID_TEAM_ID", say, "generic")).toBe("phrase:INVALID_TEAM_ID");
+    expect(loadFailureMessage("HTTP_502", say, "generic")).toBe("generic");
+    expect(loadFailureMessage("Failed to fetch", say, "generic")).toBe("generic");
+    expect(loadFailureMessage(null, say, "generic")).toBe("generic");
   });
 
   it("l'annuaire nomme son échec de chargement, réseau coupé compris", () => {
