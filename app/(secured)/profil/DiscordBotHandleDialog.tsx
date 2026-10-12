@@ -65,6 +65,8 @@ export function DiscordBotHandleDialog({
 
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
+    if (loading) return;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -94,6 +96,8 @@ export function DiscordBotHandleDialog({
 
   const confirmCode = async (event: FormEvent) => {
     event.preventDefault();
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
+    if (loading) return;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -155,6 +159,11 @@ export function DiscordBotHandleDialog({
     locked: loading,
   });
   const backdrop = useBackdropDismiss(onClose, loading);
+  // Les boutons, sans `disabled` : le focus n'en tombe pas hors de la modale
+  // pendant l'envoi (`aria-disabled`, clic ignoré).
+  const cancel = () => {
+    if (!loading) onClose();
+  };
   if (!mounted) return null;
 
   const title = mode === "LINK" ? t("botHandle.titleLink") : t("botHandle.titleUpdate");
@@ -256,10 +265,10 @@ export function DiscordBotHandleDialog({
             >
               {/* Fermé pendant un envoi : fermer perdrait l'identifiant du code
                   déjà parti, et en redemander un consomme le quota. */}
-              <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
+              <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
                 {t("botHandle.cancel")}
               </CyberButton>
-              <CyberButton variant="primary" type="submit" disabled={loading}>
+              <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
                 {loading ? t("botHandle.sending") : t("botHandle.requestCode")}
               </CyberButton>
             </div>
@@ -310,18 +319,18 @@ export function DiscordBotHandleDialog({
             >
               {/* Fermé pendant un envoi : fermer perdrait l'identifiant du code
                   déjà parti, et en redemander un consomme le quota. */}
-              <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
+              <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
                 {t("botHandle.cancel")}
               </CyberButton>
               <CyberButton
                 variant="ghost"
                 type="button"
-                disabled={loading}
-                onClick={restart}
+                aria-disabled={loading || undefined}
+                onClick={() => !loading && restart()}
               >
                 {t("botHandle.newCode")}
               </CyberButton>
-              <CyberButton variant="primary" type="submit" disabled={loading}>
+              <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
                 {loading ? t("botHandle.checking") : t("botHandle.validate")}
               </CyberButton>
             </div>

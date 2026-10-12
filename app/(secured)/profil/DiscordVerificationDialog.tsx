@@ -16,7 +16,6 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordVerificationErrorMessage } from "./discord-errors";
-import { verifiedBadgeLabels } from "./_lib/profile-text";
 
 /** Les lignes de l'exposition, dans l'ordre du registre (`DISCORD_VERIFICATION_EXPOSURE`, testé). */
 export const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
@@ -92,6 +91,8 @@ export function DiscordVerificationDialog({
 
   const requestVerification = async (event: FormEvent) => {
     event.preventDefault();
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
+    if (loading) return;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -130,6 +131,8 @@ export function DiscordVerificationDialog({
 
   const confirmVerification = async (event: FormEvent) => {
     event.preventDefault();
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
+    if (loading) return;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -186,8 +189,8 @@ export function DiscordVerificationDialog({
   // pas décoratif : une certification en cours d'envoi ne doit pas se faire
   // interrompre par une touche.
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: loading });
-  // « Annuler » suit la même règle, sans `disabled` : le focus n'en tombe pas
-  // hors de la modale pendant l'envoi (`aria-disabled`, clic ignoré).
+  // Les boutons suivent la même règle, sans `disabled` : le focus n'en tombe
+  // pas hors de la modale pendant l'envoi (`aria-disabled`, clic ignoré).
   const cancel = () => {
     if (!loading) onClose();
   };
@@ -211,7 +214,7 @@ export function DiscordVerificationDialog({
             <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
               {t("verify.cancel")}
             </CyberButton>
-            <CyberButton variant="primary" type="submit" disabled={loading}>
+            <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
               {loading ? t("verify.certifying") : t("verify.certifyThis")}
             </CyberButton>
           </div>
@@ -274,7 +277,7 @@ export function DiscordVerificationDialog({
             <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
               {t("verify.cancel")}
             </CyberButton>
-            <CyberButton variant="primary" type="submit" disabled={loading}>
+            <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
               {loading ? t("verify.checking") : t("verify.requestCode")}
             </CyberButton>
           </div>
@@ -313,10 +316,10 @@ export function DiscordVerificationDialog({
           {/* Un code brûlé (cinq essais) ou expiré ne se corrige pas en le
               retapant : le refus le dit (« Recommence la certification »),
               et ce retour à la première étape est le geste qu'il nomme. */}
-          <CyberButton variant="ghost" type="button" disabled={loading} onClick={restartVerification}>
+          <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={() => !loading && restartVerification()}>
             {t("verify.newCode")}
           </CyberButton>
-          <CyberButton variant="primary" type="submit" disabled={loading}>
+          <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
             {loading ? t("verify.certifying") : t("verify.certifyMine")}
           </CyberButton>
         </div>
@@ -366,8 +369,8 @@ export function DiscordVerificationDialog({
           style={{ fontSize: 22, margin: "12px 0 8px", display: "flex", alignItems: "center", gap: 8 }}
         >
           {t("verify.title")}
-          {/* Décoratif ici (`alt` vide) : dans le titre, il ferait dire « certifié » au nom du dialogue. */}
-          <VerifiedBadge size={20} labels={{ alt: "", title: verifiedBadgeLabels(text).title }} />
+          {/* Décoratif ici (`alt` et `title` vides) : dans le titre, il ferait dire « certifié » au nom du dialogue. */}
+          <VerifiedBadge size={20} labels={{ alt: "", title: "" }} />
         </h2>
 
         <p style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>

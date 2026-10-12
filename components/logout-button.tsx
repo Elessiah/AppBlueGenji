@@ -21,7 +21,8 @@ export function LogoutButton() {
       aria-busy={leaving || undefined}
       className={leaving ? s.leaving : undefined}
     >
-      {leaving ? t("account.loggingOut") : t("account.logout")}
+      {/* Libellé fixe (pas de saut de largeur) : l'attente se dit par `aria-busy` et les couleurs. */}
+      {t("account.logout")}
     </Button>
   );
 }

@@ -36,7 +36,7 @@
     "menuLabel": "{pseudo}, menu du compte",
     "profile": "Mon profil",
     "logout": "Déconnexion",
-    "loggingOut": "Déconnexion en cours…",
+    "loggingOut": "Déconnexion…",
     "logoutFailed": "La déconnexion a échoué. Réessaie dans un instant."
   },
   "footer": {

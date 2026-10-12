@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
@@ -18,10 +18,15 @@ export function useLogout(onSuccess?: () => void): { leaving: boolean; logout: (
   const { showError } = useToast();
   const { t } = useShellText();
   const [leaving, setLeaving] = useState(false);
+  // Garde synchrone : deux touchers avant le rendu suivant liraient tous deux
+  // `leaving` à `false` et enverraient deux requêtes.
+  const inFlight = useRef(false);
   const logout = async () => {
-    if (leaving) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setLeaving(true);
     if (!(await requestLogout())) {
+      inFlight.current = false;
       setLeaving(false);
       showError(t("account.logoutFailed"));
       return;
