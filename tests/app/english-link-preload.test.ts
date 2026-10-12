@@ -71,7 +71,11 @@ describe("écouteur délégué", () => {
     expect(route).toContain("if (!page) return;");
     expect(route).toContain("const warmTargets = quietPreload(");
     expect(route).toContain("for (const page of wanted) module.preloadEnglishPage(page);");
-    expect(listener).toContain('if (href.startsWith("/en/")) preloadEnglishRoute(href.slice(3));');
+    // Rien de retenu pendant le silence d'un échec, rien de gardé d'un essai raté.
+    expect(route).toContain("if (warmTargets()) wanted.add(page);");
+    expect(listener).toContain("preloadEnglishRoute(href.slice(3));");
+    // Un même lien une fois par seconde au plus (enfants traversés), nouvel essai possible ensuite.
+    expect(listener).toContain("if (href === last && now - lastAt < 1000) return;");
     expect(listener).toContain("setRoutePreload(preloadEnglishRoute);");
     // Les navigations par le code passent par le registre, sans `import()` dans le module de chaque page.
     const navigation = readSource("components/i18n/locale-navigation.tsx");
@@ -91,13 +95,16 @@ describe("écouteur délégué", () => {
     const gates = readSource("components/i18n/english-gates.tsx");
     expect(gates).toContain("useNestedEnglish(locale, TEAM_ROUTES, messages !== undefined);");
     expect(gates).toContain("useNestedEnglish(locale, PLAYER_ROUTES, messages !== undefined);");
+    expect(gates).toContain("for (const loader of PAGE_LOADERS[page]) loader.load().catch(() => undefined);");
     // Chargement complet : rien de lancé pour la page d'arrivée, qui amorce le sien.
     expect(gates).toContain("if (locale !== \"en\" || path === arrival.current) return;");
     // Une seule table des pages (`ENGLISH_PAGES`), lue aussi par les portes.
-    expect(gates).toContain("const TEAM_ROUTES = { teamPage: [englishTeam, englishStatsPanel], teams: [englishTeams] };");
+    expect(gates).toContain('const TEAM_ROUTES = ["teamPage", "teams"] as const;');
+    // Une seule correspondance page → espaces, lue par le survol et par les portes.
+    expect(readSource("components/i18n/english-link-targets.ts")).toContain('import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";');
     expect(gates).toContain("const page = englishPageOf(path);");
     // Le chemin suivi : une navigation par le code sous une porte montée relance.
-    expect(gates).toContain("}, [locale, path, routes]);");
+    expect(gates).toContain("}, [locale, path, pages]);");
   });
 
   it("annuaire des équipes et création : anglais de `teams` au chargement complet seulement", () => {

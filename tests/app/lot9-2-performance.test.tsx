@@ -5,7 +5,7 @@
  * leur français (ou rien, chargés à la demande), l'anglais n'arrivant que sous
  * `/en`.
  */
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readSource } from "../helpers/read-source";
 import { FR_REPORTS_TEXT, useReportsText } from "@/components/reports/reports-text";
@@ -15,7 +15,7 @@ import { PushTextProvider } from "@/components/notifications/push-text-provider"
 import { FR_PROFILE, lookupCode } from "@/app/(secured)/profil/_lib/profile-text";
 import { FR_PROFILE_TEXT } from "@/components/i18n/profile-text";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
-import { onceLoader, PRELOAD_RETRY_MS, quietPreload } from "@/lib/shared/lazy-component";
+import { onceLoader, PRELOAD_RETRY_MS, quietPreload, retryInBackground } from "@/lib/shared/lazy-component";
 import enReports from "@/messages/en/reports.json";
 import enPush from "@/messages/en/push.json";
 import FR_SHELL from "@/messages/fr/shell.json";
@@ -374,10 +374,10 @@ describe("une seule amorce par espace, préchargement de /profil sur ses liens",
 });
 
 describe("revue performance, douzième passe", () => {
-  it("un échec de chargement de l'anglais n'est pas définitif : retenté après le silence", () => {
+  it("un échec de chargement de l'anglais n'est pas définitif : repris en fond, sans rien démonter", () => {
     const hook = readSource("components/i18n/use-english-messages.ts");
-    expect(hook).toContain("}, PRELOAD_RETRY_MS);");
-    expect(hook).toContain("if (loaded) setEnglish(loaded);");
+    expect(hook).toContain("if (failed) retryInBackground(loader);");
+    expect(hook).not.toContain("setFailed(false)");
   });
 
   it("invitations : une réponse à la fois, nom accessible avec l'équipe (FR + EN)", () => {
@@ -397,6 +397,59 @@ describe("revue performance, douzième passe", () => {
       const source = readSource(path);
       expect(source).not.toContain('overflowY: "auto"');
       expect(source).toContain(`<ScrollArea orientation="y" ariaLabel={t("${key}.bodyLabel")}`);
+    }
+  });
+});
+
+describe("revue performance, treizième passe", () => {
+  it("quietPreload dit s'il a lancé le chargement ou s'il se tait", async () => {
+    let clock = 0;
+    let fail = true;
+    const preload = quietPreload(async () => {
+      if (fail) throw new Error("hors ligne");
+    }, () => clock);
+    expect(preload()).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(preload()).toBe(false);
+    clock = PRELOAD_RETRY_MS;
+    fail = false;
+    expect(preload()).toBe(true);
+  });
+
+  it("retryInBackground : un cycle par chargeur, onglet visible, jusqu'à réussite", async () => {
+    jest.useFakeTimers();
+    const globals = globalThis as { window?: unknown; document?: unknown };
+    const hadWindow = "window" in globals;
+    const hadDocument = "document" in globals;
+    const visible = { visibilityState: "visible" as string };
+    globals.window = globalThis;
+    globals.document = visible;
+    try {
+      let calls = 0;
+      let fail = true;
+      const loader = onceLoader(async () => {
+        calls += 1;
+        if (fail) throw new Error("hors ligne");
+        return "ok";
+      });
+      retryInBackground(loader);
+      retryInBackground(loader); // le même chargeur : un seul cycle
+      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS);
+      expect(calls).toBe(1);
+      visible.visibilityState = "hidden";
+      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS);
+      expect(calls).toBe(1); // onglet caché : rien
+      visible.visibilityState = "visible";
+      fail = false;
+      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS);
+      expect(calls).toBe(2);
+      expect(loader.loaded()).toBe("ok");
+      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS * 3);
+      expect(calls).toBe(2); // réussi : le cycle s'arrête
+    } finally {
+      jest.useRealTimers();
+      if (!hadWindow) delete globals.window;
+      if (!hadDocument) delete globals.document;
     }
   });
 });
