@@ -72,7 +72,7 @@ describe("bouton du formulaire de signalement", () => {
     const html = renderToStaticMarkup(<ReportProblemButton authenticated={false} label="Report a problem" />);
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).not.toContain("aria-busy");
-    expect(html).not.toContain("progress");
+    expect(html).not.toContain("pending");
   });
 
   it("précharge au survol et au focus, se dit occupé pendant le chargement", () => {
@@ -156,7 +156,10 @@ describe("revue UI/UX, troisième passe", () => {
     expect(html).toContain('<output class="sr-only"></output>');
     expect(html).not.toContain("Ouverture du formulaire");
     const button = source("components/reports/ReportProblemButton.tsx");
-    expect(button).toContain('const visibleLabel = pending ? t("footer.reportLoading") : label;');
+    // Libellé inchangé (pas de saut de largeur) ; l'attente se voit par la classe, s'annonce par la région.
+    expect(button).not.toContain("visibleLabel");
+    expect(button).toContain('className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,');
+    expect(source("components/reports/ReportProblemButton.module.css")).toContain('.pending[aria-busy="true"]:hover');
     expect(button).toContain('setStatus(t("footer.reportLoading"));');
     // L'échec s'annonce aussi dans la région d'état (hors toast, il resterait muet).
     expect(button).toMatch(/if \(toast\) \{\s*setStatus\(""\);\s*toast\.showError\(message\);\s*\} else \{\s*setStatus\(message\);/);
@@ -410,5 +413,15 @@ describe("revue UI/UX, douzième passe", () => {
     const apps = source("app/(secured)/profil/ConnectedAppsSection.tsx");
     expect(apps).not.toContain("useAppLocale");
     expect(apps).toContain("const locale = text.locale;");
+  });
+});
+
+describe("revue UI/UX, treizième passe", () => {
+  it("chaque section du profil a son titre dans les deux langues", async () => {
+    const { PROFILE_SECTIONS } = await import("@/app/(secured)/profil/_lib/profile-sections");
+    for (const locale of ["fr", "en"] as const) {
+      const { sections } = (await import(`@/messages/${locale}/profile.json`)).default as { sections: Record<string, unknown> };
+      for (const section of PROFILE_SECTIONS) expect(Object.keys(sections)).toContain(section.id);
+    }
   });
 });
