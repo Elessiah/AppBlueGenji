@@ -5,7 +5,7 @@
  * leur français (ou rien, chargés à la demande), l'anglais n'arrivant que sous
  * `/en`.
  */
-import { describe, expect, it, jest } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readSource } from "../helpers/read-source";
 import { FR_REPORTS_TEXT, useReportsText } from "@/components/reports/reports-text";
