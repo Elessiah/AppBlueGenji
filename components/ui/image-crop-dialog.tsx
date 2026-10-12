@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { IMAGE_CROP_FIELD, serializeCropRect, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
-import { orReload } from "@/lib/shared/lazy-component";
+import { onceLoader, orReload } from "@/lib/shared/lazy-component";
 import type { ImageCropDialogProps } from "./image-crop-dialog-view";
 
 /**
@@ -14,9 +14,25 @@ import type { ImageCropDialogProps } from "./image-crop-dialog-view";
  * choix) recharge la page quand c'est sûr (`orReload`).
  */
 const ImageCropDialog = dynamic<ImageCropDialogProps>(
-  () => orReload(import("./image-crop-dialog-view").then((module) => module.ImageCropDialog)),
+  () => orReload(loadImageCropDialog()),
   { ssr: false },
 );
+
+const cropDialogLoader = onceLoader(() => import("./image-crop-dialog-view").then((module) => module.ImageCropDialog));
+
+function loadImageCropDialog() {
+  return cropDialogLoader.load();
+}
+
+/**
+ * Précharge la modale : à poser sur le `<input type="file">` qui la précède
+ * (`onClick`, déclenché aussi par un `.click()` du bouton qui l'ouvre) — le
+ * morceau arrive pendant que le lecteur choisit son fichier, et la modale
+ * s'ouvre sans attente. Un échec reste muet : l'ouverture retente.
+ */
+export function preloadImageCropDialog(): void {
+  loadImageCropDialog().catch(() => undefined);
+}
 
 /** Une image choisie et sa zone gardée, prête à partir. */
 export interface CroppedImage {

@@ -110,6 +110,40 @@ export function isChunkLoadError(error: unknown): boolean {
   );
 }
 
+/** Un chargement à la demande, fait une fois et gardé (`onceLoader`). */
+export interface OnceLoader<T> {
+  /** Lance le chargement, ou rend celui en cours ; un échec se retente à l'appel suivant. */
+  load(): Promise<T>;
+  /** Le résultat, s'il est arrivé ; `null` sinon. */
+  loaded(): T | null;
+}
+
+/**
+ * Un seul chargement, partagé par le préchargement (survol, focus) et
+ * l'ouverture : la requête en cours sert tous les appels, le résultat est
+ * gardé, un échec n'est **pas** gardé — le geste suivant retente.
+ */
+export function onceLoader<T>(start: () => Promise<T>): OnceLoader<T> {
+  let result: { value: T } | null = null;
+  let pending: Promise<T> | null = null;
+  return {
+    load() {
+      pending ??= start().then(
+        (value) => {
+          result = { value };
+          return value;
+        },
+        (error: unknown) => {
+          pending = null;
+          throw error;
+        },
+      );
+      return pending;
+    },
+    loaded: () => (result ? result.value : null),
+  };
+}
+
 /** Programme le rechargement de la page après un chargement raté, dès qu'il est sûr. */
 export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): void {
   if (!env) return;

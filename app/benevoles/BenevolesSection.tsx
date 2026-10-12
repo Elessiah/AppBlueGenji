@@ -7,7 +7,7 @@ import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
-import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
+import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import {
   type Benevole,
   BENEVOLE_CATEGORY_MAX,
@@ -590,6 +590,7 @@ export function BenevolesSection({
               <input
                 ref={photoFileRef}
                 type="file"
+                onClick={preloadImageCropDialog}
                 accept="image/png,image/jpeg,image/webp"
                 className={styles.photoFileInput}
                 onChange={onPhotoFile}

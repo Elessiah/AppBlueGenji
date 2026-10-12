@@ -8,7 +8,7 @@ import { CyberButton } from "@/components/cyber";
 import { useOptionalToast } from "@/components/ui/toast";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { isChunkLoadError } from "@/lib/shared/lazy-component";
+import { isChunkLoadError, onceLoader } from "@/lib/shared/lazy-component";
 import type { Locale } from "@/lib/shared/locales";
 import type { ReportProblemDialogProps } from "./ReportProblemDialog";
 import type { ReportsMessages } from "./reports-text";
@@ -31,45 +31,28 @@ import s from "./ReportProblemButton.module.css";
  * d'office : une saisie en cours ailleurs sur la page serait perdue.
  */
 type Dialog = ComponentType<ReportProblemDialogProps>;
-let loadedDialog: Dialog | null = null;
-let dialogLoad: Promise<Dialog> | null = null;
 
-/** Un seul chargement, partagé par le préchargement et l'ouverture ; un échec se retente. */
-function loadDialog(): Promise<Dialog> {
-  dialogLoad ??= import("./ReportProblemDialog").then(
-    (module) => (loadedDialog = module.ReportProblemDialog),
-    (error: unknown) => {
-      dialogLoad = null;
-      throw error;
-    },
-  );
-  return dialogLoad;
-}
+/** Le formulaire, une fois ; un échec se retente (`onceLoader`). */
+const dialogLoader = onceLoader<Dialog>(() => import("./ReportProblemDialog").then((module) => module.ReportProblemDialog));
 
-let loadedEnglish: ReportsMessages | null = null;
-let englishLoad: Promise<ReportsMessages> | null = null;
-
-/** L'anglais du formulaire, une fois ; un échec se retente. */
-function loadEnglish(): Promise<ReportsMessages> {
-  englishLoad ??= import("@/messages/en/reports.json").then(
-    (module) => (loadedEnglish = module.default),
-    (error: unknown) => {
-      englishLoad = null;
-      throw error;
-    },
-  );
-  return englishLoad;
-}
+/**
+ * L'anglais du formulaire, sous `/en` seulement. Sur la page d'un signalement,
+ * la mise en page sert déjà le sien au formulaire de contestation : le pied de
+ * page le recharge à part s'il est ouvert là — cas rare (un lecteur anglais,
+ * sur la page qui le vise, qui signale autre chose), accepté pour garder le
+ * bouton de chaque page sans la mécanique du fournisseur.
+ */
+const englishLoader = onceLoader<ReportsMessages>(() => import("@/messages/en/reports.json").then((module) => module.default));
 
 /** Le formulaire et, sous `/en`, son anglais. */
 function loadForm(locale: Locale): Promise<Dialog> {
-  if (locale !== "en") return loadDialog();
-  return Promise.all([loadDialog(), loadEnglish()]).then(([dialog]) => dialog);
+  if (locale !== "en") return dialogLoader.load();
+  return Promise.all([dialogLoader.load(), englishLoader.load()]).then(([dialog]) => dialog);
 }
 
 /** Le formulaire déjà là, dans la langue de la page. */
 function loadedForm(locale: Locale): Dialog | null {
-  return locale === "en" && !loadedEnglish ? null : loadedDialog;
+  return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();
 }
 
 const preloadForm = (locale: Locale) => {
@@ -184,7 +167,7 @@ export function ReportProblemButton({
           authenticated={authenticated}
           initialCategory={initialCategory}
           onClose={() => setOpen(false)}
-          englishMessages={locale === "en" ? (loadedEnglish ?? undefined) : undefined}
+          englishMessages={locale === "en" ? (englishLoader.loaded() ?? undefined) : undefined}
         />
       )}
     </>

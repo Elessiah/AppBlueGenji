@@ -6,7 +6,7 @@ import { CyberButton } from "@/components/cyber";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
-import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
+import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import {
   type Sponsor,
   type SponsorTier,
@@ -583,6 +583,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                 <input
                   ref={bannerFileRef}
                   type="file"
+                  onClick={preloadImageCropDialog}
                   accept="image/png,image/jpeg,image/webp"
                   className={styles.logoFileInput}
                   onChange={(e) => uploadImage(e, "banner")}
@@ -627,6 +628,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                 <input
                   ref={logoFileRef}
                   type="file"
+                  onClick={preloadImageCropDialog}
                   accept="image/png,image/jpeg,image/webp"
                   className={styles.logoFileInput}
                   onChange={(e) => uploadImage(e, "logo")}

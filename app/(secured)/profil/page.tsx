@@ -3,7 +3,7 @@
 import { UserAvatar } from "@/components/user-avatar";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
-import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
+import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
@@ -755,6 +755,7 @@ export default function ProfilePage() {
               <input
                 ref={fileInputRef}
                 type="file"
+                onClick={preloadImageCropDialog}
                 accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
                 onChange={onAvatarChange}
                 style={{ display: "none" }}

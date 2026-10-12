@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import { appendCroppedImage, useImageCropper, type CroppedImage } from "@/components/ui/image-crop-dialog";
+import { appendCroppedImage, useImageCropper, type CroppedImage, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { CyberCard, CyberButton } from "@/components/cyber";
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, normalizeTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
@@ -203,6 +203,7 @@ export default function CreateTeamForm() {
               <input
                 ref={logoInputRef}
                 type="file"
+                onClick={preloadImageCropDialog}
                 accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
                 onChange={(event) => void onLogoChange(event)}
                 style={{ display: "none" }}

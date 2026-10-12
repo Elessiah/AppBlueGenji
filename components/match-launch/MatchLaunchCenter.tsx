@@ -7,7 +7,8 @@ import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { PushTextProvider } from "@/components/notifications/push-text-provider";
-import enPush from "@/messages/en/push.json";
+import type frPush from "@/messages/fr/push.json";
+import { onceLoader } from "@/lib/shared/lazy-component";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -359,11 +360,8 @@ export function MatchLaunchCenter({
               que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
               fois l'appareil abonné. */}
           {/* Réglage des notifications : dans la langue de la page depuis le
-              lot 9-2 (`push`) ; son anglais voyage dans ce morceau, chargé à
-              la demande, comme celui de la fenêtre. */}
-          <PushTextProvider locale={text.locale} messages={text.locale === "en" ? enPush : undefined}>
-            <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={t("pushLead")} />
-          </PushTextProvider>
+              lot 9-2 (`push`) ; son anglais chargé sous `/en` seulement. */}
+          <LaunchPushPanel locale={text.locale} lead={t("pushLead")} />
         </ScrollArea>
 
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
@@ -474,6 +472,38 @@ export function MatchLaunchCenter({
 }
 
 /** Cadence de relève selon la phase la plus pressante de la liste. */
+/** L'anglais du réglage des notifications, chargé une fois, sous `/en` seulement. */
+const englishPush = onceLoader<typeof frPush>(() => import("@/messages/en/push.json").then((module) => module.default));
+
+/**
+ * Le réglage compact des notifications : un lecteur français ne télécharge pas
+ * son anglais (revue de performance du lot 9-2). Sous `/en`, il paraît quand
+ * l'anglais est là ; un échec le laisse caché — réglage facultatif, offert
+ * aussi par `/profil` — plutôt que de le montrer en français.
+ */
+function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
+  const [english, setEnglish] = useState<typeof frPush | null>(() => englishPush.loaded());
+  useEffect(() => {
+    if (locale !== "en" || english) return;
+    let live = true;
+    englishPush
+      .load()
+      .then((messages) => {
+        if (live) setEnglish(messages);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [locale, english]);
+  if (locale === "en" && !english) return null;
+  return (
+    <PushTextProvider locale={locale} messages={locale === "en" ? (english ?? undefined) : undefined}>
+      <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={lead} />
+    </PushTextProvider>
+  );
+}
+
 function launchPollInterval(launches: readonly MatchLaunchInfo[]): number {
   const hasLobby = launches.some((info) => info.phase === "LOBBY");
   const hasActive = launches.some((info) => info.phase !== "SCHEDULED");

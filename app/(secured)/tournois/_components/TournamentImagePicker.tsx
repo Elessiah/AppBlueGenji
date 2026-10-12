@@ -7,7 +7,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { useCroppedPreviewUrl, useImageCropper } from "@/components/ui/image-crop-dialog";
+import { useCroppedPreviewUrl, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   TOURNAMENT_IMAGE_ACCEPT,
@@ -156,6 +156,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
       <input
         ref={fileInputRef}
         type="file"
+        onClick={preloadImageCropDialog}
         accept={TOURNAMENT_IMAGE_ACCEPT}
         onChange={(e) => void onFileChosen(e.target.files?.[0])}
         style={{ display: "none" }}

@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   appendCroppedImage,
   useCroppedPreviewUrl,
+  preloadImageCropDialog,
   useImageCropper,
   type CroppedImage,
 } from "@/components/ui/image-crop-dialog";
@@ -430,6 +431,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
         <input
           ref={logoFileRef}
           type="file"
+          onClick={preloadImageCropDialog}
           accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
           onChange={(event) => void onLogoChange(event)}
           className={styles.visuallyHidden}
