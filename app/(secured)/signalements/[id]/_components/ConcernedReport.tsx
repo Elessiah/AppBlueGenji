@@ -17,16 +17,12 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { useReportsText } from "@/components/reports/reports-text";
 import styles from "../concerned.module.css";
 
-function formatDate(iso: string, locale: Locale): string {
-  return new Date(iso).toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "long", year: "numeric" });
-}
-
 /**
- * Une date de la vie d'une image (masquage, échéance, suppression), **en heure
- * de Paris** comme partout ailleurs (`formatQuarantineDate`), dans la langue
- * de la page : les deux dates d'une même phrase se lisent sur le même fuseau.
+ * Les dates de la page (réception, contestations, vie d'une image), **en heure
+ * de Paris** comme partout ailleurs (`formatQuarantineDate`), dans la langue de
+ * la page : un même instant se lit au même jour d'une ligne à l'autre.
  */
-function formatQuarantineDay(iso: string, locale: Locale): string {
+function formatParisDay(iso: string, locale: Locale): string {
   return formatQuarantineDate(new Date(iso), INTL_LOCALE[locale]);
 }
 
@@ -76,8 +72,8 @@ export function ConcernedReport({
                 "concerned.logoHidden",
                 {
                   name: quarantine.targetName,
-                  since: formatQuarantineDay(quarantine.hiddenAt, locale),
-                  purge: formatQuarantineDay(quarantine.purgeAfter, locale),
+                  since: formatParisDay(quarantine.hiddenAt, locale),
+                  purge: formatParisDay(quarantine.purgeAfter, locale),
                 },
                 strong,
               ),
@@ -88,7 +84,7 @@ export function ConcernedReport({
             {richNodes(
               text.rich(
                 "concerned.avatarHidden",
-                { since: formatQuarantineDay(quarantine.hiddenAt, locale), purge: formatQuarantineDay(quarantine.purgeAfter, locale) },
+                { since: formatParisDay(quarantine.hiddenAt, locale), purge: formatParisDay(quarantine.purgeAfter, locale) },
                 strong,
               ),
             )}
@@ -102,7 +98,7 @@ export function ConcernedReport({
             {richNodes(
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.logoRemovedImmediately" : "concerned.logoRemoved",
-                { name: quarantine.targetName, date: formatQuarantineDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
+                { name: quarantine.targetName, date: formatParisDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
                 strong,
               ),
             )}
@@ -112,7 +108,7 @@ export function ConcernedReport({
             {richNodes(
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.avatarRemovedImmediately" : "concerned.avatarRemoved",
-                { date: formatQuarantineDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
+                { date: formatParisDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
                 strong,
               ),
             )}
@@ -130,7 +126,7 @@ export function ConcernedReport({
           </div>
           <div>
             <dt>{t("concerned.received")}</dt>
-            <dd>{formatDate(report.createdAt, locale)}</dd>
+            <dd>{formatParisDay(report.createdAt, locale)}</dd>
           </div>
           <div>
             <dt>{t("concerned.state")}</dt>
@@ -161,7 +157,7 @@ export function ConcernedReport({
             <ul className={styles.contests}>
               {report.myContests.map((contest) => (
                 <li key={contest.id}>
-                  <span className={styles.muted}>{t("concerned.sentOn", { date: formatDate(contest.createdAt, locale) })}</span>
+                  <span className={styles.muted}>{t("concerned.sentOn", { date: formatParisDay(contest.createdAt, locale) })}</span>
                   <p>{contest.description}</p>
                 </li>
               ))}

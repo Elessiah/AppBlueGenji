@@ -76,7 +76,7 @@ export function ReportProblemButton({
   const [open, setOpen] = useState(false);
   const [ReportProblemDialog, setDialog] = useState<Dialog | null>(() => loadedDialog);
   const [pending, setPending] = useState(false);
-  // Ce que la région d'état annonce : l'attente, puis l'échec (aussi dit hors toast).
+  // Ce que la région d'état annonce : l'attente, et l'échec quand aucun toast ne le dit.
   const [status, setStatus] = useState("");
   const { t } = useShellText();
   // Toujours posé par la mise en page racine ; `null` seulement pour un pied de
@@ -115,8 +115,13 @@ export function ReportProblemButton({
       })
       .catch((error: unknown) => {
         const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");
-        setStatus(message);
-        toast?.showError(message);
+        // Dit une fois : par le toast (sa propre région d'annonce), sinon par la région d'état.
+        if (toast) {
+          setStatus("");
+          toast.showError(message);
+        } else {
+          setStatus(message);
+        }
       })
       .finally(() => setPending(false));
   };
