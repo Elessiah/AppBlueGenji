@@ -82,7 +82,10 @@ describe("profil : fournisseurs sans français, anglais une seule fois", () => {
       const name = provider.split("/").pop()!.replace(/\.tsx$/, "");
       expect(importsOf(module).some((spec) => spec.endsWith(name))).toBe(true);
     }
-    expect(source(module)).toContain("useEnglishMessages(locale, englishProfileMessages, messages)");
+    // Chaque espace pour soi : un échec n'emporte pas les deux autres en français.
+    for (const loader of ["englishProfile", "englishTeamErrors", "englishPush"]) {
+      expect(source(module)).toContain(`useEnglishMessages(locale, ${loader}, messages?.`);
+    }
     // Au pied de chaque page, le module des chargeurs reste sans crochet ni préchargement.
     expect(source("components/i18n/english-loaders.ts")).not.toMatch(/useState|useEffect|quietPreload/);
     // Les chargeurs : aucun JSON importé d'office, un `import()` par espace ; au pied de
@@ -99,8 +102,7 @@ describe("profil : fournisseurs sans français, anglais une seule fois", () => {
       "@/messages/en/teams.json",
       "@/messages/en/team.json",
       "@/messages/en/players.json",
-      "@/messages/en/stats.json",
-      "@/messages/en/labels.json",
+      "./stats-panel-en",
     ]);
     // Rien sur le serveur : un module y est partagé entre requêtes.
     expect(source(loaders)).toContain("if (inBrowser() && locale === \"en\" && messages) loader.prime(messages);");

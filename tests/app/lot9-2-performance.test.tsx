@@ -369,7 +369,7 @@ describe("une seule amorce par espace, préchargement de /profil sur ses liens",
   });
 
   it("les liens vers /profil préchargent son anglais : écouteur délégué (english-link-preload.test.ts)", () => {
-    expect(readSource("app/(secured)/layout.tsx")).toContain("{english && <EnglishLinkPreload />}");
+    expect(readSource("app/layout.tsx")).toContain('{user && locale === "en" && <EnglishLinkPreload />}');
   });
 });
 

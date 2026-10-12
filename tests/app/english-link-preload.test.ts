@@ -61,9 +61,10 @@ describe("preloadEnglishFor", () => {
 });
 
 describe("écouteur délégué", () => {
-  it("posé par la mise en page de l'espace connecté sous /en seulement, table chargée au premier survol", () => {
-    expect(readSource("app/(secured)/layout.tsx")).toContain("{english && <EnglishLinkPreload />}");
-    const listener = readSource("components/i18n/english-link-preload.tsx");
+  it("posé par la mise en page racine (compte connecté, /en), écouteur chargé après l'hydratation", () => {
+    expect(readSource("app/layout.tsx")).toContain('{user && locale === "en" && <EnglishLinkPreload />}');
+    expect(readSource("components/i18n/english-link-preload.tsx")).toContain('import("./english-link-preload-install")');
+    const listener = readSource("components/i18n/english-link-preload-install.ts");
     const route = readSource("components/i18n/english-route-preload.ts");
     expect(route).toContain('const targets = onceLoader(() => import("./english-link-targets"));');
     // Une page sans anglais à précharger ne télécharge pas la table ; un échec se tait (`quietPreload`) ;
@@ -81,7 +82,7 @@ describe("écouteur délégué", () => {
     expect(listener).toContain("setRoutePreload(preloadEnglishRoute);");
     // Les navigations par le code passent par le registre, sans `import()` dans le module de chaque page.
     const navigation = readSource("components/i18n/locale-navigation.tsx");
-    expect(navigation.match(/if \(locale === "en"\) preloadRoute\(href\);/g)).toHaveLength(2);
+    expect(navigation.match(/if \(locale === "en"\) preloadRoute\(href\);/g)).toHaveLength(3);
     expect(readSource("components/i18n/route-preload.ts")).not.toMatch(/import\("/);
     expect(listener).toContain('document.addEventListener("pointerover", onIntent, { passive: true });');
     expect(listener).toContain('document.addEventListener("focusin", onIntent);');
@@ -151,5 +152,20 @@ describe("une seule table des pages", () => {
       report: "/signalements/1",
     };
     for (const path of Object.values(sample)) expect(preloaded(path).length).toBeGreaterThan(0);
+  });
+});
+
+describe("revue performance, quinzième passe", () => {
+  it("le préchargement de lien du routeur lance aussi l'anglais", () => {
+    expect(readSource("components/i18n/locale-navigation.tsx").match(/if \(locale === "en"\) preloadRoute\(href\);/g)).toHaveLength(3);
+  });
+
+  it("annuaire des équipes : compteurs mémorisés", () => {
+    expect(readSource("app/(secured)/equipes/TeamsList.tsx")).toMatch(/const \{ totalMembers, countOw, countMr \} = useMemo\(/);
+  });
+
+  it("bloc de statistiques : un seul morceau ; date de quarantaine par le cache commun", () => {
+    expect(readSource("components/i18n/english-loaders-account.ts")).toContain('import("./stats-panel-en")');
+    expect(readSource("lib/shared/logo-quarantine.ts")).toContain("return cached(QUARANTINE_DATE_FORMATS, intlLocale, (locale) =>");
   });
 });
