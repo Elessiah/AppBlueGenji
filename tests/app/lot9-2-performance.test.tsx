@@ -368,8 +368,7 @@ describe("une seule amorce par espace, préchargement de /profil sur ses liens",
     expect(readSource("components/i18n/use-english-messages.ts")).not.toContain("primeEnglish(");
   });
 
-  it("les liens vers /profil préchargent son anglais (morceau gardé par le cache HTTP)", () => {
-    expect(readSource("components/account-menu.tsx")).toContain("const preload = () => preloadProfileEnglish(locale);");
-    expect(readSource("app/(secured)/joueurs/PlayersList.tsx")).toContain("onPointerEnter={() => preloadProfileEnglish(text.locale)}");
+  it("les liens vers /profil préchargent son anglais : écouteur délégué (english-link-preload.test.ts)", () => {
+    expect(readSource("app/(secured)/layout.tsx")).toContain("{english && <EnglishLinkPreload />}");
   });
 });
