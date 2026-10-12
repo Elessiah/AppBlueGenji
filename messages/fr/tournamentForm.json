@@ -194,7 +194,7 @@
     "enduranceMaxRounds": "Manches maximum",
     "enduranceMaxRoundsHint": "0 = aucune limite : la phase court jusqu'à l'effectif ci-dessus. Sinon elle s'arrête à cette manche et les meilleures du classement sont qualifiées, les autres sortent.",
     "enduranceEarlyExit": "Sortie anticipée « hors course »",
-    "enduranceEarlyExitHint": "Cochée, une équipe qui ne peut plus mathématiquement rejoindre les play-offs sort avant la dernière manche, capital en poche (sauf si sa sortie laissait un nombre impair d'équipes en lice). Décochée (par défaut), toutes jouent jusqu'à la fin de la phase.",
+    "enduranceEarlyExitHint": "Cochée, une équipe qui ne peut plus mathématiquement rejoindre les play-offs sort avant la dernière manche, capital en poche (sortie reportée d'une manche si elle laissait un nombre impair d'équipes en lice). Décochée (par défaut), toutes jouent jusqu'à la fin de la phase.",
     "enduranceEarlyExitNoCap": "Sans effet tant qu'aucun plafond de manches n'est fixé.",
     "enduranceEarlyExitFreeScore": "Sans effet en saisie de score libre : il faut un format de match pour savoir ce qu'une équipe peut encore gagner.",
     "draws": "Égalités autorisées en qualification",
