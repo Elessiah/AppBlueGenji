@@ -56,7 +56,7 @@ export default function TeamsList() {
         setActiveTeam(payload.activeTeam || null);
         setCanManageGhostTeams(payload.canManageGhostTeams === true);
       })
-      .catch((e) => showError(teamErrorMessage((e as Error).message)));
+      .catch((e) => showError(teamErrorMessage((e as Error).message, "TEAMS_LOAD_FAILED")));
   }, [showError, teamErrorMessage]);
 
   useEffect(() => {
