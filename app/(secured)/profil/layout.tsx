@@ -4,7 +4,7 @@ import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { ProfileTextProvider } from "@/components/i18n/profile-text";
-import { TeamErrorsTextProvider } from "@/components/i18n/team-errors-text";
+import { TeamErrorsTextProvider } from "@/components/i18n/team-errors-text-provider";
 
 /**
  * Titre de l'écran « Mon profil » — voir `app/(secured)/tournois/layout.tsx`
