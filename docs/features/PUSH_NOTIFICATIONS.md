@@ -161,6 +161,13 @@ comprises. Un abonnement sans remise depuis `PUSH_SUBSCRIPTION_RETENTION_DAYS`
 de `/rgpd`. **Aucune notification ne porte le pseudo d'un joueur**, même règle
 que les journaux Discord.
 
+**Langue** (lot 9-3) : chaque notification est rédigée dans la langue du compte
+destinataire (`bg_users.locale`, `fr` ou `en`). Le contenu passé à
+`notifyUsers` / `notifyStaff` est une fonction de la langue
+(`LocalizedPushContent`) ; `pushToUsers` en tire une charge par langue. Tout
+rédacteur nouveau prend la langue en dernier argument, ses textes dans
+`messages/{fr,en}/pushMessages.json`. Règle de pose : `I18N.md` § Langue du compte.
+
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
