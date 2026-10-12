@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import { useParams } from "next/navigation";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
 import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
 import { useTeamDetail } from "./_hooks/useTeamDetail";
 import { useTeamPendingInvitations } from "./_hooks/useTeamPendingInvitations";
@@ -17,12 +18,16 @@ import { ModerationLogoBar } from "./_components/ModerationLogoBar";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import styles from "./team.module.css";
 
+/** Refus de chargement qui ont leur propre phrase (se reconnecter, droits). */
+const AUTH_LOAD_ERRORS: ReadonlySet<string> = new Set(["UNAUTHORIZED", "FORBIDDEN"]);
+
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
   const teamId = Number(params.id);
   const { team, loading, error, loadFailed, refresh } = useTeamDetail(teamId);
   const { t } = useTeamPageText();
   const { showError } = useToast();
+  const teamErrorMessage = useTeamErrorMessage();
   const statsI18n = useStatsPanelI18n();
 
   // Une fantôme n'a ni membre ni demande, une équipe dissoute plus rien à
@@ -32,9 +37,11 @@ export default function TeamDetailPage() {
   const reloadPending = pending.reload;
   const onPendingChanged = useCallback(() => void reloadPending(), [reloadPending]);
   // Une notification par échec ; « introuvable » a déjà la sienne (redirection).
+  // Session expirée ou droit manquant : la raison, qui dit quoi faire.
   useEffect(() => {
-    if (loadFailed) showError(t("page.loadError"));
-  }, [loadFailed, showError, t]);
+    if (!loadFailed) return;
+    showError(error && AUTH_LOAD_ERRORS.has(error) ? teamErrorMessage(error) : t("page.loadError"));
+  }, [loadFailed, error, showError, t, teamErrorMessage]);
 
   if (error) {
     return (

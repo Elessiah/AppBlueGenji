@@ -13,7 +13,8 @@ import {
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, checkTeamTag, normalizeTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
 import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
-import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { FR_TEAM_PAGE_TEXT, useTeamPageText } from "@/components/i18n/team-page-text";
+import { useStaffLang } from "@/components/i18n/staff-lang";
 import { richNodes } from "@/components/i18n/shell-text";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
@@ -72,7 +73,9 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
     }
   };
 
-  const { cropImage, cropDialog } = useImageCropper();
+  // La modale de recadrage commune est encore française (traduite au lot 9-2) :
+  // sous `/en`, titre français et `lang="fr"` plutôt qu'un mélange (WCAG 3.1.2).
+  const { cropImage, cropDialog } = useImageCropper({ lang: useStaffLang() });
   const [transferOpen, setTransferOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -325,6 +328,8 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   const { showError, showSuccess } = useToast();
   const text = useTeamPageText();
   const { t } = text;
+  // Titre de la modale de recadrage, encore française sous `/en` (voir plus haut).
+  const cropTitle = (useStaffLang() ? FR_TEAM_PAGE_TEXT : text).t("settings.cropTitle");
   const teamErrorMessage = useTeamErrorMessage();
   const [logoBusy, setLogoBusy] = useState(false);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
@@ -347,7 +352,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
       showError(teamErrorMessage(refusal));
       return;
     }
-    const cropped = await cropImage(file, "team-logo", t("settings.cropTitle"));
+    const cropped = await cropImage(file, "team-logo", cropTitle);
     if (!cropped) return;
     // Un nouveau fichier appelle une nouvelle garantie.
     setPendingLogo(cropped);
@@ -358,7 +363,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   // pas sur la zone gardée, elle reste acquise.
   const onLogoRecrop = async () => {
     if (!pendingLogo) return;
-    const cropped = await cropImage(pendingLogo.file, "team-logo", t("settings.cropTitle"));
+    const cropped = await cropImage(pendingLogo.file, "team-logo", cropTitle);
     if (cropped) setPendingLogo(cropped);
   };
 
