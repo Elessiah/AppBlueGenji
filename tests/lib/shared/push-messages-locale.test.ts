@@ -153,7 +153,7 @@ describe("notifications push — anglais", () => {
     expect(en["reminder.LOWER.2.P1D"].body).toContain("Lower bracket · round 2");
     expect(en["reminder.LOWER.2.P1D"].body).toContain("(Paris time)");
     expect(en["reminder.UPPER.1.null"].title).toBe("Match scheduled");
-    expect(en[`reminder.UPPER.${PLAYOFF_ROUND_OFFSET + 1}.PT1H`].body).toContain("Play-offs · round 2");
+    expect(en[`reminder.UPPER.${PLAYOFF_ROUND_OFFSET + 1}.PT1H`].body).toContain("Playoffs · round 2");
     expect(en["privacyChange.1"].body).toBe("A. The details are waiting for you on your next visit.");
     expect(en["privacyChange.2"].body).toContain("(and 1 other)");
     expect(en["privacyChange.3"].body).toContain("(and 2 others)");
@@ -181,9 +181,30 @@ describe("notifications push — anglais", () => {
     expect(refereeAlertPush(REFEREE_LINE, "k", "en").body).toBe("An alert is waiting for a referee.");
   });
 
-  it("mène l'arbitre anglais à la page anglaise du tournoi, l'URL absolue du texte Discord ramenée à son chemin", () => {
-    expect(en["refereeAlert.url"].url).toBe("/en/tournois/7#match-31");
+  it("sans manche connue : l'anglais mène à la liste des tournois, jamais au chemin d'une URL lue dans la ligne", () => {
+    expect(en["refereeAlert.url"].url).toBe("/en/tournois");
     expect(en["refereeAlert.nourl"].url).toBe("/en/tournois");
+    // Une URL dans un nom d'équipe, avant celle du tournoi, ne mène nulle part en anglais.
+    expect(refereeAlertPush("Conflit · https://x.y/foo vs Nova https://site.test/tournois/7", "k", "en").url).toBe("/en/tournois");
     expect(fr["refereeAlert.url"].url).toBe("https://site.test/tournois/7#match-31");
+  });
+
+  it("avec la manche : nomme le tournoi et la manche en anglais, et mène à la manche dans la langue du destinataire", () => {
+    const match = { tournamentId: 7, tournamentName: "Spring Cup", matchId: 31, bracket: "LOWER", roundNumber: 2 };
+    const conflict = refereeAlertPush(REFEREE_LINE, "score_conflict-31", "en", "score_conflict", match);
+    expect(conflict.body).toBe("Score conflict · Spring Cup, Lower bracket · round 2: a referee is needed.");
+    expect(conflict.url).toBe("/en/tournois/7#match-31");
+    expect(refereeAlertPush(REFEREE_LINE, "k", "en", "score_report_stalled", match).body).toBe(
+      "Score awaiting confirmation for too long · Spring Cup, Lower bracket · round 2: a referee needs to decide.",
+    );
+    expect(refereeAlertPush(REFEREE_LINE, "k", "en", "other", match).body).toBe("Alert · Spring Cup, Lower bracket · round 2: a referee is needed.");
+    // Le français garde la ligne Discord, et mène à la manche.
+    const fr31 = refereeAlertPush(REFEREE_LINE, "score_conflict-31", "fr", "score_conflict", match);
+    expect(fr31.body).toBe(refereeAlertPush(REFEREE_LINE, "score_conflict-31", "fr", "score_conflict").body);
+    expect(fr31.url).toBe("/tournois/7#match-31");
+  });
+
+  it("écrit « Playoffs » comme le reste du site anglais", () => {
+    expect(pushRoundLabel("UPPER", PLAYOFF_ROUND_OFFSET, "en")).toBe("Playoffs · round 1");
   });
 });

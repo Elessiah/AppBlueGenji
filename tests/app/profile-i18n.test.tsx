@@ -463,6 +463,8 @@ describe("langue du compte (lot 9-3)", () => {
     const { join } = await import("node:path");
     const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
     expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\] \{\s*opacity: 0\.6;\s*cursor: progress;/);
+    // Le survol n'invite pas à un second choix ; le focus garde son anneau.
+    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\]\[aria-disabled="true"\]:hover:not\(:focus\) \{\s*border-color: var\(--line-strong\);/);
     // Le commentaire de `.hint` reste collé à sa règle.
     expect(css).toMatch(/12 px et `--ink-soft`[^*]*avant\. \*\/\s*\.hint \{/);
   });
