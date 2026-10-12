@@ -1,5 +1,5 @@
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
-import { cached } from "@/lib/shared/message-format";
+import { cached } from "@/lib/shared/intl-cache";
 
 /** Forme ordinale d'une langue : choisit la clé « 1st » / « 2nd » / « 3rd » / « 4th ». */
 export type OrdinalForm = "one" | "two" | "few" | "other";

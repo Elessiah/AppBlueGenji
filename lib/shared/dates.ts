@@ -7,7 +7,7 @@
  * près. Un écran traduit passe la sienne (`useAppLocale()`, `requestLocale()`).
  */
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "./locales";
-import { cached } from "./message-format";
+import { cached } from "./intl-cache";
 
 // Formateurs gardés par langue (lot 9-1, revue performance) : un tableau
 // d'historique en demandait deux par ligne et par rendu. Mêmes options que

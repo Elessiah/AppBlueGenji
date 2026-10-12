@@ -18,6 +18,8 @@
  * qui formate chaque message des deux façons.
  */
 
+import { cached } from "./intl-cache";
+
 export type MessageValues = Readonly<Record<string, string | number>>;
 
 type MessageNode =
@@ -174,19 +176,6 @@ export type TagRenderer<T> = (children: Array<string | T>) => T;
 
 const pluralRules = new Map<string, Intl.PluralRules>();
 const numberFormats = new Map<string, Intl.NumberFormat>();
-
-/**
- * Une instance par langue : coûteuses à construire, lues à chaque rendu —
- * formateurs `Intl` de ce module, de `dates.ts` et `ordinal.ts`.
- */
-export function cached<K, T>(cache: Map<K, T>, locale: K, create: (locale: K) => T): T {
-  let value = cache.get(locale);
-  if (value === undefined) {
-    value = create(locale);
-    cache.set(locale, value);
-  }
-  return value;
-}
 
 function pluralBranch(
   node: Extract<MessageNode, { kind: "plural" }>,
