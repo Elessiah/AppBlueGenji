@@ -473,7 +473,9 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     const fr = render("fr", ui({ enduranceMaxRounds: 0 }));
     expect(fr).toContain("Sans effet tant qu&#x27;aucun plafond de manches n&#x27;est fixé.");
     expect(fr).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
-    expect(render("en", ui({ enduranceMaxRounds: 0 }))).toContain("No effect until a round cap is set.");
+    // La raison d'abord, comme « Égalités » : l'aide commence par elle.
+    expect(fr).toContain('id="endurance-early-exit-hint" style="margin:2px 0 0;font-size:12.5px;color:var(--ink-mute);line-height:1.5">Sans effet tant qu');
+    expect(render("en", ui({ enduranceMaxRounds: 0 }))).toContain("No effect until a round cap is set. When ticked,");
     expect(render("en", ui())).not.toContain("No effect until a round cap is set.");
   });
 

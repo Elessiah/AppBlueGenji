@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { dependentMatches, isScoreEditLocked, type MatchScoreState } from "@/lib/shared/match-lock";
-import { DEFAULT_ENDURANCE_CONFIG, earlyExitApplies, resolveEnduranceConfig } from "@/lib/shared/bg-survie/config";
+import { DEFAULT_ENDURANCE_CONFIG, earlyExitApplies, earlyExitBlocker, resolveEnduranceConfig } from "@/lib/shared/bg-survie/config";
 import {
   enduranceMatchMaps,
   type EnduranceMatchOutcome,
@@ -70,6 +70,13 @@ describe("earlyExitApplies", () => {
     expect(earlyExitApplies(null, { type: "FT", value: 3 })).toBe(false);
     expect(earlyExitApplies(0, { type: "FT", value: 3 })).toBe(false);
     expect(earlyExitApplies(5, null)).toBe(false);
+  });
+
+  it("donne une seule raison, le plafond d'abord", () => {
+    expect(earlyExitBlocker(null, null)).toBe("NO_CAP");
+    expect(earlyExitBlocker(0, { type: "FT", value: 3 })).toBe("NO_CAP");
+    expect(earlyExitBlocker(4, null)).toBe("FREE_SCORE");
+    expect(earlyExitBlocker(4, { type: "FT", value: 3 })).toBeNull();
   });
 });
 
