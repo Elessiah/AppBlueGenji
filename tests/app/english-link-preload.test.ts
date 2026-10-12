@@ -99,8 +99,6 @@ describe("écouteur délégué", () => {
     const gates = readSource("components/i18n/english-gates.tsx");
     // Seulement tant que la porte extérieure attend ; un échec se tait (`quietPreload`).
     // Seulement tant que la porte extérieure attend ; chargeurs de la fiche, hors celui de la porte.
-    expect(gates).toContain("useNestedEnglish(locale, TEAM_ROUTES, englishTeamErrors, waiting);");
-    expect(gates).toContain("useNestedEnglish(locale, PLAYER_ROUTES, englishPlayers, waiting);");
     // La table des pages, module pur : les portes n'emportent pas la mécanique du préchargement.
     expect(gates).toContain('import { englishPageOf } from "./english-pages";');
     expect(readSource("components/i18n/english-pages.ts")).not.toMatch(/import\("/);
@@ -113,7 +111,7 @@ describe("écouteur délégué", () => {
     expect(gates).toContain('const TEAM_ROUTES = ["teamPage", "teams"] as const;');
     // Une seule correspondance page → espaces, lue par le survol et par les portes.
     expect(readSource("components/i18n/english-link-targets.ts")).toContain('import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";');
-    expect(gates).toContain("const page = englishPageOf(path);");
+    expect(gates).toContain("const page = englishPageOf(splitLocalePrefix(path).path);");
     // Le chemin suivi : une navigation par le code sous une porte montée relance.
     expect(gates).toContain("}, [locale, waiting, path, pages, own]);");
     // Survol continu du même élément : rien à remonter.
@@ -193,5 +191,18 @@ describe("revue performance, vingt et unième passe", () => {
   it("une porte à plusieurs espaces lit le chemin une fois", () => {
     expect(readSource("components/i18n/profile-text-providers.tsx").match(/usePathname\(\)/g)).toHaveLength(1);
     expect(readSource("components/i18n/english-gates.tsx")).toContain("const team = useEnglishMessagesAt(locale, englishTeam, messages, pathname);");
+  });
+});
+
+describe("revue performance, vingt-deuxième passe", () => {
+  it("les portes extérieures lisent le chemin une fois, pour leur anglais et celui de la fiche", () => {
+    const gates = readSource("components/i18n/english-gates.tsx");
+    expect(gates).toContain("useNestedEnglish(locale, TEAM_ROUTES, englishTeamErrors, waiting, pathname);");
+    expect(gates).toContain("useNestedEnglish(locale, PLAYER_ROUTES, englishPlayers, waiting, pathname);");
+    expect(gates).not.toContain("useLocalePathname");
+  });
+
+  it("le formulaire importé par la page d'un signalement n'amorce le chargeur que dans le navigateur", () => {
+    expect(readSource("components/reports/report-form-loader.ts")).toContain('if (typeof window !== "undefined") dialogLoader.prime(dialog);');
   });
 });
