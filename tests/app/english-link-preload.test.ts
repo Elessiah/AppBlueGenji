@@ -299,3 +299,22 @@ describe("revue performance, trente et unième passe", () => {
     expect(install).toContain('const target = (link.getAttribute("target") ?? "").trim().toLowerCase();');
   });
 });
+
+describe("revue performance, trente-deuxième passe", () => {
+  it("annuaires : tri mémorisé à part, la recherche ne fait qu'un filtre", () => {
+    for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"]) {
+      const list = readSource(path);
+      expect(list).toContain("const sorted = useMemo(() => {");
+      expect(list).toContain("return sorted.filter(");
+    }
+  });
+
+  it("références de texte écrites après validation, jamais pendant le rendu ; TeamsList ne se relit pas sur un texte", () => {
+    for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/profil/page.tsx"]) {
+      expect(readSource(path)).not.toMatch(/^ {2}textRef\.current = text;$/m);
+    }
+    const teams = readSource("app/(secured)/equipes/TeamsList.tsx");
+    expect(teams).toContain("teamErrorMessageRef.current((e as Error).message,");
+    expect(teams).toContain("  }, [showError]);\n\n  useEffect(() => {\n    loadTeams();");
+  });
+});

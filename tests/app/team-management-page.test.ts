@@ -256,7 +256,7 @@ describe("correctifs de la première revue", () => {
 
   it("l'annuaire nomme son échec de chargement, réseau coupé compris", () => {
     const list = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "TeamsList.tsx"), "utf8"));
-    expect(list).toContain('showError(teamErrorMessage((e as Error).message, "TEAMS_LOAD_FAILED"))');
+    expect(list).toContain('showError(teamErrorMessageRef.current((e as Error).message, "TEAMS_LOAD_FAILED"))');
   });
 
   it("la modale de recadrage, traduite (lot 9-2), suit la langue de la page : titre traduit, aucun `lang` imposé", () => {
