@@ -71,16 +71,31 @@ export function resolveEnduranceConfig(input?: Partial<EnduranceConfig> | null):
   };
 }
 
+/** Ce qui empêche la sortie anticipée de jouer, `null` si rien ne l'en empêche. */
+export type EarlyExitBlocker = "NO_CAP" | "FREE_SCORE";
+
 /**
- * La sortie « hors course » anticipée peut-elle jouer ? Il lui faut un plafond
- * de manches (sans lui, aucune « dernière manche » à devancer) **et** un format
- * de match (en saisie libre, `enduranceRoundSwing` ne borne rien : aucune
- * élimination n'est mathématiquement acquise). Hors de ces conditions, la case
- * du formulaire est grisée et la ligne des réglages masquée : l'option cochée
- * n'y aurait aucun effet.
+ * Pourquoi la sortie « hors course » anticipée ne peut pas jouer. Il lui faut
+ * un plafond de manches (sans lui, aucune « dernière manche » à devancer —
+ * `NO_CAP`, raison donnée en premier) **et** un format de match (en saisie
+ * libre, `enduranceRoundSwing` ne borne rien : aucune élimination n'est
+ * mathématiquement acquise — `FREE_SCORE`). Le formulaire en tire la raison
+ * affichée sous la case grisée : une seule source pour la condition et sa
+ * raison.
  *
  * @param maxRounds - plafond de manches, `null` ou `0` = aucun.
  */
+export function earlyExitBlocker(maxRounds: number | null, matchFormat: MatchFormat | null): EarlyExitBlocker | null {
+  if (maxRounds === null || maxRounds < 1) return "NO_CAP";
+  if (matchFormat === null) return "FREE_SCORE";
+  return null;
+}
+
+/**
+ * La sortie anticipée peut-elle jouer ? Hors de ces conditions
+ * (`earlyExitBlocker`), la case du formulaire est grisée et la ligne des
+ * réglages masquée : l'option cochée n'y aurait aucun effet.
+ */
 export function earlyExitApplies(maxRounds: number | null, matchFormat: MatchFormat | null): boolean {
-  return maxRounds !== null && maxRounds >= 1 && matchFormat !== null;
+  return earlyExitBlocker(maxRounds, matchFormat) === null;
 }
