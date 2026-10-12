@@ -472,12 +472,15 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
 
   it("sans plafond de manches, grisée et dite sans effet", () => {
     const fr = render("fr", ui({ enduranceMaxRounds: 0 }));
-    expect(fr).toContain("Sans effet tant que « Manches maximum » vaut 0.");
+    expect(fr).toContain("Indisponible tant que « Manches maximum » vaut 0 : sans dernière manche fixée, il n&#x27;y a rien à devancer.");
     expect(fr).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
-    // La raison d'abord, comme « Égalités » : l'aide commence par elle.
-    expect(fr).toContain('id="endurance-early-exit-hint" style="margin:2px 0 0;font-size:12.5px;color:var(--ink-mute);line-height:1.5">Sans effet tant que « Manches maximum »');
-    expect(render("en", ui({ enduranceMaxRounds: 0 }))).toContain("No effect while “Maximum rounds” is 0. When ticked,");
-    expect(render("en", ui())).not.toContain("No effect while “Maximum rounds” is 0.");
+    // Comme « Égalités », la raison remplace l'aide : « dernière manche » et
+    // « trait » n'y voudraient rien dire.
+    expect(fr).not.toContain("Cochée, une équipe");
+    const en = render("en", ui({ enduranceMaxRounds: 0 }));
+    expect(en).toContain("Unavailable while “Maximum rounds” is 0: with no last round set, there is nothing to get ahead of.");
+    expect(en).not.toContain("When ticked,");
+    expect(render("en", ui())).not.toContain("Unavailable while “Maximum rounds” is 0");
   });
 
   it("en saisie de score libre, grisée et dite sans effet (aucune élimination n'y est acquise)", () => {
@@ -486,12 +489,12 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     expect(fr).toMatch(/<input id="endurance-early-exit" type="checkbox" disabled=""(?![^>]*checked)[^>]*>/);
     const en = render("en", ui({ matchFormat: null }));
     expect(fr).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
-    expect(fr).toContain("Sans effet avec le format de match « Libre » : il faut un BO ou un FT");
-    expect(en).toContain("No effect with the “Free” match format: a BO or FT is needed to know what a team can still win.");
+    expect(fr).toContain("Indisponible avec le format de match « Libre » : il faut un BO ou un FT");
+    expect(en).toContain("Unavailable with the “Free” match format: a BO or FT is needed to know what a team can still win.");
     expect(en).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
     // Une seule raison à la fois : sans plafond, c'est celle-là qui est donnée.
-    expect(render("en", ui({ matchFormat: null, enduranceMaxRounds: 0 }))).not.toContain("No effect with the “Free” match format");
-    expect(render("en", ui())).not.toContain("No effect with the “Free” match format");
+    expect(render("en", ui({ matchFormat: null, enduranceMaxRounds: 0 }))).not.toContain("Unavailable with the “Free” match format");
+    expect(render("en", ui())).not.toContain("Unavailable with the “Free” match format");
   });
 
   it("n'apparaît qu'en BG Survie", () => {
@@ -524,8 +527,8 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
       />,
     );
     expect(html).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
-    expect(html).not.toContain("No effect while “Maximum rounds” is 0.");
-    expect(html).not.toContain("Sans effet tant que");
+    expect(html).not.toContain("Unavailable while “Maximum rounds” is 0");
+    expect(html).not.toContain("Indisponible tant que");
   });
 
   it("l'aide dit que la parité reporte la sortie, sans l'annuler (FR et EN)", () => {

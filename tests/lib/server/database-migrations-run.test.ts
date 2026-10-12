@@ -402,35 +402,39 @@ describe("backfillLaunchedAt", () => {
 
 describe("addEnduranceEarlyExit", () => {
   const ADD = /^ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit/;
-  const FILL = /^UPDATE bg_tournaments SET endurance_early_exit = 1/;
+  const DEFAULT_OFF = /^ALTER TABLE bg_tournaments ALTER COLUMN endurance_early_exit SET DEFAULT 0/;
+  const NARROW = /^UPDATE bg_tournaments SET endurance_early_exit = 0/;
 
-  it("garde la sortie anticipée des tournois BG Survie plafonnés existants, une fois, quand la colonne vient d'être ajoutée", async () => {
+  it("fait naître la colonne à 1 (ajout et remplissage en une instruction), puis remet le défaut à 0 et resserre", async () => {
     on(ADD, () => OK);
 
     await getDatabase();
 
-    const fill = issued[rank(FILL)];
-    expect(rank(FILL)).toBeGreaterThan(rank(ADD));
-    expect(fill).toContain("format = 'BG_SURVIE'");
-    expect(fill).toContain("endurance_max_rounds IS NOT NULL");
+    expect(issued[rank(ADD)]).toContain("NOT NULL DEFAULT 1 AFTER endurance_max_rounds");
+    expect(rank(DEFAULT_OFF)).toBeGreaterThan(rank(ADD));
+    expect(rank(NARROW)).toBeGreaterThan(rank(DEFAULT_OFF));
+    expect(issued[rank(NARROW)]).toContain("WHERE NOT (format = 'BG_SURVIE' AND endurance_max_rounds IS NOT NULL)");
   });
 
-  it("ne remplit rien quand la colonne existe déjà (un tournoi décoché depuis le reste)", async () => {
-    fail(ADD, "ER_DUP_FIELDNAME");
-
+  it("colonne déjà là : remet le défaut à 0 à chaque démarrage, sans rien resserrer (un tournoi coché depuis le reste)", async () => {
     await getDatabase();
 
-    expect(count(FILL)).toBe(0);
+    expect(count(DEFAULT_OFF)).toBe(1);
+    expect(count(NARROW)).toBe(0);
     expect(errors()).not.toContain("endurance_early_exit");
   });
 
-  it("dit l'échec du remplissage sous le nom de l'ALTER", async () => {
+  it("dit chaque échec sous sa propre instruction", async () => {
     on(ADD, () => OK);
-    fail(FILL, "ER_LOCK_WAIT_TIMEOUT");
+    fail(DEFAULT_OFF, "ER_LOCK_WAIT_TIMEOUT");
+    fail(NARROW, "ER_LOCK_WAIT_TIMEOUT");
 
     await getDatabase();
 
-    expect(errors()).toContain("ADD COLUMN endurance_early_exit TINYINT(1) NOT NULL DEFAULT 0");
+    expect(errors()).toContain("ALTER COLUMN endurance_early_exit SET DEFAULT 0");
+    expect(errors()).toContain("UPDATE bg_tournaments SET endurance_early_exit = 0");
+    // L'ajout a réussi : le resserrement est tenté malgré l'échec du défaut.
+    expect(count(NARROW)).toBe(1);
   });
 });
 

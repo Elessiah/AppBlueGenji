@@ -206,13 +206,15 @@ describe("Schéma — la règle des deux endroits", () => {
     );
   });
 
-  // Le défaut 0 éteint l'option pour tout tournoi neuf ; les tournois BG Survie
-  // plafonnés qui existaient la gardent (`addEnduranceEarlyExit`).
+  // Le défaut 0 éteint l'option pour tout tournoi neuf ; sur une base qui tourne,
+  // la colonne naît à 1 (les tournois existants la gardent, `addEnduranceEarlyExit`)
+  // puis son défaut repasse à 0.
   it("ajoute la sortie anticipée de BG Survie éteinte, aux deux endroits", () => {
     expect(table("bg_tournaments")).toMatch(/endurance_early_exit TINYINT\(1\) NOT NULL DEFAULT 0/);
     expect(migrations).toMatch(
-      /ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit TINYINT\(1\) NOT NULL DEFAULT 0/,
+      /ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit TINYINT\(1\) NOT NULL DEFAULT 1/,
     );
+    expect(migrations).toContain("ALTER TABLE bg_tournaments ALTER COLUMN endurance_early_exit SET DEFAULT 0");
   });
 
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {
@@ -328,15 +330,15 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    // Treize : la boucle des changements récents, les quatre retraits de colonne,
+    // Quinze : la boucle des changements récents, les quatre retraits de colonne,
     // les deux reports qui précèdent un retrait (`user_id` → `authenticated`
     // des visites, `highlight` → `priority` des annonces de recrutement),
-    // `launched_at` et `endurance_early_exit`, dont le remplissage ne suit que
-    // l'ajout effectif, et les
+    // `launched_at`, dont le remplissage ne suit que l'ajout effectif, les trois
+    // étapes d'`endurance_early_exit` (ajout à 1, défaut à 0, resserrement), et les
     // trois étapes du défaut de `open_to_recruitment` (lecture, bascule,
     // remplissage), chacune sous son propre libellé, et la reprise unique des
     // empreintes de visiteurs dans `bg_site_visitors`.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(13);
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(15);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
