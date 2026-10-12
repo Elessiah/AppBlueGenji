@@ -9,6 +9,8 @@ import type { ReactElement, ReactNode } from "react";
 
 let mockLocale: "fr" | "en" = "en";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
+// Lecteur connecté : sans session, les mises en page ne sérialisent pas l'anglais (`isDocumentLoad`).
+jest.mock("@/lib/server/auth", () => ({ ...jest.requireActual<object>("@/lib/server/auth"), getCurrentUser: async () => ({ id: 1 }) }));
 // Chargement complet par défaut ; `"0"` : requête du routeur (navigation, `router.refresh()`).
 let mockDocument = "1";
 jest.mock("next/headers", () => ({ headers: async () => new Headers({ "x-bg-document": mockDocument }) }));
