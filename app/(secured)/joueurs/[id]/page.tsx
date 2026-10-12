@@ -55,9 +55,11 @@ export default function PlayerDetailPage() {
     },
   );
   // Une notification par échec, pas à chaque rendu de l'état d'erreur.
+  // La page et la notification disent la même raison (session expirée…).
+  const failure = status === "error" ? playerErrorMessage(text, error, "PLAYER_LOAD_FAILED") : null;
   useEffect(() => {
-    if (status === "error") showError(playerErrorMessage(text, error, "PLAYER_LOAD_FAILED"));
-  }, [status, error, showError, text]);
+    if (failure) showError(failure);
+  }, [failure, showError]);
   if (status === "loading")
     return <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>{t("page.loading")}</section>;
 
@@ -74,7 +76,7 @@ export default function PlayerDetailPage() {
   if (status === "error") {
     return (
       <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>
-        {t("page.loadError")}{" "}
+        {failure}{" "}
         <LocaleLink href="/joueurs" style={{ color: "var(--blue-100)" }}>
           {t("page.backToPlayers")}
         </LocaleLink>

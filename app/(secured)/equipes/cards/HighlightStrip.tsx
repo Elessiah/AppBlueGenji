@@ -32,7 +32,7 @@ export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
           <LocaleLink
             href={`/equipes/${team.id}`}
             className={s.cardOverlay}
-            aria-label={t("card.viewProfile", { name: team.name })}
+            aria-label={t("card.viewTeam", { name: team.name })}
           />
           <div className={s.rank}>{String(team.rank).padStart(2, "0")}</div>
           <div>

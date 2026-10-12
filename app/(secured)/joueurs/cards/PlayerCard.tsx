@@ -95,7 +95,7 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
                 teamId={player.team.id}
                 podiumTier={player.isDeleted ? null : undefined}
                 className={`${s.aboveOverlay} tap-target`}
-                title={t("card.viewProfile", { name: player.team.name })}
+                title={t("card.viewTeam", { name: player.team.name })}
               >
                 <em>{player.team.name.toUpperCase()}</em>
               </TeamLink>

@@ -54,6 +54,7 @@
   },
   "card": {
     "viewProfile": "Voir la fiche de {name}",
+    "viewTeam": "Voir la fiche de {name}",
     "deleted": "Compte supprimé",
     "rosterStatus": {
       "ROSTER": "ROSTER",
@@ -82,7 +83,6 @@
   "page": {
     "loading": "Chargement du profil joueur…",
     "notFound": "Joueur non trouvé.",
-    "loadError": "Erreur lors du chargement du joueur.",
     "backToPlayers": "Retour aux joueurs",
     "back": "← Joueurs",
     "deletedBadge": "Compte supprimé",
