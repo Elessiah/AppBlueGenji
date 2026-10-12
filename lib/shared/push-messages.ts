@@ -1,6 +1,7 @@
 /**
  * Ce que dit chaque notification push — un rédacteur par sujet de
- * `PUSH_TOPICS`.
+ * `PUSH_TOPICS`, **dans la langue du destinataire** (lot 9-3 : espace
+ * `pushMessages`, `bg_users.locale`).
  *
  * Une notification push n'est pas un message Discord raccourci : elle s'affiche
  * sur un écran verrouillé, en deux lignes, parfois sous les yeux d'un autre. Les
@@ -9,19 +10,35 @@
  * - le **titre** dit l'évènement, le **corps** ce qu'il faut faire ou savoir ;
  * - **aucun pseudo de joueur**, même règle que les journaux Discord
  *   (`lib/shared/log-privacy.ts`) : les noms d'équipe restent, ils sont publics ;
- * - le **lien** est un chemin du site, qui ouvre la page où agir.
+ * - le **lien** est un chemin du site, qui ouvre la page où agir — dans la
+ *   langue du destinataire quand la page est traduite (`localeHref`).
+ *
+ * Chaque rédacteur prend la langue en dernier argument (français par défaut,
+ * texte inchangé) ; `notifyUsers` / `notifyStaff` n'acceptent qu'une
+ * notification à rédiger par langue (`LocalizedPushContent`). Les messages
+ * privés Discord, eux, restent en français (D6).
  *
  * Module pur : chaque rédacteur se teste sans réseau.
  */
+import enPush from "@/messages/en/pushMessages.json";
+import frPush from "@/messages/fr/pushMessages.json";
+import enReports from "@/messages/en/reports.json";
+import frReports from "@/messages/fr/reports.json";
 import { formatMatchStart } from "./discord-notifications";
+import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { tournamentMatchHref } from "./match-anchor";
-import {
-  reportConcernedHref,
-  type ReportCategory,
-} from "./content-reports";
-import { REPORT_CATEGORY_DEFINITIONS } from "./content-report-categories";
-import { plural } from "./plural";
+import { reportConcernedHref, type ReportCategory } from "./content-reports";
+import { DEFAULT_LOCALE, localeHref, type Locale } from "./locales";
+import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import type { PushContent } from "./push-notifications";
+
+type PushText = ScopedText<Leaves<typeof frPush>>;
+
+const TEXT: Readonly<Record<Locale, PushText>> = { fr: scopedText("fr", frPush), en: scopedText("en", enPush) };
+const CATEGORY_LABELS: Readonly<Record<Locale, Readonly<Record<ReportCategory, { label: string }>>>> = {
+  fr: frReports.categories,
+  en: enReports.categories,
+};
 
 type MatchSide = {
   tournamentId: number;
@@ -38,8 +55,8 @@ type MatchSide = {
 };
 
 /** « Renards contre Nova », ou « Ton match » quand les engagés sont des joueurs. */
-function pairing(side: MatchSide): string {
-  return side.solo ? "Ton match" : `${side.teamName} contre ${side.opponentName}`;
+function pairing(side: MatchSide, text: PushText): string {
+  return side.solo ? text.t("pairingSolo") : text.t("pairing", { team: side.teamName, opponent: side.opponentName });
 }
 
 /** Étiquette d'un match : les notifications d'un même match se remplacent. */
@@ -53,66 +70,125 @@ function matchTag(matchId: number): string {
  * par l'arbitrage). Même étiquette pour les deux : l'annonce du départ
  * remplace l'appel aux « Prêt » au lieu de s'y empiler.
  */
-export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED"): PushContent {
+export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const values = { pairing: pairing(side, text), tournament: side.tournamentName };
   return {
-    title: phase === "LOBBY" ? "Ton match commence" : "Ton match est lancé",
-    body:
-      `${pairing(side)} · ${side.tournamentName}. ` +
-      (phase === "LOBBY" ? "Déclare-toi prêt." : "Bonne partie !"),
-    url: tournamentMatchHref(side.tournamentId, side.matchId),
+    title: phase === "LOBBY" ? text.t("matchStart.titleLobby") : text.t("matchStart.titleLaunched"),
+    body: phase === "LOBBY" ? text.t("matchStart.bodyLobby", values) : text.t("matchStart.bodyLaunched", values),
+    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: matchTag(side.matchId),
   };
 }
 
-/** Rappel d'un match programmé (`offsetLabel` : « une semaine », « 1 h »…), ou annonce de son horaire. */
+/** Palier d'un rappel (`MATCH_REMINDER_OFFSETS`), par sa clé. */
+export type MatchReminderOffsetKey = "P7D" | "P1D" | "PT1H";
+
+/**
+ * Libellé d'une manche (`matchRoundLabel`, français du journal Discord) dans
+ * la langue du texte ; le français égale `matchRoundLabel` (testé).
+ */
+export function pushRoundLabel(bracket: string, roundNumber: number, locale: Locale = DEFAULT_LOCALE): string {
+  const text = TEXT[locale];
+  if (isEndurancePlayoffRound(roundNumber) && bracket !== "THIRD_PLACE") {
+    return text.t("round.playoff", { round: roundNumber - PLAYOFF_ROUND_OFFSET + 1 });
+  }
+  switch (bracket) {
+    case "LOWER":
+      return text.t("round.lower", { round: roundNumber });
+    case "GRAND":
+      return text.t("round.grand");
+    case "THIRD_PLACE":
+      return text.t("round.thirdPlace");
+    default:
+      return text.t("round.default", { round: roundNumber });
+  }
+}
+
+/** Coup d'envoi d'un match, heure de Paris, dans la langue du texte (24 h dans les deux). */
+function pushMatchStart(startAt: string | Date, locale: Locale): string {
+  if (locale === "fr") return formatMatchStart(startAt);
+  const date = startAt instanceof Date ? startAt : new Date(startAt);
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/Paris",
+  }).format(date);
+}
+
+/** Rappel d'un match programmé (`offset` : son palier), ou annonce de son horaire (`null`). */
 export function matchReminderPush(
-  side: MatchSide & { roundLabel: string; startAt: string | Date },
-  offsetLabel: string | null,
+  side: MatchSide & { bracket: string; roundNumber: number; startAt: string | Date },
+  offset: MatchReminderOffsetKey | null,
+  locale: Locale = DEFAULT_LOCALE,
 ): PushContent {
+  const text = TEXT[locale];
   return {
-    title: offsetLabel ? `Match dans ${offsetLabel}` : "Match programmé",
-    body: `${pairing(side)} · ${side.tournamentName}, ${side.roundLabel}. Coup d'envoi ${formatMatchStart(side.startAt)} (heure de Paris).`,
-    url: tournamentMatchHref(side.tournamentId, side.matchId),
+    title: offset ? text.t("matchReminder.title", { offset: text.t(`matchReminder.offset.${offset}`) }) : text.t("matchReminder.titleScheduled"),
+    body: text.t("matchReminder.body", {
+      pairing: pairing(side, text),
+      tournament: side.tournamentName,
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale),
+      start: pushMatchStart(side.startAt, locale),
+    }),
+    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-reminder`,
   };
 }
 
 /** L'adversaire a saisi un score : à confirmer, ou à contester. */
-export function scoreToConfirmPush(side: MatchSide): PushContent {
+export function scoreToConfirmPush(side: MatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
   return {
-    title: "Score à confirmer",
-    body: `${side.solo ? "Ton adversaire" : side.opponentName} a saisi le score de votre match (${side.tournamentName}). Confirme-le, ou conteste-le.`,
-    url: tournamentMatchHref(side.tournamentId, side.matchId),
+    title: text.t("scoreToConfirm.title"),
+    body: text.t("scoreToConfirm.body", {
+      opponent: side.solo ? text.t("scoreToConfirm.soloOpponent") : side.opponentName,
+      tournament: side.tournamentName,
+    }),
+    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-score`,
   };
 }
 
 /** Un tournoi où l'équipe du joueur est engagée vient d'être lancé. */
-export function tournamentStartPush(input: { tournamentId: number; tournamentName: string }): PushContent {
+export function tournamentStartPush(
+  input: { tournamentId: number; tournamentName: string },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
   return {
-    title: "Le tournoi commence",
-    body: `${input.tournamentName} est lancé. Retrouve ton premier match sur la page du tournoi.`,
-    url: `/tournois/${input.tournamentId}`,
+    title: text.t("tournamentStart.title"),
+    body: text.t("tournamentStart.body", { tournament: input.tournamentName }),
+    url: localeHref(`/tournois/${input.tournamentId}`, locale),
     tag: `tournament-${input.tournamentId}-start`,
   };
 }
 
 /** Un joueur demande à rejoindre une équipe que le destinataire gère. */
-export function teamJoinRequestPush(input: { teamId: number; teamName: string }): PushContent {
+export function teamJoinRequestPush(input: { teamId: number; teamName: string }, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
   return {
-    title: "Demande d'adhésion",
-    body: `Un joueur demande à rejoindre ${input.teamName}. Réponds depuis la fiche de l'équipe.`,
-    url: `/equipes/${input.teamId}`,
+    title: text.t("teamJoinRequest.title"),
+    body: text.t("teamJoinRequest.body", { team: input.teamName }),
+    url: localeHref(`/equipes/${input.teamId}`, locale),
     tag: `team-${input.teamId}-join`,
   };
 }
 
 /** Un signalement vise le destinataire ou son équipe. */
-export function contentReportPush(input: { reportId: number; category: ReportCategory }): PushContent {
+export function contentReportPush(
+  input: { reportId: number; category: ReportCategory },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
   return {
-    title: "Un signalement te concerne",
-    body: `Signalement (${REPORT_CATEGORY_DEFINITIONS[input.category].label}) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.`,
-    url: reportConcernedHref(input.reportId),
+    title: text.t("contentReport.title"),
+    body: text.t("contentReport.body", { category: CATEGORY_LABELS[locale][input.category].label }),
+    url: localeHref(reportConcernedHref(input.reportId), locale),
     tag: `report-${input.reportId}`,
   };
 }
@@ -124,28 +200,32 @@ export type ModerationPushKind = "HIDDEN" | "REMOVED" | "RESTORED";
  * l'avatar du destinataire (`teamName` absent). Le lien mène au signalement
  * quand il y en a un — c'est là qu'on conteste.
  */
-export function moderationPush(input: {
-  kind: ModerationPushKind;
-  teamName?: string | null;
-  teamId?: number | null;
-  reportId: number | null;
-}): PushContent {
-  const subject = input.teamName ? `Le logo de ${input.teamName}` : "Ton avatar";
-  const verb = { HIDDEN: "a été masqué", REMOVED: "a été supprimé", RESTORED: "a été rétabli" }[input.kind];
-  const next = moderationNextStep(input.kind, input.reportId);
+export function moderationPush(
+  input: {
+    kind: ModerationPushKind;
+    teamName?: string | null;
+    teamId?: number | null;
+    reportId: number | null;
+  },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
+  const decision = input.teamName
+    ? text.t(`moderation.logo.${input.kind}`, { team: input.teamName })
+    : text.t(`moderation.avatar.${input.kind}`);
   const fallback = input.teamId ? `/equipes/${input.teamId}` : "/profil";
   return {
-    title: "Décision de modération",
-    body: `${subject} ${verb}. ${next}`,
-    url: input.reportId !== null ? reportConcernedHref(input.reportId) : fallback,
+    title: text.t("moderation.title"),
+    body: `${decision} ${moderationNextStep(text, input.kind, input.reportId)}`,
+    url: localeHref(input.reportId !== null ? reportConcernedHref(input.reportId) : fallback, locale),
     tag: input.teamId ? `moderation-team-${input.teamId}` : "moderation-avatar",
   };
 }
 
 /** Ce qui reste à faire après une décision de modération. */
-function moderationNextStep(kind: ModerationPushKind, reportId: number | null): string {
-  if (kind === "RESTORED") return "La contestation a été acceptée.";
-  return reportId !== null ? "Tu peux contester la décision." : "Écris à l'association si tu en détiens les droits.";
+function moderationNextStep(text: PushText, kind: ModerationPushKind, reportId: number | null): string {
+  if (kind === "RESTORED") return text.t("moderation.next.restored");
+  return reportId !== null ? text.t("moderation.next.contest") : text.t("moderation.next.writeUs");
 }
 
 /**
@@ -154,48 +234,57 @@ function moderationNextStep(kind: ModerationPushKind, reportId: number | null): 
  * complet est donné en message privé Discord et à la tentative de connexion
  * suivante — seul endroit où le lecteur a prouvé être le titulaire.
  */
-export function suspensionPush(kind: "SUSPENDED" | "LIFTED"): PushContent {
-  return kind === "SUSPENDED"
-    ? {
-        title: "Décision de modération",
-        body: "Ton compte a été suspendu. La décision, ses motifs et le moyen de la contester s'affichent à ta prochaine tentative de connexion.",
-        url: "/connexion",
-        tag: "moderation-suspension",
-      }
-    : {
-        title: "Décision de modération",
-        body: "La suspension de ton compte a été levée : tu peux de nouveau te connecter.",
-        url: "/connexion",
-        tag: "moderation-suspension",
-      };
-}
-
-/** Des changements du traitement des données sont à lire — une information, aucun accord n'est demandé. */
-export function privacyChangePush(titles: readonly string[]): PushContent {
-  const first = titles[0] ?? "Traitement de tes données";
-  const others = titles.length - 1;
-  const more = others > 0 ? ` (et ${plural(others, "autre")})` : "";
+export function suspensionPush(kind: "SUSPENDED" | "LIFTED", locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
   return {
-    title: "Tes données : ce qui change",
-    body: `${first}${more}. Le détail t'attend à ta prochaine visite.`,
-    url: "/rgpd",
-    tag: "privacy-change",
+    title: text.t("moderation.title"),
+    body: kind === "SUSPENDED" ? text.t("suspension.suspended") : text.t("suspension.lifted"),
+    url: localeHref("/connexion", locale),
+    tag: "moderation-suspension",
   };
 }
 
 /**
- * Alerte d'arbitrage. Le texte Discord porte déjà l'essentiel en une ligne ; le
- * push en reprend la phrase, sans la mise en forme Markdown qu'une
- * notification afficherait telle quelle.
+ * Des changements du traitement des données sont à lire — une information,
+ * aucun accord n'est demandé. `titles` : les titres **dans la langue du
+ * destinataire** (`localizedPrivacyChanges`).
  */
-export function refereeAlertPush(message: string, key: string): PushContent {
+export function privacyChangePush(titles: readonly string[], locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const first = titles[0] ?? text.t("privacyChange.fallback");
+  const others = titles.length - 1;
+  return {
+    title: text.t("privacyChange.title"),
+    body: others > 0 ? text.t("privacyChange.bodyMore", { first, others }) : text.t("privacyChange.body", { first }),
+    url: localeHref("/rgpd", locale),
+    tag: "privacy-change",
+  };
+}
+
+/** Nature d'une alerte d'arbitrage, pour la rédiger sans le texte Discord (français, D6). */
+export type RefereeAlertKind = "score_conflict" | "score_report_stalled" | "other";
+
+/**
+ * Alerte d'arbitrage. En français, le texte Discord porte déjà l'essentiel en
+ * une ligne : le push en reprend la phrase, sans la mise en forme Markdown
+ * qu'une notification afficherait telle quelle. Dans une autre langue, ce
+ * texte (français, D6) n'est pas repris : une phrase de la nature de l'alerte
+ * le remplace, le détail restant sur Discord et sur la page du tournoi.
+ */
+export function refereeAlertPush(
+  message: string,
+  key: string,
+  locale: Locale = DEFAULT_LOCALE,
+  kind: RefereeAlertKind = "other",
+): PushContent {
+  const text = TEXT[locale];
   // Le lien du tournoi est dans la ligne (URL absolue) : c'est là qu'on
   // arbitre. `buildPushPayload` le ramène à un chemin du site.
   const url = /https?:\/\/\S+/.exec(message)?.[0] ?? "/tournois";
   return {
-    title: "Arbitrage requis",
-    body: stripMarkdown(message),
-    url,
+    title: text.t("refereeAlert.title"),
+    body: locale === "fr" ? stripMarkdown(message) : text.t(`refereeAlert.${kind}`),
+    url: url.startsWith("/") ? localeHref(url, locale) : url,
     // Une étiquette **par alerte** (nature et manche) : deux conflits d'un même
     // tournoi ne se remplacent pas, et une même alerte renvoyée après un échec
     // du bot remplace la précédente sans resonner.
@@ -203,15 +292,45 @@ export function refereeAlertPush(message: string, key: string): PushContent {
   };
 }
 
-/** Nouveau signalement, ou contestation, reçu par la modération. */
-export function staffReportPush(input: { reportId: number; contest: boolean }): PushContent {
+/** Problème signalé par un engagé pendant un match (`issue-reports.ts`). */
+export function issueReportPush(
+  input: { tournamentId: number; tournamentName: string; match: { id: number; bracket: string; roundNumber: number } | null },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
   return {
-    title: input.contest ? "Contestation reçue" : "Nouveau signalement",
-    body: input.contest
-      ? "Une décision de modération est contestée."
-      : "Un signalement attend la modération.",
+    title: text.t("refereeAlert.title"),
+    body: input.match
+      ? text.t("issueReport.bodyRound", {
+          tournament: input.tournamentName,
+          round: pushRoundLabel(input.match.bracket, input.match.roundNumber, locale),
+        })
+      : text.t("issueReport.body", { tournament: input.tournamentName }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.match?.id ?? null), locale),
+    tag: `issue-${input.tournamentId}-${input.match?.id ?? 0}`,
+  };
+}
+
+/** Nouveau signalement, ou contestation, reçu par la modération. */
+export function staffReportPush(input: { reportId: number; contest: boolean }, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: input.contest ? text.t("staffReport.titleContest") : text.t("staffReport.titleReport"),
+    body: input.contest ? text.t("staffReport.bodyContest") : text.t("staffReport.bodyReport"),
+    // Le panneau de modération reste français (D4) : même adresse dans les deux langues.
     url: `/admin/signalements`,
     tag: `staff-report-${input.reportId}`,
+  };
+}
+
+/** Afflux de signalements : les suivants arrivent au panneau sans alerte. */
+export function staffReportSaturatedPush(locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("staffReport.titleSaturated"),
+    body: text.t("staffReport.bodySaturated"),
+    url: `/admin/signalements`,
+    tag: "staff-report-saturated",
   };
 }
 

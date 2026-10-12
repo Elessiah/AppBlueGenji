@@ -11,6 +11,7 @@ import { exportPushData } from "@/lib/server/push-subscriptions";
 import { listOwnSuspensions } from "@/lib/server/account-suspensions";
 import type { PersonalDataExport } from "@/lib/shared/types";
 import { getFullProfile } from "./full-profile";
+import { accountLocaleFromRow } from "./account-locale";
 
 /**
  * Rassemble l'intégralité des données personnelles du propriétaire du compte
@@ -41,6 +42,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       visible_major: 0 | 1;
       visible_discord: 0 | 1;
       open_to_recruitment: 0 | 1;
+      locale: string | null;
       created_at: Date;
     })[]
   >(
@@ -48,7 +50,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
             discord_pseudo, discord_verified_at, discord_id, discord_link_method,
             google_sub, blizzard_sub, is_adult, is_admin,
             visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
-            open_to_recruitment, created_at
+            open_to_recruitment, locale, created_at
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -83,6 +85,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       blizzardSub: row.blizzard_sub,
       isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
       isAdmin: Boolean(row.is_admin),
+      // La langue du compte est une donnée détenue (lot 9-3) : elle est rendue.
+      locale: accountLocaleFromRow(row.locale),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

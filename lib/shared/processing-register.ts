@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-09";
+export const REGISTER_UPDATED_AT = "2026-10-12";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -309,6 +309,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)",
       "Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)",
       "Exporter ses données et supprimer son compte depuis « Mon profil »",
+      "Rédiger les notifications push dans la langue du compte : celle de la page à la dernière connexion, ou celle choisie dans « Mon profil »",
     ],
     legalBasis:
       "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles",
@@ -318,6 +319,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord",
       "Majorité déclarée (oui / non / non renseignée)",
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
+      "Langue du compte (français ou anglais), remise au français à l'anonymisation",
       "Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale",
     ],
     sensitiveData: "Aucune",
@@ -719,6 +721,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Adresse d'abonnement de l'appareil, fournie par le navigateur, et ses clés de chiffrement",
       "Date d'abonnement et de la dernière notification remise",
       "Sujets de notification coupés par le compte",
+      "Langue du compte (T01), dans laquelle la notification est rédigée",
     ],
     sensitiveData: "Aucune",
     retention: [

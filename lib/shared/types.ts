@@ -12,6 +12,7 @@ import type {
   RegistrationFilters,
 } from "./registration-filters";
 import type { PlatformRole } from "./permissions";
+import type { Locale } from "./locales";
 import type { TournamentPreview } from "./tournament-preview";
 import type { TournamentImage } from "./tournament-image";
 import type { DeepStats, TeamRankingPosition } from "./stats";
@@ -904,6 +905,11 @@ export type FullProfileResponse = {
    * ni un compte supprimé. Toujours `false` hors modération.
    */
   moderationSuspendable: boolean;
+  /**
+   * Langue du compte (lot 9-3), pour son **seul titulaire** (`isSelf`) :
+   * absente de toute autre fiche.
+   */
+  accountLocale?: Locale;
 };
 
 /**
@@ -935,6 +941,11 @@ export type PersonalDataExport = {
     blizzardSub: string | null;
     isAdult: boolean | null;
     isAdmin: boolean;
+    /**
+     * Langue du compte (lot 9-3) : celle de la dernière connexion, ou choisie
+     * dans « Mon profil » — elle choisit la langue des notifications push.
+     */
+    locale: Locale;
     createdAt: string;
   };
   profile: {

@@ -6,6 +6,8 @@ import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { consumeDiscordLoginChallenge, isDiscordChallengeToken } from "@/lib/server/users/discord-challenges";
 import { createOrGetDiscordUser } from "@/lib/server/users/sign-in";
+import { recordLoginLocale } from "@/lib/server/users/account-locale";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/shared/locales";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
@@ -21,6 +23,8 @@ export async function POST(req: Request) {
       code?: string;
       pseudo?: string;
       termsAccepted?: boolean;
+      /** Langue de la page de connexion (lot 9-3) : celle du compte. */
+      locale?: unknown;
     };
     const challenge = body.challenge;
     const code = typeof body.code === "string" ? body.code.trim() : "";
@@ -79,6 +83,9 @@ export async function POST(req: Request) {
       termsAccepted: body.termsAccepted === true,
     });
     await createSession(userId, "LOGIN_DISCORD_CODE");
+    // La langue du compte suit celle de la page de connexion (lot 9-3) ; une
+    // valeur absente ou inconnue vaut le français, jamais bloquant.
+    await recordLoginLocale(userId, isLocale(body.locale) ? body.locale : DEFAULT_LOCALE);
 
     return ok({ success: true });
   } catch (error) {

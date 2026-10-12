@@ -131,6 +131,11 @@
   },
   "save": "Save",
   "saved": "Profile updated.",
+  "accountLocale": {
+    "label": "Notification language",
+    "hint": "Push notifications reach you in this language. It follows the page's language at every login: your choice here holds until your next login made in the other language.",
+    "saved": "Notification language saved."
+  },
   "avatarUpdated": "Avatar updated.",
   "avatarDeleted": "Avatar deleted.",
   "invitations": {

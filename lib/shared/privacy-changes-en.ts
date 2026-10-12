@@ -338,6 +338,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the paragraph “Following a tournament without an account”"],
   },
+  "2026-10-langue-du-compte": {
+    title: "Notifications: in your account's language",
+    summary:
+      "Your account now keeps a language, French or English: push notifications reach you in that language.",
+    details: [
+      "The account's language is the page's language at your last login; you can change it in “My profile”, Notifications section — that choice holds until your next login made in the other language.",
+      "The site only keeps this choice (French or English), for the lifetime of the account. It appears in the export of your data and goes back to French if the account is anonymized.",
+      "Discord messages stay in French.",
+    ],
+    linkLabels: ["Read the “Push notifications” section"],
+  },
 };
 
 /**

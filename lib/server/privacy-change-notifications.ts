@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { isBotCircuitOpen } from "@/lib/server/bot-integration";
 import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
 import { privacyChangePush } from "@/lib/shared/push-messages";
+import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { privacyAudienceSql } from "@/lib/server/privacy-consent";
@@ -246,7 +247,9 @@ async function sendPrivacyGroup(
   const report = await notifyUsers(group.recipients, {
     topic: "PRIVACY_CHANGE",
     discord: { message: buildPrivacyChangesMessage(group.changes, siteUrl), context: "privacy-changes" },
-    push: privacyChangePush(group.changes.map((change) => change.title)),
+    // Les titres dans la langue de chaque destinataire (lot 9-3) ; le message
+    // Discord, lui, reste français (D6).
+    push: (locale) => privacyChangePush(localizedPrivacyChanges(group.changes, locale).map((change) => change.title), locale),
   });
   if (report.discord !== null) return report.pushed + report.discord.sent;
   // Bot injoignable : seuls les comptes qu'il devait joindre sont rendus au

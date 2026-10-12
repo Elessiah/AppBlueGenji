@@ -17,7 +17,7 @@ import { getDatabase } from "@/lib/server/database";
 import { pushLeadershipAlert } from "@/lib/server/bot-integration";
 import { notifyStaff, notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
 import { withNamedLock } from "@/lib/server/named-lock";
-import { contentReportPush, staffReportPush } from "@/lib/shared/push-messages";
+import { contentReportPush, staffReportPush, staffReportSaturatedPush } from "@/lib/shared/push-messages";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
@@ -433,14 +433,7 @@ function alertLeadership(receivedInLastHour: number, message: string, reportId: 
   void notifyStaff({
     topic: "STAFF_REPORT",
     discord: () => pushLeadershipAlert(text, contest ? "content-report-contest" : "content-report"),
-    push: saturated
-      ? {
-          title: "Afflux de signalements",
-          body: "Les signalements suivants arrivent au panneau sans alerte.",
-          url: REPORTS_ADMIN_PATH,
-          tag: "staff-report-saturated",
-        }
-      : staffReportPush({ reportId, contest }),
+    push: (locale) => (saturated ? staffReportSaturatedPush(locale) : staffReportPush({ reportId, contest }, locale)),
   }).catch(() => undefined);
 }
 
@@ -556,7 +549,7 @@ export async function notifyReportTargets(
       notifyUsers(group.recipients, {
         topic: "CONTENT_REPORT",
         discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
-        push: contentReportPush({ reportId, category }),
+        push: (locale) => contentReportPush({ reportId, category }, locale),
       }),
     ),
   );

@@ -36,7 +36,7 @@ import {
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import {
   PUSH_TOPICS,
-  type PushContent,
+  type LocalizedPushContent,
   type PushTopic,
 } from "@/lib/shared/push-notifications";
 import { pushToUsers, subscribedStaffCandidates, type PushOptions } from "./push-subscriptions";
@@ -49,7 +49,8 @@ export type NotificationRecipient = {
 
 export type UserNotification = {
   topic: PushTopic;
-  push: PushContent;
+  /** Rédigée dans la langue de chaque destinataire (lot 9-3, `bg_users.locale`). */
+  push: LocalizedPushContent;
   /** Le message privé Discord, quand la notification en a un. */
   discord?: { message: string; context: string };
   pushOptions?: PushOptions;
@@ -90,7 +91,8 @@ export async function notifyUsers(
 
 export type StaffNotification = {
   topic: PushTopic;
-  push: PushContent;
+  /** Rédigée dans la langue de chaque destinataire (lot 9-3, `bg_users.locale`). */
+  push: LocalizedPushContent;
   /**
    * L'envoi Discord au métier (rôle arbitre, direction), déjà câblé par
    * l'appelant : il décide du coupe-circuit, que ce module n'a pas à connaître.

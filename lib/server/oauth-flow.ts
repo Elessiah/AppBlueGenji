@@ -66,6 +66,7 @@ import {
 } from "@/lib/shared/safe-redirect";
 import { DEFAULT_LOCALE, isLocale, localeHref, type Locale } from "@/lib/shared/locales";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
+import { recordLoginLocale } from "@/lib/server/users/account-locale";
 
 /** Où retombe un rattachement, réussi ou non. */
 const PROFILE_PATH = "/profil";
@@ -317,6 +318,9 @@ async function completeLogin(
     // l'appelant.
     const userId = await createOrGetOAuthUser(identity, { termsAccepted: saved.termsAccepted });
     await createSession(userId, `LOGIN_${provider}`);
+    // La langue du compte suit celle de la page d'où l'on s'est connecté
+    // (lot 9-3, `lib/server/users/account-locale.ts`) ; jamais bloquant.
+    await recordLoginLocale(userId, locale);
   } catch (error) {
     // Un compte neuf sans les conditions acceptées : la page de connexion le
     // dit, plutôt qu'un « échec de connexion » qui ferait réessayer pour rien.

@@ -10,6 +10,7 @@ import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { getActiveSuspension } from "@/lib/server/account-suspensions";
 import type { FullProfileResponse, PublicUserProfile, UserTeamTimeline } from "@/lib/shared/types";
 import { applyVisibility, mapPublicUser, type UserRow } from "./players";
+import { accountLocaleFromRow } from "./account-locale";
 
 /*
  * Fiche complète d'un joueur telle que la voit son lecteur — lui-même, le
@@ -134,7 +135,7 @@ export async function getFullProfile(
   const canModerate = can(viewer, "moderation");
   const db = await getDatabase();
 
-  const [userRows] = await db.execute<UserRow[]>(
+  const [userRows] = await db.execute<(UserRow & { locale?: string | null })[]>(
     `SELECT
       id,
       pseudo,
@@ -153,6 +154,7 @@ export async function getFullProfile(
       is_admin,
       platform_roles_json,
       is_deleted,
+      locale,
       created_at
     FROM bg_users
     WHERE id = ?
@@ -277,5 +279,8 @@ export async function getFullProfile(
     // compte soit suspendu, et pourquoi, ne regarde que lui et elle.
     moderationSuspension: canModerate && !isDeleted ? await getActiveSuspension(targetUserId) : null,
     moderationSuspendable: canModerate && !isDeleted && !isSelf && !targetIsAdmin,
+    // La langue du compte ne regarde que son titulaire (lot 9-3) : « Mon
+    // profil » l'affiche et la change, aucune autre fiche ne la porte.
+    ...(isSelf ? { accountLocale: accountLocaleFromRow(userRows[0].locale) } : {}),
   };
 }

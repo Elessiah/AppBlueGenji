@@ -47,6 +47,7 @@ import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { localeHref } from "@/lib/shared/locales";
 import { ProfileSection } from "./_components/ProfileSection";
+import { AccountLocaleField } from "./_components/AccountLocaleField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
@@ -1021,6 +1022,7 @@ export default function ProfilePage() {
 
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
+        {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
       </ProfileSection>
 
       {invitations.length > 0 && (

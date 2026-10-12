@@ -937,6 +937,14 @@ function RgpdFr({
               navigateur révoque l&apos;abonnement ou que vous supprimiez votre compte — et au plus{" "}
               {PUSH_SUBSCRIPTION_RETENTION_DAYS} jours sans notification remise.
             </li>
+            <li>
+              <strong>Dans quelle langue</strong> : celle de votre compte, français ou anglais — la
+              langue de la page lors de votre dernière connexion, ou celle que vous choisissez dans{" "}
+              <Link href="/profil#notifications">Mon profil</Link>, jusqu&apos;à votre prochaine connexion
+              faite dans l&apos;autre langue. Le site garde ce seul choix avec votre compte, le temps du
+              compte ; il figure dans l&apos;export de vos données et revient au français si le compte
+              est anonymisé. Les messages Discord, eux, restent français.
+            </li>
           </ul>
         </div>
       </section>

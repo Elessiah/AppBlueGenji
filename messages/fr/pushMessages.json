@@ -1,0 +1,90 @@
+{
+  "pairing": "{team} contre {opponent}",
+  "pairingSolo": "Ton match",
+  "matchStart": {
+    "titleLobby": "Ton match commence",
+    "titleLaunched": "Ton match est lancé",
+    "bodyLobby": "{pairing} · {tournament}. Déclare-toi prêt.",
+    "bodyLaunched": "{pairing} · {tournament}. Bonne partie !"
+  },
+  "matchReminder": {
+    "title": "Match dans {offset}",
+    "titleScheduled": "Match programmé",
+    "body": "{pairing} · {tournament}, {round}. Coup d'envoi {start} (heure de Paris).",
+    "offset": {
+      "P7D": "une semaine",
+      "P1D": "24 heures",
+      "PT1H": "1 heure"
+    }
+  },
+  "round": {
+    "playoff": "Play-offs · tour {round}",
+    "lower": "Loser bracket · manche {round}",
+    "grand": "Grande finale",
+    "thirdPlace": "Petite finale",
+    "default": "Manche {round}"
+  },
+  "scoreToConfirm": {
+    "title": "Score à confirmer",
+    "body": "{opponent} a saisi le score de votre match ({tournament}). Confirme-le, ou conteste-le.",
+    "soloOpponent": "Ton adversaire"
+  },
+  "tournamentStart": {
+    "title": "Le tournoi commence",
+    "body": "{tournament} est lancé. Retrouve ton premier match sur la page du tournoi."
+  },
+  "teamJoinRequest": {
+    "title": "Demande d'adhésion",
+    "body": "Un joueur demande à rejoindre {team}. Réponds depuis la fiche de l'équipe."
+  },
+  "contentReport": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement ({category}) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé."
+  },
+  "moderation": {
+    "title": "Décision de modération",
+    "logo": {
+      "HIDDEN": "Le logo de {team} a été masqué.",
+      "REMOVED": "Le logo de {team} a été supprimé.",
+      "RESTORED": "Le logo de {team} a été rétabli."
+    },
+    "avatar": {
+      "HIDDEN": "Ton avatar a été masqué.",
+      "REMOVED": "Ton avatar a été supprimé.",
+      "RESTORED": "Ton avatar a été rétabli."
+    },
+    "next": {
+      "restored": "La contestation a été acceptée.",
+      "contest": "Tu peux contester la décision.",
+      "writeUs": "Écris à l'association si tu en détiens les droits."
+    }
+  },
+  "suspension": {
+    "suspended": "Ton compte a été suspendu. La décision, ses motifs et le moyen de la contester s'affichent à ta prochaine tentative de connexion.",
+    "lifted": "La suspension de ton compte a été levée : tu peux de nouveau te connecter."
+  },
+  "privacyChange": {
+    "title": "Tes données : ce qui change",
+    "fallback": "Traitement de tes données",
+    "body": "{first}. Le détail t'attend à ta prochaine visite.",
+    "bodyMore": "{first} (et {others, plural, one {# autre} other {# autres}}). Le détail t'attend à ta prochaine visite."
+  },
+  "refereeAlert": {
+    "title": "Arbitrage requis",
+    "score_conflict": "Un conflit de score attend un arbitre.",
+    "score_report_stalled": "Un score attend sa confirmation depuis trop longtemps : un arbitre doit trancher.",
+    "other": "Une alerte attend un arbitre."
+  },
+  "issueReport": {
+    "body": "Problème signalé · {tournament}.",
+    "bodyRound": "Problème signalé · {tournament}, {round}."
+  },
+  "staffReport": {
+    "titleReport": "Nouveau signalement",
+    "titleContest": "Contestation reçue",
+    "bodyReport": "Un signalement attend la modération.",
+    "bodyContest": "Une décision de modération est contestée.",
+    "titleSaturated": "Afflux de signalements",
+    "bodySaturated": "Les signalements suivants arrivent au panneau sans alerte."
+  }
+}

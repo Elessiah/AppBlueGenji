@@ -21,6 +21,7 @@
  */
 
 import { can, type Permission, type PlatformRole } from "./permissions";
+import type { Locale } from "./locales";
 
 /**
  * Qui peut recevoir un sujet : tout joueur (`null`), ou seulement le staff qui
@@ -138,6 +139,15 @@ export type PushContent = {
    */
   tag?: string;
 };
+
+/**
+ * Une notification **rédigée dans la langue de chaque destinataire** (lot
+ * 9-3) : la distribution (`pushToUsers`) la demande une fois par langue de
+ * compte (`bg_users.locale`). Toute notification adressée par
+ * `notifyUsers` / `notifyStaff` prend cette forme : un sujet ne peut pas
+ * partir en une seule langue.
+ */
+export type LocalizedPushContent = (locale: Locale) => PushContent;
 
 /** Ce que le service worker reçoit, chiffré, dans le corps du push. */
 export type PushPayload = {

@@ -39,7 +39,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
-import { refereeAlertPush } from "@/lib/shared/push-messages";
+import { refereeAlertPush, type RefereeAlertKind } from "@/lib/shared/push-messages";
 import { notifyTournamentStart } from "./player-pushes";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
@@ -343,7 +343,7 @@ export function flushBotLogs(connection: PoolConnection): void {
         const report = await notifyStaff({
           topic: "REFEREE_ALERT",
           discord: () => pushRefereeAlert(message, "referee-alert", { honourCircuit: true }),
-          push: refereeAlertPush(message, refereePushKey(entry)),
+          push: (locale) => refereeAlertPush(message, refereePushKey(entry), locale, refereeAlertKind(entry)),
         });
         sent = report.discord !== null;
       } catch {
@@ -427,6 +427,11 @@ function refereeAlertClaimId(entry: PendingBotLog): number | null {
  */
 function refereePushKey(entry: PendingBotLog): string {
   return "matchId" in entry ? `${entry.kind}-${entry.matchId}` : entry.kind;
+}
+
+/** Nature d'une alerte d'arbitrage, pour la rédiger hors du français du journal (lot 9-3). */
+function refereeAlertKind(entry: PendingBotLog): RefereeAlertKind {
+  return entry.kind === "score_conflict" || entry.kind === "score_report_stalled" ? entry.kind : "other";
 }
 
 function refereeAlertMatchId(entry: PendingBotLog): number {

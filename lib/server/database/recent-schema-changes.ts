@@ -197,6 +197,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // équipe n'était encore « hors course » en production au déploiement.
     `ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit TINYINT(1) NOT NULL DEFAULT 0
        AFTER endurance_max_rounds`,
+    // i18n lot 9-3 — langue du compte (`lib/server/users/account-locale.ts`) :
+    // celle de la dernière connexion, modifiable dans « Mon profil » ; elle
+    // choisit la langue des notifications push. Défaut `fr` : tout compte
+    // existant garde le français jusqu'à sa prochaine connexion.
+    `ALTER TABLE bg_users ADD COLUMN locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr' AFTER terms_accepted_at`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

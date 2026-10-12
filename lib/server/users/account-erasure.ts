@@ -94,6 +94,9 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
              -- datée restée seule serait une trace de plus sans objet.
              terms_version = NULL,
              terms_accepted_at = NULL,
+             -- La langue du compte (lot 9-3) revient au défaut : un compte qui
+             -- ne recevra plus rien n'a plus de langue à retenir.
+             locale = 'fr',
              is_deleted = 1
          WHERE id = ?`,
         [pseudo, userId],

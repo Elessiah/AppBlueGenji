@@ -131,6 +131,11 @@
   },
   "save": "Sauvegarder",
   "saved": "Profil mis à jour.",
+  "accountLocale": {
+    "label": "Langue des notifications",
+    "hint": "Les notifications push t'arrivent dans cette langue. Elle suit la langue de la page à chaque connexion : ton choix ici vaut jusqu'à ta prochaine connexion faite dans l'autre langue.",
+    "saved": "Langue des notifications enregistrée."
+  },
   "avatarUpdated": "Avatar mis à jour.",
   "avatarDeleted": "Avatar supprimé.",
   "invitations": {
