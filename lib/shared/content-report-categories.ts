@@ -1,5 +1,6 @@
 import { discordInline } from "./discord-text";
 import {
+  OFF_SITE_CONDUCT_ICON,
   REPORT_CATEGORY_RULES,
   REPORT_TARGET_LABELS,
   REPORT_TARGET_TYPES,
@@ -153,3 +154,19 @@ export function formatContestAlert(input: {
     `envoyée par ${author}.${state} À traiter : ${input.adminUrl}`
   );
 }
+
+/*
+ * Le français de référence de l'entrée « Comportement d'un joueur » et du rappel
+ * de l'étape « Modération » — égal, mot pour mot, à `reports.json` (testé) ; le
+ * formulaire lit ses textes dans les messages et n'emporte pas celui-ci.
+ */
+/** Carte du choix de catégorie qui renvoie vers le portail de support. */
+export const OFF_SITE_CONDUCT_ENTRY = {
+  label: "Comportement d'un joueur",
+  hint: "En match, en vocal ou sur Discord : insulte, triche, anti-jeu… Se signale sur notre portail de support.",
+  icon: OFF_SITE_CONDUCT_ICON,
+} as const;
+
+/** Rappel affiché dans l'étape « Modération » du formulaire. */
+export const OFF_SITE_CONDUCT_NOTICE =
+  "Ce formulaire concerne les contenus publiés sur le site (pseudo, nom d'équipe, logo…). Un mauvais comportement en match, une insulte d'un joueur, de la triche ou un problème sur Discord se signalent sur le";

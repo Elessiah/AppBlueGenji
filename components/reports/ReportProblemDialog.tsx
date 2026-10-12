@@ -9,7 +9,7 @@ import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
-  OFF_SITE_CONDUCT_ENTRY,
+  OFF_SITE_CONDUCT_ICON,
   REPORT_CATEGORIES,
   REPORT_CATEGORY_RULES,
   REPORT_CONTACT_EMAIL_MAX_LENGTH,
@@ -473,7 +473,7 @@ function CategoryChoice({ onChoose }: Readonly<{ onChoose: (category: ReportCate
               className={`${styles.categoryCard} ${styles.categoryExternal}`}
             >
               <span className={styles.categoryIcon} aria-hidden="true">
-                {OFF_SITE_CONDUCT_ENTRY.icon}
+                {OFF_SITE_CONDUCT_ICON}
               </span>
               <span className={styles.categoryLabel}>
                 {t("offSite.label")}
