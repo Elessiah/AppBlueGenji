@@ -91,9 +91,9 @@ manche close :
 
 La sortie avant la fin (point 2) est une **option du tournoi**,
 `bg_tournaments.endurance_early_exit` (`TINYINT(1) NOT NULL DEFAULT 0`), lue en
-`EnduranceConfig.earlyExit`. Case « Sortir avant la fin les équipes qui ne
-peuvent plus être qualifiées » du formulaire de création / d'édition (BG Survie
-seulement), **décochée par défaut**.
+`EnduranceConfig.earlyExit`. Case « Sortie anticipée « hors course » » (même
+nom que la ligne des réglages et la liste des champs modifiés) du formulaire de
+création / d'édition (BG Survie seulement), **décochée par défaut**.
 
 - **Décochée** : aucune équipe n'est « hors course » avant la dernière manche.
   La phase s'arrête comme avant sur un capital à zéro, un effectif retombé à la
@@ -102,9 +102,12 @@ seulement), **décochée par défaut**.
 - **Cochée** : comportement d'origine, à l'identique (critère mathématique et
   règle de parité ci-dessous). L'instantané de caractérisation du moteur
   (`engine-characterisation.test.ts`) tourne option cochée et n'a pas bougé.
-- **Sans plafond**, l'option n'a aucun effet ; le formulaire le dit, et le
+- **Sans plafond, ou en saisie de score libre** (aucun format de match, donc
+  aucune élimination mathématiquement acquise), l'option n'a aucun effet :
+  `earlyExitApplies` (`lib/shared/bg-survie/config.ts`) le décide pour tous. La
+  case est alors grisée (comme « Égalités ») avec la raison en aide, et le
   panneau des règles (`?tournoi=`) n'affiche la ligne « Sortie anticipée « hors
-  course » » (Oui / Non) que sous plafond.
+  course » » (Oui / Non) que lorsqu'elle peut jouer.
 - **Migration** : le défaut `0` de l'`ALTER` tolérant éteint l'option sur
   **tous** les tournois existants, en cours compris — aucune équipe n'était
   encore « hors course » en production, rien à remplir ni à rejouer.
