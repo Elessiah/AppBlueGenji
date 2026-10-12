@@ -16,7 +16,6 @@ import { FR_PROFILE, lookupCode } from "@/app/(secured)/profil/_lib/profile-text
 import { FR_PROFILE_TEXT } from "@/components/i18n/profile-text";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
 import { onceLoader, PRELOAD_RETRY_MS, quietPreload } from "@/lib/shared/lazy-component";
-import { retryInBackground } from "@/components/i18n/use-english-messages";
 import enReports from "@/messages/en/reports.json";
 import enPush from "@/messages/en/push.json";
 import FR_SHELL from "@/messages/fr/shell.json";
@@ -375,10 +374,10 @@ describe("une seule amorce par espace, préchargement de /profil sur ses liens",
 });
 
 describe("revue performance, douzième passe", () => {
-  it("un échec de chargement de l'anglais n'est pas définitif : repris en fond, sans rien démonter", () => {
+  it("un échec vaut pour l'adresse affichée : retenté à la navigation suivante, sans boucle de fond", () => {
     const hook = readSource("components/i18n/use-english-messages.ts");
-    expect(hook).toContain("if (failed) retryInBackground(loader);");
-    expect(hook).not.toContain("setFailed(false)");
+    expect(hook).toContain("const failed = failedAt !== undefined && failedAt === pathname;");
+    expect(hook).not.toMatch(/setTimeout|setInterval|retryInBackground/);
   });
 
   it("invitations : une réponse à la fois, nom accessible avec l'équipe (FR + EN)", () => {
@@ -417,40 +416,4 @@ describe("revue performance, treizième passe", () => {
     expect(preload()).toBe(true);
   });
 
-  it("retryInBackground : un cycle par chargeur, onglet visible, jusqu'à réussite", async () => {
-    jest.useFakeTimers();
-    const globals = globalThis as { window?: unknown; document?: unknown };
-    const hadWindow = "window" in globals;
-    const hadDocument = "document" in globals;
-    const visible = { visibilityState: "visible" as string };
-    globals.window = globalThis;
-    globals.document = visible;
-    try {
-      let calls = 0;
-      let fail = true;
-      const loader = onceLoader(async () => {
-        calls += 1;
-        if (fail) throw new Error("hors ligne");
-        return "ok";
-      });
-      retryInBackground(loader);
-      retryInBackground(loader); // le même chargeur : un seul cycle
-      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS);
-      expect(calls).toBe(1);
-      visible.visibilityState = "hidden";
-      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS);
-      expect(calls).toBe(1); // onglet caché : rien
-      visible.visibilityState = "visible";
-      fail = false;
-      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS);
-      expect(calls).toBe(2);
-      expect(loader.loaded()).toBe("ok");
-      await jest.advanceTimersByTimeAsync(PRELOAD_RETRY_MS * 3);
-      expect(calls).toBe(2); // réussi : le cycle s'arrête
-    } finally {
-      jest.useRealTimers();
-      if (!hadWindow) delete globals.window;
-      if (!hadDocument) delete globals.document;
-    }
-  });
 });

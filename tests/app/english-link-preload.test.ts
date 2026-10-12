@@ -73,6 +73,8 @@ describe("écouteur délégué", () => {
     expect(route).toContain("for (const page of wanted) module.preloadEnglishPage(page);");
     // Rien de retenu pendant le silence d'un échec, rien de gardé d'un essai raté.
     expect(route).toContain("if (warmTargets()) wanted.add(page);");
+    // Un seul essai en vol : les survols pendant l'arrivée n'attachent rien de plus.
+    expect(route).toMatch(/if \(warming\) \{\s*wanted\.add\(page\);\s*return;/);
     expect(listener).toContain("preloadEnglishRoute(href.slice(3));");
     // Un même lien une fois par seconde au plus (enfants traversés), nouvel essai possible ensuite.
     expect(listener).toContain("if (href === last && now - lastAt < 1000) return;");
