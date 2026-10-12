@@ -7,7 +7,7 @@ import { teamShareCardKey } from "@/lib/shared/page-share-cards";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { TeamPageTextProvider } from "@/components/i18n/team-page-text";
+import { TeamPageTextProvider } from "@/components/i18n/team-page-text-provider";
 import { StatsPanelI18nProvider } from "@/components/i18n/stats-panel-i18n";
 import { statsPanelMessages } from "@/lib/shared/stats-text";
 

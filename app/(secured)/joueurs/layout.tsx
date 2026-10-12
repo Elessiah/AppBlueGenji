@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { PlayersTextProvider } from "@/components/i18n/players-text";
+import { PlayersTextProvider } from "@/components/i18n/players-text-provider";
 
 /**
  * Titre de l'annuaire des joueurs et, faute de mieux, de ses sous-pages —

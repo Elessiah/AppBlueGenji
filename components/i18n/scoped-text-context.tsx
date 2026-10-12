@@ -14,25 +14,58 @@ import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-te
  * l'anglais n'arrive que sous `/en`, sérialisé par la mise en page du segment.
  * Hors fournisseur (tests, page française) : le français.
  */
+export type ScopedTextProvider<M extends object> = (
+  props: Readonly<{ locale: Locale; messages?: M; children: ReactNode }>,
+) => ReactNode;
+
+/**
+ * La moitié **sans** le français : le fournisseur et ce qu'il pose. Une mise
+ * en page serveur qui pose un fournisseur n'importe que cette moitié (module
+ * `*-text-provider.tsx`) : si son module importait aussi le JSON français,
+ * celui-ci partirait **deux fois** au navigateur — dans le morceau de la mise
+ * en page et dans celui de la page, que webpack ne met pas en commun sous son
+ * seuil de taille.
+ */
+export type ScopedTextSlot<M extends object> = {
+  readonly Provider: ScopedTextProvider<M>;
+  /** Le texte posé par le fournisseur ; `undefined` : le français. */
+  readonly useProvided: () => ScopedText<Leaves<M>> | undefined;
+};
+
 export type ScopedTextContext<M extends object> = {
   /** Le français du paquet. */
   readonly fr: ScopedText<Leaves<M>>;
-  readonly Provider: (props: Readonly<{ locale: Locale; messages?: M; children: ReactNode }>) => ReactNode;
+  readonly Provider: ScopedTextProvider<M>;
   readonly useText: () => ScopedText<Leaves<M>>;
 };
 
-export function createScopedTextContext<M extends object>(frMessages: M): ScopedTextContext<M> {
-  const fr = scopedText("fr", frMessages);
-  const Context = createContext<ScopedText<Leaves<M>>>(fr);
+export function createScopedTextSlot<M extends object>(): ScopedTextSlot<M> {
+  const Context = createContext<ScopedText<Leaves<M>> | undefined>(undefined);
 
   function Provider({ locale, messages, children }: Readonly<{ locale: Locale; messages?: M; children: ReactNode }>) {
     // Indexé sur la **langue** seule : chaque rendu serveur (`router.refresh()`)
     // renvoie un objet `messages` neuf au contenu identique, et un texte neuf
     // relancerait les effets qui le lisent.
-    const [state, setState] = useState(() => ({ locale, value: messages ? scopedText(locale, messages) : fr }));
-    if (state.locale !== locale) setState({ locale, value: messages ? scopedText(locale, messages) : fr });
+    const read = () => ({ locale, value: messages ? scopedText(locale, messages) : undefined });
+    const [state, setState] = useState(read);
+    if (state.locale !== locale) setState(read());
     return <Context.Provider value={state.value}>{children}</Context.Provider>;
   }
 
-  return { fr, Provider, useText: () => useContext(Context) };
+  return { Provider, useProvided: () => useContext(Context) };
+}
+
+/** Le texte d'un emplacement, le français du paquet à défaut. */
+export function withFrenchFallback<M extends object>(slot: ScopedTextSlot<M>, frMessages: M): ScopedTextContext<M> {
+  const fr = scopedText("fr", frMessages);
+  return { fr, Provider: slot.Provider, useText: () => slot.useProvided() ?? fr };
+}
+
+/**
+ * Emplacement et français dans un même module : pour un fournisseur posé par
+ * la **page** elle-même (même morceau que ses lecteurs), ou dont le français
+ * vit déjà dans un morceau commun.
+ */
+export function createScopedTextContext<M extends object>(frMessages: M): ScopedTextContext<M> {
+  return withFrenchFallback(createScopedTextSlot<M>(), frMessages);
 }
