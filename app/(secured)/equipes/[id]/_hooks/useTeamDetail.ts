@@ -37,8 +37,11 @@ export function useTeamDetail(teamId: number) {
     team: data,
     loading: status === "loading" || redirecting,
     error: !redirecting && (status === "not-found" || status === "error") ? error ?? status : null,
-    /** Échec de chargement (réseau, 5xx) : l'équipe existe peut-être, ne pas dire « introuvable ». */
-    loadFailed: !redirecting && status === "error",
+    /**
+     * Échec de chargement (réseau, 5xx) : l'équipe existe peut-être, ne pas dire
+     * « introuvable ». Un identifiant invalide (`/equipes/abc`) n'en est pas un.
+     */
+    loadFailed: !redirecting && status === "error" && error !== "INVALID_TEAM_ID",
     /**
      * Relecture **silencieuse** après un geste : la fiche reste affichée
      * pendant l'appel au lieu de repasser par « Chargement… ».

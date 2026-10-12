@@ -75,6 +75,7 @@
   },
   "errors": {
     "PLAYER_NOT_FOUND": "This player doesn't exist or no longer exists.",
+    "INVALID_ID": "This player doesn't exist or no longer exists.",
     "PLAYER_LOAD_FAILED": "The player's profile couldn't be loaded.",
     "PLAYERS_LOAD_FAILED": "The player list couldn't be loaded.",
     "UNAUTHORIZED": "Your session has expired: log in again to continue.",

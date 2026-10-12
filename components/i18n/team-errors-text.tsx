@@ -12,8 +12,8 @@ import { createScopedTextContext } from "./scoped-text-context";
 
 /**
  * Table des refus des écrans d'équipe (espace `teamErrors`, lot 9) : le
- * français du paquet, l'anglais posé par les mises en page `/equipes` et
- * `/profil` sous `/en` seulement.
+ * français du paquet, l'anglais posé par la mise en page `/equipes` sous `/en`
+ * seulement (`/profil` la posera au lot 9-2).
  */
 const context = createScopedTextContext<TeamErrorsMessages>(frTeamErrors);
 
