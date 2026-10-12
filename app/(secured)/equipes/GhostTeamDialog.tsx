@@ -11,7 +11,8 @@ import {
   normalizeTeamTag,
 } from "@/lib/shared/team-tag";
 import s from "./GhostTeamDialog.module.css";
-import { teamErrorMessage } from "./_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamsText } from "@/components/i18n/teams-text";
 import { checkTeamName } from "@/lib/shared/team-name";
 import { CodedError, TEAM_IDENTITY_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -32,6 +33,8 @@ type GhostTeamDialogProps = {
  */
 export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialogProps>) {
   const { showError, showSuccess } = useToast();
+  const { t } = useTeamsText();
+  const teamErrorMessage = useTeamErrorMessage();
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
@@ -67,7 +70,7 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
         const code = payload.error || "GHOST_TEAM_CREATE_FAILED";
         throw new CodedError(code, code);
       }
-      showSuccess("Équipe fantôme créée.");
+      showSuccess(t("ghostDialog.created"));
       onCreated();
       onClose();
     } catch (e) {
@@ -93,16 +96,13 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
         tabIndex={-1}
       >
         <h2 id="ghost-team-title" className={s.title}>
-          Nouvelle équipe fantôme
+          {t("ghostDialog.title")}
         </h2>
-        <p className={s.lede}>
-          Une équipe sans joueur rattaché, administrée par le staff. Elle peut être inscrite à un
-          tournoi puis attribuée à un joueur réel.
-        </p>
+        <p className={s.lede}>{t("ghostDialog.lede")}</p>
 
         <form onSubmit={submit}>
           <div className="field">
-            <label htmlFor="ghost-team-name">Nom de l&apos;équipe</label>
+            <label htmlFor="ghost-team-name">{t("identity.name")}</label>
             <input
               id="ghost-team-name"
               value={name}
@@ -120,7 +120,7 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
             <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
           </div>
           <div className="field">
-            <label htmlFor="ghost-team-tag">Sigle (facultatif)</label>
+            <label htmlFor="ghost-team-tag">{t("identity.tagOptional")}</label>
             <input
               id="ghost-team-tag"
               value={tag}
@@ -131,17 +131,17 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
               minLength={TEAM_TAG_MIN_LENGTH}
               maxLength={TEAM_TAG_MAX_LENGTH}
               pattern="[A-Za-z0-9]*"
-              placeholder="BG"
+              placeholder={t("identity.tagPlaceholder")}
               {...fieldErrors.aria("tag", "ghost-team-tag-help")}
               style={{ textTransform: "uppercase", letterSpacing: "0.12em", maxWidth: 160 }}
             />
             <FieldErrorText fieldId={FIELD_IDS.tag} message={fieldErrors.message("tag")} />
             <p id="ghost-team-tag-help" style={{ fontSize: 11, color: "var(--ink-mute)", margin: "6px 0 0" }}>
-              {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le site
+              {t("identity.tagHelp", { min: TEAM_TAG_MIN_LENGTH, max: TEAM_TAG_MAX_LENGTH })}
             </p>
           </div>
           <div className="field">
-            <label htmlFor="ghost-team-description">Description (facultatif)</label>
+            <label htmlFor="ghost-team-description">{t("identity.descriptionOptional")}</label>
             <textarea
               id="ghost-team-description"
               value={description}
@@ -152,10 +152,10 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
 
           <div className={s.actions}>
             <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
-              Annuler
+              {t("ghostDialog.cancel")}
             </button>
             <button type="submit" className="btn" disabled={busy}>
-              {busy ? "Création…" : "Créer l'équipe"}
+              {busy ? t("ghostDialog.pending") : t("ghostDialog.submit")}
             </button>
           </div>
         </form>

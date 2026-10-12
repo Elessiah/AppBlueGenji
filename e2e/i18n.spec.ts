@@ -69,12 +69,14 @@ test.describe("Langues — adresses /en", () => {
     await expect(page.locator('a[hreflang="en"]').first()).toHaveAttribute("href", "/en/regles");
   });
 
-  // `/tournois` n'est pas traduite (lot 8) : ni sélecteur ni `hreflang` (l'accueil,
+  // Le back-office n'est pas traduit (D4) : ni sélecteur ni `hreflang` (l'accueil,
   // traduit au lot 2, et `/connexion`, au lot 6, en portent — contrôles ci-dessous).
   // `/mentions-legales` servait d'exemple jusqu'à sa traduction (lot 7b-1).
   test("une page française non traduite garde lang=fr, son nonce, et aucun sélecteur ni hreflang", async ({ page }) => {
-    // `/tournois` est traduite depuis le lot 8a-1 : `/equipes` reste française (lot 9).
-    const response = await page.goto("/equipes");
+    // `/tournois` est traduite depuis le lot 8a-1, `/equipes` depuis le lot 9-1 :
+    // le back-office (`/admin/...`) reste français (D4) — sans session, la carte
+    // « Connexion requise » en 200.
+    const response = await page.goto("/admin/signalements");
     const csp = response?.headers()["content-security-policy"] ?? "";
     const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();

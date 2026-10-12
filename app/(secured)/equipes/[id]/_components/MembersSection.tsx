@@ -10,7 +10,8 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { PLAYER_PSEUDO_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { teamErrorMessage } from "../../_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { useMemberManagement } from "../_hooks/useMemberManagement";
 import { RolesDialog, type RolesDialogTarget } from "./RolesDialog";
 import { RolePills } from "./RolePills";
@@ -50,6 +51,8 @@ export function MembersSection({
   const [kickTarget, setKickTarget] = useState<TeamMember | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const { showError } = useToast();
+  const { t, locale } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
   const fieldErrors = useFieldErrors(PLAYER_PSEUDO_FIELD_ERRORS, INVITE_FIELD_IDS);
 
   const refreshAll = () => {
@@ -96,27 +99,25 @@ export function MembersSection({
         aria-labelledby="team-members-title"
       >
         <div className={`ds-section-title purple ${styles.sectionHead}`}>
-          <h2 id="team-members-title">Membres</h2>
-          <span className={styles.count}>
-            {members.length} {members.length > 1 ? "joueurs" : "joueur"}
-          </span>
+          <h2 id="team-members-title">{t("members.title")}</h2>
+          <span className={styles.count}>{t("members.count", { count: members.length })}</span>
         </div>
 
         {members.length === 0 ? (
-          <p className={styles.empty}>Aucun joueur dans cette équipe.</p>
+          <p className={styles.empty}>{t("members.empty")}</p>
         ) : (
-          <div className={styles.roster} role="table" aria-label={`Roster de ${teamName}`}>
+          <div className={styles.roster} role="table" aria-label={t("members.rosterLabel", { team: teamName })}>
             <div role="rowgroup">
               <div
                 role="row"
                 className={`${styles.rosterRow} ${styles.rosterHeader} ${canManage ? styles.withActions : ""}`}
               >
-                <span role="columnheader">Joueur</span>
-                <span role="columnheader">Rôles</span>
-                <span role="columnheader">Arrivée</span>
+                <span role="columnheader">{t("members.column.player")}</span>
+                <span role="columnheader">{t("members.column.roles")}</span>
+                <span role="columnheader">{t("members.column.joined")}</span>
                 {canManage ? (
                   <span role="columnheader" className={styles.visuallyHidden}>
-                    Actions
+                    {t("members.column.actions")}
                   </span>
                 ) : null}
               </div>
@@ -149,14 +150,14 @@ export function MembersSection({
                       <PlayerLink userId={member.userId} className={styles.playerName}>
                         {member.pseudo}
                       </PlayerLink>
-                      {isViewer ? <span className={styles.youTag}>Toi</span> : null}
+                      {isViewer ? <span className={styles.youTag}>{t("members.you")}</span> : null}
                     </span>
                     <span role="cell">
-                      <RolePills roles={member.roles} label={`Rôles de ${member.pseudo}`} />
+                      <RolePills roles={member.roles} label={t("members.rolesOf", { pseudo: member.pseudo })} />
                     </span>
                     <span role="cell" className={styles.joinedAt}>
-                      <span className={styles.cellLabel}>Arrivée le </span>
-                      {formatLocalDate(member.joinedAt)}
+                      <span className={styles.cellLabel}>{t("members.joinedOnLabel")}</span>{" "}
+                      {formatLocalDate(member.joinedAt, locale)}
                     </span>
                     {canManage ? (
                       <span role="cell" className={styles.rowActions}>
@@ -164,7 +165,7 @@ export function MembersSection({
                           <button
                             type="button"
                             className={`btn ${styles.smallButton}`}
-                            aria-label={`Modifier les rôles de ${member.pseudo}`}
+                            aria-label={t("members.editRolesLabel", { pseudo: member.pseudo })}
                             onClick={() =>
                               setRolesTarget({
                                 userId: member.userId,
@@ -175,17 +176,17 @@ export function MembersSection({
                               })
                             }
                           >
-                            Rôles
+                            {t("members.editRoles")}
                           </button>
                         ) : null}
                         {canKick ? (
                           <button
                             type="button"
                             className={`btn ghost ${styles.smallButton} ${styles.dangerButton}`}
-                            aria-label={`Exclure ${member.pseudo}`}
+                            aria-label={t("members.kickLabel", { pseudo: member.pseudo })}
                             onClick={() => setKickTarget(member)}
                           >
-                            Exclure
+                            {t("members.kick")}
                           </button>
                         ) : null}
                       </span>
@@ -200,11 +201,11 @@ export function MembersSection({
         {canManage ? (
           <form onSubmit={invite} className={styles.divider} aria-labelledby="team-invite-title">
             <h3 id="team-invite-title" className={styles.subTitle}>
-              Inviter un joueur
+              {t("members.inviteTitle")}
             </h3>
             <div className={styles.inviteGrid}>
               <div className="field">
-                <label htmlFor="team-invite-pseudo">Pseudo du joueur</label>
+                <label htmlFor="team-invite-pseudo">{t("members.pseudo")}</label>
                 <PlayerPseudoCombobox
                   id={INVITE_FIELD_IDS.pseudo}
                   value={memberPseudo}
@@ -212,21 +213,20 @@ export function MembersSection({
                     setMemberPseudo(value);
                     fieldErrors.clear("pseudo");
                   }}
-                  placeholder="Commence à taper un pseudo…"
+                  placeholder={t("members.pseudoPlaceholder")}
                   aria={fieldErrors.aria("pseudo", "team-invite-help")}
                   excludeUserIds={invitations.map((inv) => inv.userId)}
                 />
                 <FieldErrorText fieldId={INVITE_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />
                 <p id="team-invite-help" className={styles.help}>
-                  Seuls les joueurs sans équipe sont proposés. Le joueur rejoint l&apos;équipe quand
-                  il accepte l&apos;invitation — tout de suite s&apos;il l&apos;avait lui-même demandé.
+                  {t("members.inviteHelp")}
                 </p>
               </div>
               <RolePicker selected={memberRoles} onChange={setMemberRoles} />
             </div>
             <div className={styles.formFooter}>
               <button type="submit" className={`btn ${styles.primaryButton}`} disabled={!canInvite}>
-                {inviting ? "Envoi…" : "Inviter"}
+                {inviting ? t("members.sending") : t("members.invite")}
               </button>
             </div>
           </form>
@@ -234,25 +234,25 @@ export function MembersSection({
 
         {canManage && invitations.length > 0 ? (
           <div className={styles.divider}>
-            <h3 className={styles.subTitle}>Invitations en attente ({invitations.length})</h3>
+            <h3 className={styles.subTitle}>{t("members.pendingTitle", { count: invitations.length })}</h3>
             <ul className={styles.pendingList}>
               {invitations.map((invitation) => (
                 <li key={invitation.id} className={styles.pendingItem}>
                   <span className={styles.pendingMain}>
                     <PlayerLink userId={invitation.userId}>{invitation.pseudo}</PlayerLink>
-                    <RolePills roles={invitation.roles} label={`Rôles proposés à ${invitation.pseudo}`} />
+                    <RolePills roles={invitation.roles} label={t("members.proposedRoles", { pseudo: invitation.pseudo })} />
                     <span className={styles.pendingDate}>
-                      envoyée le {formatLocalDate(invitation.createdAt)}
+                      {t("members.sentOn", { date: formatLocalDate(invitation.createdAt, locale) })}
                     </span>
                   </span>
                   <button
                     type="button"
                     className={`btn ghost ${styles.smallButton}`}
                     disabled={cancellingId === invitation.id}
-                    aria-label={`Retirer l'invitation de ${invitation.pseudo}`}
+                    aria-label={t("members.withdrawLabel", { pseudo: invitation.pseudo })}
                     onClick={() => void withdraw(invitation)}
                   >
-                    {cancellingId === invitation.id ? "Retrait…" : "Retirer"}
+                    {cancellingId === invitation.id ? t("members.withdrawing") : t("members.withdraw")}
                   </button>
                 </li>
               ))}
@@ -275,9 +275,9 @@ export function MembersSection({
 
       {kickTarget ? (
         <ConfirmActionDialog
-          title={`Exclure ${kickTarget.pseudo} ?`}
-          confirmLabel="Exclure"
-          pendingLabel="Exclusion…"
+          title={t("members.kickTitle", { pseudo: kickTarget.pseudo })}
+          confirmLabel={t("members.kick")}
+          pendingLabel={t("members.kickPending")}
           onClose={() => setKickTarget(null)}
           onConfirm={async () => {
             const ok = await removeMember(kickTarget.userId, kickTarget.pseudo);
@@ -285,10 +285,7 @@ export function MembersSection({
             return ok;
           }}
         >
-          <p>
-            {kickTarget.pseudo} quitte le roster de {teamName} immédiatement. Ses matchs joués avec
-            l&apos;équipe restent acquis, et une nouvelle invitation reste possible.
-          </p>
+          <p>{t("members.kickBody", { pseudo: kickTarget.pseudo, team: teamName })}</p>
         </ConfirmActionDialog>
       ) : null}
     </>

@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "title": "Joueurs",
+    "description": "L'annuaire des joueurs inscrits sur BlueGenji : profils, statistiques, disponibilité.",
+    "fallbackTitle": "Joueur",
+    "deletedTitle": "Compte supprimé"
+  },
+  "list": {
+    "eyebrow": "COMMUNAUTÉ · ANNUAIRE",
+    "title": "Joueurs <em>inscrits</em>",
+    "subtitle": "PROFILS · STATISTIQUES · DISPONIBILITÉ",
+    "myProfile": "Mon profil",
+    "metrics": {
+      "profiles": "Profils référencés",
+      "freeAgents": "Free agents · ouverts aux offres",
+      "overwatch": "Joueurs Overwatch",
+      "marvelRivals": "Joueurs Marvel Rivals"
+    },
+    "searchLabel": "Rechercher un joueur",
+    "searchPlaceholder": "Rechercher un pseudo, une équipe…",
+    "roleFilter": {
+      "all": "Tous",
+      "DPS": "DPS",
+      "TANK": "Tank",
+      "HEAL": "Heal",
+      "COACH": "Coach"
+    },
+    "count": "{count, plural, one {# joueur} other {# joueurs}}",
+    "statusFilter": {
+      "all": "TOUS",
+      "free": "FREE AGENTS"
+    },
+    "sortBy": "Trier :",
+    "sort": {
+      "pseudo": "Pseudo",
+      "tournaments": "Tournois"
+    },
+    "showDeleted": "Afficher les comptes supprimés ({count})",
+    "sectionTitle": "PROFILS",
+    "sectionAccent": "· COMMUNAUTÉ ACTIVE",
+    "sectionCount": "{count, plural, one {# JOUEUR} other {# JOUEURS}}",
+    "showMore": "Voir plus ({step} sur {hidden, plural, one {# restant} other {# restants}})",
+    "showMoreNoun": "joueurs"
+  },
+  "ticker": {
+    "directory": "ANNUAIRE · Profils mis à jour quotidiennement",
+    "roster": "ROSTER · Inscris-toi dans une équipe pour participer",
+    "tournaments": "TOURNOIS · Candidatures ouvertes pour les prochaines saisons",
+    "label": "Fil d'actualité",
+    "resume": "Relancer le défilement du bandeau",
+    "pause": "Mettre en pause le défilement du bandeau",
+    "resumeShort": "Relancer",
+    "pauseShort": "Pause"
+  },
+  "card": {
+    "viewProfile": "Voir la fiche de {name}",
+    "viewTeam": "Voir la fiche de {name}",
+    "deleted": "Compte supprimé",
+    "rosterStatus": {
+      "ROSTER": "ROSTER",
+      "FREE_AGENT": "FREE AGENT",
+      "UNAFFILIATED": "SANS ÉQUIPE"
+    },
+    "role": {
+      "DPS": "DPS",
+      "TANK": "TANK",
+      "HEAL": "HEAL",
+      "COACH": "COACH",
+      "CAPITAINE": "CAP",
+      "OWNER": "OWNER",
+      "MANAGER": "MANAGER"
+    },
+    "tournaments": "Tournois",
+    "record": "V – D"
+  },
+  "errors": {
+    "PLAYER_NOT_FOUND": "Ce joueur n'existe pas ou n'existe plus.",
+    "INVALID_ID": "Ce joueur n'existe pas ou n'existe plus.",
+    "PLAYER_LOAD_FAILED": "Le profil du joueur n'a pas pu être chargé.",
+    "PLAYERS_LOAD_FAILED": "La liste des joueurs n'a pas pu être chargée.",
+    "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi pour continuer.",
+    "fallback": "L'opération a échoué."
+  },
+  "page": {
+    "loading": "Chargement du profil joueur…",
+    "notFound": "Ce joueur n'existe pas ou n'existe plus.",
+    "backToPlayers": "Retour aux joueurs",
+    "back": "← Joueurs",
+    "deletedBadge": "Compte supprimé",
+    "teamAndRoles": "Équipe et rôles du joueur",
+    "viewTeam": "Voir la fiche de {name}",
+    "noTeamTitle": "Ce joueur n'est dans aucune équipe",
+    "noTeam": "Sans équipe",
+    "deletedNotice": "Ce joueur a supprimé son compte. Ses informations personnelles ont été effacées et son pseudo remplacé par un pseudo d'emprunt ; ses résultats restent, parce qu'ils appartiennent aussi aux équipes qu'il a affrontées.",
+    "statsTitle": "Statistiques",
+    "infoTitle": "Informations",
+    "battletag": "BattleTag Overwatch",
+    "marvelRivalsTag": "Tag Marvel Rivals",
+    "discord": "Discord",
+    "adult": "Majorité",
+    "hidden": "Masqué",
+    "adultYes": "Oui (18+)",
+    "adultNo": "Non (mineur)",
+    "battletagHiddenSelf": "Masqué au public : seuls les joueurs de tes matchs et l'arbitrage le lisent, tant que le tournoi n'est pas terminé.",
+    "battletagHiddenOther": "Masqué au public : tu le lis pour jouer ou arbitrer un tournoi qui n'est pas terminé. Ne le diffuse pas.",
+    "verifiedAlt": "Tag Discord vérifié",
+    "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
+    "teamsTitle": "Historique équipes",
+    "teamsColumn": {
+      "team": "Équipe",
+      "roles": "Rôles",
+      "start": "Début",
+      "end": "Fin"
+    },
+    "active": "Actif",
+    "tournamentsTitle": "Historique tournois",
+    "tournamentsColumn": {
+      "tournament": "Tournoi",
+      "state": "Statut",
+      "record": "Bilan",
+      "rank": "Place"
+    },
+    "record": "{wins} V – <loss>{losses} D</loss>",
+    "rank": {
+      "one": "{rank}er",
+      "two": "{rank}e",
+      "few": "{rank}e",
+      "other": "{rank}e"
+    },
+    "state": {
+      "UPCOMING": "Prochainement",
+      "REGISTRATION": "Inscriptions ouvertes",
+      "RUNNING": "En cours",
+      "FINISHED": "Terminé"
+    }
+  },
+  "platformRoles": {
+    "ADMIN": {
+      "label": "Administrateur",
+      "description": "Tous les droits, dont l'attribution des rôles."
+    },
+    "ARBITRE": {
+      "label": "Arbitre",
+      "description": "Créer et gérer les tournois."
+    },
+    "CASTER": {
+      "label": "Caster",
+      "description": "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne)."
+    },
+    "COMMUNITY_MANAGER": {
+      "label": "Community Manager",
+      "description": "Gérer le site vitrine et l'association."
+    },
+    "RECRUTEUR": {
+      "label": "Recruteur",
+      "description": "Gérer la page recrutement."
+    }
+  }
+}

@@ -50,7 +50,7 @@ describe("repli mobile des formulaires", () => {
   });
 
   it("donne une marge interne à la carte de création d'équipe", () => {
-    expect(read("app/(secured)/equipes/creer/page.tsx")).toMatch(
+    expect(read("app/(secured)/equipes/creer/CreateTeamForm.tsx")).toMatch(
       /<CyberCard ticks style=\{\{ padding: /,
     );
   });

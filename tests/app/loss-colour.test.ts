@@ -139,7 +139,7 @@ describe("la défaite ne sert qu'à la défaite", () => {
     );
     expect(
       readSource(join(ROOT, "app", "(secured)", "equipes", "[id]", "_components", "TeamHeader.tsx")),
-    ).toMatch(/label: "Défaites", value: team\.stats\.matchesLost, loss: true/);
+    ).toMatch(/label: t\("header\.stats\.losses"\), value: team\.stats\.matchesLost, loss: true/);
     const profile = stripComments(readSource(join(ROOT, "app", "(secured)", "profil", "profil.module.css")));
     expect(profile).toMatch(/\[data-tone="loss"\]\s*\{[^}]*var\(--result-loss-ink\)[^}]*\}/);
   });

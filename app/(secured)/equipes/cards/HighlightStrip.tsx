@@ -1,11 +1,13 @@
-import Link from "next/link";
+"use client";
+
+import { memo } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
-import {
-  isRankedTeam,
-  RANKING_POINTS_LABEL,
-  rankingPointsHint,
-} from "@/lib/shared/ranking";
+import { isRankedTeam } from "@/lib/shared/ranking";
 import { TeamPodiumName } from "@/components/podium-tiers";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { richNodes } from "@/components/i18n/shell-text";
+import { useTeamsText } from "@/components/i18n/teams-text";
+import { teamPointsHint } from "../_lib/team-points";
 import s from "./HighlightStrip.module.css";
 
 /**
@@ -18,26 +20,33 @@ import s from "./HighlightStrip.module.css";
  * tout le texte de la carte mis bout à bout. Le bloc des points repasse
  * au-dessus d'elle pour garder son `title`, seule explication visible de la cote.
  */
-export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
+function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
+  const text = useTeamsText();
+  const { t } = text;
   const top = teams.slice(0, 3);
   if (top.length < 3) return null;
 
   return (
     <div className={s.strip}>
-      {top.map((t) => (
-        <div key={t.id} className={s.card} data-rank={t.rank}>
-          <Link
-            href={`/equipes/${t.id}`}
+      {top.map((team) => (
+        <div key={team.id} className={s.card} data-rank={team.rank}>
+          <LocaleLink
+            href={`/equipes/${team.id}`}
             className={s.cardOverlay}
-            aria-label={`Voir la fiche de ${t.name}`}
+            aria-label={t("card.viewTeam", { name: team.name })}
           />
-          <div className={s.rank}>{String(t.rank).padStart(2, "0")}</div>
+          <div className={s.rank}>{String(team.rank).padStart(2, "0")}</div>
           <div>
             <div className={s.name}>
-              <TeamPodiumName teamId={t.id}>{t.name}</TeamPodiumName>
+              <TeamPodiumName teamId={team.id}>{team.name}</TeamPodiumName>
             </div>
             <div className={s.meta}>
-              {t.wins}V – <span className="result-loss">{t.losses}D</span>{t.region ? ` · ${t.region}` : ""}
+              {richNodes(
+                text.rich("card.record", { wins: team.wins, losses: team.losses }, {
+                  loss: (chunks) => <span className="result-loss">{chunks}</span>,
+                }),
+              )}
+              {team.region ? ` · ${team.region}` : ""}
             </div>
           </div>
           {/* Même nuance que sur la carte : un filtre par jeu peut laisser
@@ -47,14 +56,14 @@ export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
               de deux façons contradictoires sur la même page. */}
           <div
             className={s.ptsBlock}
-            title={`${RANKING_POINTS_LABEL} · ${rankingPointsHint(isRankedTeam(t), t.points)}`}
+            title={`${t("points.label")} · ${teamPointsHint(text, isRankedTeam(team), team.points)}`}
           >
-            <div className={s.pts}>{t.points}</div>
+            <div className={s.pts}>{team.points}</div>
             {/* Même règle que sur la carte : le mot complet est lu, l'abréviation
                 est vue. Un `aria-label` posé ici ne serait pas exposé. */}
             <div className={s.ptsLbl}>
-              <span aria-hidden="true">PTS</span>
-              <span className="sr-only">{RANKING_POINTS_LABEL}</span>
+              <span aria-hidden="true">{t("card.ptsShort")}</span>
+              <span className="sr-only">{t("points.label")}</span>
             </div>
           </div>
         </div>
@@ -62,3 +71,6 @@ export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
     </div>
   );
 }
+
+/** Mémoïsé, comme les cartes : la liste filtrée garde sa référence tant que la recherche différée n'a pas suivi. */
+export const HighlightStrip = memo(HighlightStripView);

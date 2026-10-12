@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { SecuredLoading } from "@/app/(secured)/_shared/SecuredLoading";
+import { SecuredLoadingView } from "@/app/(secured)/_shared/SecuredLoading";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -29,7 +29,7 @@ describe("barre de navigation — rafraîchie après les gestes qui la changent"
     ["app/(secured)/profil/page.tsx", 'showSuccess("Avatar supprimé.")'],
     ["app/(secured)/profil/page.tsx", 'Invitation acceptée.'],
     ["app/(secured)/equipes/[id]/_components/MembershipActions.tsx", "showSuccess(await request())"],
-    ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'showSuccess("Équipe mise à jour.")'],
+    ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'showSuccess(t("settings.updated"))'],
     ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'router.push("/equipes")'],
     ["app/(secured)/admin/signalements/page.tsx", "showSuccess(success)"],
   ])("%s — %s", (file, marker) => {
@@ -57,7 +57,7 @@ describe("frontière de chargement de l'espace connecté", () => {
   });
 
   it("annonce le chargement et masque le décor, sans aria-busy qui ne retomberait jamais", () => {
-    const html = renderToStaticMarkup(<SecuredLoading />);
+    const html = renderToStaticMarkup(<SecuredLoadingView label="Chargement…" />);
     expect(html).toContain('role="status"');
     expect(html).toContain("Chargement…");
     expect(html).not.toContain("aria-busy");
@@ -68,5 +68,12 @@ describe("frontière de chargement de l'espace connecté", () => {
     const css = read("app/(secured)/_shared/SecuredLoading.module.css");
     expect(css).toContain("animation-play-state: var(--deco-anim-state)");
     expect(css).toContain("prefers-reduced-motion: reduce");
+  });
+
+  it("reste un composant serveur : aucun JavaScript de plus par segment", () => {
+    const code = read("app/(secured)/_shared/SecuredLoading.tsx");
+    expect(code).not.toContain('"use client"');
+    expect(code).toContain("export async function SecuredLoading()");
+    expect(code).toContain("messagesFor(await requestLocale())");
   });
 });

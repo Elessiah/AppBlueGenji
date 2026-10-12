@@ -17,6 +17,7 @@ export function DirectoryShowMore({
   hidden,
   shown,
   noun,
+  label: formatLabel,
   gridRef,
   onShowMore,
 }: Readonly<{
@@ -25,13 +26,18 @@ export function DirectoryShowMore({
   shown: number;
   /** Nom au pluriel des éléments listés (« joueurs », « équipes »). */
   noun: string;
+  /**
+   * Libellé du bouton dans la langue de la page (lot 9) : « Voir plus (20 sur
+   * 35 restants) » — `step` cartes ajoutées, `hidden` encore masquées.
+   */
+  label: (step: number, hidden: number) => string;
   /** Grille dont chaque enfant est une carte. */
   gridRef: RefObject<HTMLElement | null>;
   onShowMore: () => void;
 }>) {
   if (hidden <= 0) return null;
   const step = Math.min(hidden, DIRECTORY_PAGE_SIZE);
-  const label = `Voir plus (${step} sur ${hidden} restant${hidden > 1 ? "s" : ""})`;
+  const label = formatLabel(step, hidden);
 
   const handleClick = () => {
     onShowMore();

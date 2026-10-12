@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
-import { teamErrorMessage } from "../../_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { TeamDialog } from "./TeamDialog";
 import { RolePicker } from "./RolePicker";
 import styles from "../team.module.css";
@@ -29,6 +30,8 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
   const [selected, setSelected] = useState(target.selected);
   const [pending, setPending] = useState(false);
   const { showError } = useToast();
+  const { t } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
 
   const unchanged =
     selected.length === target.selected.length && selected.every((role) => target.selected.includes(role));
@@ -57,32 +60,27 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
 
   return (
     <TeamDialog
-      title={target.isViewer ? "Mes rôles" : `Rôles de ${target.pseudo}`}
+      title={target.isViewer ? t("roles.myRoles") : t("roles.rolesOf", { pseudo: target.pseudo })}
       onClose={onClose}
       busy={pending}
       onSubmit={save}
       footer={
         <>
           <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
-            Annuler
+            {t("roles.cancel")}
           </button>
           <button type="submit" className={`btn ${styles.primaryButton}`} disabled={unchanged || pending}>
-            {pending ? "Enregistrement…" : "Enregistrer"}
+            {pending ? t("roles.saving") : t("roles.save")}
           </button>
         </>
       }
     >
       {target.isOwner ? (
-        <p>
-          Le rôle de propriétaire ne se coche pas : il se transfère, depuis les paramètres de
-          l&apos;équipe.
-        </p>
+        <p>{t("roles.ownerNotice")}</p>
       ) : null}
       <RolePicker selected={selected} onChange={setSelected} />
       {dropsOwnManagement ? (
-        <p className={styles.help}>
-          Sans le rôle de manager, tu ne pourras plus gérer le roster de l&apos;équipe.
-        </p>
+        <p className={styles.help}>{t("roles.dropsManagement")}</p>
       ) : null}
     </TeamDialog>
   );

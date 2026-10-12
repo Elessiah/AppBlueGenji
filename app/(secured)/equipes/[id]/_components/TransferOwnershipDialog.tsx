@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { TeamMember } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { sortTeamMembers } from "@/lib/shared/team-role-display";
-import { teamErrorMessage } from "../../_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { TeamDialog } from "./TeamDialog";
 import { RolePills } from "./RolePills";
@@ -22,6 +23,8 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
   const [confirmStep, setConfirmStep] = useState(false);
   const [pending, setPending] = useState(false);
   const { showError, showSuccess } = useToast();
+  const { t } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
 
   // Un compte supprimé reste au roster mais ne peut plus rien conduire : le
   // serveur le refuse (`MEMBER_ACCOUNT_DELETED`), la liste ne le propose pas.
@@ -45,7 +48,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
         jsonRequest("POST", { newOwnerUserId: target.userId }),
         "TEAM_OWNERSHIP_TRANSFER_FAILED",
       );
-      showSuccess(`${target.pseudo} est désormais propriétaire de l'équipe.`);
+      showSuccess(t("transfer.done", { pseudo: target.pseudo }));
       onClose();
       onChanged();
     } catch (e) {
@@ -54,11 +57,11 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
     }
   };
 
-  const submitLabel = confirmStep ? "Confirmer définitivement" : "Transférer";
+  const submitLabel = confirmStep ? t("transfer.confirm") : t("transfer.submit");
 
   return (
     <TeamDialog
-      title="Transférer la propriété"
+      title={t("transfer.title")}
       onClose={onClose}
       busy={pending}
       onSubmit={submit}
@@ -66,33 +69,27 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
       footer={
         <>
           <button type="button" className="btn ghost" disabled={pending} onClick={onClose}>
-            Annuler
+            {t("transfer.cancel")}
           </button>
           <button
             type="submit"
             className={`btn ${confirmStep ? "danger" : styles.primaryButton}`}
             disabled={!target || pending}
           >
-            {pending ? "Transfert…" : submitLabel}
+            {pending ? t("transfer.pending") : submitLabel}
           </button>
         </>
       }
     >
-      <p>
-        Le nouveau propriétaire pourra renommer, transférer et dissoudre l&apos;équipe. Tu perds le
-        rôle de propriétaire et gardes tes autres rôles
-        {ownerKeepsManagement
-          ? " — dont celui de manager : tu continues de gérer le roster."
-          : " (DPS si tu n'en as pas d'autre) : sans le rôle de manager, tu ne gères plus l'équipe."}
-      </p>
+      <p>{ownerKeepsManagement ? t("transfer.bodyKeepsManagement") : t("transfer.bodyLosesManagement")}</p>
 
       {candidates.length === 0 ? (
-        <p>Aucun autre membre dans l&apos;équipe : invite d&apos;abord le joueur à qui la confier.</p>
+        <p>{t("transfer.noCandidate")}</p>
       ) : (
         // Pas de zone défilante : c'est le voile de la modale qui défile. Une
         // `ScrollArea` poserait `tabIndex={0}` — elle prendrait le focus
         // initial et ajouterait un arrêt clavier avant les boutons radio.
-        <div role="radiogroup" aria-label="Nouveau propriétaire" className={styles.choiceList}>
+        <div role="radiogroup" aria-label={t("transfer.newOwner")} className={styles.choiceList}>
           {candidates.map((m) => (
             <label key={m.userId} className={styles.choice} data-checked={targetId === m.userId}>
               <input
@@ -106,7 +103,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
               />
               <span className={styles.choiceName}>{m.pseudo}</span>
               <span className={styles.choiceRoles}>
-                <RolePills roles={m.roles} label={`Rôles de ${m.pseudo}`} />
+                <RolePills roles={m.roles} label={t("transfer.rolesOf", { pseudo: m.pseudo })} />
               </span>
             </label>
           ))}
@@ -115,8 +112,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
 
       {confirmStep && target ? (
         <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.help} role="status">
-          Dernière vérification : {target.pseudo} deviendra propriétaire, et sera la seule
-          personne à pouvoir te rendre ce rôle.
+          {t("transfer.lastCheck", { pseudo: target.pseudo })}
         </p>
       ) : null}
     </TeamDialog>

@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 import type { TeamDetailResponse } from "@/lib/shared/types";
-import { teamErrorMessage } from "../../_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
 
 export function useTeamDetail(teamId: number) {
-  const router = useRouter();
+  const router = useLocaleRouter();
   const { showError } = useToast();
+  const teamErrorMessage = useTeamErrorMessage();
   // Un lien d'entrée solo mène au profil : pendant la redirection, la page ne
   // doit afficher ni « introuvable » ni rien qui ressemble à une erreur.
   const [redirecting, setRedirecting] = useState(false);
@@ -36,6 +37,8 @@ export function useTeamDetail(teamId: number) {
     team: data,
     loading: status === "loading" || redirecting,
     error: !redirecting && (status === "not-found" || status === "error") ? error ?? status : null,
+    /** Refus autre qu'un 404 (réseau, 5xx, session, identifiant invalide) : la page le trie. */
+    loadFailed: !redirecting && status === "error",
     /**
      * Relecture **silencieuse** après un geste : la fiche reste affichée
      * pendant l'appel au lieu de repasser par « Chargement… ».

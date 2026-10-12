@@ -5,7 +5,8 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { PLAYER_PSEUDO_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { teamErrorMessage } from "../../_lib/team-errors";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { TeamDialog } from "./TeamDialog";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
@@ -28,6 +29,8 @@ interface ClaimGhostTeamDialogProps {
  */
 export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: Readonly<ClaimGhostTeamDialogProps>) {
   const { showError, showSuccess } = useToast();
+  const { t } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
   const [pseudo, setPseudo] = useState("");
   const [busy, setBusy] = useState(false);
   const fieldErrors = useFieldErrors(PLAYER_PSEUDO_FIELD_ERRORS, CLAIM_FIELD_IDS);
@@ -39,7 +42,7 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
     fieldErrors.clear();
     try {
       await teamApi(`/api/teams/${teamId}/claim`, jsonRequest("POST", { pseudo: trimmed }), "TEAM_CLAIM_FAILED");
-      showSuccess(`${trimmed} est invité à reprendre ${teamName}.`);
+      showSuccess(t("claim.done", { pseudo: trimmed, team: teamName }));
       onClose();
       onChanged();
     } catch (e) {
@@ -55,28 +58,24 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
 
   return (
     <TeamDialog
-      title="Proposer l'équipe à un joueur"
+      title={t("claim.title")}
       onClose={onClose}
       busy={busy}
       onSubmit={submit}
       footer={
         <>
           <button type="button" className="btn ghost" disabled={busy} onClick={onClose}>
-            Annuler
+            {t("claim.cancel")}
           </button>
           <button type="submit" className={`btn ${styles.primaryButton}`} disabled={busy || !trimmed}>
-            {busy ? "Envoi…" : "Envoyer la proposition"}
+            {busy ? t("claim.pending") : t("claim.submit")}
           </button>
         </>
       }
     >
-      <p>
-        Le joueur reçoit une invitation. S&apos;il l&apos;accepte, {teamName} cesse d&apos;être une
-        équipe fantôme : il en devient propriétaire et gère lui-même son roster, historique de
-        tournois compris. Rien ne change tant qu&apos;il n&apos;a pas répondu.
-      </p>
+      <p>{t("claim.body", { team: teamName })}</p>
       <div className="field">
-        <label htmlFor="claim-pseudo">Pseudo du joueur</label>
+        <label htmlFor="claim-pseudo">{t("claim.pseudo")}</label>
         <PlayerPseudoCombobox
           id={CLAIM_FIELD_IDS.pseudo}
           value={pseudo}
@@ -84,12 +83,12 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
             setPseudo(value);
             fieldErrors.clear("pseudo");
           }}
-          placeholder="Commence à taper un pseudo…"
+          placeholder={t("claim.pseudoPlaceholder")}
           aria={fieldErrors.aria("pseudo", "claim-pseudo-help")}
         />
         <FieldErrorText fieldId={CLAIM_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />
         <p id="claim-pseudo-help" className={styles.help}>
-          Seuls les joueurs sans équipe sont proposés : il ne doit appartenir à aucune autre.
+          {t("claim.help")}
         </p>
       </div>
     </TeamDialog>

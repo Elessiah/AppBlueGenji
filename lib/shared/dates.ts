@@ -7,13 +7,46 @@
  * près. Un écran traduit passe la sienne (`useAppLocale()`, `requestLocale()`).
  */
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "./locales";
+import { cached } from "./intl-cache";
+
+// Formateurs gardés par langue (lot 9-1, revue performance) : un tableau
+// d'historique en demandait deux par ligne et par rendu. Mêmes options que
+// `toLocaleDateString` / `toLocaleString` sans argument (date ; date et heure,
+// en chiffres) : le rendu ne change pas d'un octet.
+const dateFormats = new Map<Locale, Intl.DateTimeFormat>();
+const dateTimeFormats = new Map<Locale, Intl.DateTimeFormat>();
+
+/**
+ * `format` d'un formateur gardé, avec le repli de `toLocale*String` : une date
+ * invalide y rend « Invalid Date », là où `Intl.DateTimeFormat#format` lève
+ * (`RangeError`) — une seule donnée abîmée ferait tomber tout l'écran.
+ */
+function formatWith(format: Intl.DateTimeFormat, date: Date | string): string {
+  const value = new Date(date);
+  return Number.isNaN(value.getTime()) ? String(value) : format.format(value);
+}
 
 export function formatLocalDate(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  return new Date(date).toLocaleDateString(INTL_LOCALE[locale]);
+  return formatWith(cached(dateFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l])), date);
 }
 
 export function formatLocalDateTime(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  return new Date(date).toLocaleString(INTL_LOCALE[locale]);
+  return formatWith(
+    cached(
+      dateTimeFormats,
+      locale,
+      (l) =>
+        new Intl.DateTimeFormat(INTL_LOCALE[l], {
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          second: "numeric",
+        }),
+    ),
+    date,
+  );
 }
 
 const monthFormats = new Map<Locale, Intl.DateTimeFormat>();
@@ -27,12 +60,34 @@ export function shortMonthLabel(month: string, locale: Locale = DEFAULT_LOCALE):
   const year = Number(month.slice(0, 4));
   const index = Number(month.slice(5, 7)) - 1;
   if (!/^\d{4}-\d{2}$/.test(month) || index < 0 || index > 11) return month;
-  let format = monthFormats.get(locale);
-  if (!format) {
-    format = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "short", timeZone: "UTC" });
-    monthFormats.set(locale, format);
-  }
+  const format = cached(monthFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l], { month: "short", timeZone: "UTC" }));
   return format.format(new Date(Date.UTC(year, index, 15)));
+}
+
+const monthYearFormats = new Map<Locale, Intl.DateTimeFormat>();
+
+/**
+ * Mois abrégé et année (« mars 2026 » / « Mar 2026 »), à l'heure du lecteur —
+ * `toLocaleDateString(langue, { month: "short", year: "numeric" })`, le
+ * formateur gardé d'un appel à l'autre (une grille de cartes le demandait à
+ * chaque carte et chaque frappe).
+ */
+export function formatMonthYear(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
+  return formatWith(
+    cached(monthYearFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l], { month: "short", year: "numeric" })),
+    date,
+  );
+}
+
+const collators = new Map<Locale, Intl.Collator>();
+
+/**
+ * Comparateur de noms dans la langue de la page, pour `Array.sort` : un
+ * `Intl.Collator` gardé par langue plutôt que `localeCompare(b, langue)`, qui
+ * en résout un à chaque comparaison.
+ */
+export function compareLocalText(locale: Locale = DEFAULT_LOCALE): (a: string, b: string) => number {
+  return cached(collators, locale, (l) => new Intl.Collator(INTL_LOCALE[l])).compare;
 }
 
 /** Nombre dans la langue de la page (`1 500` / `1,500`, `1,5` / `1.5`). */

@@ -8,6 +8,7 @@ import {
   ASSIGNABLE_MANAGEMENT_ROLES,
   teamRoleLabel,
 } from "@/lib/shared/team-role-display";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import styles from "../team.module.css";
 
 interface RolePickerProps {
@@ -26,6 +27,7 @@ export function RolePicker({ selected, onChange }: Readonly<RolePickerProps>) {
   // Deux sélecteurs peuvent coexister (formulaire d'invitation et modale des
   // rôles) : un identifiant écrit en dur serait dupliqué dans la page.
   const helpId = useId();
+  const { t, locale } = useTeamPageText();
   const toggle = (role: TeamRole) => {
     onChange(selected.includes(role) ? selected.filter((r) => r !== role) : [...selected, role]);
   };
@@ -33,12 +35,12 @@ export function RolePicker({ selected, onChange }: Readonly<RolePickerProps>) {
   return (
     <div className={styles.rolePicker}>
       <fieldset className={styles.roleGroup}>
-        <legend className={styles.roleGroupLegend}>Rôles de jeu</legend>
+        <legend className={styles.roleGroupLegend}>{t("roles.gameRoles")}</legend>
         <div className={styles.roleGroupOptions}>
           {ASSIGNABLE_GAME_ROLES.map((role) => (
             <Coche
               key={role}
-              label={teamRoleLabel(role)}
+              label={teamRoleLabel(role, locale)}
               checked={selected.includes(role)}
               theme="equipe"
               onChange={() => toggle(role)}
@@ -47,12 +49,12 @@ export function RolePicker({ selected, onChange }: Readonly<RolePickerProps>) {
         </div>
       </fieldset>
       <fieldset className={styles.roleGroup}>
-        <legend className={styles.roleGroupLegend}>Gestion de l&apos;équipe</legend>
+        <legend className={styles.roleGroupLegend}>{t("roles.management")}</legend>
         <div className={styles.roleGroupOptions}>
           {ASSIGNABLE_MANAGEMENT_ROLES.map((role) => (
             <Coche
               key={role}
-              label={teamRoleLabel(role)}
+              label={teamRoleLabel(role, locale)}
               checked={selected.includes(role)}
               theme="equipe"
               onChange={() => toggle(role)}
@@ -61,9 +63,7 @@ export function RolePicker({ selected, onChange }: Readonly<RolePickerProps>) {
           ))}
         </div>
         <p id={helpId} className={styles.help}>
-          Un manager invite et exclut des membres, distribue les rôles, change le logo et inscrit
-          l&apos;équipe aux tournois. Le nom, le sigle, la description et la dissolution restent au
-          propriétaire.
+          {t("roles.managerHelp")}
         </p>
       </fieldset>
     </div>

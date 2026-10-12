@@ -6,8 +6,12 @@ import { describe, expect, it, jest } from "@jest/globals";
  * instantanés ont été pris sur `main` avant la migration, puis rejoués contre la
  * coquille traduite : un écart d'un octet (espace, apostrophe, ordre) les casse.
  */
+// Une sous-adresse de fiche d'équipe qui n'existe pas : « Équipes » reste la
+// section courante, mais la route n'est pas traduite — le sélecteur de langue
+// se tait, comme quand ces instantanés ont été pris (`/equipes/12` l'est
+// depuis le lot 9).
 jest.mock("next/navigation", () => ({
-  usePathname: () => "/equipes/12",
+  usePathname: () => "/equipes/12/roster",
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined, prefetch: () => undefined }),
   useSearchParams: () => new URLSearchParams(),
 }));

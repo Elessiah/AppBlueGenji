@@ -53,8 +53,8 @@ describe("Intitulé d'un `.field` sans contrôle", () => {
   });
 
   it.each<[string, string]>([
-    ["app/(secured)/equipes/creer/page.tsx", "Logo (optionnel)"],
-    ["app/(secured)/joueurs/[id]/page.tsx", "Discord"],
+    ["app/(secured)/equipes/creer/CreateTeamForm.tsx", '{t("create.logo")}'],
+    ["app/(secured)/joueurs/[id]/page.tsx", '{t("page.discord")}'],
   ])("%s n'emploie plus de `<label>` orphelin pour « %s »", (path, text) => {
     const source = read(path);
     expect(source).toContain(`<span className="field-label">${text}</span>`);

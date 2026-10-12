@@ -1,5 +1,8 @@
+"use client";
+
 import type { TeamRole } from "@/lib/shared/types";
 import { sortTeamRoles, teamRoleFamily, teamRoleLabel, teamRoleTone } from "@/lib/shared/team-role-display";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import styles from "../team.module.css";
 
 const FAMILY_ICON: Record<ReturnType<typeof teamRoleFamily>, string | null> = {
@@ -9,15 +12,16 @@ const FAMILY_ICON: Record<ReturnType<typeof teamRoleFamily>, string | null> = {
 };
 
 /**
- * Rôles d'un membre en pastilles : libellés français, dans l'ordre du plus fort
+ * Rôles d'un membre en pastilles : libellés dans la langue de la page, dans l'ordre du plus fort
  * au plus sportif, la famille dite par la couleur **et** par un pictogramme —
  * la couleur seule ne se lit pas partout.
  */
 export function RolePills({ roles, label }: Readonly<{ roles: readonly TeamRole[]; label?: string }>) {
+  const { t, locale } = useTeamPageText();
   const sorted = sortTeamRoles(roles);
   if (sorted.length === 0) return <span className={styles.joinedAt}>—</span>;
   return (
-    <ul className={styles.rolePills} aria-label={label ?? "Rôles"}>
+    <ul className={styles.rolePills} aria-label={label ?? t("roles.pillsLabel")}>
       {sorted.map((role) => {
         const family = teamRoleFamily(role);
         const icon = FAMILY_ICON[family];
@@ -28,7 +32,7 @@ export function RolePills({ roles, label }: Readonly<{ roles: readonly TeamRole[
                 {icon}
               </span>
             ) : null}
-            {teamRoleLabel(role)}
+            {teamRoleLabel(role, locale)}
           </li>
         );
       })}

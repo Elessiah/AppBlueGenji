@@ -12,6 +12,8 @@ import {
   type PlatformRole,
   type PlatformRoleChange,
 } from "@/lib/shared/permissions";
+import { useStaffLang } from "@/components/i18n/staff-lang";
+import { rolesErrorMessage } from "../_lib/roles-errors";
 
 /**
  * Attribution des rôles de plateforme depuis la fiche d'un joueur (réservée à
@@ -22,6 +24,9 @@ import {
  * dit ce que le joueur gagne et perd (`ADMIN_CONFIRMATIONS.md`). Retirer son
  * propre accès est impossible ici : le panneau n'est jamais rendu sur sa
  * propre fiche, et la route refuse en `CANNOT_MODIFY_SELF`.
+ *
+ * Outil de l'administration : il reste **français** sous `/en` (D4), annoncé
+ * `lang="fr"` — panneau, confirmation et notifications.
  */
 export function PlayerRolesPanel({
   userId,
@@ -35,6 +40,8 @@ export function PlayerRolesPanel({
   onSaved: () => Promise<void> | void;
 }>) {
   const { showError, showSuccess } = useToast();
+  const staffLang = useStaffLang();
+  const toastLang = staffLang ? { lang: staffLang } : undefined;
   const [rolesBusy, setRolesBusy] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<PlatformRole[]>([]);
   const [pendingChange, setPendingChange] = useState<PlatformRoleChange | null>(null);
@@ -60,11 +67,11 @@ export function PlayerRolesPanel({
       });
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
-      showSuccess("Rôles mis à jour.");
+      showSuccess("Rôles mis à jour.", toastLang);
       await onSaved();
       return true;
     } catch (e) {
-      showError((e as Error).message);
+      showError(rolesErrorMessage((e as Error).message), toastLang);
       return false;
     } finally {
       setRolesBusy(false);
@@ -78,7 +85,7 @@ export function PlayerRolesPanel({
   };
 
   return (
-    <div className="ds-block" style={{ marginBottom: 20, borderColor: "rgba(var(--violet-400-rgb), 0.3)" }}>
+    <div className="ds-block" style={{ marginBottom: 20, borderColor: "rgba(var(--violet-400-rgb), 0.3)" }} lang={staffLang}>
       <div className="ds-section-title purple">
         <h2>Rôles &amp; permissions</h2>
       </div>
@@ -123,6 +130,7 @@ export function PlayerRolesPanel({
       </div>
       {pendingChange ? (
         <ConfirmActionDialog
+          contentLang={staffLang}
           title={`Modifier les rôles de ${pseudo} ?`}
           confirmLabel="Enregistrer les rôles"
           pendingLabel="Enregistrement…"

@@ -87,7 +87,7 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
   });
 });
 
-const ANNUAIRE = read("app/(secured)/joueurs/page.tsx");
+const ANNUAIRE = read("app/(secured)/joueurs/PlayersList.tsx");
 const FICHE = read("app/(secured)/joueurs/[id]/page.tsx");
 
 /**
@@ -105,10 +105,10 @@ describe("interface — discret dans l'annuaire, évident sur la fiche", () => {
     expect(ANNUAIRE).not.toContain("<Coche");
     expect(ANNUAIRE).toContain("<UserX");
     expect(ANNUAIRE).toContain("aria-pressed={showDeleted}");
-    expect(ANNUAIRE).toMatch(/aria-label=\{`Afficher les comptes supprimés \(\$\{deletedCount\}\)`\}/);
+    expect(ANNUAIRE).toContain('aria-label={t("list.showDeleted", { count: deletedCount })}');
     // Infobulle et nom accessible disent la même action ; l'état passe par
     // `aria-pressed`, jamais par un libellé qui changerait sous le pointeur.
-    expect(ANNUAIRE).toMatch(/title=\{`Afficher les comptes supprimés \(\$\{deletedCount\}\)`\}/);
+    expect(ANNUAIRE).toContain('title={t("list.showDeleted", { count: deletedCount })}');
     expect(ANNUAIRE).not.toContain("Masquer les comptes supprimés");
     // Aucun libellé rendu en clair entre les balises du bouton.
     const button = ANNUAIRE.slice(
@@ -126,8 +126,11 @@ describe("interface — discret dans l'annuaire, évident sur la fiche", () => {
   it("annonce le compte supprimé en tête de fiche", () => {
     expect(FICHE).toContain("const deleted = Boolean(data.profile.isDeleted);");
     expect(FICHE).toMatch(/\{deleted && \(\s*<span className=\{styles\.deletedBadge\}>/);
-    expect(FICHE).toContain("Compte supprimé");
-    expect(FICHE).toContain("pseudo d'emprunt");
+    expect(FICHE).toContain('t("page.deletedBadge")');
+    expect(FICHE).toContain('t("page.deletedNotice")');
+    const players = JSON.parse(read("messages/fr/players.json")) as { page: { deletedBadge: string; deletedNotice: string } };
+    expect(players.page.deletedBadge).toBe("Compte supprimé");
+    expect(players.page.deletedNotice).toContain("pseudo d'emprunt");
   });
 
   it("n'affiche plus d'informations ni de gestion des rôles sur un compte supprimé", () => {

@@ -18,6 +18,8 @@
  * qui formate chaque message des deux façons.
  */
 
+import { cached } from "./intl-cache";
+
 export type MessageValues = Readonly<Record<string, string | number>>;
 
 type MessageNode =
@@ -174,16 +176,6 @@ export type TagRenderer<T> = (children: Array<string | T>) => T;
 
 const pluralRules = new Map<string, Intl.PluralRules>();
 const numberFormats = new Map<string, Intl.NumberFormat>();
-
-/** Une instance par langue : coûteuses à construire, lues à chaque rendu. */
-function cached<T>(cache: Map<string, T>, locale: string, create: (locale: string) => T): T {
-  let value = cache.get(locale);
-  if (!value) {
-    value = create(locale);
-    cache.set(locale, value);
-  }
-  return value;
-}
 
 function pluralBranch(
   node: Extract<MessageNode, { kind: "plural" }>,

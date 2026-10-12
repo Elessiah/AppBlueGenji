@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { formatFinalRank } from "@/app/(secured)/equipes/[id]/_lib/team-history";
+import { finalRankLabel, ordinalForm } from "@/lib/shared/ordinal";
+import { loadFailureMessage } from "@/app/(secured)/equipes/[id]/_lib/load-failure";
 import { jsonRequest, teamApi } from "@/app/(secured)/equipes/[id]/_lib/team-api";
 import { membershipErrorMessage, teamErrorMessage } from "@/app/(secured)/equipes/_lib/team-errors";
 
@@ -139,7 +140,9 @@ describe("page", () => {
   });
 });
 
-describe("formatFinalRank", () => {
+describe("finalRankLabel", () => {
+  const french = (rank: number | null) =>
+    finalRankLabel("fr", rank, (form, value) => (form === "one" ? `${value}er` : `${value}e`));
   it.each([
     [1, "1er"],
     [2, "2e"],
@@ -148,7 +151,12 @@ describe("formatFinalRank", () => {
     [0, "—"],
     [1.5, "—"],
   ])("%p → %s", (rank, expected) => {
-    expect(formatFinalRank(rank as number | null)).toBe(expected);
+    expect(french(rank as number | null)).toBe(expected);
+  });
+
+  it("formes ordinales : le français n'a que « one » et « other »", () => {
+    expect([1, 2, 3, 4, 21].map((n) => ordinalForm("fr", n))).toEqual(["one", "other", "other", "other", "other"]);
+    expect([1, 2, 3, 4, 11, 21].map((n) => ordinalForm("en", n))).toEqual(["one", "two", "few", "other", "other", "one"]);
   });
 });
 
@@ -226,6 +234,40 @@ describe("correctifs de la première revue", () => {
     expect(hook).toMatch(/loading: status === "loading" \|\| redirecting/);
   });
 
+  it("un échec de chargement garde sa phrase et sa notification, pas « introuvable »", () => {
+    const hook = stripComments(read("_hooks", "useTeamDetail.ts"));
+    expect(hook).toContain('loadFailed: !redirecting && status === "error"');
+    const page = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "[id]", "page.tsx"), "utf8"));
+    // La notification et la page disent la même phrase, triée en un seul endroit.
+    expect(page).toContain('{failure ?? t("page.notFound")}');
+    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(failure\) showError\(failure\);/);
+    expect(page.match(/page\.loadError/g)).toHaveLength(1);
+  });
+
+  it("phrase d'un échec : sa raison (session, droits, adresse invalide), sinon le repli", () => {
+    const say = (code: string) => `phrase:${code}`;
+    expect(loadFailureMessage("UNAUTHORIZED", say, "generic")).toBe("phrase:UNAUTHORIZED");
+    expect(loadFailureMessage("FORBIDDEN", say, "generic")).toBe("phrase:FORBIDDEN");
+    expect(loadFailureMessage("INVALID_TEAM_ID", say, "generic")).toBe("phrase:INVALID_TEAM_ID");
+    expect(loadFailureMessage("HTTP_502", say, "generic")).toBe("generic");
+    expect(loadFailureMessage("Failed to fetch", say, "generic")).toBe("generic");
+    expect(loadFailureMessage(null, say, "generic")).toBe("generic");
+  });
+
+  it("l'annuaire nomme son échec de chargement, réseau coupé compris", () => {
+    const list = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "TeamsList.tsx"), "utf8"));
+    expect(list).toContain('showError(teamErrorMessage((e as Error).message, "TEAMS_LOAD_FAILED"))');
+  });
+
+  it("la modale de recadrage, encore française, l'est entière sous `/en` (titre et `lang`)", () => {
+    const settings = stripComments(read("_components", "TeamSettings.tsx"));
+    expect(settings).toContain("useImageCropper({ lang: useStaffLang() })");
+    expect(settings).toContain('(useStaffLang() ? FR_TEAM_PAGE_TEXT : text).t("settings.cropTitle")');
+    const create = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "creer", "CreateTeamForm.tsx"), "utf8"));
+    expect(create).toContain("useImageCropper({ lang: cropLang })");
+    expect(create).toContain('(cropLang ? FR_TEAMS_TEXT : text).t("create.cropTitle")');
+  });
+
   it("la piste d'actions du roster a une largeur fixe, jamais `auto`", () => {
     const withActions = block(".withActions");
     expect(withActions).toMatch(/grid-template-columns:[^;]*\d+px;/);
@@ -284,7 +326,7 @@ describe("correctifs de la première revue", () => {
 describe("correctifs de la troisième revue", () => {
   it("le champ du nom ne porte pas de bornes natives, qui comptent des unités UTF-16", () => {
     const settings = stripComments(read("_components", "TeamSettings.tsx"));
-    const creer = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "creer", "page.tsx"), "utf8"));
+    const creer = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "creer", "CreateTeamForm.tsx"), "utf8"));
     expect(settings).not.toContain("maxLength={TEAM_NAME_MAX_LENGTH}");
     expect(settings).not.toContain("minLength={TEAM_NAME_MIN_LENGTH}");
     expect(creer).not.toContain("maxLength={TEAM_NAME_MAX_LENGTH}");

@@ -194,5 +194,6 @@
     "failed": "Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.",
     "replay": "Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.",
     "inFrench": "(en français)"
-  }
+  },
+  "loading": "Chargement…"
 }

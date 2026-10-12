@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { TeamDetailResponse, TeamJoinRequest } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { PlayerLink } from "@/components/entity-link";
 import { formatLocalDate } from "@/lib/shared/dates";
-import { membershipErrorMessage, teamErrorMessage } from "../../_lib/team-errors";
+import { useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useMembershipErrorMessage, useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import styles from "../team.module.css";
@@ -21,7 +22,10 @@ interface MembershipActionsProps {
 
 export function MembershipActions({ team, requests, onChanged, onRequestsChanged }: Readonly<MembershipActionsProps>) {
   const { showError, showSuccess } = useToast();
-  const router = useRouter();
+  const router = useLocaleRouter();
+  const { t, locale } = useTeamPageText();
+  const teamErrorMessage = useTeamErrorMessage();
+  const membershipErrorMessage = useMembershipErrorMessage();
   const teamId = team.team.id;
   const [busy, setBusy] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -60,7 +64,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
           { method: "POST" },
           "TEAM_JOIN_FAILED",
         );
-        return payload.result === "JOINED" ? "Tu as rejoint l'équipe !" : "Demande envoyée à l'équipe.";
+        return payload.result === "JOINED" ? t("membership.joined") : t("membership.requested");
       },
       membershipErrorMessage,
     );
@@ -71,7 +75,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       : act(
           async () => {
             await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: false }), "INVITATION_RESPOND_FAILED");
-            return "Invitation déclinée.";
+            return t("membership.declined");
           },
           membershipErrorMessage,
         );
@@ -87,7 +91,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       : act(
           async () => {
             await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: true }), "INVITATION_RESPOND_FAILED");
-            return "Tu es désormais propriétaire de l'équipe.";
+            return t("membership.claimAccepted");
           },
           membershipErrorMessage,
         );
@@ -98,7 +102,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       : act(
           async () => {
             await teamApi(`/api/invitations/${team.viewerInvitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
-            return "Demande retirée.";
+            return t("membership.withdrawn");
           },
           membershipErrorMessage,
         );
@@ -107,7 +111,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     act(
       async () => {
         await teamApi(`/api/teams/${teamId}/leave`, { method: "POST" }, "TEAM_LEAVE_FAILED");
-        return "Tu as quitté l'équipe.";
+        return t("membership.left");
       },
       membershipErrorMessage,
     );
@@ -116,7 +120,9 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     act(
       async () => {
         await teamApi(`/api/invitations/${request.id}`, jsonRequest("POST", { accept }), "INVITATION_RESPOND_FAILED");
-        return accept ? `${request.pseudo} a rejoint l'équipe.` : `Demande de ${request.pseudo} refusée.`;
+        return accept
+          ? t("membership.requestAccepted", { pseudo: request.pseudo })
+          : t("membership.requestRefused", { pseudo: request.pseudo });
       },
       // Accepter la demande d'un autre : `USER_ALREADY_IN_TEAM` parle de lui.
       teamErrorMessage,
@@ -125,10 +131,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   if (team.team.deletedAt) {
     return (
       <div className={`ds-block ${styles.block}`}>
-        <p className={styles.notice}>
-          🛑 Équipe dissoute — ses statistiques et son historique restent consultables, mais elle
-          ne peut plus être rejointe ni administrée.
-        </p>
+        <p className={styles.notice}>{t("membership.dissolved")}</p>
       </div>
     );
   }
@@ -143,17 +146,14 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       <div className={`ds-block ${styles.block}`}>
         {team.viewerInvitation === "INVITED" ? (
           <div className={styles.actionsRow}>
-            <p className={styles.notice}>
-              👻 Le staff te propose de reprendre cette équipe fantôme&nbsp;: en acceptant, tu en
-              deviens propriétaire, historique de tournois compris.
-            </p>
+            <p className={styles.notice}>{t("membership.ghostClaimOffer")}</p>
             <button
               type="button"
               className={`btn ${styles.primaryButton}`}
               onClick={() => void acceptGhostClaim()}
               disabled={busy || team.viewerInvitationId === null}
             >
-              Reprendre l&apos;équipe
+              {t("membership.takeOver")}
             </button>
             <button
               type="button"
@@ -161,14 +161,11 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
               onClick={() => void declineInvitation()}
               disabled={busy || team.viewerInvitationId === null}
             >
-              Décliner
+              {t("membership.decline")}
             </button>
           </div>
         ) : (
-          <p className={styles.notice}>
-            👻 Équipe fantôme — créée par le staff pour les tournois, sans joueur rattaché. Elle ne
-            peut pas être rejointe&nbsp;: seul le staff peut la proposer à un joueur.
-          </p>
+          <p className={styles.notice}>{t("membership.ghostNotice")}</p>
         )}
       </div>
     );
@@ -178,9 +175,9 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   const joinPrompt =
     team.viewerInvitation === "INVITED" ? (
       <div className={styles.actionsRow}>
-        <p className={styles.notice}>Tu as reçu une invitation pour cette équipe.</p>
+        <p className={styles.notice}>{t("membership.invited")}</p>
         <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
-          Rejoindre
+          {t("membership.join")}
         </button>
         <button
           type="button"
@@ -188,12 +185,12 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
           onClick={() => void declineInvitation()}
           disabled={busy || team.viewerInvitationId === null}
         >
-          Décliner
+          {t("membership.decline")}
         </button>
       </div>
     ) : (
       <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
-        Demander à rejoindre l&apos;équipe
+        {t("membership.requestToJoin")}
       </button>
     );
 
@@ -203,16 +200,14 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
         <div className={`ds-block ${styles.block}`}>
           {team.viewerInvitation === "REQUESTED" ? (
             <div className={styles.actionsRow}>
-              <p className={styles.notice}>
-                Demande envoyée — en attente de validation par la gestion de l&apos;équipe.
-              </p>
+              <p className={styles.notice}>{t("membership.requestPending")}</p>
               <button
                 type="button"
                 className={`btn ghost ${styles.smallButton}`}
                 onClick={() => void withdrawRequest()}
                 disabled={busy || team.viewerInvitationId === null}
               >
-                Retirer ma demande
+                {t("membership.withdrawRequest")}
               </button>
             </div>
           ) : (
@@ -224,7 +219,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       {team.viewerMembership === "MEMBER" && (
         <div className={`ds-block ${styles.block} ${styles.leaveBlock}`}>
           <button type="button" className="btn ghost" onClick={() => setConfirmLeave(true)} disabled={busy}>
-            Quitter l&apos;équipe
+            {t("membership.leave")}
           </button>
         </div>
       )}
@@ -232,14 +227,16 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       {team.canManage && requests.length > 0 && (
         <section className={`ds-block ${styles.block}`} aria-labelledby="team-requests-title">
           <div className="ds-section-title purple">
-            <h2 id="team-requests-title">Demandes d&apos;adhésion ({requests.length})</h2>
+            <h2 id="team-requests-title">{t("membership.requestsTitle", { count: requests.length })}</h2>
           </div>
           <ul className={styles.pendingList}>
             {requests.map((r) => (
               <li key={r.id} className={styles.pendingItem}>
                 <span className={styles.pendingMain}>
                   <PlayerLink userId={r.userId}>{r.pseudo}</PlayerLink>
-                  <span className={styles.pendingDate}>reçue le {formatLocalDate(r.createdAt)}</span>
+                  <span className={styles.pendingDate}>
+                    {t("membership.receivedOn", { date: formatLocalDate(r.createdAt, locale) })}
+                  </span>
                 </span>
                 <span className={styles.rowActions}>
                   <button
@@ -247,32 +244,32 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                     className={`btn ${styles.smallButton}`}
                     onClick={() => void respondRequest(r, true)}
                     disabled={busy}
-                    aria-label={`Accepter la demande de ${r.pseudo}`}
+                    aria-label={t("membership.acceptLabel", { pseudo: r.pseudo })}
                   >
-                    Accepter
+                    {t("membership.accept")}
                   </button>
                   <button
                     type="button"
                     className={`btn ghost ${styles.smallButton}`}
                     onClick={() => void respondRequest(r, false)}
                     disabled={busy}
-                    aria-label={`Refuser la demande de ${r.pseudo}`}
+                    aria-label={t("membership.refuseLabel", { pseudo: r.pseudo })}
                   >
-                    Refuser
+                    {t("membership.refuse")}
                   </button>
                 </span>
               </li>
             ))}
           </ul>
-          <p className={styles.help}>Un joueur accepté arrive avec le rôle DPS : ajuste-le ensuite dans le roster.</p>
+          <p className={styles.help}>{t("membership.acceptedRoleHint")}</p>
         </section>
       )}
 
       {confirmLeave ? (
         <ConfirmActionDialog
-          title="Quitter l'équipe ?"
-          confirmLabel="Quitter"
-          pendingLabel="Départ…"
+          title={t("membership.leaveTitle")}
+          confirmLabel={t("membership.leaveConfirm")}
+          pendingLabel={t("membership.leavePending")}
           onClose={() => setConfirmLeave(false)}
           onConfirm={async () => {
             const ok = await leave();
@@ -280,10 +277,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
             return ok;
           }}
         >
-          <p>
-            Tu quittes le roster de {team.team.name}. Tes matchs joués avec l&apos;équipe restent à
-            ton palmarès ; pour revenir, il faudra une nouvelle invitation ou une demande acceptée.
-          </p>
+          <p>{t("membership.leaveBody", { team: team.team.name })}</p>
         </ConfirmActionDialog>
       ) : null}
     </>

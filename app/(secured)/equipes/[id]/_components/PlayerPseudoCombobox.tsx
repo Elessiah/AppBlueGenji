@@ -4,6 +4,7 @@ import { KeyboardEvent, useEffect, useId, useMemo, useState } from "react";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { isFieldErrorFocus, type FieldAria } from "@/lib/shared/field-errors";
 import { UserAvatar } from "@/components/user-avatar";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
 import styles from "../team.module.css";
 
 /** Nombre de suggestions affichées : au-delà, mieux vaut préciser la saisie. */
@@ -72,6 +73,7 @@ export function PlayerPseudoCombobox({
   excludeUserIds = [],
 }: Readonly<PlayerPseudoComboboxProps>) {
   const listId = useId();
+  const { t } = useTeamPageText();
   const [players, setPlayers] = useState<PublicUserProfile[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -170,7 +172,7 @@ export function PlayerPseudoCombobox({
         spellCheck={false}
       />
       {expanded ? (
-        <ul id={listId} role="listbox" aria-label="Joueurs sans équipe" className={styles.suggestions}>
+        <ul id={listId} role="listbox" aria-label={t("members.suggestions")} className={styles.suggestions}>
           {suggestions.map((player, index) => (
             <li
               key={player.id}

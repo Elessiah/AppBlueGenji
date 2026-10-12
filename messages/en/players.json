@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "title": "Players",
+    "description": "The directory of players registered on BlueGenji: profiles, statistics, availability.",
+    "fallbackTitle": "Player",
+    "deletedTitle": "Deleted account"
+  },
+  "list": {
+    "eyebrow": "COMMUNITY · DIRECTORY",
+    "title": "Registered <em>players</em>",
+    "subtitle": "PROFILES · STATISTICS · AVAILABILITY",
+    "myProfile": "My profile",
+    "metrics": {
+      "profiles": "Listed profiles",
+      "freeAgents": "Free agents · open to offers",
+      "overwatch": "Overwatch players",
+      "marvelRivals": "Marvel Rivals players"
+    },
+    "searchLabel": "Search for a player",
+    "searchPlaceholder": "Search for a username, a team…",
+    "roleFilter": {
+      "all": "All",
+      "DPS": "DPS",
+      "TANK": "Tank",
+      "HEAL": "Support",
+      "COACH": "Coach"
+    },
+    "count": "{count, plural, one {# player} other {# players}}",
+    "statusFilter": {
+      "all": "ALL",
+      "free": "FREE AGENTS"
+    },
+    "sortBy": "Sort:",
+    "sort": {
+      "pseudo": "Username",
+      "tournaments": "Tournaments"
+    },
+    "showDeleted": "Show deleted accounts ({count})",
+    "sectionTitle": "PROFILES",
+    "sectionAccent": "· ACTIVE COMMUNITY",
+    "sectionCount": "{count, plural, one {# PLAYER} other {# PLAYERS}}",
+    "showMore": "Show more ({step} of {hidden} remaining)",
+    "showMoreNoun": "players"
+  },
+  "ticker": {
+    "directory": "DIRECTORY · Profiles updated daily",
+    "roster": "ROSTER · Join a team to take part",
+    "tournaments": "TOURNAMENTS · Applications open for the next seasons",
+    "label": "News feed",
+    "resume": "Resume the scrolling banner",
+    "pause": "Pause the scrolling banner",
+    "resumeShort": "Resume",
+    "pauseShort": "Pause"
+  },
+  "card": {
+    "viewProfile": "View {name}'s profile",
+    "viewTeam": "Open {name}'s page",
+    "deleted": "Deleted account",
+    "rosterStatus": {
+      "ROSTER": "ROSTER",
+      "FREE_AGENT": "FREE AGENT",
+      "UNAFFILIATED": "NO TEAM"
+    },
+    "role": {
+      "DPS": "DPS",
+      "TANK": "TANK",
+      "HEAL": "SUPPORT",
+      "COACH": "COACH",
+      "CAPITAINE": "CAPT",
+      "OWNER": "OWNER",
+      "MANAGER": "MANAGER"
+    },
+    "tournaments": "Tournaments",
+    "record": "W – L"
+  },
+  "errors": {
+    "PLAYER_NOT_FOUND": "This player doesn't exist or no longer exists.",
+    "INVALID_ID": "This player doesn't exist or no longer exists.",
+    "PLAYER_LOAD_FAILED": "The player's profile couldn't be loaded.",
+    "PLAYERS_LOAD_FAILED": "The player list couldn't be loaded.",
+    "UNAUTHORIZED": "Your session has expired: log in again to continue.",
+    "fallback": "The operation failed."
+  },
+  "page": {
+    "loading": "Loading the player profile…",
+    "notFound": "This player doesn't exist or no longer exists.",
+    "backToPlayers": "Back to players",
+    "back": "← Players",
+    "deletedBadge": "Deleted account",
+    "teamAndRoles": "Player's team and roles",
+    "viewTeam": "Open {name}'s page",
+    "noTeamTitle": "This player isn't in any team",
+    "noTeam": "No team",
+    "deletedNotice": "This player deleted their account. Their personal information has been erased and their username replaced with a placeholder one; their results remain, because they also belong to the teams they faced.",
+    "statsTitle": "Statistics",
+    "infoTitle": "Information",
+    "battletag": "Overwatch BattleTag",
+    "marvelRivalsTag": "Marvel Rivals tag",
+    "discord": "Discord",
+    "adult": "Of age",
+    "hidden": "Hidden",
+    "adultYes": "Yes (18+)",
+    "adultNo": "No (minor)",
+    "battletagHiddenSelf": "Hidden from the public: only the players in your matches and the referees can read it, until the tournament is over.",
+    "battletagHiddenOther": "Hidden from the public: you can read it to play or referee a tournament that isn't over. Don't share it.",
+    "verifiedAlt": "Verified Discord tag",
+    "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
+    "teamsTitle": "Team history",
+    "teamsColumn": {
+      "team": "Team",
+      "roles": "Roles",
+      "start": "Start",
+      "end": "End"
+    },
+    "active": "Active",
+    "tournamentsTitle": "Tournament history",
+    "tournamentsColumn": {
+      "tournament": "Tournament",
+      "state": "Status",
+      "record": "Record",
+      "rank": "Placement"
+    },
+    "record": "{wins} W – <loss>{losses} L</loss>",
+    "rank": {
+      "one": "{rank}st",
+      "two": "{rank}nd",
+      "few": "{rank}rd",
+      "other": "{rank}th"
+    },
+    "state": {
+      "UPCOMING": "Upcoming",
+      "REGISTRATION": "Registration open",
+      "RUNNING": "In progress",
+      "FINISHED": "Finished"
+    }
+  },
+  "platformRoles": {
+    "ADMIN": {
+      "label": "Administrator",
+      "description": "All rights, including assigning roles."
+    },
+    "ARBITRE": {
+      "label": "Referee",
+      "description": "Create and manage tournaments."
+    },
+    "CASTER": {
+      "label": "Caster",
+      "description": "Prepare and broadcast live matches (stage preview, going on air)."
+    },
+    "COMMUNITY_MANAGER": {
+      "label": "Community Manager",
+      "description": "Manage the showcase site and the association."
+    },
+    "RECRUTEUR": {
+      "label": "Recruiter",
+      "description": "Manage the recruitment page."
+    }
+  }
+}

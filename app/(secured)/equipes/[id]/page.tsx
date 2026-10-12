@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { useToast } from "@/components/ui/toast";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
 import { useTeamDetail } from "./_hooks/useTeamDetail";
+import { loadFailureMessage } from "./_lib/load-failure";
 import { useTeamPendingInvitations } from "./_hooks/useTeamPendingInvitations";
 import { TeamHeader } from "./_components/TeamHeader";
 import { MembersSection } from "./_components/MembersSection";
@@ -17,7 +22,11 @@ import styles from "./team.module.css";
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
   const teamId = Number(params.id);
-  const { team, loading, error, refresh } = useTeamDetail(teamId);
+  const { team, loading, error, loadFailed, refresh } = useTeamDetail(teamId);
+  const { t } = useTeamPageText();
+  const { showError } = useToast();
+  const teamErrorMessage = useTeamErrorMessage();
+  const statsI18n = useStatsPanelI18n();
 
   // Une fantôme n'a ni membre ni demande, une équipe dissoute plus rien à
   // gérer : la route refuserait (403), autant ne pas l'appeler.
@@ -25,15 +34,21 @@ export default function TeamDetailPage() {
   const pending = useTeamPendingInvitations(teamId, managesRoster);
   const reloadPending = pending.reload;
   const onPendingChanged = useCallback(() => void reloadPending(), [reloadPending]);
+  // Une phrase par refus, la même en page et en notification ; un 404 a déjà la
+  // sienne (redirection). Seul endroit où se trie un échec de chargement.
+  const failure = loadFailed ? loadFailureMessage(error, teamErrorMessage, t("page.loadError")) : null;
+  useEffect(() => {
+    if (failure) showError(failure);
+  }, [failure, showError]);
 
   if (error) {
     return (
       <section className={`ds-block ${styles.page}`}>
         <p className={styles.notice}>
-          Cette équipe n&apos;existe pas ou n&apos;existe plus.{" "}
-          <Link href="/equipes" className="entity-link">
-            Retour aux équipes
-          </Link>
+          {failure ?? t("page.notFound")}{" "}
+          <LocaleLink href="/equipes" className="entity-link">
+            {t("page.backToTeams")}
+          </LocaleLink>
         </p>
       </section>
     );
@@ -42,7 +57,7 @@ export default function TeamDetailPage() {
   if (loading || !team) {
     return (
       <section className={`ds-block ${styles.page}`} aria-busy="true">
-        <p className={styles.notice}>Chargement de l&apos;équipe…</p>
+        <p className={styles.notice}>{t("page.loading")}</p>
       </section>
     );
   }
@@ -73,9 +88,9 @@ export default function TeamDetailPage() {
 
       <section className={`ds-block ${styles.block}`} aria-labelledby="team-stats-title">
         <div className="ds-section-title purple">
-          <h2 id="team-stats-title">Statistiques</h2>
+          <h2 id="team-stats-title">{t("page.statsTitle")}</h2>
         </div>
-        <StatsPanel stats={team.stats} accent="violet" ranking={team.ranking} />
+        <StatsPanel stats={team.stats} accent="violet" ranking={team.ranking} i18n={statsI18n} />
       </section>
 
       <TeamHistory tournaments={team.tournaments} />

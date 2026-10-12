@@ -13,7 +13,7 @@ const read = (path: string) => readFileSync(join(__dirname, "..", "..", path), "
 const GLOBALS = stripComments(read("app/globals.css"));
 const TOURNAMENTS = read("app/(secured)/tournois/TournamentsList.tsx");
 const TOURNAMENTS_CSS = stripComments(read("app/(secured)/tournois/tournois.module.css"));
-const TEAMS = read("app/(secured)/equipes/page.tsx");
+const TEAMS = read("app/(secured)/equipes/TeamsList.tsx");
 const DIRECTORY_CSS = stripComments(read("app/(secured)/_shared/annuaire.module.css"));
 const RGPD_CSS = stripComments(read("app/rgpd/page.module.css"));
 

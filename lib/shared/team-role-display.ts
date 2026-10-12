@@ -16,8 +16,11 @@
  * seuls, et le serveur peut s'y référer sans rien importer du client.
  */
 
+import enTeamRoles from "@/messages/en/teamRoles.json";
+import frTeamRoles from "@/messages/fr/teamRoles.json";
 import type { TeamRole } from "./types";
 import { TEAM_MANAGEMENT_ROLES } from "./team-roles";
+import { DEFAULT_LOCALE, type Locale } from "./locales";
 
 export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
   OWNER: "Propriétaire",
@@ -61,9 +64,21 @@ export function teamRoleFamily(role: TeamRole): TeamRoleFamily {
   return TEAM_MANAGEMENT_ROLES.includes(role) ? "management" : "game";
 }
 
+/**
+ * Les mêmes libellés **par langue** (espace `teamRoles`, lot 9 de la
+ * traduction) : sept mots, dont les deux langues voyagent avec qui les lit
+ * plutôt que par un fournisseur. Le français égale {@link TEAM_ROLE_LABELS}
+ * (testé) ; `HEAL` se dit *Support* en anglais (D8).
+ */
+const TEAM_ROLE_LABELS_BY_LOCALE: Readonly<Record<Locale, Readonly<Record<string, string>>>> = {
+  fr: frTeamRoles,
+  en: enTeamRoles,
+};
+
 /** Libellé d'un rôle — un code inconnu reste affiché tel quel plutôt que perdu. */
-export function teamRoleLabel(role: TeamRole): string {
-  return TEAM_ROLE_LABELS[role] ?? role;
+export function teamRoleLabel(role: TeamRole, locale: Locale = DEFAULT_LOCALE): string {
+  const labels = TEAM_ROLE_LABELS_BY_LOCALE[locale];
+  return Object.hasOwn(labels, role) ? labels[role] : role;
 }
 
 /** Les rôles d'un membre dans l'ordre d'affichage, doublons retirés. */
@@ -76,8 +91,8 @@ export function sortTeamRoles(roles: readonly TeamRole[]): TeamRole[] {
 }
 
 /** Rôles d'un membre, en phrase lisible (« Propriétaire, Tank, DPS »). */
-export function formatTeamRoles(roles: readonly TeamRole[]): string {
-  return sortTeamRoles(roles).map(teamRoleLabel).join(", ");
+export function formatTeamRoles(roles: readonly TeamRole[], locale: Locale = DEFAULT_LOCALE): string {
+  return sortTeamRoles(roles).map((role) => teamRoleLabel(role, locale)).join(", ");
 }
 
 /**

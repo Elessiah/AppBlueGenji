@@ -1,5 +1,5 @@
 /**
- * Les refus des routes d'équipe, dits en français.
+ * Les refus des routes d'équipe, dits dans la langue de la page.
  *
  * Né pour les seuls gestes d'appartenance (rejoindre, quitter, répondre à une
  * demande), qui remontaient le code brut du serveur dans le toast — un joueur
@@ -9,119 +9,68 @@
  * (`ALREADY_INVITED`, `CANNOT_KICK_OWNER`, `MISSING_ROLE`, `FORBIDDEN`…). Tout
  * passe désormais par ce registre : une seule page, un seul vocabulaire.
  *
- * Ce n'est pas un détail de forme — le projet pose que **tout le texte
- * d'interface est en français**, et un code d'erreur ne dit pas au joueur ce
- * qu'il doit faire.
+ * Depuis le lot 9 de la traduction, les phrases vivent dans l'espace
+ * `teamErrors` (`messages/<langue>/teamErrors.json`) ; les réponses de l'API
+ * restent des **codes**. Le français est celui d'avant, code par code (y
+ * compris les refus du sigle, d'une image et du motif de modération, recopiés
+ * de leurs registres partagés — `teamTagErrorMessage`,
+ * `imageUploadErrorMessage`, `moderationReasonErrorMessage` — et vérifiés
+ * égaux par un test). Chaque fonction prend la table de la langue en dernier
+ * argument, français par défaut ; un écran la lit par `useTeamErrorsText()`.
  *
  * Même forme que `app/(secured)/tournois/[id]/_lib/error-map.ts` : un registre
  * pur, et un repli qui n'invente rien quand le code est inconnu.
  */
-
-import { imageUploadErrorMessage } from "@/lib/shared/image-upload-errors";
-import { moderationReasonErrorMessage } from "@/lib/shared/logo-quarantine";
-import { teamTagErrorMessage } from "@/lib/shared/team-tag";
+import frTeamErrors from "@/messages/fr/teamErrors.json";
+import { SUSPENSION_REASON_MAX_LENGTH, SUSPENSION_REASON_MIN_LENGTH } from "@/lib/shared/account-suspension";
+import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH } from "@/lib/shared/team-name";
+import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH } from "@/lib/shared/team-tag";
+import { IMAGE_UPLOAD_MAX_BYTES } from "@/lib/shared/uploads";
 
-const TEAM_ERRORS: Record<string, string> = {
-  // Le refus le plus banal de toutes les routes, et le seul que le joueur puisse
-  // corriger tout seul : la session dure trente jours, elle finit par tomber —
-  // ou l'onglet voisin s'est déconnecté. Sans cette ligne, un clic sur « Quitter
-  // l'équipe » ne disait plus que « L'opération a échoué », sans jamais nommer
-  // la seule chose à faire.
-  UNAUTHORIZED: "Ta session a expiré : reconnecte-toi pour continuer.",
-  // Posé par le client (`team-api.ts`) quand la requête n'a pas abouti du tout.
-  NETWORK_ERROR: "Connexion impossible. Vérifie ton réseau puis réessaie.",
-  // Identifiant hors d'un entier positif : l'URL a été bricolée, ou un lien est
-  // périmé. Rien à corriger dans le formulaire.
-  INVALID_TEAM_ID: "Cette équipe n'existe pas.",
-  INVALID_INVITATION_ID: "Cette invitation n'existe pas.",
-  // La ligne existe dans `bg_teams`, mais elle ne représente pas une équipe
-  // qu'on rejoint : une fantôme n'a aucun membre — elle se reprend par
-  // l'arbitrage —, et une entrée solo est l'identité d'un joueur en tournoi
-  // individuel. Dans les deux cas la demande n'aurait jamais trouvé personne
-  // pour y répondre.
-  TEAM_NOT_JOINABLE: "Cette fiche n'est pas une équipe que l'on peut rejoindre.",
-  TEAM_NOT_FOUND: "Cette équipe n'existe pas ou n'existe plus.",
-  TEAM_DELETED: "Cette équipe a été dissoute.",
-  TEAM_ALREADY_DELETED: "Cette équipe a déjà été dissoute.",
-  USER_ALREADY_IN_TEAM: "Ce joueur appartient déjà à une équipe : il doit la quitter d'abord.",
-  ALREADY_REQUESTED: "Ta demande est déjà en attente auprès de cette équipe.",
-  NOT_A_MEMBER: "Tu ne fais pas partie de cette équipe.",
-  // Le propriétaire ne peut pas se retirer : l'équipe se retrouverait sans
-  // personne pour la conduire. Le transfert de propriété est le geste attendu.
-  OWNER_MUST_TRANSFER:
-    "Transfère d'abord la propriété de l'équipe à un autre membre, puis quitte-la.",
-  FORBIDDEN: "Tu n'as pas les droits nécessaires sur cette équipe.",
-  INVITATION_NOT_FOUND: "Cette invitation n'existe plus.",
-  INVITATION_NOT_PENDING: "Cette invitation a déjà reçu une réponse.",
+export type TeamErrorsMessages = typeof frTeamErrors;
+export type TeamErrorsText = ScopedText<Leaves<TeamErrorsMessages>>;
 
-  // ── Gestion du roster ──
-  MISSING_PSEUDO: "Saisis le pseudo du joueur.",
-  INVALID_PSEUDO: "Saisis le pseudo du joueur.",
-  USER_NOT_FOUND: "Aucun joueur ne porte ce pseudo. Vérifie l'orthographe.",
-  ALREADY_INVITED: "Ce joueur a déjà une invitation en attente de ton équipe.",
-  MISSING_USER_ID: "Ce membre est introuvable. Recharge la page.",
-  MEMBER_NOT_FOUND: "Ce joueur ne fait plus partie de l'équipe.",
-  MISSING_ROLE: "Choisis au moins un rôle.",
-  CANNOT_KICK_OWNER: "Le propriétaire ne peut pas être exclu de son équipe.",
-  // `removeTeamMember` refuse de s'exclure soi-même sous ce nom, quel que soit
-  // le rôle : le code dit « propriétaire », le geste attendu est de quitter.
-  OWNER_CANNOT_LEAVE: "Tu ne peux pas t'exclure toi-même : utilise « Quitter l'équipe ».",
+/** La table française du paquet — hors fournisseur, tests, écrans français. */
+export const FR_TEAM_ERRORS_TEXT: TeamErrorsText = scopedText("fr", frTeamErrors);
 
-  // ── Identité de l'équipe ──
-  INVALID_TEAM_NAME: `Le nom de l'équipe doit compter de ${TEAM_NAME_MIN_LENGTH} à ${TEAM_NAME_MAX_LENGTH} caractères.`,
-  TEAM_NAME_ALREADY_USED: "Ce nom est déjà porté par une autre équipe.",
-  INVALID_TEAM_FIELDS: "Les informations de l'équipe envoyées sont invalides. Recharge la page puis réessaie.",
-  TRANSFER_TO_SELF: "Tu es déjà propriétaire de cette équipe.",
-  PLAYER_ACCOUNT_DELETED: "Ce joueur a supprimé son compte : il ne peut plus rejoindre d'équipe.",
-  MEMBER_ACCOUNT_DELETED: "Ce compte a été supprimé : il ne peut pas recevoir la propriété de l'équipe.",
-  NOT_A_GHOST_TEAM: "Cette équipe n'est plus une équipe fantôme : elle a déjà un propriétaire.",
-  // Reprise d'une fantôme déjà proposée au même joueur (staff) : distinct
-  // d'`ALREADY_INVITED`, qui parle à la gestion de « son » équipe.
-  GHOST_CLAIM_ALREADY_PROPOSED: "Cette équipe est déjà proposée à ce joueur : sa réponse est attendue.",
+type CodeTable = "codes" | "tag" | "image";
 
-  // ── Replis des routes : chacun nomme le geste qui a échoué. ──
-  TEAM_JOIN_FAILED: "La demande n'a pas pu être envoyée.",
-  TEAM_LEAVE_FAILED: "Le départ n'a pas pu être enregistré.",
-  // Le repli de la troisième route, oublié quand ses deux sœurs y figuraient.
-  INVITATION_RESPOND_FAILED: "La réponse à l'invitation n'a pas pu être enregistrée.",
-  INVITATION_CANCEL_FAILED: "L'invitation n'a pas pu être retirée.",
-  INVITATIONS_LOAD_FAILED: "Les invitations en attente n'ont pas pu être chargées.",
-  TEAM_MEMBER_ADD_FAILED: "L'invitation n'a pas pu être envoyée.",
-  TEAM_INVITE_FAILED: "L'invitation n'a pas pu être envoyée.",
-  TEAM_MEMBER_REMOVE_FAILED: "Le membre n'a pas pu être exclu.",
-  TEAM_MEMBER_UPDATE_FAILED: "Les rôles n'ont pas pu être enregistrés.",
-  TEAM_UPDATE_FAILED: "Les modifications de l'équipe n'ont pas pu être enregistrées.",
-  TEAM_CREATE_FAILED: "L'équipe n'a pas pu être créée.",
-  GHOST_TEAM_CREATE_FAILED: "L'équipe fantôme n'a pas pu être créée.",
-  TEAMS_LOAD_FAILED: "La liste des équipes n'a pas pu être chargée.",
-  TEAM_DELETE_FAILED: "L'équipe n'a pas pu être dissoute.",
-  TEAM_CLAIM_FAILED: "La proposition de reprise n'a pas pu être envoyée.",
-  TEAM_OWNERSHIP_TRANSFER_FAILED: "La propriété n'a pas pu être transférée.",
-  LOGO_UPLOAD_FAILED: "Le logo n'a pas pu être envoyé.",
-  LOGO_DELETE_FAILED: "Le logo n'a pas pu être supprimé.",
-  // Conditions d'utilisation : non acceptées par qui gère l'équipe (la modale
-  // s'ouvre en même temps, `teamApi`), ou case décochée à la création.
-  TERMS_ACCEPTANCE_REQUIRED:
-    "Pour gérer ton équipe, accepte d'abord les conditions d'utilisation (fenêtre ouverte à l'instant).",
-  TERMS_REQUIRED: "Coche l'acceptation des conditions d'utilisation pour créer ton équipe.",
-  LOGO_RIGHTS_NOT_CERTIFIED: "Certifie détenir les droits sur ce logo pour l'envoyer.",
-  TEAM_HAS_NO_LOGO: "Cette équipe n'a déjà plus de logo.",
-  TEAM_LOGO_REMOVE_FAILED: "Le logo n'a pas pu être retiré.",
-  MODERATION_REASON_REQUIRED: moderationReasonErrorMessage("MODERATION_REASON_REQUIRED"),
-  MODERATION_REASON_TOO_LONG: moderationReasonErrorMessage("MODERATION_REASON_TOO_LONG"),
-};
+/** Bornes citées par les phrases (`{min}`, `{max}`), selon le code. */
+function valuesFor(code: string): Record<string, number> | undefined {
+  switch (code) {
+    case "INVALID_TEAM_NAME":
+      return { min: TEAM_NAME_MIN_LENGTH, max: TEAM_NAME_MAX_LENGTH };
+    case "MODERATION_REASON_REQUIRED":
+    case "MODERATION_REASON_TOO_LONG":
+      return { min: SUSPENSION_REASON_MIN_LENGTH, max: SUSPENSION_REASON_MAX_LENGTH };
+    case "TEAM_TAG_TOO_SHORT":
+    case "TEAM_TAG_TOO_LONG":
+      return { min: TEAM_TAG_MIN_LENGTH, max: TEAM_TAG_MAX_LENGTH };
+    case "IMAGE_TOO_LARGE":
+      return { max: IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024) };
+    default:
+      return undefined;
+  }
+}
 
-const FALLBACK = "L'opération a échoué.";
+/** La phrase d'un code dans une table, ou `null` s'il n'y figure pas. */
+function lookup(text: TeamErrorsText, table: CodeTable, code: string): string | null {
+  // `code in` remonterait la chaîne de prototypes (« constructor ») : on lit
+  // la table française, propre, par `Object.hasOwn` — les deux langues ont
+  // les mêmes clés (test de parité).
+  if (!Object.hasOwn(frTeamErrors[table], code)) return null;
+  return text.t(`${table}.${code}` as Leaves<TeamErrorsMessages>, valuesFor(code));
+}
 
 /**
  * Message à afficher pour un code de refus.
  *
- * Les refus de forme du sigle ont leur propre registre (`teamTagErrorMessage`,
- * partagé avec la création), ceux d'une image aussi (`imageUploadErrorMessage`,
- * partagé avec l'avatar) : ils sont consultés d'abord. Un code inconnu retombe
- * sur une phrase générique **et non sur le code lui-même** : le jour où le
- * serveur en ajoute un, le joueur lit une phrase, pas un jeton.
+ * Les refus de forme du sigle ont leur propre table (`tag`), ceux d'une image
+ * aussi (`image`, partagée avec l'avatar) : ils sont consultés d'abord. Un
+ * code inconnu retombe sur une phrase générique **et non sur le code
+ * lui-même** : le jour où le serveur en ajoute un, le joueur lit une phrase,
+ * pas un jeton.
  *
  * `fallbackCode` nomme le repli du geste (`INVITATION_RESPOND_FAILED`…) : il
  * sert au code absent **et** au code inconnu — le `TypeError` d'une coupure
@@ -131,20 +80,11 @@ const FALLBACK = "L'opération a échoué.";
 export function teamErrorMessage(
   code: string | null | undefined,
   fallbackCode?: string,
+  text: TeamErrorsText = FR_TEAM_ERRORS_TEXT,
 ): string {
-  const fallback = () =>
-    fallbackCode && Object.hasOwn(TEAM_ERRORS, fallbackCode)
-      ? TEAM_ERRORS[fallbackCode]
-      : FALLBACK;
+  const fallback = () => (fallbackCode ? lookup(text, "codes", fallbackCode) : null) ?? text.t("fallback");
   if (!code) return fallback();
-  const tagMessage = teamTagErrorMessage(code);
-  if (tagMessage) return tagMessage;
-  // Les refus du logo sont ceux de toute image téléversée : une seule rédaction,
-  // partagée avec l'avatar de `/profil`.
-  const imageMessage = imageUploadErrorMessage(code);
-  if (imageMessage) return imageMessage;
-  // `code in` remonterait la chaîne de prototypes (« constructor »).
-  return Object.hasOwn(TEAM_ERRORS, code) ? TEAM_ERRORS[code] : fallback();
+  return lookup(text, "tag", code) ?? lookup(text, "image", code) ?? lookup(text, "codes", code) ?? fallback();
 }
 
 /**
@@ -159,7 +99,8 @@ export function teamErrorMessage(
 export function membershipErrorMessage(
   code: string | null | undefined,
   fallbackCode?: string,
+  text: TeamErrorsText = FR_TEAM_ERRORS_TEXT,
 ): string {
-  if (code === "USER_ALREADY_IN_TEAM") return "Tu appartiens déjà à une équipe : quitte-la d'abord.";
-  return teamErrorMessage(code, fallbackCode);
+  if (code === "USER_ALREADY_IN_TEAM") return text.t("selfAlreadyInTeam");
+  return teamErrorMessage(code, fallbackCode, text);
 }
