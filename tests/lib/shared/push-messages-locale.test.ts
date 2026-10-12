@@ -176,7 +176,7 @@ describe("notifications push — anglais", () => {
   });
 
   it("ne reprend pas en anglais le texte Discord, resté français (D6)", () => {
-    expect(en["refereeAlert.url"].body).toBe("A score conflict is waiting for a referee.");
+    expect(en["refereeAlert.url"].body).toBe("Conflicting scores are waiting for a referee.");
     expect(en["refereeAlert.nourl"].body).toBe("A score has been waiting too long for confirmation: a referee needs to decide.");
     expect(refereeAlertPush(REFEREE_LINE, "k", "en").body).toBe("An alert is waiting for a referee.");
   });
@@ -192,7 +192,7 @@ describe("notifications push — anglais", () => {
   it("avec la manche : nomme le tournoi et la manche en anglais, et mène à la manche dans la langue du destinataire", () => {
     const match = { tournamentId: 7, tournamentName: "Spring Cup", matchId: 31, bracket: "LOWER", roundNumber: 2 };
     const conflict = refereeAlertPush(REFEREE_LINE, "score_conflict-31", "en", "score_conflict", match);
-    expect(conflict.body).toBe("Score conflict · Spring Cup, Lower bracket · round 2: a referee is needed.");
+    expect(conflict.body).toBe("Conflicting scores · Spring Cup, Lower bracket · round 2: a referee is needed.");
     expect(conflict.url).toBe("/en/tournois/7#match-31");
     expect(refereeAlertPush(REFEREE_LINE, "k", "en", "score_report_stalled", match).body).toBe(
       "Score awaiting confirmation for too long · Spring Cup, Lower bracket · round 2: a referee needs to decide.",

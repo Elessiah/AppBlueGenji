@@ -448,7 +448,14 @@ describe("langue du compte (lot 9-3)", () => {
     expect(field).toContain("aria-disabled={busy || undefined}");
     expect(field).toContain("aria-busy={busy || undefined}");
     expect(field).not.toMatch(/\sdisabled=\{/);
-    expect(field).toContain("if (busy || !isLocale(next) || next === locale) return;");
+    // Un second choix pendant l'envoi n'est pas perdu : affiché, puis envoyé à la suite.
+    expect(field).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = value;\s*setLocale\(value\);\s*return;/);
+    expect(field).toContain("next = after !== null && after !== saved ? after : null;");
+    // Une langue relue ailleurs est reprise sans remonter le champ (ni perdre l'envoi ou le focus).
+    expect(field).toContain("if (initial !== shown && !busy) {");
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
+      "<AccountLocaleField initial={data.accountLocale} />",
+    );
     // Détachée du réglage des notifications qui la précède (passe d'auto-contrôle).
     expect(field).toContain("s.accountLocale");
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8")).toMatch(/\.accountLocale \{\s*margin-top: 14px;/);
@@ -467,10 +474,6 @@ describe("langue du compte (lot 9-3)", () => {
     const globals = readFileSync(join(__dirname, "..", "..", "app/globals.css"), "utf8");
     expect(globals).toContain('.field select:hover:not(:disabled):not([aria-disabled="true"]) {');
     expect(globals).toMatch(/\.field select:disabled,\s*\.field select\[aria-disabled="true"\] \{\s*opacity: 0\.6;/);
-    // Une langue changée ailleurs (connexion dans un autre onglet) remonte le champ.
-    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
-      "<AccountLocaleField key={data.accountLocale} initial={data.accountLocale} />",
-    );
     // Le commentaire de `.hint` reste collé à sa règle.
     expect(css).toMatch(/12 px et `--ink-soft`[^*]*avant\. \*\/\s*\.hint \{/);
   });
