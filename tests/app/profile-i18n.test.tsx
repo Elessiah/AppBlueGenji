@@ -499,9 +499,6 @@ describe("anglais — écrans", () => {
     }
     mockPush = states[4];
     expect(inEnglish(<PushNotificationsPanel />)).toContain("2 devices subscribed to your account");
-    mockPush = states[1];
-    const french = inEnglish(<PushNotificationsPanel toastLang="fr" />);
-    expect(french).toContain("pas encore activées");
   });
 });
 

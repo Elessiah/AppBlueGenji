@@ -24,6 +24,9 @@ const LAYOUT_PROVIDERS = [
   { layout: "app/(secured)/equipes/[id]/layout.tsx", provider: "components/i18n/team-page-text-provider.tsx" },
   { layout: "app/(secured)/joueurs/layout.tsx", provider: "components/i18n/players-text-provider.tsx" },
   { layout: "app/(secured)/equipes/layout.tsx", provider: "components/i18n/team-errors-text-provider.tsx" },
+  // Lot 9-2 : le profil pose ses textes et la table des refus d'équipe.
+  { layout: "app/(secured)/profil/layout.tsx", provider: "components/i18n/profile-text-provider.tsx" },
+  { layout: "app/(secured)/profil/layout.tsx", provider: "components/i18n/team-errors-text-provider.tsx" },
 ];
 
 describe("fournisseur posé par une mise en page : sans le français", () => {

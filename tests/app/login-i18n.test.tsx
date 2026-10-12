@@ -127,9 +127,9 @@ function leaves(tree: unknown, prefix = ""): Array<{ key: string; source: string
 
 /**
  * Les morceaux de phrases françaises de la page (balises et arguments retirés),
- * assez longs pour ne pas être un nom propre. Seul « Autre » reste cité sous
- * `/en` : c'est l'intitulé, encore français, de la catégorie du formulaire de
- * signalement (lot 9), entre guillemets anglais et suivi de sa traduction.
+ * assez longs pour ne pas être un nom propre. Le formulaire de signalement
+ * est traduit depuis le lot 9-2 : sa catégorie « Other » n'est plus citée en
+ * français sous `/en`.
  */
 const FRENCH_FRAGMENTS = (() => {
   const en = new Set(leaves(EN).map((leaf) => leaf.source));
@@ -141,7 +141,7 @@ const FRENCH_FRAGMENTS = (() => {
     .filter((text) => text.length >= 12);
 })();
 
-/** Lettres accentuées du français ; « Autre » et un motif saisi par la modération mis à part. */
+/** Lettres accentuées du français ; un motif saisi par la modération mis à part. */
 const ACCENTED = /[àâçéèêëîïôûùüÿœÀÂÇÉÈÊËÎÏÔÛÙÜŸŒ«»]/;
 
 function expectNoFrench(text: string) {
@@ -348,8 +348,9 @@ describe("exposé de suspension", () => {
     expect(text).toContain("This account is suspended until October 15, 2026 at 10:00 (Paris time) (decision S-12)");
     expect(text).toContain("“Conduct”");
     expect(html).toContain('lang="fr">Triche avérée<');
-    // « Autre » : intitulé encore français du formulaire de signalement (lot 9).
-    expect(html).toContain('“<span lang="fr">Autre</span>” (“Other”; no login needed)');
+    // Catégorie du formulaire de signalement, traduit depuis le lot 9-2.
+    expect(text).toContain("category “Other” (no login needed)");
+    expect(html).not.toContain("Autre");
     expectNoFrench(text.replace("Triche avérée", ""));
   });
 
@@ -376,8 +377,8 @@ describe("exposé de suspension", () => {
     expect(suspendedLoginText(FR_TEXT, null)).toBe(suspendedLoginMessage(null));
     expect(suspendedLoginText(FR_TEXT, notice.endsAt)).toBe(suspendedLoginMessage(notice.endsAt));
     expect(suspendedLoginText(FR_TEXT, "pas une date")).toBe(suspendedLoginMessage("pas une date"));
-    // Le toast cite l'intitulé réel du formulaire (encore français, lot 9), traduit à la suite.
-    expect(suspendedLoginText(EN_TEXT, null)).toContain("category “Autre” (“Other”; no login needed)");
+    // Le toast cite l'intitulé réel du formulaire, traduit depuis le lot 9-2.
+    expect(suspendedLoginText(EN_TEXT, null)).toContain("category “Other” (no login needed)");
     expect(suspensionSpanText(FR_TEXT, null, "S-1")).toBe(
       `Ce compte est suspendu ${suspensionSpan(null)} (décision S-1) : aucune connexion n'est possible tant que la suspension court.`,
     );

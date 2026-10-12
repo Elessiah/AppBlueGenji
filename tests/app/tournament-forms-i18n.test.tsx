@@ -319,11 +319,10 @@ describe("route et référencement", () => {
     const launch = readFileSync(path.join(process.cwd(), "components/match-launch/MatchLaunchCenter.tsx"), "utf8");
     expect(launch).not.toContain("toastLang=");
     expect(launch).toContain('lead={t("pushLead")}');
-    // Un écran resté français peut encore l'imposer : textes et notifications.
+    // Plus aucune langue imposée : textes et notifications suivent la page.
     const panel = readFileSync(path.join(process.cwd(), "components/notifications/PushNotificationsPanel.tsx"), "utf8");
-    expect(panel.match(/toastOptions\)/g)).toHaveLength(2);
-    expect(panel).toContain("toastLang ? { lang: toastLang } : undefined");
-    expect(panel).toContain("usePushText(toastLang)");
+    expect(panel).not.toContain("toastLang");
+    expect(panel).toContain("usePushText()");
   });
 
   it("l'édition lit les refus du fournisseur de la fiche, le formulaire du sien", () => {
