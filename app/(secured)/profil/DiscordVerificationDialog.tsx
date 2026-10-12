@@ -18,7 +18,6 @@ import { useProfileText } from "@/components/i18n/profile-text";
 import { discordVerificationErrorMessage } from "./discord-errors";
 import { verifiedBadgeLabels } from "./_lib/profile-text";
 
-/** Les cinq lignes de l'exposition (`DISCORD_VERIFICATION_EXPOSURE`), dans l'ordre. */
 /** Les lignes de l'exposition, dans l'ordre du registre (`DISCORD_VERIFICATION_EXPOSURE`, testé). */
 export const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
 

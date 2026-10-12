@@ -127,23 +127,22 @@ export function ReportProblemButton({
     "aria-busy": pending || undefined,
     style: pending ? BUSY_STYLE : undefined,
   };
-  // Le chargement se voit (points de suspension) et s'annonce (région d'état,
-  // toujours présente pour qu'un lecteur d'écran lise son changement).
-  const busyMark = pending ? <span aria-hidden="true">…</span> : null;
+  // Le chargement se voit (le libellé devient « Ouverture du formulaire… ») et
+  // s'annonce (région d'état, toujours présente pour qu'un lecteur d'écran lise
+  // son changement).
+  const visibleLabel = pending ? t("footer.reportLoading") : label;
 
   return (
     <>
       {cyber ? (
         <CyberButton variant="ghost" {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
-          {label}
-          {busyMark}
+          {visibleLabel}
         </CyberButton>
       ) : (
         <button {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
-          {label}
-          {busyMark}
+          {visibleLabel}
         </button>
       )}
       <output className="sr-only">{status}</output>
