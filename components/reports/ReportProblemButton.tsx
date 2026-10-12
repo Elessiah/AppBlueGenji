@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useState } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
@@ -8,10 +8,8 @@ import { CyberButton } from "@/components/cyber";
 import { useOptionalToast } from "@/components/ui/toast";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { isChunkLoadError, onceLoader } from "@/lib/shared/lazy-component";
-import type { Locale } from "@/lib/shared/locales";
-import type { ReportProblemDialogProps } from "./ReportProblemDialog";
-import type { ReportsMessages } from "./reports-text";
+import { isChunkLoadError } from "@/lib/shared/lazy-component";
+import { loadedEnglishReports, loadedReportForm, loadReportForm, preloadReportForm } from "./report-form-loader";
 import s from "./ReportProblemButton.module.css";
 
 /**
@@ -30,43 +28,6 @@ import s from "./ReportProblemButton.module.css";
  * entre la page et le clic) invite à recharger la page, sans la recharger
  * d'office : une saisie en cours ailleurs sur la page serait perdue.
  */
-type Dialog = ComponentType<ReportProblemDialogProps>;
-
-/** Le formulaire, une fois ; un échec se retente (`onceLoader`). */
-const dialogLoader = onceLoader<Dialog>(() => import("./ReportProblemDialog").then((module) => module.ReportProblemDialog));
-
-/**
- * L'anglais du formulaire, sous `/en` seulement. Sur la page d'un signalement,
- * la mise en page sert déjà le sien au formulaire de contestation : le pied de
- * page le recharge à part s'il est ouvert là — cas rare (un lecteur anglais,
- * sur la page qui le vise, qui signale autre chose), accepté pour garder le
- * bouton de chaque page sans la mécanique du fournisseur.
- */
-const englishLoader = onceLoader<ReportsMessages>(() => import("@/messages/en/reports.json").then((module) => module.default));
-
-/** Le formulaire et, sous `/en`, son anglais. */
-function loadForm(locale: Locale): Promise<Dialog> {
-  if (locale !== "en") return dialogLoader.load();
-  return Promise.all([dialogLoader.load(), englishLoader.load()]).then(([dialog]) => dialog);
-}
-
-/** Le formulaire déjà là, dans la langue de la page. */
-function loadedForm(locale: Locale): Dialog | null {
-  return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();
-}
-
-/**
- * Un préchargement raté (hors ligne, déploiement) ne se relance pas à chaque
- * survol ou focus : seul le clic retente — et dit l'échec.
- */
-let preloadFailed = false;
-const preloadForm = (locale: Locale) => {
-  if (preloadFailed) return;
-  loadForm(locale).catch(() => {
-    preloadFailed = true;
-  });
-};
-
 interface ReportProblemButtonProps {
   /** Visiteur connecté : il peut désigner des cibles par leur nom. */
   authenticated: boolean;
@@ -99,7 +60,6 @@ export function ReportProblemButton({
 }: Readonly<ReportProblemButtonProps>) {
   const [open, setOpen] = useState(false);
   const locale = useAppLocale();
-  const [ReportProblemDialog, setDialog] = useState<Dialog | null>(() => loadedForm(locale));
   const [pending, setPending] = useState(false);
   // Ce que la région d'état annonce : l'attente, et l'échec quand aucun toast ne le dit.
   const [status, setStatus] = useState("");
@@ -113,9 +73,7 @@ export function ReportProblemButton({
 
   const openDialog = () => {
     // Déjà là : chargé par un autre bouton, ou préchargé au survol.
-    const ready = loadedForm(locale);
-    if (ready) {
-      setDialog(() => ready);
+    if (loadedReportForm(locale)) {
       setOpen(true);
       return;
     }
@@ -123,9 +81,8 @@ export function ReportProblemButton({
     setPending(true);
     // Un nouvel essai efface l'échec précédent de la région d'état.
     setStatus(t("footer.reportLoading"));
-    loadForm(locale)
-      .then((loaded) => {
-        setDialog(() => loaded);
+    loadReportForm(locale)
+      .then(() => {
         setStatus("");
         // Ouvert même si le lecteur a changé de page entre-temps : c'est la
         // suite attendue de son clic, et le formulaire retient la page affichée.
@@ -147,13 +104,16 @@ export function ReportProblemButton({
     type: "button" as const,
     className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,
     onClick: openDialog,
-    onPointerEnter: () => preloadForm(locale),
-    onFocus: () => preloadForm(locale),
+    onPointerEnter: () => preloadReportForm(locale),
+    onFocus: () => preloadReportForm(locale),
     "aria-haspopup": "dialog" as const,
     "aria-busy": pending || undefined,
     // Clic ignoré pendant l'attente ; écarte aussi le survol du bouton du système de design.
     "aria-disabled": pending || undefined,
   };
+
+  // Lu du chargeur à chaque rendu : `setOpen(true)` suit toujours son arrivée.
+  const ReportProblemDialog = open ? loadedReportForm(locale) : null;
 
   return (
     <>
@@ -169,13 +129,13 @@ export function ReportProblemButton({
         </button>
       )}
       <output className="sr-only">{status}</output>
-      {open && ReportProblemDialog && (
+      {ReportProblemDialog && (
         <ReportProblemDialog
           pathname={pathname}
           authenticated={authenticated}
           initialCategory={initialCategory}
           onClose={() => setOpen(false)}
-          englishMessages={locale === "en" ? (englishLoader.loaded() ?? undefined) : undefined}
+          englishMessages={locale === "en" ? (loadedEnglishReports() ?? undefined) : undefined}
         />
       )}
     </>

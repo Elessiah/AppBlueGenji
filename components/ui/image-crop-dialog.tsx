@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useAppLocale } from "@/components/i18n/locale-context";
 import { useShellText } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { IMAGE_CROP_FIELD, serializeCropRect, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
-import { isChunkLoadError, onceLoader } from "@/lib/shared/lazy-component";
-import type { ImageCropDialogProps } from "./image-crop-dialog-view";
+import { isChunkLoadError, onceLoader, quietPreload } from "@/lib/shared/lazy-component";
+import type { ImageCropDialogProps, ImageCropMessages } from "./image-crop-dialog-view";
 
 /**
  * La modale de recadrage, chargée **à la demande** (revue de performance du
@@ -22,21 +23,21 @@ import type { ImageCropDialogProps } from "./image-crop-dialog-view";
  */
 type CropDialog = ComponentType<ImageCropDialogProps>;
 const cropDialogLoader = onceLoader<CropDialog>(() => import("./image-crop-dialog-view").then((module) => module.ImageCropDialog));
+/** L'anglais de la modale, sous `/en` seulement (hors écran du staff, en français). */
+const englishCropLoader = onceLoader<ImageCropMessages>(() => import("@/messages/en/imageCrop.json").then((module) => module.default));
 
-let preloadFailed = false;
+const preloadCropDialog = quietPreload(() => cropDialogLoader.load());
 
 /**
  * Précharge la modale : à poser sur le `<input type="file">` qui la précède
  * (`onClick`, déclenché aussi par un `.click()` du bouton qui l'ouvre) — le
  * morceau arrive pendant que le lecteur choisit son fichier, et la modale
- * s'ouvre sans attente. Un échec reste muet et ne se relance pas à chaque
- * clic : l'ouverture, elle, retente et le dit.
+ * s'ouvre sans attente. Un échec reste muet et se tait un moment
+ * (`quietPreload`) : l'ouverture, elle, retente et le dit.
  */
 export function preloadImageCropDialog(): void {
-  if (preloadFailed) return;
-  cropDialogLoader.load().catch(() => {
-    preloadFailed = true;
-  });
+  if (cropDialogLoader.loaded()) return;
+  preloadCropDialog();
 }
 
 /** Une image choisie et sa zone gardée, prête à partir. */
@@ -152,6 +153,8 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
   const requestRef = useRef<CropRequest | null>(null);
   const { showError } = useToast();
   const { t } = useShellText();
+  // Le français imposé (écran du staff) n'a pas besoin de l'anglais.
+  const english = useAppLocale() === "en" && options.lang !== "fr";
 
   const settle = useCallback((image: CroppedImage | null) => {
     const current = requestRef.current;
@@ -163,7 +166,7 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
   const cropImage = useCallback(
     async (file: File, kind: ImageUploadKind, title: string) => {
       try {
-        await cropDialogLoader.load();
+        await Promise.all([cropDialogLoader.load(), english ? englishCropLoader.load() : null]);
       } catch (error) {
         // Rien ne part : l'écran garde sa saisie, le lecteur peut rechoisir.
         showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));
@@ -177,7 +180,7 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
         setRequest(next);
       });
     },
-    [showError, t],
+    [english, showError, t],
   );
 
   // Écran quitté modale ouverte : l'attente se résout en annulation plutôt
@@ -195,6 +198,7 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
       onCancel={() => settle(null)}
       onConfirm={(crop) => settle({ file: request.file, crop })}
       lang={options.lang}
+      englishMessages={english ? (englishCropLoader.loaded() ?? undefined) : undefined}
     />
   ) : null;
 

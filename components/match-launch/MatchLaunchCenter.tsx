@@ -155,6 +155,13 @@ export function MatchLaunchCenter({
     onPrivacyPage: pathname === PRIVACY_POLICY_PATH,
   });
   const { launches, refresh } = useMatchLaunchFeed(clocks);
+  // Sous `/en`, l'anglais du réglage des notifications part dès qu'un match se
+  // lance — avant que la fenêtre ne s'ouvre — plutôt qu'à son ouverture : le
+  // réglage paraît avec elle, sans second aller-retour ni saut de contenu.
+  const hasLaunches = launches.length > 0;
+  useEffect(() => {
+    if (text.locale === "en" && hasLaunches) englishPush.load().catch(() => undefined);
+  }, [text.locale, hasLaunches]);
   const [openMatchId, setOpenMatchId] = useState<number | null>(requestedMatchId);
   const [confirming, setConfirming] = useState(false);
   // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la

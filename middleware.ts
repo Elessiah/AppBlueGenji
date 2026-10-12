@@ -5,7 +5,7 @@ import { siteBaseUrl } from "@/lib/server/site-url";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
-import { LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
+import { DOCUMENT_REQUEST_HEADER, LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 
 /** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
 export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
@@ -169,6 +169,7 @@ function localizedRequestHeaders(request: NextRequest, locale: Locale, path: str
   requestHeaders.set(LOCALE_HEADER, locale);
   requestHeaders.set(PATHNAME_HEADER, path);
   requestHeaders.set(SEARCH_HEADER, request.nextUrl.search);
+  requestHeaders.set(DOCUMENT_REQUEST_HEADER, isDocumentRequest(request) ? "1" : "0");
   return requestHeaders;
 }
 

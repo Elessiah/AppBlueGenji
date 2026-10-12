@@ -116,6 +116,8 @@ export interface OnceLoader<T> {
   load(): Promise<T>;
   /** Le résultat, s'il est arrivé ; `null` sinon. */
   loaded(): T | null;
+  /** Fournit le résultat d'avance (déjà reçu autrement) : aucun chargement ne partira. */
+  prime(value: T): void;
 }
 
 /**
@@ -141,6 +143,34 @@ export function onceLoader<T>(start: () => Promise<T>): OnceLoader<T> {
       return pending;
     },
     loaded: () => (result ? result.value : null),
+    prime(value) {
+      result ??= { value };
+    },
+  };
+}
+
+/** Silence d'un préchargement raté avant qu'un geste le relance. */
+export const PRELOAD_RETRY_MS = 30_000;
+
+/**
+ * Un préchargement (survol, focus, clic sur un sélecteur de fichier) qui, raté
+ * — hors ligne, déploiement —, se tait `PRELOAD_RETRY_MS` au lieu de repartir
+ * à chaque geste, puis se relance de lui-même au geste suivant : une coupure
+ * passagère n'éteint pas le préchargement pour toute la session. L'ouverture,
+ * elle, retente toujours et dit l'échec.
+ */
+export function quietPreload(load: () => Promise<unknown>, now: () => number = Date.now): () => void {
+  let failedAt: number | null = null;
+  return () => {
+    if (failedAt !== null && now() - failedAt < PRELOAD_RETRY_MS) return;
+    load().then(
+      () => {
+        failedAt = null;
+      },
+      () => {
+        failedAt = now();
+      },
+    );
   };
 }
 

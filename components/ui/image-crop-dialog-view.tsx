@@ -34,10 +34,7 @@ import {
   type ImageSize,
   type ImageUploadKind,
 } from "@/lib/shared/image-crop";
-import enImageCrop from "@/messages/en/imageCrop.json";
 import frImageCrop from "@/messages/fr/imageCrop.json";
-import { useAppLocale } from "@/components/i18n/locale-context";
-import type { Locale } from "@/lib/shared/locales";
 import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
 import s from "./image-crop-dialog.module.css";
 
@@ -62,23 +59,39 @@ export interface ImageCropDialogProps {
    * elle n'hérite pas du `lang` de l'éditeur qui l'ouvre.
    */
   lang?: "fr";
+  /**
+   * L'anglais de la modale, chargé avec elle sous `/en` par `useImageCropper`
+   * (revue de performance du lot 9-2) : absent, le français — jamais
+   * l'anglais dans le morceau d'un lecteur français.
+   */
+  englishMessages?: ImageCropMessages;
 }
+
+export type ImageCropMessages = typeof frImageCrop;
 
 type Drag =
   | { mode: "move"; pointerId: number; startX: number; startY: number; startBox: CropBox }
   | { mode: "resize"; handle: CropHandle; pointerId: number; startX: number; startY: number; startBox: CropBox };
 
 /**
- * Textes de la modale (espace `imageCrop`, lot 9-2) : ses deux langues
- * voyagent avec elle, dans son morceau chargé à la demande — quelques
- * centaines d'octets, et la modale sert des écrans de toutes les langues,
- * staff compris. `lang="fr"` (outil du staff,
- * D4) impose le français ; sinon, la langue de la page.
+ * Textes de la modale (espace `imageCrop`, lot 9-2) : son français voyage
+ * avec elle, dans son morceau chargé à la demande ; l'anglais arrive à part,
+ * sous `/en` seulement (`englishMessages`, chargé par `useImageCropper`).
+ * `lang="fr"` (outil du staff, D4) impose le français.
  */
-const CROP_TEXT: Readonly<Record<Locale, ScopedText<Leaves<typeof frImageCrop>>>> = {
-  fr: scopedText("fr", frImageCrop),
-  en: scopedText("en", enImageCrop),
-};
+const FR_CROP_TEXT: ScopedText<Leaves<ImageCropMessages>> = scopedText("fr", frImageCrop);
+/** Un texte anglais par paquet de messages reçu (un seul en pratique). */
+const englishTexts = new WeakMap<ImageCropMessages, ScopedText<Leaves<ImageCropMessages>>>();
+
+function cropText(lang: "fr" | undefined, englishMessages: ImageCropMessages | undefined): ScopedText<Leaves<ImageCropMessages>> {
+  if (lang === "fr" || !englishMessages) return FR_CROP_TEXT;
+  let text = englishTexts.get(englishMessages);
+  if (!text) {
+    text = scopedText("en", englishMessages);
+    englishTexts.set(englishMessages, text);
+  }
+  return text;
+}
 
 const pct = (value: number) => `${value}%`;
 
@@ -102,9 +115,8 @@ function handleOf(target: EventTarget): CropHandle | null {
  * Portée dans `document.body`, pile commune de modales, voile fermé par
  * `useBackdropDismiss` — les trois règles de `docs/features/MODAL_DIALOGS.md`.
  */
-export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }: Readonly<ImageCropDialogProps>) {
-  const pageLocale = useAppLocale();
-  const { t } = CROP_TEXT[lang === "fr" ? "fr" : pageLocale];
+export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang, englishMessages }: Readonly<ImageCropDialogProps>) {
+  const { t } = cropText(lang, englishMessages);
   const titleId = useId();
   const hintId = useId();
   const aspect = IMAGE_CROP_ASPECTS[kind];

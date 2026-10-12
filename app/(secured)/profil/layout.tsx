@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { segmentTitle } from "@/lib/shared/page-metadata";
-import { localeAlternates, localeHref } from "@/lib/shared/locales";
+import { DOCUMENT_REQUEST_HEADER, localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { ProfileTextProvider } from "@/components/i18n/profile-text-provider";
-import { TeamErrorsTextProvider } from "@/components/i18n/team-errors-text-provider";
-import { PushTextProvider } from "@/components/notifications/push-text-provider";
+import { headers } from "next/headers";
+import { ProfileTextProviders } from "@/components/i18n/profile-text-providers";
+import { SecuredLoadingView } from "../_shared/SecuredLoading";
 
 /**
  * Titre de l'écran « Mon profil » — voir `app/(secured)/tournois/layout.tsx`
@@ -26,18 +26,19 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Pose les textes du profil, ceux du réglage des notifications et la table des
  * refus d'équipe (réponses aux invitations, refus d'une image) : rien en
- * français, déjà dans le paquet ; l'anglais sous `/en` seulement.
+ * français, déjà dans le paquet ; l'anglais sous `/en` seulement, et au
+ * chargement complet d'une page seulement — une requête de navigation ou de
+ * `router.refresh()` (`DOCUMENT_REQUEST_HEADER`, posé par le middleware) n'en porte aucun : le client garde celui
+ * qu'il a reçu, ou le charge à part (`ProfileTextProviders`).
  */
 export default async function ProfileLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? messagesFor(locale) : undefined;
+  const documentRequest = (await headers()).get(DOCUMENT_REQUEST_HEADER) !== "0";
+  const all = messagesFor(locale);
+  const messages = locale === "en" && documentRequest ? { profile: all.profile, teamErrors: all.teamErrors, push: all.push } : undefined;
   return (
-    <TeamErrorsTextProvider locale={locale} messages={messages?.teamErrors}>
-      <ProfileTextProvider locale={locale} messages={messages?.profile}>
-        <PushTextProvider locale={locale} messages={messages?.push}>
-          {children}
-        </PushTextProvider>
-      </ProfileTextProvider>
-    </TeamErrorsTextProvider>
+    <ProfileTextProviders locale={locale} messages={messages} fallback={<SecuredLoadingView label={all.shell.loading} />}>
+      {children}
+    </ProfileTextProviders>
   );
 }
