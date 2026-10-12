@@ -232,6 +232,12 @@
 /* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
    mention légale. 12 px et `--ink-soft`, contre 11 px et `--ink-quiet` partout
    avant. */
+/* Langue du compte, sous le réglage des notifications : détachée de son
+   dernier paragraphe par l'écart du panneau lui-même (14 px). */
+.accountLocale {
+  margin-top: 14px;
+}
+
 .hint {
   font-size: 12px;
   line-height: 1.65;
