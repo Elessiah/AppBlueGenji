@@ -120,7 +120,7 @@ describe("écouteur délégué", () => {
 
   it("annuaire des équipes et création : anglais de `teams` au chargement complet seulement", () => {
     for (const page of ["app/(secured)/equipes/page.tsx", "app/(secured)/equipes/creer/page.tsx"]) {
-      expect(readSource(page)).toContain('const messages = locale === "en" && (await isDocumentLoad()) ? all.teams : undefined;');
+      expect(readSource(page)).toContain("const messages = await englishOnDocumentLoad(locale, (all) => all.teams);");
     }
     expect(readSource("components/i18n/teams-text.tsx")).toContain("primeEnglish(englishTeams, props.locale, props.messages);");
   });

@@ -473,6 +473,13 @@ describe("anglais — écrans", () => {
       expect(html).toContain("Verify my Discord tag");
       expectEnglish(html);
     }
+    // Un tag enregistré avec une commande de direction ne réordonne pas la phrase.
+    effects.armed = true;
+    const attested = inEnglish(
+      <DiscordVerificationDialog initialTag={"no‮va​"} linked attested onClose={() => undefined} onVerified={() => undefined} />,
+    );
+    expect(attested).toContain("<strong>nova</strong>");
+    expect(attested).not.toMatch(/[‮​]/u);
     for (const mode of ["LINK", "UPDATE"] as const) {
       effects.armed = true;
       const html = inEnglish(<DiscordBotHandleDialog mode={mode} onClose={() => undefined} onUpdated={() => undefined} />);

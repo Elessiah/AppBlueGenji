@@ -10,7 +10,7 @@ jest.mock("next/headers", () => ({ headers: async () => new Headers(mockHeaders)
 let mockSignedIn = true;
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: async () => (mockSignedIn ? { id: 1 } : null) }));
 
-import { isDocumentLoad } from "@/lib/server/layout-messages";
+import { englishOnDocumentLoad, isDocumentLoad } from "@/lib/server/layout-messages";
 
 beforeEach(() => {
   mockHeaders = {};
@@ -41,5 +41,24 @@ describe("isDocumentLoad", () => {
     mockSignedIn = false;
     mockHeaders = { "x-bg-document": "1" };
     expect(await isDocumentLoad()).toBe(false);
+  });
+});
+
+describe("englishOnDocumentLoad", () => {
+  it("/en, chargement complet, connecté : le dictionnaire choisi, en anglais", async () => {
+    mockHeaders = { "x-bg-document": "1" };
+    expect(await englishOnDocumentLoad("en", (all) => all.profile.meta.title)).toBe("My profile");
+  });
+
+  it("français, requête du routeur, en-tête absent ou sans session : rien", async () => {
+    mockHeaders = { "x-bg-document": "1" };
+    expect(await englishOnDocumentLoad("fr", (all) => all.profile)).toBeUndefined();
+    mockHeaders = { "x-bg-document": "0" };
+    expect(await englishOnDocumentLoad("en", (all) => all.profile)).toBeUndefined();
+    mockHeaders = {};
+    expect(await englishOnDocumentLoad("en", (all) => all.profile)).toBeUndefined();
+    mockHeaders = { "x-bg-document": "1" };
+    mockSignedIn = false;
+    expect(await englishOnDocumentLoad("en", (all) => all.profile)).toBeUndefined();
   });
 });

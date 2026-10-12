@@ -113,10 +113,15 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
 
   it("la page d'un signalement : anglais sérialisé sous /en, au chargement complet seulement", () => {
     const layout = readSource("app/(secured)/signalements/[id]/layout.tsx");
-    expect(layout).toContain('const messages = locale === "en" && (await isDocumentLoad()) ? all.reports : undefined;');
+    expect(layout).toContain("const messages = await englishOnDocumentLoad(locale, (all) => all.reports);");
     expect(readSource("app/(secured)/profil/layout.tsx")).toContain(
-      'locale === "en" && (await isDocumentLoad()) ? { profile: all.profile, teamErrors: all.teamErrors, push: all.push } : undefined;',
+      "const messages = await englishOnDocumentLoad(locale, (all) => ({ profile: all.profile, teamErrors: all.teamErrors, push: all.push }));",
     );
+    // Une seule porte (revue de sécurité du lot 9-2) : aucun écran ne recopie la règle.
+    for (const file of ["app/(secured)/equipes/layout.tsx", "app/(secured)/equipes/[id]/layout.tsx", "app/(secured)/joueurs/layout.tsx", "app/(secured)/joueurs/[id]/layout.tsx"]) {
+      expect(readSource(file)).toContain("await englishOnDocumentLoad(locale, ");
+      expect(readSource(file)).not.toContain("isDocumentLoad()");
+    }
     // L'écran d'attente n'est plus sérialisé : rendu par le client (`EnglishGateFallback`).
     expect(layout).not.toContain("fallback=");
     expect(readSource("app/(secured)/profil/layout.tsx")).not.toContain("fallback=");
@@ -263,6 +268,11 @@ describe("dates en heure de Paris, formateur réutilisé", () => {
     expect(formatQuarantineDate(date, "en-US")).toBe(date.toLocaleDateString("en-US", options));
     // Deuxième appel : le formateur gardé rend la même chose.
     expect(formatQuarantineDate(date, "en-US")).toBe("January 1, 2027");
+  });
+
+  it("date illisible : chaîne vide, sans lever (la page d'un signalement ne tombe pas)", () => {
+    expect(formatQuarantineDate(new Date(""))).toBe("");
+    expect(formatQuarantineDate(new Date("pas une date"), "en-US")).toBe("");
   });
 
   it("les dates du formulaire de contestation se forment une fois par langue", () => {
