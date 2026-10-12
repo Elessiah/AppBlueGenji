@@ -105,7 +105,10 @@ création / d'édition (BG Survie seulement), **décochée par défaut**.
 - **Sans plafond, ou en saisie de score libre** (aucun format de match, donc
   aucune élimination mathématiquement acquise), l'option n'a aucun effet :
   `earlyExitApplies` (`lib/shared/bg-survie/config.ts`) le décide pour tous. La
-  case est alors grisée (comme « Égalités ») avec la raison en aide, et le
+  case est alors grisée et montrée décochée (comme « Égalités » ; la valeur
+  enregistrée reste), la raison en tête de l'aide en nommant le réglage à
+  changer — sauf si ce réglage ou la case sont figés, le verrou disant déjà
+  pourquoi —, et le
   panneau des règles (`?tournoi=`) n'affiche la ligne « Sortie anticipée « hors
   course » » (Oui / Non) que lorsqu'elle peut jouer.
 - **Migration** (`addEnduranceEarlyExit`, `data-migrations.ts`) : le défaut `0`
