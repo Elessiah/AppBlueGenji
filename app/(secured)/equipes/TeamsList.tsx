@@ -107,9 +107,15 @@ export default function TeamsList() {
     JSON.stringify([deferredQuery.trim().toLowerCase(), gameFilter, sort]),
   );
 
-  const totalMembers = teams.reduce((sum, team) => sum + team.membersCount, 0);
-  const countOw = teams.filter((team) => team.games.includes("OW")).length;
-  const countMr = teams.filter((team) => team.games.includes("MR")).length;
+  // Comptés une fois par liste, pas à chaque frappe dans la recherche (revue de performance du lot 9-2).
+  const { totalMembers, countOw, countMr } = useMemo(
+    () => ({
+      totalMembers: teams.reduce((sum, team) => sum + team.membersCount, 0),
+      countOw: teams.filter((team) => team.games.includes("OW")).length,
+      countMr: teams.filter((team) => team.games.includes("MR")).length,
+    }),
+    [teams],
+  );
 
   const accentStyle = {
     "--g-rgb": ACCENT_RGB,

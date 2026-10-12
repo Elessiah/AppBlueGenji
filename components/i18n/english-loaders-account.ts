@@ -24,9 +24,6 @@ export const englishPlayers = /* @__PURE__ */ onceLoader<Messages["players"]>(()
  * porte le français, que ce module n'importe pas).
  */
 export const englishStatsPanel = /* @__PURE__ */ onceLoader<StatsPanelMessages>(() =>
-  Promise.all([import("@/messages/en/stats.json"), import("@/messages/en/labels.json")]).then(([stats, labels]) => ({
-    stats: stats.default,
-    labels: { formatShort: labels.default.formatShort, game: labels.default.game },
-  })),
+  import("./stats-panel-en").then((module) => module.STATS_PANEL_EN),
 );
 

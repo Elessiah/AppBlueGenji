@@ -34,6 +34,7 @@ import { discordInline } from "./discord-text";
 import { SUSPENSION_REASON_MAX_LENGTH, SUSPENSION_REASON_MIN_LENGTH, cleanModerationReason } from "./account-suspension";
 // Type seul : `content-reports.ts` importe les valeurs de ce module.
 import type { ReportCategory } from "./content-reports";
+import { cached } from "./intl-cache";
 
 /** Durée de la quarantaine avant suppression définitive, en mois civils. */
 export const LOGO_QUARANTINE_MONTHS = 6;
@@ -144,16 +145,13 @@ export function formatQuarantineDate(date: Date, intlLocale = "fr-FR"): string {
   return quarantineDateFormat(intlLocale).format(date);
 }
 
-/** Un formateur par langue, construit une fois : `toLocaleDateString` en bâtirait un à chaque date. */
+/** Un formateur par langue, construit une fois (`cached`) : `toLocaleDateString` en bâtirait un à chaque date. */
 const QUARANTINE_DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
 
 function quarantineDateFormat(intlLocale: string): Intl.DateTimeFormat {
-  let format = QUARANTINE_DATE_FORMATS.get(intlLocale);
-  if (!format) {
-    format = new Intl.DateTimeFormat(intlLocale, { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });
-    QUARANTINE_DATE_FORMATS.set(intlLocale, format);
-  }
-  return format;
+  return cached(QUARANTINE_DATE_FORMATS, intlLocale, (locale) =>
+    new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

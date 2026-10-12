@@ -94,7 +94,9 @@ export function useLocaleRouter(): LocaleRouter {
         }
       },
       prefetch(href) {
-        if (!crossesLocale(href, locale)) router.prefetch(localeHref(href, locale));
+        if (crossesLocale(href, locale)) return;
+        if (locale === "en") preloadRoute(href);
+        router.prefetch(localeHref(href, locale));
       },
       back: () => router.back(),
       forward: () => router.forward(),

@@ -16,6 +16,7 @@ import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCenterLazy";
+import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { needsTermsForTeamManagement } from "@/lib/server/terms-acceptance";
@@ -313,6 +314,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               s'ouvre à l'heure du match, où qu'il se trouve sur le site. Chargée
               à la demande : hors du premier chargement de chaque page. */}
           {user && <MatchLaunchCenterLazy privacyPending={privacyChanges.length > 0} />}
+          {/* Sous `/en`, l'anglais de l'espace connecté part au survol de ses liens, depuis toute page (revue de performance du lot 9-2). */}
+          {user && locale === "en" && <EnglishLinkPreload />}
           {children}
         </ToastProvider>
         </PodiumTiersProvider>

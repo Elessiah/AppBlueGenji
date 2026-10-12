@@ -1,6 +1,6 @@
 "use client";
 
-import { quietPreload, type OnceLoader } from "@/lib/shared/lazy-component";
+import { quietPreload } from "@/lib/shared/lazy-component";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
 import { englishProfile, englishPush, englishTeamErrors } from "./english-loaders-account";
@@ -24,12 +24,6 @@ function loadProfileEnglish(): Promise<ProfileEnglishMessages> {
     push,
   }));
 }
-
-/** Le chargeur composé de `/profil`, au format d'un `OnceLoader` (l'amorce passe par les fournisseurs). */
-export const englishProfileMessages: Pick<OnceLoader<ProfileEnglishMessages>, "load" | "loaded"> = {
-  load: loadProfileEnglish,
-  loaded: loadedProfileEnglish,
-};
 
 const preloadProfile = /* @__PURE__ */ quietPreload(loadProfileEnglish);
 
