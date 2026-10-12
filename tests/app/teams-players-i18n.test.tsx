@@ -532,6 +532,14 @@ describe("revue UI/UX", () => {
     }
   });
 
+  it("fiche joueur : « introuvable » dit la même phrase en page et en notification ; colonne « Place » comme l'équipe", () => {
+    for (const locale of LOCALES) {
+      const { players, team } = messagesFor(locale);
+      expect(players.page.notFound).toBe(players.errors.PLAYER_NOT_FOUND);
+      expect(players.page.tournamentsColumn.rank).toBe(team.history.column.rank);
+    }
+  });
+
   it("fiche d'équipe : un échec de chargement n'est pas « introuvable »", () => {
     for (const locale of LOCALES) {
       const page = messagesFor(locale).team.page;
