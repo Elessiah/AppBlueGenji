@@ -583,7 +583,7 @@ describe("équivalence avec next-intl, message par message", () => {
             count, max: 32, min: 20, label: "Discord", handle: "nova", time: "10:00", tag: "nova", purpose: "P", audience: "A", rename: "R",
             change: "C", removed: "Removed.", backupDays: 30, journalDays: 90, logDays: 365, days: 30, months: 6, channel: "here", id: "9",
             category: "Bug", date: "May 1", status: "Open", length: 3, picker: "Teams", name: "Glaciers", since: "May 1", purge: "Nov 1",
-            width: 50, height: 50, left: 10, top: 10,
+            width: 50, height: 50, left: 10, top: 10, team: "Glaciers",
           };
           expect(`${key}: ${formatMessage(locale, source, values)}`).toBe(`${key}: ${reference("m", values)}`);
         }

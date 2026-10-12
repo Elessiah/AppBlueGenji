@@ -8,7 +8,7 @@ import { readSource } from "../helpers/read-source";
 import { englishReports } from "@/components/i18n/english-loaders";
 import { englishPlayers, englishProfile, englishPush, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "@/components/i18n/english-loaders-account";
 import { preloadEnglishFor } from "@/components/i18n/english-link-targets";
-import { barePath } from "@/components/i18n/english-route-preload";
+import { barePath, englishPageOf, ENGLISH_PAGES } from "@/components/i18n/english-route-preload";
 import { preloadRoute, setRoutePreload } from "@/components/i18n/route-preload";
 
 type Name = "englishReports" | "englishPlayers" | "englishProfile" | "englishPush" | "englishStatsPanel" | "englishTeam" | "englishTeamErrors" | "englishTeams";
@@ -66,9 +66,11 @@ describe("écouteur délégué", () => {
     const listener = readSource("components/i18n/english-link-preload.tsx");
     const route = readSource("components/i18n/english-route-preload.ts");
     expect(route).toContain('const targets = onceLoader(() => import("./english-link-targets"));');
-    // Une page sans anglais à précharger ne télécharge pas la table ; un échec se tait (`quietPreload`).
-    expect(route).toContain("if (!TARGET_PAGES.test(bare)) return;");
+    // Une page sans anglais à précharger ne télécharge pas la table ; un échec se tait (`quietPreload`) ;
+    // toutes les pages demandées pendant son arrivée sont servies.
+    expect(route).toContain("if (!page) return;");
     expect(route).toContain("const warmTargets = quietPreload(");
+    expect(route).toContain("for (const page of wanted) module.preloadEnglishPage(page);");
     expect(listener).toContain('if (href.startsWith("/en/")) preloadEnglishRoute(href.slice(3));');
     expect(listener).toContain("setRoutePreload(preloadEnglishRoute);");
     // Les navigations par le code passent par le registre, sans `import()` dans le module de chaque page.
@@ -91,7 +93,9 @@ describe("écouteur délégué", () => {
     expect(gates).toContain("useNestedEnglish(locale, PLAYER_ROUTES, messages !== undefined);");
     // Chargement complet : rien de lancé pour la page d'arrivée, qui amorce le sien.
     expect(gates).toContain("if (locale !== \"en\" || path === arrival.current) return;");
-    expect(gates).toContain("[/^\\/equipes\\/\\d+\\/?$/, [englishTeam, englishStatsPanel]],");
+    // Une seule table des pages (`ENGLISH_PAGES`), lue aussi par les portes.
+    expect(gates).toContain("const TEAM_ROUTES = { teamPage: [englishTeam, englishStatsPanel], teams: [englishTeams] };");
+    expect(gates).toContain("const page = englishPageOf(path);");
     // Le chemin suivi : une navigation par le code sous une porte montée relance.
     expect(gates).toContain("}, [locale, path, routes]);");
   });
@@ -119,5 +123,24 @@ describe("registre des navigations par le code", () => {
     setRoutePreload(null);
     preloadRoute("/equipes/3");
     expect(seen).toEqual(["/equipes/2"]);
+  });
+});
+
+describe("une seule table des pages", () => {
+  it("chaque page de la table a son préchargement ; le reste n'en a pas", () => {
+    expect(Object.keys(ENGLISH_PAGES).sort()).toEqual(["playerPage", "players", "profile", "report", "teamPage", "teams"]);
+    expect(englishPageOf("/equipes/12/")).toBe("teamPage");
+    expect(englishPageOf("/equipes/creer?x=1")).toBe("teams");
+    expect(englishPageOf("/joueurs#top")).toBe("players");
+    expect(englishPageOf("/tournois/4")).toBeNull();
+    const sample: Record<keyof typeof ENGLISH_PAGES, string> = {
+      profile: "/profil",
+      teamPage: "/equipes/1",
+      teams: "/equipes",
+      playerPage: "/joueurs/1",
+      players: "/joueurs",
+      report: "/signalements/1",
+    };
+    for (const path of Object.values(sample)) expect(preloaded(path).length).toBeGreaterThan(0);
   });
 });

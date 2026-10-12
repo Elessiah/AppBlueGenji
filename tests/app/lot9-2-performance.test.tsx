@@ -372,3 +372,31 @@ describe("une seule amorce par espace, préchargement de /profil sur ses liens",
     expect(readSource("app/(secured)/layout.tsx")).toContain("{english && <EnglishLinkPreload />}");
   });
 });
+
+describe("revue performance, douzième passe", () => {
+  it("un échec de chargement de l'anglais n'est pas définitif : retenté après le silence", () => {
+    const hook = readSource("components/i18n/use-english-messages.ts");
+    expect(hook).toContain("}, PRELOAD_RETRY_MS);");
+    expect(hook).toContain("if (loaded) setEnglish(loaded);");
+  });
+
+  it("invitations : une réponse à la fois, nom accessible avec l'équipe (FR + EN)", () => {
+    const page = readSource("app/(secured)/profil/page.tsx");
+    expect(page).toContain("if (respondingRef.current) return;");
+    expect(page).toContain('aria-label={t("invitations.acceptLabel", { team: visibleText(inv.teamName) })}');
+    expect(page).toContain('aria-label={t("invitations.refuseLabel", { team: visibleText(inv.teamName) })}');
+    expect(page.match(/aria-disabled=\{respondingInvitation !== null \|\| undefined\}/g)).toHaveLength(2);
+    expect(FR_PROFILE.t("invitations.acceptLabel", { team: "Glaciers" })).toBe("Accepter l'invitation de Glaciers");
+  });
+
+  it("dialogues Discord : le corps défile dans une zone nommée, jamais la boîte", () => {
+    for (const [path, key] of [
+      ["app/(secured)/profil/DiscordVerificationDialog.tsx", "verify"],
+      ["app/(secured)/profil/DiscordBotHandleDialog.tsx", "botHandle"],
+    ] as const) {
+      const source = readSource(path);
+      expect(source).not.toContain('overflowY: "auto"');
+      expect(source).toContain(`<ScrollArea orientation="y" ariaLabel={t("${key}.bodyLabel")}`);
+    }
+  });
+});
