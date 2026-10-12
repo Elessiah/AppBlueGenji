@@ -24,6 +24,26 @@ type SettingsMessages = Pick<Messages["tournament"], "settings" | "matchFormat">
 type SettingsText = ScopedText<Leaves<SettingsMessages>>;
 type LabelMessages = Messages["labels"];
 
+
+/** Barème d'endurance (BG Survie) : capital, barème, plateau, plafond, sortie anticipée. */
+function enduranceSettings(
+  text: SettingsText,
+  endurance: NonNullable<TournamentSettingsInput["endurance"]>,
+): TournamentSetting[] {
+  const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = endurance;
+  const settings: TournamentSetting[] = [
+    { label: text.t("settings.mode.startPoints"), value: text.t("settings.mode.startPointsValue", { count: startPoints }) },
+    { label: text.t("settings.mode.scoring"), value: text.t("settings.mode.enduranceScoring", { win: String(winDelta), loss: String(lossDelta) }) },
+    { label: text.t("settings.mode.playoffSize"), value: String(playoffSize) },
+    { label: text.t("settings.mode.maxRounds"), value: maxRounds === null ? text.t("settings.none") : String(maxRounds) },
+  ];
+  // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
+  if (maxRounds !== null) {
+    settings.push({ label: text.t("settings.mode.earlyExit"), value: text.t(earlyExit ? "settings.yes" : "settings.no") });
+  }
+  return settings;
+}
+
 function matchFormatSetting(text: SettingsText, format: MatchFormat | null): string {
   let label: string;
   if (format) {
@@ -101,20 +121,7 @@ function modeSettings(text: SettingsText, labels: LabelMessages, input: Tourname
       ];
     }
     case "BG_SURVIE": {
-      const settings: TournamentSetting[] = [];
-      if (input.endurance) {
-        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = input.endurance;
-        settings.push(
-          { label: text.t("settings.mode.startPoints"), value: text.t("settings.mode.startPointsValue", { count: startPoints }) },
-          { label: text.t("settings.mode.scoring"), value: text.t("settings.mode.enduranceScoring", { win: String(winDelta), loss: String(lossDelta) }) },
-          { label: text.t("settings.mode.playoffSize"), value: String(playoffSize) },
-          { label: text.t("settings.mode.maxRounds"), value: maxRounds === null ? text.t("settings.none") : String(maxRounds) },
-        );
-        // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
-        if (maxRounds !== null) {
-          settings.push({ label: text.t("settings.mode.earlyExit"), value: text.t(earlyExit ? "settings.yes" : "settings.no") });
-        }
-      }
+      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(text, input.endurance) : [];
       settings.push({
         label: text.t("settings.mode.playoffFormat"),
         value: matchFormatSetting(text, card.endurancePlayoffFormat ?? withoutDraws(card.matchFormat)),

@@ -107,6 +107,23 @@ function phaseDetails(phase: TournamentPhase): string[] {
   return details;
 }
 
+/** Barème d'endurance (BG Survie) : capital, barème, plateau, plafond, sortie anticipée. */
+function enduranceSettings(endurance: NonNullable<TournamentSettingsInput["endurance"]>): TournamentSetting[] {
+  const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = endurance;
+  const settings: TournamentSetting[] = [
+    { label: "Capital de départ", value: plural(startPoints, "point") },
+    { label: "Barème", value: `+${winDelta} par map gagnée · −${lossDelta} par map perdue` },
+    { label: "Qualifiées pour les play-offs", value: String(playoffSize) },
+    {
+      label: "Plafond de manches qualificatives",
+      value: maxRounds === null ? "Aucun" : String(maxRounds),
+    },
+  ];
+  // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
+  if (maxRounds !== null) settings.push({ label: "Sortie anticipée « hors course »", value: yesNo(earlyExit) });
+  return settings;
+}
+
 function modeSettings(input: TournamentSettingsInput): TournamentSetting[] {
   const { card } = input;
   switch (card.format) {
@@ -131,23 +148,7 @@ function modeSettings(input: TournamentSettingsInput): TournamentSetting[] {
       ];
     }
     case "BG_SURVIE": {
-      const settings: TournamentSetting[] = [];
-      if (input.endurance) {
-        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = input.endurance;
-        settings.push(
-          { label: "Capital de départ", value: plural(startPoints, "point") },
-          { label: "Barème", value: `+${winDelta} par map gagnée · −${lossDelta} par map perdue` },
-          { label: "Qualifiées pour les play-offs", value: String(playoffSize) },
-          {
-            label: "Plafond de manches qualificatives",
-            value: maxRounds === null ? "Aucun" : String(maxRounds),
-          },
-        );
-        // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
-        if (maxRounds !== null) {
-          settings.push({ label: "Sortie anticipée « hors course »", value: earlyExit ? "Oui" : "Non" });
-        }
-      }
+      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(input.endurance) : [];
       settings.push({
         label: "Format des play-offs",
         value: matchFormatSettingLabel(card.endurancePlayoffFormat ?? withoutDraws(card.matchFormat)),
