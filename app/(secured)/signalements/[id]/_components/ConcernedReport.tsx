@@ -2,6 +2,7 @@
 
 import { CyberButton, CyberCard } from "@/components/cyber";
 import { TargetThumb } from "@/components/reports/TargetPicker";
+import { PlayerLink, TeamLink } from "@/components/entity-link";
 import {
   REPORT_CATEGORY_DEFINITIONS,
   REPORT_STATUS_PILL,
@@ -27,6 +28,18 @@ function formatDate(iso: string, locale: Locale): string {
  */
 function formatQuarantineDay(iso: string, locale: Locale): string {
   return formatQuarantineDate(new Date(iso), INTL_LOCALE[locale]);
+}
+
+/** Le nom d'une cible : fiche d'un joueur ou d'une équipe par son lien dédié, tournoi par son adresse. */
+function TargetName({ target }: Readonly<{ target: ConcernedReportView["targets"][number] }>) {
+  if (!target.exists) return <span>{target.label}</span>;
+  if (target.type === "USER") return <PlayerLink userId={target.id}>{target.label}</PlayerLink>;
+  if (target.type === "TEAM") return <TeamLink teamId={target.id}>{target.label}</TeamLink>;
+  return (
+    <LocaleLink href={reportTargetHref(target)} className="entity-link">
+      {target.label}
+    </LocaleLink>
+  );
 }
 
 const strong = { strong: (chunks: React.ReactNode[]) => <strong>{chunks}</strong> };
@@ -134,13 +147,7 @@ export function ConcernedReport({
           {report.targets.map((target) => (
             <li key={`${target.type}-${target.id}`}>
               <TargetThumb option={target} />
-              {target.exists ? (
-                <LocaleLink href={reportTargetHref(target)} className="entity-link">
-                  {target.label}
-                </LocaleLink>
-              ) : (
-                <span>{target.label}</span>
-              )}
+              <TargetName target={target} />
             </li>
           ))}
         </ul>

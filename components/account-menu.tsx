@@ -31,11 +31,8 @@ type AccountMenuProps = {
  * tabulation en sort — mêmes règles que le menu de la vitrine.
  */
 export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<AccountMenuProps>) {
-  const router = useLocaleRouter();
-  const { showError } = useToast();
   const { t } = useShellText();
   const [open, setOpen] = useState(false);
-  const [leaving, setLeaving] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -58,19 +55,7 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<A
     };
   }, [open]);
 
-  const onLogout = async () => {
-    if (leaving) return;
-    setLeaving(true);
-    const done = await requestLogout();
-    setLeaving(false);
-    if (!done) {
-      showError(t("account.logoutFailed"));
-      return;
-    }
-    setOpen(false);
-    router.push("/");
-    router.refresh();
-  };
+  const { leaving, logout: onLogout } = useLogout(() => setOpen(false));
 
   const close = () => setOpen(false);
 
@@ -158,6 +143,32 @@ export function AccountMenuPanel({
       </button>
     </div>
   );
+}
+
+/**
+ * Le geste « Déconnexion », commun au menu du compte et au bouton de `/profil` :
+ * un échec se dit (toast) au lieu de ramener à l'accueil un joueur toujours
+ * connecté ; un second clic n'envoie rien de plus, et le bouton reste occupé
+ * jusqu'à l'accueil (`leaving` ne retombe qu'après un échec).
+ */
+export function useLogout(onSuccess?: () => void): { leaving: boolean; logout: () => Promise<void> } {
+  const router = useLocaleRouter();
+  const { showError } = useToast();
+  const { t } = useShellText();
+  const [leaving, setLeaving] = useState(false);
+  const logout = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    if (!(await requestLogout())) {
+      setLeaving(false);
+      showError(t("account.logoutFailed"));
+      return;
+    }
+    onSuccess?.();
+    router.push("/");
+    router.refresh();
+  };
+  return { leaving, logout };
 }
 
 /**

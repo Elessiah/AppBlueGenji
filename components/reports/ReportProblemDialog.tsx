@@ -575,7 +575,7 @@ function ContestField({
             {t("dialog.contestOption", {
               id: String(option.id),
               category: t(`categories.${option.category}.label`),
-              date: new Date(option.createdAt).toLocaleDateString(INTL_LOCALE[text.locale]),
+              date: new Date(option.createdAt).toLocaleDateString(INTL_LOCALE[text.locale], { day: "numeric", month: "long", year: "numeric" }),
               status: t(`status.${option.status}`),
             })}
           </option>

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, type ComponentType, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
 import { useOptionalToast } from "@/components/ui/toast";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { isChunkLoadError, reloadAfterChunkError } from "@/lib/shared/lazy-component";
+import { isChunkLoadError } from "@/lib/shared/lazy-component";
 import type { ReportProblemDialogProps } from "./ReportProblemDialog";
 
 /**
@@ -18,9 +18,10 @@ import type { ReportProblemDialogProps } from "./ReportProblemDialog";
  * Chargement à la main plutôt que `next/dynamic` : un échec ne doit pas rester
  * en mémoire sous la forme d'un composant vide (le bouton ne ferait plus rien).
  * Le morceau part dès le survol ou le focus du bouton ; le bouton se dit occupé
- * (`aria-busy`) tant qu'il n'est pas arrivé ; un échec le dit (toast), se
- * retente au clic suivant, et un morceau disparu (déploiement entre la page et
- * le clic) recharge la page quand c'est sûr (`reloadAfterChunkError`).
+ * (`aria-busy`, « … », région d'état) tant qu'il n'est pas arrivé ; un échec
+ * le dit (toast) et se retente au clic suivant. Un morceau disparu (déploiement
+ * entre la page et le clic) invite à recharger la page, sans la recharger
+ * d'office : une saisie en cours ailleurs sur la page serait perdue.
  */
 type Dialog = ComponentType<ReportProblemDialogProps>;
 let loadedDialog: Dialog | null = null;
@@ -76,28 +77,37 @@ export function ReportProblemButton({
   const [ReportProblemDialog, setDialog] = useState<Dialog | null>(() => loadedDialog);
   const [pending, setPending] = useState(false);
   const { t } = useShellText();
+  // Toujours posé par la mise en page racine ; `null` seulement pour un pied de
+  // page rendu seul (tests) — le geste reste alors muet plutôt que de lever.
   const toast = useOptionalToast();
+  // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
+  // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
+  const { path: pathname } = useLocalePathname();
+  // Le pied de page survit à une navigation : un formulaire arrivé après que
+  // le lecteur a changé de page ne s'ouvre pas sur la nouvelle.
+  const currentPath = useRef(pathname);
+  useEffect(() => {
+    currentPath.current = pathname;
+  }, [pathname]);
+
   const openDialog = () => {
-    if (ReportProblemDialog) {
+    // Déjà là : chargé par un autre bouton, ou préchargé au survol.
+    const ready = ReportProblemDialog ?? loadedDialog;
+    if (ready) {
+      setDialog(() => ready);
       setOpen(true);
       return;
     }
     if (pending) return;
     setPending(true);
+    const clickedOn = pathname;
     loadDialog()
       .then((loaded) => {
         setDialog(() => loaded);
-        setOpen(true);
+        if (currentPath.current === clickedOn) setOpen(true);
       })
       .catch((error: unknown) => {
-        // Un morceau disparu (déploiement) : la page se recharge dès que c'est
-        // sûr — le dire, plutôt que d'inviter à réessayer sous un rechargement.
-        if (isChunkLoadError(error)) {
-          reloadAfterChunkError();
-          toast?.showError(t("footer.reportReloading"));
-          return;
-        }
-        toast?.showError(t("footer.reportLoadFailed"));
+        toast?.showError(t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed"));
       })
       .finally(() => setPending(false));
   };
@@ -114,9 +124,6 @@ export function ReportProblemButton({
   // Le chargement se voit (points de suspension) et s'annonce (région d'état,
   // toujours présente pour qu'un lecteur d'écran lise son changement).
   const busyMark = pending ? <span aria-hidden="true">…</span> : null;
-  // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
-  // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
-  const { path: pathname } = useLocalePathname();
 
   return (
     <>
