@@ -52,6 +52,11 @@ export default function PlayersList() {
   // — c'est le seul moyen de retrouver un adversaire d'un tournoi passé.
   const [showDeleted, setShowDeleted] = useState(false);
 
+  // Le texte par une référence : l'annuaire ne se relit jamais sur un simple
+  // changement de texte (revue de performance du lot 9-2).
+  const textRef = useRef(text);
+  textRef.current = text;
+
   useEffect(() => {
     fetch("/api/players", { cache: "no-store" })
       .then(async (response) => {
@@ -61,8 +66,8 @@ export default function PlayersList() {
         }
         setPlayers(payload.players);
       })
-      .catch((e) => showError(playerErrorMessage(text, (e as Error).message, "PLAYERS_LOAD_FAILED")));
-  }, [showError, text]);
+      .catch((e) => showError(playerErrorMessage(textRef.current, (e as Error).message, "PLAYERS_LOAD_FAILED")));
+  }, [showError]);
 
   // L'annuaire, comptes supprimés compris ou non : tout ce que la page montre
   // ou compte en descend, sinon la case à cocher changerait la liste sans
