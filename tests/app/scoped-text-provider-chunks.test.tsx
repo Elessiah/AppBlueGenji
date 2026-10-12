@@ -25,10 +25,8 @@ const LAYOUT_PROVIDERS = [
   { layout: "app/(secured)/joueurs/layout.tsx", provider: "components/i18n/players-text-provider.tsx" },
   { layout: "app/(secured)/equipes/layout.tsx", provider: "components/i18n/team-errors-text-provider.tsx" },
   // Lot 9-2 : le profil pose ses textes et la table des refus d'équipe.
-  { layout: "app/(secured)/profil/layout.tsx", provider: "components/i18n/profile-text-provider.tsx" },
-  { layout: "app/(secured)/profil/layout.tsx", provider: "components/i18n/team-errors-text-provider.tsx" },
-  // Lot 9-2, revue performance : le réglage des notifications et la page d'un signalement.
-  { layout: "app/(secured)/profil/layout.tsx", provider: "components/notifications/push-text-provider.tsx" },
+  // Lot 9-2, revue performance : la page d'un signalement (le profil passe par
+  // `ProfileTextProviders`, plus bas).
   { layout: "app/(secured)/signalements/[id]/layout.tsx", provider: "components/reports/reports-text-provider.tsx" },
 ];
 
@@ -48,7 +46,34 @@ describe("fournisseur posé par une mise en page : sans le français", () => {
       .split("\n")
       .filter((line) => line.startsWith("import ") && !line.startsWith("import type "))
       .map((line) => /from\s+"([^"]+)"/.exec(line)?.[1]);
-    expect(valueImports).toEqual([expect.stringMatching(/^(\.|@\/components\/i18n)\/scoped-text-context$/)]);
+    expect(valueImports[0]).toMatch(/^(\.|@\/components\/i18n)\/scoped-text-context$/);
+    // Le fournisseur des signalements remet aussi l'anglais reçu au chargeur du pied de page (module sans texte).
+    expect(valueImports.slice(1)).toEqual(provider.includes("reports-text-provider") ? ["./report-form-loader"] : []);
+  });
+});
+
+describe("profil : fournisseurs sans français, anglais une seule fois", () => {
+  const PROVIDERS = [
+    "components/i18n/profile-text-provider.tsx",
+    "components/i18n/team-errors-text-provider.tsx",
+    "components/notifications/push-text-provider.tsx",
+  ];
+
+  it("la mise en page n'importe que les fournisseurs, sans texte", () => {
+    const layout = "app/(secured)/profil/layout.tsx";
+    expect(importsOf(layout)).toContain("@/components/i18n/profile-text-providers");
+    expect(importsOf(layout).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+  });
+
+  it("ProfileTextProviders : aucun JSON, anglais chargé à part", () => {
+    const module = "components/i18n/profile-text-providers.tsx";
+    expect(importsOf(module).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+    for (const provider of PROVIDERS) {
+      const name = provider.split("/").pop()!.replace(/\.tsx$/, "");
+      expect(importsOf(module).some((spec) => spec.endsWith(name))).toBe(true);
+    }
+    expect(source(module)).toContain('import("./profile-english-messages")');
+    expect(source(module)).toMatch(/import type \{ ProfileEnglishMessages \} from "\.\/profile-english-messages"/);
   });
 });
 

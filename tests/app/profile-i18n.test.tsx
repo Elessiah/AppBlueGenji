@@ -9,6 +9,9 @@ import type { ReactElement, ReactNode } from "react";
 
 let mockLocale: "fr" | "en" = "en";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
+// Chargement complet par défaut ; `"0"` : requête de navigation ou de `router.refresh()` (middleware).
+let mockDocument: string | null = null;
+jest.mock("next/headers", () => ({ headers: async () => new Headers(mockDocument === null ? {} : { "x-bg-document": mockDocument }) }));
 jest.mock("next/navigation", () => ({
   usePathname: () => "/en/profil",
   useParams: () => ({ id: "9" }),
@@ -233,13 +236,22 @@ describe("liste blanche et métadonnées", () => {
     expect((await reportsMetadata("12")).alternates).toEqual(expect.objectContaining({ canonical: "/signalements/12" }));
   });
 
-  it("la mise en page ne sérialise l'anglais que sous /en", async () => {
+  it("la mise en page ne sérialise l'anglais que sous /en, au chargement complet seulement", async () => {
+    type Props = { messages?: { profile: unknown; teamErrors: unknown; push: unknown } };
     mockLocale = "fr";
-    const fr = (await ProfileLayout({ children: null })) as ReactElement<{ messages?: unknown }>;
+    const fr = (await ProfileLayout({ children: null })) as ReactElement<Props>;
     expect(fr.props.messages).toBeUndefined();
     mockLocale = "en";
-    const en = (await ProfileLayout({ children: null })) as ReactElement<{ messages?: unknown }>;
-    expect(en.props.messages).toBe(EN.teamErrors);
+    const en = (await ProfileLayout({ children: null })) as ReactElement<Props>;
+    expect(en.props.messages).toEqual({ profile: EN.profile, teamErrors: EN.teamErrors, push: EN.push });
+    // `router.refresh()` ou navigation : aucun dictionnaire renvoyé, le client garde le sien.
+    mockDocument = "0";
+    try {
+      const refreshed = (await ProfileLayout({ children: null })) as ReactElement<Props>;
+      expect(refreshed.props.messages).toBeUndefined();
+    } finally {
+      mockDocument = null;
+    }
   });
 });
 
@@ -468,11 +480,11 @@ describe("anglais — écrans", () => {
     const file = new File(["x"], "logo.png", { type: "image/png" });
     globalThis.URL.createObjectURL ??= () => "blob:x";
     effects.armed = true;
-    const html = inEnglish(<ImageCropDialog file={file} kind="avatar" title="Crop your avatar" onCancel={() => undefined} onConfirm={() => undefined} />);
+    const html = inEnglish(<ImageCropDialog file={file} kind="avatar" title="Crop your avatar" onCancel={() => undefined} onConfirm={() => undefined} englishMessages={EN.imageCrop} />);
     expect(html).toContain("Confirm crop");
     expectEnglish(html);
     effects.armed = true;
-    const staff = inEnglish(<ImageCropDialog file={file} kind="avatar" title="Recadrer" onCancel={() => undefined} onConfirm={() => undefined} lang="fr" />);
+    const staff = inEnglish(<ImageCropDialog file={file} kind="avatar" title="Recadrer" onCancel={() => undefined} onConfirm={() => undefined} lang="fr" englishMessages={EN.imageCrop} />);
     expect(staff).toContain("Valider le recadrage");
     expect(staff).toMatch(/role="dialog"[^>]*lang="fr"/);
   });

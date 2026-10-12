@@ -15,7 +15,7 @@ import { PushTextProvider } from "@/components/notifications/push-text-provider"
 import { FR_PROFILE, lookupCode } from "@/app/(secured)/profil/_lib/profile-text";
 import { FR_PROFILE_TEXT } from "@/components/i18n/profile-text";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
-import { onceLoader } from "@/lib/shared/lazy-component";
+import { onceLoader, PRELOAD_RETRY_MS, quietPreload } from "@/lib/shared/lazy-component";
 import enReports from "@/messages/en/reports.json";
 import enPush from "@/messages/en/push.json";
 import FR_SHELL from "@/messages/fr/shell.json";
@@ -39,6 +39,9 @@ describe("aucun anglais importé d'office", () => {
     "components/notifications/push-text.ts",
     "components/notifications/PushNotificationsPanel.tsx",
     "components/ui/image-crop-dialog.tsx",
+    "components/ui/image-crop-dialog-view.tsx",
+    "components/i18n/profile-text-providers.tsx",
+    "app/(secured)/profil/layout.tsx",
   ])("%s n'importe aucun JSON anglais", (path) => {
     expect(valueImports(path).filter((spec) => spec.startsWith("@/messages/en/"))).toEqual([]);
   });
@@ -50,6 +53,8 @@ describe("aucun anglais importé d'office", () => {
     expect(launch).toContain('if (locale !== "en" || english) return;');
     expect(launch).toContain('if (locale === "en" && !english) return null;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
+    // Parti dès qu'un match se lance, avant l'ouverture de la fenêtre.
+    expect(launch).toContain('if (text.locale === "en" && hasLaunches) englishPush.load().catch(() => undefined);');
     // La documentation de la cadence reste collée à sa fonction.
     expect(launch).toContain("/** Cadence de relève selon la phase la plus pressante de la liste. */\nfunction launchPollInterval(");
   });
@@ -58,14 +63,27 @@ describe("aucun anglais importé d'office", () => {
 describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulement", () => {
   const button = readSource("components/reports/ReportProblemButton.tsx");
 
+  const loader = readSource("components/reports/report-form-loader.ts");
+
   it("le formulaire et son anglais partent à la demande", () => {
-    expect(dynamicImports("components/reports/ReportProblemButton.tsx")).toEqual(["./ReportProblemDialog", "@/messages/en/reports.json"]);
-    expect(button).toContain('if (locale !== "en") return dialogLoader.load();');
-    expect(button).toContain('return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();');
+    expect(dynamicImports("components/reports/report-form-loader.ts")).toEqual(["./ReportProblemDialog", "@/messages/en/reports.json"]);
+    expect(dynamicImports("components/reports/ReportProblemButton.tsx")).toEqual([]);
+    expect(loader).toContain('if (locale !== "en") return dialogLoader.load();');
+    expect(loader).toContain('return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();');
+    // Le formulaire se lit du chargeur à chaque rendu, sans état en double.
+    expect(button).toContain("const ReportProblemDialog = open ? loadedReportForm(locale) : null;");
+    expect(button).not.toContain("setDialog");
+  });
+
+  it("l'anglais déjà servi par une page n'est pas retéléchargé par le pied de page", () => {
+    expect(readSource("components/reports/reports-text-provider.tsx")).toContain(
+      'if (props.locale === "en" && props.messages) primeEnglishReports(props.messages);',
+    );
+    expect(loader).toContain("englishLoader.prime(messages);");
   });
 
   it("le formulaire pose lui-même son fournisseur, anglais seulement sous /en", () => {
-    expect(button).toContain('englishMessages={locale === "en" ? (englishLoader.loaded() ?? undefined) : undefined}');
+    expect(button).toContain('englishMessages={locale === "en" ? (loadedEnglishReports() ?? undefined) : undefined}');
     // Le bouton, au pied de chaque page, ne porte pas la mécanique du fournisseur.
     expect(valueImports("components/reports/ReportProblemButton.tsx")).not.toContain("./reports-text-provider");
     expect(readSource("components/reports/ReportProblemDialog.tsx")).toContain(
@@ -79,10 +97,10 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
     expect(dynamicImports(page)).toEqual([]);
   });
 
-  it("un préchargement raté ne se relance pas à chaque survol ; le clic retente", () => {
-    expect(button).toContain("if (preloadFailed) return;");
-    expect(button).toMatch(/loadForm\(locale\)\.catch\(\(\) => \{\s*preloadFailed = true;/);
-    expect(button).toContain("loadForm(locale)\n      .then((loaded) => {");
+  it("préchargement : rien si tout est là, discret après un échec ; le clic retente", () => {
+    expect(loader).toContain("if (loadedReportForm(locale)) return;");
+    expect(loader).toContain('const preloadEnglish = quietPreload(() => loadReportForm("en"));');
+    expect(button).toContain("loadReportForm(locale)\n      .then(() => {");
   });
 
   it("la page d'un signalement : anglais sérialisé sous /en seulement", () => {
@@ -132,8 +150,8 @@ describe("modale de recadrage chargée à la demande", () => {
   const hook = readSource("components/ui/image-crop-dialog.tsx");
 
   it("le crochet ne charge la modale qu'à l'ouverture", () => {
-    expect(dynamicImports("components/ui/image-crop-dialog.tsx")).toEqual(["./image-crop-dialog-view"]);
-    expect(hook).toContain('import type { ImageCropDialogProps } from "./image-crop-dialog-view";');
+    expect(dynamicImports("components/ui/image-crop-dialog.tsx")).toEqual(["./image-crop-dialog-view", "@/messages/en/imageCrop.json"]);
+    expect(hook).toContain('import type { ImageCropDialogProps, ImageCropMessages } from "./image-crop-dialog-view";');
     expect(valueImports("components/ui/image-crop-dialog.tsx")).not.toContain("./image-crop-dialog-view");
   });
 
@@ -143,12 +161,13 @@ describe("modale de recadrage chargée à la demande", () => {
     expect(valueImports("components/ui/image-crop-dialog.tsx")).not.toContain("next/dynamic");
     expect(hook).not.toContain("orReload }");
     expect(hook).not.toContain("orReload,");
-    expect(hook).toContain("await cropDialogLoader.load();");
+    expect(hook).toContain("await Promise.all([cropDialogLoader.load(), english ? englishCropLoader.load() : null]);");
     expect(hook).toContain('showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));');
     expect(hook).toMatch(/imageCropLoad\.failed"\)\);\s*return null;/);
     expect(hook).toContain("const cropDialog = request && ImageCropDialog ? (");
-    // Le préchargement raté ne se relance pas à chaque clic.
-    expect(hook).toContain("if (preloadFailed) return;");
+    // Le préchargement raté se tait un moment (`quietPreload`), rien s'il est déjà là.
+    expect(hook).toContain("const preloadCropDialog = quietPreload(() => cropDialogLoader.load());");
+    expect(hook).toContain("if (cropDialogLoader.loaded()) return;");
   });
 
   it("messages d'échec du recadrage dans les deux langues", () => {
@@ -256,5 +275,60 @@ describe("onceLoader : un chargement partagé, un échec retenté", () => {
     expect(await loader.load()).toBe(42);
     expect(calls).toBe(2);
     expect(loader.loaded()).toBe(42);
+  });
+});
+
+describe("onceLoader.prime et quietPreload", () => {
+  it("prime fournit le résultat sans rien charger, sans écraser un résultat déjà là", async () => {
+    let calls = 0;
+    const loader = onceLoader(async () => {
+      calls += 1;
+      return "chargé";
+    });
+    loader.prime("reçu");
+    expect(loader.loaded()).toBe("reçu");
+    loader.prime("autre");
+    expect(loader.loaded()).toBe("reçu");
+    expect(calls).toBe(0);
+  });
+
+  it("un préchargement raté se tait PRELOAD_RETRY_MS, puis se relance", async () => {
+    let clock = 0;
+    let calls = 0;
+    let fail = true;
+    const preload = quietPreload(async () => {
+      calls += 1;
+      if (fail) throw new Error("hors ligne");
+    }, () => clock);
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+    preload();
+    await settle();
+    expect(calls).toBe(1);
+    preload();
+    clock = PRELOAD_RETRY_MS - 1;
+    preload();
+    await settle();
+    expect(calls).toBe(1);
+    clock = PRELOAD_RETRY_MS;
+    fail = false;
+    preload();
+    await settle();
+    expect(calls).toBe(2);
+    // Réussi : le geste suivant repart aussitôt (le chargeur, lui, rend son résultat gardé).
+    preload();
+    await settle();
+    expect(calls).toBe(3);
+  });
+});
+
+describe("modale de recadrage : anglais passé par le crochet", () => {
+  it("français sans anglais fourni, ou imposé ; anglais sinon", async () => {
+    const { default: enImageCrop } = await import("@/messages/en/imageCrop.json");
+    const view = readSource("components/ui/image-crop-dialog-view.tsx");
+    expect(view).toContain('if (lang === "fr" || !englishMessages) return FR_CROP_TEXT;');
+    expect(enImageCrop).toHaveProperty("confirm");
+    expect(readSource("components/ui/image-crop-dialog.tsx")).toContain(
+      "englishMessages={english ? (englishCropLoader.loaded() ?? undefined) : undefined}",
+    );
   });
 });

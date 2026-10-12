@@ -77,12 +77,12 @@ describe("bouton du formulaire de signalement", () => {
 
   it("précharge au survol et au focus, se dit occupé pendant le chargement", () => {
     const button = source("components/reports/ReportProblemButton.tsx");
-    expect(button).toContain("onPointerEnter: () => preloadForm(locale),");
-    expect(button).toContain("onFocus: () => preloadForm(locale),");
+    expect(button).toContain("onPointerEnter: () => preloadReportForm(locale),");
+    expect(button).toContain("onFocus: () => preloadReportForm(locale),");
     expect(button).toContain('"aria-busy": pending || undefined');
     // Un seul chargement partagé, retenté après un échec, qui le dit.
     // Un seul chargement, un échec se retente (`onceLoader`, revue de performance).
-    expect(button).toContain('const dialogLoader = onceLoader<Dialog>(() => import("./ReportProblemDialog")');
+    expect(source("components/reports/report-form-loader.ts")).toContain('const dialogLoader = onceLoader<ReportDialog>(() => import("./ReportProblemDialog")');
     expect(button).toContain('const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");');
     expect(button).not.toContain('from "next/dynamic"');
   });
@@ -172,7 +172,7 @@ describe("revue UI/UX, troisième passe", () => {
     // Après un clic, jamais de rechargement d'office (une saisie en cours serait perdue).
     expect(button).not.toContain("reloadAfterChunkError");
     // Préchargé au survol : le clic ouvre sans passer par l'attente.
-    expect(button).toContain("const ready = loadedForm(locale);");
+    expect(button).toContain("if (loadedReportForm(locale)) {");
     // Arrivé après un changement de page : ouvert quand même (suite du clic, page affichée retenue).
     expect(button).not.toContain("currentPath");
   });
