@@ -261,6 +261,17 @@ export function privacyChangePush(titles: readonly string[], locale: Locale = DE
   };
 }
 
+/** Chemin d'une URL absolue (`https://hôte/x?y#z` → `/x?y#z`) ; un chemin reste tel quel. */
+function absoluteUrlPath(url: string): string {
+  if (url.startsWith("/")) return url;
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "/tournois";
+  }
+}
+
 /** Nature d'une alerte d'arbitrage, pour la rédiger sans le texte Discord (français, D6). */
 export type RefereeAlertKind = "score_conflict" | "score_report_stalled" | "other";
 
@@ -279,12 +290,13 @@ export function refereeAlertPush(
 ): PushContent {
   const text = TEXT[locale];
   // Le lien du tournoi est dans la ligne (URL absolue) : c'est là qu'on
-  // arbitre. `buildPushPayload` le ramène à un chemin du site.
+  // arbitre. `buildPushPayload` le ramène à un chemin du site. Dans une autre
+  // langue, il est ramené ici à son chemin pour recevoir le préfixe de langue.
   const url = /https?:\/\/\S+/.exec(message)?.[0] ?? "/tournois";
   return {
     title: text.t("refereeAlert.title"),
     body: locale === "fr" ? stripMarkdown(message) : text.t(`refereeAlert.${kind}`),
-    url: url.startsWith("/") ? localeHref(url, locale) : url,
+    url: locale === DEFAULT_LOCALE ? url : localeHref(absoluteUrlPath(url), locale),
     // Une étiquette **par alerte** (nature et manche) : deux conflits d'un même
     // tournoi ne se remplacent pas, et une même alerte renvoyée après un échec
     // du bot remplace la précédente sans resonner.

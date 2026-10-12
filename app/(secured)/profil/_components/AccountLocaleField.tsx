@@ -2,13 +2,21 @@
 
 import { useState } from "react";
 import { useProfileText } from "@/components/i18n/profile-text";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { isLocale, LOCALES, type Locale } from "@/lib/shared/locales";
 import { profileErrorMessage } from "../profile-errors";
 import s from "../profil.module.css";
 
 /** Nom de chaque langue **dans cette langue** : on reconnaît la sienne sans lire l'autre. */
 const LOCALE_AUTONYMS: Record<Locale, string> = { fr: "Français", en: "English" };
+
+const FIELD_ID = "profile-account-locale";
+const HINT_ID = "profile-account-locale-hint";
+/** Le refus qui désigne ce champ (`PUT /api/profile/locale`). */
+const ACCOUNT_LOCALE_FIELD_ERRORS = { INVALID_LOCALE: "locale" } as const;
+const FIELD_IDS = { locale: FIELD_ID } as const;
 
 /**
  * Langue du compte (`bg_users.locale`, lot 9-3) : celle des notifications push.
@@ -24,6 +32,7 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
   const { showError, showSuccess } = useToast();
   const [locale, setLocale] = useState<Locale>(initial);
   const [busy, setBusy] = useState(false);
+  const fieldErrors = useFieldErrors(ACCOUNT_LOCALE_FIELD_ERRORS, FIELD_IDS);
 
   const save = async (next: string) => {
     // Pendant l'envoi, le champ garde le focus (`aria-disabled`, pas `disabled`
@@ -32,6 +41,7 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
     const previous = locale;
     setLocale(next);
     setBusy(true);
+    fieldErrors.clear();
     try {
       const response = await fetch("/api/profile/locale", {
         method: "PUT",
@@ -43,7 +53,10 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
       showSuccess(t("accountLocale.saved"));
     } catch (e) {
       setLocale(previous);
-      showError(profileErrorMessage((e as Error).message, text));
+      const code = (e as Error).message;
+      const message = profileErrorMessage(code, text);
+      fieldErrors.report(code, message);
+      showError(message);
     } finally {
       setBusy(false);
     }
@@ -51,14 +64,14 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
 
   return (
     <div className={`field ${s.accountLocale}`}>
-      <label htmlFor="profile-account-locale">{t("accountLocale.label")}</label>
+      <label htmlFor={FIELD_ID}>{t("accountLocale.label")}</label>
       <select
-        id="profile-account-locale"
+        id={FIELD_ID}
         value={locale}
         aria-disabled={busy || undefined}
         aria-busy={busy || undefined}
         onChange={(e) => void save(e.target.value)}
-        aria-describedby="profile-account-locale-hint"
+        {...fieldErrors.aria("locale", HINT_ID)}
       >
         {LOCALES.map((code) => (
           <option key={code} value={code} lang={code}>
@@ -66,7 +79,8 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
           </option>
         ))}
       </select>
-      <p id="profile-account-locale-hint" className={s.hint}>
+      <FieldErrorText fieldId={FIELD_ID} message={fieldErrors.message("locale")} />
+      <p id={HINT_ID} className={s.hint}>
         {t("accountLocale.hint")}
       </p>
     </div>

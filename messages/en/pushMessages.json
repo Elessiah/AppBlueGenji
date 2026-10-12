@@ -10,7 +10,7 @@
   "matchReminder": {
     "title": "Match in {offset}",
     "titleScheduled": "Match scheduled",
-    "body": "{pairing} · {tournament}, {round}. Kickoff {start} (Paris time).",
+    "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
     "offset": {
       "P7D": "a week",
       "P1D": "24 hours",

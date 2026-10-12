@@ -196,7 +196,8 @@
       "PSEUDO_ALREADY_USED": "Ce pseudo est déjà pris. Choisis-en un autre.",
       "DISCORD_TAG_LOCKED": "Ton compte Discord est rattaché : ce tag vient de lui. Renomme-toi sur Discord puis reconnecte-toi pour en changer, ou retire-le.",
       "BATTLETAG_LOCKED": "Ton compte Blizzard est rattaché : ce BattleTag vient de lui. Retire Blizzard depuis « Applications connectées » pour en changer, ou décoche « BattleTag OW » pour cesser de le publier.",
-      "ACCOUNT_DELETED": "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée."
+      "ACCOUNT_DELETED": "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée.",
+      "INVALID_LOCALE": "La langue envoyée est invalide. Recharge la page puis réessaie."
     },
     "shared": {
       "UNAUTHORIZED": "Ta session a expiré. Reconnecte-toi.",

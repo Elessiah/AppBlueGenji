@@ -133,7 +133,7 @@
   "saved": "Profile updated.",
   "accountLocale": {
     "label": "Notification language",
-    "hint": "Push notifications reach you in this language. It follows the page's language at every login: your choice here holds until your next login made in the other language.",
+    "hint": "Push notifications reach you in this language. It follows the page's language each time you log in: your choice here holds until you next log in from a page in the other language.",
     "saved": "Notification language saved."
   },
   "avatarUpdated": "Avatar updated.",
@@ -196,7 +196,8 @@
       "PSEUDO_ALREADY_USED": "This username is already taken. Choose another one.",
       "DISCORD_TAG_LOCKED": "Your Discord account is linked: this tag comes from it. Rename yourself on Discord, then log in again to change it, or remove it.",
       "BATTLETAG_LOCKED": "Your Blizzard account is linked: this BattleTag comes from it. Remove Blizzard from “Connected apps” to change it, or untick “OW BattleTag” to stop publishing it.",
-      "ACCOUNT_DELETED": "This account was just deleted: the change wasn't saved."
+      "ACCOUNT_DELETED": "This account was just deleted: the change wasn't saved.",
+      "INVALID_LOCALE": "The language sent is invalid. Reload the page, then try again."
     },
     "shared": {
       "UNAUTHORIZED": "Your session has expired. Log in again.",
