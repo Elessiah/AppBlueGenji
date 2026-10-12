@@ -39,14 +39,14 @@
   },
   "contentReport": {
     "title": "A report concerns you",
-    "body": "Report ({category}): no decision has been made. Read it and contest it if it's unfounded."
+    "body": "Report ({category}): no decision has been made. Read it and appeal it if it's unfounded."
   },
   "moderation": {
     "title": "Moderation decision",
     "logo": {
-      "HIDDEN": "{team}'s logo has been hidden.",
-      "REMOVED": "{team}'s logo has been deleted.",
-      "RESTORED": "{team}'s logo has been restored."
+      "HIDDEN": "The logo of {team} has been hidden.",
+      "REMOVED": "The logo of {team} has been deleted.",
+      "RESTORED": "The logo of {team} has been restored."
     },
     "avatar": {
       "HIDDEN": "Your avatar has been hidden.",
@@ -54,13 +54,13 @@
       "RESTORED": "Your avatar has been restored."
     },
     "next": {
-      "restored": "The contest was accepted.",
-      "contest": "You can contest the decision.",
+      "restored": "The appeal was accepted.",
+      "contest": "You can appeal the decision.",
       "writeUs": "Write to the association if you hold the rights to it."
     }
   },
   "suspension": {
-    "suspended": "Your account has been suspended. The decision, its grounds and how to contest it are shown at your next login attempt.",
+    "suspended": "Your account has been suspended. The decision, its grounds and how to appeal it are shown at your next login attempt.",
     "lifted": "Your account's suspension has been lifted: you can log in again."
   },
   "privacyChange": {
@@ -81,9 +81,9 @@
   },
   "staffReport": {
     "titleReport": "New report",
-    "titleContest": "Contest received",
+    "titleContest": "Appeal received",
     "bodyReport": "A report is waiting for moderation.",
-    "bodyContest": "A moderation decision is being contested.",
+    "bodyContest": "A moderation decision is being appealed.",
     "titleSaturated": "Surge of reports",
     "bodySaturated": "The next reports reach the panel without an alert."
   }

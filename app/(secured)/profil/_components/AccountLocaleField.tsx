@@ -26,7 +26,9 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
   const [busy, setBusy] = useState(false);
 
   const save = async (next: string) => {
-    if (!isLocale(next) || next === locale) return;
+    // Pendant l'envoi, le champ garde le focus (`aria-disabled`, pas `disabled`
+    // qui le ferait perdre) : ce garde refuse un second choix.
+    if (busy || !isLocale(next) || next === locale) return;
     const previous = locale;
     setLocale(next);
     setBusy(true);
@@ -48,12 +50,13 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
   };
 
   return (
-    <div className="field">
+    <div className={`field ${s.accountLocale}`}>
       <label htmlFor="profile-account-locale">{t("accountLocale.label")}</label>
       <select
         id="profile-account-locale"
         value={locale}
-        disabled={busy}
+        aria-disabled={busy || undefined}
+        aria-busy={busy || undefined}
         onChange={(e) => void save(e.target.value)}
         aria-describedby="profile-account-locale-hint"
       >
