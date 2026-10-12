@@ -12,7 +12,6 @@ import { useProgressiveList } from "@/lib/shared/hooks/useProgressiveList";
 import { UserX } from "lucide-react";
 import { PlayerCard } from "./cards/PlayerCard";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { preloadProfileEnglish } from "@/components/i18n/profile-english";
 import { richNodes } from "@/components/i18n/shell-text";
 import { usePlayersText } from "@/components/i18n/players-text";
 import { compareLocalText } from "@/lib/shared/dates";
@@ -133,13 +132,7 @@ export default function PlayersList() {
               <h1 className={s.title}>{richNodes(text.rich("list.title", {}, { em: (chunks) => <em>{chunks}</em> }))}</h1>
               <div className={s.subtitle}>{t("list.subtitle")}</div>
             </div>
-            {/* Sous `/en`, l'anglais de `/profil` part au survol (revue de performance du lot 9-2). */}
-            <LocaleLink
-              href="/profil"
-              className={s.cta}
-              onPointerEnter={() => preloadProfileEnglish(text.locale)}
-              onFocus={() => preloadProfileEnglish(text.locale)}
-            >
+            <LocaleLink href="/profil" className={s.cta}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path
                   d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 14a6 6 0 0 1 12 0"

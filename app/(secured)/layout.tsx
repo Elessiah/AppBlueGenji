@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
 import { ArenaShell } from "@/components/arena-shell";
+import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { AuthGate } from "./_shared/AuthGate";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -61,8 +62,11 @@ export default async function SecuredLayout({ children }: Readonly<{ children: R
     );
   }
 
+  // Sous `/en` : l'anglais d'une page part au survol du lien qui y mène (revue de performance du lot 9-2).
+  const english = (await requestLocale()) === "en";
   return (
     <ArenaShell user={user} mainClassName="page-shell">
+      {english && <EnglishLinkPreload />}
       {children}
     </ArenaShell>
   );
