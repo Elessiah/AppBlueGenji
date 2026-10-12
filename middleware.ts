@@ -155,9 +155,9 @@ function isDocumentRequest(request: NextRequest): boolean {
  * Chargement complet d'une page, pour `DOCUMENT_REQUEST_HEADER` : `Sec-Fetch-Dest`
  * quand le navigateur l'envoie ; sinon (Safari avant 16.4, certaines vues web)
  * l'en-tête `Accept` — un document demande `text/html` **en tête** de liste,
- * le routeur de Next (`fetch`) non ; un client qui glisse `text/html` plus loin
- * (`*/*, text/html`) n'est pas pris pour un document (revue de sécurité du lot 9-2). Plus strict que `isDocumentRequest` : sans aucun des deux,
- * la page sert le texte par son propre morceau plutôt que de renvoyer le
+ * le routeur de Next (`fetch`) non ; un client qui glisse `text/html` après une
+ * autre entrée n'est pas pris pour un document (revue de sécurité du lot 9-2).
+ * Plus strict que `isDocumentRequest` : sans aucun des deux, la page sert le texte par son propre morceau plutôt que de renvoyer le
  * dictionnaire à chaque rafraîchissement.
  */
 // Pas d'en-tête `RSC` : Next le retire, avec `Next-Router-State-Tree` et
