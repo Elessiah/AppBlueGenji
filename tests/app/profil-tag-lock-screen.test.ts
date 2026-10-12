@@ -42,7 +42,7 @@ describe("champ Discord — un état illisible garde une sortie", () => {
     // mais faire disparaître tous les gestes ferait disparaître « Retirer mon
     // tag » — la seule annulation d'exposition que le site offre.
     expect(page).toContain("discordState.linked !== true ?");
-    expect(page).toContain('aria-label={t("discord.retryLabel")}');
+    expect(page).toContain('aria-label={busyAriaLabel(discordStateBusy, t("discord.retryLabel"))}');
     expect(page).toContain("onClick={() => void loadDiscordState()}");
   });
 

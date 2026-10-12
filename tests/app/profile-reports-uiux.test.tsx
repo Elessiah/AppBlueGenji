@@ -215,8 +215,8 @@ describe("revue UI/UX, quatrième passe", () => {
   it("date d'un signalement à contester : français inchangé, mois nommé en anglais", () => {
     const dialog = source("components/reports/ReportProblemDialog.tsx");
     expect(dialog).toContain("date: contestOptionDate(option.createdAt, text.locale),");
-    expect(dialog).toContain("? date.toLocaleDateString(INTL_LOCALE.fr)");
-    expect(dialog).toContain('{ day: "numeric", month: "short", year: "numeric" }');
+    expect(dialog).toContain('? date.toLocaleDateString(INTL_LOCALE.fr, { timeZone: "Europe/Paris" })');
+    expect(dialog).toContain('{ day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }');
   });
 });
 
@@ -257,5 +257,44 @@ describe("revue UI/UX, cinquième passe", () => {
       const { account } = (await import(`@/messages/${locale}/profile.json`)).default as { account: Record<string, string> };
       expect(account).not.toHaveProperty("logout");
     }
+  });
+});
+
+describe("revue UI/UX, septième passe", () => {
+  it("bouton occupé : plus d'aria-label figé, le texte visible fait le nom (WCAG 2.5.3)", () => {
+    const apps = source("app/(secured)/profil/ConnectedAppsSection.tsx");
+    expect(apps).toContain('aria-label={busyAriaLabel(busy === connection.provider, t("connections.unlinkLabel", { label }))}');
+    expect(apps).toContain('aria-label={busyAriaLabel(disconnecting, t("connections.bot.disconnectLabel"))}');
+    const page = source("app/(secured)/profil/page.tsx");
+    expect(page).toContain('aria-label={busyAriaLabel(discordStateBusy, t("discord.retryLabel"))}');
+    expect(page).toContain('aria-label={busyAriaLabel(discordTagBusy, t("discord.removeLabel"))}');
+  });
+
+  it("busyAriaLabel : le libellé au repos, aucun une fois occupé", async () => {
+    const { busyAriaLabel } = await import("@/lib/shared/busy-aria-label");
+    expect(busyAriaLabel(false, "Remove my tag (Discord)")).toBe("Remove my tag (Discord)");
+    expect(busyAriaLabel(true, "Remove my tag (Discord)")).toBeUndefined();
+  });
+
+  it("date à contester : heure de Paris, comme la page du signalement", () => {
+    const dialog = source("components/reports/ReportProblemDialog.tsx");
+    expect(dialog.match(/timeZone: "Europe\/Paris"/g)).toHaveLength(2);
+  });
+
+  it("suite donnée à une notification : la phrase anglaise du formulaire égale celle des pages juridiques", async () => {
+    const { NOTIFIER_FOLLOW_UP_EN } = await import("@/lib/shared/legal-text-en");
+    expect(enReports.privacy.followUp).toBe(NOTIFIER_FOLLOW_UP_EN);
+  });
+
+  it("logo d'une équipe masqué ou supprimé : le nom passe par TeamLink, dans les deux langues", async () => {
+    const frReports = (await import("@/messages/fr/reports.json")).default;
+    for (const messages of [frReports, enReports]) {
+      for (const key of ["logoHidden", "logoRemoved", "logoRemovedImmediately"] as const) {
+        expect(messages.concerned[key]).toContain("<team>{name}</team>");
+      }
+    }
+    const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
+    expect(view).toContain("team: (chunks: React.ReactNode[]) => <TeamLink teamId={teamId}>{chunks}</TeamLink>");
+    expect(view.match(/teamTags\(quarantine\.targetId\)/g)).toHaveLength(2);
   });
 });
