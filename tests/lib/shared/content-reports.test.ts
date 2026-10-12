@@ -4,7 +4,6 @@ import {
   CONTESTABLE_TARGET_TYPES,
   PRIMARY_REPORT_CATEGORIES,
   REPORT_CATEGORIES,
-  REPORT_CATEGORY_DEFINITIONS,
   REPORT_DESCRIPTION_MAX_LENGTH,
   REPORT_DESCRIPTION_MIN_LENGTH,
   REPORT_MAX_TARGETS,
@@ -17,10 +16,7 @@ import {
   REPORTS_HOURLY_CAP,
   REPORTS_HOURLY_HARD_CAP,
   REPORTS_SATURATION_NOTICE_INTERVAL_MS,
-  formatContestAlert,
   formatReportsSaturatedAlert,
-  formatReportAlert,
-  formatTargetNotice,
   canContestReport,
   notifierMayContest,
   isConcernedByReport,
@@ -47,6 +43,7 @@ import {
   type ReportAction,
   type ReportStatus,
 } from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS, formatContestAlert, formatReportAlert, formatTargetNotice } from "@/lib/shared/content-report-categories";
 import { logoQuarantinePurgeDate } from "@/lib/shared/logo-quarantine";
 
 const DESCRIPTION = "Le logo de cette équipe reprend celui de notre club, déposé.";

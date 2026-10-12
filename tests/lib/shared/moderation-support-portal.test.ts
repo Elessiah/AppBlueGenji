@@ -4,8 +4,8 @@ import {
   OFF_SITE_CONDUCT_ENTRY,
   OFF_SITE_CONDUCT_NOTICE,
   REPORT_CATEGORIES,
-  REPORT_CATEGORY_DEFINITIONS,
 } from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 import { readSource } from "../../helpers/read-source";
 
 describe("renvoi de la modération hors site vers le portail de support", () => {

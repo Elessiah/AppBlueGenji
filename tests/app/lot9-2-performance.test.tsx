@@ -179,7 +179,7 @@ describe("modale de recadrage chargée à la demande", () => {
     expect(valueImports("components/ui/image-crop-dialog.tsx")).not.toContain("next/dynamic");
     expect(hook).not.toContain("orReload }");
     expect(hook).not.toContain("orReload,");
-    expect(hook).toContain("await Promise.all([cropDialogLoader.load(), english ? englishCropLoader.load() : null]);");
+    expect(hook).toContain("if (!ready) await Promise.all([cropDialogLoader.load(), english ? englishCropLoader.load() : null]);");
     expect(hook).toContain('showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));');
     expect(hook).toMatch(/imageCropLoad\.failed"\)\);\s*return null;/);
     expect(hook).toContain("const cropDialog = request && ImageCropDialog ? (");

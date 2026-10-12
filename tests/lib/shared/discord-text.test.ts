@@ -3,7 +3,7 @@ import { discordInline, discordQuote } from "@/lib/shared/discord-text";
 import { entrantLabel } from "@/lib/shared/log-privacy";
 import { buildIssueReportMessage } from "@/lib/shared/discord-notifications";
 import { formatTeamJoinRequestNotice } from "@/lib/shared/team-join-request-notice";
-import { formatReportAlert } from "@/lib/shared/content-reports";
+import { formatReportAlert } from "@/lib/shared/content-report-categories";
 
 const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b);
 

@@ -118,7 +118,6 @@ import {
   OFF_SITE_CONDUCT_ENTRY,
   OFF_SITE_CONDUCT_NOTICE,
   REPORT_CATEGORIES,
-  REPORT_CATEGORY_DEFINITIONS,
   REPORT_PRIVACY_NOTICE,
   REPORT_STATUS_LABELS,
   REPORT_TARGET_LABELS,
@@ -129,6 +128,7 @@ import {
   type ConcernedReportView,
   type ReportCategory,
 } from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 import { DISCORD_VERIFICATION_EXPOSURE, DISCORD_VERIFICATION_PURPOSE } from "@/lib/shared/discord-identity";
 import { discordTagLockNotice } from "@/lib/shared/discord-tag-lock";
 import {

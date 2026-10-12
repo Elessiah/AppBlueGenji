@@ -83,7 +83,7 @@ describe("écouteur délégué", () => {
     expect(listener).toContain("setRoutePreload(preloadEnglishRoute);");
     // Les navigations par le code passent par le registre, sans `import()` dans le module de chaque page.
     const navigation = readSource("components/i18n/locale-navigation.tsx");
-    expect(navigation.match(/if \(locale === "en"\) preloadRoute\(href\);/g)).toHaveLength(3);
+    expect(navigation.match(/if \(locale === "en"\) preloadRoute\(href\);/g)).toHaveLength(2);
     expect(readSource("components/i18n/route-preload.ts")).not.toMatch(/import\("/);
     expect(listener).toContain('document.addEventListener("pointerover", onIntent, { passive: true });');
     expect(listener).toContain('document.addEventListener("focusin", onIntent);');
@@ -164,8 +164,8 @@ describe("une seule table des pages", () => {
 });
 
 describe("revue performance, quinzième passe", () => {
-  it("le préchargement de lien du routeur lance aussi l'anglais", () => {
-    expect(readSource("components/i18n/locale-navigation.tsx").match(/if \(locale === "en"\) preloadRoute\(href\);/g)).toHaveLength(3);
+  it("push et replace préchargent l'anglais ; prefetch, sans appelant, non", () => {
+    expect(readSource("components/i18n/locale-navigation.tsx").match(/if \(locale === "en"\) preloadRoute\(href\);/g)).toHaveLength(2);
   });
 
   it("annuaire des équipes : compteurs mémorisés", () => {
@@ -212,5 +212,19 @@ describe("revue performance, vingt-troisième passe", () => {
     const button = readSource("components/reports/ReportProblemButton.tsx");
     expect(button).not.toContain("useLocalePathname");
     expect(button).toContain("setPathname(splitLocalePrefix(window.location.pathname).path);");
+  });
+});
+
+describe("revue performance, vingt-cinquième passe", () => {
+  it("le formulaire et la page d'un signalement n'emportent pas les phrases françaises des catégories", () => {
+    for (const path of ["components/reports/ReportProblemDialog.tsx", "app/(secured)/signalements/[id]/_components/ConcernedReport.tsx"]) {
+      const source = readSource(path);
+      expect(source).not.toContain("REPORT_CATEGORY_DEFINITIONS");
+      expect(source).not.toContain("content-report-categories");
+    }
+    const shared = readSource("lib/shared/content-reports.ts");
+    expect(shared).toContain("export const REPORT_CATEGORY_RULES");
+    expect(shared).not.toContain("Un logo, un avatar ou une image utilisé sans autorisation.");
+    expect(readSource("lib/shared/content-report-categories.ts")).toContain("...REPORT_CATEGORY_RULES.COPYRIGHT,");
   });
 });

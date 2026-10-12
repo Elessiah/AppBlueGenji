@@ -17,7 +17,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
-import { REPORT_CATEGORIES, REPORT_CATEGORY_DEFINITIONS, type ReportCategory } from "@/lib/shared/content-reports";
+import {
+  REPORT_CATEGORIES,
+  type ReportCategory,
+} from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 
 const globalWithDocument = globalThis as { document?: unknown };
 const hadDocument = "document" in globalWithDocument;
