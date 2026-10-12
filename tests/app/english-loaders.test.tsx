@@ -31,7 +31,6 @@ function ReportsProbe() {
   return <>{useReportsText().t("concerned.title")}</>;
 }
 
-const FALLBACK = <span>loading</span>;
 const PROFILE_EN = { profile: enProfile, teamErrors: enTeamErrors, push: enPush };
 const globals = globalThis as { window?: unknown };
 
@@ -62,7 +61,7 @@ describe("onceLoader : un résultat amorcé ne relance rien", () => {
 describe("serveur : aucun dictionnaire gardé d'une requête à l'autre", () => {
   it("rendu serveur avec l'anglais : rendu, mais rien d'amorcé", () => {
     const html = renderToStaticMarkup(
-      <ProfileTextProviders locale="en" messages={PROFILE_EN} fallback={FALLBACK}>
+      <ProfileTextProviders locale="en" messages={PROFILE_EN}>
         <ProfileProbe />
       </ProfileTextProviders>,
     );
@@ -75,11 +74,11 @@ describe("serveur : aucun dictionnaire gardé d'une requête à l'autre", () => 
 
   it("rendu serveur sans l'anglais : l'écran d'attente, même si une requête précédente l'avait", () => {
     const html = renderToStaticMarkup(
-      <ProfileTextProviders locale="en" fallback={FALLBACK}>
+      <ProfileTextProviders locale="en">
         <ProfileProbe />
       </ProfileTextProviders>,
     );
-    expect(html).toBe("<span>loading</span>");
+    expect(html).toContain('role="status"');
   });
 });
 
@@ -87,19 +86,19 @@ describe("ProfileTextProviders (navigateur)", () => {
   it("français : ni anglais ni attente", () => {
     const html = inBrowser(() =>
       renderToStaticMarkup(
-        <ProfileTextProviders locale="fr" fallback={FALLBACK}>
+        <ProfileTextProviders locale="fr">
           <ProfileProbe />
         </ProfileTextProviders>,
       ),
     );
-    expect(html).not.toContain("loading");
+    expect(html).not.toContain('role="status"');
     expect(html).toContain("Départ de match");
   });
 
   it("anglais servi par la mise en page : rendu tout de suite, et gardé pour la session", () => {
     const html = inBrowser(() =>
       renderToStaticMarkup(
-        <ProfileTextProviders locale="en" messages={PROFILE_EN} fallback={FALLBACK}>
+        <ProfileTextProviders locale="en" messages={PROFILE_EN}>
           <ProfileProbe />
         </ProfileTextProviders>,
       ),
@@ -110,7 +109,7 @@ describe("ProfileTextProviders (navigateur)", () => {
     expect(englishTeamErrors.loaded()).toBe(enTeamErrors);
     const refreshed = inBrowser(() =>
       renderToStaticMarkup(
-        <ProfileTextProviders locale="en" fallback={FALLBACK}>
+        <ProfileTextProviders locale="en">
           <ProfileProbe />
         </ProfileTextProviders>,
       ),
@@ -125,15 +124,15 @@ describe("ConcernedReportsText (navigateur)", () => {
     expect(
       inBrowser(() =>
         renderToStaticMarkup(
-          <ConcernedReportsText locale="en" fallback={FALLBACK}>
+          <ConcernedReportsText locale="en">
             <ReportsProbe />
           </ConcernedReportsText>,
         ),
       ),
-    ).toBe("<span>loading</span>");
+    ).toContain('role="status"');
     const html = inBrowser(() =>
       renderToStaticMarkup(
-        <ConcernedReportsText locale="en" messages={enReports} fallback={FALLBACK}>
+        <ConcernedReportsText locale="en" messages={enReports}>
           <ReportsProbe />
         </ConcernedReportsText>,
       ),

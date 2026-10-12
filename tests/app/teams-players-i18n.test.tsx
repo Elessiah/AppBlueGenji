@@ -210,10 +210,9 @@ describe("liste blanche et métadonnées", () => {
       // Revue performance du lot 9-2 : jamais dans une réponse du routeur — le client garde le sien.
       mockDocument = "0";
       try {
-        const routed = (await layout({ children: child })) as ReactElement<{ messages?: unknown; stats?: unknown; fallback?: unknown }>;
+        const routed = (await layout({ children: child })) as ReactElement<{ messages?: unknown; stats?: unknown }>;
         expect(routed.props.messages).toBeUndefined();
         expect(routed.props.stats).toBeUndefined();
-        expect(routed.props.fallback).toBeTruthy();
       } finally {
         mockDocument = "1";
       }

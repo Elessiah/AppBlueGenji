@@ -54,8 +54,9 @@ describe("aucun anglais importé d'office", () => {
     expect(valueImports("components/match-launch/MatchLaunchCenter.tsx")).toContain("@/components/i18n/english-loaders-account");
     expect(launch).toContain('if (locale === "en" && !english) return null;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
+    // Un échec vaut jusqu'à la réouverture, pas à chaque navigation.
+    expect(launch).toContain('useEnglishMessages(locale, englishPush, undefined, "remount");');
     // Le crochet partagé ; préchargé au survol du bouton flottant, rien pour qui n'ouvre pas la fenêtre.
-    expect(launch).toContain("const { english } = useEnglishMessages(locale, englishPush, undefined);");
     expect(launch).toContain("const preload = () => preloadEnglishPush(locale);");
     expect(launch).not.toContain("hasLaunches");
     // La documentation de la cadence reste collée à sa fonction.
@@ -115,11 +116,10 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
     expect(readSource("app/(secured)/profil/layout.tsx")).toContain(
       'locale === "en" && (await isDocumentLoad()) ? { profile: all.profile, teamErrors: all.teamErrors, push: all.push } : undefined;',
     );
-    // L'écran d'attente n'est sérialisé que s'il peut servir.
-    expect(layout).toContain('fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}');
-    expect(readSource("app/(secured)/profil/layout.tsx")).toContain(
-      'fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}',
-    );
+    // L'écran d'attente n'est plus sérialisé : rendu par le client (`EnglishGateFallback`).
+    expect(layout).not.toContain("fallback=");
+    expect(readSource("app/(secured)/profil/layout.tsx")).not.toContain("fallback=");
+    expect(readSource("components/i18n/english-gate-fallback.tsx")).toContain('return <SecuredLoadingView label={t("loading")} />;');
     expect(readSource("components/reports/concerned-reports-text.tsx")).toContain(
       "useEnglishMessages(locale, englishReports, messages)",
     );
@@ -376,7 +376,7 @@ describe("une seule amorce par espace, préchargement de /profil sur ses liens",
 describe("revue performance, douzième passe", () => {
   it("un échec vaut pour l'adresse affichée : retenté à la navigation suivante, sans boucle de fond", () => {
     const hook = readSource("components/i18n/use-english-messages.ts");
-    expect(hook).toContain("const failed = failedAt !== undefined && failedAt === pathname;");
+    expect(hook).toContain("const failed = failedAt !== undefined && failedAt === scope;");
     expect(hook).not.toMatch(/setTimeout|setInterval|retryInBackground/);
   });
 

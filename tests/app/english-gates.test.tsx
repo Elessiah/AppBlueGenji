@@ -17,7 +17,6 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 
 const EN = messagesFor("en");
 const EN_STATS = statsPanelMessages(EN);
-const FALLBACK = <span>loading</span>;
 const globals = globalThis as { window?: unknown };
 
 function inBrowser<T>(run: () => T): T {
@@ -51,8 +50,8 @@ function ErrorsProbe() {
 describe("portes : français sans attente", () => {
   it("rien à charger en français", () => {
     const html = renderToStaticMarkup(
-      <TeamErrorsTextGate locale="fr" fallback={FALLBACK}>
-        <PlayersTextGate locale="fr" fallback={FALLBACK}>
+      <TeamErrorsTextGate locale="fr">
+        <PlayersTextGate locale="fr">
           <ErrorsProbe /> <PlayersProbe />
         </PlayersTextGate>
       </TeamErrorsTextGate>,
@@ -64,32 +63,32 @@ describe("portes : français sans attente", () => {
 describe("portes : anglais", () => {
   it("rien reçu : l'écran d'attente", () => {
     for (const gate of [
-      <TeamErrorsTextGate key="e" locale="en" fallback={FALLBACK}>x</TeamErrorsTextGate>,
-      <PlayersTextGate key="p" locale="en" fallback={FALLBACK}>x</PlayersTextGate>,
-      <StatsPanelGate key="s" locale="en" fallback={FALLBACK}>x</StatsPanelGate>,
-      <TeamPageTextGate key="t" locale="en" fallback={FALLBACK}>x</TeamPageTextGate>,
+      <TeamErrorsTextGate key="e" locale="en">x</TeamErrorsTextGate>,
+      <PlayersTextGate key="p" locale="en">x</PlayersTextGate>,
+      <StatsPanelGate key="s" locale="en">x</StatsPanelGate>,
+      <TeamPageTextGate key="t" locale="en">x</TeamPageTextGate>,
     ]) {
-      expect(inBrowser(() => renderToStaticMarkup(gate))).toBe("<span>loading</span>");
+      expect(inBrowser(() => renderToStaticMarkup(gate))).toContain('role="status"');
     }
   });
 
   it("la fiche d'une équipe attend ses deux espaces : l'un sans l'autre, toujours l'écran d'attente", () => {
     const html = inBrowser(() =>
       renderToStaticMarkup(
-        <TeamPageTextGate locale="en" messages={EN.team} fallback={FALLBACK}>
+        <TeamPageTextGate locale="en" messages={EN.team}>
           <TeamProbe />
         </TeamPageTextGate>,
       ),
     );
-    expect(html).toBe("<span>loading</span>");
+    expect(html).toContain('role="status"');
   });
 
   it("servi au chargement complet : rendu en anglais, et gardé pour la session", () => {
     const html = inBrowser(() =>
       renderToStaticMarkup(
-        <TeamErrorsTextGate locale="en" messages={EN.teamErrors} fallback={FALLBACK}>
-          <PlayersTextGate locale="en" messages={EN.players} fallback={FALLBACK}>
-            <TeamPageTextGate locale="en" messages={EN.team} stats={EN_STATS} fallback={FALLBACK}>
+        <TeamErrorsTextGate locale="en" messages={EN.teamErrors}>
+          <PlayersTextGate locale="en" messages={EN.players}>
+            <TeamPageTextGate locale="en" messages={EN.team} stats={EN_STATS}>
               <ErrorsProbe /> <PlayersProbe /> <TeamProbe />
             </TeamPageTextGate>
           </PlayersTextGate>
@@ -104,8 +103,8 @@ describe("portes : anglais", () => {
     // Une navigation suivante (rien sérialisé) : rendu tout de suite.
     const next = inBrowser(() =>
       renderToStaticMarkup(
-        <StatsPanelGate locale="en" fallback={FALLBACK}>
-          <PlayersTextGate locale="en" fallback={FALLBACK}>
+        <StatsPanelGate locale="en">
+          <PlayersTextGate locale="en">
             <PlayersProbe />
           </PlayersTextGate>
         </StatsPanelGate>,

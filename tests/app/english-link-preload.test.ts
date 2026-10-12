@@ -67,15 +67,11 @@ describe("écouteur délégué", () => {
     const listener = readSource("components/i18n/english-link-preload-install.ts");
     const route = readSource("components/i18n/english-route-preload.ts");
     expect(route).toContain('const targets = onceLoader(() => import("./english-link-targets"));');
-    // Une page sans anglais à précharger ne télécharge pas la table ; un échec se tait (`quietPreload`) ;
-    // toutes les pages demandées pendant son arrivée sont servies.
+    // Une page sans anglais à précharger ne télécharge pas la table ; un préchargement par page,
+    // requête de la table partagée en vol, silence après échec : rien de retenu d'un essai à l'autre.
     expect(route).toContain("if (!page) return;");
-    expect(route).toContain("const warmTargets = quietPreload(");
-    expect(route).toContain("for (const page of wanted) module.preloadEnglishPage(page);");
-    // Rien de retenu pendant le silence d'un échec, rien de gardé d'un essai raté.
-    expect(route).toContain("if (warmTargets()) wanted.add(page);");
-    // Un seul essai en vol : les survols pendant l'arrivée n'attachent rien de plus.
-    expect(route).toMatch(/if \(warming\) \{\s*wanted\.add\(page\);\s*return;/);
+    expect(route).toContain("quietPreload(() => targets.load().then((module) => module.preloadEnglishPage(page))),");
+    expect(route).not.toMatch(/wanted|warming/);
     expect(listener).toContain("preloadEnglishRoute(href.slice(3));");
     // Un même lien une fois par seconde au plus (enfants traversés), nouvel essai possible ensuite.
     expect(listener).toContain("if (href === last && now - lastAt < 1000) return;");
