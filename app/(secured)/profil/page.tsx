@@ -1019,7 +1019,7 @@ export default function ProfilePage() {
             {invitations.map((inv) => (
               <div className="table-row" key={inv.id} style={{ alignItems: "center" }}>
                 <span>
-                  <TeamLink teamId={inv.teamId}>{inv.teamName}</TeamLink>
+                  <TeamLink teamId={inv.teamId}>{visibleText(inv.teamName)}</TeamLink>
                   {/* Reprise d'une équipe fantôme proposée par le staff : l'accepter
                       en fait le propriétaire, ce qu'une invitation ordinaire ne fait
                       jamais — le joueur doit le lire avant de cliquer. */}

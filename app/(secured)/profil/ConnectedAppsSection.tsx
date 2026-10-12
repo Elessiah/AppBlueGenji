@@ -49,6 +49,7 @@ import { connectionErrorMessage, connectionSuccessMessage, unlinkSuccessMessage 
 import { OtherSessionsPanel } from "./OtherSessionsPanel";
 import s from "./profil.module.css";
 import { busyAriaLabel } from "@/lib/shared/busy-aria-label";
+import { visibleText } from "@/lib/shared/visible-text";
 
 
 export function ConnectedAppsSection({
@@ -352,7 +353,7 @@ function connectionDetails(text: ProfileText, connection: AccountConnection, dis
     // chacun a son libellé traduit sous `connections.handleLabels` (testé).
     if (connection.handle && OAUTH_PROVIDER_HANDLE_LABELS[connection.provider] !== null) {
       const labelKey = `connections.handleLabels.${connection.provider}` as Parameters<typeof t>[0];
-      return t("connections.handleLine", { label: t(labelKey), handle: connection.handle });
+      return t("connections.handleLine", { label: t(labelKey), handle: visibleText(connection.handle) });
     }
     return t("connections.linked");
   }

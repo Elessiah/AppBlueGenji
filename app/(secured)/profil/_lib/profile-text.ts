@@ -21,6 +21,7 @@ import type {
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "@/lib/shared/oauth-providers";
 import { messageAt, type Leaves } from "@/lib/shared/scoped-text";
+import { visibleText } from "@/lib/shared/visible-text";
 import { FR_PROFILE_TEXT, type ProfileText } from "@/components/i18n/profile-text";
 
 export type { ProfileText } from "@/components/i18n/profile-text";
@@ -137,7 +138,7 @@ export function discordBotRowText(
 function discordBotNote(text: ProfileText, code: DiscordBotNoteCode, handle: string | null): string {
   switch (code) {
     case "HANDLE":
-      return text.t("connections.bot.handleNote", { handle: handle ?? "" });
+      return text.t("connections.bot.handleNote", { handle: visibleText(handle ?? "") });
     case "LINKED_BY_CODE":
       return text.t("connections.bot.linkedByCode");
     case "LINKED_BY_BUTTON":

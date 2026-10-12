@@ -140,7 +140,7 @@ function isMissingConfiguration(error: unknown): boolean {
  * pour qui est parti de la page anglaise (lot 6). Sans cookie d'état lisible
  * (expiré, navigateur qui l'isole), la langue n'est plus connue : le français.
  */
-function loginFailure(base: string, provider: OAuthProvider, kind: string, locale: Locale = DEFAULT_LOCALE): NextResponse {
+function loginFailure(base: string, provider: OAuthProvider, kind: string, locale: Locale): NextResponse {
   const url = new URL(localeHref("/connexion", locale), base);
   url.searchParams.set("error", kind);
   url.searchParams.set("provider", OAUTH_PROVIDER_SLUGS[provider]);
@@ -151,7 +151,7 @@ function loginFailure(base: string, provider: OAuthProvider, kind: string, local
  * Retour d'un rattachement refusé sur `/profil`, dans la langue du départ
  * (`/en/profil` depuis le lot 9-2 — même langue scellée que la connexion).
  */
-function linkFailure(base: string, provider: OAuthProvider, code: string, locale: Locale = DEFAULT_LOCALE): NextResponse {
+function linkFailure(base: string, provider: OAuthProvider, code: string, locale: Locale): NextResponse {
   const url = new URL(localeHref(PROFILE_PATH, locale), base);
   url.searchParams.set("connection_error", code);
   url.searchParams.set("provider", OAUTH_PROVIDER_SLUGS[provider]);
