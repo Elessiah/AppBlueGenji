@@ -356,17 +356,9 @@ export function MatchLaunchCenter({
           {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici
               que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
               fois l'appareil abonné. */}
-          {/* Réglage des notifications : français jusqu'au lot 9 (langue du
-              compte), annoncé comme tel sous `/en`. L'enveloppe ne fait pas de
-              boîte (`display: contents`) : panneau muet, aucun écart en plus. */}
-          <div className={styles.pushLang} lang={text.locale === "fr" ? undefined : "fr"}>
-            <PushNotificationsPanel
-              variant="compact"
-              topics={["MATCH_START"]}
-              toastLang={text.locale === "fr" ? undefined : "fr"}
-              lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
-            />
-          </div>
+          {/* Réglage des notifications : dans la langue de la page depuis le
+              lot 9-2 (`push`). */}
+          <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={t("pushLead")} />
         </ScrollArea>
 
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps

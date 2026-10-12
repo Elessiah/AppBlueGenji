@@ -1,6 +1,6 @@
 /**
- * Les refus du rattachement et du retrait d'un moyen de connexion, dits en
- * français.
+ * Les refus du rattachement et du retrait d'un moyen de connexion, dits dans
+ * la langue de la page.
  *
  * Même forme que `discord-errors.ts` et `app/connexion/_lib/login-errors.ts` —
  * registre pur, testable, repli qui ne laisse jamais sortir un jeton en
@@ -9,55 +9,20 @@
  * autre porte d'entrée, seulement de lui dire quel geste lève le refus.
  *
  * `LAST_CONNECTION` a le sien dans le module pur
- * (`connectionUnlinkRefusalMessage`), qui sait de quel fournisseur on parle :
- * l'écran s'en sert pour griser le bouton **avant** le clic. La ligne ci-dessous
- * ne couvre que le cas où le serveur refuse un geste que l'écran croyait permis
- * — deux onglets ouverts, par exemple.
+ * (`connectionUnlinkRefusalMessage`, et sa sœur `connectionRefusalText`), qui
+ * sait de quel fournisseur on parle : l'écran s'en sert pour griser le bouton
+ * **avant** le clic. La ligne de la table ne couvre que le cas où le serveur
+ * refuse un geste que l'écran croyait permis — deux onglets ouverts, par
+ * exemple.
+ *
+ * Phrases dans l'espace `profile` (`connections.*`, lot 9-2) ; texte de la
+ * langue en dernier argument, français par défaut.
  */
 import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "@/lib/shared/oauth-providers";
+import { FR_PROFILE, lookupCode, type ProfileText } from "./_lib/profile-text";
 
-const CONNECTION_ERRORS: Record<string, string> = {
-  // Le compte porte déjà une autre identité de ce fournisseur. On ne déplace
-  // pas une porte d'entrée. Le cas le plus courant n'est **pas** un joueur qui
-  // veut changer de compte, mais un joueur qui reconfirme le sien (c'est ainsi
-  // qu'un compte relié à Discord fait nommer son pseudo par Discord, avant de
-  // le certifier d'un clic) en étant connecté, chez le
-  // fournisseur, sous un autre compte : la phrase donne d'abord ce geste-là, et
-  // ne propose le retrait qu'ensuite — le conseiller d'emblée pousserait à
-  // détacher la bonne identité.
-  PROVIDER_ALREADY_LINKED:
-    "Le compte avec lequel tu viens de passer chez ce fournisseur n'est pas celui rattaché à ton profil. Connecte-toi chez lui avec le bon compte, puis recommence. Pour changer de compte, retire d'abord l'ancien.",
-  // L'identité appartient à un autre compte du site. Rien que le joueur puisse
-  // corriger seul : les deux comptes sont peut-être les siens.
-  IDENTITY_ALREADY_LINKED:
-    "Ce compte est déjà rattaché à un autre profil BlueGenji. Contacte l'organisation si les deux sont bien à toi.",
-  LAST_CONNECTION:
-    "C'est ton dernier moyen de connexion : rattache-en un autre avant de le retirer.",
-  NOT_LINKED: "Cette application n'est pas rattachée à ton compte.",
-  UNKNOWN_PROVIDER: "Application inconnue.",
-  OAUTH_FAILED: "Le rattachement a échoué chez le fournisseur. Réessaie dans un instant.",
-  // Le motif que prennent toutes les pannes qui n'ont pas de nom : le message du
-  // serveur ne voyage pas jusqu'ici (`LINK_REFUSALS`), et il n'apprendrait rien
-  // au joueur.
-  LINK_FAILED: "Le rattachement n'a pas abouti. Réessaie dans un instant.",
-  LINK_CANCELLED: "Rattachement annulé : rien n'a été modifié.",
-  // L'état revenu n'est pas celui émis : le plus souvent une seconde tentative
-  // ouverte dans un autre onglet, qui a remplacé la première.
-  LINK_STATE_MISMATCH:
-    "Le rattachement n'a pas pu être vérifié (une autre tentative l'a peut-être remplacé). Recommence depuis ce bouton.",
-  // Rien à réessayer : la variable d'environnement manque, et le bouton ne
-  // marchera pas tant que personne ne l'aura remplie.
-  NOT_CONFIGURED:
-    "Ce moyen de connexion n'est pas configuré sur le site. Signale-le à l'organisation.",
-  PROFILE_NOT_FOUND: "Ton compte est introuvable. Reconnecte-toi.",
-  UNAUTHORIZED: "Reconnecte-toi pour gérer tes applications.",
-  SESSIONS_READ_FAILED: "Tes autres sessions n'ont pas pu être comptées. Réessaie dans un instant.",
-  SESSIONS_REVOKE_FAILED: "Tes autres sessions n'ont pas pu être fermées. Réessaie dans un instant.",
-};
-
-export function connectionErrorMessage(code: string | null | undefined): string {
-  if (!code) return "L'opération a échoué. Réessaie dans un instant.";
-  return CONNECTION_ERRORS[code] ?? "L'opération a échoué. Réessaie dans un instant.";
+export function connectionErrorMessage(code: string | null | undefined, text: ProfileText = FR_PROFILE): string {
+  return lookupCode(text, "connections.errors", code) ?? text.t("connections.fallback");
 }
 
 /**
@@ -66,22 +31,19 @@ export function connectionErrorMessage(code: string | null | undefined): string 
  * Deux cas, parce que le même retour couvre deux gestes : **ajouter** une
  * application, et **reconfirmer** celle qui l'était déjà — c'est le chemin par
  * lequel un compte relié à Discord fait nommer son pseudo, qu'il certifie
- * ensuite d'un clic (la reconfirmation, elle, ne certifie rien). Annoncer « rattaché » à qui
- * l'était déjà décrirait un changement qui n'a pas eu lieu, et tairait celui qui
- * a eu lieu : le pseudo a été relu auprès du fournisseur.
+ * ensuite d'un clic. Annoncer « rattaché » à qui l'était déjà décrirait un
+ * changement qui n'a pas eu lieu.
  */
-export function connectionSuccessMessage(provider: OAuthProvider | null, refreshed: boolean): string {
-  if (!provider) return refreshed ? "Application reconfirmée." : "Application rattachée.";
+export function connectionSuccessMessage(
+  provider: OAuthProvider | null,
+  refreshed: boolean,
+  text: ProfileText = FR_PROFILE,
+): string {
+  const { t } = text;
+  if (!provider) return refreshed ? t("connections.success.refreshedAny") : t("connections.success.linkedAny");
   const label = OAUTH_PROVIDER_LABELS[provider];
-  if (!refreshed) return `${label} est maintenant rattaché à ton compte.`;
-  return provider === "DISCORD"
-    ? "Discord reconfirmé : ton pseudo a été relu auprès de Discord. S'il a changé, il n'est plus certifié : certifie-le de nouveau pour rester joignable."
-    : `${label} reconfirmé : les informations de ton compte ont été relues.`;
-}
-
-/** « 1 autre session », « 3 autres sessions » — l'accord suit le nombre. */
-function otherSessions(count: number): string {
-  return count === 1 ? "1 autre session" : `${count} autres sessions`;
+  if (!refreshed) return t("connections.success.linked", { label });
+  return provider === "DISCORD" ? t("connections.success.refreshedDiscord") : t("connections.success.refreshed", { label });
 }
 
 /**
@@ -89,16 +51,16 @@ function otherSessions(count: number): string {
  * appareils ouvrent encore le compte. `null` = pas encore lu (ou illisible), et
  * la phrase ne l'invente pas.
  */
-export function otherSessionsSummary(count: number | null): string {
-  if (count === null) return "Les sessions ouvertes sur tes autres appareils n'ont pas encore été comptées.";
-  if (count === 0) return "Aucune autre session n'est ouverte : seul cet appareil est connecté à ton compte.";
-  return `${otherSessions(count)} ${count === 1 ? "est ouverte" : "sont ouvertes"} sur d'autres navigateurs ou appareils.`;
+export function otherSessionsSummary(count: number | null, text: ProfileText = FR_PROFILE): string {
+  if (count === null) return text.t("connections.sessions.unknown");
+  if (count === 0) return text.t("connections.sessions.none");
+  return text.t("connections.sessions.open", { count });
 }
 
 /** Le compte rendu de « Déconnecter mes autres sessions ». */
-export function sessionsRevokedMessage(count: number): string {
-  if (count === 0) return "Aucune autre session n'était ouverte.";
-  return `${otherSessions(count)} ${count === 1 ? "a été fermée" : "ont été fermées"}.`;
+export function sessionsRevokedMessage(count: number, text: ProfileText = FR_PROFILE): string {
+  if (count === 0) return text.t("connections.sessions.revokedNone");
+  return text.t("connections.sessions.revoked", { count });
 }
 
 /**
@@ -109,11 +71,9 @@ export function sessionsRevokedMessage(count: number): string {
  * `revoked` à `null` renvoie au bouton qui refait le geste, puisque le
  * retrait lui-même est acquis.
  */
-export function unlinkSuccessMessage(provider: OAuthProvider, revoked: number | null): string {
-  const removed = `${OAUTH_PROVIDER_LABELS[provider]} a été retiré de ton compte.`;
-  if (revoked === null) {
-    return `${removed} Tes autres sessions n'ont pas pu être fermées : utilise « Déconnecter mes autres sessions ».`;
-  }
+export function unlinkSuccessMessage(provider: OAuthProvider, revoked: number | null, text: ProfileText = FR_PROFILE): string {
+  const removed = text.t("connections.unlinked", { label: OAUTH_PROVIDER_LABELS[provider] });
+  if (revoked === null) return text.t("connections.unlinkedSessionsFailed", { removed });
   if (revoked === 0) return removed;
-  return `${removed} ${sessionsRevokedMessage(revoked)}`;
+  return `${removed} ${sessionsRevokedMessage(revoked, text)}`;
 }

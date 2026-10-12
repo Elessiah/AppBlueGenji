@@ -1,0 +1,22 @@
+{
+  "handles": {
+    "nw": "coin haut gauche",
+    "ne": "coin haut droit",
+    "sw": "coin bas gauche",
+    "se": "coin bas droit"
+  },
+  "resizeBy": "Redimensionner par le {handle}",
+  "frame": "Zone gardée",
+  "frameDetail": "Zone gardée : {width} % de la largeur, {height} % de la hauteur, à {left} % du bord gauche et {top} % du haut",
+  "frameRole": "cadre de recadrage",
+  "failed": "Cette image ne peut pas être affichée ici. Choisis-en une autre.",
+  "hint": "Fais glisser le cadre pour choisir la zone gardée, tire un coin pour le redimensionner.",
+  "hintFixed": "Fais glisser le cadre pour choisir la zone gardée, tire un coin pour le redimensionner (proportions imposées).",
+  "hintKeys": " Au clavier : flèches pour le déplacer (Maj pour aller plus vite), + et − pour l'agrandir ou le réduire, Origine pour revenir au cadre proposé.",
+  "preview": "Aperçu",
+  "shrink": "Réduire",
+  "grow": "Agrandir",
+  "reset": "Réinitialiser",
+  "cancel": "Annuler",
+  "confirm": "Valider le recadrage"
+}

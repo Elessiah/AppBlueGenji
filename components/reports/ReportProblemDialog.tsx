@@ -10,7 +10,6 @@ import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
   OFF_SITE_CONDUCT_ENTRY,
-  OFF_SITE_CONDUCT_NOTICE,
   REPORT_CATEGORIES,
   REPORT_CATEGORY_DEFINITIONS,
   REPORT_CONTACT_EMAIL_MAX_LENGTH,
@@ -18,18 +17,11 @@ import {
   REPORT_DESCRIPTION_MAX_LENGTH,
   REPORT_DESCRIPTION_MIN_LENGTH,
   REPORT_MAX_TARGETS,
-  NOTIFIER_FOLLOW_UP,
-  REPORT_PRIVACY_NOTICE,
   RIGHTS_RELATIONS,
-  RIGHTS_RELATION_LABELS,
-  reportErrorMessage,
   missingReplyChannel,
-  reportLegalBasisNotice,
   reportRequiresConsent,
-  reportRightsNotice,
   reportTargetFromPath,
   validateReportSubmission,
-  REPORT_STATUS_LABELS,
   type ContestableReportOption,
   type ReportCategory,
   type ReportCategoryDefinition,
@@ -39,6 +31,16 @@ import {
 } from "@/lib/shared/content-reports";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { TargetPicker } from "./TargetPicker";
+import { richNodes } from "@/components/i18n/shell-text";
+import { INTL_LOCALE } from "@/lib/shared/locales";
+import {
+  legalBasisText,
+  reportErrorText,
+  retentionText,
+  rightsText,
+  useReportsText,
+  type ReportsText,
+} from "./reports-text";
 import styles from "./ReportProblem.module.css";
 
 interface ReportProblemDialogProps {
@@ -67,19 +69,15 @@ type Selection = Record<ReportTargetType, ReportTargetOption[]>;
 const EMPTY_SELECTION: Selection = { USER: [], TEAM: [], TOURNAMENT: [] };
 
 /** Mention à côté du champ d'adresse de réponse. */
-function replyChannelRequirement(requiresReplyChannel: boolean, authenticated: boolean): string {
-  if (!requiresReplyChannel) return "(facultatif)";
-  return authenticated ? "(obligatoire sans tag Discord certifié)" : "(obligatoire sans compte)";
+function replyChannelRequirement(text: ReportsText, requiresReplyChannel: boolean, authenticated: boolean): string {
+  if (!requiresReplyChannel) return text.t("dialog.replyOptional");
+  return authenticated ? text.t("dialog.replyRequiredDiscord") : text.t("dialog.replyRequiredAccount");
 }
 
 /** Ce que l'absence d'adresse de réponse implique. */
-function replyChannelHint(requiresReplyChannel: boolean, authenticated: boolean): string {
-  if (authenticated) {
-    return "Sans adresse, l'association te répondra sur Discord, si ton tag Discord est certifié.";
-  }
-  return requiresReplyChannel
-    ? "Sans compte, c'est la seule façon pour l'association de te répondre."
-    : "Sans adresse, l'association ne pourra pas te tenir au courant.";
+function replyChannelHint(text: ReportsText, requiresReplyChannel: boolean, authenticated: boolean): string {
+  if (authenticated) return text.t("dialog.replyHintAuthenticated");
+  return requiresReplyChannel ? text.t("dialog.replyHintRequired") : text.t("dialog.replyHintOptional");
 }
 
 /**
@@ -106,6 +104,8 @@ export function ReportProblemDialog({
   onSubmitted,
 }: Readonly<ReportProblemDialogProps>) {
   const { showError, showSuccess } = useToast();
+  const text = useReportsText();
+  const { t } = text;
   const titleId = useId();
   const [category, setCategory] = useState<ReportCategory | null>(
     contestOf ? "CONTEST" : (initialCategory ?? null),
@@ -219,11 +219,11 @@ export function ReportProblemDialog({
     event.preventDefault();
     if (busy) return;
     if (!validation.ok) {
-      showError(reportErrorMessage(validation.error));
+      showError(reportErrorText(text, validation.error));
       return;
     }
     if (missingReplyChannel(validation.value, authenticated)) {
-      showError(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED"));
+      showError(reportErrorText(text, "REPORT_REPLY_CHANNEL_REQUIRED"));
       return;
     }
     setBusy(true);
@@ -235,15 +235,11 @@ export function ReportProblemDialog({
       });
       const body = (await response.json().catch(() => ({}))) as { id?: number; error?: string };
       if (!response.ok) throw new Error(body.error);
-      showSuccess(
-        category === "CONTEST"
-          ? "Ta contestation a bien été transmise à l'association, qui réexamine le signalement."
-          : `Merci, ton signalement n° ${body.id} a bien été transmis à l'association.`,
-      );
+      showSuccess(category === "CONTEST" ? t("dialog.contestSent") : t("dialog.sent", { id: String(body.id) }));
       onSubmitted?.();
       onClose();
     } catch (error) {
-      showError(reportErrorMessage((error as Error).message));
+      showError(reportErrorText(text, (error as Error).message));
     } finally {
       setBusy(false);
     }
@@ -261,12 +257,12 @@ export function ReportProblemDialog({
       >
         <div className={styles.head}>
           <div>
-            <span className="eyebrow">ASSOCIATION · SIGNALEMENT</span>
+            <span className="eyebrow">{t("dialog.eyebrow")}</span>
             <h2 id={titleId} className={styles.title}>
-              Signaler un problème
+              {t("dialog.title")}
             </h2>
           </div>
-          <button type="button" className={styles.close} onClick={onClose} disabled={busy} aria-label="Fermer">
+          <button type="button" className={styles.close} onClick={onClose} disabled={busy} aria-label={t("dialog.close")}>
             ×
           </button>
         </div>
@@ -275,25 +271,25 @@ export function ReportProblemDialog({
           <CategoryChoice onChoose={chooseCategory} />
         ) : (
           <form onSubmit={submit} className={styles.form} noValidate>
-            <ScrollArea orientation="y" className={styles.body} ariaLabel="Détail du signalement">
+            <ScrollArea orientation="y" className={styles.body} ariaLabel={t("dialog.bodyLabel")}>
               <div className={styles.stepBar}>
                 {contestOf === undefined && (
                   <button type="button" className={styles.back} onClick={() => setCategory(null)} disabled={busy}>
-                    ← CHANGER DE CATÉGORIE
+                    {t("dialog.changeCategory")}
                   </button>
                 )}
                 <span className={styles.categoryPill}>
-                  <span aria-hidden="true">{definition.icon}</span> {definition.label}
+                  <span aria-hidden="true">{definition.icon}</span> {t(`categories.${category}.label`)}
                 </span>
               </div>
 
               {category === "MODERATION" && (
                 <p className={styles.anonNote}>
-                  {OFF_SITE_CONDUCT_NOTICE}{" "}
+                  {t("offSite.notice")}{" "}
                   <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
-                    portail de support BlueGenji
+                    {t("dialog.portalLink")}
                     {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
-                    <span className="sr-only"> (nouvel onglet)</span>
+                    <span className="sr-only">{t("dialog.newTab")}</span>
                   </a>
                   {/* NOSONAR S6772 — le point suit le lien sans espace */}
                   .
@@ -324,14 +320,14 @@ export function ReportProblemDialog({
               )}
 
               <div className="field">
-                <label htmlFor={`${titleId}-description`}>Description</label>
+                <label htmlFor={`${titleId}-description`}>{t("dialog.description")}</label>
                 <textarea
                   id={`${titleId}-description`}
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   rows={5}
                   maxLength={REPORT_DESCRIPTION_MAX_LENGTH}
-                  placeholder={definition.descriptionPlaceholder}
+                  placeholder={t(`categories.${category}.placeholder`)}
                   aria-invalid={descriptionTooShort}
                   aria-describedby={`${titleId}-description-hint`}
                   data-autofocus={contestOf !== undefined || initialCategory !== undefined ? "" : undefined}
@@ -341,8 +337,8 @@ export function ReportProblemDialog({
                   className={`${styles.hint} ${descriptionTooShort ? styles.hintError : ""}`}
                 >
                   {descriptionTooShort
-                    ? `Encore ${REPORT_DESCRIPTION_MIN_LENGTH - descriptionLength} caractères au moins.`
-                    : `${descriptionLength}/${REPORT_DESCRIPTION_MAX_LENGTH}`}
+                    ? t("dialog.tooShort", { count: REPORT_DESCRIPTION_MIN_LENGTH - descriptionLength })
+                    : t("dialog.counter", { length: descriptionLength, max: REPORT_DESCRIPTION_MAX_LENGTH })}
                 </p>
               </div>
 
@@ -368,22 +364,19 @@ export function ReportProblemDialog({
               {reportRequiresConsent(category) && (
                 <label className={styles.check}>
                   <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-                  <span>
-                    J&apos;accepte que l&apos;association Bluegenji Esport traite ces données pour donner suite à mon
-                    signalement, dans les conditions ci-dessus.
-                  </span>
+                  <span>{t("dialog.consent")}</span>
                 </label>
               )}
             </ScrollArea>
 
             <div className={styles.foot}>
               <CyberButton type="button" variant="ghost" onClick={onClose} disabled={busy}>
-                Annuler
+                {t("dialog.cancel")}
               </CyberButton>
               {/* Jamais grisé pour une saisie incomplète : un bouton éteint ne
                   dit pas ce qui manque, l'envoi le dit (en notification). */}
               <CyberButton type="submit" variant="primary" disabled={busy}>
-                {busy ? "Envoi…" : "Envoyer le signalement"}
+                {busy ? t("dialog.sending") : t("dialog.submit")}
               </CyberButton>
             </div>
           </form>
@@ -396,12 +389,10 @@ export function ReportProblemDialog({
 
 /** Étape 1 : le choix de la catégorie. */
 function CategoryChoice({ onChoose }: Readonly<{ onChoose: (category: ReportCategory) => void }>) {
+  const { t } = useReportsText();
   return (
-    <ScrollArea orientation="y" className={styles.body} ariaLabel="Choix de la catégorie">
-      <p className={styles.lead}>
-        De quoi s&apos;agit-il ? Le signalement est lu par les administrateurs de
-        l&apos;association, qui le traitent au plus vite.
-      </p>
+    <ScrollArea orientation="y" className={styles.body} ariaLabel={t("dialog.chooseLabel")}>
+      <p className={styles.lead}>{t("dialog.lead")}</p>
       <div className={styles.categories}>
         {REPORT_CATEGORIES.flatMap((key) => {
           const item = REPORT_CATEGORY_DEFINITIONS[key];
@@ -417,8 +408,8 @@ function CategoryChoice({ onChoose }: Readonly<{ onChoose: (category: ReportCate
               <span className={styles.categoryIcon} aria-hidden="true">
                 {item.icon}
               </span>
-              <span className={styles.categoryLabel}>{item.label}</span>
-              <span className={styles.categoryHint}>{item.hint}</span>
+              <span className={styles.categoryLabel}>{t(`categories.${key}.label`)}</span>
+              <span className={styles.categoryHint}>{t(`categories.${key}.hint`)}</span>
             </button>
           );
           if (key !== "MODERATION") return [card];
@@ -437,10 +428,10 @@ function CategoryChoice({ onChoose }: Readonly<{ onChoose: (category: ReportCate
                 {OFF_SITE_CONDUCT_ENTRY.icon}
               </span>
               <span className={styles.categoryLabel}>
-                {OFF_SITE_CONDUCT_ENTRY.label}
-                <span className="sr-only"> (portail de support, nouvel onglet)</span>
+                {t("offSite.label")}
+                <span className="sr-only">{t("dialog.portalSuffix")}</span>
               </span>
-              <span className={styles.categoryHint}>{OFF_SITE_CONDUCT_ENTRY.hint}</span>
+              <span className={styles.categoryHint}>{t("offSite.hint")}</span>
             </a>,
           ];
         })}
@@ -469,6 +460,7 @@ function TargetsField({
   pathname,
   onClose,
 }: Readonly<TargetsFieldProps>) {
+  const text = useReportsText();
   if (types.length === 0) return null;
   if (authenticated) {
     return (
@@ -487,12 +479,15 @@ function TargetsField({
   }
   return (
     <p className={styles.anonNote}>
-      <LoginReturnLink pathname={pathname} onClose={onClose}>
-        Connecte-toi
-      </LoginReturnLink>{" "}
-      pour
-      désigner directement les joueurs, équipes ou tournois concernés. Sans compte, indique leur nom
-      ou l&apos;adresse de la page dans ta description.
+      {richNodes(
+        text.rich("dialog.targetsAnon", {}, {
+          login: (chunks) => (
+            <LoginReturnLink pathname={pathname} onClose={onClose}>
+              {chunks}
+            </LoginReturnLink>
+          ),
+        }),
+      )}
     </p>
   );
 }
@@ -540,44 +535,47 @@ function ContestField({
   onParentReportIdChange,
   onClose,
 }: Readonly<ContestFieldProps>) {
+  const text = useReportsText();
+  const { t } = text;
   if (!authenticated) {
     return (
       <p className={styles.anonNote}>
-        <LoginReturnLink pathname={pathname} onClose={onClose}>
-          Connecte-toi
-        </LoginReturnLink>{" "}
-        pour contester un signalement : seuls les joueurs visés, les membres des équipes visées
-        et l&apos;auteur d&apos;un signalement de droit d&apos;auteur ou de modération, une fois le
-        dossier archivé, peuvent le faire.
+        {richNodes(
+          text.rich("dialog.contestAnon", {}, {
+            login: (chunks) => (
+              <LoginReturnLink pathname={pathname} onClose={onClose}>
+                {chunks}
+              </LoginReturnLink>
+            ),
+          }),
+        )}
       </p>
     );
   }
   if (contestOf !== undefined) {
-    return <p className={styles.lead}>Tu contestes le signalement n° {contestOf}.</p>;
+    return <p className={styles.lead}>{t("dialog.contestOf", { id: String(contestOf) })}</p>;
   }
   if (contestable !== null && contestable.length === 0) {
-    return (
-      <p className={styles.anonNote}>
-        Aucun signalement ne te vise, ni toi ni ton équipe, et aucun de ceux que tu as envoyés
-        n&apos;est archivé : il n&apos;y a rien à contester.
-      </p>
-    );
+    return <p className={styles.anonNote}>{t("dialog.nothingToContest")}</p>;
   }
   return (
     <div className="field">
-      <label htmlFor={`${fieldId}-parent`}>Signalement contesté</label>
+      <label htmlFor={`${fieldId}-parent`}>{t("dialog.contested")}</label>
       <select
         id={`${fieldId}-parent`}
         value={parentReportId ?? ""}
         onChange={(event) => onParentReportIdChange(event.target.value ? Number(event.target.value) : null)}
         disabled={contestable === null}
       >
-        <option value="">{contestable === null ? "Chargement…" : "Choisir…"}</option>
+        <option value="">{contestable === null ? t("dialog.loading") : t("dialog.choose")}</option>
         {(contestable ?? []).map((option) => (
           <option key={option.id} value={option.id}>
-            N° {option.id} · {REPORT_CATEGORY_DEFINITIONS[option.category].label} · du{" "}
-            {new Date(option.createdAt).toLocaleDateString("fr-FR")} ·{" "}
-            {REPORT_STATUS_LABELS[option.status]}
+            {t("dialog.contestOption", {
+              id: String(option.id),
+              category: t(`categories.${option.category}.label`),
+              date: new Date(option.createdAt).toLocaleDateString(INTL_LOCALE[text.locale]),
+              status: t(`status.${option.status}`),
+            })}
           </option>
         ))}
       </select>
@@ -613,13 +611,15 @@ function ContactFields({
   goodFaith,
   onGoodFaithChange,
 }: Readonly<ContactFieldsProps>) {
+  const text = useReportsText();
+  const { t } = text;
   if (definition.requiresContact) {
     return (
       <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>TES COORDONNÉES</legend>
+        <legend className={styles.legend}>{t("dialog.contactLegend")}</legend>
         <div className={styles.twoCols}>
           <div className="field">
-            <label htmlFor={`${fieldId}-name`}>Nom ou raison sociale</label>
+            <label htmlFor={`${fieldId}-name`}>{t("dialog.contactName")}</label>
             <input
               id={`${fieldId}-name`}
               value={contactName}
@@ -630,7 +630,7 @@ function ContactFields({
             />
           </div>
           <div className="field">
-            <label htmlFor={`${fieldId}-email`}>Adresse électronique</label>
+            <label htmlFor={`${fieldId}-email`}>{t("dialog.contactEmail")}</label>
             <input
               id={`${fieldId}-email`}
               type="email"
@@ -643,26 +643,24 @@ function ContactFields({
           </div>
         </div>
         <div className="field">
-          <label htmlFor={`${fieldId}-relation`}>Ta qualité</label>
+          <label htmlFor={`${fieldId}-relation`}>{t("dialog.relation")}</label>
           <select
             id={`${fieldId}-relation`}
             value={rightsRelation}
             onChange={(event) => onRightsRelationChange(event.target.value as RightsRelation | "")}
             required
           >
-            <option value="">Choisir…</option>
+            <option value="">{t("dialog.choose")}</option>
             {RIGHTS_RELATIONS.map((relation) => (
               <option key={relation} value={relation}>
-                {RIGHTS_RELATION_LABELS[relation]}
+                {t(`relation.${relation}`)}
               </option>
             ))}
           </select>
         </div>
         <label className={styles.check}>
           <input type="checkbox" checked={goodFaith} onChange={(event) => onGoodFaithChange(event.target.checked)} />
-          <span>
-            Je déclare de bonne foi que les informations de ce signalement sont exactes et complètes.
-          </span>
+          <span>{t("dialog.goodFaith")}</span>
         </label>
       </fieldset>
     );
@@ -670,9 +668,9 @@ function ContactFields({
   return (
     <div className="field">
       <label htmlFor={`${fieldId}-email`}>
-        Adresse pour te répondre{" "}
+        {t("dialog.replyEmail")}{" "}
         <span className={styles.optional}>
-          {replyChannelRequirement(definition.requiresReplyChannel, authenticated)}
+          {replyChannelRequirement(text, definition.requiresReplyChannel, authenticated)}
         </span>
       </label>
       <input
@@ -684,7 +682,7 @@ function ContactFields({
         autoComplete="email"
       />
       <p className={styles.hint}>
-        {replyChannelHint(definition.requiresReplyChannel, authenticated)}
+        {replyChannelHint(text, definition.requiresReplyChannel, authenticated)}
       </p>
     </div>
   );
@@ -692,29 +690,27 @@ function ContactFields({
 
 /** Mentions d'information sur les données du signalement. */
 function ReportPrivacyNotice({ category }: Readonly<{ category: ReportCategory }>) {
+  const text = useReportsText();
+  const { t } = text;
   return (
     <div className={styles.notice}>
-      <strong>Tes données</strong>
+      <strong>{t("dialog.privacyTitle")}</strong>
       <ul>
-        <li>{REPORT_PRIVACY_NOTICE.controller}</li>
-        <li>{REPORT_PRIVACY_NOTICE.purpose}</li>
-        <li>{REPORT_PRIVACY_NOTICE.data}</li>
+        <li>{t("privacy.controller")}</li>
+        <li>{t("privacy.purpose")}</li>
+        <li>{t("privacy.data")}</li>
+        <li>{category === "CONTEST" ? t("privacy.contestRecipients") : t("privacy.recipients")}</li>
+        <li>{retentionText(text)}</li>
+        <li>{legalBasisText(text, category)}</li>
+        {(category === "COPYRIGHT" || category === "MODERATION") && <li>{t("privacy.followUp")}</li>}
         <li>
-          {category === "CONTEST"
-            ? REPORT_PRIVACY_NOTICE.contestRecipients
-            : REPORT_PRIVACY_NOTICE.recipients}
-        </li>
-        <li>{REPORT_PRIVACY_NOTICE.retention}</li>
-        <li>{reportLegalBasisNotice(category)}</li>
-        {(category === "COPYRIGHT" || category === "MODERATION") && <li>{NOTIFIER_FOLLOW_UP}</li>}
-        <li>
-          {reportRightsNotice(category)}{" "}
+          {rightsText(text, category)}{" "}
           <LocaleLink href="/rgpd" target="_blank" rel="noreferrer">
-            Politique de confidentialité
+            {t("dialog.privacyPolicy")}
           </LocaleLink>{" "}
           ·{" "}
           <LocaleLink href={`${TERMS_PATH}#signalement`} target="_blank" rel="noreferrer">
-            Conditions d&apos;utilisation
+            {t("dialog.terms")}
           </LocaleLink>
         </li>
       </ul>

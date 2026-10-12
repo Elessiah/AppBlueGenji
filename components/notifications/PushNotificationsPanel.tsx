@@ -22,13 +22,16 @@
 import { useCallback, useId } from "react";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
-import {
-  PUSH_SUPPORT_NOTICES,
-  PUSH_TOPICS,
-  pushErrorMessage,
-  type PushTopic,
-} from "@/lib/shared/push-notifications";
+import type { PushTopic } from "@/lib/shared/push-notifications";
 import { usePushNotifications } from "./usePushNotifications";
+import {
+  pushErrorText,
+  pushSupportNotice,
+  pushTopicDescription,
+  pushTopicLabel,
+  usePushText,
+  type PushText,
+} from "./push-text";
 import s from "./PushNotificationsPanel.module.css";
 
 export type PushNotificationsPanelProps = {
@@ -38,8 +41,10 @@ export type PushNotificationsPanelProps = {
   /** Phrase d'accroche de la forme compacte. */
   lead?: string;
   /**
-   * Langue des notifications du panneau (français) quand elle diffère de la
-   * page : rendues hors du panneau, elles n'héritent pas de son `lang`.
+   * Langue imposée au panneau (`"fr"`) quand il est posé dans un écran resté
+   * français sous `/en` : ses textes **et** ses notifications — rendues hors du
+   * panneau, elles n'héritent pas de son `lang` — la suivent. Sans elle : la
+   * langue de la page (lot 9-2).
    */
   toastLang?: string;
 };
@@ -51,9 +56,11 @@ export function PushNotificationsPanel({
   toastLang,
 }: Readonly<PushNotificationsPanelProps>): React.ReactElement | null {
   const { showError } = useToast();
+  const text = usePushText(toastLang);
+  const { t } = text;
   const onError = useCallback(
-    (code: string) => showError(pushErrorMessage(code), toastLang ? { lang: toastLang } : undefined),
-    [showError, toastLang],
+    (code: string) => showError(pushErrorText(text, code), toastLang ? { lang: toastLang } : undefined),
+    [showError, toastLang, text],
   );
   const push = usePushNotifications(onError, {
     syncExisting: variant === "full",
@@ -66,7 +73,7 @@ export function PushNotificationsPanel({
     return variant === "compact" ? null : (
       <div className={s.deviceRow}>
         <CyberButton type="button" variant="ghost" onClick={push.retry}>
-          Réessayer
+          {t("panel.retry")}
         </CyberButton>
       </div>
     );
@@ -75,25 +82,27 @@ export function PushNotificationsPanel({
   if (push.support === null || push.server === null) {
     return variant === "compact" ? null : (
       <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.muted} role="status">
-        Chargement des notifications…
+        {t("panel.loading")}
       </p>
     );
   }
 
   const shown = push.server.topics.filter((topic) => !topics || topics.includes(topic));
   const configured = push.server.publicKey !== null;
-  const blocked = push.support !== "AVAILABLE" ? PUSH_SUPPORT_NOTICES[push.support] : null;
+  const blocked = push.support !== "AVAILABLE" ? pushSupportNotice(text, push.support) : null;
 
   // La forme compacte ne sert qu'à proposer : abonné, ou sans rien à proposer,
   // elle se tait plutôt que d'occuper la place d'un écran qui a autre chose à dire.
   if (variant === "compact" && (!push.checked || push.subscribed || !configured || blocked)) return null;
 
-  const deviceControl = <DeviceControl push={push} configured={configured} blocked={blocked} toastLang={toastLang} />;
+  const deviceControl = (
+    <DeviceControl push={push} configured={configured} blocked={blocked} toastLang={toastLang} text={text} />
+  );
 
   if (variant === "compact") {
     return (
       <div className={s.compact}>
-        <p className={s.lead}>{lead ?? "Sois prévenu même quand le site est fermé."}</p>
+        <p className={s.lead}>{lead ?? t("panel.compactLead")}</p>
         {deviceControl}
       </div>
     );
@@ -104,15 +113,12 @@ export function PushNotificationsPanel({
     <div className={s.panel}>
       {deviceControl}
       {devices > 0 ? (
-        <p className={s.hint}>
-          {devices === 1 ? "1 appareil abonné" : `${devices} appareils abonnés`} à ton compte. Les
-          réglages ci-dessous valent pour tous.
-        </p>
+        <p className={s.hint}>{t("panel.devices", { count: devices })}</p>
       ) : null}
 
       {shown.length > 0 ? (
         <fieldset className={s.topics} aria-describedby={`${listId}-hint`}>
-          <legend className={s.legend}>Me prévenir pour</legend>
+          <legend className={s.legend}>{t("panel.legend")}</legend>
           <ul className={s.topicList}>
             {shown.map((topic) => {
               const id = `${listId}-${topic}`;
@@ -127,9 +133,9 @@ export function PushNotificationsPanel({
                     onChange={(event) => void push.setTopicEnabled(topic, event.target.checked)}
                   />
                   <label htmlFor={id} className={s.topicText}>
-                    <span className={s.topicLabel}>{PUSH_TOPICS[topic].label}</span>
+                    <span className={s.topicLabel}>{pushTopicLabel(text, topic)}</span>
                     <span id={`${id}-desc`} className={s.topicDesc}>
-                      {PUSH_TOPICS[topic].description}
+                      {pushTopicDescription(text, topic)}
                     </span>
                   </label>
                 </li>
@@ -137,8 +143,7 @@ export function PushNotificationsPanel({
             })}
           </ul>
           <p id={`${listId}-hint`} className={s.hint}>
-            Les messages privés Discord ne dépendent pas de ces réglages : ils suivent ton tag
-            Discord.
+            {t("panel.discordHint")}
           </p>
         </fieldset>
       ) : null}
@@ -155,23 +160,26 @@ function DeviceControl({
   configured,
   blocked,
   toastLang,
+  text,
 }: Readonly<{
   push: ReturnType<typeof usePushNotifications>;
   configured: boolean;
   blocked: string | null;
   toastLang?: string;
+  text: PushText;
 }>): React.ReactElement {
   const { showSuccess } = useToast();
+  const { t } = text;
   const toastOptions = toastLang ? { lang: toastLang } : undefined;
   if (!configured) {
-    return <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>;
+    return <p className={s.notice}>{t("panel.notConfigured")}</p>;
   }
   if (!push.checked) {
     // L'abonnement du navigateur n'est pas encore relu : proposer d'activer
     // maintenant, ce serait le proposer un instant à qui l'est déjà.
     return (
       <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.muted} role="status">
-        Vérification de cet appareil…
+        {t("panel.checking")}
       </p>
     );
   }
@@ -183,17 +191,17 @@ function DeviceControl({
       <div className={s.deviceRow}>
         {/* Annoncé aux lecteurs d'écran : c'est l'issue du geste qu'on vient de faire. */}
         <span /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.status} role="status">
-          <span className={s.dot} aria-hidden="true" /> Activées sur cet appareil
+          <span className={s.dot} aria-hidden="true" /> {t("panel.enabledHere")}
         </span>
         <CyberButton
           type="button"
           variant="ghost"
           disabled={push.busy}
           onClick={async () => {
-            if (await push.disable()) showSuccess("Notifications désactivées sur cet appareil.", toastOptions);
+            if (await push.disable()) showSuccess(t("panel.disabled"), toastOptions);
           }}
         >
-          Désactiver sur cet appareil
+          {t("panel.disable")}
         </CyberButton>
       </div>
     );
@@ -205,10 +213,10 @@ function DeviceControl({
         aria-busy={push.busy}
         disabled={push.busy}
         onClick={async () => {
-          if (await push.enable()) showSuccess("Notifications activées sur cet appareil.", toastOptions);
+          if (await push.enable()) showSuccess(t("panel.enabled"), toastOptions);
         }}
       >
-        {push.busy ? "Activation…" : "Activer les notifications sur cet appareil"}
+        {push.busy ? t("panel.enabling") : t("panel.enable")}
       </CyberButton>
     </div>
   );

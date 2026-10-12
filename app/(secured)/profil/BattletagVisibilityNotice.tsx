@@ -3,6 +3,8 @@
 import { createPortal } from "react-dom";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { richNodes } from "@/components/i18n/shell-text";
+import { useProfileText } from "@/components/i18n/profile-text";
 
 /**
  * Ce que masquer le BattleTag **ne fait pas**, dit au moment où on le masque.
@@ -30,6 +32,9 @@ export function BattletagVisibilityNotice({ onClose }: Readonly<{ onClose: () =>
   // n'aurait aucun moyen de refermer ce qu'il vient d'ouvrir. La pile partagée
   // verrouille aussi le défilement et piège la tabulation.
   const dialogRef = useDialogBehavior({ open: true, onClose });
+  const text = useProfileText();
+  const { t } = text;
+  const strong = { strong: (chunks: React.ReactNode[]) => <strong>{chunks}</strong> };
 
   // Portée dans <body> : `/profil` rend la modale dans son `<section
   // class="fade-in">`, dont l'animation laisse un `transform` posé — la section
@@ -66,20 +71,18 @@ export function BattletagVisibilityNotice({ onClose }: Readonly<{ onClose: () =>
           padding: 32,
         }}
       >
-        <span className="eyebrow">VISIBILITÉ · BATTLETAG</span>
+        <span className="eyebrow">{t("battletagNotice.eyebrow")}</span>
         <h2
           id="battletag-visibility-title"
           className="display"
           style={{ fontSize: 24, margin: "12px 0 16px" }}
         >
-          Masqué, mais pas pour tout le monde
+          {t("battletagNotice.title")}
         </h2>
 
         <div id="battletag-visibility-body">
           <p style={{ color: "var(--ink-mute)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
-            Ton BattleTag n&apos;apparaîtra plus sur ta fiche publique ni dans
-            l&apos;annuaire des joueurs. Il reste en revanche lisible là où il sert à
-            jouer :
+            {t("battletagNotice.intro")}
           </p>
 
           <ul
@@ -91,32 +94,19 @@ export function BattletagVisibilityNotice({ onClose }: Readonly<{ onClose: () =>
               paddingLeft: 20,
             }}
           >
-            <li>
-              <strong>Les autres joueurs de chaque match que tu disputes</strong>, le
-              temps du tournoi — c&apos;est par lui qu&apos;on s&apos;ajoute en jeu pour
-              lancer la partie.
-            </li>
-            <li>
-              <strong>Le caster de ton match</strong>, de son lancement à sa fin, si tu fais
-              partie des contacts présentés.
-            </li>
-            <li>
-              <strong>Les arbitres et les administrateurs</strong>, tant que tu es inscrit à un
-              tournoi qui n&apos;est pas terminé — dès l&apos;ouverture des inscriptions.
-            </li>
+            <li>{richNodes(text.rich("battletagNotice.players", {}, strong))}</li>
+            <li>{richNodes(text.rich("battletagNotice.caster", {}, strong))}</li>
+            <li>{richNodes(text.rich("battletagNotice.staff", {}, strong))}</li>
           </ul>
 
           <p style={{ color: "var(--ink-dim)", fontSize: 13, lineHeight: 1.7, margin: "0 0 24px" }}>
-            Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes
-            adversaires ne pourront alors plus t&apos;ajouter en jeu. Et si un compte
-            Blizzard est rattaché, c&apos;est lui qui tient ce champ : il faut le retirer
-            d&apos;abord.
+            {t("battletagNotice.outro")}
           </p>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <CyberButton variant="primary" onClick={onClose}>
-            J&apos;ai compris
+            {t("battletagNotice.ok")}
           </CyberButton>
         </div>
       </div>

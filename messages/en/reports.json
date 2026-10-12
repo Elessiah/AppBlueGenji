@@ -1,0 +1,186 @@
+{
+  "dialog": {
+    "eyebrow": "ASSOCIATION · REPORT",
+    "title": "Report a problem",
+    "close": "Close",
+    "bodyLabel": "Report details",
+    "chooseLabel": "Choose a category",
+    "lead": "What's it about? Reports are read by the association's administrators, who handle them as quickly as possible.",
+    "portalSuffix": " (support portal, new tab)",
+    "changeCategory": "← CHANGE CATEGORY",
+    "portalLink": "BlueGenji support portal",
+    "newTab": " (new tab)",
+    "description": "Description",
+    "tooShort": "At least {count} more characters.",
+    "counter": "{length}/{max}",
+    "consent": "I agree that the Bluegenji Esport association processes this data to follow up on my report, under the conditions above.",
+    "cancel": "Cancel",
+    "submit": "Send the report",
+    "sending": "Sending…",
+    "contestSent": "Your contest has been sent to the association, which is reviewing the report again.",
+    "sent": "Thanks, your report no. {id} has been sent to the association.",
+    "targetsAnon": "<login>Log in</login> to point out the players, teams or tournaments concerned directly. Without an account, give their name or the page address in your description.",
+    "contestAnon": "<login>Log in</login> to contest a report: only the targeted players, the members of the targeted teams and the author of a copyright or moderation report, once the case is archived, can do so.",
+    "contestOf": "You're contesting report no. {id}.",
+    "nothingToContest": "No report targets you or your team, and none of those you sent is archived: there's nothing to contest.",
+    "contested": "Contested report",
+    "loading": "Loading…",
+    "choose": "Choose…",
+    "contestOption": "No. {id} · {category} · from {date} · {status}",
+    "contactLegend": "YOUR DETAILS",
+    "contactName": "Name or company name",
+    "contactEmail": "Email address",
+    "relation": "Your capacity",
+    "goodFaith": "I declare in good faith that the information in this report is accurate and complete.",
+    "replyEmail": "Address to reply to you",
+    "replyOptional": "(optional)",
+    "replyRequiredDiscord": "(required without a verified Discord tag)",
+    "replyRequiredAccount": "(required without an account)",
+    "replyHintAuthenticated": "Without an address, the association will reply to you on Discord, if your Discord tag is verified.",
+    "replyHintRequired": "Without an account, it's the only way for the association to reply to you.",
+    "replyHintOptional": "Without an address, the association won't be able to keep you posted.",
+    "privacyTitle": "Your data",
+    "privacyPolicy": "Privacy policy",
+    "terms": "Terms of use"
+  },
+  "categories": {
+    "COPYRIGHT": {
+      "label": "Copyright",
+      "hint": "A logo, avatar or image used without permission.",
+      "placeholder": "Which work is reproduced, where to see it on the site, and who it belongs to…"
+    },
+    "MODERATION": {
+      "label": "Moderation",
+      "hint": "A username, team name or site content that breaks the rules.",
+      "placeholder": "Which site content, on which page, and what's wrong…"
+    },
+    "BUG": {
+      "label": "Bug",
+      "hint": "A page that won't display, a button that doesn't respond.",
+      "placeholder": "What you were doing, what you expected, what happened…"
+    },
+    "RGPD": {
+      "label": "GDPR",
+      "hint": "Exercise your rights over your data: access, rectification, erasure, objection, portability.",
+      "placeholder": "The right you're exercising, the account concerned (username), and exactly what you're asking for…"
+    },
+    "HOSTING": {
+      "label": "Host",
+      "hint": "Write to the site's publisher or host: legal notice, request from an authority, legal question.",
+      "placeholder": "Who you are (individual, organization, authority), what your request is about, and the page concerned…"
+    },
+    "OTHER": {
+      "label": "Other",
+      "hint": "Anything that doesn't fit any box above.",
+      "placeholder": "Tell us about the problem…"
+    },
+    "CONTEST": {
+      "label": "Contest",
+      "hint": "Respond to a report that targets you or your team — or contest the decision taken on your own copyright or moderation report.",
+      "placeholder": "Why the report is unfounded: license, rights holder's permission, the team's own creation, context…"
+    }
+  },
+  "offSite": {
+    "label": "A player's behavior",
+    "hint": "In a match, on voice or on Discord: insults, cheating, griefing… Report it on our support portal.",
+    "notice": "This form is about content published on the site (username, team name, logo…). Bad behavior in a match, insults from a player, cheating or a problem on Discord are reported on the"
+  },
+  "targets": {
+    "USER": {
+      "picker": "Players concerned",
+      "placeholder": "A player's username…"
+    },
+    "TEAM": {
+      "picker": "Teams concerned",
+      "placeholder": "A team's name or tag…"
+    },
+    "TOURNAMENT": {
+      "picker": "Tournaments concerned",
+      "placeholder": "A tournament's name…"
+    },
+    "selection": "{picker} (selected)",
+    "remove": "Remove {label}",
+    "full": "Maximum number of items reached",
+    "empty": "No results.",
+    "ghostTeam": "Ghost team",
+    "unpublished": "Not published"
+  },
+  "status": {
+    "OPEN": "To handle",
+    "IN_PROGRESS": "In progress",
+    "RESOLVED": "Archived"
+  },
+  "relation": {
+    "HOLDER": "I am the rights holder",
+    "AGENT": "I represent the rights holder",
+    "THIRD_PARTY": "I am neither"
+  },
+  "privacy": {
+    "controller": "Data controller: the Bluegenji Esport association.",
+    "purpose": "Purpose: to handle your report (check it, remove content, fix a bug) and to be able to contact you again about it.",
+    "data": "Data: the category, your description, the players, teams or tournaments pointed out, the page you're reporting from, your account if you're logged in, and the name and address you provide.",
+    "recipients": "Recipients: the association's administrators. An alert is posted on Discord, without your name, your address, your description or any player's username. The targeted players and members of targeted teams can read your description in order to respond — never your name, your address or your account — and are notified of it by message, except from a brand-new account or beyond a daily limit per account.",
+    "contestRecipients": "Recipients: the association's administrators. An alert is posted on Discord, without your name, your description or your username. Neither the author of the report nor the people it targets are informed of your contest.",
+    "retention": "Retention: for the time it takes to handle it, then {days} days after it's resolved — the report is then erased. If a logo or avatar is hidden or deleted as a result, it's kept until the contest deadline ({months} months at most). A copyright or moderation report sent from your account is kept for {months} months after it's resolved, so that you can contest the decision.",
+    "legalBasis": {
+      "RGPD": "Legal basis: the legal obligation to respond to a request to exercise data rights (GDPR, art. 6.1.c and 12). No agreement is asked of you: your request will be handled.",
+      "NOTICE": "Legal basis: the host's obligation to handle notices of illegal content (EU Digital Services Act, art. 16). No agreement is asked of you: your notice will be handled.",
+      "HOSTING": "Legal basis: the host's obligation to receive and handle the requests addressed to it, including those from authorities (EU Digital Services Act, art. 11 and 16). No agreement is asked of you: your request will be handled.",
+      "CONTEST": "Legal basis: the obligation to allow a moderation decision to be contested (EU Digital Services Act, art. 20). No agreement is asked of you: your contest will be reviewed.",
+      "CONSENT": "Legal basis: your consent, given with the box below."
+    },
+    "rightsChannel": "through this form (“GDPR” category) or from the person to contact about your data (privacy policy, “Exercising your rights” section)",
+    "rightsConsent": "You can request access to, rectification or erasure of this data, or withdraw your consent, {channel}.",
+    "rightsNoConsent": "You can request access to this data or its rectification {channel}; its erasure once the request has been handled — not before, as the association is required to handle it (GDPR, art. 17.3.b).",
+    "followUp": "The author of a notice receives, at the address they provide (required for copyright, optional otherwise), an acknowledgment of receipt, then the decision taken on it and the remedies available to them. If they reported from their account, they can contest that decision — including a decision not to act — through the “Contest” category of the same form, once the report is archived."
+  },
+  "errors": {
+    "REPORT_INVALID_CATEGORY": "Choose a category.",
+    "REPORT_DESCRIPTION_TOO_SHORT": "Describe the problem in at least {min} characters.",
+    "REPORT_DESCRIPTION_TOO_LONG": "The description exceeds {max} characters.",
+    "REPORT_INVALID_TARGET": "One of the items pointed out no longer exists. Remove it and try again.",
+    "REPORT_TARGET_NOT_FOUND": "One of the items pointed out no longer exists. Remove it and try again.",
+    "REPORT_TARGET_NOT_ALLOWED": "This category doesn't allow pointing out this item.",
+    "REPORT_TOO_MANY_TARGETS": "You can point out {max} items at most.",
+    "REPORT_CONTACT_REQUIRED": "Give your name and an email address: a copyright report must be possible to follow up on.",
+    "REPORT_REPLY_CHANNEL_REQUIRED": "Give an email address so we can reply to you: without an account, or without a verified Discord tag, it's the only way.",
+    "REPORT_CONTACT_TOO_LONG": "The name given is too long.",
+    "REPORT_INVALID_EMAIL": "The email address isn't valid.",
+    "REPORT_RIGHTS_RELATION_REQUIRED": "State your capacity with regard to the rights invoked.",
+    "REPORT_GOOD_FAITH_REQUIRED": "Tick the good-faith declaration.",
+    "REPORT_CONSENT_REQUIRED": "Accept the processing of your data to send the report.",
+    "REPORT_PARENT_REQUIRED": "Choose the report you're contesting.",
+    "REPORT_CONTEST_LOGIN_REQUIRED": "Log in to contest a report that concerns you.",
+    "REPORT_TARGETS_REQUIRE_LOGIN": "Log in to point out players, teams or tournaments — or describe them in your message.",
+    "REPORT_NOT_CONCERNED": "You can only contest a report that targets you or a team you're a member of — or the decision taken on a copyright or moderation report you sent, once the case is archived.",
+    "REPORTS_SATURATED": "Too many reports received in a short time. Try again later, or write to us on Discord.",
+    "TOO_MANY_REQUESTS": "You sent several reports in a row. Wait a little before trying again.",
+    "fallback": "The report couldn't be sent. Try again in a moment."
+  },
+  "concerned": {
+    "title": "Report",
+    "loading": "Loading the report…",
+    "notFoundTitle": "Report not found",
+    "notFoundBody": "This report doesn't exist, has been erased, or doesn't concern you: only the targeted players and members of targeted teams can view it.",
+    "eyebrow": "REPORT NO. {id}",
+    "heading": "A report concerns you",
+    "lead": "The Bluegenji Esport association is reviewing this report. If you believe it's unfounded — you hold the rights to the logo, the content is yours, the context is different —, contest it: your response is read by the administrators before any final decision.",
+    "logoHidden": "<strong>The logo of “{name}” is hidden</strong> since {since}. Unless you contest it, it will be <strong>permanently deleted on {purge}</strong>. If the contest succeeds, it's restored as it was.",
+    "avatarHidden": "<strong>Your avatar is hidden</strong> since {since}. Unless you contest it, it will be <strong>permanently deleted on {purge}</strong>. If the contest succeeds, it's restored as it was.",
+    "logoRemoved": "<strong>The logo of “{name}” was deleted</strong> on {date} following this report. If you hold the rights to it, contest it: if the contest succeeds, you'll be able to upload it again.",
+    "logoRemovedImmediately": "<strong>The logo of “{name}” was deleted</strong> immediately on {date} following this report. If you hold the rights to it, contest it: if the contest succeeds, you'll be able to upload it again.",
+    "avatarRemoved": "<strong>Your avatar was deleted</strong> on {date} following this report. If you hold the rights to it, contest it: if the contest succeeds, you'll be able to upload it again.",
+    "avatarRemovedImmediately": "<strong>Your avatar was deleted</strong> immediately on {date} following this report. If you hold the rights to it, contest it: if the contest succeeds, you'll be able to upload it again.",
+    "reason": "Reason",
+    "received": "Received on",
+    "state": "Status",
+    "targetsTitle": "What's targeted",
+    "reproachTitle": "What's alleged",
+    "myContests": "Your contests",
+    "sentOn": "Sent on {date}",
+    "addContest": "Add a contest",
+    "contest": "Contest this report",
+    "howItWorks": "How does a report work?",
+    "archived": "This report is archived: contesting it reopens it, and the association is notified."
+  }
+}

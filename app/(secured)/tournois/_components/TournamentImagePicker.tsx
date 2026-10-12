@@ -24,7 +24,7 @@ import {
   withNewFile,
   type ImagePickerValue,
 } from "../_lib/image-picker";
-import { FR_IMAGE_TEXT, imageErrorText, useImageText } from "../_lib/image-text";
+import { imageErrorText, useImageText } from "../_lib/image-text";
 import s from "./TournamentImagePicker.module.css";
 
 interface TournamentImagePickerProps {
@@ -66,26 +66,19 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
  *
  * Le composant est contrôlé : il ne fait qu'un brouillon, que la page enregistre.
  */
-/**
- * Titre de la modale de recadrage — son nom accessible. Elle reste française
- * jusqu'au lot 9 (`lang="fr"`) : un titre anglais y serait lu avec la
- * prononciation française et jurerait avec le reste de la fenêtre.
- */
-const CROP_TITLE = FR_IMAGE_TEXT.t("picker.cropTitle");
-
 export function TournamentImagePicker({ existing, value, onChange, disabled }: Readonly<TournamentImagePickerProps>) {
   const { showError } = useToast();
   const text = useImageText();
   const { t } = text;
-  // La modale de recadrage est commune au site (équipes, profil) : française
-  // jusqu'au lot 9, elle le redit sous `/en` — portée hors de cet arbre.
-  const cropLang = text.locale === "fr" ? undefined : "fr";
+  // La modale de recadrage commune au site suit la langue de la page depuis le
+  // lot 9-2 : son titre (son nom accessible) vient d'ici, dans la même langue.
+  const cropTitle = t("picker.cropTitle");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draggingRef = useRef(false);
   // Un fichier survole la zone vide : on le dit avant qu'il soit lâché.
   const [dropping, setDropping] = useState(false);
   const baseId = useId();
-  const { cropImage, cropDialog } = useImageCropper({ lang: cropLang });
+  const { cropImage, cropDialog } = useImageCropper();
   // L'aperçu montre la **zone gardée** : c'est dans elle que se choisit le
   // point focal, et c'est elle que le serveur enregistrera.
   const pending = useMemo(
@@ -122,7 +115,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
       return;
     }
     const seq = ++pickSeqRef.current;
-    const cropped = await cropImage(file, "tournament-image", CROP_TITLE);
+    const cropped = await cropImage(file, "tournament-image", cropTitle);
     if (!cropped || seq !== pickSeqRef.current) return;
     const size = await readImageSize(file);
     if (seq !== pickSeqRef.current) return;
@@ -138,7 +131,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
   const onRecrop = async () => {
     if (!value.file) return;
     const seq = ++pickSeqRef.current;
-    const cropped = await cropImage(value.file, "tournament-image", CROP_TITLE);
+    const cropped = await cropImage(value.file, "tournament-image", cropTitle);
     if (!cropped || seq !== pickSeqRef.current) return;
     onChange(withNewFile(value.file, settings.fit, cropped.crop));
   };

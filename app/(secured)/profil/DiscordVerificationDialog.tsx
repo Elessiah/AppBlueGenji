@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { CyberButton } from "@/components/cyber/CyberButton";
@@ -13,11 +12,13 @@ import { DISCORD_VERIFICATION_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
-import {
-  DISCORD_VERIFICATION_EXPOSURE,
-  DISCORD_VERIFICATION_PURPOSE,
-} from "@/lib/shared/discord-identity";
+import { INTL_LOCALE } from "@/lib/shared/locales";
+import { richNodes } from "@/components/i18n/shell-text";
+import { useProfileText } from "@/components/i18n/profile-text";
 import { discordVerificationErrorMessage } from "./discord-errors";
+
+/** Les cinq lignes de l'exposition (`DISCORD_VERIFICATION_EXPOSURE`), dans l'ordre. */
+const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
 
 const FIELD_IDS = { handle: "discord-verify-handle", code: "discord-verify-code" } as const;
 
@@ -63,6 +64,8 @@ export function DiscordVerificationDialog({
   onVerified,
 }: Readonly<DiscordVerificationDialogProps>) {
   const { showError, showSuccess } = useToast();
+  const text = useProfileText();
+  const { t } = text;
   // Monté après l'hydratation : le portail vise `document.body`, qui n'existe
   // pas au rendu serveur.
   const [mounted, setMounted] = useState(false);
@@ -81,7 +84,7 @@ export function DiscordVerificationDialog({
    */
   const refuse = (e: unknown) => {
     const code = (e as Error).message;
-    const message = discordVerificationErrorMessage(code);
+    const message = discordVerificationErrorMessage(code, text);
     showError(message);
     fieldErrors.report(code, message);
   };
@@ -106,16 +109,16 @@ export function DiscordVerificationDialog({
       if (!response.ok) throw new Error(payload.error ?? "");
 
       if (payload.status === "VERIFIED") {
-        showSuccess("Tag Discord certifié.");
+        showSuccess(t("verify.certified"));
         onVerified(payload.tag ?? handle);
         return;
       }
 
       setChallenge(payload.challenge ?? "");
       showSuccess(
-        `Code envoyé en message privé Discord (expiration : ${new Date(
-          payload.expiresAt ?? "",
-        ).toLocaleTimeString()}).`,
+        t("verify.codeSent", {
+          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(text.locale === "fr" ? undefined : INTL_LOCALE[text.locale]),
+        }),
       );
     } catch (e) {
       refuse(e);
@@ -136,7 +139,7 @@ export function DiscordVerificationDialog({
       });
       const payload = (await response.json()) as { error?: string; tag?: string };
       if (!response.ok) throw new Error(payload.error ?? "");
-      showSuccess("Tag Discord certifié.");
+      showSuccess(t("verify.certified"));
       onVerified(payload.tag ?? handle);
     } catch (e) {
       // Ces refus arrivent code **consommé** : le retaper ne rendrait plus que
@@ -196,15 +199,14 @@ export function DiscordVerificationDialog({
               est faite, ce clic ne donne que le consentement. Le tag est
               montré tel qu'il sera exposé — c'est lui, et rien d'autre. */}
           <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
-            Pseudo donné par Discord à ta dernière connexion : <strong>{initialTag}</strong>. Il
-            suffit de confirmer — ni code, ni nouvelle autorisation Discord.
+            {richNodes(text.rich("verify.attested", { tag: initialTag }, { strong: (chunks) => <strong>{chunks}</strong> }))}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <CyberButton variant="ghost" type="button" onClick={onClose}>
-              Annuler
+              {t("verify.cancel")}
             </CyberButton>
             <CyberButton variant="primary" type="submit" disabled={loading}>
-              {loading ? "Certification…" : "Certifier ce tag"}
+              {loading ? t("verify.certifying") : t("verify.certifyThis")}
             </CyberButton>
           </div>
         </form>
@@ -217,21 +219,18 @@ export function DiscordVerificationDialog({
               pourquoi le bouton quitte la page, elle doit se lire avant le
               clic. */}
           <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
-            Ton compte est relié à Discord, mais aucun pseudo donné par Discord n&apos;est
-            enregistré. Passe par sa page d&apos;autorisation, avec le compte Discord déjà relié :
-            il nommera ton pseudo, que tu pourras ensuite certifier ici d&apos;un clic. Un pseudo
-            fait uniquement de chiffres n&apos;est pas certifiable.
+            {t("verify.linkedNoTag")}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <CyberButton variant="ghost" type="button" onClick={onClose}>
-              Annuler
+              {t("verify.cancel")}
             </CyberButton>
             {/* Une navigation et non un appel de fond : l'aller-retour OAuth
                 quitte la page. Un `<a>` plutôt qu'un `<Link>` — la route
                 répond par une redirection vers Discord, rien que le routeur
                 client puisse précharger ou rendre. */}
             <CyberButton variant="primary" asChild>
-              <a href={oauthStartPath("DISCORD", { intent: "LINK" })}>Continuer avec Discord →</a>
+              <a href={oauthStartPath("DISCORD", { intent: "LINK", locale: text.locale })}>{t("verify.continueWithDiscord")}</a>
             </CyberButton>
           </div>
         </div>
@@ -241,7 +240,7 @@ export function DiscordVerificationDialog({
       return (
         <form onSubmit={requestVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="field">
-            <label htmlFor="discord-verify-handle">Tag Discord</label>
+            <label htmlFor="discord-verify-handle">{t("verify.tag")}</label>
             <input
               id={FIELD_IDS.handle}
               value={handle}
@@ -249,7 +248,7 @@ export function DiscordVerificationDialog({
                 setHandle(e.target.value);
                 fieldErrors.clear("handle");
               }}
-              placeholder="ton_pseudo"
+              placeholder={t("verify.tagPlaceholder")}
               required
               {...fieldErrors.aria("handle", "discord-verify-handle-help")}
             />
@@ -258,24 +257,28 @@ export function DiscordVerificationDialog({
               id="discord-verify-handle-help"
               style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0", lineHeight: 1.6 }}
             >
-              Le bot doit partager un serveur avec toi pour retrouver ton compte :{" "}
-              <Link
-                href={DISCORD_INVITE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-              >
-                rejoins le serveur BlueGenji
-              </Link>{" "}
-              avant de certifier. Tu recevras un code à six chiffres en message privé.
+              {richNodes(
+                text.rich("verify.tagHelp", {}, {
+                  join: (chunks) => (
+                    <a
+                      href={DISCORD_INVITE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                }),
+              )}
             </p>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <CyberButton variant="ghost" type="button" onClick={onClose}>
-              Annuler
+              {t("verify.cancel")}
             </CyberButton>
             <CyberButton variant="primary" type="submit" disabled={loading}>
-              {loading ? "Vérification…" : "Recevoir un code →"}
+              {loading ? t("verify.checking") : t("verify.requestCode")}
             </CyberButton>
           </div>
         </form>
@@ -284,7 +287,7 @@ export function DiscordVerificationDialog({
     return (
       <form onSubmit={confirmVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="field">
-          <label htmlFor="discord-verify-code">Code reçu en message privé</label>
+          <label htmlFor="discord-verify-code">{t("verify.code")}</label>
           <input
             id={FIELD_IDS.code}
             value={code}
@@ -295,29 +298,29 @@ export function DiscordVerificationDialog({
             inputMode="numeric"
             autoComplete="one-time-code"
             pattern="\d{6}"
-            placeholder="123456"
+            placeholder={t("verify.codePlaceholder")}
             required
             {...fieldErrors.aria("code", "discord-verify-code-help")}
           />
           <FieldErrorText fieldId={FIELD_IDS.code} message={fieldErrors.message("code")} />
           <p id="discord-verify-code-help" style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0" }}>
-            Cinq essais, puis le code est brûlé — demande-en un nouveau si tu te trompes.
+            {t("verify.codeHelp")}
           </p>
         </div>
         {/* Trois boutons : à la largeur d'un téléphone ils ne tiennent pas
             sur une ligne, la rangée passe à la ligne plutôt que de déborder. */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
           <CyberButton variant="ghost" type="button" onClick={onClose}>
-            Annuler
+            {t("verify.cancel")}
           </CyberButton>
           {/* Un code brûlé (cinq essais) ou expiré ne se corrige pas en le
               retapant : le refus le dit (« Recommence la certification »),
               et ce retour à la première étape est le geste qu'il nomme. */}
           <CyberButton variant="ghost" type="button" disabled={loading} onClick={restartVerification}>
-            Nouveau code
+            {t("verify.newCode")}
           </CyberButton>
           <CyberButton variant="primary" type="submit" disabled={loading}>
-            {loading ? "Certification…" : "Certifier mon tag"}
+            {loading ? t("verify.certifying") : t("verify.certifyMine")}
           </CyberButton>
         </div>
       </form>
@@ -359,20 +362,20 @@ export function DiscordVerificationDialog({
           padding: 28,
         }}
       >
-        <span className="eyebrow">CERTIFICATION · DISCORD</span>
+        <span className="eyebrow">{t("verify.eyebrow")}</span>
         <h2
           id="discord-verify-title"
           className="display"
           style={{ fontSize: 22, margin: "12px 0 8px", display: "flex", alignItems: "center", gap: 8 }}
         >
-          Certifier mon tag Discord
-          <VerifiedBadge size={20} />
+          {t("verify.title")}
+          <VerifiedBadge size={20} labels={{ alt: t("discord.verifiedAlt"), title: t("discord.verifiedTitle") }} />
         </h2>
 
         <p style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>
-          {DISCORD_VERIFICATION_PURPOSE} La certification est <strong>facultative</strong> et
-          ne se fait que par ce geste — se connecter par Discord ne la donne pas : sans elle, ton
-          tag reste invisible pour tout le monde, administrateurs compris.
+          {richNodes(
+            text.rich("verify.intro", { purpose: t("verify.purpose") }, { strong: (chunks) => <strong>{chunks}</strong> }),
+          )}
         </p>
 
         <p
@@ -384,7 +387,7 @@ export function DiscordVerificationDialog({
             margin: "0 0 8px",
           }}
         >
-          Ce que la certification expose
+          {t("verify.exposureTitle")}
         </p>
         <ul
           id="discord-verify-exposure"
@@ -399,8 +402,8 @@ export function DiscordVerificationDialog({
             gap: 4,
           }}
         >
-          {DISCORD_VERIFICATION_EXPOSURE.map((line) => (
-            <li key={line}>{line}</li>
+          {EXPOSURE_KEYS.map((key) => (
+            <li key={key}>{t(`verify.exposure.${key}`)}</li>
           ))}
         </ul>
 

@@ -19,7 +19,7 @@
  * documents légaux du bot ; lot 7b-1 : conditions, mentions légales,
  * déclaration d'accessibilité ; lot 7b-2 : politique de confidentialité et
  * registre des traitements ; lots 8 : tournois ; lot 9-1 : équipes et
- * joueurs).
+ * joueurs ; lot 9-2 : profil et signalements).
  *
  * Module à part de `locales.ts` pour que les tests puissent simuler une liste
  * remplie sans toucher aux fonctions qui la lisent.
@@ -93,4 +93,10 @@ export const MIGRATED_ROUTES: readonly string[] = [
   "/equipes/[id]",
   "/joueurs",
   "/joueurs/[id]",
+  // Lot 9-2 — profil (réglages, applications connectées, suppression du
+  // compte) et page d'un signalement pour la personne visée. Le formulaire
+  // « Signaler un problème », la modale de recadrage et le réglage des
+  // notifications, communs au site, suivent la langue de la page.
+  "/profil",
+  "/signalements/[id]",
 ];

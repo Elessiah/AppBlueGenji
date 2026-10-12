@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { CyberButton } from "@/components/cyber/CyberButton";
@@ -11,6 +10,9 @@ import { FieldErrorText } from "@/components/ui/field-error-text";
 import { DISCORD_VERIFICATION_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { INTL_LOCALE } from "@/lib/shared/locales";
+import { richNodes } from "@/components/i18n/shell-text";
+import { useProfileText } from "@/components/i18n/profile-text";
 import { discordHandleUpdateErrorMessage } from "./discord-errors";
 
 const FIELD_IDS = {
@@ -41,6 +43,8 @@ export function DiscordBotHandleDialog({
   onUpdated: (tag: string) => void;
 }>) {
   const { showError, showSuccess } = useToast();
+  const text = useProfileText();
+  const { t } = text;
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const [handle, setHandle] = useState("");
@@ -54,7 +58,7 @@ export function DiscordBotHandleDialog({
 
   const refuse = (e: unknown) => {
     const reason = (e as Error).message;
-    const message = discordHandleUpdateErrorMessage(reason);
+    const message = discordHandleUpdateErrorMessage(reason, text);
     showError(message);
     fieldErrors.report(reason, message);
   };
@@ -77,9 +81,9 @@ export function DiscordBotHandleDialog({
       if (!response.ok) throw new Error(payload.error ?? "");
       setChallenge(payload.challenge ?? "");
       showSuccess(
-        `Code envoyé en message privé Discord (expiration : ${new Date(
-          payload.expiresAt ?? "",
-        ).toLocaleTimeString()}).`,
+        t("botHandle.codeSent", {
+          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(text.locale === "fr" ? undefined : INTL_LOCALE[text.locale]),
+        }),
       );
     } catch (e) {
       refuse(e);
@@ -104,9 +108,7 @@ export function DiscordBotHandleDialog({
       };
       if (!response.ok) throw new Error(payload.error ?? "");
       showSuccess(
-        mode === "LINK"
-          ? "Discord rattaché par code."
-          : "Pseudo Discord mis à jour.",
+        mode === "LINK" ? t("botHandle.linked") : t("botHandle.updated"),
       );
       onUpdated(payload.tag ?? "");
     } catch (e) {
@@ -155,10 +157,7 @@ export function DiscordBotHandleDialog({
   const backdrop = useBackdropDismiss(onClose, loading);
   if (!mounted) return null;
 
-  const title =
-    mode === "LINK"
-      ? "Rattacher Discord par code"
-      : "Mettre à jour mon pseudo Discord";
+  const title = mode === "LINK" ? t("botHandle.titleLink") : t("botHandle.titleUpdate");
 
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
@@ -192,7 +191,7 @@ export function DiscordBotHandleDialog({
           padding: 28,
         }}
       >
-        <span className="eyebrow">BOT DISCORD · CODE PAR MESSAGE PRIVÉ</span>
+        <span className="eyebrow">{t("botHandle.eyebrow")}</span>
         <h2
           id="discord-bot-title"
           className="display"
@@ -209,14 +208,8 @@ export function DiscordBotHandleDialog({
             margin: "0 0 16px",
           }}
         >
-          Saisis ton pseudo Discord : le bot BlueGenji t&apos;envoie un code à
-          six chiffres en message privé, et le code prouve que ce pseudo est le
-          tien.{" "}
-          {mode === "UPDATE"
-            ? "Seul le pseudo du compte Discord déjà rattaché est accepté. "
-            : ""}
-          Un pseudo qui change perd sa certification : tu pourras la redonner
-          d&apos;un clic avec « Certifier mon tag ».
+          {t("botHandle.intro")} {mode === "UPDATE" ? `${t("botHandle.introUpdate")} ` : ""}
+          {t("botHandle.introOutro")}
         </p>
 
         {!awaitingCode ? (
@@ -225,7 +218,7 @@ export function DiscordBotHandleDialog({
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
             <div className="field">
-              <label htmlFor={FIELD_IDS.handle}>Pseudo Discord</label>
+              <label htmlFor={FIELD_IDS.handle}>{t("botHandle.handle")}</label>
               <input
                 id={FIELD_IDS.handle}
                 value={handle}
@@ -233,7 +226,7 @@ export function DiscordBotHandleDialog({
                   setHandle(e.target.value);
                   fieldErrors.clear("handle");
                 }}
-                placeholder="ton_pseudo"
+                placeholder={t("botHandle.handlePlaceholder")}
                 autoComplete="off"
                 required
                 {...fieldErrors.aria("handle", "discord-bot-handle-help")}
@@ -251,19 +244,20 @@ export function DiscordBotHandleDialog({
                   lineHeight: 1.6,
                 }}
               >
-                Le bot doit partager un serveur avec toi :{" "}
-                <Link
-                  href={DISCORD_INVITE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "var(--blue-300)",
-                    textDecoration: "underline",
-                  }}
-                >
-                  rejoins le serveur BlueGenji
-                </Link>{" "}
-                si ce n&apos;est pas déjà fait.
+                {richNodes(
+                  text.rich("botHandle.handleHelp", {}, {
+                    join: (chunks) => (
+                      <a
+                        href={DISCORD_INVITE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+                      >
+                        {chunks}
+                      </a>
+                    ),
+                  }),
+                )}
               </p>
             </div>
             <div
@@ -272,10 +266,10 @@ export function DiscordBotHandleDialog({
               {/* Fermé pendant un envoi : fermer perdrait l'identifiant du code
                   déjà parti, et en redemander un consomme le quota. */}
               <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
-                Annuler
+                {t("botHandle.cancel")}
               </CyberButton>
               <CyberButton variant="primary" type="submit" disabled={loading}>
-                {loading ? "Envoi…" : "Recevoir un code →"}
+                {loading ? t("botHandle.sending") : t("botHandle.requestCode")}
               </CyberButton>
             </div>
           </form>
@@ -285,7 +279,7 @@ export function DiscordBotHandleDialog({
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
             <div className="field">
-              <label htmlFor={FIELD_IDS.code}>Code reçu en message privé</label>
+              <label htmlFor={FIELD_IDS.code}>{t("botHandle.code")}</label>
               <input
                 id={FIELD_IDS.code}
                 value={code}
@@ -296,7 +290,7 @@ export function DiscordBotHandleDialog({
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 pattern="\d{6}"
-                placeholder="123456"
+                placeholder={t("botHandle.codePlaceholder")}
                 required
                 {...fieldErrors.aria("code", "discord-bot-code-help")}
               />
@@ -312,8 +306,7 @@ export function DiscordBotHandleDialog({
                   margin: "6px 0 0",
                 }}
               >
-                Cinq essais, puis le code est brûlé — demande-en un nouveau si
-                tu te trompes.
+                {t("botHandle.codeHelp")}
               </p>
             </div>
             <div
@@ -327,7 +320,7 @@ export function DiscordBotHandleDialog({
               {/* Fermé pendant un envoi : fermer perdrait l'identifiant du code
                   déjà parti, et en redemander un consomme le quota. */}
               <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
-                Annuler
+                {t("botHandle.cancel")}
               </CyberButton>
               <CyberButton
                 variant="ghost"
@@ -335,10 +328,10 @@ export function DiscordBotHandleDialog({
                 disabled={loading}
                 onClick={restart}
               >
-                Nouveau code
+                {t("botHandle.newCode")}
               </CyberButton>
               <CyberButton variant="primary" type="submit" disabled={loading}>
-                {loading ? "Vérification…" : "Valider le code"}
+                {loading ? t("botHandle.checking") : t("botHandle.validate")}
               </CyberButton>
             </div>
           </form>

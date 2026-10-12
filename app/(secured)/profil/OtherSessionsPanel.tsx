@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { connectionErrorMessage, otherSessionsSummary, sessionsRevokedMessage } from "./connection-errors";
+import { useProfileText } from "@/components/i18n/profile-text";
 import s from "./profil.module.css";
 
 async function readError(res: Response): Promise<string> {
@@ -25,6 +26,7 @@ async function readError(res: Response): Promise<string> {
 
 export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): React.ReactElement {
   const { showError, showSuccess } = useToast();
+  const text = useProfileText();
   const [count, setCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -53,10 +55,10 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
       const res = await fetch("/api/profile/sessions", { method: "DELETE" });
       if (!res.ok) throw new Error(await readError(res));
       const payload = (await res.json()) as { revoked: number };
-      showSuccess(sessionsRevokedMessage(payload.revoked));
+      showSuccess(sessionsRevokedMessage(payload.revoked, text));
       setCount(0);
     } catch (e) {
-      showError(connectionErrorMessage((e as Error).message || "SESSIONS_REVOKE_FAILED"));
+      showError(connectionErrorMessage((e as Error).message || "SESSIONS_REVOKE_FAILED", text));
     } finally {
       setBusy(false);
     }
@@ -67,7 +69,7 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
       {/* Pas de zone d'annonce : la notification dit déjà le résultat du geste,
           et la ligne répétée juste après le doublerait au lecteur d'écran. */}
       <p id="other-sessions-summary" className={`${s.hint} ${s.sessionsSummary}`}>
-        {otherSessionsSummary(count)}
+        {otherSessionsSummary(count, text)}
       </p>
       <button
         type="button"
@@ -76,7 +78,7 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
         disabled={busy || count === 0}
         aria-describedby="other-sessions-summary"
       >
-        {busy ? "Fermeture…" : "Déconnecter mes autres sessions"}
+        {busy ? text.t("connections.sessions.revoking") : text.t("connections.sessions.revoke")}
       </button>
     </div>
   );

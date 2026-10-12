@@ -1,10 +1,13 @@
 ﻿"use client";
 
-import { useRouter } from "next/navigation";
+import { useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useShellText } from "@/components/i18n/shell-text";
 import { Button } from "./Button";
 
+/** « Déconnexion » de `/profil` — le mot du menu du compte, dans la langue de la page. */
 export function LogoutButton() {
-  const router = useRouter();
+  const router = useLocaleRouter();
+  const { t } = useShellText();
 
   const onLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -14,7 +17,7 @@ export function LogoutButton() {
 
   return (
     <Button variant="ghost" onClick={onLogout}>
-      Déconnexion
+      {t("account.logout")}
     </Button>
   );
 }

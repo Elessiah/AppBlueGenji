@@ -1,0 +1,385 @@
+{
+  "meta": {
+    "title": "My profile"
+  },
+  "loading": "Loading your profile…",
+  "header": {
+    "eyebrow": "Player area",
+    "title": "My profile",
+    "subtitle": "Your username and avatar are public; everything else is set here, field by field."
+  },
+  "navLabel": "Profile sections",
+  "sections": {
+    "identite": {
+      "title": "Identity",
+      "lead": "Your username and avatar, visible wherever you play."
+    },
+    "jeux": {
+      "title": "Game accounts",
+      "lead": "The IDs that let other players add you."
+    },
+    "discord": {
+      "title": "Discord",
+      "lead": "The tag the organizers use to reach you during a tournament."
+    },
+    "confidentialite": {
+      "title": "Privacy",
+      "lead": "What others see of you, and whether teams can approach you."
+    },
+    "connexions": {
+      "title": "Connected apps",
+      "lead": "The doors you use to get into the site, and the sessions still open."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "lead": "Get notified on your phone or computer, even with the site closed."
+    },
+    "invitations": {
+      "title": "Team invitations",
+      "lead": "The teams that invited you to join them."
+    },
+    "statistiques": {
+      "title": "Statistics",
+      "lead": "Your record on the platform."
+    },
+    "compte": {
+      "title": "My account",
+      "lead": "Export your data, log out, or erase everything."
+    }
+  },
+  "identity": {
+    "pseudo": "Site username",
+    "pseudoHint": "It's what identifies you in brackets, rosters and match sheets. It can't be hidden ({max} characters max).",
+    "avatar": "Avatar",
+    "changeAvatar": "Change avatar",
+    "sending": "Uploading…",
+    "deleteAvatar": "Delete",
+    "deleteAvatarLabel": "Delete my avatar",
+    "avatarHint": "PNG, JPEG or WebP — {max} MB max.",
+    "cropTitle": "Crop your avatar",
+    "adult": "Of age",
+    "adultUnknown": "Not specified",
+    "adultYes": "Yes (18+)",
+    "adultNo": "No (minor)",
+    "adultHint": "Some tournaments have age categories. Can be hidden below."
+  },
+  "games": {
+    "battletag": "Overwatch BattleTag",
+    "battletagPlaceholder": "Username#1234",
+    "marvel": "Marvel Rivals tag",
+    "gameTagNotice": "Only used so other players can add you in game — never for statistics.",
+    "blizzardNotice": "If you link Battle.net, Blizzard fills in this BattleTag and updates it at every login — what you typed is then replaced by the source's value."
+  },
+  "battletagLock": {
+    "pending": "Reading your connected apps… The field stays read-only until we know whether Blizzard fills in this BattleTag.",
+    "unknown": "Couldn't read your connected apps for now: the field stays read-only so as not to overwrite a BattleTag Blizzard may have filled in. Reload the page to try again.",
+    "change": "To change it, remove Blizzard from “Connected apps”, then link the right account.",
+    "noTag": "Your Blizzard account is linked, but it gave no BattleTag. The field stays read-only: Blizzard will fill it in at your next login, and would overwrite anything typed here. {change}",
+    "tagged": "Your Blizzard account is linked: it provides this BattleTag, and Blizzard updates it at every login — a correction typed here would be erased next time. {change} To stop publishing it, untick “OW BattleTag” below."
+  },
+  "discord": {
+    "label": "Discord username",
+    "placeholder": "your_username",
+    "certify": "Verify my tag",
+    "certifyLabel": "Verify my Discord tag",
+    "recertify": "Verify again",
+    "recertifyLabel": "Verify my Discord tag again",
+    "register": "Save my tag",
+    "registerLabel": "Save my Discord tag",
+    "remove": "Remove my tag",
+    "removeLabel": "Remove my Discord tag",
+    "removing": "Removing…",
+    "retry": "Try again",
+    "retryLabel": "Try reading the Discord status again",
+    "reading": "Reading…",
+    "unverifiedHint": "Unverified tag: {audience} Verify it so they can.",
+    "unverifiedAudience": "nobody sees it, not even the administrators. So the organizers can't reach you during a tournament.",
+    "audience": "the administrators see it at any time, the referees as long as you're registered for a tournament that isn't over (from the moment registration opens), and the players and caster of your match for the duration of the match, from its launch; other players only if you make it visible in your privacy settings. Nobody else, ever.",
+    "removed": "Discord tag removed.",
+    "lock": {
+      "pending": "Reading your Discord account status… The field stays read-only until we know whether Discord provided this username.",
+      "unknown": "Couldn't read your Discord account status for now: the field stays read-only so as not to overwrite a username Discord may have provided. Try again, or reload the page.",
+      "rename": "To change it, rename yourself on Discord, then use “Update my username” (“Discord bot” row of the connected apps).",
+      "noTag": "Your Discord account is linked, but no username is saved: the organizers can't reach you during a tournament. Use “Save my tag” or “Update my username”, or log in again with Discord.",
+      "unverified": "Your Discord account is linked, but this username isn't verified: {audience} Logging in with Discord doesn't verify it: “Verify my tag” does. {rename} You can also remove it.",
+      "verified": "Your Discord account is linked and this username is verified: {audience} {rename} A new username arrives unverified and must be verified again. To stop being reachable, remove it."
+    },
+    "removalTitle": "Remove your Discord tag?",
+    "removalConfirm": "Remove my tag",
+    "removalPending": "Removing…",
+    "removalBody": "The organizers will no longer be able to reach you on Discord during a tournament, and your verification is lost.",
+    "removalBody2": "Your next login with Discord will save your username again, but without verifying it: it will stay invisible to everyone until you verify it again.",
+    "verifiedAlt": "Verified Discord tag",
+    "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account."
+  },
+  "privacy": {
+    "visibleTitle": "Visible to other players",
+    "visibility": {
+      "avatar": "Avatar",
+      "overwatch": "OW BattleTag",
+      "marvel": "Marvel tag",
+      "discord": "Discord tag",
+      "major": "Of age"
+    },
+    "pseudoAlwaysVisible": "Your username is always visible: it's what identifies you in brackets, rosters and match sheets.",
+    "discordNotice": "Verification opens your Discord tag to the organizers (administrators at any time, referees as long as you're registered for a tournament that isn't over), not to other players: tick “Discord tag” so they can see it on your profile. An unverified tag stays hidden, box ticked or not.",
+    "discordPending": "Your tag isn't verified: it will stay hidden from other players until you verify it.",
+    "discordNoTag": "You don't have a Discord tag yet: save it, then verify it so other players can see it.",
+    "recruitmentTitle": "Recruitment",
+    "openToOffers": "Open to team offers",
+    "recruitmentHint": "Unticked by default. Ticked, you show up in the directory's “Free agents” filter and your card says “FREE AGENT” as long as you have no team."
+  },
+  "save": "Save",
+  "saved": "Profile updated.",
+  "avatarUpdated": "Avatar updated.",
+  "avatarDeleted": "Avatar deleted.",
+  "invitations": {
+    "ownership": " · you'll become its owner",
+    "accept": "Accept",
+    "refuse": "Decline",
+    "accepted": "Invitation accepted.",
+    "refused": "Invitation declined."
+  },
+  "stats": {
+    "tournamentsPlayed": "Tournaments played",
+    "tournamentsWon": "Tournaments won",
+    "wins": "Wins",
+    "losses": "Losses",
+    "bestRank": "Best placement"
+  },
+  "account": {
+    "export": "Export my data",
+    "delete": "Delete my account",
+    "deleting": "Deleting…",
+    "logout": "Log out"
+  },
+  "deletion": {
+    "question": "Permanently delete your account?",
+    "confirm": "Delete my account",
+    "pending": "Deleting…",
+    "residual": "As with any deleted account, what remains is: the site's encrypted backups ({backupDays} days), the record of your deletion in the log used to replay it after a restore (at least {journalDays} days), the audience-measurement fingerprint described in the privacy policy, your connection data (IP address, date, login method), which the law requires us to keep for {logDays} days, and, if you're a staff member, the trace of your actions in the server logs.",
+    "irreversible": "This can't be undone.",
+    "consequences": {
+      "TOURNAMENTS": "Your personal information will be erased and your username replaced with a placeholder one, but your tournament statistics will be kept — they also belong to the teams you played against.",
+      "SOLO_REGISTRATIONS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you're registered for a solo tournament, where your username serves as the entrant's name and will be replaced by that placeholder.",
+      "ORGANIZED_TOURNAMENTS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you're the organizer of tournaments that must keep an owner.",
+      "OWNED_TEAMS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you own a team that nobody could manage without you. Transfer or disband it first for a complete erasure.",
+      "NONE": "You haven't played any match and you manage no team or tournament: your account and profile will be erased entirely.",
+      "UNKNOWN": "The site couldn't tell what will remain: depending on what you left behind (a match played, a solo tournament registration, a team owned, a tournament organized), it will be anonymized or erased entirely."
+    },
+    "outcome": {
+      "TOURNAMENTS": "Account deleted. Your statistics are kept under a placeholder username.",
+      "SOLO_REGISTRATIONS": "Account deleted. Your solo tournament registrations now carry a placeholder username.",
+      "ORGANIZED_TOURNAMENTS": "Account deleted. Your tournaments keep an anonymous organizer.",
+      "OWNED_TEAMS": "Account deleted. Your team keeps an anonymous owner.",
+      "NONE": "Account erased. Your account and profile are gone from the site; only the traces described in the privacy policy and its register remain (backups, deletion log, audience measurement).",
+      "UNKNOWN": "Account deleted."
+    },
+    "errors": {
+      "ACCOUNT_STILL_REFERENCED": "Your account was linked to a tournament or a team during the deletion. Try again: it will then be anonymized rather than erased.",
+      "fallback": "Account deletion failed. Try again in a moment."
+    }
+  },
+  "errors": {
+    "write": {
+      "INVALID_PSEUDO": "The username sent is invalid. Reload the page, then try again.",
+      "PSEUDO_EMPTY": "Your username can't be empty.",
+      "PSEUDO_TOO_LONG": "Your username must be {max} characters or fewer.",
+      "INVALID_DISCORD_PSEUDO": "The Discord tag must be text. Type it again.",
+      "INVALID_OVERWATCH_BATTLETAG": "The BattleTag must be text. Type it again.",
+      "PSEUDO_ALREADY_USED": "This username is already taken. Choose another one.",
+      "DISCORD_TAG_LOCKED": "Your Discord account is linked: this tag comes from it. Rename yourself on Discord, then log in again to change it, or remove it.",
+      "BATTLETAG_LOCKED": "Your Blizzard account is linked: this BattleTag comes from it. Remove Blizzard from “Connected apps” to change it, or untick “OW BattleTag” to stop publishing it.",
+      "ACCOUNT_DELETED": "This account was just deleted: the change wasn't saved."
+    },
+    "shared": {
+      "UNAUTHORIZED": "Your session has expired. Log in again.",
+      "PROFILE_NOT_FOUND": "Your account can't be found. Log in again."
+    },
+    "saveFallback": "Saving failed. Try again in a moment.",
+    "loadFallback": "Couldn't load your profile. Try again in a moment.",
+    "avatarUploadFallback": "The avatar couldn't be uploaded. Try again in a moment.",
+    "avatarDeleteFallback": "The avatar couldn't be deleted. Try again in a moment."
+  },
+  "verification": {
+    "errors": {
+      "INVALID_DISCORD_HANDLE": "Enter a Discord tag (a username, not a numeric ID): that's what will be verified.",
+      "INVALID_CODE": "The code must have 6 digits.",
+      "CODE_INVALID_OR_EXPIRED": "Invalid or expired code. Start the verification again.",
+      "INVALID_CHALLENGE": "Code request not found. Start the verification again.",
+      "DISCORD_ID_MISMATCH": "This tag belongs to a different Discord account than the one linked to your BlueGenji account. Correct the tag, or contact the organizers.",
+      "DISCORD_ALREADY_LINKED": "This Discord account is already verified by another account on the site. Contact the organizers if it really is yours.",
+      "DISCORD_NOT_LINKED": "Your account is no longer linked to Discord. Reload the page to verify your tag with a code.",
+      "DISCORD_TAG_MISSING": "No tag is saved: reconnect Discord so it provides your username, then verify it.",
+      "DISCORD_TAG_NOT_ATTESTED": "This tag wasn't provided by Discord: reconnect Discord so it provides your username, then verify it.",
+      "DISCORD_TAG_CHANGED": "Your Discord tag just changed. Reload the page to see the one you're verifying.",
+      "DISCORD_USER_NOT_FOUND": "Tag not found: the bot must share a server with you. Join the BlueGenji server, then try again.",
+      "DISCORD_DM_FAILED": "Couldn't send you the code by direct message: open your DMs on a server you share with the bot (the BlueGenji server, for example), then try again.",
+      "BOT_INTERNAL_UNREACHABLE": "Verification unavailable for now (bot unreachable). Try again later.",
+      "BOT_INTERNAL_UNAUTHORIZED": "Verification unavailable (internal configuration). Report it to the organizers.",
+      "BOT_RESOLVE_TIMEOUT": "The bot's search for your tag didn't finish in time: the tag may not be on any of its servers, or the bot is overloaded. Check your tag and join the BlueGenji server, then try again.",
+      "TOO_MANY_CODE_REQUESTS": "Too many codes requested for this Discord account. Wait about fifteen minutes.",
+      "TOO_MANY_CODE_REQUESTS_TODAY": "Too many codes requested for this Discord account today. Try again tomorrow.",
+      "TOO_MANY_REQUESTS": "Too many attempts. Wait about fifteen minutes.",
+      "PROFILE_NOT_FOUND": "Your account can't be found. Log in again.",
+      "UNAUTHORIZED": "Log in again to verify your tag."
+    },
+    "fallback": "Verification failed. Try again in a moment."
+  },
+  "handleUpdate": {
+    "errors": {
+      "INVALID_DISCORD_HANDLE": "Enter your Discord username (a username, not a numeric ID).",
+      "CODE_INVALID_OR_EXPIRED": "Invalid or expired code. Request a new code.",
+      "INVALID_CHALLENGE": "Code request not found. Request a new code.",
+      "DISCORD_ID_MISMATCH": "This username belongs to a different Discord account than the one linked to your BlueGenji account. Check the username: one Discord account isn't swapped for another.",
+      "DISCORD_ALREADY_LINKED": "This Discord account is already linked to another account on the site. Contact the organizers if it really is yours.",
+      "BOT_INTERNAL_UNREACHABLE": "Update unavailable for now (bot unreachable). Try again later.",
+      "BOT_INTERNAL_UNAUTHORIZED": "Update unavailable (internal configuration). Report it to the organizers.",
+      "UNAUTHORIZED": "Log in again to update your username."
+    },
+    "fallback": "Updating your username failed. Try again in a moment."
+  },
+  "connections": {
+    "intro": "Your account has no password: it opens through the apps linked below. You can add several so you're never locked out — the last one can't be removed.",
+    "loading": "Loading…",
+    "notes": {
+      "GOOGLE": "One-click login. No email address is saved.",
+      "DISCORD": "Login, verification of your tag, and match reminders by direct message.",
+      "BLIZZARD": "Login, and your BattleTag kept up to date by Blizzard."
+    },
+    "linked": "Linked",
+    "handleLine": "{label}: {handle}",
+    "handleLabels": {
+      "DISCORD": "Discord tag",
+      "BLIZZARD": "BattleTag"
+    },
+    "discordByCode": "Your Discord is linked by code. The button adds the Discord authorization to it — with the same Discord account.",
+    "method": {
+      "OAUTH": "Linked with the Discord button",
+      "DM_CODE": "Linked by direct-message code"
+    },
+    "refusal": {
+      "NOT_LINKED": "No {label} account is linked.",
+      "LAST_CONNECTION": "Can't remove {label}: it's your last login method. Add another one first."
+    },
+    "unlink": "Remove",
+    "unlinking": "Removing…",
+    "unlinkLabel": "Remove {label} from my account",
+    "link": "Link",
+    "linkLabel": "Link {label} to my account",
+    "bot": {
+      "label": "Discord bot (direct-message code)",
+      "handleNote": "Discord username: {handle}",
+      "linkedByCode": "Linked by direct-message code",
+      "linkedByButton": "Your Discord is linked with the Discord button: it's removed on that row. The direct-message code updates your username here.",
+      "linkedElsewhere": "Your Discord is linked: it's removed on the Discord row. The direct-message code updates your username here.",
+      "notLinked": "Link your Discord without an authorization screen: the BlueGenji bot sends you a code by direct message.",
+      "linkByCode": "Link by code",
+      "updateHandle": "Update my username",
+      "disconnect": "Disconnect",
+      "disconnectLabel": "Disconnect from the Discord bot",
+      "disconnecting": "Disconnecting…",
+      "lastConnection": "Can't disconnect from the bot: it's your last login method. Add another one first."
+    },
+    "errors": {
+      "PROVIDER_ALREADY_LINKED": "The account you just used with this provider isn't the one linked to your profile. Log in there with the right account, then start again. To switch accounts, remove the old one first.",
+      "IDENTITY_ALREADY_LINKED": "This account is already linked to another BlueGenji profile. Contact the organizers if both are really yours.",
+      "LAST_CONNECTION": "It's your last login method: link another one before removing it.",
+      "NOT_LINKED": "This app isn't linked to your account.",
+      "UNKNOWN_PROVIDER": "Unknown app.",
+      "OAUTH_FAILED": "Linking failed at the provider. Try again in a moment.",
+      "LINK_FAILED": "Linking didn't go through. Try again in a moment.",
+      "LINK_CANCELLED": "Linking canceled: nothing was changed.",
+      "LINK_STATE_MISMATCH": "Linking couldn't be verified (another attempt may have replaced it). Start again from this button.",
+      "NOT_CONFIGURED": "This login method isn't configured on the site. Report it to the organizers.",
+      "PROFILE_NOT_FOUND": "Your account can't be found. Log in again.",
+      "UNAUTHORIZED": "Log in again to manage your apps.",
+      "SESSIONS_READ_FAILED": "Your other sessions couldn't be counted. Try again in a moment.",
+      "SESSIONS_REVOKE_FAILED": "Your other sessions couldn't be closed. Try again in a moment."
+    },
+    "fallback": "The operation failed. Try again in a moment.",
+    "success": {
+      "linkedAny": "App linked.",
+      "refreshedAny": "App reconfirmed.",
+      "linked": "{label} is now linked to your account.",
+      "refreshedDiscord": "Discord reconfirmed: your username was read again from Discord. If it changed, it's no longer verified: verify it again to stay reachable.",
+      "refreshed": "{label} reconfirmed: your account information was read again."
+    },
+    "unlinked": "{label} was removed from your account.",
+    "unlinkedSessionsFailed": "{removed} Your other sessions couldn't be closed: use “Log out my other sessions”.",
+    "sessions": {
+      "unknown": "The sessions open on your other devices haven't been counted yet.",
+      "none": "No other session is open: only this device is logged in to your account.",
+      "open": "{count, plural, one {1 other session is open} other {{count} other sessions are open}} on other browsers or devices.",
+      "revokedNone": "No other session was open.",
+      "revoked": "{count, plural, one {1 other session was closed} other {{count} other sessions were closed}}.",
+      "revoke": "Log out my other sessions",
+      "revoking": "Closing…"
+    }
+  },
+  "battletagNotice": {
+    "eyebrow": "VISIBILITY · BATTLETAG",
+    "title": "Hidden, but not from everyone",
+    "intro": "Your BattleTag will no longer appear on your public profile or in the player directory. It stays readable, however, where it's needed to play:",
+    "players": "<strong>The other players of every match you play</strong>, for the duration of the tournament — it's how you add each other in game to start the match.",
+    "caster": "<strong>The caster of your match</strong>, from its launch to its end, if you're among the contacts shown.",
+    "staff": "<strong>Referees and administrators</strong>, as long as you're registered for a tournament that isn't over — from the moment registration opens.",
+    "outro": "To stop sharing it entirely, you have to clear the field — but your opponents will then no longer be able to add you in game. And if a Blizzard account is linked, it controls this field: you have to remove it first.",
+    "ok": "Got it"
+  },
+  "verify": {
+    "eyebrow": "VERIFICATION · DISCORD",
+    "title": "Verify my Discord tag",
+    "purpose": "The organizers need to be able to reach you during a tournament: rescheduling a round, a score dispute, a forfeit.",
+    "intro": "{purpose} Verification is <strong>optional</strong> and only happens through this step — logging in with Discord doesn't grant it: without it, your tag stays invisible to everyone, administrators included.",
+    "exposureTitle": "What verification exposes",
+    "exposure": {
+      "admins": "The site's administrators can see your Discord tag at all times.",
+      "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after.",
+      "match": "The players and caster of your match can see it for the duration of the match, from its launch — to add each other and create the channel.",
+      "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page.",
+      "undo": "You can cancel at any time by removing your tag from “My profile”: the verification is lost, and the exposure with it. Logging in with Discord then saves your username again, but without verifying it: only this step verifies it."
+    },
+    "attested": "Username provided by Discord at your last login: <strong>{tag}</strong>. You just need to confirm — no code, no new Discord authorization.",
+    "linkedNoTag": "Your account is linked to Discord, but no username provided by Discord is saved. Go through its authorization page, with the Discord account already linked: it will provide your username, which you can then verify here in one click. A username made only of digits can't be verified.",
+    "continueWithDiscord": "Continue with Discord →",
+    "tag": "Discord tag",
+    "tagPlaceholder": "your_username",
+    "tagHelp": "The bot must share a server with you to find your account: <join>join the BlueGenji server</join> before verifying. You'll receive a six-digit code by direct message.",
+    "code": "Code received by direct message",
+    "codePlaceholder": "123456",
+    "codeHelp": "Five attempts, then the code is burned — request a new one if you make a mistake.",
+    "cancel": "Cancel",
+    "certifyThis": "Verify this tag",
+    "certifying": "Verifying…",
+    "requestCode": "Get a code →",
+    "checking": "Checking…",
+    "newCode": "New code",
+    "certifyMine": "Verify my tag",
+    "certified": "Discord tag verified.",
+    "codeSent": "Code sent by Discord direct message (expires at {time})."
+  },
+  "botHandle": {
+    "eyebrow": "DISCORD BOT · DIRECT-MESSAGE CODE",
+    "titleLink": "Link Discord by code",
+    "titleUpdate": "Update my Discord username",
+    "intro": "Enter your Discord username: the BlueGenji bot sends you a six-digit code by direct message, and the code proves this username is yours.",
+    "introUpdate": "Only the username of the Discord account already linked is accepted.",
+    "introOutro": "A username that changes loses its verification: you can restore it in one click with “Verify my tag”.",
+    "handle": "Discord username",
+    "handlePlaceholder": "your_username",
+    "handleHelp": "The bot must share a server with you: <join>join the BlueGenji server</join> if you haven't already.",
+    "code": "Code received by direct message",
+    "codePlaceholder": "123456",
+    "codeHelp": "Five attempts, then the code is burned — request a new one if you make a mistake.",
+    "cancel": "Cancel",
+    "sending": "Sending…",
+    "requestCode": "Get a code →",
+    "newCode": "New code",
+    "checking": "Checking…",
+    "validate": "Confirm the code",
+    "linked": "Discord linked by code.",
+    "updated": "Discord username updated.",
+    "codeSent": "Code sent by Discord direct message (expires at {time})."
+  }
+}

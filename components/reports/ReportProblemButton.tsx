@@ -1,11 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { CyberButton } from "@/components/cyber";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { ReportProblemDialog } from "./ReportProblemDialog";
+import { orReload } from "@/lib/shared/lazy-component";
+
+/**
+ * Le formulaire, chargé **au clic** (lot 9-2) : le bouton est au pied de chaque
+ * page, et le formulaire porte ses deux langues (`reports-text.ts`) — les
+ * importer ici les aurait mises dans le premier chargement de tout le site.
+ * Un morceau disparu (déploiement entre la page et le clic) recharge la page
+ * quand c'est sûr (`orReload`).
+ */
+const ReportProblemDialog = dynamic(
+  () => orReload(import("./ReportProblemDialog").then((module) => module.ReportProblemDialog)),
+  { ssr: false },
+);
 
 interface ReportProblemButtonProps {
   /** Visiteur connecté : il peut désigner des cibles par leur nom. */

@@ -37,6 +37,11 @@ import {
   type ImageSize,
   type ImageUploadKind,
 } from "@/lib/shared/image-crop";
+import enImageCrop from "@/messages/en/imageCrop.json";
+import frImageCrop from "@/messages/fr/imageCrop.json";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import type { Locale } from "@/lib/shared/locales";
+import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
 import s from "./image-crop-dialog.module.css";
 
 /** Une image choisie et sa zone gardée, prête à partir. */
@@ -143,11 +148,15 @@ type Drag =
   | { mode: "move"; pointerId: number; startX: number; startY: number; startBox: CropBox }
   | { mode: "resize"; handle: CropHandle; pointerId: number; startX: number; startY: number; startBox: CropBox };
 
-const HANDLE_LABELS: Record<CropHandle, string> = {
-  nw: "coin haut gauche",
-  ne: "coin haut droit",
-  sw: "coin bas gauche",
-  se: "coin bas droit",
+/**
+ * Textes de la modale (espace `imageCrop`, lot 9-2) : ses deux langues
+ * voyagent avec elle — quelques centaines d'octets, et la modale sert des
+ * écrans de toutes les langues, staff compris. `lang="fr"` (outil du staff,
+ * D4) impose le français ; sinon, la langue de la page.
+ */
+const CROP_TEXT: Readonly<Record<Locale, ScopedText<Leaves<typeof frImageCrop>>>> = {
+  fr: scopedText("fr", frImageCrop),
+  en: scopedText("en", enImageCrop),
 };
 
 const pct = (value: number) => `${value}%`;
@@ -173,6 +182,8 @@ function handleOf(target: EventTarget): CropHandle | null {
  * `useBackdropDismiss` — les trois règles de `docs/features/MODAL_DIALOGS.md`.
  */
 export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }: Readonly<ImageCropDialogProps>) {
+  const pageLocale = useAppLocale();
+  const { t } = CROP_TEXT[lang === "fr" ? "fr" : pageLocale];
   const titleId = useId();
   const hintId = useId();
   const aspect = IMAGE_CROP_ASPECTS[kind];
@@ -292,16 +303,17 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }
       }
     : undefined;
   const frameLabel = ready
-    ? `Zone gardée : ${Math.round((box.width / size.width) * 100)} % de la largeur, ${Math.round(
-        (box.height / size.height) * 100,
-      )} % de la hauteur, à ${Math.round((box.x / size.width) * 100)} % du bord gauche et ${Math.round(
-        (box.y / size.height) * 100,
-      )} % du haut`
-    : "Zone gardée";
+    ? t("frameDetail", {
+        width: Math.round((box.width / size.width) * 100),
+        height: Math.round((box.height / size.height) * 100),
+        left: Math.round((box.x / size.width) * 100),
+        top: Math.round((box.y / size.height) * 100),
+      })
+    : t("frame");
 
   let body: ReactNode;
   if (failed) {
-    body = <p className={s.error}>Cette image ne peut pas être affichée ici. Choisis-en une autre.</p>;
+    body = <p className={s.error}>{t("failed")}</p>;
   } else {
     body = (
       <div className={s.layout}>
@@ -324,7 +336,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }
                 className={`${s.frame} ${round ? s.frameRound : ""}`}
                 style={frameStyle}
                 role="application"
-                aria-roledescription="cadre de recadrage"
+                aria-roledescription={t("frameRole")}
                 aria-label={frameLabel}
                 aria-describedby={hintId}
                 tabIndex={0} // NOSONAR S6845 — le cadre se déplace au clavier, il doit recevoir le focus
@@ -344,28 +356,23 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }
                     className={`${s.handle} ${s["handle_" + handle]}`}
                     aria-hidden="true"
                     data-handle={handle}
-                    title={`Redimensionner par le ${HANDLE_LABELS[handle]}`}
+                    title={t("resizeBy", { handle: t(`handles.${handle}`) })}
                   />
                 ))}
               </div>
             )}
           </div>
           <p id={hintId} className={s.hint}>
-            Fais glisser le cadre pour choisir la zone gardée, tire un coin pour le redimensionner
-            {aspect !== null ? " (proportions imposées)" : ""}.
+            {aspect !== null ? t("hintFixed") : t("hint")}
             {/* L'aide clavier quitte l'écran tactile, où les boutons de
                 l'aperçu tiennent le même rôle, mais reste lue avec le cadre. */}
-            <span className={s.hintKeys}>
-              {" "}
-              Au clavier : flèches pour le déplacer (Maj pour aller plus vite), + et − pour
-              l&apos;agrandir ou le réduire, Origine pour revenir au cadre proposé.
-            </span>
+            <span className={s.hintKeys}>{t("hintKeys")}</span>
           </p>
         </div>
 
         {ready && url && (
           <div className={s.side}>
-            <p className={s.caption}>Aperçu</p>
+            <p className={s.caption}>{t("preview")}</p>
             <div
               className={`${s.preview} ${round ? s.previewRound : ""}`}
               style={{
@@ -386,13 +393,15 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }
                   symbole seul nommé autrement ne répondrait plus à la commande
                   vocale de ce qu'on lit dessus (WCAG 2.5.3). */}
               <button type="button" className="btn ghost" onClick={() => scale(1 / CROP_SCALE_STEP)}>
-                <span aria-hidden="true">− </span>Réduire
+                <span aria-hidden="true">− </span>
+                {t("shrink")}
               </button>
               <button type="button" className="btn ghost" onClick={() => scale(CROP_SCALE_STEP)}>
-                <span aria-hidden="true">+ </span>Agrandir
+                <span aria-hidden="true">+ </span>
+                {t("grow")}
               </button>
               <button type="button" className="btn ghost" onClick={() => setBox(defaultCropBox(size, aspect))}>
-                Réinitialiser
+                {t("reset")}
               </button>
             </div>
           </div>
@@ -410,7 +419,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }
         {body}
         <div className={s.footer}>
           <button type="button" className={s.cancel} onClick={onCancel}>
-            Annuler
+            {t("cancel")}
           </button>
           <button
             type="button"
@@ -420,7 +429,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }
               if (box && size) onConfirm(cropToSend(box, size));
             }}
           >
-            Valider le recadrage
+            {t("confirm")}
           </button>
         </div>
       </div>

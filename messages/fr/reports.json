@@ -1,0 +1,186 @@
+{
+  "dialog": {
+    "eyebrow": "ASSOCIATION · SIGNALEMENT",
+    "title": "Signaler un problème",
+    "close": "Fermer",
+    "bodyLabel": "Détail du signalement",
+    "chooseLabel": "Choix de la catégorie",
+    "lead": "De quoi s'agit-il ? Le signalement est lu par les administrateurs de l'association, qui le traitent au plus vite.",
+    "portalSuffix": " (portail de support, nouvel onglet)",
+    "changeCategory": "← CHANGER DE CATÉGORIE",
+    "portalLink": "portail de support BlueGenji",
+    "newTab": " (nouvel onglet)",
+    "description": "Description",
+    "tooShort": "Encore {count} caractères au moins.",
+    "counter": "{length}/{max}",
+    "consent": "J'accepte que l'association Bluegenji Esport traite ces données pour donner suite à mon signalement, dans les conditions ci-dessus.",
+    "cancel": "Annuler",
+    "submit": "Envoyer le signalement",
+    "sending": "Envoi…",
+    "contestSent": "Ta contestation a bien été transmise à l'association, qui réexamine le signalement.",
+    "sent": "Merci, ton signalement n° {id} a bien été transmis à l'association.",
+    "targetsAnon": "<login>Connecte-toi</login> pour désigner directement les joueurs, équipes ou tournois concernés. Sans compte, indique leur nom ou l'adresse de la page dans ta description.",
+    "contestAnon": "<login>Connecte-toi</login> pour contester un signalement : seuls les joueurs visés, les membres des équipes visées et l'auteur d'un signalement de droit d'auteur ou de modération, une fois le dossier archivé, peuvent le faire.",
+    "contestOf": "Tu contestes le signalement n° {id}.",
+    "nothingToContest": "Aucun signalement ne te vise, ni toi ni ton équipe, et aucun de ceux que tu as envoyés n'est archivé : il n'y a rien à contester.",
+    "contested": "Signalement contesté",
+    "loading": "Chargement…",
+    "choose": "Choisir…",
+    "contestOption": "N° {id} · {category} · du {date} · {status}",
+    "contactLegend": "TES COORDONNÉES",
+    "contactName": "Nom ou raison sociale",
+    "contactEmail": "Adresse électronique",
+    "relation": "Ta qualité",
+    "goodFaith": "Je déclare de bonne foi que les informations de ce signalement sont exactes et complètes.",
+    "replyEmail": "Adresse pour te répondre",
+    "replyOptional": "(facultatif)",
+    "replyRequiredDiscord": "(obligatoire sans tag Discord certifié)",
+    "replyRequiredAccount": "(obligatoire sans compte)",
+    "replyHintAuthenticated": "Sans adresse, l'association te répondra sur Discord, si ton tag Discord est certifié.",
+    "replyHintRequired": "Sans compte, c'est la seule façon pour l'association de te répondre.",
+    "replyHintOptional": "Sans adresse, l'association ne pourra pas te tenir au courant.",
+    "privacyTitle": "Tes données",
+    "privacyPolicy": "Politique de confidentialité",
+    "terms": "Conditions d'utilisation"
+  },
+  "categories": {
+    "COPYRIGHT": {
+      "label": "Droit d'auteur",
+      "hint": "Un logo, un avatar ou une image utilisé sans autorisation.",
+      "placeholder": "Quelle œuvre est reproduite, où la voir sur le site, et à qui elle appartient…"
+    },
+    "MODERATION": {
+      "label": "Modération",
+      "hint": "Un pseudo, un nom d'équipe ou un contenu du site contraire aux règles.",
+      "placeholder": "Quel contenu du site, sur quelle page, et ce qui ne va pas…"
+    },
+    "BUG": {
+      "label": "Bug",
+      "hint": "Une page qui ne s'affiche pas, un bouton qui ne répond pas.",
+      "placeholder": "Ce que tu faisais, ce que tu attendais, ce qui s'est passé…"
+    },
+    "RGPD": {
+      "label": "RGPD",
+      "hint": "Exercer tes droits sur tes données : accès, rectification, effacement, opposition, portabilité.",
+      "placeholder": "Le droit que tu exerces, le compte concerné (pseudo), et ce que tu demandes précisément…"
+    },
+    "HOSTING": {
+      "label": "Hébergeur",
+      "hint": "Écrire à l'éditeur ou à l'hébergeur du site : mentions légales, demande d'une autorité, question juridique.",
+      "placeholder": "Qui tu es (particulier, organisme, autorité), l'objet de ta demande, et la page concernée…"
+    },
+    "OTHER": {
+      "label": "Autre",
+      "hint": "Tout ce qui ne rentre dans aucune case ci-dessus.",
+      "placeholder": "Explique-nous le problème…"
+    },
+    "CONTEST": {
+      "label": "Contestation",
+      "hint": "Répondre à un signalement qui te vise, toi ou ton équipe — ou contester la décision prise sur ton propre signalement de droit d'auteur ou de modération.",
+      "placeholder": "Pourquoi le signalement est infondé : licence, autorisation du titulaire, création de l'équipe, contexte…"
+    }
+  },
+  "offSite": {
+    "label": "Comportement d'un joueur",
+    "hint": "En match, en vocal ou sur Discord : insulte, triche, anti-jeu… Se signale sur notre portail de support.",
+    "notice": "Ce formulaire concerne les contenus publiés sur le site (pseudo, nom d'équipe, logo…). Un mauvais comportement en match, une insulte d'un joueur, de la triche ou un problème sur Discord se signalent sur le"
+  },
+  "targets": {
+    "USER": {
+      "picker": "Joueurs concernés",
+      "placeholder": "Pseudo d'un joueur…"
+    },
+    "TEAM": {
+      "picker": "Équipes concernées",
+      "placeholder": "Nom ou sigle d'une équipe…"
+    },
+    "TOURNAMENT": {
+      "picker": "Tournois concernés",
+      "placeholder": "Nom d'un tournoi…"
+    },
+    "selection": "{picker} (sélection)",
+    "remove": "Retirer {label}",
+    "full": "Nombre maximal d'éléments atteint",
+    "empty": "Aucun résultat.",
+    "ghostTeam": "Équipe fantôme",
+    "unpublished": "Non publié"
+  },
+  "status": {
+    "OPEN": "À traiter",
+    "IN_PROGRESS": "En cours",
+    "RESOLVED": "Archivé"
+  },
+  "relation": {
+    "HOLDER": "Je suis titulaire des droits",
+    "AGENT": "Je représente le titulaire des droits",
+    "THIRD_PARTY": "Je ne suis ni l'un ni l'autre"
+  },
+  "privacy": {
+    "controller": "Responsable : l'association Bluegenji Esport.",
+    "purpose": "Finalité : traiter ton signalement (vérifier, retirer un contenu, corriger un bug) et pouvoir te recontacter à son sujet.",
+    "data": "Données : la catégorie, ta description, les joueurs, équipes ou tournois désignés, la page d'où tu signales, ton compte si tu es connecté, et le nom et l'adresse que tu indiques.",
+    "recipients": "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ton adresse, ta description ni le pseudo d'un joueur. Les joueurs et les membres des équipes visés peuvent lire ta description pour y répondre — jamais ton nom, ton adresse ni ton compte — et en sont prévenus par message, sauf depuis un compte tout juste créé ou au-delà d'une limite quotidienne par compte.",
+    "contestRecipients": "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. Ni l'auteur du signalement ni les personnes qu'il vise ne sont informés de ta contestation.",
+    "retention": "Durée : le temps du traitement, puis {days} jours après sa résolution — le signalement est alors effacé. Si un logo ou un avatar est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation ({months} mois au plus). Un signalement de droit d'auteur ou de modération envoyé depuis ton compte est gardé {months} mois après sa résolution, le temps que tu puisses contester la décision.",
+    "legalBasis": {
+      "RGPD": "Base légale : l'obligation légale de répondre à une demande d'exercice des droits (RGPD, art. 6.1.c et 12). Aucun accord n'est demandé : ta demande sera traitée.",
+      "NOTICE": "Base légale : l'obligation faite à l'hébergeur de traiter les notifications de contenu illicite (règlement européen sur les services numériques, art. 16). Aucun accord n'est demandé : ta notification sera traitée.",
+      "HOSTING": "Base légale : l'obligation faite à l'hébergeur de recevoir et de traiter les demandes qui lui sont adressées, dont celles des autorités (règlement européen sur les services numériques, art. 11 et 16). Aucun accord n'est demandé : ta demande sera traitée.",
+      "CONTEST": "Base légale : l'obligation de permettre la contestation d'une décision de modération (règlement européen sur les services numériques, art. 20). Aucun accord n'est demandé : ta contestation sera examinée.",
+      "CONSENT": "Base légale : ton consentement, donné par la case ci-dessous."
+    },
+    "rightsChannel": "par ce formulaire (catégorie « RGPD ») ou auprès de la personne à contacter pour tes données (politique de confidentialité, section « Exercer vos droits »)",
+    "rightsConsent": "Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, {channel}.",
+    "rightsNoConsent": "Tu peux demander l'accès à ces données ou leur rectification {channel} ; leur effacement, une fois la demande traitée — pas avant, l'association étant tenue de la traiter (RGPD, art. 17.3.b).",
+    "followUp": "L'auteur d'une notification reçoit, à l'adresse qu'il indique (exigée en droit d'auteur, facultative ailleurs), un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes. S'il a signalé depuis son compte, il peut contester cette décision — y compris celle de ne pas agir — par la catégorie « Contestation » du même formulaire, une fois le signalement archivé."
+  },
+  "errors": {
+    "REPORT_INVALID_CATEGORY": "Choisis une catégorie.",
+    "REPORT_DESCRIPTION_TOO_SHORT": "Décris le problème en {min} caractères au moins.",
+    "REPORT_DESCRIPTION_TOO_LONG": "La description dépasse {max} caractères.",
+    "REPORT_INVALID_TARGET": "Un des éléments désignés n'existe plus. Retire-le et réessaie.",
+    "REPORT_TARGET_NOT_FOUND": "Un des éléments désignés n'existe plus. Retire-le et réessaie.",
+    "REPORT_TARGET_NOT_ALLOWED": "Cette catégorie ne permet pas de désigner cet élément.",
+    "REPORT_TOO_MANY_TARGETS": "Tu peux désigner {max} éléments au plus.",
+    "REPORT_CONTACT_REQUIRED": "Indique ton nom et une adresse électronique : un signalement de droit d'auteur doit pouvoir être suivi.",
+    "REPORT_REPLY_CHANNEL_REQUIRED": "Indique une adresse électronique pour qu'on puisse te répondre : sans compte, ou sans tag Discord certifié, c'est le seul moyen.",
+    "REPORT_CONTACT_TOO_LONG": "Le nom indiqué est trop long.",
+    "REPORT_INVALID_EMAIL": "L'adresse électronique n'est pas valide.",
+    "REPORT_RIGHTS_RELATION_REQUIRED": "Indique ta qualité vis-à-vis des droits invoqués.",
+    "REPORT_GOOD_FAITH_REQUIRED": "Coche la déclaration de bonne foi.",
+    "REPORT_CONSENT_REQUIRED": "Accepte le traitement de tes données pour envoyer le signalement.",
+    "REPORT_PARENT_REQUIRED": "Choisis le signalement que tu contestes.",
+    "REPORT_CONTEST_LOGIN_REQUIRED": "Connecte-toi pour contester un signalement qui te concerne.",
+    "REPORT_TARGETS_REQUIRE_LOGIN": "Connecte-toi pour désigner des joueurs, équipes ou tournois — ou décris-les dans ton message.",
+    "REPORT_NOT_CONCERNED": "Tu ne peux contester qu'un signalement qui te vise, toi ou une équipe dont tu es membre — ou la décision prise sur un signalement de droit d'auteur ou de modération que tu as envoyé, une fois le dossier archivé.",
+    "REPORTS_SATURATED": "Trop de signalements reçus en peu de temps. Réessaie plus tard, ou écris-nous sur Discord.",
+    "TOO_MANY_REQUESTS": "Tu as envoyé plusieurs signalements d'affilée. Patiente un peu avant de recommencer.",
+    "fallback": "Le signalement n'a pas pu être envoyé. Réessaie dans un instant."
+  },
+  "concerned": {
+    "title": "Signalement",
+    "loading": "Chargement du signalement…",
+    "notFoundTitle": "Signalement introuvable",
+    "notFoundBody": "Ce signalement n'existe pas, a été effacé, ou ne te concerne pas : seuls les joueurs visés et les membres des équipes visées peuvent le consulter.",
+    "eyebrow": "SIGNALEMENT N° {id}",
+    "heading": "Un signalement te concerne",
+    "lead": "L'association Bluegenji Esport examine ce signalement. Si tu le crois infondé — tu détiens les droits sur le logo, le contenu est le tien, le contexte est différent —, conteste-le : ta réponse est lue par les administrateurs avant toute décision définitive.",
+    "logoHidden": "<strong>Le logo de « {name} » est masqué</strong> depuis le {since}. Sans contestation de votre part, il sera <strong>supprimé définitivement le {purge}</strong>. Si la contestation aboutit, il est rétabli tel quel.",
+    "avatarHidden": "<strong>Ton avatar est masqué</strong> depuis le {since}. Sans contestation de ta part, il sera <strong>supprimé définitivement le {purge}</strong>. Si la contestation aboutit, il est rétabli tel quel.",
+    "logoRemoved": "<strong>Le logo de « {name} » a été supprimé</strong> le {date} à la suite de ce signalement. Si vous en détenez les droits, contestez-le : si la contestation aboutit, vous pourrez l'envoyer de nouveau.",
+    "logoRemovedImmediately": "<strong>Le logo de « {name} » a été supprimé</strong> sans délai le {date} à la suite de ce signalement. Si vous en détenez les droits, contestez-le : si la contestation aboutit, vous pourrez l'envoyer de nouveau.",
+    "avatarRemoved": "<strong>Ton avatar a été supprimé</strong> le {date} à la suite de ce signalement. Si tu en détiens les droits, conteste-le : si la contestation aboutit, tu pourras l'envoyer de nouveau.",
+    "avatarRemovedImmediately": "<strong>Ton avatar a été supprimé</strong> sans délai le {date} à la suite de ce signalement. Si tu en détiens les droits, conteste-le : si la contestation aboutit, tu pourras l'envoyer de nouveau.",
+    "reason": "Motif",
+    "received": "Reçu le",
+    "state": "État",
+    "targetsTitle": "Ce qui est visé",
+    "reproachTitle": "Ce qui est reproché",
+    "myContests": "Tes contestations",
+    "sentOn": "Envoyée le {date}",
+    "addContest": "Ajouter une contestation",
+    "contest": "Contester ce signalement",
+    "howItWorks": "Comment se passe un signalement ?",
+    "archived": "Ce signalement est archivé : le contester le rouvre, et l'association en est prévenue."
+  }
+}
