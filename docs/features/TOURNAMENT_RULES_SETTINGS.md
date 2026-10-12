@@ -4,7 +4,7 @@ Les pages `/regles/<mode>` décrivent un mode **en général** (« 9 points par 
 
 ## Fonctionnement
 
-- Le bouton flottant « ? » de `/tournois/[id]` (`components/rules/RulesHelpFab.tsx`) pointe vers `/regles/<mode>?tournoi=<id>` (`rulesHrefWithTournament`).
+- Le bouton flottant « ? » de `/tournois/[id]` (`components/rules/RulesHelpFab.tsx`) pointe vers `/regles/<mode>?tournoi=<id>` (`rulesHrefWithTournament`, `lib/shared/rules-tournament-link.ts` : module sans dépendance, pour que ce composant client ne tire pas dans son bundle le constructeur des réglages).
 - La page lit `?tournoi=` par `parseRulesTournamentParam` (entier positif en base 10, rien d'autre), puis l'instantané par `getVisibleTournamentSnapshot` — **la même porte que la fiche** : il faut être connecté, et un tournoi non publié n'existe que pour la permission `tournaments`. Tout refus ou toute panne de lecture rend simplement la page générale du mode.
 - `tournamentSettingsGroups` (`lib/shared/tournament-settings.ts`, pur) rédige trois groupes : **Tournoi** (jeu, mode, participants, effectif maximal, format des matchs, ordre de départ), **le mode** (petite finale, cadence des coupes, rondes et barème suisse, capital / barème / qualifiées / plafond / format des play-offs de BlueGenji Survie, une ligne par phase en multi-phases) et **Conditions d'inscription**. Un groupe vide n'est pas rendu.
 - Sous `/en/regles/<mode>?tournoi=<id>` (lot 8a-2), les mêmes groupes sont rédigés en anglais par `localizedTournamentSettingsGroups` (`lib/shared/tournament-settings-text.ts`, espace `tournament.settings`) ; le français reste celui de `tournamentSettingsGroups`, égalité testée mode par mode.
