@@ -38,6 +38,7 @@ import {
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
 import { useProfileText } from "@/components/i18n/profile-text";
+import { useAppLocale } from "@/components/i18n/locale-context";
 import {
   connectionMethodText,
   connectionRefusalText,
@@ -219,8 +220,10 @@ function ConnectionRow({
 }>): React.ReactElement {
   const text = useProfileText();
   const { t } = text;
-  // La langue du texte posé : une seule source pour la ligne et son aller-retour OAuth.
-  const locale = text.locale;
+  // La langue de l'adresse (seule l'URL dit la langue) pour l'aller-retour OAuth : si
+  // l'anglais du profil n'a pas pu se charger, le texte retombe sur le français, mais
+  // le lecteur de `/en/profil` doit y revenir (revue de sécurité du lot 9-2).
+  const locale = useAppLocale();
   // Discord a deux lignes pour une seule identité : la ligne du bouton
   // ne se dit rattachée que si ce n'est pas le code qui porte le
   // rattachement (`discordButtonLinked`) — sinon, c'est la ligne du bot

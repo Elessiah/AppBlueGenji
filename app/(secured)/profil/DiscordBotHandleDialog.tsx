@@ -52,6 +52,7 @@ export function DiscordBotHandleDialog({
   const [challenge, setChallenge] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const inFlight = useRef(false);
   const fieldErrors = useFieldErrors(
     DISCORD_VERIFICATION_FIELD_ERRORS,
     FIELD_IDS,
@@ -66,8 +67,11 @@ export function DiscordBotHandleDialog({
 
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
-    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
-    if (loading) return;
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
+    // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
+    // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -91,14 +95,18 @@ export function DiscordBotHandleDialog({
     } catch (e) {
       refuse(e);
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
 
   const confirmCode = async (event: FormEvent) => {
     event.preventDefault();
-    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
-    if (loading) return;
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
+    // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
+    // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -133,6 +141,7 @@ export function DiscordBotHandleDialog({
         restart();
       refuse(e);
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };

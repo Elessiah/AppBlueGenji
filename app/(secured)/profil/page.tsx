@@ -44,6 +44,7 @@ import {
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useTeamErrorsText } from "@/components/i18n/team-errors-text";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useAppLocale } from "@/components/i18n/locale-context";
 import { localeHref } from "@/lib/shared/locales";
 import { ProfileSection } from "./_components/ProfileSection";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
@@ -123,6 +124,8 @@ export default function ProfilePage() {
   const { showError, showSuccess } = useToast();
   const text = useProfileText();
   const { t } = text;
+  // Langue de l'adresse (le texte peut retomber sur le français) : après la suppression du compte, l'accueil de cette langue.
+  const pageLocale = useAppLocale();
   const teamErrorsText = useTeamErrorsText();
   const { cropImage, cropDialog } = useImageCropper();
   const fieldErrors = useFieldErrors(PROFILE_FIELD_ERRORS, PROFILE_FIELD_IDS);
@@ -566,7 +569,7 @@ export default function ProfilePage() {
       showSuccess(deletionOutcomeText(text, applied));
       setTimeout(() => {
         // L'accueil dans la langue de la page (`/en` sous `/en/profil`).
-        window.location.href = localeHref("/", text.locale);
+        window.location.href = localeHref("/", pageLocale);
       }, 1200);
       return true;
     } catch (e) {

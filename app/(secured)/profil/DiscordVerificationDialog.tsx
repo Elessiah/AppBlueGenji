@@ -15,6 +15,7 @@ import { INTL_LOCALE } from "@/lib/shared/locales";
 import { visibleText } from "@/lib/shared/visible-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
+import { useAppLocale } from "@/components/i18n/locale-context";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordVerificationErrorMessage } from "./discord-errors";
 import { ScrollArea } from "@/components/cyber";
@@ -76,6 +77,9 @@ export function DiscordVerificationDialog({
   const [challenge, setChallenge] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const inFlight = useRef(false);
+  // Langue de l'adresse, pas du texte (repli français possible) : le retour OAuth reste sur `/en/profil`.
+  const pageLocale = useAppLocale();
   const fieldErrors = useFieldErrors(DISCORD_VERIFICATION_FIELD_ERRORS, FIELD_IDS);
 
   /**
@@ -93,8 +97,11 @@ export function DiscordVerificationDialog({
 
   const requestVerification = async (event: FormEvent) => {
     event.preventDefault();
-    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
-    if (loading) return;
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
+    // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
+    // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -127,14 +134,18 @@ export function DiscordVerificationDialog({
     } catch (e) {
       refuse(e);
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
 
   const confirmVerification = async (event: FormEvent) => {
     event.preventDefault();
-    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici.
-    if (loading) return;
+    // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
+    // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
+    // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setLoading(true);
     try {
@@ -162,7 +173,7 @@ export function DiscordVerificationDialog({
       }
       refuse(e);
     } finally {
-
+      inFlight.current = false;
       setLoading(false);
     }
   };
@@ -241,7 +252,7 @@ export function DiscordVerificationDialog({
                 répond par une redirection vers Discord, rien que le routeur
                 client puisse précharger ou rendre. */}
             <CyberButton variant="primary" asChild>
-              <a href={oauthStartPath("DISCORD", { intent: "LINK", locale: text.locale })}>{t("verify.continueWithDiscord")}</a>
+              <a href={oauthStartPath("DISCORD", { intent: "LINK", locale: pageLocale })}>{t("verify.continueWithDiscord")}</a>
             </CyberButton>
           </div>
         </div>

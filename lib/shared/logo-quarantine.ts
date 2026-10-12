@@ -36,6 +36,9 @@ import { SUSPENSION_REASON_MAX_LENGTH, SUSPENSION_REASON_MIN_LENGTH, cleanModera
 import type { ReportCategory } from "./content-reports";
 import { cached } from "./intl-cache";
 
+/** Ce qu'affiche une date illisible : visible, sans langue. */
+export const UNREADABLE_DATE = "—";
+
 /** Durée de la quarantaine avant suppression définitive, en mois civils. */
 export const LOGO_QUARANTINE_MONTHS = 6;
 
@@ -140,11 +143,12 @@ export function canAutoPurgeLogo(input: {
  * serveur pour des lecteurs dont on ne connaît pas le fuseau, il est rédigé une
  * fois pour tous. En français par défaut (messages du serveur) ; un écran passe
  * la langue de sa page (`INTL_LOCALE`), toujours en heure de Paris. Une date
- * illisible rend une chaîne vide : `Intl.DateTimeFormat#format` lève là où
- * `toLocaleDateString` rendait « Invalid Date », et une page entière tomberait.
+ * illisible rend un tiret visible (`UNREADABLE_DATE`), signe d'une donnée
+ * abîmée : `Intl.DateTimeFormat#format` lève là où `toLocaleDateString` rendait
+ * « Invalid Date », et une page entière tomberait.
  */
 export function formatQuarantineDate(date: Date, intlLocale = "fr-FR"): string {
-  if (Number.isNaN(date.getTime())) return "";
+  if (Number.isNaN(date.getTime())) return UNREADABLE_DATE;
   return quarantineDateFormat(intlLocale).format(date);
 }
 
