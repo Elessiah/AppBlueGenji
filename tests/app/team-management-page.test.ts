@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { formatFinalRank } from "@/app/(secured)/equipes/[id]/_lib/team-history";
+import { finalRankLabel, ordinalForm } from "@/lib/shared/ordinal";
 import { jsonRequest, teamApi } from "@/app/(secured)/equipes/[id]/_lib/team-api";
 import { membershipErrorMessage, teamErrorMessage } from "@/app/(secured)/equipes/_lib/team-errors";
 
@@ -139,7 +139,9 @@ describe("page", () => {
   });
 });
 
-describe("formatFinalRank", () => {
+describe("finalRankLabel", () => {
+  const french = (rank: number | null) =>
+    finalRankLabel("fr", rank, (form, value) => (form === "one" ? `${value}er` : `${value}e`));
   it.each([
     [1, "1er"],
     [2, "2e"],
@@ -148,7 +150,12 @@ describe("formatFinalRank", () => {
     [0, "—"],
     [1.5, "—"],
   ])("%p → %s", (rank, expected) => {
-    expect(formatFinalRank(rank as number | null)).toBe(expected);
+    expect(french(rank as number | null)).toBe(expected);
+  });
+
+  it("formes ordinales : le français n'a que « one » et « other »", () => {
+    expect([1, 2, 3, 4, 21].map((n) => ordinalForm("fr", n))).toEqual(["one", "other", "other", "other", "other"]);
+    expect([1, 2, 3, 4, 11, 21].map((n) => ordinalForm("en", n))).toEqual(["one", "two", "few", "other", "other", "one"]);
   });
 });
 

@@ -49,7 +49,7 @@ import { TeamSettings } from "@/app/(secured)/equipes/[id]/_components/TeamSetti
 import { RolePicker } from "@/app/(secured)/equipes/[id]/_components/RolePicker";
 import { ModerationLogoBar } from "@/app/(secured)/equipes/[id]/_components/ModerationLogoBar";
 import { SecuredLoading } from "@/app/(secured)/_shared/SecuredLoading";
-import { formatFinalRank, localizedFinalRank } from "@/app/(secured)/equipes/[id]/_lib/team-history";
+import { localizedFinalRank } from "@/app/(secured)/equipes/[id]/_lib/team-history";
 import { teamPointsHint } from "@/app/(secured)/equipes/_lib/team-points";
 import { membershipErrorMessage, teamErrorMessage, type TeamErrorsText } from "@/app/(secured)/equipes/_lib/team-errors";
 import { playerErrorMessage } from "@/app/(secured)/joueurs/_lib/player-errors";
@@ -256,7 +256,7 @@ describe("français inchangé", () => {
 
   it("place finale : « 1er », « 2e »… comme avant", () => {
     for (let rank = 1; rank <= 30; rank++) {
-      expect(localizedFinalRank(FR_TEAM_PAGE_TEXT, rank)).toBe(formatFinalRank(rank));
+      expect(localizedFinalRank(FR_TEAM_PAGE_TEXT, rank)).toBe(rank === 1 ? "1er" : `${rank}e`);
     }
     expect(localizedFinalRank(FR_TEAM_PAGE_TEXT, null)).toBe("—");
   });
@@ -454,6 +454,73 @@ describe("anglais", () => {
   it("frontière de chargement de l'espace connecté", () => {
     expect(inEnglish(<SecuredLoading />)).toContain("Loading…");
     expect(renderToStaticMarkup(<SecuredLoading />)).toContain("Chargement…");
+  });
+});
+
+describe("revue UI/UX", () => {
+  it("filtres et tris annoncent leur état (`aria-pressed`) et ne soumettent rien", () => {
+    for (const html of [inEnglish(<TeamsList />), inEnglish(<PlayersList />)]) {
+      const buttons = [...html.matchAll(/<button[^>]*>/g)].map((m) => m[0]);
+      const toggles = buttons.filter((tag) => tag.includes("aria-pressed"));
+      expect(toggles.length).toBeGreaterThanOrEqual(5);
+      for (const tag of toggles) expect(tag).toContain('type="button"');
+      expect(toggles.some((tag) => tag.includes('aria-pressed="true"'))).toBe(true);
+    }
+  });
+
+  it("compteur de section au singulier dans les deux langues", () => {
+    for (const locale of LOCALES) {
+      const messages = messagesFor(locale);
+      expect(formatMessage(locale, messages.teams.list.sectionCount, { count: 1 })).toBe(locale === "fr" ? "1 ÉQUIPE" : "1 TEAM");
+      expect(formatMessage(locale, messages.teams.list.sectionCount, { count: 2 })).toBe(locale === "fr" ? "2 ÉQUIPES" : "2 TEAMS");
+      expect(formatMessage(locale, messages.players.list.sectionCount, { count: 1 })).toBe(locale === "fr" ? "1 JOUEUR" : "1 PLAYER");
+    }
+  });
+
+  it("aucun libellé ne compte sur une espace en bord de message", () => {
+    for (const locale of LOCALES) {
+      for (const namespace of ["teams", "team", "teamErrors", "teamRoles", "players"] as const) {
+        const walk = (tree: object, path: string): void => {
+          for (const [key, value] of Object.entries(tree)) {
+            if (typeof value === "string") expect(`${path}${key}=${value.trim()}`).toBe(`${path}${key}=${value}`);
+            else walk(value as object, `${path}${key}.`);
+          }
+        };
+        walk(messagesFor(locale)[namespace], `${locale}.${namespace}.`);
+      }
+    }
+  });
+
+  it("fiche joueur : place ordinale et bilan comme sur la fiche d'équipe", () => {
+    mockPlayer = fullProfileResponse({
+      tournaments: [
+        { tournamentId: 9, tournamentName: "Winter Cup", state: "FINISHED", finalRank: 3, wins: 3, losses: 1, playedAt: "2026-02-02T00:00:00.000Z" },
+        { tournamentId: 10, tournamentName: "Spring Cup", state: "RUNNING", finalRank: null, wins: 0, losses: 0, playedAt: "2026-03-02T00:00:00.000Z" },
+      ],
+    });
+    const html = inEnglish(<PlayerDetailPage />);
+    expect(html).toContain(">3rd<");
+    expect(html).toContain(">—<");
+    expect(html).toContain("3 W – ");
+    const team = teamDetailResponse({
+      tournaments: [{ tournamentId: 9, tournamentName: "Winter Cup", state: "FINISHED", finalRank: 3, wins: 3, losses: 1, playedAt: "2026-02-02T00:00:00.000Z" }],
+    });
+    const teamHtml = inEnglish(<TeamHistory tournaments={team.tournaments} />);
+    expect(teamHtml).toContain("3rd");
+    expect(teamHtml).toContain("3 W – ");
+    // Le libellé de cellule (mobile) reste séparé de sa valeur sans espace dans le message.
+    expect(teamHtml).toMatch(/Record<\/span> 3 W/);
+    expect(teamHtml).toMatch(/Placement<\/span> 3rd/);
+  });
+
+  it("fiche joueur en français : « 3e », « 3 V – 1 D »", () => {
+    mockLocale = "fr";
+    mockPlayer = fullProfileResponse({
+      tournaments: [{ tournamentId: 9, tournamentName: "Coupe", state: "FINISHED", finalRank: 3, wins: 3, losses: 1, playedAt: "2026-02-02T00:00:00.000Z" }],
+    });
+    const html = renderToStaticMarkup(<PlayerDetailPage />);
+    expect(html).toContain(">3e<");
+    expect(html).toContain("3 V – ");
   });
 });
 
