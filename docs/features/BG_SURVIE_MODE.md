@@ -106,20 +106,23 @@ création / d'édition (BG Survie seulement), **décochée par défaut**.
   aucune élimination mathématiquement acquise), l'option n'a aucun effet :
   `earlyExitApplies` (`lib/shared/bg-survie/config.ts`) le décide pour tous. La
   case est alors grisée et montrée décochée (comme « Égalités » ; la valeur
-  enregistrée reste), la raison en tête de l'aide en nommant le réglage à
-  changer — sauf si ce réglage ou la case sont figés, le verrou disant déjà
-  pourquoi —, et le
+  enregistrée reste), et la raison **remplace** l'aide en nommant le réglage à
+  changer (« dernière manche », « trait » n'y voudraient rien dire) — sauf si ce
+  réglage ou la case sont figés, le verrou disant déjà pourquoi. Le
   panneau des règles (`?tournoi=`) n'affiche la ligne « Sortie anticipée « hors
   course » » (Oui / Non) que lorsqu'elle peut jouer.
 - **Migration** (`addEnduranceEarlyExit`, `data-migrations.ts`) : le défaut `0`
   vaut pour tout tournoi **créé désormais** ; au moment où la colonne naît, les
-  tournois BG Survie **plafonnés** qui existaient la gardent **allumée** (`1`).
+  tournois BG Survie **plafonnés** qui existaient la gardent **allumée** (`1`) :
+  la colonne naît à `1` (ajout et remplissage en une instruction, rien ne peut
+  se perdre entre les deux), son défaut repasse à `0` à chaque démarrage, puis
+  ce qui n'est pas « BG Survie plafonné » est remis à `0`.
   Ils ont été annoncés avec elle (règlement, aide du formulaire), le rejeu la
   relit à chaque passage, et le formulaire d'un tournoi publié est figé :
   l'éteindre aurait changé les règles en pleine qualification, sans recours, et
   réécrit les « Hors course » des tournois terminés. Le remplissage ne suit que
-  l'ajout effectif de la colonne : rejoué, il rallumerait l'option d'un tournoi
-  décoché depuis.
+  l'ajout effectif de la colonne : rejoué, il éteindrait l'option d'un tournoi
+  coché depuis.
 - **Modifiable** comme le reste du barème d'endurance : dans la seule fenêtre
   `FULL` (tournoi encore invisible), figée dès la publication. Le rejeu la
   relisant à chaque passage, une bascule en base (ou un futur déverrouillage en
