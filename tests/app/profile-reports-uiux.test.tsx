@@ -188,8 +188,8 @@ describe("revue UI/UX, troisième passe", () => {
     expect(button).not.toContain("account-menu");
     expect(source("components/account-menu.tsx")).toContain("useLogout(() => setOpen(false))");
     const menu = source("components/use-logout.ts");
-    // `leaving` retombe après chaque tentative ; l'échec se dit.
-    expect(menu).toMatch(/const done = await requestLogout\(\);\s*setLeaving\(false\);\s*if \(!done\) \{\s*showError\(t\("account\.logoutFailed"\)\);/);
+    // `leaving` ne retombe qu'après un échec, qui se dit.
+    expect(menu).toMatch(/if \(!\(await requestLogout\(\)\)\) \{\s*setLeaving\(false\);\s*showError\(t\("account\.logoutFailed"\)\);/);
     // Le bouton du profil garde le focus pendant la requête.
     expect(button).toContain("aria-disabled={leaving || undefined}");
     expect(button).not.toMatch(/\sdisabled=\{leaving\}/);
@@ -319,5 +319,27 @@ describe("revue UI/UX, huitième passe", () => {
     expect(rgpd).not.toContain("other —,");
     const enProfile = (await import("@/messages/en/profile.json")).default;
     expect(JSON.stringify(enProfile)).not.toContain("Of age");
+  });
+});
+
+describe("revue UI/UX, neuvième passe", () => {
+  it("gras des alertes de logo : ses morceaux passent par richNodes (lien d'équipe imbriqué, avec clé)", () => {
+    const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
+    expect(view).toContain("const strong = { strong: (chunks: React.ReactNode[]) => <strong>{richNodes(chunks)}</strong> };");
+  });
+
+  it("exposition de la certification : les clés du dialogue suivent les messages", async () => {
+    const { EXPOSURE_KEYS } = await import("@/app/(secured)/profil/DiscordVerificationDialog");
+    for (const locale of ["fr", "en"] as const) {
+      const { verify } = (await import(`@/messages/${locale}/profile.json`)).default as { verify: { exposure: Record<string, string> } };
+      expect(Object.keys(verify.exposure)).toEqual([...EXPOSURE_KEYS]);
+    }
+  });
+
+  it("badge certifié : un seul jeu de libellés", async () => {
+    const { verifiedBadgeLabels, FR_PROFILE } = await import("@/app/(secured)/profil/_lib/profile-text");
+    expect(verifiedBadgeLabels(FR_PROFILE)).toEqual({ alt: FR_PROFILE.t("discord.verifiedAlt"), title: FR_PROFILE.t("discord.verifiedTitle") });
+    expect(source("app/(secured)/profil/page.tsx")).toContain("<VerifiedBadge labels={verifiedBadgeLabels(text)} />");
+    expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).toContain("labels={verifiedBadgeLabels(text)}");
   });
 });
