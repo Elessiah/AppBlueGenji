@@ -1,7 +1,6 @@
 import type { Pool } from "mysql2/promise";
 import { applyPermanentCatchUps } from "./catch-ups";
 import {
-  addEnduranceEarlyExit,
   backfillLaunchedAt,
   dropRecruitmentContactEmail,
   dropSiteVisitUserId,
@@ -82,7 +81,6 @@ export async function runMigrations(db: Pool): Promise<void> {
   await createComplianceTables(db);
   await applyRecentSchemaChanges(db);
   await backfillLaunchedAt(db);
-  await addEnduranceEarlyExit(db);
   await switchOpenToRecruitmentDefault(db);
   await dropRecruitmentContactEmail(db);
   await dropUserEmail(db);

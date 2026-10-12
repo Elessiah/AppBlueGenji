@@ -235,7 +235,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // peut arrêter la rencontre sur 2-2), vrai FT3 en play-offs.
   { name: "BG Survie Égalités", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66, mapDetails: true },
   { name: "BG Survie Plafond Manches", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -3, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, enduranceEarlyExit: true, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 108 },
-  { name: "BG Survie Plafond Atteint", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 16, maxTeams: 32, daysOffset: -18, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 3, enduranceEarlyExit: true, matchFormat: { type: "FT", value: 3 }, teamOffset: 128 },
+  { name: "BG Survie Plafond Atteint", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 16, maxTeams: 32, daysOffset: -18, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 3, matchFormat: { type: "FT", value: 3 }, teamOffset: 128 },
   // Défaut d'un tournoi neuf : plafond, option décochée — personne n'est écarté avant la dernière manche.
   { name: "BG Survie Plafond Sans Sortie", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -2, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 140 },
 
