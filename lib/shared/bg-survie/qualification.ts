@@ -7,7 +7,7 @@
  */
 
 import { matchWinsRequired, type MatchFormat } from "../match-format";
-import type { EnduranceConfig } from "./config";
+import { roundCutMayFire, type EnduranceConfig } from "./config";
 import { assignRanks, rankActiveTeams, type EnduranceStanding } from "./standings";
 
 /** La phase qualificative est-elle terminée ? (effectif retombé à la cible) */
@@ -80,14 +80,15 @@ export function enduranceEliminationCut(
   remainingRounds: number,
   format: MatchFormat | null | undefined,
 ): number[] {
+  // Option décochée (le défaut) : personne n'est écarté avant la dernière
+  // manche. Le rejeu n'appelle même pas la coupe dans ce cas ; la garde reste
+  // pour tout autre appelant de cette fonction publique, sans tri inutile.
+  if (!roundCutMayFire(config, remainingRounds)) return [];
+
   // Plus de manche à jouer : la coupe est un simple trait sous la cible.
   if (remainingRounds <= 0) {
     return rankActiveTeams(standings).slice(config.playoffSize).map((s) => s.teamId);
   }
-
-  // Option décochée (le défaut) : personne n'est écarté avant la dernière
-  // manche — sortie avant le tri, appelée à chaque manche close de chaque rejeu.
-  if (!config.earlyExit) return [];
 
   const swing = enduranceRoundSwing(config, format);
   if (!swing) return [];

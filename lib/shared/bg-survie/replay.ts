@@ -30,7 +30,7 @@
  */
 
 import type { MatchFormat } from "../match-format";
-import type { EnduranceConfig } from "./config";
+import { roundCutMayFire, type EnduranceConfig } from "./config";
 import type { EnduranceMatchOutcome } from "./match-outcome";
 import {
   applyEnduranceMatch,
@@ -219,9 +219,14 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
     applyRoundForfeits(standings, forfeitsByRound.get(round), round);
 
     // Coupe de fin de manche — seulement sous plafond de manches, seulement sur
-    // une manche close. Les équipes écartées gardent leur capital : c'est
-    // l'horizon qui leur manque, pas les points.
-    if (config.maxRounds !== null && roundIsClosed(round)) {
+    // une manche close, et avant la dernière seulement option cochée (sinon
+    // rien n'est copié ni trié pour rien). Les équipes écartées gardent leur
+    // capital : c'est l'horizon qui leur manque, pas les points.
+    if (
+      config.maxRounds !== null &&
+      roundCutMayFire(config, config.maxRounds - round) &&
+      roundIsClosed(round)
+    ) {
       applyRoundCut(standings, config, config.maxRounds - round, round, matchFormat);
     }
 

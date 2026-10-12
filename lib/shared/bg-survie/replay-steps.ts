@@ -208,9 +208,6 @@ export function applyRoundCut(
   round: number,
   matchFormat: MatchFormat | null | undefined,
 ): void {
-  // Option décochée (le défaut) et manches restantes : rien ne peut sortir, et
-  // la copie du classement serait jetée — à chaque manche close de chaque rejeu.
-  if (remainingRounds > 0 && !config.earlyExit) return;
   const cut = enduranceEliminationCut([...standings.values()], config, remainingRounds, matchFormat);
   for (const teamId of cut) {
     const standing = standings.get(teamId);

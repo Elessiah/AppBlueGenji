@@ -99,3 +99,15 @@ export function earlyExitBlocker(maxRounds: number | null, matchFormat: MatchFor
 export function earlyExitApplies(maxRounds: number | null, matchFormat: MatchFormat | null): boolean {
   return earlyExitBlocker(maxRounds, matchFormat) === null;
 }
+
+/**
+ * Une coupe peut-elle tomber à la fin d'une manche à `remainingRounds` du
+ * plafond ? Le trait de la dernière manche (`remainingRounds <= 0`) toujours ;
+ * avant, seulement si le tournoi a coché la sortie anticipée. La seule
+ * formulation de la règle : le rejeu (`replayEndurance`), la coupe
+ * (`enduranceEliminationCut`) et l'aperçu de la manche suivante
+ * (`withEliminationCut`) la lisent ici, et ne peuvent donc pas diverger.
+ */
+export function roundCutMayFire(config: EnduranceConfig, remainingRounds: number): boolean {
+  return remainingRounds <= 0 || config.earlyExit;
+}
