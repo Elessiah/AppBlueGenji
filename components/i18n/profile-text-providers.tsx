@@ -29,8 +29,7 @@ export function ProfileTextProviders({
   const profile = useEnglishMessages(locale, englishProfile, messages?.profile);
   const teamErrors = useEnglishMessages(locale, englishTeamErrors, messages?.teamErrors);
   const push = useEnglishMessages(locale, englishPush, messages?.push);
-  const waiting = (state: { english: unknown; failed: boolean }) => !state.english && !state.failed;
-  if (locale === "en" && (waiting(profile) || waiting(teamErrors) || waiting(push))) return <>{fallback}</>;
+  if (profile.waiting || teamErrors.waiting || push.waiting) return <>{fallback}</>;
   return (
     <TeamErrorsTextProvider locale={locale} messages={teamErrors.english ?? undefined}>
       <ProfileTextProvider locale={locale} messages={profile.english ?? undefined}>

@@ -487,6 +487,7 @@ export function MatchLaunchCenter({
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
   const { english } = useEnglishMessages(locale, englishPush, undefined);
+  // Pas d'écran d'attente ici : rien tant que l'anglais manque (attente ou échec).
   if (locale === "en" && !english) return null;
   return (
     <PushTextProvider locale={locale} messages={locale === "en" ? (english ?? undefined) : undefined}>

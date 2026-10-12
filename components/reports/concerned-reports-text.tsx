@@ -22,8 +22,8 @@ export function ConcernedReportsText({
   fallback,
   children,
 }: Readonly<{ locale: Locale; messages?: Messages["reports"]; fallback: ReactNode; children: ReactNode }>) {
-  const { english, failed } = useEnglishMessages(locale, englishReports, messages);
-  if (locale === "en" && !english && !failed) return <>{fallback}</>;
+  const { english, waiting } = useEnglishMessages(locale, englishReports, messages);
+  if (waiting) return <>{fallback}</>;
   return (
     <ReportsTextProvider locale={locale} messages={english ?? undefined}>
       {children}

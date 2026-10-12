@@ -14,12 +14,7 @@ export function installEnglishLinkPreload(): () => void {
   // fois par seconde (un nouvel essai reste possible ensuite).
   let last = "";
   let lastAt = 0;
-  // Le même élément survolé de suite : rien à remonter (survol continu d'une page dense).
-  // Référence faible : un élément retiré de la page (navigation) n'est pas retenu.
-  let lastTarget: WeakRef<EventTarget> | null = null;
   const onIntent = (event: Event) => {
-    if (event.target && lastTarget?.deref() === event.target) return;
-    lastTarget = event.target ? new WeakRef(event.target) : null;
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
     const href = link?.getAttribute("href") ?? "";
     if (!href.startsWith("/en/")) return;

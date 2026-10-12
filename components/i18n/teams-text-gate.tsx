@@ -21,8 +21,8 @@ export function TeamsTextGate({
   fallback,
   children,
 }: Readonly<{ locale: Locale; messages?: Messages["teams"]; fallback: ReactNode; children: ReactNode }>) {
-  const { english, failed } = useEnglishMessages(locale, englishTeams, messages);
-  if (locale === "en" && !english && !failed) return <>{fallback}</>;
+  const { english, waiting } = useEnglishMessages(locale, englishTeams, messages);
+  if (waiting) return <>{fallback}</>;
   return (
     <TeamsTextProvider locale={locale} messages={english ?? undefined}>
       {children}

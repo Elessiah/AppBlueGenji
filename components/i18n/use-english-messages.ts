@@ -24,7 +24,7 @@ export function useEnglishMessages<T>(
   locale: Locale,
   loader: Pick<OnceLoader<T>, "load" | "loaded">,
   provided: T | undefined,
-): { english: T | null; failed: boolean } {
+): { english: T | null; failed: boolean; waiting: boolean } {
   const [english, setEnglish] = useState<T | null>(() => {
     if (locale !== "en") return null;
     return provided ?? (inBrowser() ? loader.loaded() : null);
@@ -51,5 +51,6 @@ export function useEnglishMessages<T>(
     };
   }, [waiting, loader, pathname]);
 
-  return { english: locale === "en" ? english : null, failed };
+  // `waiting` : l'écran d'attente se montre — sous `/en`, ni anglais ni échec.
+  return { english: locale === "en" ? english : null, failed, waiting };
 }
