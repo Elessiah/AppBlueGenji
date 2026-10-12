@@ -132,6 +132,19 @@ describe("pushToUsers", () => {
     expect(sent.map((payload) => payload.lang)).toEqual(["en", "fr", "en", "fr"]);
   });
 
+  it("un contenu non traduit se déclare français, quelle que soit la langue du compte (lot 9-3)", async () => {
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 30, ...SUB, locale: "en" }]])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+
+    await pushToUsers([1], "MATCH_START", { title: "Ton match commence", body: "b", url: "/" }, {}, CONFIG);
+
+    expect(JSON.parse(jest.mocked(sendWebPush).mock.calls[0][2])).toMatchObject({ title: "Ton match commence", lang: "fr" });
+  });
+
   it("ne lève jamais : une panne rend zéro", async () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     pool({ query: jest.fn<SqlQuery>().mockRejectedValue(new Error("panne")) });

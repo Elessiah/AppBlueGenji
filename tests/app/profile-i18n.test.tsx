@@ -450,12 +450,14 @@ describe("langue du compte (lot 9-3)", () => {
     expect(field).not.toMatch(/\sdisabled=\{/);
     // Un second choix pendant l'envoi n'est pas perdu : affiché, puis envoyé à la suite.
     expect(field).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = value;\s*setLocale\(value\);\s*return;/);
-    expect(field).toContain("next = after !== null && after !== saved ? after : null;");
+    expect(field).toContain("const outcome = await runQueuedSaves<Locale>({");
     // Une langue relue ailleurs est reprise sans remonter le champ (ni perdre l'envoi ou le focus).
     expect(field).toContain("if (initial !== shown && !busy && !chosenHere) {");
     // Un seul toast de succès par geste, après le dernier envoi, et aucun au fil des envois.
     expect(field.match(/showSuccess\(/g)).toHaveLength(1);
-    expect(field).toMatch(/if \(stored\) \{\s*setChosenHere\(true\);\s*showSuccess\(t\("accountLocale\.saved"\)\);/);
+    expect(field).toContain('if (outcome.confirmed) showSuccess(t("accountLocale.saved"));');
+    // Une erreur n'est rattachée (focus repris) que si le champ a encore le focus.
+    expect(field).toContain("if (document.activeElement?.id === FIELD_ID) fieldErrors.report(code, message);");
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
       "<AccountLocaleField initial={data.accountLocale} />",
     );
@@ -485,7 +487,6 @@ describe("langue du compte (lot 9-3)", () => {
     const { join } = await import("node:path");
     const field = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/AccountLocaleField.tsx"), "utf8");
     expect(field).toContain('{ INVALID_LOCALE: "locale" }');
-    expect(field).toContain("fieldErrors.report(code, message);");
     expect(field).toContain('{...fieldErrors.aria("locale", HINT_ID)}');
     expect(field).toContain('<FieldErrorText fieldId={FIELD_ID} message={fieldErrors.message("locale")} />');
   });
