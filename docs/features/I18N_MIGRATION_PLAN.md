@@ -450,6 +450,23 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 - **Restent français** (`lang="fr"`, lot 9) : modale de recadrage commune au site, réglage des
   notifications dans la fenêtre de lancement. Aperçu du tirage : voir 8b-1.
 
+### Ce que le lot 9-1 a établi (2026-10-12) — écarts au plan
+
+- **Lot 9 coupé en trois** (volume : ~620 messages, plus le schéma et le RGPD) : **9-1** équipes et
+  joueurs (annuaires, cartes, création, fiches, refus, bloc de statistiques) ; **9-2** profil,
+  signalements, formulaire « Signaler un problème », modale de recadrage commune, réglage des
+  notifications ; **9-3** langue du compte (`bg_users.locale`), notifications push par langue et
+  tout le RGPD qui va avec. Détail : `I18N.md` § Équipes et joueurs.
+- **Fournisseur générique** (`createScopedTextContext`) plutôt qu'un fournisseur écrit à la main par
+  espace ; toujours pas de `next-intl` dans le navigateur.
+- **Outils de la modération et rôles de plateforme restés français** (D4), annoncés `lang="fr"` ;
+  ceux du staff `tournaments` sur les fantômes sont traduits, comme au lot 8b-1.
+- **Défauts de la fiche joueur corrigés** en passant (codes affichés tels quels, bilan anglais en
+  français) : seul écart au français d'avant.
+- **Défaut trouvé** : les entrées `[id]` de `I18N_MIGRATED_FILES` (lots 8) ne désignent pas leur
+  dossier (`minimatch` y lit une classe de caractères) — la règle des textes en dur ne s'y applique
+  pas. Ce lot écrit `[[]id]` ; la correction des lots 8 est laissée à part.
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -488,7 +505,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 7b ✅ (7b-1, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a ✅ (8a-1, 8a-2) | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b ✅ (8b-1, 8b-2) | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
-| 9 | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
+| 9 (9-1 ✅, 9-2, 9-3) | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
 | ~~10~~ | ~~Admin~~ | **Abandonné** : l'admin reste en français (D4) | — | — | — |
 
 **Ordre** : 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7a/7b (en parallèle possible) → 8a → 8b → 9. Les lots
