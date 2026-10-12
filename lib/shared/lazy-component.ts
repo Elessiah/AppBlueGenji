@@ -178,37 +178,6 @@ export function quietPreload(load: () => Promise<unknown>, now: () => number = D
   };
 }
 
-/** Les chargements qu'un échec a mis en reprise de fond (un seul cycle par chargeur). */
-const retrying = new WeakSet<object>();
-
-/**
- * Après l'échec d'un chargement, le reprend **en fond** toutes les
- * `PRELOAD_RETRY_MS`, onglet visible seulement, jusqu'à réussite — un seul
- * cycle par chargeur, quel que soit le nombre d'écrans qui l'attendent. Rien
- * n'est rendu à nouveau : l'écran resté en français le reste (une bascule en
- * cours de saisie la perdrait) ; c'est la navigation suivante qui trouve le
- * résultat (`loaded()`).
- */
-export function retryInBackground(loader: Pick<OnceLoader<unknown>, "load" | "loaded">): void {
-  if (typeof window === "undefined" || retrying.has(loader)) return;
-  retrying.add(loader);
-  const attempt = () => {
-    if (loader.loaded() !== null) {
-      retrying.delete(loader);
-      return;
-    }
-    if (document.visibilityState !== "visible") {
-      window.setTimeout(attempt, PRELOAD_RETRY_MS);
-      return;
-    }
-    loader.load().then(
-      () => retrying.delete(loader),
-      () => window.setTimeout(attempt, PRELOAD_RETRY_MS),
-    );
-  };
-  window.setTimeout(attempt, PRELOAD_RETRY_MS);
-}
-
 /** Programme le rechargement de la page après un chargement raté, dès qu'il est sûr. */
 export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): void {
   if (!env) return;

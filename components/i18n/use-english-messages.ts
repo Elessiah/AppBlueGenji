@@ -1,9 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { retryInBackground, type OnceLoader } from "@/lib/shared/lazy-component";
+import { PRELOAD_RETRY_MS, type OnceLoader } from "@/lib/shared/lazy-component";
 import type { Locale } from "@/lib/shared/locales";
 import { inBrowser } from "./english-loaders";
+
+/** Les chargements qu'un échec a mis en reprise de fond (un seul cycle par chargeur) — ici, module de l'espace connecté, pas dans `lazy-component.ts` servi à chaque page. */
+const retrying = new WeakSet<object>();
+
+/**
+ * Après l'échec d'un chargement, le reprend **en fond** toutes les
+ * `PRELOAD_RETRY_MS`, onglet visible seulement, jusqu'à réussite — un seul
+ * cycle par chargeur, quel que soit le nombre d'écrans qui l'attendent. Rien
+ * n'est rendu à nouveau : l'écran resté en français le reste (une bascule en
+ * cours de saisie la perdrait) ; c'est la navigation suivante qui trouve le
+ * résultat (`loaded()`).
+ */
+export function retryInBackground(loader: Pick<OnceLoader<unknown>, "load" | "loaded">): void {
+  if (typeof window === "undefined" || retrying.has(loader)) return;
+  retrying.add(loader);
+  const attempt = () => {
+    if (loader.loaded() !== null) {
+      retrying.delete(loader);
+      return;
+    }
+    if (document.visibilityState !== "visible") {
+      window.setTimeout(attempt, PRELOAD_RETRY_MS);
+      return;
+    }
+    loader.load().then(
+      () => retrying.delete(loader),
+      () => window.setTimeout(attempt, PRELOAD_RETRY_MS),
+    );
+  };
+  window.setTimeout(attempt, PRELOAD_RETRY_MS);
+}
+
 
 /**
  * L'anglais d'une page sous `/en` : celui qu'a sérialisé la mise en page
