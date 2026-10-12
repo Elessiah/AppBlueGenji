@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { useLocalePathname } from "./locale-navigation";
 import { englishPageOf } from "./english-pages";
 import { PAGE_LOADERS } from "./english-page-loaders";
 import type { Locale } from "@/lib/shared/locales";
@@ -15,6 +14,7 @@ import { TeamPageTextProvider } from "./team-page-text-provider";
 import { usePathname } from "next/navigation";
 import { useEnglishMessages, useEnglishMessagesAt } from "./use-english-messages";
 import { EnglishGateFallback } from "./english-gate-fallback";
+import { splitLocalePrefix } from "@/lib/shared/locales";
 
 /**
  * Les fournisseurs des équipes et des joueurs, posés par leurs mises en page
@@ -41,12 +41,18 @@ type GateProps<T> = Readonly<{ locale: Locale; messages?: T; children: ReactNode
  */
 type NestedPage = "teamPage" | "teams" | "playerPage";
 
-function useNestedEnglish(locale: Locale, pages: ReadonlyArray<NestedPage>, own: { load(): Promise<unknown> }, waiting: boolean): void {
-  // Le chemin suivi : une navigation sous une porte qui attend encore la relance.
-  const { path } = useLocalePathname();
+function useNestedEnglish(
+  locale: Locale,
+  pages: ReadonlyArray<NestedPage>,
+  own: { load(): Promise<unknown> },
+  waiting: boolean,
+  pathname: string | null,
+): void {
+  // Le chemin suivi (lu une fois par la porte) : une navigation sous une porte qui attend encore la relance.
+  const path = pathname ?? "/";
   useEffect(() => {
     if (locale !== "en" || !waiting) return;
-    const page = englishPageOf(path);
+    const page = englishPageOf(splitLocalePrefix(path).path);
     const nested = pages.find((candidate) => candidate === page);
     if (!nested) return;
     for (const loader of PAGE_LOADERS[nested]) {
@@ -61,8 +67,9 @@ const PLAYER_ROUTES = ["playerPage"] as const;
 
 /** `/equipes` et ses sous-pages : la table des refus d'équipe. */
 export function TeamErrorsTextGate({ locale, messages, children }: GateProps<Messages["teamErrors"]>) {
-  const { english, waiting } = useEnglishMessages(locale, englishTeamErrors, messages);
-  useNestedEnglish(locale, TEAM_ROUTES, englishTeamErrors, waiting);
+  const pathname = usePathname();
+  const { english, waiting } = useEnglishMessagesAt(locale, englishTeamErrors, messages, pathname);
+  useNestedEnglish(locale, TEAM_ROUTES, englishTeamErrors, waiting, pathname);
   if (waiting) return <EnglishGateFallback />;
   return (
     <TeamErrorsTextProvider locale={locale} messages={english ?? undefined}>
@@ -73,8 +80,9 @@ export function TeamErrorsTextGate({ locale, messages, children }: GateProps<Mes
 
 /** `/joueurs` et la fiche d'un joueur : l'espace `players`. */
 export function PlayersTextGate({ locale, messages, children }: GateProps<Messages["players"]>) {
-  const { english, waiting } = useEnglishMessages(locale, englishPlayers, messages);
-  useNestedEnglish(locale, PLAYER_ROUTES, englishPlayers, waiting);
+  const pathname = usePathname();
+  const { english, waiting } = useEnglishMessagesAt(locale, englishPlayers, messages, pathname);
+  useNestedEnglish(locale, PLAYER_ROUTES, englishPlayers, waiting, pathname);
   if (waiting) return <EnglishGateFallback />;
   return (
     <PlayersTextProvider locale={locale} messages={english ?? undefined}>

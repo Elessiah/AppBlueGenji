@@ -23,7 +23,8 @@ const dialogLoader = onceLoader<ReportDialog>(() => import("./ReportProblemDialo
  * une seconde fois.
  */
 export function primeReportDialog(dialog: ReportDialog): void {
-  dialogLoader.prime(dialog);
+  // Navigateur seulement : sur le serveur, un module est partagé entre requêtes.
+  if (typeof window !== "undefined") dialogLoader.prime(dialog);
 }
 
 /** Le formulaire et, sous `/en`, son anglais. */
