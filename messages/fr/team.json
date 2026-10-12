@@ -4,6 +4,7 @@
   },
   "page": {
     "notFound": "Cette équipe n'existe pas ou n'existe plus.",
+    "loadError": "La fiche de l'équipe n'a pas pu être chargée.",
     "backToTeams": "Retour aux équipes",
     "loading": "Chargement de l'équipe…",
     "statsTitle": "Statistiques"

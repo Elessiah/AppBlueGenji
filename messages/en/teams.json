@@ -53,7 +53,7 @@
     "ghostBadge": "GHOST",
     "form": "Form",
     "formOrder": "· recent → older",
-    "formSpoken": "Last {count} matches, most recent first: {results}",
+    "formSpoken": "{count, plural, one {Last match: {results}} other {Last # matches, most recent first: {results}}}",
     "formResult": {
       "w": "win",
       "l": "loss",

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { useToast } from "@/components/ui/toast";
 import { useParams } from "next/navigation";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
@@ -19,8 +20,9 @@ import styles from "./team.module.css";
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
   const teamId = Number(params.id);
-  const { team, loading, error, refresh } = useTeamDetail(teamId);
+  const { team, loading, error, loadFailed, refresh } = useTeamDetail(teamId);
   const { t } = useTeamPageText();
+  const { showError } = useToast();
   const statsI18n = useStatsPanelI18n();
 
   // Une fantôme n'a ni membre ni demande, une équipe dissoute plus rien à
@@ -29,12 +31,16 @@ export default function TeamDetailPage() {
   const pending = useTeamPendingInvitations(teamId, managesRoster);
   const reloadPending = pending.reload;
   const onPendingChanged = useCallback(() => void reloadPending(), [reloadPending]);
+  // Une notification par échec ; « introuvable » a déjà la sienne (redirection).
+  useEffect(() => {
+    if (loadFailed) showError(t("page.loadError"));
+  }, [loadFailed, showError, t]);
 
   if (error) {
     return (
       <section className={`ds-block ${styles.page}`}>
         <p className={styles.notice}>
-          {t("page.notFound")}{" "}
+          {loadFailed ? t("page.loadError") : t("page.notFound")}{" "}
           <LocaleLink href="/equipes" className="entity-link">
             {t("page.backToTeams")}
           </LocaleLink>

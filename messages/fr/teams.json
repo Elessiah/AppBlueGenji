@@ -53,7 +53,7 @@
     "ghostBadge": "FANTÔME",
     "form": "Forme",
     "formOrder": "· récent → ancien",
-    "formSpoken": "{count} derniers matchs, du plus récent au plus ancien : {results}",
+    "formSpoken": "{count, plural, one {Dernier match : {results}} other {# derniers matchs, du plus récent au plus ancien : {results}}}",
     "formResult": {
       "w": "victoire",
       "l": "défaite",

@@ -4,6 +4,7 @@
   },
   "page": {
     "notFound": "This team doesn't exist or no longer exists.",
+    "loadError": "The team's page couldn't be loaded.",
     "backToTeams": "Back to teams",
     "loading": "Loading the team…",
     "statsTitle": "Statistics"
