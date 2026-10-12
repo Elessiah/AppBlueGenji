@@ -203,7 +203,7 @@ export async function pushToUsers(
       let payload = payloads.get(locale);
       if (payload === undefined) {
         const localized = typeof content === "function" ? content(locale) : content;
-        payload = JSON.stringify(buildPushPayload(topic, localized, origin));
+        payload = JSON.stringify(buildPushPayload(topic, localized, origin, locale));
         payloads.set(locale, payload);
       }
       return payload;

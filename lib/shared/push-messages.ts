@@ -28,6 +28,7 @@ import { formatMatchStart } from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
+import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import type { PushContent } from "./push-notifications";
@@ -105,19 +106,24 @@ export function pushRoundLabel(bracket: string, roundNumber: number, locale: Loc
   }
 }
 
+const MATCH_START_FORMATS = new Map<Locale, Intl.DateTimeFormat>();
+
 /** Coup d'envoi d'un match, heure de Paris, dans la langue du texte (24 h dans les deux). */
 function pushMatchStart(startAt: string | Date, locale: Locale): string {
   if (locale === "fr") return formatMatchStart(startAt);
   const date = startAt instanceof Date ? startAt : new Date(startAt);
-  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "Europe/Paris",
-  }).format(date);
+  // Un formateur par langue (`cached`) : un balayage de rappels en rédige un par engagé.
+  return cached(MATCH_START_FORMATS, locale, (code) =>
+    new Intl.DateTimeFormat(INTL_LOCALE[code], {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "Europe/Paris",
+    }),
+  ).format(date);
 }
 
 /** Rappel d'un match programmé (`offset` : son palier), ou annonce de son horaire (`null`). */

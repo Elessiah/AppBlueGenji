@@ -113,7 +113,9 @@ self.addEventListener("push", (event) => {
     // la notification porte le même visage que l'icône du site.
     icon: "/icons/icon-192.png",
     badge: "/favicon.png",
-    lang: "fr",
+    // Langue du texte, celle du compte (lot 9-3) : le lecteur d'écran prend la
+    // bonne voix. Une charge d'avant le lot n'en porte pas : elle est française.
+    lang: data.lang === "en" ? "en" : "fr",
     data: { url: sitePath(data.url) },
   };
   // Même étiquette = la notification remplace la précédente sans resonner

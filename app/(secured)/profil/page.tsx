@@ -1022,7 +1022,7 @@ export default function ProfilePage() {
 
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
-        {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
+        {data?.accountLocale ? <AccountLocaleField key={data.accountLocale} initial={data.accountLocale} /> : null}
       </ProfileSection>
 
       {invitations.length > 0 && (

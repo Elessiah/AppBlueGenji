@@ -156,6 +156,8 @@ export type PushPayload = {
   body: string;
   url: string;
   tag: string;
+  /** Langue du texte : le service worker la déclare à la notification (lecteur d'écran, traduction). */
+  lang: Locale;
 };
 
 export const PUSH_TITLE_MAX = 80;
@@ -190,6 +192,7 @@ export function buildPushPayload(
   topic: PushTopic,
   content: PushContent,
   siteOrigin: string | null = null,
+  lang: Locale = "fr",
 ): PushPayload {
   return {
     topic,
@@ -197,6 +200,7 @@ export function buildPushPayload(
     body: clip(content.body, PUSH_BODY_MAX),
     url: pushTargetPath(content.url, siteOrigin),
     tag: clip(content.tag ?? topic, PUSH_TAG_MAX) || topic,
+    lang,
   };
 }
 

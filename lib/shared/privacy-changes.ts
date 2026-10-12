@@ -656,7 +656,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "La langue du compte est celle de la page lors de ta dernière connexion ; tu peux la changer dans « Mon profil », section Notifications — ce choix vaut jusqu'à ta prochaine connexion faite dans l'autre langue.",
       "Le site ne garde que ce choix (français ou anglais), le temps du compte. Il figure dans l'export de tes données et revient au français si le compte est anonymisé.",
-      "Les messages Discord, eux, restent français.",
+      "Les messages Discord, eux, restent en français.",
     ],
     links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
   },
