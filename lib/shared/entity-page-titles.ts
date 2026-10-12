@@ -31,11 +31,13 @@ export type TeamPageIdentity = { name: string };
  * Les mots du titre dans la langue de la page (lot 9 : `team.meta`,
  * `players.meta`) ; par défaut, le français ci-dessus.
  */
-export type EntityTitleWords = { fallback: string; deleted?: string };
+export type EntityTitleWords = { fallback: string };
+/** Le titre d'un compte supprimé est requis : un repli français sous `/en` mêlerait les langues. */
+export type PlayerTitleWords = EntityTitleWords & { deleted: string };
 export type PlayerPageIdentity = { pseudo: string; isDeleted: boolean };
 
 const FR_TEAM_TITLE_WORDS: Readonly<EntityTitleWords> = { fallback: TEAM_PAGE_FALLBACK_TITLE };
-const FR_PLAYER_TITLE_WORDS: Readonly<EntityTitleWords> = {
+const FR_PLAYER_TITLE_WORDS: Readonly<PlayerTitleWords> = {
   fallback: PLAYER_PAGE_FALLBACK_TITLE,
   deleted: DELETED_PLAYER_PAGE_TITLE,
 };
@@ -59,10 +61,10 @@ export function teamPageTitle(
  */
 export function playerPageTitle(
   player: PlayerPageIdentity | null,
-  words: Readonly<EntityTitleWords> = FR_PLAYER_TITLE_WORDS,
+  words: Readonly<PlayerTitleWords> = FR_PLAYER_TITLE_WORDS,
 ): string {
   if (!player) return words.fallback;
-  if (player.isDeleted) return `${words.deleted ?? DELETED_PLAYER_PAGE_TITLE} · ${words.fallback}`;
+  if (player.isDeleted) return `${words.deleted} · ${words.fallback}`;
   const pseudo = player.pseudo.trim();
   return pseudo ? `${pseudo} · ${words.fallback}` : words.fallback;
 }

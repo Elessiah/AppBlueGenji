@@ -20,7 +20,7 @@ import { usePlayersText, type PlayersText } from "@/components/i18n/players-text
 import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
 import { formatTeamRoles } from "@/lib/shared/team-role-display";
 import { finalRankLabel } from "@/lib/shared/ordinal";
-import type { TeamRole } from "@/lib/shared/types";
+import type { TeamRole, TournamentState } from "@/lib/shared/types";
 import { playerErrorMessage } from "../_lib/player-errors";
 import styles from "./player.module.css";
 
@@ -30,12 +30,21 @@ function adultLabel(text: PlayersText, isAdult: boolean | null): string {
   return isAdult ? text.t("page.adultYes") : text.t("page.adultNo");
 }
 
-const TOURNAMENT_STATES = ["UPCOMING", "REGISTRATION", "RUNNING", "FINISHED"] as const;
+/** Tout état du type partagé : un état ajouté sans libellé ne compile pas. */
+const TOURNAMENT_STATE_KEYS = {
+  UPCOMING: true,
+  REGISTRATION: true,
+  RUNNING: true,
+  FINISHED: true,
+} as const satisfies Record<TournamentState, true>;
+
+function isTournamentState(state: string): state is TournamentState {
+  return Object.hasOwn(TOURNAMENT_STATE_KEYS, state);
+}
 
 /** État d'un tournoi de l'historique : il s'affichait en code brut (`FINISHED`). */
 function tournamentStateLabel(text: PlayersText, state: string): string {
-  const known = TOURNAMENT_STATES.find((code) => code === state);
-  return known ? text.t(`page.state.${known}`) : state;
+  return isTournamentState(state) ? text.t(`page.state.${state}`) : state;
 }
 
 export default function PlayerDetailPage() {
