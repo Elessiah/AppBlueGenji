@@ -32,7 +32,7 @@ import {
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { TargetPicker } from "./TargetPicker";
 import { richNodes } from "@/components/i18n/shell-text";
-import { INTL_LOCALE } from "@/lib/shared/locales";
+import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import {
   legalBasisText,
   reportErrorText,
@@ -42,6 +42,19 @@ import {
   type ReportsText,
 } from "./reports-text";
 import styles from "./ReportProblem.module.css";
+
+/**
+ * Date d'un signalement dans la liste à contester : courte (le texte d'une
+ * option ne passe pas à la ligne). Le français garde ses chiffres (jour/mois,
+ * sans ambiguïté pour lui) ; l'anglais nomme le mois, que `10/12/2026` ne dit
+ * pas sans équivoque.
+ */
+function contestOptionDate(iso: string, locale: Locale): string {
+  const date = new Date(iso);
+  return locale === "fr"
+    ? date.toLocaleDateString(INTL_LOCALE.fr)
+    : date.toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "short", year: "numeric" });
+}
 
 export interface ReportProblemDialogProps {
   /** Chemin de la page d'où l'on signale : il accompagne le signalement. */
@@ -291,7 +304,7 @@ export function ReportProblemDialog({
                   <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
                     {t("dialog.portalLink")}
                     {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
-                    <span className="sr-only">{t("dialog.newTab")}</span>
+                    <span className="sr-only">{` ${t("dialog.newTab")}`}</span>
                   </a>
                   {/* NOSONAR S6772 — le point suit le lien sans espace */}
                   .
@@ -431,7 +444,7 @@ function CategoryChoice({ onChoose }: Readonly<{ onChoose: (category: ReportCate
               </span>
               <span className={styles.categoryLabel}>
                 {t("offSite.label")}
-                <span className="sr-only">{t("dialog.portalSuffix")}</span>
+                <span className="sr-only">{` ${t("dialog.portalSuffix")}`}</span>
               </span>
               <span className={styles.categoryHint}>{t("offSite.hint")}</span>
             </a>,
@@ -575,7 +588,7 @@ function ContestField({
             {t("dialog.contestOption", {
               id: String(option.id),
               category: t(`categories.${option.category}.label`),
-              date: new Date(option.createdAt).toLocaleDateString(INTL_LOCALE[text.locale], { day: "numeric", month: "long", year: "numeric" }),
+              date: contestOptionDate(option.createdAt, text.locale),
               status: t(`status.${option.status}`),
             })}
           </option>

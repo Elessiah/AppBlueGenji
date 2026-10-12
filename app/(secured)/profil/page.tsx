@@ -1004,7 +1004,7 @@ export default function ProfilePage() {
                       en fait le propriétaire, ce qu'une invitation ordinaire ne fait
                       jamais — le joueur doit le lire avant de cliquer. */}
                   {inv.ownership && (
-                    <span className={s.inviteOwnership}>{t("invitations.ownership")}</span>
+                    <span className={s.inviteOwnership}>{` ${t("invitations.ownership")}`}</span>
                   )}
                 </span>
                 <span className={s.inviteActions}>

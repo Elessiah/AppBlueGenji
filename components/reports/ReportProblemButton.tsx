@@ -76,9 +76,11 @@ export function ReportProblemButton({
   const [open, setOpen] = useState(false);
   const [ReportProblemDialog, setDialog] = useState<Dialog | null>(() => loadedDialog);
   const [pending, setPending] = useState(false);
+  // Ce que la région d'état annonce : l'attente, puis l'échec (aussi dit hors toast).
+  const [status, setStatus] = useState("");
   const { t } = useShellText();
   // Toujours posé par la mise en page racine ; `null` seulement pour un pied de
-  // page rendu seul (tests) — le geste reste alors muet plutôt que de lever.
+  // page rendu seul (tests) : l'échec reste alors dit par la région d'état.
   const toast = useOptionalToast();
   // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
   // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
@@ -100,14 +102,21 @@ export function ReportProblemButton({
     }
     if (pending) return;
     setPending(true);
+    setStatus(t("footer.reportLoading"));
     const clickedOn = pathname;
     loadDialog()
       .then((loaded) => {
         setDialog(() => loaded);
+        setStatus("");
+        // Le lecteur est passé à une autre page entre-temps : le geste est caduc
+        // (le formulaire retiendrait la nouvelle page) ; le bouton, toujours au
+        // pied, rouvre aussitôt le formulaire, désormais chargé.
         if (currentPath.current === clickedOn) setOpen(true);
       })
       .catch((error: unknown) => {
-        toast?.showError(t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed"));
+        const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");
+        setStatus(message);
+        toast?.showError(message);
       })
       .finally(() => setPending(false));
   };
@@ -140,7 +149,7 @@ export function ReportProblemButton({
           {busyMark}
         </button>
       )}
-      <output className="sr-only">{pending ? t("footer.reportLoading") : ""}</output>
+      <output className="sr-only">{status}</output>
       {open && ReportProblemDialog && (
         <ReportProblemDialog
           pathname={pathname}

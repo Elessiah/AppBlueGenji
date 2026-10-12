@@ -255,7 +255,7 @@ export function DiscordBotHandleDialog({
                       >
                         {chunks}
                         {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
-                        <span className="sr-only">{t("verify.newTab")}</span>
+                        <span className="sr-only">{` ${t("verify.newTab")}`}</span>
                       </a>
                     ),
                   }),

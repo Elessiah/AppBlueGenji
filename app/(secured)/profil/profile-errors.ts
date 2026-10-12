@@ -21,21 +21,18 @@
  */
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import type { ProfileInputError } from "@/lib/shared/profile-input-errors";
+import type frProfileMessages from "@/messages/fr/profile.json";
 import { FR_TEAM_ERRORS_TEXT, imageErrorMessage, membershipErrorMessage, type TeamErrorsText } from "../equipes/_lib/team-errors";
 import { FR_PROFILE, lookupCode, type ProfileText } from "./_lib/profile-text";
 
 /**
  * Les refus de saisie, typés sur la liste partagée avec la route : un code
- * ajouté là-bas sans sa phrase dans `profile.errors.write` casse le test de
- * couverture (`tests/app/profile-i18n.test.tsx`).
+ * ajouté là-bas sans sa phrase dans `profile.errors.write` **ne compile pas**
+ * (et casse le test de couverture, `tests/app/profile-reports-uiux.test.tsx`).
  */
-export const PROFILE_INPUT_ERROR_CODES: readonly ProfileInputError[] = [
-  "INVALID_PSEUDO",
-  "PSEUDO_EMPTY",
-  "PSEUDO_TOO_LONG",
-  "INVALID_DISCORD_PSEUDO",
-  "INVALID_OVERWATCH_BATTLETAG",
-];
+type WriteErrorCode = keyof (typeof frProfileMessages)["errors"]["write"];
+type InputErrorsCovered = [ProfileInputError] extends [WriteErrorCode] ? true : never;
+export const PROFILE_INPUT_ERRORS_COVERED: InputErrorsCovered = true;
 
 /** Le code nommé d'une écriture, ou `null`. */
 function namedMessage(text: ProfileText, code: string | null | undefined): string | null {

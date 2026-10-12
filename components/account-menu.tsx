@@ -2,12 +2,15 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { LogOut, Shield, UserRound } from "lucide-react";
-import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { UserAvatar } from "./user-avatar";
-import { useToast } from "./ui/toast";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
+import { useLogout } from "./use-logout";
 import s from "./account-menu.module.css";
+
+// Le geste vit dans son propre module (`use-logout.ts`), que le bouton de `/profil` importe sans le menu.
+export { requestLogout } from "./use-logout";
 
 export type AccountMenuTeam = { teamId: number; teamName: string };
 
@@ -143,44 +146,4 @@ export function AccountMenuPanel({
       </button>
     </div>
   );
-}
-
-/**
- * Le geste « Déconnexion », commun au menu du compte et au bouton de `/profil` :
- * un échec se dit (toast) au lieu de ramener à l'accueil un joueur toujours
- * connecté ; un second clic n'envoie rien de plus, et le bouton reste occupé
- * jusqu'à l'accueil (`leaving` ne retombe qu'après un échec).
- */
-export function useLogout(onSuccess?: () => void): { leaving: boolean; logout: () => Promise<void> } {
-  const router = useLocaleRouter();
-  const { showError } = useToast();
-  const { t } = useShellText();
-  const [leaving, setLeaving] = useState(false);
-  const logout = async () => {
-    if (leaving) return;
-    setLeaving(true);
-    if (!(await requestLogout())) {
-      setLeaving(false);
-      showError(t("account.logoutFailed"));
-      return;
-    }
-    onSuccess?.();
-    router.push("/");
-    router.refresh();
-  };
-  return { leaving, logout };
-}
-
-/**
- * Ferme la session côté serveur. Rend `false` si la requête échoue ou est
- * refusée : l'appelant le dit (toast) au lieu de ramener à l'accueil un
- * joueur toujours connecté.
- */
-export async function requestLogout(fetchImpl: typeof fetch = fetch): Promise<boolean> {
-  try {
-    const res = await fetchImpl("/api/auth/logout", { method: "POST" });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }

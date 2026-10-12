@@ -12,7 +12,7 @@
   "failed": "This image can't be displayed here. Choose another one.",
   "hint": "Drag the frame to choose the kept area, pull a corner to resize it.",
   "hintFixed": "Drag the frame to choose the kept area, pull a corner to resize it (fixed proportions).",
-  "hintKeys": " With the keyboard: arrows to move it (Shift to go faster), + and − to enlarge or shrink it, Home to go back to the suggested frame.",
+  "hintKeys": "With the keyboard: arrows to move it (Shift to go faster), + and − to enlarge or shrink it, Home to go back to the suggested frame.",
   "preview": "Preview",
   "shrink": "Shrink",
   "grow": "Enlarge",

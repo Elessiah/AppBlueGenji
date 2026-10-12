@@ -366,7 +366,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm, lang }
             {aspect !== null ? t("hintFixed") : t("hint")}
             {/* L'aide clavier quitte l'écran tactile, où les boutons de
                 l'aperçu tiennent le même rôle, mais reste lue avec le cadre. */}
-            <span className={s.hintKeys}>{t("hintKeys")}</span>
+            <span className={s.hintKeys}>{` ${t("hintKeys")}`}</span>
           </p>
         </div>
 

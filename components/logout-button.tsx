@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useLogout } from "@/components/account-menu";
+import { useLogout } from "@/components/use-logout";
 import { useShellText } from "@/components/i18n/shell-text";
 import { Button } from "./Button";
 
