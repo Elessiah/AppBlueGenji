@@ -308,8 +308,9 @@ describe("revue UI/UX, septième passe", () => {
       }
     }
     const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
-    expect(view).toContain("team: (chunks: React.ReactNode[]) => <TeamLink teamId={teamId}>{chunks}</TeamLink>");
-    expect(view.match(/teamTags\(quarantine\.targetId\)/g)).toHaveLength(2);
+    expect(view).toContain("exists ? <TeamLink teamId={teamId}>{richNodes(chunks)}</TeamLink> : <>{richNodes(chunks)}</>");
+    // Lien seulement si l'équipe existe encore (cible du signalement) : une équipe dissoute n'a plus de fiche.
+    expect(view.match(/teamTags\(quarantine\.targetId, teamExists\(quarantine\.targetId\)\)/g)).toHaveLength(2);
   });
 });
 
@@ -448,5 +449,25 @@ describe("revue UI/UX, quinzième passe", () => {
       expect(text.match(/if \(loading\) return;/g)).toHaveLength(2);
       expect(text).toContain("aria-disabled={loading || undefined}");
     }
+  });
+});
+
+describe("revue UI/UX, seizième passe", () => {
+  it("profil : boutons à libellé d'attente en `aria-disabled`, garde au clic", () => {
+    const apps = source("app/(secured)/profil/ConnectedAppsSection.tsx");
+    expect(apps).toContain("onClick={() => busy === null && onUnlink(connection.provider)}");
+    expect(apps).toContain("onClick={() => !busy && onDisconnect()}");
+    const page = source("app/(secured)/profil/page.tsx");
+    expect(page).toContain("aria-disabled={discordStateBusy || undefined}");
+    expect(page).toContain("aria-disabled={discordTagBusy || undefined}");
+    expect(page).not.toContain("disabled={discordTagBusy}");
+  });
+
+  it("bouton du formulaire en attente : aria-disabled (pas de survol du bouton du système de design)", () => {
+    expect(source("components/reports/ReportProblemButton.tsx")).toContain('"aria-disabled": pending || undefined,');
+  });
+
+  it("requestLogout n'a qu'une adresse", () => {
+    expect(source("components/account-menu.tsx")).not.toContain("export { requestLogout }");
   });
 });

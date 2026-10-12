@@ -6,7 +6,8 @@ jest.mock("next/navigation", () => ({
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { AccountMenu, AccountMenuPanel, requestLogout } from "@/components/account-menu";
+import { AccountMenu, AccountMenuPanel } from "@/components/account-menu";
+import { requestLogout } from "@/components/use-logout";
 import { ToastProvider } from "@/components/ui/toast";
 import { readSource } from "../helpers/read-source";
 

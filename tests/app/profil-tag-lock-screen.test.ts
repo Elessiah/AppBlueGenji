@@ -43,11 +43,11 @@ describe("champ Discord — un état illisible garde une sortie", () => {
     // tag » — la seule annulation d'exposition que le site offre.
     expect(page).toContain("discordState.linked !== true ?");
     expect(page).toContain('aria-label={busyAriaLabel(discordStateBusy, t("discord.retryLabel"))}');
-    expect(page).toContain("onClick={() => void loadDiscordState()}");
+    expect(page).toContain("onClick={() => !discordStateBusy && void loadDiscordState()}");
   });
 
-  it("désarme le bouton pendant la lecture", () => {
-    expect(page).toContain("disabled={discordStateBusy}");
+  it("désarme le bouton pendant la lecture (aria-disabled : le focus reste, clic ignoré)", () => {
+    expect(page).toContain("aria-disabled={discordStateBusy || undefined}");
   });
 
   it("ne propose jamais un geste sur un état inconnu", () => {
