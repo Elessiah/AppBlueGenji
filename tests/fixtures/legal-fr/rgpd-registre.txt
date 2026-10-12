@@ -5,7 +5,7 @@ Le registre décrit les traitements de données personnelles du site et du bot D
 Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
 Télécharger le registre (tableur CSV)← Politique de confidentialité
 RESPONSABLE
-ActeursMIS À JOUR LE 09/10/2026
+ActeursMIS À JOUR LE 12/10/2026
 Responsable du traitement
 Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
 Contact
@@ -24,6 +24,7 @@ Sous-finalités
 Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)
 Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)
 Exporter ses données et supprimer son compte depuis « Mon profil »
+Rédiger les notifications push dans la langue du compte : celle de la page à la dernière connexion, ou celle choisie dans « Mon profil »
 Base légale
 Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles
 Personnes concernées
@@ -33,6 +34,7 @@ Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Googl
 Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord
 Majorité déclarée (oui / non / non renseignée)
 Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme
+Langue du compte (français ou anglais), remise au français à l'anonymisation
 Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale
 Données sensibles
 Aucune
@@ -438,6 +440,7 @@ Données
 Adresse d'abonnement de l'appareil, fournie par le navigateur, et ses clés de chiffrement
 Date d'abonnement et de la dernière notification remise
 Sujets de notification coupés par le compte
+Langue du compte (T01), dans laquelle la notification est rédigée
 Données sensibles
 Aucune
 Conservation

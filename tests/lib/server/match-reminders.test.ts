@@ -11,6 +11,7 @@ import {
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import { resolvePush } from "../../helpers/push";
 
 const START = new Date("2026-09-10T18:00:00Z");
 const ONE_HOUR_BEFORE = new Date("2026-09-10T17:00:00Z");
@@ -176,9 +177,9 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const [userIds, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
     expect(userIds).toEqual([1, 2]);
     expect(topic).toBe("MATCH_REMINDER");
-    expect(content.title).toBe("Match dans 1 heure");
-    expect(content.body).toContain("Les Renards contre Team Nova");
-    expect(content.url).toBe("/tournois/7#match-31");
+    expect(resolvePush(content).title).toBe("Match dans 1 heure");
+    expect(resolvePush(content).body).toContain("Les Renards contre Team Nova");
+    expect(resolvePush(content).url).toBe("/tournois/7#match-31");
   });
 
   it("ne borne le calendrier qu'aux manches programmées et non jouées", async () => {

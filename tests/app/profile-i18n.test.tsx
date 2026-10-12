@@ -57,6 +57,7 @@ import ProfileLayout, { generateMetadata as profileMetadata } from "@/app/(secur
 import { generateMetadata as reportMetadata } from "@/app/(secured)/signalements/[id]/layout";
 import ProfilePage from "@/app/(secured)/profil/page";
 import { ProfileSection } from "@/app/(secured)/profil/_components/ProfileSection";
+import { AccountLocaleField } from "@/app/(secured)/profil/_components/AccountLocaleField";
 import { ConnectedAppsSection } from "@/app/(secured)/profil/ConnectedAppsSection";
 import { OtherSessionsPanel } from "@/app/(secured)/profil/OtherSessionsPanel";
 import { BattletagVisibilityNotice } from "@/app/(secured)/profil/BattletagVisibilityNotice";
@@ -424,6 +425,26 @@ describe("anglais — phrases", () => {
     for (const code of Object.keys(PUSH_ERROR_MESSAGES)) expect(pushErrorText(push, code)).not.toMatch(ACCENTED);
     const reports = scopedText("en", EN.reports);
     for (const code of Object.keys(EN.reports.errors)) expect(reportErrorText(reports, code)).not.toMatch(ACCENTED);
+  });
+});
+
+describe("langue du compte (lot 9-3)", () => {
+  it("en anglais : libellé, règle dite, chaque langue nommée dans sa langue", () => {
+    const html = inEnglish(<AccountLocaleField initial="en" />);
+    expect(html).toContain(">Notification language</label>");
+    expect(html).toContain("It follows the page&#x27;s language at every login");
+    expect(html).toContain('<option value="fr" lang="fr">Français</option>');
+    expect(html).toContain('<option value="en" lang="en" selected="">English</option>');
+    expect(html).toContain('aria-describedby="profile-account-locale-hint"');
+    // Hors les noms de langue, rien de français.
+    expectEnglish(html.replace(/<option[^>]*>[^<]*<\/option>/g, ""));
+  });
+
+  it("en français : libellé et règle", () => {
+    const html = renderToStaticMarkup(<AccountLocaleField initial="fr" />);
+    expect(html).toContain(">Langue des notifications</label>");
+    expect(html).toContain("prochaine connexion faite dans l&#x27;autre langue");
+    expect(html).toContain('<option value="fr" lang="fr" selected="">Français</option>');
   });
 });
 

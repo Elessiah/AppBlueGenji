@@ -17,7 +17,7 @@ import {
 } from "@/lib/server/notify";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
-const PUSH = { title: "t", body: "b", url: "/" };
+const PUSH = () => ({ title: "t", body: "b", url: "/" });
 
 beforeEach(() => {
   jest.clearAllMocks();

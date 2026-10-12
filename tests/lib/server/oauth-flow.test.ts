@@ -6,6 +6,7 @@ jest.mock("@/lib/server/account-identities");
 jest.mock("@/lib/server/google-oauth");
 jest.mock("@/lib/server/discord-oauth");
 jest.mock("@/lib/server/blizzard-oauth");
+jest.mock("@/lib/server/users/account-locale", () => ({ recordLoginLocale: jest.fn(async () => undefined) }));
 
 import crypto from "node:crypto";
 import { NextRequest } from "next/server";
@@ -23,6 +24,7 @@ import { buildBlizzardAuthorizationUrl, fetchBlizzardUser } from "@/lib/server/b
 import type { OAuthProvider } from "@/lib/shared/oauth-providers";
 import { AccountSuspendedError } from "@/lib/server/account-suspensions";
 import { SUSPENSION_NOTICE_COOKIE, parseSuspensionNotice } from "@/lib/shared/account-suspension";
+import { recordLoginLocale } from "@/lib/server/users/account-locale";
 import { authUser } from "../../helpers/auth-user";
 
 /**
@@ -304,6 +306,24 @@ describe("completeOAuth — connexion", () => {
     );
     expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
     expect(response.headers.get("location")).toBe("http://localhost:3000/tournois");
+    // Langue du compte : celle de la page de départ (lot 9-3).
+    expect(recordLoginLocale).toHaveBeenCalledWith(7, "fr");
+  });
+
+  it("retient l'anglais comme langue du compte pour une connexion partie de /en (lot 9-3)", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    jest.mocked(consumeOAuthState).mockResolvedValue({
+      provider: "GOOGLE",
+      state: STATE,
+      redirectTo: "/en/tournois",
+      intent: "LOGIN",
+      termsAccepted: true,
+    });
+    await completeOAuth(request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`), "GOOGLE");
+    expect(recordLoginLocale).toHaveBeenCalledWith(7, "en");
+    expect(jest.mocked(recordLoginLocale).mock.invocationCallOrder[0]).toBeGreaterThan(
+      jest.mocked(createSession).mock.invocationCallOrder[0],
+    );
   });
 
   it("retient le **pseudo** Discord, pas son nom d'affichage", async () => {

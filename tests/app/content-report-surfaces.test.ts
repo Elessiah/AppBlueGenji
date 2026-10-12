@@ -58,7 +58,8 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(login).toContain("String(TERMS_VERSION)");
     // Les trois portes transmettent l'acceptation.
     expect(login).toContain("termsAccepted={termsAccepted}");
-    expect(login).toMatch(/termsAccepted,\s*\}\)/);
+    // Suivie de la langue de la page, devenue celle du compte (lot 9-3).
+    expect(login).toMatch(/termsAccepted,\s*(?:\/\/[^\n]*\s*)?locale: text\.locale,\s*\}\)/);
     expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, termsAccepted, locale })");
   });
 

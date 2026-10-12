@@ -93,6 +93,41 @@ describe("pushToUsers", () => {
     expect(query.mock.calls[2][1]).toEqual([10]);
   });
 
+  it("rédige chaque appareil dans la langue de son titulaire, une fois par langue", async () => {
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([
+        [
+          { id: 20, ...SUB, locale: "en" },
+          { id: 21, ...SUB, locale: "fr" },
+          { id: 22, ...SUB, locale: "en" },
+          // Valeur inattendue (base pas encore migrée, par exemple) : le français.
+          { id: 23, ...SUB, locale: null },
+        ],
+      ])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+    const content = jest.fn((locale: "fr" | "en") => ({
+      title: locale === "en" ? "Your match is starting" : "Ton match commence",
+      body: "b",
+      url: locale === "en" ? "/en/tournois/4" : "/tournois/4",
+    }));
+
+    expect(await pushToUsers([1, 2, 3], "MATCH_START", content, {}, CONFIG)).toBe(4);
+
+    expect(query.mock.calls[0][0]).toMatch(/SELECT s\.id, s\.endpoint, s\.p256dh, s\.auth, u\.locale/);
+    expect(content.mock.calls.map(([locale]) => locale).sort()).toEqual(["en", "fr"]);
+    const sent = jest.mocked(sendWebPush).mock.calls.map((call) => JSON.parse(call[2]) as { title: string; url: string });
+    expect(sent.map((payload) => payload.title)).toEqual([
+      "Your match is starting",
+      "Ton match commence",
+      "Your match is starting",
+      "Ton match commence",
+    ]);
+    expect(sent[0].url).toBe("/en/tournois/4");
+  });
+
   it("ne lève jamais : une panne rend zéro", async () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     pool({ query: jest.fn<SqlQuery>().mockRejectedValue(new Error("panne")) });
