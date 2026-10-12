@@ -7,7 +7,8 @@ import { englishProfile, englishPush, englishTeamErrors } from "./english-loader
 import type { ProfileEnglishMessages } from "./profile-english";
 import { ProfileTextProvider } from "./profile-text-provider";
 import { TeamErrorsTextProvider } from "./team-errors-text-provider";
-import { useEnglishMessages } from "./use-english-messages";
+import { usePathname } from "next/navigation";
+import { useEnglishMessagesAt } from "./use-english-messages";
 import { EnglishGateFallback } from "./english-gate-fallback";
 
 /**
@@ -26,9 +27,11 @@ export function ProfileTextProviders({
   messages,
   children,
 }: Readonly<{ locale: Locale; messages?: ProfileEnglishMessages; children: ReactNode }>) {
-  const profile = useEnglishMessages(locale, englishProfile, messages?.profile);
-  const teamErrors = useEnglishMessages(locale, englishTeamErrors, messages?.teamErrors);
-  const push = useEnglishMessages(locale, englishPush, messages?.push);
+  // Le chemin lu une fois pour les trois espaces.
+  const pathname = usePathname();
+  const profile = useEnglishMessagesAt(locale, englishProfile, messages?.profile, pathname);
+  const teamErrors = useEnglishMessagesAt(locale, englishTeamErrors, messages?.teamErrors, pathname);
+  const push = useEnglishMessagesAt(locale, englishPush, messages?.push, pathname);
   if (profile.waiting || teamErrors.waiting || push.waiting) return <EnglishGateFallback />;
   return (
     <TeamErrorsTextProvider locale={locale} messages={teamErrors.english ?? undefined}>

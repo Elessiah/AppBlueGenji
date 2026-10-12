@@ -12,7 +12,8 @@ import { PlayersTextProvider } from "./players-text-provider";
 import { StatsPanelI18nProvider } from "./stats-panel-i18n";
 import { TeamErrorsTextProvider } from "./team-errors-text-provider";
 import { TeamPageTextProvider } from "./team-page-text-provider";
-import { useEnglishMessages } from "./use-english-messages";
+import { usePathname } from "next/navigation";
+import { useEnglishMessages, useEnglishMessagesAt } from "./use-english-messages";
 import { EnglishGateFallback } from "./english-gate-fallback";
 
 /**
@@ -96,8 +97,10 @@ export function TeamPageTextGate({
   stats,
   children,
 }: GateProps<Messages["team"]> & Readonly<{ stats?: StatsPanelMessages }>) {
-  const team = useEnglishMessages(locale, englishTeam, messages);
-  const panel = useEnglishMessages(locale, englishStatsPanel, stats);
+  // Le chemin lu une fois pour les deux espaces.
+  const pathname = usePathname();
+  const team = useEnglishMessagesAt(locale, englishTeam, messages, pathname);
+  const panel = useEnglishMessagesAt(locale, englishStatsPanel, stats, pathname);
   if (team.waiting || panel.waiting) return <EnglishGateFallback />;
   return (
     <TeamPageTextProvider locale={locale} messages={team.english ?? undefined}>

@@ -28,7 +28,7 @@ export function useEnglishMessages<T>(
   provided: T | undefined,
 ): EnglishMessagesState<T> {
   // L'adresse où le chargement a échoué : l'échec ne vaut que pour elle.
-  return useEnglishMessagesIn(locale, loader, provided, usePathname());
+  return useEnglishMessagesAt(locale, loader, provided, usePathname());
 }
 
 /**
@@ -40,10 +40,15 @@ export function useEnglishMessagesUntilRemount<T>(
   locale: Locale,
   loader: Pick<OnceLoader<T>, "load" | "loaded">,
 ): EnglishMessagesState<T> {
-  return useEnglishMessagesIn(locale, loader, undefined, "");
+  return useEnglishMessagesAt(locale, loader, undefined, "");
 }
 
-function useEnglishMessagesIn<T>(
+/**
+ * La forme de base, le chemin (portée d'un échec) donné par l'appelant : une
+ * porte qui attend plusieurs espaces lit le chemin **une** fois et le passe à
+ * chacun.
+ */
+export function useEnglishMessagesAt<T>(
   locale: Locale,
   loader: Pick<OnceLoader<T>, "load" | "loaded">,
   provided: T | undefined,

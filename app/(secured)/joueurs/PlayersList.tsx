@@ -75,24 +75,26 @@ export default function PlayersList() {
   // La recherche filtre sur une valeur **différée** : la frappe met le champ à
   // jour tout de suite, le refiltrage de la grille suit sans la bloquer.
   const deferredQuery = useDeferredValue(query);
+  // Clé de recherche de chaque joueur, calculée une fois par liste et non à chaque frappe (revue de performance du lot 9-2).
+  const searchKeys = useMemo(() => new Map(listed.map((p) => [p, `${p.pseudo} ${p.team?.name || ""}`.toLowerCase()])), [listed]);
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
-    let r = listed.filter((p) => {
-      if (q && !`${p.pseudo} ${p.team?.name || ""}`.toLowerCase().includes(q)) return false;
+    const r = listed.filter((p) => {
+      if (q && !(searchKeys.get(p) ?? "").includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
       // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
       // décoché « ouvert aux propositions » ne veut pas être démarché.
       if (statusFilter === "free" && !isFreeAgent(p)) return false;
       return true;
     });
-    r = [...r];
+    // `filter` rend déjà un tableau neuf : le tri ne touche pas la liste source.
     if (sort === "pseudo") {
       const compare = compareLocalText(text.locale);
       r.sort((a, b) => compare(a.pseudo, b.pseudo));
     }
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
     return r;
-  }, [listed, deferredQuery, roleFilter, statusFilter, sort, text.locale]);
+  }, [listed, searchKeys, deferredQuery, roleFilter, statusFilter, sort, text.locale]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);

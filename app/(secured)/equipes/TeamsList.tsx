@@ -78,18 +78,22 @@ export default function TeamsList() {
 
   // Recherche différée : le champ suit la frappe, la grille suit sans la bloquer.
   const deferredQuery = useDeferredValue(query);
+  // Le sigle est un nom court : on cherche une équipe par « BG » comme par son
+  // nom complet. Clé calculée une fois par liste, non à chaque frappe (revue de performance du lot 9-2).
+  const searchKeys = useMemo(
+    () => new Map(teams.map((team) => [team, `${team.name} ${team.tag || ""} ${team.region || ""}`.toLowerCase()])),
+    [teams],
+  );
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
-    let r = teams.filter((team) => {
-      // Le sigle est un nom court : on cherche une équipe par « BG » comme par
-      // son nom complet.
-      if (q && !`${team.name} ${team.tag || ""} ${team.region || ""}`.toLowerCase().includes(q)) return false;
+    const r = teams.filter((team) => {
+      if (q && !(searchKeys.get(team) ?? "").includes(q)) return false;
       if (gameFilter === "all") return true;
       if (gameFilter === "ow") return team.games.includes("OW");
       if (gameFilter === "mr") return team.games.includes("MR");
       return true;
     });
-    r = [...r];
+    // `filter` rend déjà un tableau neuf : le tri ne touche pas la liste source.
     if (sort === "rank") r.sort((a, b) => a.rank - b.rank);
     if (sort === "name") {
       const compare = compareLocalText(text.locale);
@@ -98,7 +102,7 @@ export default function TeamsList() {
     if (sort === "wins") r.sort((a, b) => b.wins - a.wins);
     if (sort === "members") r.sort((a, b) => b.membersCount - a.membersCount);
     return r;
-  }, [teams, deferredQuery, gameFilter, sort, text.locale]);
+  }, [searchKeys, teams, deferredQuery, gameFilter, sort, text.locale]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);
