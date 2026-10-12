@@ -214,7 +214,7 @@ export function DiscordVerificationDialog({
             <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
               {t("verify.cancel")}
             </CyberButton>
-            <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
+            <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined} aria-busy={loading || undefined}>
               {loading ? t("verify.certifying") : t("verify.certifyThis")}
             </CyberButton>
           </div>
@@ -277,7 +277,7 @@ export function DiscordVerificationDialog({
             <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
               {t("verify.cancel")}
             </CyberButton>
-            <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
+            <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined} aria-busy={loading || undefined}>
               {loading ? t("verify.checking") : t("verify.requestCode")}
             </CyberButton>
           </div>
@@ -319,7 +319,7 @@ export function DiscordVerificationDialog({
           <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={() => !loading && restartVerification()}>
             {t("verify.newCode")}
           </CyberButton>
-          <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
+          <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined} aria-busy={loading || undefined}>
             {loading ? t("verify.certifying") : t("verify.certifyMine")}
           </CyberButton>
         </div>

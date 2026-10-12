@@ -404,8 +404,8 @@ function DiscordBotRow({
         <button
           type="button"
           className={row.handleAction === "LINK" ? "btn" : "btn ghost"}
-          disabled={busy}
-          onClick={() => onUpdate(row.handleAction)}
+          aria-disabled={busy || undefined}
+          onClick={() => !busy && onUpdate(row.handleAction)}
           aria-describedby={detailsId}
           style={{ padding: "4px 12px", fontSize: 12 }}
         >

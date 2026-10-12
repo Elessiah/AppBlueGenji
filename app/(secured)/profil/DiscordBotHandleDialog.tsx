@@ -268,7 +268,7 @@ export function DiscordBotHandleDialog({
               <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
                 {t("botHandle.cancel")}
               </CyberButton>
-              <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
+              <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined} aria-busy={loading || undefined}>
                 {loading ? t("botHandle.sending") : t("botHandle.requestCode")}
               </CyberButton>
             </div>
@@ -330,7 +330,7 @@ export function DiscordBotHandleDialog({
               >
                 {t("botHandle.newCode")}
               </CyberButton>
-              <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined}>
+              <CyberButton variant="primary" type="submit" aria-disabled={loading || undefined} aria-busy={loading || undefined}>
                 {loading ? t("botHandle.checking") : t("botHandle.validate")}
               </CyberButton>
             </div>
