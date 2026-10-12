@@ -54,7 +54,7 @@
   },
   "card": {
     "viewProfile": "View {name}'s profile",
-    "viewTeam": "View the {name} team page",
+    "viewTeam": "Open {name}'s page",
     "deleted": "Deleted account",
     "rosterStatus": {
       "ROSTER": "ROSTER",
@@ -88,7 +88,7 @@
     "back": "← Players",
     "deletedBadge": "Deleted account",
     "teamAndRoles": "Player's team and roles",
-    "viewTeam": "View the {name} team page",
+    "viewTeam": "Open {name}'s page",
     "noTeamTitle": "This player isn't in any team",
     "noTeam": "No team",
     "deletedNotice": "This player deleted their account. Their personal information has been erased and their username replaced with a placeholder one; their results remain, because they also belong to the teams they faced.",

@@ -49,7 +49,7 @@
   },
   "card": {
     "viewProfile": "View {name}'s profile",
-    "viewTeam": "View the {name} team page",
+    "viewTeam": "Open {name}'s page",
     "ghostTitle": "Ghost team, created by the staff",
     "ghostBadge": "GHOST",
     "form": "Form",
