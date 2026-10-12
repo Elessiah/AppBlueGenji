@@ -340,12 +340,20 @@
    l'avatar » pendant un envoi, « Retirer mon tag » pendant un retrait et
    « Supprimer mon compte » pendant l'effacement gardaient le survol, le
    soulèvement, le reflet et `cursor: pointer` tout en refusant le clic. */
-/* `[aria-disabled="true"]` : même état pour les boutons qui gardent le focus
-   pendant leur geste (lot 9-2 — « Retirer », « Réessayer », « Retirer mon tag »). */
-.page :global(.btn:disabled),
-.page :global(.btn[aria-disabled="true"]) {
+.page :global(.btn:disabled) {
   opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* `[aria-disabled="true"]` : un bouton qui garde le focus pendant son geste
+   (lot 9-2 — « Retirer », « Réessayer », « Retirer mon tag », « Déconnexion »)
+   et dont le libellé d'attente doit se lire : couleurs atténuées par jeton,
+   jamais `opacity` (contraste ≥ 4,5:1), curseur d'attente, sans survol. */
+.page :global(.btn[aria-disabled="true"]) {
+  color: var(--ink-mute);
+  cursor: progress;
   box-shadow: none;
   transform: none;
 }
