@@ -13,6 +13,15 @@ import { FieldErrorText } from "@/components/ui/field-error-text";
 import type { FieldAria } from "@/lib/shared/field-errors";
 import { earlyExitBlocker, type EarlyExitBlocker } from "@/lib/shared/bg-survie/config";
 
+/**
+ * Identifiant de la case « sortie anticipée » : son `id`, la cible du refus
+ * (`FieldErrorText`) et l'entrée de `FIELD_IDS` du formulaire, qui en tire
+ * `aria-describedby` et le focus d'un refus — une seule source pour les trois.
+ */
+export const EARLY_EXIT_FIELD_ID = "endurance-early-exit";
+/** Aide de la case, toujours rattachée par `aria-describedby`. */
+export const EARLY_EXIT_HINT_ID = `${EARLY_EXIT_FIELD_ID}-hint`;
+
 /** Raison affichée sous la case « sortie anticipée » grisée, par empêchement. */
 const EARLY_EXIT_REASONS = {
   NO_CAP: "settings.enduranceEarlyExitNoCap",
@@ -181,9 +190,9 @@ export function FormatSettings({
           </div>
 
           <div className="field" style={FULL_WIDTH}>
-            <label htmlFor="endurance-early-exit" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label htmlFor={EARLY_EXIT_FIELD_ID} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
-                id="endurance-early-exit"
+                id={EARLY_EXIT_FIELD_ID}
                 type="checkbox"
                 disabled={locked("enduranceEarlyExit") || earlyExitBlocked !== null}
                 checked={values.enduranceEarlyExit}
@@ -192,8 +201,8 @@ export function FormatSettings({
               />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
               {t("settings.enduranceEarlyExit")}
             </label>
-            <FieldErrorText fieldId="endurance-early-exit" message={earlyExitError} />
-            <p id="endurance-early-exit-hint" style={HINT}>
+            <FieldErrorText fieldId={EARLY_EXIT_FIELD_ID} message={earlyExitError} />
+            <p id={EARLY_EXIT_HINT_ID} style={HINT}>
               {earlyExitReason}
               {t("settings.enduranceEarlyExitHint")}
             </p>

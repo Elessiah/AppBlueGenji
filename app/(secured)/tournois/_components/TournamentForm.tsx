@@ -29,7 +29,7 @@ import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
 import { conditionsText, formatHintText, invalidFormatText, phaseIssueText, useFormText } from "../_lib/form-text";
 import { useErrorsText } from "../[id]/_lib/error-map";
-import { FormatSettings } from "./FormatSettings";
+import { EARLY_EXIT_FIELD_ID, EARLY_EXIT_HINT_ID, FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
@@ -66,7 +66,7 @@ const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
   registrationOpenAt: "registration-open-at",
   registrationCloseAt: "registration-close-at",
   startAt: "start-at",
-  enduranceEarlyExit: "endurance-early-exit",
+  enduranceEarlyExit: EARLY_EXIT_FIELD_ID,
 };
 
 // Les valeurs et leurs conversions vivent dans `_lib/tournament-form-values`.
@@ -502,7 +502,7 @@ export function TournamentForm({
               lockedAttr={lockedAttr}
               onSwissTotalRoundsChange={setSwissTotalRounds}
               phaseFocusRequest={phaseFocusRequest}
-              earlyExitAria={fieldAttrs("enduranceEarlyExit", "endurance-early-exit-hint")}
+              earlyExitAria={fieldAttrs("enduranceEarlyExit", EARLY_EXIT_HINT_ID)}
               earlyExitError={fieldErrors.message("enduranceEarlyExit")}
             />
           </div>

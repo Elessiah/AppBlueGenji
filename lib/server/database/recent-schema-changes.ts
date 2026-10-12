@@ -191,11 +191,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_recruitment_ads ADD COLUMN title_en VARCHAR(140) NULL AFTER title`,
     `ALTER TABLE bg_recruitment_ads ADD COLUMN roles_en VARCHAR(200) NULL AFTER roles`,
     `ALTER TABLE bg_recruitment_ads ADD COLUMN body_en TEXT NULL AFTER body`,
-    // BlueGenji Survie — sortie « hors course » anticipée devenue une option,
-    // décochée par défaut : le défaut 0 l'éteint sur tout tournoi existant,
-    // sans autre migration (aucune équipe n'était encore « hors course »).
-    `ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit TINYINT(1) NOT NULL DEFAULT 0
-       AFTER endurance_max_rounds`,
+    // BlueGenji Survie — sortie « hors course » anticipée : son `ALTER` vit dans
+    // `addEnduranceEarlyExit` (`data-migrations.ts`), qui remplit les tournois
+    // existants au moment où la colonne naît, et seulement alors.
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

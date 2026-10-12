@@ -37,6 +37,34 @@ export async function backfillLaunchedAt(db: Pool): Promise<void> {
   }
 }
 
+/**
+ * Ajout de `bg_tournaments.endurance_early_exit`, et maintien de la sortie
+ * anticipée sur les tournois BG Survie existants qui ont un plafond.
+ */
+export async function addEnduranceEarlyExit(db: Pool): Promise<void> {
+  // La sortie « hors course » anticipée devient une option, **décochée** pour
+  // tout tournoi créé désormais. Mais un tournoi BG Survie déjà plafonné a été
+  // annoncé — règlement public, aide du formulaire — avec elle, et le rejeu la
+  // relit à chaque passage : l'éteindre par le défaut 0 changerait les règles
+  // en pleine qualification (le formulaire étant figé, sans recours pour
+  // l'organisateur) et réécrirait les statuts « Hors course » des tournois
+  // terminés. Ceux-là la gardent donc allumée ; sans plafond, elle n'a aucun
+  // effet et reste à 0. Le remplissage ne suit **que** l'ajout effectif de la
+  // colonne — rejoué à chaque démarrage, il rallumerait l'option sur tout
+  // tournoi plafonné créé depuis, décochée par son organisateur.
+  const statement = `ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit TINYINT(1) NOT NULL DEFAULT 0
+       AFTER endurance_max_rounds`;
+  try {
+    await db.execute(statement);
+    await db.execute(
+      `UPDATE bg_tournaments SET endurance_early_exit = 1
+       WHERE format = 'BG_SURVIE' AND endurance_max_rounds IS NOT NULL`,
+    );
+  } catch (error) {
+    reportSchemaFailure(error, statement);
+  }
+}
+
 /** Bascule du défaut de `bg_users.open_to_recruitment`, jouée une fois. */
 export async function switchOpenToRecruitmentDefault(db: Pool): Promise<void> {
   // `open_to_recruitment` : un compte neuf ne s'annonce plus « free agent »
