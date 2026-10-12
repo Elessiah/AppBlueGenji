@@ -25,21 +25,29 @@ export function barePath(path: string): string {
   return bare.length > 1 ? bare.replace(/\/+$/, "") : bare;
 }
 
+const ENTRIES = Object.entries(ENGLISH_PAGES) as Array<[EnglishPage, RegExp]>;
+
 /** La page de la table que désigne `path`, ou `null`. */
 export function englishPageOf(path: string): EnglishPage | null {
   const bare = barePath(path);
-  const found = (Object.keys(ENGLISH_PAGES) as EnglishPage[]).find((page) => ENGLISH_PAGES[page].test(bare));
-  return found ?? null;
+  return ENTRIES.find(([, pattern]) => pattern.test(bare))?.[0] ?? null;
 }
 
 const targets = onceLoader(() => import("./english-link-targets"));
 /** Les pages demandées pendant que la table arrive : toutes servies à son arrivée. */
 const wanted = new Set<EnglishPage>();
 const warmTargets = quietPreload(() =>
-  targets.load().then((module) => {
-    for (const page of wanted) module.preloadEnglishPage(page);
-    wanted.clear();
-  }),
+  targets.load().then(
+    (module) => {
+      for (const page of wanted) module.preloadEnglishPage(page);
+      wanted.clear();
+    },
+    (error: unknown) => {
+      // Rien n'est gardé d'un essai raté : le prochain survol après le silence dit ce qu'il faut.
+      wanted.clear();
+      throw error;
+    },
+  ),
 );
 
 /**
@@ -56,6 +64,6 @@ export function preloadEnglishRoute(path: string): void {
     loaded.preloadEnglishPage(page);
     return;
   }
-  wanted.add(page);
-  warmTargets();
+  // Pendant le silence d'un échec, rien n'est retenu.
+  if (warmTargets()) wanted.add(page);
 }

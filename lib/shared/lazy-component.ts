@@ -161,10 +161,11 @@ export const PRELOAD_RETRY_MS = 30_000;
  * passagère n'éteint pas le préchargement pour toute la session. L'ouverture,
  * elle, retente toujours et dit l'échec.
  */
-export function quietPreload(load: () => Promise<unknown>, now: () => number = Date.now): () => void {
+export function quietPreload(load: () => Promise<unknown>, now: () => number = Date.now): () => boolean {
   let failedAt: number | null = null;
+  // `true` : le chargement est parti (ou en cours) ; `false` : silence après un échec.
   return () => {
-    if (failedAt !== null && now() - failedAt < PRELOAD_RETRY_MS) return;
+    if (failedAt !== null && now() - failedAt < PRELOAD_RETRY_MS) return false;
     load().then(
       () => {
         failedAt = null;
@@ -173,7 +174,39 @@ export function quietPreload(load: () => Promise<unknown>, now: () => number = D
         failedAt = now();
       },
     );
+    return true;
   };
+}
+
+/** Les chargements qu'un échec a mis en reprise de fond (un seul cycle par chargeur). */
+const retrying = new WeakSet<object>();
+
+/**
+ * Après l'échec d'un chargement, le reprend **en fond** toutes les
+ * `PRELOAD_RETRY_MS`, onglet visible seulement, jusqu'à réussite — un seul
+ * cycle par chargeur, quel que soit le nombre d'écrans qui l'attendent. Rien
+ * n'est rendu à nouveau : l'écran resté en français le reste (une bascule en
+ * cours de saisie la perdrait) ; c'est la navigation suivante qui trouve le
+ * résultat (`loaded()`).
+ */
+export function retryInBackground(loader: Pick<OnceLoader<unknown>, "load" | "loaded">): void {
+  if (typeof window === "undefined" || retrying.has(loader)) return;
+  retrying.add(loader);
+  const attempt = () => {
+    if (loader.loaded() !== null) {
+      retrying.delete(loader);
+      return;
+    }
+    if (document.visibilityState !== "visible") {
+      window.setTimeout(attempt, PRELOAD_RETRY_MS);
+      return;
+    }
+    loader.load().then(
+      () => retrying.delete(loader),
+      () => window.setTimeout(attempt, PRELOAD_RETRY_MS),
+    );
+  };
+  window.setTimeout(attempt, PRELOAD_RETRY_MS);
 }
 
 /** Programme le rechargement de la page après un chargement raté, dès qu'il est sûr. */

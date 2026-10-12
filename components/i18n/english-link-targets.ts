@@ -1,9 +1,8 @@
 "use client";
 
 import { quietPreload } from "@/lib/shared/lazy-component";
-import { englishReports } from "./english-loaders";
-import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
 import { englishPageOf, type EnglishPage } from "./english-route-preload";
+import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";
 import { preloadProfileEnglish } from "./profile-english";
 
 /**
@@ -12,24 +11,13 @@ import { preloadProfileEnglish } from "./profile-english";
  * performance du lot 9-2) : l'anglais de la page visée part avant la réponse
  * du routeur. Chargé lui-même au premier besoin.
  */
-type Loader = { load(): Promise<unknown>; loaded(): unknown };
-
-function group(...loaders: Loader[]): () => void {
+function group(...loaders: PageLoader[]): () => void {
   const preload = quietPreload(() => Promise.all(loaders.map((loader) => loader.load())));
   return () => {
     if (loaders.every((loader) => loader.loaded() !== null)) return;
     preload();
   };
 }
-
-/** Les chargeurs d'une page de la table (`ENGLISH_PAGES`) — repris par les portes. */
-export const PAGE_LOADERS = {
-  teamPage: [englishTeamErrors, englishTeam, englishStatsPanel],
-  teams: [englishTeamErrors, englishTeams],
-  playerPage: [englishPlayers, englishStatsPanel],
-  players: [englishPlayers],
-  report: [englishReports],
-} as const satisfies Partial<Record<EnglishPage, readonly Loader[]>>;
 
 const PRELOADS: Record<EnglishPage, () => void> = {
   profile: () => preloadProfileEnglish("en"),

@@ -3,10 +3,11 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useLocalePathname } from "./locale-navigation";
 import { englishPageOf, type EnglishPage } from "./english-route-preload";
+import { PAGE_LOADERS } from "./english-page-loaders";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { StatsPanelMessages } from "@/lib/shared/stats-text";
-import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
+import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors } from "./english-loaders-account";
 import { PlayersTextProvider } from "./players-text-provider";
 import { StatsPanelI18nProvider } from "./stats-panel-i18n";
 import { TeamErrorsTextProvider } from "./team-errors-text-provider";
@@ -32,11 +33,7 @@ type GateProps<T> = Readonly<{ locale: Locale; messages?: T; fallback: ReactNode
  * donc aussi, en même temps, l'anglais de la fiche visée — sans quoi les deux
  * morceaux partiraient l'un après l'autre.
  */
-function useNestedEnglish(
-  locale: Locale,
-  routes: Partial<Record<EnglishPage, ReadonlyArray<{ load(): Promise<unknown> }>>>,
-  received: boolean,
-): void {
+function useNestedEnglish(locale: Locale, pages: ReadonlyArray<Exclude<EnglishPage, "profile">>, received: boolean): void {
   // Le chemin suivi : une navigation par le code sous une porte déjà montée la relance.
   const { path } = useLocalePathname();
   // Chargement complet (anglais reçu) : la fiche d'arrivée a reçu le sien aussi
@@ -46,13 +43,15 @@ function useNestedEnglish(
     if (locale !== "en" || path === arrival.current) return;
     arrival.current = null;
     const page = englishPageOf(path);
-    for (const loader of (page && routes[page]) || []) loader.load().catch(() => undefined);
-  }, [locale, path, routes]);
+    if (!page || page === "profile" || !pages.includes(page)) return;
+    // La table commune (`PAGE_LOADERS`) : ce que la porte charge déjà elle-même est partagé, pas redemandé.
+    for (const loader of PAGE_LOADERS[page]) loader.load().catch(() => undefined);
+  }, [locale, path, pages]);
 }
 
-/** Ce que la porte extérieure lance pour une page de la table (`ENGLISH_PAGES`) sous elle. */
-const TEAM_ROUTES = { teamPage: [englishTeam, englishStatsPanel], teams: [englishTeams] };
-const PLAYER_ROUTES = { playerPage: [englishStatsPanel] };
+/** Les pages de la table (`ENGLISH_PAGES`) sous chaque porte extérieure. */
+const TEAM_ROUTES = ["teamPage", "teams"] as const;
+const PLAYER_ROUTES = ["playerPage"] as const;
 
 /** `/equipes` et ses sous-pages : la table des refus d'équipe. */
 export function TeamErrorsTextGate({ locale, messages, fallback, children }: GateProps<Messages["teamErrors"]>) {

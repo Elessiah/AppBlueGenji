@@ -16,10 +16,19 @@ import { setRoutePreload } from "./route-preload";
  */
 export function EnglishLinkPreload() {
   useEffect(() => {
+    // `pointerover` part de chaque enfant traversé : un même lien ne compte qu'une
+    // fois par seconde (un nouvel essai reste possible ensuite).
+    let last = "";
+    let lastAt = 0;
     const onIntent = (event: Event) => {
       const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
       const href = link?.getAttribute("href") ?? "";
-      if (href.startsWith("/en/")) preloadEnglishRoute(href.slice(3));
+      if (!href.startsWith("/en/")) return;
+      const now = Date.now();
+      if (href === last && now - lastAt < 1000) return;
+      last = href;
+      lastAt = now;
+      preloadEnglishRoute(href.slice(3));
     };
     document.addEventListener("pointerover", onIntent, { passive: true });
     document.addEventListener("focusin", onIntent);
