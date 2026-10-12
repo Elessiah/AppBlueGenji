@@ -14,6 +14,7 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordHandleUpdateErrorMessage } from "./discord-errors";
+import { ScrollArea } from "@/components/cyber";
 
 const FIELD_IDS = {
   handle: "discord-bot-handle",
@@ -193,13 +194,15 @@ export function DiscordBotHandleDialog({
         style={{
           width: "min(520px, calc(100vw - 32px))",
           maxHeight: "calc(100vh - 32px)",
-          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
           background: "var(--cyber-bg-1)",
           border: "1px solid var(--line-strong-cy)",
           borderRadius: "var(--r-cy-lg)",
-          padding: 28,
         }}
       >
+        {/* Zone défilante nommée (CLAUDE.md) : le corps défile, pas la boîte. */}
+        <ScrollArea orientation="y" ariaLabel={t("botHandle.bodyLabel")} style={{ padding: 28, minHeight: 0 }}>
         <span className="eyebrow">{t("botHandle.eyebrow")}</span>
         <h2
           id="discord-bot-title"
@@ -336,6 +339,7 @@ export function DiscordBotHandleDialog({
             </div>
           </form>
         )}
+      </ScrollArea>
       </div>
     </div>,
     document.body,

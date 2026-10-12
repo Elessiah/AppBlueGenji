@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { OnceLoader } from "@/lib/shared/lazy-component";
+import { PRELOAD_RETRY_MS, type OnceLoader } from "@/lib/shared/lazy-component";
 import type { Locale } from "@/lib/shared/locales";
 import { inBrowser } from "./english-loaders";
 
@@ -40,6 +40,19 @@ export function useEnglishMessages<T>(
       live = false;
     };
   }, [waiting, loader]);
+
+  // Un échec n'est pas définitif : la page reste en français le temps du silence
+  // (`PRELOAD_RETRY_MS`), puis retente — ou reprend l'anglais qu'un survol a
+  // chargé entre-temps.
+  useEffect(() => {
+    if (!failed) return;
+    const timer = setTimeout(() => {
+      const loaded = loader.loaded();
+      if (loaded) setEnglish(loaded);
+      setFailed(false);
+    }, PRELOAD_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [failed, loader]);
 
   return { english: locale === "en" ? english : null, failed };
 }

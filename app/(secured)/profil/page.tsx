@@ -58,6 +58,7 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { busyAriaLabel } from "@/lib/shared/busy-aria-label";
+import { visibleText } from "@/lib/shared/visible-text";
 
 /** Contrôles que peut désigner un refus de la sauvegarde du profil. */
 const PROFILE_FIELD_IDS = {
@@ -251,7 +252,14 @@ export default function ProfilePage() {
     void loadDiscordState();
   }, []);
 
+  const [respondingInvitation, setRespondingInvitation] = useState<number | null>(null);
+  // Garde synchrone : deux clics dans le même rendu voient encore l'état d'avant.
+  const respondingRef = useRef(false);
   const respondInvitation = async (invitationId: number, accept: boolean) => {
+    // Une réponse à la fois : un double clic n'envoie pas deux réponses (ni deux rafraîchissements).
+    if (respondingRef.current) return;
+    respondingRef.current = true;
+    setRespondingInvitation(invitationId);
     try {
       const res = await fetch(`/api/invitations/${invitationId}`, {
         method: "POST",
@@ -272,6 +280,9 @@ export default function ProfilePage() {
       // (`TypeError` d'une coupure réseau, `SyntaxError` d'une réponse HTML), que
       // le registre ramène à son repli au lieu d'afficher leur message anglais.
       showError(invitationResponseErrorMessage((e as Error).message, teamErrorsText));
+    } finally {
+      respondingRef.current = false;
+      setRespondingInvitation(null);
     }
   };
 
@@ -1014,6 +1025,9 @@ export default function ProfilePage() {
                     type="button"
                     className={`btn ${s.inviteButton}`}
                     onClick={() => respondInvitation(inv.id, true)}
+                    aria-label={t("invitations.acceptLabel", { team: visibleText(inv.teamName) })}
+                    aria-busy={respondingInvitation === inv.id || undefined}
+                    aria-disabled={respondingInvitation !== null || undefined}
                   >
                     {t("invitations.accept")}
                   </button>
@@ -1021,6 +1035,9 @@ export default function ProfilePage() {
                     type="button"
                     className={`btn ghost ${s.inviteButton}`}
                     onClick={() => respondInvitation(inv.id, false)}
+                    aria-label={t("invitations.refuseLabel", { team: visibleText(inv.teamName) })}
+                    aria-busy={respondingInvitation === inv.id || undefined}
+                    aria-disabled={respondingInvitation !== null || undefined}
                   >
                     {t("invitations.refuse")}
                   </button>

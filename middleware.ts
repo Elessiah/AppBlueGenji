@@ -159,6 +159,9 @@ function isDocumentRequest(request: NextRequest): boolean {
  * la page sert le texte par son propre morceau plutôt que de renvoyer le
  * dictionnaire à chaque rafraîchissement.
  */
+// Pas d'en-tête `RSC` : Next le retire, avec `Next-Router-State-Tree` et
+// `Next-Router-Prefetch`, de la requête qu'il remet au middleware (vérifié sur
+// `next dev`, revue de performance du lot 9-2) — d'où ces indices du navigateur.
 function loadsDocument(request: NextRequest): boolean {
   if (request.headers.has("sec-fetch-dest")) return isDocumentRequest(request);
   return request.headers.get("accept")?.includes("text/html") ?? false;

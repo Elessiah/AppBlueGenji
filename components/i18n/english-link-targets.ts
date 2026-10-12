@@ -3,14 +3,14 @@
 import { quietPreload } from "@/lib/shared/lazy-component";
 import { englishReports } from "./english-loaders";
 import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
-import { barePath } from "./english-route-preload";
+import { englishPageOf, type EnglishPage } from "./english-route-preload";
 import { preloadProfileEnglish } from "./profile-english";
 
 /**
  * Ce que précharge le survol ou le focus d'un lien `/en/…` de l'espace
- * connecté (`EnglishLinkPreload`, revue de performance du lot 9-2) : l'anglais
- * de la page visée part avant le clic, et la page n'attend plus son morceau
- * après la réponse de navigation. Chargé lui-même au premier survol.
+ * connecté, ou une navigation par le code (`EnglishLinkPreload`, revue de
+ * performance du lot 9-2) : l'anglais de la page visée part avant la réponse
+ * du routeur. Chargé lui-même au premier besoin.
  */
 type Loader = { load(): Promise<unknown>; loaded(): unknown };
 
@@ -22,19 +22,30 @@ function group(...loaders: Loader[]): () => void {
   };
 }
 
-const TEAM_PAGE = group(englishTeamErrors, englishTeam, englishStatsPanel);
-const TEAMS = group(englishTeamErrors, englishTeams);
-const PLAYER_PAGE = group(englishPlayers, englishStatsPanel);
-const PLAYERS = group(englishPlayers);
-const REPORT = group(englishReports);
+/** Les chargeurs d'une page de la table (`ENGLISH_PAGES`) — repris par les portes. */
+export const PAGE_LOADERS = {
+  teamPage: [englishTeamErrors, englishTeam, englishStatsPanel],
+  teams: [englishTeamErrors, englishTeams],
+  playerPage: [englishPlayers, englishStatsPanel],
+  players: [englishPlayers],
+  report: [englishReports],
+} as const satisfies Partial<Record<EnglishPage, readonly Loader[]>>;
+
+const PRELOADS: Record<EnglishPage, () => void> = {
+  profile: () => preloadProfileEnglish("en"),
+  teamPage: group(...PAGE_LOADERS.teamPage),
+  teams: group(...PAGE_LOADERS.teams),
+  playerPage: group(...PAGE_LOADERS.playerPage),
+  players: group(...PAGE_LOADERS.players),
+  report: group(...PAGE_LOADERS.report),
+};
+
+export function preloadEnglishPage(page: EnglishPage): void {
+  PRELOADS[page]();
+}
 
 /** Le chemin sans préfixe (`/equipes/5`), requête et ancre ôtées. */
 export function preloadEnglishFor(path: string): void {
-  const bare = barePath(path);
-  if (bare === "/profil") preloadProfileEnglish("en");
-  else if (/^\/equipes\/\d+$/.test(bare)) TEAM_PAGE();
-  else if (/^\/equipes(\/creer)?$/.test(bare)) TEAMS();
-  else if (/^\/joueurs\/\d+$/.test(bare)) PLAYER_PAGE();
-  else if (bare === "/joueurs") PLAYERS();
-  else if (/^\/signalements\/\d+$/.test(bare)) REPORT();
+  const page = englishPageOf(path);
+  if (page) preloadEnglishPage(page);
 }

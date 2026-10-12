@@ -138,7 +138,9 @@
     "accept": "Accepter",
     "refuse": "Refuser",
     "accepted": "Invitation acceptée.",
-    "refused": "Invitation refusée."
+    "refused": "Invitation refusée.",
+    "acceptLabel": "Accepter l'invitation de {team}",
+    "refuseLabel": "Refuser l'invitation de {team}"
   },
   "stats": {
     "tournamentsPlayed": "Tournois joués",
@@ -357,7 +359,8 @@
     "newCode": "Nouveau code",
     "certifyMine": "Certifier mon tag",
     "certified": "Tag Discord certifié.",
-    "codeSent": "Code envoyé en message privé Discord (expiration : {time})."
+    "codeSent": "Code envoyé en message privé Discord (expiration : {time}).",
+    "bodyLabel": "Certification du tag Discord"
   },
   "botHandle": {
     "eyebrow": "BOT DISCORD · CODE PAR MESSAGE PRIVÉ",
@@ -380,6 +383,7 @@
     "validate": "Valider le code",
     "linked": "Discord rattaché par code.",
     "updated": "Pseudo Discord mis à jour.",
-    "codeSent": "Code envoyé en message privé Discord (expiration : {time})."
+    "codeSent": "Code envoyé en message privé Discord (expiration : {time}).",
+    "bodyLabel": "Pseudo Discord du bot"
   }
 }

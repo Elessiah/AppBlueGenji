@@ -138,7 +138,9 @@
     "accept": "Accept",
     "refuse": "Decline",
     "accepted": "Invitation accepted.",
-    "refused": "Invitation declined."
+    "refused": "Invitation declined.",
+    "acceptLabel": "Accept the invitation from {team}",
+    "refuseLabel": "Decline the invitation from {team}"
   },
   "stats": {
     "tournamentsPlayed": "Tournaments played",
@@ -357,7 +359,8 @@
     "newCode": "New code",
     "certifyMine": "Verify my tag",
     "certified": "Discord tag verified.",
-    "codeSent": "Code sent by Discord direct message (expires at {time})."
+    "codeSent": "Code sent by Discord direct message (expires at {time}).",
+    "bodyLabel": "Discord tag verification"
   },
   "botHandle": {
     "eyebrow": "DISCORD BOT · DIRECT-MESSAGE CODE",
@@ -380,6 +383,7 @@
     "validate": "Confirm the code",
     "linked": "Discord linked by code.",
     "updated": "Discord username updated.",
-    "codeSent": "Code sent by Discord direct message (expires at {time})."
+    "codeSent": "Code sent by Discord direct message (expires at {time}).",
+    "bodyLabel": "Discord username for the bot"
   }
 }

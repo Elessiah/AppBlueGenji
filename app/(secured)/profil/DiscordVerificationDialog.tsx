@@ -16,6 +16,7 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordVerificationErrorMessage } from "./discord-errors";
+import { ScrollArea } from "@/components/cyber";
 
 /** Les lignes de l'exposition, dans l'ordre du registre (`DISCORD_VERIFICATION_EXPOSURE`, testé). */
 export const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
@@ -355,13 +356,15 @@ export function DiscordVerificationDialog({
         style={{
           width: "min(520px, calc(100vw - 32px))",
           maxHeight: "calc(100vh - 32px)",
-          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
           background: "var(--cyber-bg-1)",
           border: "1px solid var(--line-strong-cy)",
           borderRadius: "var(--r-cy-lg)",
-          padding: 28,
         }}
       >
+        {/* Zone défilante nommée (CLAUDE.md) : le corps défile, pas la boîte. */}
+        <ScrollArea orientation="y" ariaLabel={t("verify.bodyLabel")} style={{ padding: 28, minHeight: 0 }}>
         <span className="eyebrow">{t("verify.eyebrow")}</span>
         <h2
           id="discord-verify-title"
@@ -409,6 +412,7 @@ export function DiscordVerificationDialog({
         </ul>
 
         {renderStep()}
+      </ScrollArea>
       </div>
     </div>,
     document.body,

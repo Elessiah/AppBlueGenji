@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useLocalePathname } from "./locale-navigation";
+import { englishPageOf, type EnglishPage } from "./english-route-preload";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { StatsPanelMessages } from "@/lib/shared/stats-text";
@@ -33,7 +34,7 @@ type GateProps<T> = Readonly<{ locale: Locale; messages?: T; fallback: ReactNode
  */
 function useNestedEnglish(
   locale: Locale,
-  routes: ReadonlyArray<readonly [RegExp, ReadonlyArray<{ load(): Promise<unknown> }>]>,
+  routes: Partial<Record<EnglishPage, ReadonlyArray<{ load(): Promise<unknown> }>>>,
   received: boolean,
 ): void {
   // Le chemin suivi : une navigation par le code sous une porte déjà montée la relance.
@@ -44,16 +45,14 @@ function useNestedEnglish(
   useEffect(() => {
     if (locale !== "en" || path === arrival.current) return;
     arrival.current = null;
-    const match = routes.find(([pattern]) => pattern.test(path));
-    for (const loader of match?.[1] ?? []) loader.load().catch(() => undefined);
+    const page = englishPageOf(path);
+    for (const loader of (page && routes[page]) || []) loader.load().catch(() => undefined);
   }, [locale, path, routes]);
 }
 
-const TEAM_ROUTES = [
-  [/^\/equipes\/\d+\/?$/, [englishTeam, englishStatsPanel]],
-  [/^\/equipes(\/creer)?\/?$/, [englishTeams]],
-] as const;
-const PLAYER_ROUTES = [[/^\/joueurs\/\d+\/?$/, [englishStatsPanel]]] as const;
+/** Ce que la porte extérieure lance pour une page de la table (`ENGLISH_PAGES`) sous elle. */
+const TEAM_ROUTES = { teamPage: [englishTeam, englishStatsPanel], teams: [englishTeams] };
+const PLAYER_ROUTES = { playerPage: [englishStatsPanel] };
 
 /** `/equipes` et ses sous-pages : la table des refus d'équipe. */
 export function TeamErrorsTextGate({ locale, messages, fallback, children }: GateProps<Messages["teamErrors"]>) {
