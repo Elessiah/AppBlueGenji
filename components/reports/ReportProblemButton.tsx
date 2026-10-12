@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from "react";
+import { useState, type ComponentType, type CSSProperties } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
@@ -85,12 +85,6 @@ export function ReportProblemButton({
   // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
   // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
   const { path: pathname } = useLocalePathname();
-  // Le pied de page survit à une navigation : un formulaire arrivé après que
-  // le lecteur a changé de page ne s'ouvre pas sur la nouvelle.
-  const currentPath = useRef(pathname);
-  useEffect(() => {
-    currentPath.current = pathname;
-  }, [pathname]);
 
   const openDialog = () => {
     // Déjà là : chargé par un autre bouton, ou préchargé au survol.
@@ -103,15 +97,13 @@ export function ReportProblemButton({
     if (pending) return;
     setPending(true);
     setStatus(t("footer.reportLoading"));
-    const clickedOn = pathname;
     loadDialog()
       .then((loaded) => {
         setDialog(() => loaded);
         setStatus("");
-        // Le lecteur est passé à une autre page entre-temps : le geste est caduc
-        // (le formulaire retiendrait la nouvelle page) ; le bouton, toujours au
-        // pied, rouvre aussitôt le formulaire, désormais chargé.
-        if (currentPath.current === clickedOn) setOpen(true);
+        // Ouvert même si le lecteur a changé de page entre-temps : c'est la
+        // suite attendue de son clic, et le formulaire retient la page affichée.
+        setOpen(true);
       })
       .catch((error: unknown) => {
         const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");

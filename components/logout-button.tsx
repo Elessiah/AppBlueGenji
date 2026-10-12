@@ -10,7 +10,10 @@ export function LogoutButton() {
   const { leaving, logout } = useLogout();
 
   return (
-    <Button variant="ghost" onClick={logout} disabled={leaving} aria-busy={leaving || undefined}>
+    // `aria-disabled` plutôt que `disabled` : le focus reste sur le bouton (un
+    // échec se retente au clavier sans tout reparcourir) ; `useLogout` ignore
+    // déjà un second clic pendant la requête.
+    <Button variant="ghost" onClick={logout} aria-disabled={leaving || undefined} aria-busy={leaving || undefined}>
       {leaving ? t("account.loggingOut") : t("account.logout")}
     </Button>
   );

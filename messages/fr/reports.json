@@ -84,7 +84,7 @@
   "offSite": {
     "label": "Comportement d'un joueur",
     "hint": "En match, en vocal ou sur Discord : insulte, triche, anti-jeu… Se signale sur notre portail de support.",
-    "notice": "Ce formulaire concerne les contenus publiés sur le site (pseudo, nom d'équipe, logo…). Un mauvais comportement en match, une insulte d'un joueur, de la triche ou un problème sur Discord se signalent sur le"
+    "notice": "Ce formulaire concerne les contenus publiés sur le site (pseudo, nom d'équipe, logo…). Un mauvais comportement en match, une insulte d'un joueur, de la triche ou un problème sur Discord se signalent sur le <portal>portail de support BlueGenji</portal>."
   },
   "targets": {
     "USER": {

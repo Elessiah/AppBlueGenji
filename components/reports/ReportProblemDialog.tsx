@@ -301,14 +301,18 @@ export function ReportProblemDialog({
 
               {category === "MODERATION" && (
                 <p className={styles.anonNote}>
-                  {t("offSite.notice")}{" "}
-                  <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
-                    {t("dialog.portalLink")}
-                    {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
-                    <span className="sr-only">{` ${t("dialog.newTab")}`}</span>
-                  </a>
-                  {/* NOSONAR S6772 — le point suit le lien sans espace */}
-                  .
+                  {/* Une seule phrase, lien compris (`<portal>`) : chaque langue place le lien où elle veut. */}
+                  {richNodes(
+                    text.rich("offSite.notice", {}, {
+                      portal: (chunks) => (
+                        <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
+                          {richNodes(chunks)}
+                          {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
+                          <span className="sr-only">{` ${t("dialog.newTab")}`}</span>
+                        </a>
+                      ),
+                    }),
+                  )}
                 </p>
               )}
 

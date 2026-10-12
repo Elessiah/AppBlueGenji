@@ -57,7 +57,7 @@
     "deleteAvatarLabel": "Delete my avatar",
     "avatarHint": "PNG, JPEG or WebP — {max} MB max.",
     "cropTitle": "Crop your avatar",
-    "adult": "Of age",
+    "adult": "Adult (18+)",
     "adultUnknown": "Not specified",
     "adultYes": "Yes (18+)",
     "adultNo": "No (minor)",
@@ -119,7 +119,7 @@
       "overwatch": "OW BattleTag",
       "marvel": "Marvel tag",
       "discord": "Discord tag",
-      "major": "Of age"
+      "major": "Adult (18+)"
     },
     "pseudoAlwaysVisible": "Your username is always visible: it's what identifies you in brackets, rosters and match sheets.",
     "discordNotice": "Verification opens your Discord tag to the organizers (administrators at any time, referees as long as you're registered for a tournament that isn't over), not to other players: tick “Discord tag” so they can see it on your profile. An unverified tag stays hidden, box ticked or not.",
