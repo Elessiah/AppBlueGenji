@@ -49,6 +49,7 @@ import { DiscordBotHandleDialog } from "./DiscordBotHandleDialog";
 import { connectionErrorMessage, connectionSuccessMessage, unlinkSuccessMessage } from "./connection-errors";
 import { OtherSessionsPanel } from "./OtherSessionsPanel";
 import s from "./profil.module.css";
+import { busyAriaLabel } from "@/lib/shared/busy-aria-label";
 
 
 export function ConnectedAppsSection({
@@ -302,7 +303,7 @@ function ConnectionRow({
               className="btn ghost"
               disabled={busy !== null}
               onClick={() => onUnlink(connection.provider)}
-              aria-label={t("connections.unlinkLabel", { label })}
+              aria-label={busyAriaLabel(busy === connection.provider, t("connections.unlinkLabel", { label }))}
               /* La **porte** fait partie de ce qui décrit ce bouton :
                  laissée hors de la description, elle n'était lue par
                  personne au clavier — un lecteur d'écran qui parcourt
@@ -416,7 +417,7 @@ function DiscordBotRow({
             className="btn ghost"
             disabled={busy}
             onClick={onDisconnect}
-            aria-label={t("connections.bot.disconnectLabel")}
+            aria-label={busyAriaLabel(disconnecting, t("connections.bot.disconnectLabel"))}
             aria-describedby={detailsId}
             style={{ padding: "4px 12px", fontSize: 12 }}
           >

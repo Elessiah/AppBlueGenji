@@ -40,6 +40,11 @@ function TargetName({ target }: Readonly<{ target: ConcernedReportView["targets"
 
 const strong = { strong: (chunks: React.ReactNode[]) => <strong>{chunks}</strong> };
 
+/** Le nom de l'équipe d'un logo, cliquable vers sa fiche (`TeamLink`), dans la phrase en gras. */
+function teamTags(teamId: number) {
+  return { ...strong, team: (chunks: React.ReactNode[]) => <TeamLink teamId={teamId}>{chunks}</TeamLink> };
+}
+
 /**
  * Le signalement lu par la personne qu'il vise, une fois chargé : ce qui est
  * reproché et à quoi, les images masquées ou supprimées à sa suite, ses
@@ -75,7 +80,7 @@ export function ConcernedReport({
                   since: formatParisDay(quarantine.hiddenAt, locale),
                   purge: formatParisDay(quarantine.purgeAfter, locale),
                 },
-                strong,
+                teamTags(quarantine.targetId),
               ),
             )}
           </div>
@@ -99,7 +104,7 @@ export function ConcernedReport({
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.logoRemovedImmediately" : "concerned.logoRemoved",
                 { name: quarantine.targetName, date: formatParisDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
-                strong,
+                teamTags(quarantine.targetId),
               ),
             )}
           </div>

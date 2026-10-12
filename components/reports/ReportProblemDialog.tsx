@@ -47,13 +47,14 @@ import styles from "./ReportProblem.module.css";
  * Date d'un signalement dans la liste à contester : courte (le texte d'une
  * option ne passe pas à la ligne). Le français garde ses chiffres (jour/mois,
  * sans ambiguïté pour lui) ; l'anglais nomme le mois, que `10/12/2026` ne dit
- * pas sans équivoque.
+ * pas sans équivoque. En heure de Paris, comme la page du signalement : les
+ * deux écrans donnent le même jour.
  */
 function contestOptionDate(iso: string, locale: Locale): string {
   const date = new Date(iso);
   return locale === "fr"
-    ? date.toLocaleDateString(INTL_LOCALE.fr)
-    : date.toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "short", year: "numeric" });
+    ? date.toLocaleDateString(INTL_LOCALE.fr, { timeZone: "Europe/Paris" })
+    : date.toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" });
 }
 
 export interface ReportProblemDialogProps {

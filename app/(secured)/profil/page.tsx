@@ -56,6 +56,7 @@ import { PROFILE_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { busyAriaLabel } from "@/lib/shared/busy-aria-label";
 
 /** Contrôles que peut désigner un refus de la sauvegarde du profil. */
 const PROFILE_FIELD_IDS = {
@@ -1144,7 +1145,7 @@ function DiscordLockedActions({
         className="btn ghost"
         onClick={() => void loadDiscordState()}
         disabled={discordStateBusy}
-        aria-label={t("discord.retryLabel")}
+        aria-label={busyAriaLabel(discordStateBusy, t("discord.retryLabel"))}
         style={{ padding: "7px 14px", fontSize: 12 }}
       >
         {discordStateBusy ? t("discord.reading") : t("discord.retry")}
@@ -1195,7 +1196,7 @@ function DiscordLinkedActions({
           className="btn ghost"
           onClick={onDiscordTagRemove}
           disabled={discordTagBusy}
-          aria-label={t("discord.removeLabel")}
+          aria-label={busyAriaLabel(discordTagBusy, t("discord.removeLabel"))}
           style={{ padding: "7px 14px", fontSize: 12 }}
         >
           {discordTagBusy ? t("discord.removing") : t("discord.remove")}
