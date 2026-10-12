@@ -9,9 +9,6 @@ import { useShellText } from "./i18n/shell-text";
 import { useLogout } from "./use-logout";
 import s from "./account-menu.module.css";
 
-// Le geste vit dans son propre module (`use-logout.ts`), que le bouton de `/profil` importe sans le menu.
-export { requestLogout } from "./use-logout";
-
 export type AccountMenuTeam = { teamId: number; teamName: string };
 
 type AccountMenuProps = {

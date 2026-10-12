@@ -41,9 +41,17 @@ function TargetName({ target }: Readonly<{ target: ConcernedReportView["targets"
 // `richNodes` : un lien (`<team>`) imbriqué dans le gras reçoit sa clé.
 const strong = { strong: (chunks: React.ReactNode[]) => <strong>{richNodes(chunks)}</strong> };
 
-/** Le nom de l'équipe d'un logo, cliquable vers sa fiche (`TeamLink`), dans la phrase en gras. */
-function teamTags(teamId: number) {
-  return { ...strong, team: (chunks: React.ReactNode[]) => <TeamLink teamId={teamId}>{chunks}</TeamLink> };
+/**
+ * Le nom de l'équipe d'un logo, dans la phrase en gras : cliquable vers sa
+ * fiche (`TeamLink`) tant que l'équipe existe (cible du signalement), texte
+ * sinon — une équipe dissoute depuis n'a plus de fiche.
+ */
+function teamTags(teamId: number, exists: boolean) {
+  return {
+    ...strong,
+    team: (chunks: React.ReactNode[]) =>
+      exists ? <TeamLink teamId={teamId}>{richNodes(chunks)}</TeamLink> : <>{richNodes(chunks)}</>,
+  };
 }
 
 /**
@@ -63,6 +71,8 @@ export function ConcernedReport({
   // Supprimé sans délai, ou masqué puis supprimé (échéance, contestation
   // rejetée) : la décision reste lisible, pas seulement tant qu'elle attend.
   const removed = report.quarantines.filter((quarantine) => quarantine.status === "PURGED");
+  const teamExists = (teamId: number) =>
+    report.targets.some((target) => target.type === "TEAM" && target.id === teamId && target.exists);
 
   return (
     <>
@@ -83,7 +93,7 @@ export function ConcernedReport({
                   since: formatParisDay(quarantine.hiddenAt, locale),
                   purge: formatParisDay(quarantine.purgeAfter, locale),
                 },
-                teamTags(quarantine.targetId),
+                teamTags(quarantine.targetId, teamExists(quarantine.targetId)),
               ),
             )}
           </div>
@@ -107,7 +117,7 @@ export function ConcernedReport({
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.logoRemovedImmediately" : "concerned.logoRemoved",
                 { name: quarantine.targetName, date: formatParisDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
-                teamTags(quarantine.targetId),
+                teamTags(quarantine.targetId, teamExists(quarantine.targetId)),
               ),
             )}
           </div>

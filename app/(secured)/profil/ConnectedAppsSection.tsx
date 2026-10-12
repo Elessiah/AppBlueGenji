@@ -300,8 +300,9 @@ function ConnectionRow({
             <button
               type="button"
               className="btn ghost"
-              disabled={busy !== null}
-              onClick={() => onUnlink(connection.provider)}
+              /* `aria-disabled`, pas `disabled` : le focus reste sur le bouton pendant le geste. */
+              aria-disabled={busy !== null || undefined}
+              onClick={() => busy === null && onUnlink(connection.provider)}
               aria-label={busyAriaLabel(busy === connection.provider, t("connections.unlinkLabel", { label }))}
               /* La **porte** fait partie de ce qui décrit ce bouton :
                  laissée hors de la description, elle n'était lue par
@@ -414,8 +415,8 @@ function DiscordBotRow({
           <button
             type="button"
             className="btn ghost"
-            disabled={busy}
-            onClick={onDisconnect}
+            aria-disabled={busy || undefined}
+            onClick={() => !busy && onDisconnect()}
             aria-label={busyAriaLabel(disconnecting, t("connections.bot.disconnectLabel"))}
             aria-describedby={detailsId}
             style={{ padding: "4px 12px", fontSize: 12 }}

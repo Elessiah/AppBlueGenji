@@ -126,6 +126,8 @@ export function ReportProblemButton({
     onFocus: preloadDialog,
     "aria-haspopup": "dialog" as const,
     "aria-busy": pending || undefined,
+    // Clic ignoré pendant l'attente ; écarte aussi le survol du bouton du système de design.
+    "aria-disabled": pending || undefined,
   };
 
   return (

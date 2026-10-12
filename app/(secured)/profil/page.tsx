@@ -1143,8 +1143,8 @@ function DiscordLockedActions({
       <button
         type="button"
         className="btn ghost"
-        onClick={() => void loadDiscordState()}
-        disabled={discordStateBusy}
+        onClick={() => !discordStateBusy && void loadDiscordState()}
+        aria-disabled={discordStateBusy || undefined}
         aria-label={busyAriaLabel(discordStateBusy, t("discord.retryLabel"))}
         style={{ padding: "7px 14px", fontSize: 12 }}
       >
@@ -1194,8 +1194,8 @@ function DiscordLinkedActions({
         <button
           type="button"
           className="btn ghost"
-          onClick={onDiscordTagRemove}
-          disabled={discordTagBusy}
+          onClick={() => !discordTagBusy && onDiscordTagRemove()}
+          aria-disabled={discordTagBusy || undefined}
           aria-label={busyAriaLabel(discordTagBusy, t("discord.removeLabel"))}
           style={{ padding: "7px 14px", fontSize: 12 }}
         >
