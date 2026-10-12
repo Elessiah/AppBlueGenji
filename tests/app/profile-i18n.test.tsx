@@ -574,6 +574,15 @@ describe("anglais — écrans", () => {
     const html = inEnglish(<ConcernedReport report={report} onContest={() => undefined} />);
     expect(html).not.toMatch(/[‮​]/u);
     expect(html.split("Glaciers").length - 1).toBeGreaterThanOrEqual(4);
+    // Textes libres (signalement, contestations) : direction isolée, sauts de ligne gardés.
+    const withText = inEnglish(
+      <ConcernedReport
+        report={{ ...report, description: "a‮b", myContests: [{ id: 3, createdAt: "2026-03-02T10:00:00.000Z", description: "c‮d" }] }}
+        onContest={() => undefined}
+      />,
+    );
+    expect(withText).toMatch(/<blockquote[^>]*dir="auto"[^>]*>a‮b<\/blockquote>/u);
+    expect(withText).toContain('<p dir="auto">c‮d</p>');
   });
 
   it("choix des cibles : vignette tirée du nom nettoyé", () => {

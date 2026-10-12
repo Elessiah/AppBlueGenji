@@ -325,7 +325,7 @@ describe("Autres écrans — noms cliquables", () => {
     [
       "invitations reçues",
       "app/(secured)/profil/page.tsx",
-      "<TeamLink teamId={inv.teamId}>{inv.teamName}</TeamLink>",
+      "<TeamLink teamId={inv.teamId}>{visibleText(inv.teamName)}</TeamLink>",
     ],
     [
       "historique d'équipes d'un joueur",
