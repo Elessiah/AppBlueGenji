@@ -6,7 +6,7 @@ import { generateMetadata as createTournamentLayoutMetadata } from "@/app/(secur
 import { generateMetadata as teamsLayoutMetadata } from "@/app/(secured)/equipes/layout";
 import { generateMetadata as createTeamLayoutMetadata } from "@/app/(secured)/equipes/creer/layout";
 import { generateMetadata as playersLayoutMetadata } from "@/app/(secured)/joueurs/layout";
-import { metadata as profileMetadata } from "@/app/(secured)/profil/layout";
+import { generateMetadata as profileLayoutMetadata } from "@/app/(secured)/profil/layout";
 import { generateMetadata as editTournamentLayoutMetadata } from "@/app/(secured)/tournois/[id]/modifier/layout";
 import { SITE_TITLE_TEMPLATE, pageMetadata, segmentTitle, siteTitle } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
@@ -25,7 +25,10 @@ let editTournamentMetadata: Metadata;
 let teamsMetadata: Metadata;
 let createTeamMetadata: Metadata;
 let playersMetadata: Metadata;
+// Le profil aussi (lot 9-2) ; sans sous-page, sa mise en page porte sa canonique.
+let profileMetadata: Metadata;
 beforeAll(async () => {
+  profileMetadata = await profileLayoutMetadata();
   teamsMetadata = await teamsLayoutMetadata();
   createTeamMetadata = await createTeamLayoutMetadata();
   playersMetadata = await playersLayoutMetadata();
@@ -91,7 +94,7 @@ describe("titres des espaces connectés (WCAG 2.4.2)", () => {
   });
 
   it("ne déclare ni canonique ni og:url : l'adresse de la liste ne doit pas descendre sur les fiches", () => {
-    for (const metadata of [tournamentsMetadata, teamsMetadata, playersMetadata, profileMetadata]) {
+    for (const metadata of [tournamentsMetadata, teamsMetadata, playersMetadata]) {
       expect(metadata.alternates).toBeUndefined();
       const openGraph = metadata.openGraph as { url?: unknown } | undefined;
       expect(openGraph?.url).toBeUndefined();
@@ -99,7 +102,10 @@ describe("titres des espaces connectés (WCAG 2.4.2)", () => {
   });
 
   it("pose un encart générique aux listes, rien au profil", () => {
-    expect(Object.keys(profileMetadata)).toEqual(["title"]);
+    // Aucun encart pour le profil ; sa canonique et ses `hreflang` sont les
+    // siens (aucune sous-page à qui les transmettre).
+    expect(Object.keys(profileMetadata).sort((a, b) => a.localeCompare(b))).toEqual(["alternates", "title"]);
+    expect(profileMetadata.alternates).toMatchObject({ canonical: "/profil" });
     expect(Object.keys(tournamentsMetadata).sort((a, b) => a.localeCompare(b))).toEqual(["openGraph", "title", "twitter"]);
     expect(JSON.stringify(teamsMetadata.openGraph)).toContain("/og/fr/teams.png");
     expect(JSON.stringify(playersMetadata.openGraph)).toContain("/og/fr/players.png");

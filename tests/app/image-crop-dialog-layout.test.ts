@@ -62,8 +62,10 @@ describe("modale de recadrage — petits écrans", () => {
     const keys = tsx.slice(tsx.indexOf("className={s.hintKeys}"));
     expect(keys.length).toBeLessThan(tsx.length);
     // La phrase du geste au doigt n'est pas dans la partie masquée.
-    expect(keys).not.toContain("Fais glisser le cadre");
-    expect(tsx).toContain("Fais glisser le cadre");
+    // Lot 9-2 : la phrase du geste au doigt vient des messages (`hint`,
+    // `hintFixed`), rendue hors de la partie masquée.
+    expect(keys).not.toContain('t("hint")');
+    expect(tsx).toContain('{aspect !== null ? t("hintFixed") : t("hint")}');
   });
 });
 

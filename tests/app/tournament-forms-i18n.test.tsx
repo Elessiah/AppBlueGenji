@@ -311,15 +311,19 @@ describe("route et référencement", () => {
     expect(link?.[0]).toBe('<LocaleLink href="/tournois/creer">');
   });
 
-  it("les fenêtres restées françaises (recadrage, notifications) le disent jusque dans leur titre et leurs notifications", () => {
+  it("recadrage et notifications suivent la page depuis le lot 9-2, titre de la modale compris", () => {
     const picker = readFileSync(path.join(process.cwd(), "app/(secured)/tournois/_components/TournamentImagePicker.tsx"), "utf8");
-    expect(picker).toContain('const CROP_TITLE = FR_IMAGE_TEXT.t("picker.cropTitle");');
-    expect(picker).not.toContain(', t("picker.cropTitle")');
+    expect(picker).toContain('const cropTitle = t("picker.cropTitle");');
+    expect(picker).toContain("useImageCropper()");
+    expect(picker).not.toContain("FR_IMAGE_TEXT");
     const launch = readFileSync(path.join(process.cwd(), "components/match-launch/MatchLaunchCenter.tsx"), "utf8");
-    expect(launch).toContain('toastLang={text.locale === "fr" ? undefined : "fr"}');
+    expect(launch).not.toContain("toastLang=");
+    expect(launch).toContain('lead={t("pushLead")}');
+    // Un écran resté français peut encore l'imposer : textes et notifications.
     const panel = readFileSync(path.join(process.cwd(), "components/notifications/PushNotificationsPanel.tsx"), "utf8");
     expect(panel.match(/toastOptions\)/g)).toHaveLength(2);
     expect(panel).toContain("toastLang ? { lang: toastLang } : undefined");
+    expect(panel).toContain("usePushText(toastLang)");
   });
 
   it("l'édition lit les refus du fournisseur de la fiche, le formulaire du sien", () => {

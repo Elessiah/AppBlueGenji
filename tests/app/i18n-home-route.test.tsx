@@ -29,7 +29,8 @@ describe("accueil traduit — liste blanche", () => {
     expect(isMigratedRoute("/")).toBe(true);
     // Espace joueur : lots 8–9.
     expect(isMigratedRoute("/admin")).toBe(false);
-    expect(isMigratedRoute("/profil")).toBe(false);
+    // `/profil` l'est depuis le lot 9-2 ; l'administration reste française (D4).
+    expect(isMigratedRoute("/admin/signalements")).toBe(false);
   });
 
   it("un lien vers l'accueil prend /en sur une page anglaise, les autres restent français", () => {

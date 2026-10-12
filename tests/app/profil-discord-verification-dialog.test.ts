@@ -18,6 +18,8 @@ const dialog = readFileSync(
   "utf8",
 );
 const page = readFileSync(join(process.cwd(), "app/(secured)/profil/page.tsx"), "utf8");
+// Depuis le lot 9-2, les phrases de `/profil` vivent dans les messages.
+const frProfile = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/profile.json"), "utf8")) as typeof import("@/messages/fr/profile.json");
 
 function slice(from: string, to: string): string {
   const start = dialog.indexOf(from);
@@ -41,7 +43,8 @@ describe("certification d'un compte relié dont Discord a nommé le pseudo", () 
   });
 
   it("montre le tag qui sera exposé, et rien d'autre", () => {
-    expect(oneClickBranch()).toContain("<strong>{initialTag}</strong>");
+    expect(oneClickBranch()).toContain('text.rich("verify.attested", { tag: initialTag }');
+    expect(frProfile.verify.attested).toContain("<strong>{tag}</strong>");
   });
 
   it("la page lui passe le tag **enregistré**, pas celui du champ", () => {
@@ -54,18 +57,20 @@ describe("certification d'un compte relié dont Discord a nommé le pseudo", () 
 
 describe("certification d'un compte relié sans pseudo nommé par Discord", () => {
   it("repart chez Discord, en rattachement, pour qu'il nomme le pseudo", () => {
-    expect(relinkBranch()).toContain('oauthStartPath("DISCORD", { intent: "LINK" })');
+    // La langue de la page voyage avec le rattachement (retour sur `/en/profil`).
+    expect(relinkBranch()).toContain('oauthStartPath("DISCORD", { intent: "LINK", locale: text.locale })');
     expect(relinkBranch()).toMatch(/<a href=\{oauthStartPath/);
   });
 
   it("dit qu'il faudra revenir certifier : le retour ne certifie rien", () => {
-    expect(relinkBranch()).toMatch(/certifier ici\s+d&apos;un clic/);
+    expect(relinkBranch()).toContain('t("verify.linkedNoTag")');
+    expect(frProfile.verify.linkedNoTag).toMatch(/certifier ici d'un clic/);
   });
 });
 
 describe("ce que le dialogue ne promet plus", () => {
   it("dit que la connexion ne donne pas la certification", () => {
-    expect(dialog).toMatch(/se connecter par Discord ne la donne pas/);
+    expect(frProfile.verify.intro).toMatch(/se connecter par Discord ne la donne pas/);
   });
 
   it("ne promet plus une certification « immédiate » par le bot", () => {

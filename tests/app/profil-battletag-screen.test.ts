@@ -16,6 +16,8 @@ const page = read("app/(secured)/profil/page.tsx");
 const modal = read("app/(secured)/profil/BattletagVisibilityNotice.tsx");
 const section = read("app/(secured)/profil/ConnectedAppsSection.tsx");
 const hook = read("app/(secured)/profil/useAccountConnections.ts");
+// Lot 9-2 : les phrases vivent dans les messages (`profile`).
+const frProfile = JSON.parse(read("messages/fr/profile.json")) as typeof import("@/messages/fr/profile.json");
 
 describe("champ BattleTag — ce que le formulaire soumet", () => {
   it("ne le soumet que s'il a changé", () => {
@@ -74,7 +76,7 @@ describe("champ BattleTag — le verrou à l'écran", () => {
     // L'annonce prévient de ce qui arrivera si un compte Blizzard est rattaché.
     // Il l'est : la garder à côté du verrou ferait lire un avertissement au
     // futur sur un fait déjà accompli.
-    expect(page).toContain("battletagLockNotice({");
+    expect(page).toContain("battletagLockText(text, {");
     expect(page).toContain("pending: connectionsPending");
   });
 
@@ -109,13 +111,13 @@ describe("la liste des rattachements n'a qu'une source", () => {
 
 describe("« Applications connectées » — la porte du rattachement Discord", () => {
   it("affiche le geste quand le module a quelque chose à en dire", () => {
-    expect(section).toContain("connectionMethodLabel(connection)");
+    expect(section).toContain("connectionMethodText(text, connection)");
     expect(section).toContain("{methodLabel ? (");
   });
 
   it("ne le rend jamais sur une porte détachée", () => {
     expect(section).toContain(
-      "connection.linked ? connectionMethodLabel(connection) : null",
+      "connection.linked ? connectionMethodText(text, connection) : null",
     );
   });
 
@@ -154,16 +156,18 @@ describe("modale de visibilité du BattleTag", () => {
 
   it("n'a qu'un bouton : il n'y a rien à accepter ni à refuser", () => {
     expect([...modal.matchAll(/<CyberButton/g)]).toHaveLength(1);
-    expect(modal).toContain("J&apos;ai compris");
+    expect(modal).toContain('t("battletagNotice.ok")');
+    expect(frProfile.battletagNotice.ok).toBe("J'ai compris");
   });
 
   it("nomme les publics qui continuent de lire le tag, comme la politique", () => {
-    expect(modal).toContain("de chaque match que tu disputes");
-    expect(modal).toContain("Le caster de ton match");
-    expect(modal).toContain("arbitres");
-    expect(modal).toContain("administrateurs");
+    const notice = Object.values(frProfile.battletagNotice).join(" ");
+    expect(notice).toContain("de chaque match que tu disputes");
+    expect(notice).toContain("Le caster de ton match");
+    expect(notice).toContain("arbitres");
+    expect(notice).toContain("administrateurs");
     // `isInActiveTournament` : dès l'inscription, pas seulement « le temps du tournoi ».
-    expect(modal).toContain("tant que tu es inscrit à un");
+    expect(notice).toContain("tant que tu es inscrit à un");
   });
 
   it("prend le focus et se ferme par Échap, par la pile commune des modales", () => {

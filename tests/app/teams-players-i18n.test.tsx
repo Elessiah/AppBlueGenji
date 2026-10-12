@@ -438,8 +438,8 @@ describe("anglais", () => {
     expect(html).toContain("Registered <em>players</em>");
     expect(html).toContain("SUPPORT");
     expect(html).toContain("Deleted account");
-    // `/profil` n'est pas encore traduite (lot 9-2) : le lien reste français.
-    expect(html).toContain('href="/profil"');
+    // `/profil` est traduite au lot 9-2 : le lien suit la langue.
+    expect(html).toContain('href="/en/profil"');
     expectEnglish(html);
   });
 

@@ -1,0 +1,533 @@
+/**
+ * Lot 9-2 — `/profil`, `/signalements/[id]`, formulaire « Signaler un
+ * problème », modale de recadrage, réglage des notifications : le français
+ * reste celui d'avant (sources partagées, phrase par phrase), l'anglais se rend
+ * sans français.
+ */
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import type { ReactElement, ReactNode } from "react";
+
+let mockLocale: "fr" | "en" = "en";
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/en/profil",
+  useParams: () => ({ id: "9" }),
+  useSearchParams: () => new URLSearchParams(""),
+  useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined, prefetch: () => undefined }),
+}));
+jest.mock("@/components/ui/toast", () => ({
+  useToast: () => ({ showError: () => undefined, showSuccess: () => undefined }),
+  ToastProvider: ({ children }: { children: ReactNode }) => children,
+}));
+jest.mock("react-dom", () => {
+  const actual = jest.requireActual<typeof import("react-dom")>("react-dom");
+  return { ...actual, createPortal: (node: unknown) => node };
+});
+jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: () => ({ current: null }) }));
+// Les fenêtres se montent après l'hydratation (`setMounted(true)` dans un
+// effet) : l'effet de montage est joué une fois par rendu armé.
+const effects = { armed: false };
+jest.mock("react", () => {
+  const actual = jest.requireActual<typeof import("react")>("react");
+  return {
+    ...actual,
+    useEffect: (effect: () => void) => {
+      if (!effects.armed || !String(effect).includes("setMounted(true)")) return;
+      effects.armed = false;
+      effect();
+    },
+  };
+});
+type PushState = ReturnType<typeof import("@/components/notifications/usePushNotifications").usePushNotifications>;
+let mockPush: Partial<PushState> = {};
+jest.mock("@/components/notifications/usePushNotifications", () => ({ usePushNotifications: () => mockPush }));
+
+import { renderToStaticMarkup } from "react-dom/server";
+import { createTranslator } from "next-intl";
+import ProfileLayout, { generateMetadata as profileMetadata } from "@/app/(secured)/profil/layout";
+import { generateMetadata as reportsMetadata } from "@/app/(secured)/signalements/layout";
+import ProfilePage from "@/app/(secured)/profil/page";
+import { ProfileSection } from "@/app/(secured)/profil/_components/ProfileSection";
+import { ConnectedAppsSection } from "@/app/(secured)/profil/ConnectedAppsSection";
+import { OtherSessionsPanel } from "@/app/(secured)/profil/OtherSessionsPanel";
+import { BattletagVisibilityNotice } from "@/app/(secured)/profil/BattletagVisibilityNotice";
+import { DiscordVerificationDialog } from "@/app/(secured)/profil/DiscordVerificationDialog";
+import { DiscordBotHandleDialog } from "@/app/(secured)/profil/DiscordBotHandleDialog";
+import { ConcernedReport } from "@/app/(secured)/signalements/[id]/_components/ConcernedReport";
+import { PROFILE_SECTIONS, type ProfileSectionId } from "@/app/(secured)/profil/_lib/profile-sections";
+import {
+  battletagLockText,
+  connectionMethodText,
+  connectionRefusalText,
+  deletionConsequencesText,
+  deletionErrorText,
+  deletionOutcomeText,
+  discordBotRowText,
+  discordTagLockText,
+  FR_PROFILE,
+} from "@/app/(secured)/profil/_lib/profile-text";
+import { avatarUploadErrorMessage, profileErrorMessage } from "@/app/(secured)/profil/profile-errors";
+import { connectionErrorMessage, otherSessionsSummary, sessionsRevokedMessage, unlinkSuccessMessage } from "@/app/(secured)/profil/connection-errors";
+import { discordVerificationErrorMessage } from "@/app/(secured)/profil/discord-errors";
+import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
+import {
+  FR_REPORTS_TEXT,
+  legalBasisText,
+  reportErrorText,
+  reportsText,
+  retentionText,
+  rightsText,
+  targetDetailText,
+} from "@/components/reports/reports-text";
+import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
+import { FR_PUSH_TEXT, pushErrorText, pushSupportNotice, pushText, pushTopicDescription, pushTopicLabel } from "@/components/notifications/push-text";
+import { LogoutButton } from "@/components/logout-button";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { AppLocaleProvider } from "@/components/i18n/locale-context";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { ProfileTextProvider } from "@/components/i18n/profile-text";
+import { TeamErrorsTextProvider } from "@/components/i18n/team-errors-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import {
+  ACCOUNT_DELETION_QUESTION,
+  accountDeletionConsequences,
+  accountDeletionErrorMessage,
+  accountDeletionOutcome,
+  RETENTION_UNKNOWN,
+} from "@/lib/shared/account-deletion";
+import {
+  connectionMethodLabel,
+  connectionUnlinkRefusalMessage,
+  DISCORD_BOT_CONNECTION_LABEL,
+  discordBotRowState,
+  type AccountConnection,
+} from "@/lib/shared/account-connections";
+import { battletagLockNotice } from "@/lib/shared/battletag-lock";
+import {
+  NOTIFIER_FOLLOW_UP,
+  OFF_SITE_CONDUCT_ENTRY,
+  OFF_SITE_CONDUCT_NOTICE,
+  REPORT_CATEGORIES,
+  REPORT_CATEGORY_DEFINITIONS,
+  REPORT_PRIVACY_NOTICE,
+  REPORT_STATUS_LABELS,
+  REPORT_TARGET_LABELS,
+  RIGHTS_RELATION_LABELS,
+  reportErrorMessage,
+  reportLegalBasisNotice,
+  reportRightsNotice,
+  type ConcernedReportView,
+  type ReportCategory,
+} from "@/lib/shared/content-reports";
+import { DISCORD_VERIFICATION_EXPOSURE, DISCORD_VERIFICATION_PURPOSE } from "@/lib/shared/discord-identity";
+import { discordTagLockNotice } from "@/lib/shared/discord-tag-lock";
+import {
+  BLIZZARD_BATTLETAG_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_NO_TAG,
+  DISCORD_PLAYER_VISIBILITY_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_PENDING,
+  DISCORD_TAG_AUDIENCE,
+  DISCORD_TAG_UNVERIFIED_AUDIENCE,
+  GAME_TAG_NOTICE,
+} from "@/lib/shared/identity-sharing";
+import { isMigratedRoute, LOCALES, SITE_TIME_ZONE } from "@/lib/shared/locales";
+import { formatMessage } from "@/lib/shared/message-format";
+import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/shared/oauth-providers";
+import { PUSH_ERROR_MESSAGES, PUSH_SUPPORT_NOTICES, PUSH_TOPIC_KEYS, PUSH_TOPICS, pushErrorMessage } from "@/lib/shared/push-notifications";
+import { scopedText } from "@/lib/shared/scoped-text";
+import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
+
+const EN = messagesFor("en");
+const EN_PROFILE = scopedText("en", EN.profile);
+
+function inEnglish(ui: ReactElement): string {
+  return renderToStaticMarkup(
+    <AppLocaleProvider locale="en">
+      <ShellTextProvider locale="en" messages={EN.shell}>
+        <TeamErrorsTextProvider locale="en" messages={EN.teamErrors}>
+          <ProfileTextProvider locale="en" messages={EN.profile}>
+            {ui}
+          </ProfileTextProvider>
+        </TeamErrorsTextProvider>
+      </ShellTextProvider>
+    </AppLocaleProvider>,
+  );
+}
+
+/** Le texte visible et les attributs lus (noms accessibles, infobulles, champs). */
+function readable(html: string): string {
+  const attributes = [...html.matchAll(/(?:aria-label|title|placeholder|alt|aria-roledescription)="([^"]*)"/g)].map((m) => m[1]);
+  return `${html.replace(/<[^>]+>/g, " ")} ${attributes.join(" ")}`;
+}
+
+const FRENCH_WORDS =
+  /\b(Profil|profil|Pseudo|Réessayer|Retirer|Rattacher|Rattaché|Annuler|Valider|Certifier|Recevoir|Signaler|Signalement|signalement|Envoyer|Chargement|Choisir|Fermer|Connecte-toi|Données|Destinataires|Finalité|Durée|Base légale|Déconnexion|Activer|Désactiver|Aperçu|Réduire|Agrandir|Réinitialiser|Masqué|compris|Motif|Reçu|État|Ajouter|Contester|toi|ton|ta|tes)\b/;
+const ACCENTED = /[À-ÖØ-öø-ÿ]/;
+
+function expectEnglish(html: string): void {
+  const text = readable(html);
+  expect(text).not.toMatch(FRENCH_WORDS);
+  expect(text).not.toMatch(ACCENTED);
+}
+
+const connection = (provider: OAuthProvider, overrides: Partial<AccountConnection> = {}): AccountConnection => ({
+  provider,
+  linked: false,
+  method: null,
+  handle: null,
+  ...overrides,
+});
+
+const CONNECTION_SETS: AccountConnection[][] = [
+  OAUTH_PROVIDERS.map((p) => connection(p)),
+  [connection("GOOGLE", { linked: true }), connection("DISCORD", { linked: true, method: "DM_CODE", handle: "nova" }), connection("BLIZZARD")],
+  [connection("GOOGLE"), connection("DISCORD", { linked: true, method: "DM_CODE" }), connection("BLIZZARD")],
+  [connection("GOOGLE", { linked: true }), connection("DISCORD", { linked: true, method: "OAUTH", handle: "nova" }), connection("BLIZZARD", { linked: true, handle: "Nova#1234" })],
+  [connection("GOOGLE"), connection("DISCORD", { linked: true, method: null }), connection("BLIZZARD")],
+];
+
+// Les fenêtres se portent dans `document.body` : le portail est remplacé par
+// son contenu, il ne faut qu'un `document` à désigner.
+const globals = globalThis as { document?: unknown };
+const hadDocument = "document" in globals;
+beforeAll(() => {
+  if (!hadDocument) globals.document = { body: {}, getElementById: () => null };
+});
+afterAll(() => {
+  if (!hadDocument) delete globals.document;
+});
+
+beforeEach(() => {
+  mockLocale = "en";
+  effects.armed = false;
+  mockPush = {};
+});
+
+describe("liste blanche et métadonnées", () => {
+  it("ouvre /profil et la page d'un signalement", () => {
+    expect(isMigratedRoute("/profil")).toBe(true);
+    expect(isMigratedRoute("/signalements/12")).toBe(true);
+    expect(isMigratedRoute("/signalements/abc")).toBe(false);
+  });
+
+  it("titres et canonique dans la langue de l'adresse", async () => {
+    const en = await profileMetadata();
+    expect(en.title).toEqual(expect.objectContaining({ default: "My profile" }));
+    expect(en.alternates).toEqual({ canonical: "/en/profil", languages: { fr: "/profil", en: "/en/profil", "x-default": "/profil" } });
+    expect((await reportsMetadata()).title).toEqual(expect.objectContaining({ default: "Report" }));
+    mockLocale = "fr";
+    expect((await profileMetadata()).title).toEqual(expect.objectContaining({ default: "Mon profil" }));
+    expect((await reportsMetadata()).title).toEqual(expect.objectContaining({ default: "Signalement" }));
+  });
+
+  it("la mise en page ne sérialise l'anglais que sous /en", async () => {
+    mockLocale = "fr";
+    const fr = (await ProfileLayout({ children: null })) as ReactElement<{ messages?: unknown }>;
+    expect(fr.props.messages).toBeUndefined();
+    mockLocale = "en";
+    const en = (await ProfileLayout({ children: null })) as ReactElement<{ messages?: unknown }>;
+    expect(en.props.messages).toBe(EN.teamErrors);
+  });
+});
+
+describe("français inchangé — profil", () => {
+  it("sections : le registre et les messages disent la même chose", () => {
+    for (const section of PROFILE_SECTIONS) {
+      const id = section.id as ProfileSectionId;
+      expect(FR_PROFILE.t(`sections.${id}.title`)).toBe(section.title);
+      expect(FR_PROFILE.t(`sections.${id}.lead`)).toBe(section.lead);
+    }
+  });
+
+  it("annonces partagées avec /connexion", () => {
+    expect(FR_PROFILE.t("games.gameTagNotice")).toBe(GAME_TAG_NOTICE);
+    expect(FR_PROFILE.t("games.blizzardNotice")).toBe(BLIZZARD_BATTLETAG_NOTICE);
+    expect(FR_PROFILE.t("discord.audience")).toBe(DISCORD_TAG_AUDIENCE);
+    expect(FR_PROFILE.t("discord.unverifiedAudience")).toBe(DISCORD_TAG_UNVERIFIED_AUDIENCE);
+    expect(FR_PROFILE.t("privacy.discordNotice")).toBe(DISCORD_PLAYER_VISIBILITY_NOTICE);
+    expect(FR_PROFILE.t("privacy.discordPending")).toBe(DISCORD_PLAYER_VISIBILITY_PENDING);
+    expect(FR_PROFILE.t("privacy.discordNoTag")).toBe(DISCORD_PLAYER_VISIBILITY_NO_TAG);
+    expect(FR_PROFILE.t("verify.purpose")).toBe(DISCORD_VERIFICATION_PURPOSE);
+    expect(Object.values(messagesFor("fr").profile.verify.exposure)).toEqual([...DISCORD_VERIFICATION_EXPOSURE]);
+  });
+
+  it("verrous des champs : cas par cas", () => {
+    for (const linked of [true, false, null]) {
+      for (const pending of [true, false]) {
+        for (const tag of ["nova", null]) {
+          for (const verified of [true, false]) {
+            const state = { tag, verified, linked, pending };
+            expect(discordTagLockText(FR_PROFILE, state)).toBe(discordTagLockNotice(state));
+          }
+          expect(battletagLockText(FR_PROFILE, { tag, linked, pending })).toBe(battletagLockNotice({ tag, linked, pending }));
+        }
+      }
+    }
+  });
+
+  it("suppression du compte : chaque issue", () => {
+    expect(FR_PROFILE.t("deletion.question")).toBe(ACCOUNT_DELETION_QUESTION);
+    for (const subject of ["TOURNAMENTS", "SOLO_REGISTRATIONS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS", null, RETENTION_UNKNOWN] as const) {
+      expect(deletionConsequencesText(FR_PROFILE, subject)).toBe(accountDeletionConsequences(subject));
+      expect(deletionOutcomeText(FR_PROFILE, subject)).toBe(accountDeletionOutcome(subject));
+    }
+    for (const code of ["ACCOUNT_STILL_REFERENCED", "X", undefined]) {
+      expect(deletionErrorText(FR_PROFILE, code)).toBe(accountDeletionErrorMessage(code));
+    }
+  });
+
+  it("applications connectées : refus, porte, ligne du bot", () => {
+    expect(FR_PROFILE.t("connections.bot.label")).toBe(DISCORD_BOT_CONNECTION_LABEL);
+    for (const provider of OAUTH_PROVIDERS) {
+      for (const refusal of ["NOT_LINKED", "LAST_CONNECTION"] as const) {
+        expect(connectionRefusalText(FR_PROFILE, refusal, provider)).toBe(connectionUnlinkRefusalMessage(refusal, provider));
+      }
+    }
+    for (const set of CONNECTION_SETS) {
+      for (const item of set) expect(connectionMethodText(FR_PROFILE, item)).toBe(connectionMethodLabel(item));
+      const row = discordBotRowState(set);
+      expect(discordBotRowText(FR_PROFILE, set)).toEqual({ note: row.note, refusal: row.refusal });
+    }
+  });
+});
+
+describe("français inchangé — signalements et notifications", () => {
+  const fr = messagesFor("fr");
+
+  it("catégories, statuts, qualités, cibles", () => {
+    for (const category of [...REPORT_CATEGORIES, "CONTEST"] as ReportCategory[]) {
+      const definition = REPORT_CATEGORY_DEFINITIONS[category];
+      expect(fr.reports.categories[category]).toEqual({
+        label: definition.label,
+        hint: definition.hint,
+        placeholder: definition.descriptionPlaceholder,
+      });
+      expect(legalBasisText(FR_REPORTS_TEXT, category)).toBe(reportLegalBasisNotice(category));
+      expect(rightsText(FR_REPORTS_TEXT, category)).toBe(reportRightsNotice(category));
+    }
+    expect(fr.reports.status).toEqual(REPORT_STATUS_LABELS);
+    expect(fr.reports.relation).toEqual(RIGHTS_RELATION_LABELS);
+    for (const type of ["USER", "TEAM", "TOURNAMENT"] as const) expect(fr.reports.targets[type].picker).toBe(REPORT_TARGET_LABELS[type].picker);
+    expect(fr.reports.offSite).toEqual({ label: OFF_SITE_CONDUCT_ENTRY.label, hint: OFF_SITE_CONDUCT_ENTRY.hint, notice: OFF_SITE_CONDUCT_NOTICE });
+  });
+
+  it("mentions de confidentialité du formulaire, mot pour mot", () => {
+    expect(FR_REPORTS_TEXT.t("privacy.controller")).toBe(REPORT_PRIVACY_NOTICE.controller);
+    expect(FR_REPORTS_TEXT.t("privacy.purpose")).toBe(REPORT_PRIVACY_NOTICE.purpose);
+    expect(FR_REPORTS_TEXT.t("privacy.data")).toBe(REPORT_PRIVACY_NOTICE.data);
+    expect(FR_REPORTS_TEXT.t("privacy.recipients")).toBe(REPORT_PRIVACY_NOTICE.recipients);
+    expect(FR_REPORTS_TEXT.t("privacy.contestRecipients")).toBe(REPORT_PRIVACY_NOTICE.contestRecipients);
+    expect(retentionText(FR_REPORTS_TEXT)).toBe(REPORT_PRIVACY_NOTICE.retention);
+    expect(FR_REPORTS_TEXT.t("privacy.followUp")).toBe(NOTIFIER_FOLLOW_UP);
+  });
+
+  it("refus du formulaire, code par code, jamais le jeton", () => {
+    for (const code of [...Object.keys(fr.reports.errors).filter((key) => key !== "fallback"), "NOPE", null, "constructor"]) {
+      expect(reportErrorText(FR_REPORTS_TEXT, code)).toBe(reportErrorMessage(code));
+    }
+  });
+
+  it("précision des cibles rédigée par le serveur", () => {
+    const en = reportsText("en");
+    expect(targetDetailText(en, "Équipe fantôme")).toBe("Ghost team");
+    expect(targetDetailText(en, "Non publié")).toBe("Not published");
+    expect(targetDetailText(en, "GLC")).toBe("GLC");
+  });
+
+  it("notifications : sujets, aides, refus", () => {
+    for (const topic of PUSH_TOPIC_KEYS) {
+      expect(pushTopicLabel(FR_PUSH_TEXT, topic)).toBe(PUSH_TOPICS[topic].label);
+      expect(pushTopicDescription(FR_PUSH_TEXT, topic)).toBe(PUSH_TOPICS[topic].description);
+    }
+    for (const support of ["UNSUPPORTED", "IOS_NEEDS_INSTALL", "DENIED"] as const) {
+      expect(pushSupportNotice(FR_PUSH_TEXT, support)).toBe(PUSH_SUPPORT_NOTICES[support]);
+    }
+    for (const code of [...Object.keys(PUSH_ERROR_MESSAGES), "NOPE", null]) {
+      expect(pushErrorText(FR_PUSH_TEXT, code)).toBe(pushErrorMessage(code));
+    }
+  });
+});
+
+describe("anglais — phrases", () => {
+  it("refus du profil, de la certification, des connexions", () => {
+    expect(profileErrorMessage("PSEUDO_TOO_LONG", EN_PROFILE)).toBe(`Your username must be ${PSEUDO_MAX_LENGTH} characters or fewer.`);
+    expect(profileErrorMessage("NOPE", EN_PROFILE)).toBe("Saving failed. Try again in a moment.");
+    expect(avatarUploadErrorMessage("IMAGE_TOO_LARGE", EN_PROFILE, scopedText("en", EN.teamErrors))).toBe("Image too large: 5 MB maximum.");
+    expect(discordVerificationErrorMessage("INVALID_CODE", EN_PROFILE)).toBe("The code must have 6 digits.");
+    expect(connectionErrorMessage("constructor", EN_PROFILE)).toBe("The operation failed. Try again in a moment.");
+    expect(otherSessionsSummary(1, EN_PROFILE)).toBe("1 other session is open on other browsers or devices.");
+    expect(otherSessionsSummary(3, EN_PROFILE)).toBe("3 other sessions are open on other browsers or devices.");
+    expect(sessionsRevokedMessage(2, EN_PROFILE)).toBe("2 other sessions were closed.");
+    expect(unlinkSuccessMessage("BLIZZARD", null, EN_PROFILE)).toBe(
+      "Blizzard was removed from your account. Your other sessions couldn't be closed: use “Log out my other sessions”.",
+    );
+    expect(deletionConsequencesText(EN_PROFILE, null)).toMatch(/^You haven't played any match/);
+    expect(discordTagLockText(EN_PROFILE, { tag: "nova", verified: true, linked: true })).toContain("Nobody else, ever.");
+  });
+
+  it("aucun refus anglais n'est un code ni ne garde d'accent", () => {
+    const push = pushText("en");
+    for (const code of Object.keys(PUSH_ERROR_MESSAGES)) expect(pushErrorText(push, code)).not.toMatch(ACCENTED);
+    const reports = reportsText("en");
+    for (const code of Object.keys(EN.reports.errors)) expect(reportErrorText(reports, code)).not.toMatch(ACCENTED);
+  });
+});
+
+describe("anglais — écrans", () => {
+  it("profil : chargement, sections, déconnexion", () => {
+    const html = inEnglish(
+      <>
+        <ProfilePage />
+        {PROFILE_SECTIONS.map((section) => (
+          <ProfileSection key={section.id} section={section}>
+            <span />
+          </ProfileSection>
+        ))}
+        <LogoutButton />
+      </>,
+    );
+    expect(html).toContain("Loading your profile…");
+    expect(html).toContain("Connected apps");
+    expect(html).toContain("Log out");
+    expectEnglish(html);
+  });
+
+  it("applications connectées, chaque état", () => {
+    for (const set of CONNECTION_SETS) {
+      const html = inEnglish(<ConnectedAppsSection connections={set} reload={async () => undefined} />);
+      expect(html).toContain("Discord bot (direct-message code)");
+      expectEnglish(html);
+    }
+    expect(inEnglish(<ConnectedAppsSection connections={null} reload={async () => undefined} />)).toContain("Loading…");
+    const linkHtml = inEnglish(<ConnectedAppsSection connections={CONNECTION_SETS[0]} reload={async () => undefined} />);
+    // Le rattachement emporte la langue : retour sur `/en/profil`.
+    expect(linkHtml).toContain("/api/auth/google/start?lang=en&amp;intent=link");
+    expect(inEnglish(<OtherSessionsPanel version={0} />)).toContain("Log out my other sessions");
+  });
+
+  it("fenêtres du profil", () => {
+    const notice = inEnglish(<BattletagVisibilityNotice onClose={() => undefined} />);
+    expect(notice).toContain("Hidden, but not from everyone");
+    expectEnglish(notice);
+    for (const props of [
+      { initialTag: "nova", linked: true, attested: true },
+      { initialTag: "", linked: true, attested: false },
+      { initialTag: "nova", linked: false, attested: false },
+    ]) {
+      effects.armed = true;
+      const html = inEnglish(<DiscordVerificationDialog {...props} onClose={() => undefined} onVerified={() => undefined} />);
+      expect(html).toContain("Verify my Discord tag");
+      expectEnglish(html);
+    }
+    for (const mode of ["LINK", "UPDATE"] as const) {
+      effects.armed = true;
+      const html = inEnglish(<DiscordBotHandleDialog mode={mode} onClose={() => undefined} onUpdated={() => undefined} />);
+      expect(html).toContain(mode === "LINK" ? "Link Discord by code" : "Update my Discord username");
+      expectEnglish(html);
+    }
+  });
+
+  it("modale de recadrage : la langue de la page, ou le français imposé", () => {
+    const file = new File(["x"], "logo.png", { type: "image/png" });
+    globalThis.URL.createObjectURL ??= () => "blob:x";
+    effects.armed = true;
+    const html = inEnglish(<ImageCropDialog file={file} kind="avatar" title="Crop your avatar" onCancel={() => undefined} onConfirm={() => undefined} />);
+    expect(html).toContain("Confirm crop");
+    expectEnglish(html);
+    effects.armed = true;
+    const staff = inEnglish(<ImageCropDialog file={file} kind="avatar" title="Recadrer" onCancel={() => undefined} onConfirm={() => undefined} lang="fr" />);
+    expect(staff).toContain("Valider le recadrage");
+    expect(staff).toMatch(/role="dialog"[^>]*lang="fr"/);
+  });
+
+  it("formulaire de signalement : chaque catégorie, connecté ou non", () => {
+    const choice = inEnglish(<ReportProblemDialog pathname="/equipes/4" authenticated={false} onClose={() => undefined} />);
+    expect(choice).toContain("Report a problem");
+    expect(choice).toContain("A player&#x27;s behavior");
+    expectEnglish(choice);
+    for (const category of REPORT_CATEGORIES.filter((key): key is Exclude<ReportCategory, "CONTEST"> => key !== "CONTEST")) {
+      for (const authenticated of [true, false]) {
+        const html = inEnglish(
+          <ReportProblemDialog pathname="/equipes/4" authenticated={authenticated} initialCategory={category} onClose={() => undefined} />,
+        );
+        expect(html).toContain("Your data");
+        expectEnglish(html);
+      }
+    }
+    const contest = inEnglish(<ReportProblemDialog pathname="/signalements/9" authenticated contestOf={9} onClose={() => undefined} />);
+    expect(contest).toContain("You&#x27;re contesting report no. 9.");
+    expectEnglish(contest);
+  });
+
+  it("page d'un signalement pour la personne visée", () => {
+    const report: ConcernedReportView = {
+      id: 9,
+      category: "COPYRIGHT",
+      status: "RESOLVED",
+      description: "Logo copied",
+      createdAt: "2026-03-01T10:00:00.000Z",
+      targets: [{ type: "TEAM", id: 4, label: "Glaciers", exists: true, imageUrl: null, detail: null }],
+      myContests: [{ id: 3, createdAt: "2026-03-02T10:00:00.000Z", description: "We made it" }],
+      quarantines: [
+        { id: 1, targetType: "TEAM", targetId: 4, targetName: "Glaciers", reportId: 9, status: "HIDDEN", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: null },
+        { id: 2, targetType: "USER", targetId: 5, targetName: "Nova", reportId: 9, status: "PURGED", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: "2026-03-01T10:00:00.000Z" },
+      ],
+    };
+    const html = inEnglish(<ConcernedReport report={report} onContest={() => undefined} />);
+    expect(html).toContain("A report concerns you");
+    expect(html).toContain("permanently deleted on September 1, 2026");
+    expect(html).toContain("deleted</strong> immediately on March 1, 2026");
+    expect(html).toContain('href="/en/equipes/4"');
+    expectEnglish(html.replace("Logo copied", "").replace("We made it", ""));
+  });
+
+  it("réglage des notifications, chaque état de l'appareil", () => {
+    const server = { publicKey: "k", topics: [...PUSH_TOPIC_KEYS], disabledTopics: [], devices: 2 };
+    const states: Partial<PushState>[] = [
+      { support: null, server: null, loadFailed: false },
+      { support: "AVAILABLE", server: { ...server, publicKey: null }, checked: true, subscribed: false },
+      { support: "IOS_NEEDS_INSTALL", server, checked: true, subscribed: false },
+      { support: "AVAILABLE", server, checked: false, subscribed: false },
+      { support: "AVAILABLE", server, checked: true, subscribed: true },
+      { support: "AVAILABLE", server, checked: true, subscribed: false, busy: true },
+      { support: null, server: null, loadFailed: true },
+    ];
+    for (const state of states) {
+      mockPush = state;
+      const html = inEnglish(<PushNotificationsPanel />);
+      expectEnglish(html);
+    }
+    mockPush = states[4];
+    expect(inEnglish(<PushNotificationsPanel />)).toContain("2 devices subscribed to your account");
+    mockPush = states[1];
+    const french = inEnglish(<PushNotificationsPanel toastLang="fr" />);
+    expect(french).toContain("pas encore activées");
+  });
+});
+
+describe("équivalence avec next-intl, message par message", () => {
+  function leaves(tree: object, prefix = ""): Array<{ key: string; source: string }> {
+    return Object.entries(tree).flatMap(([key, value]) =>
+      typeof value === "string" ? [{ key: `${prefix}${key}`, source: value }] : leaves(value as object, `${prefix}${key}.`),
+    );
+  }
+
+  it.each(LOCALES.flatMap((locale) => (["profile", "reports", "imageCrop", "push"] as const).map((ns) => [locale, ns] as const)))(
+    "%s · %s",
+    (locale, namespace) => {
+      for (const { key, source } of leaves(messagesFor(locale)[namespace])) {
+        if (source.includes("<")) continue;
+        const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
+        for (const count of [0, 1, 2]) {
+          const values = {
+            count, max: 32, min: 20, label: "Discord", handle: "nova", time: "10:00", tag: "nova", purpose: "P", audience: "A", rename: "R",
+            change: "C", removed: "Removed.", backupDays: 30, journalDays: 90, logDays: 365, days: 30, months: 6, channel: "here", id: "9",
+            category: "Bug", date: "May 1", status: "Open", length: 3, picker: "Teams", name: "Glaciers", since: "May 1", purge: "Nov 1",
+            width: 50, height: 50, left: 10, top: 10,
+          };
+          expect(`${key}: ${formatMessage(locale, source, values)}`).toBe(`${key}: ${reference("m", values)}`);
+        }
+      }
+    },
+  );
+});

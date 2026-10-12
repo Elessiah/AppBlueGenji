@@ -135,7 +135,7 @@ describe("la défaite ne sert qu'à la défaite", () => {
       /<Tile label=\{text\.t\("tile\.losses"\)\} value=\{stats\.matchesLost\} loss \/>/,
     );
     expect(readSource(join(ROOT, "app", "(secured)", "profil", "page.tsx"))).toMatch(
-      /label: "Défaites", value: data\.stats\.matchesLost, tone: "loss"/,
+      /label: t\("stats\.losses"\), value: data\.stats\.matchesLost, tone: "loss"/,
     );
     expect(
       readSource(join(ROOT, "app", "(secured)", "equipes", "[id]", "_components", "TeamHeader.tsx")),

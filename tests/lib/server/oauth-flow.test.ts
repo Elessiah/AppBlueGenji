@@ -140,6 +140,15 @@ describe("startOAuth", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/profil?connection_error=NOT_CONFIGURED&provider=blizzard",
     );
+
+    // Parti de la page anglaise : retour sur `/en/profil` (lot 9-2).
+    const english = await startOAuth(
+      request("http://localhost:3000/api/auth/x/start?intent=link&lang=en"),
+      "BLIZZARD",
+    );
+    expect(english.headers.get("location")).toBe(
+      "http://localhost:3000/en/profil?connection_error=NOT_CONFIGURED&provider=blizzard",
+    );
   });
 
   it("nomme la configuration manquante plutôt que d'inviter à réessayer", async () => {
@@ -453,6 +462,37 @@ describe("completeOAuth — rattachement", () => {
 
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/profil?connected=discord&refreshed=1",
+    );
+  });
+
+  it("revient sur /en/profil pour un rattachement parti de la page anglaise (lot 9-2)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+    jest.mocked(consumeOAuthState).mockResolvedValue({
+      provider: "DISCORD",
+      state: STATE,
+      redirectTo: "/en/tournois",
+      intent: "LINK",
+      termsAccepted: true,
+    });
+    const response = await completeOAuth(
+      request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
+      "DISCORD",
+    );
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/profil?connected=discord");
+
+    jest.mocked(consumeOAuthState).mockResolvedValue({
+      provider: "DISCORD",
+      state: STATE,
+      redirectTo: "/en/tournois",
+      intent: "LINK",
+      termsAccepted: true,
+    });
+    const cancelled = await completeOAuth(
+      request(`http://localhost:3000/api/auth/x/callback?error=access_denied&state=${STATE}`),
+      "DISCORD",
+    );
+    expect(cancelled.headers.get("location")).toBe(
+      "http://localhost:3000/en/profil?connection_error=LINK_CANCELLED&provider=discord",
     );
   });
 

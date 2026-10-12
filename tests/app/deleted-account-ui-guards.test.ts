@@ -47,9 +47,10 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
     // Les deux écritures du profil traduisent dans leur `catch` par ce registre
     // — la sauvegarde en passant par une variable, pour rattacher aussi le
     // refus à son champ (`useFieldErrors`).
-    expect(PROFIL.match(/profileErrorMessage\((?:\(e as Error\)\.message|code)\)/g) ?? []).toHaveLength(2);
-    expect(PROFIL).toContain("showError(avatarUploadErrorMessage((e as Error).message))");
-    expect(PROFIL).toContain("showError(avatarDeleteErrorMessage((e as Error).message))");
+    // Lot 9-2 : chaque registre reçoit en plus le texte de la langue de la page.
+    expect(PROFIL.match(/profileErrorMessage\((?:\(e as Error\)\.message|code), text\)/g) ?? []).toHaveLength(2);
+    expect(PROFIL).toContain("showError(avatarUploadErrorMessage((e as Error).message, text, teamErrorsText))");
+    expect(PROFIL).toContain("showError(avatarDeleteErrorMessage((e as Error).message, text))");
   });
 
   it("ne traduit plus deux fois : la phrase du compte supprimé survit à la sauvegarde", () => {
