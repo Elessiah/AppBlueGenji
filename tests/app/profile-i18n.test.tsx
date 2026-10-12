@@ -440,6 +440,23 @@ describe("langue du compte (lot 9-3)", () => {
     expectEnglish(html.replace(/<option[^>]*>[^<]*<\/option>/g, ""));
   });
 
+  it("pendant l'envoi : focus gardé (aria-disabled + aria-busy, jamais disabled), second choix refusé", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const field = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/AccountLocaleField.tsx"), "utf8");
+    expect(field).toContain("aria-disabled={busy || undefined}");
+    expect(field).toContain("aria-busy={busy || undefined}");
+    expect(field).not.toMatch(/\sdisabled=\{/);
+    expect(field).toContain("if (busy || !isLocale(next) || next === locale) return;");
+    // Détachée du réglage des notifications qui la précède (passe d'auto-contrôle).
+    expect(field).toContain("s.accountLocale");
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8")).toMatch(/\.accountLocale \{\s*margin-top: 14px;/);
+    // Au repos, rien d'occupé ni de désactivé.
+    const html = renderToStaticMarkup(<AccountLocaleField initial="fr" />);
+    expect(html).not.toContain("aria-busy");
+    expect(html).not.toContain("disabled");
+  });
+
   it("en français : libellé et règle", () => {
     const html = renderToStaticMarkup(<AccountLocaleField initial="fr" />);
     expect(html).toContain(">Langue des notifications</label>");

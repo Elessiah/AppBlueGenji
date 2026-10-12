@@ -22,6 +22,7 @@ import {
 } from "@/lib/shared/push-messages";
 import type { PushContent } from "@/lib/shared/push-notifications";
 import FR_BEFORE from "../../fixtures/push-messages-fr-before-lot9.json";
+import EN_PUSH from "@/messages/en/pushMessages.json";
 
 /**
  * Lot 9-3 : chaque rédacteur de notification push écrit dans la langue du
@@ -157,8 +158,17 @@ describe("notifications push — anglais", () => {
     expect(en["privacyChange.1"].body).toBe("A. The details are waiting for you on your next visit.");
     expect(en["privacyChange.2"].body).toContain("(and 1 other)");
     expect(en["privacyChange.3"].body).toContain("(and 2 others)");
-    expect(en["moderation.logo.HIDDEN.12"].body).toBe("Les Renards's logo has been hidden. You can contest the decision.");
+    expect(en["moderation.logo.HIDDEN.12"].body).toBe("The logo of Les Renards has been hidden. You can appeal the decision.");
     expect(en["issueReport.GRAND.1"].body).toBe("Problem reported · Coupe, Grand final.");
+  });
+
+  it("parle le vocabulaire de l'écran anglais : appeal, jamais contest ; pas de possessif sur un nom d'équipe", () => {
+    const leaves = (node: unknown): string[] =>
+      typeof node === "string" ? [node] : Object.values(node as Record<string, unknown>).flatMap(leaves);
+    const values = leaves(EN_PUSH).join(" | ");
+    expect(values).not.toMatch(/contest/i);
+    expect(values).not.toContain("{team}'s");
+    expect(en["moderation.logo.HIDDEN.12"].body).toContain("appeal");
   });
 
   it("donne l'heure de coup d'envoi en anglais, heure de Paris, sur 24 heures", () => {
