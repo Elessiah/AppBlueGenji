@@ -112,7 +112,9 @@ describe("revue UI/UX, deuxième passe", () => {
     expect(formatQuarantineDate(date, "en-US")).toBe("January 1, 2027");
     const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
     expect(view).not.toContain("formatPurgeDate");
-    expect(view).not.toMatch(/formatDate\(quarantine\./);
+    // Toutes les dates de la page, réception et contestations comprises, en heure de Paris.
+    expect(view).not.toMatch(/\bformatDate\(/);
+    expect(view).toContain("formatParisDay(report.createdAt, locale)");
   });
 
   it("identifiant d'un fournisseur : le registre décide, chaque libellé est traduit", async () => {
@@ -154,7 +156,7 @@ describe("revue UI/UX, troisième passe", () => {
     expect(button).toContain('const busyMark = pending ? <span aria-hidden="true">…</span> : null;');
     expect(button).toContain('setStatus(t("footer.reportLoading"));');
     // L'échec s'annonce aussi dans la région d'état (hors toast, il resterait muet).
-    expect(button).toMatch(/setStatus\(message\);\s*toast\?\.showError\(message\);/);
+    expect(button).toMatch(/if \(toast\) \{\s*setStatus\(""\);\s*toast\.showError\(message\);\s*\} else \{\s*setStatus\(message\);/);
     // Après un clic, jamais de rechargement d'office (une saisie en cours serait perdue).
     expect(button).not.toContain("reloadAfterChunkError");
     // Préchargé au survol : le clic ouvre sans passer par l'attente.
