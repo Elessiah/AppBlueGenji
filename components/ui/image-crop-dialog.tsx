@@ -6,7 +6,8 @@ import { useShellText } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { IMAGE_CROP_FIELD, serializeCropRect, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
 import { isChunkLoadError, onceLoader, quietPreload } from "@/lib/shared/lazy-component";
-import type { ImageCropDialogProps, ImageCropMessages } from "./image-crop-dialog-view";
+import { englishImageCrop as englishCropLoader } from "@/components/i18n/english-loaders";
+import type { ImageCropDialogProps } from "./image-crop-dialog-view";
 
 /**
  * La modale de recadrage, chargée **à la demande** (revue de performance du
@@ -23,8 +24,6 @@ import type { ImageCropDialogProps, ImageCropMessages } from "./image-crop-dialo
  */
 type CropDialog = ComponentType<ImageCropDialogProps>;
 const cropDialogLoader = onceLoader<CropDialog>(() => import("./image-crop-dialog-view").then((module) => module.ImageCropDialog));
-/** L'anglais de la modale, sous `/en` seulement (hors écran du staff, en français). */
-const englishCropLoader = onceLoader<ImageCropMessages>(() => import("@/messages/en/imageCrop.json").then((module) => module.default));
 
 const preloadCropDialog = quietPreload(() => cropDialogLoader.load());
 const preloadCropEnglish = quietPreload(() => englishCropLoader.load());

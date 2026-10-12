@@ -9,7 +9,8 @@ import { useOptionalToast } from "@/components/ui/toast";
 import type { ReportCategory } from "@/lib/shared/content-reports";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import { isChunkLoadError } from "@/lib/shared/lazy-component";
-import { loadedEnglishReports, loadedReportForm, loadReportForm, preloadReportForm } from "./report-form-loader";
+import { englishReports } from "@/components/i18n/english-loaders";
+import { loadedReportForm, loadReportForm, preloadReportForm } from "./report-form-loader";
 import s from "./ReportProblemButton.module.css";
 
 /**
@@ -135,7 +136,7 @@ export function ReportProblemButton({
           authenticated={authenticated}
           initialCategory={initialCategory}
           onClose={() => setOpen(false)}
-          englishMessages={locale === "en" ? (loadedEnglishReports() ?? undefined) : undefined}
+          englishMessages={locale === "en" ? (englishReports.loaded() ?? undefined) : undefined}
         />
       )}
     </>

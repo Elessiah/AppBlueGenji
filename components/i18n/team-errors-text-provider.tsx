@@ -1,7 +1,7 @@
 "use client";
 
 import type { TeamErrorsMessages } from "@/app/(secured)/equipes/_lib/team-errors";
-import { englishTeamErrors } from "./english-loaders";
+import { englishTeamErrors, primeEnglish } from "./english-loaders";
 import { createScopedTextSlot, type ScopedTextProvider } from "./scoped-text-context";
 
 /**
@@ -18,6 +18,6 @@ export const teamErrorsTextSlot = createScopedTextSlot<TeamErrorsMessages>();
  * atteint ensuite par navigation ne le télécharge pas une seconde fois.
  */
 export const TeamErrorsTextProvider: ScopedTextProvider<TeamErrorsMessages> = (props) => {
-  if (props.locale === "en" && props.messages) englishTeamErrors.prime(props.messages);
+  primeEnglish(englishTeamErrors, props.locale, props.messages);
   return <teamErrorsTextSlot.Provider {...props} />;
 };

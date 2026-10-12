@@ -26,15 +26,6 @@ export function primeReportDialog(dialog: ReportDialog): void {
   dialogLoader.prime(dialog);
 }
 
-/**
- * L'anglais du formulaire (`englishReports`, partagé : une page qui l'a déjà
- * reçu — mise en page de `/signalements/[id]` — l'a amorcé par son
- * `ReportsTextProvider`), ou `null`.
- */
-export function loadedEnglishReports(): ReturnType<typeof englishLoader.loaded> {
-  return englishLoader.loaded();
-}
-
 /** Le formulaire et, sous `/en`, son anglais. */
 export function loadReportForm(locale: Locale): Promise<ReportDialog> {
   if (locale !== "en") return dialogLoader.load();

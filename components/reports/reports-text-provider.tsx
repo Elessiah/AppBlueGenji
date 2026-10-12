@@ -1,7 +1,7 @@
 "use client";
 
 import type frReports from "@/messages/fr/reports.json";
-import { englishReports } from "@/components/i18n/english-loaders";
+import { englishReports, primeEnglish } from "@/components/i18n/english-loaders";
 import { createScopedTextSlot, type ScopedTextProvider } from "@/components/i18n/scoped-text-context";
 
 /**
@@ -18,6 +18,6 @@ import { createScopedTextSlot, type ScopedTextProvider } from "@/components/i18n
 export const reportsTextSlot = createScopedTextSlot<typeof frReports>();
 
 export const ReportsTextProvider: ScopedTextProvider<typeof frReports> = (props) => {
-  if (props.locale === "en" && props.messages) englishReports.prime(props.messages);
+  primeEnglish(englishReports, props.locale, props.messages);
   return <reportsTextSlot.Provider {...props} />;
 };

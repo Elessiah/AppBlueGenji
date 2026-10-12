@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { PushTextProvider } from "@/components/notifications/push-text-provider";
 import type { Locale } from "@/lib/shared/locales";
-import { englishProfileMessages, useEnglishMessages, type ProfileEnglishMessages } from "./english-loaders";
+import { englishProfileMessages, type ProfileEnglishMessages } from "./profile-english";
+import { useEnglishMessages } from "./use-english-messages";
 import { ProfileTextProvider } from "./profile-text-provider";
 import { TeamErrorsTextProvider } from "./team-errors-text-provider";
 

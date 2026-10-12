@@ -7,8 +7,9 @@ import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { PushTextProvider } from "@/components/notifications/push-text-provider";
-import type frPush from "@/messages/fr/push.json";
 import { englishPush } from "@/components/i18n/english-loaders";
+import { useEnglishMessages } from "@/components/i18n/use-english-messages";
+import { quietPreload } from "@/lib/shared/lazy-component";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -155,13 +156,6 @@ export function MatchLaunchCenter({
     onPrivacyPage: pathname === PRIVACY_POLICY_PATH,
   });
   const { launches, refresh } = useMatchLaunchFeed(clocks);
-  // Sous `/en`, l'anglais du réglage des notifications part dès qu'un match se
-  // lance — avant que la fenêtre ne s'ouvre — plutôt qu'à son ouverture : le
-  // réglage paraît avec elle, sans second aller-retour ni saut de contenu.
-  const hasLaunches = launches.length > 0;
-  useEffect(() => {
-    if (text.locale === "en" && hasLaunches) englishPush.load().catch(() => undefined);
-  }, [text.locale, hasLaunches]);
   const [openMatchId, setOpenMatchId] = useState<number | null>(requestedMatchId);
   const [confirming, setConfirming] = useState(false);
   // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la
@@ -488,26 +482,21 @@ export function MatchLaunchCenter({
  * il retente à la réouverture suivante (`onceLoader` ne garde pas un échec).
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
-  const [english, setEnglish] = useState<typeof frPush | null>(() => englishPush.loaded());
-  useEffect(() => {
-    if (locale !== "en" || english) return;
-    let live = true;
-    englishPush
-      .load()
-      .then((messages) => {
-        if (live) setEnglish(messages);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [locale, english]);
+  const { english } = useEnglishMessages(locale, englishPush, undefined);
   if (locale === "en" && !english) return null;
   return (
     <PushTextProvider locale={locale} messages={locale === "en" ? (english ?? undefined) : undefined}>
       <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={lead} />
     </PushTextProvider>
   );
+}
+
+const preloadPush = quietPreload(() => englishPush.load());
+
+/** Précharge l'anglais du réglage des notifications (bouton de la fenêtre de lancement). */
+function preloadEnglishPush(locale: Locale): void {
+  if (locale !== "en" || englishPush.loaded()) return;
+  preloadPush();
 }
 
 /** Cadence de relève selon la phase la plus pressante de la liste. */
@@ -609,15 +598,20 @@ function LaunchFab({
   pending,
   onOpen,
 }: Readonly<{ pending: readonly MatchLaunchInfo[]; onOpen: (matchId: number) => void }>) {
-  const { t } = useLaunchText();
+  const { t, locale } = useLaunchText();
   const lobby = pending.find((info) => info.phase === "LOBBY");
   const target = lobby ?? pending[0];
+  // Sous `/en`, l'anglais du réglage des notifications part au survol : il est
+  // là quand la fenêtre s'ouvre, sans rien télécharger pour qui ne l'ouvre pas.
+  const preload = () => preloadEnglishPush(locale);
   return (
     <button
       type="button"
       className={styles.fab}
       data-phase={target.phase}
       onClick={() => onOpen(target.matchId)}
+      onPointerEnter={preload}
+      onFocus={preload}
     >
       <span aria-hidden="true">{lobby ? "⏳" : "▶"}</span>
       {lobby ? t("fabLobby") : t("fabMine")}

@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { englishReports, useEnglishMessages } from "@/components/i18n/english-loaders";
+import { englishReports } from "@/components/i18n/english-loaders";
+import { useEnglishMessages } from "@/components/i18n/use-english-messages";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
 import { ReportsTextProvider } from "./reports-text-provider";

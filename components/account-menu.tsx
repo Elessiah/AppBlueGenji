@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { preloadProfileEnglish } from "@/components/i18n/english-loaders";
+import { preloadProfileEnglish } from "@/components/i18n/profile-english";
 import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";

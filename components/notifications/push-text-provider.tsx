@@ -1,7 +1,7 @@
 "use client";
 
 import type frPush from "@/messages/fr/push.json";
-import { englishPush } from "@/components/i18n/english-loaders";
+import { englishPush, primeEnglish } from "@/components/i18n/english-loaders";
 import { createScopedTextSlot, type ScopedTextProvider } from "@/components/i18n/scoped-text-context";
 
 /**
@@ -15,6 +15,6 @@ import { createScopedTextSlot, type ScopedTextProvider } from "@/components/i18n
 export const pushTextSlot = createScopedTextSlot<typeof frPush>();
 
 export const PushTextProvider: ScopedTextProvider<typeof frPush> = (props) => {
-  if (props.locale === "en" && props.messages) englishPush.prime(props.messages);
+  primeEnglish(englishPush, props.locale, props.messages);
   return <pushTextSlot.Provider {...props} />;
 };

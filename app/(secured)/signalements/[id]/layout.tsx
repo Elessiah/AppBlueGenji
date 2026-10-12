@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { segmentTitle } from "@/lib/shared/page-metadata";
-import { DOCUMENT_REQUEST_HEADER, localeAlternates, localeHref } from "@/lib/shared/locales";
+import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { headers } from "next/headers";
+import { clientShowsSegment } from "@/lib/server/layout-messages";
 import { ConcernedReportsText } from "@/components/reports/concerned-reports-text";
 import { SecuredLoadingView } from "../../_shared/SecuredLoading";
 
@@ -33,19 +33,19 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
 /**
  * Pose les textes de la page et du formulaire de contestation : rien en
  * français, déjà dans le paquet de la page (`reports-text.ts`) ; l'anglais
- * sous `/en` seulement, et au chargement complet d'une page seulement (comme
- * `/profil`) — une navigation d'un signalement à l'autre, un préchargement ou
- * un rafraîchissement n'en portent aucun (`ConcernedReportsText`).
+ * sous `/en` seulement — et pas à un client qui affiche déjà un signalement
+ * (rafraîchissement, passage d'un signalement à l'autre : `clientShowsSegment`),
+ * qui le tient déjà (`ConcernedReportsText`).
  */
 export default async function ConcernedReportLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const documentRequest = (await headers()).get(DOCUMENT_REQUEST_HEADER) !== "0";
   const all = messagesFor(locale);
+  const messages = locale === "en" && !(await clientShowsSegment("/signalements")) ? all.reports : undefined;
   return (
     <ConcernedReportsText
       locale={locale}
-      messages={locale === "en" && documentRequest ? all.reports : undefined}
-      fallback={<SecuredLoadingView label={all.shell.loading} />}
+      messages={messages}
+      fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}
     >
       {children}
     </ConcernedReportsText>
