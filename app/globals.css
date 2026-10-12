@@ -833,17 +833,14 @@ textarea,
   cursor: pointer;
 }
 
-/* `aria-disabled` aussi : un champ occupé garde le focus (pas `disabled`) mais
-   n'invite pas à un second choix. */
-.field select:hover:not(:disabled):not([aria-disabled="true"]) {
+.field select:hover:not(:disabled) {
   border-color: var(--accent-green);
   background-color: rgba(10, 11, 15, 0.92);
 }
 
 .field input:not([type="checkbox"]):not([type="radio"]):disabled,
 .field textarea:disabled,
-.field select:disabled,
-.field select[aria-disabled="true"] {
+.field select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

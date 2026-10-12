@@ -747,7 +747,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm, of a
-            tournament&apos;s kick-off, of match reminders and of what concerns your account or your team.{" "}
+            tournament&apos;s kickoff, of match reminders and of what concerns your account or your team.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>
@@ -769,7 +769,7 @@ export function RgpdEn({
             </li>
             <li>
               <strong>In which language</strong>: your account&apos;s, French or English — the language of the page
-              at your last login, or the one you choose in <LocaleLink href="/profil#notifications">My profile</LocaleLink>,
+              at your last login, or the one you choose in <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>,
               until you next log in from a page in the other language. The site keeps this single choice with every
               account, subscribed or not, for the lifetime of the account; it appears in the export of your data and goes back to French if the
               account is anonymized. Discord messages, for their part, stay in French.

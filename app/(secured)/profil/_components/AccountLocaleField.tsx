@@ -35,15 +35,18 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
   const fieldErrors = useFieldErrors(ACCOUNT_LOCALE_FIELD_ERRORS, FIELD_IDS);
 
   // Langue relue ailleurs (connexion dans un autre onglet, puis rechargement
-  // des données de la page) : le champ la reprend, hors envoi en cours — le
-  // remonter perdrait l'envoi et le focus.
+  // des données de la page) : le champ la reprend sans être remonté (ce qui
+  // perdrait un envoi et le focus) — tant que le joueur n'a rien enregistré
+  // ici. Après, son choix sur cette page est le plus récent : une relecture
+  // commencée avant son envoi ne doit pas le recouvrir à l'écran.
   const [shown, setShown] = useState<Locale>(initial);
-  if (initial !== shown && !busy) {
+  const [chosenHere, setChosenHere] = useState(false);
+  if (initial !== shown && !busy && !chosenHere) {
     setShown(initial);
     setLocale(initial);
   }
 
-  /** Un envoi : `true` si la langue est enregistrée (toast dans les deux cas). */
+  /** Un envoi : `true` si la langue est enregistrée (toast d'erreur sinon). */
   const put = async (next: Locale): Promise<boolean> => {
     try {
       const response = await fetch("/api/profile/locale", {
@@ -54,7 +57,6 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
       fieldErrors.clear();
-      showSuccess(t("accountLocale.saved"));
       return true;
     } catch (e) {
       const code = (e as Error).message;
@@ -67,9 +69,9 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
 
   const save = async (value: string) => {
     if (!isLocale(value)) return;
-    // Pendant l'envoi, le champ garde le focus (`aria-disabled`, pas `disabled`
-    // qui le ferait perdre) ; un second choix n'est pas perdu : il s'affiche
-    // et part à la suite.
+    // Pendant l'envoi, le champ reste utilisable (`aria-busy`, ni `disabled`
+    // qui ferait perdre le focus, ni `aria-disabled` qui le dirait inerte) :
+    // un second choix s'affiche et part à la suite.
     if (busyRef.current) {
       queued.current = value;
       setLocale(value);
@@ -81,15 +83,23 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
     busyRef.current = true;
     setBusy(true);
     fieldErrors.clear();
+    let stored = false;
     while (next !== null) {
       setLocale(next);
-      if (await put(next)) saved = next;
+      if (await put(next)) {
+        saved = next;
+        stored = true;
+      }
       const after: Locale | null = queued.current;
       queued.current = null;
       next = after !== null && after !== saved ? after : null;
     }
-    // Ce que le serveur a retenu : le dernier envoi réussi.
+    // Ce que le serveur a retenu : le dernier envoi réussi, confirmé une fois.
     setLocale(saved);
+    if (stored) {
+      setChosenHere(true);
+      showSuccess(t("accountLocale.saved"));
+    }
     busyRef.current = false;
     setBusy(false);
   };
@@ -100,7 +110,6 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
       <select
         id={FIELD_ID}
         value={locale}
-        aria-disabled={busy || undefined}
         aria-busy={busy || undefined}
         onChange={(e) => void save(e.target.value)}
         {...fieldErrors.aria("locale", HINT_ID)}
