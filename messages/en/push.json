@@ -22,7 +22,7 @@
     },
     "CONTENT_REPORT": {
       "label": "Reports about you",
-      "description": "A report targets your account or your team: you can contest it."
+      "description": "A report targets your account or your team: you can appeal it."
     },
     "MODERATION": {
       "label": "Moderation decisions",
@@ -38,7 +38,7 @@
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",
-      "description": "A new report, or a contest, reaches moderation."
+      "description": "A new report, or an appeal, reaches moderation."
     }
   },
   "panel": {

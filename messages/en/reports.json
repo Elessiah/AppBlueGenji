@@ -106,7 +106,7 @@
     "unpublished": "Not published"
   },
   "status": {
-    "OPEN": "To handle",
+    "OPEN": "Pending",
     "IN_PROGRESS": "In progress",
     "RESOLVED": "Archived"
   },

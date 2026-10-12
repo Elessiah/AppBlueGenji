@@ -727,10 +727,14 @@ function ReportPrivacyNotice({ category }: Readonly<{ category: ReportCategory }
           {rightsText(text, category)}{" "}
           <LocaleLink href="/rgpd" target="_blank" rel="noreferrer">
             {t("dialog.privacyPolicy")}
+            {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
+            <span className="sr-only">{` ${t("dialog.newTab")}`}</span>
           </LocaleLink>{" "}
           ·{" "}
           <LocaleLink href={`${TERMS_PATH}#signalement`} target="_blank" rel="noreferrer">
             {t("dialog.terms")}
+            {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
+            <span className="sr-only">{` ${t("dialog.newTab")}`}</span>
           </LocaleLink>
         </li>
       </ul>

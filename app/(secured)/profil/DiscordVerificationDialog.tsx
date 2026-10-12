@@ -203,7 +203,7 @@ export function DiscordVerificationDialog({
             {richNodes(text.rich("verify.attested", { tag: initialTag }, { strong: (chunks) => <strong>{chunks}</strong> }))}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <CyberButton variant="ghost" type="button" onClick={onClose}>
+            <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
               {t("verify.cancel")}
             </CyberButton>
             <CyberButton variant="primary" type="submit" disabled={loading}>
@@ -223,7 +223,7 @@ export function DiscordVerificationDialog({
             {t("verify.linkedNoTag")}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <CyberButton variant="ghost" type="button" onClick={onClose}>
+            <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
               {t("verify.cancel")}
             </CyberButton>
             {/* Une navigation et non un appel de fond : l'aller-retour OAuth
@@ -266,7 +266,7 @@ export function DiscordVerificationDialog({
             </p>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <CyberButton variant="ghost" type="button" onClick={onClose}>
+            <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
               {t("verify.cancel")}
             </CyberButton>
             <CyberButton variant="primary" type="submit" disabled={loading}>
@@ -302,7 +302,7 @@ export function DiscordVerificationDialog({
         {/* Trois boutons : à la largeur d'un téléphone ils ne tiennent pas
             sur une ligne, la rangée passe à la ligne plutôt que de déborder. */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
-          <CyberButton variant="ghost" type="button" onClick={onClose}>
+          <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
             {t("verify.cancel")}
           </CyberButton>
           {/* Un code brûlé (cinq essais) ou expiré ne se corrige pas en le
@@ -361,7 +361,8 @@ export function DiscordVerificationDialog({
           style={{ fontSize: 22, margin: "12px 0 8px", display: "flex", alignItems: "center", gap: 8 }}
         >
           {t("verify.title")}
-          <VerifiedBadge size={20} labels={verifiedBadgeLabels(text)} />
+          {/* Décoratif ici (`alt` vide) : dans le titre, il ferait dire « certifié » au nom du dialogue. */}
+          <VerifiedBadge size={20} labels={{ alt: "", title: verifiedBadgeLabels(text).title }} />
         </h2>
 
         <p style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>
