@@ -4,7 +4,6 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { TeamsTextGate } from "@/components/i18n/teams-text-gate";
 import { isDocumentLoad } from "@/lib/server/layout-messages";
-import { SecuredLoadingView } from "../_shared/SecuredLoading";
 import TeamsList from "./TeamsList";
 
 /**
@@ -33,7 +32,7 @@ export default async function TeamsPage() {
   const all = messagesFor(locale);
   const messages = locale === "en" && (await isDocumentLoad()) ? all.teams : undefined;
   return (
-    <TeamsTextGate locale={locale} messages={messages} fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}>
+    <TeamsTextGate locale={locale} messages={messages}>
       <TeamsList />
     </TeamsTextGate>
   );

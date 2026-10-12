@@ -1,7 +1,8 @@
-/**
+/*
  * Module pur, sans `import()` (revue de performance du lot 9-2) : les portes
  * des mises en page l'importent sans emporter la mécanique du préchargement.
  */
+
 /**
  * Les pages dont l'anglais se précharge (revue de performance du lot 9-2) —
  * **une seule table**, lue par le préchargement au survol

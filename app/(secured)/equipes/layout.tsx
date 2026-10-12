@@ -4,7 +4,6 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { TeamErrorsTextGate } from "@/components/i18n/english-gates";
 import { isDocumentLoad } from "@/lib/server/layout-messages";
-import { SecuredLoadingView } from "../_shared/SecuredLoading";
 
 /**
  * Titre de l'annuaire des équipes et, faute de mieux, de ses sous-pages —
@@ -36,7 +35,6 @@ export default async function TeamsLayout({ children }: Readonly<{ children: Rea
     <TeamErrorsTextGate
       locale={locale}
       messages={messages}
-      fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}
     >
       {children}
     </TeamErrorsTextGate>

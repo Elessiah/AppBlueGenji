@@ -13,6 +13,7 @@ import { StatsPanelI18nProvider } from "./stats-panel-i18n";
 import { TeamErrorsTextProvider } from "./team-errors-text-provider";
 import { TeamPageTextProvider } from "./team-page-text-provider";
 import { useEnglishMessages } from "./use-english-messages";
+import { EnglishGateFallback } from "./english-gate-fallback";
 
 /**
  * Les fournisseurs des équipes et des joueurs, posés par leurs mises en page
@@ -22,10 +23,10 @@ import { useEnglishMessages } from "./use-english-messages";
  * `router.refresh()` après un réglage d'équipe), qui n'est pas gardée par le
  * cache du navigateur. Le client garde ce que la session a reçu, sinon le
  * charge par les morceaux de `english-loaders.ts` (immuables, gardés par le
- * cache HTTP), `fallback` (l'écran de chargement du segment) affiché d'ici
+ * cache HTTP), l'écran d'attente (`EnglishGateFallback`) affiché d'ici
  * là ; un échec retombe sur le français.
  */
-type GateProps<T> = Readonly<{ locale: Locale; messages?: T; fallback: ReactNode; children: ReactNode }>;
+type GateProps<T> = Readonly<{ locale: Locale; messages?: T; children: ReactNode }>;
 
 /**
  * Une porte extérieure (`/equipes`, `/joueurs`) **qui attend** son anglais ne
@@ -58,10 +59,10 @@ const TEAM_ROUTES = ["teamPage", "teams"] as const;
 const PLAYER_ROUTES = ["playerPage"] as const;
 
 /** `/equipes` et ses sous-pages : la table des refus d'équipe. */
-export function TeamErrorsTextGate({ locale, messages, fallback, children }: GateProps<Messages["teamErrors"]>) {
+export function TeamErrorsTextGate({ locale, messages, children }: GateProps<Messages["teamErrors"]>) {
   const { english, waiting } = useEnglishMessages(locale, englishTeamErrors, messages);
   useNestedEnglish(locale, TEAM_ROUTES, englishTeamErrors, waiting);
-  if (waiting) return <>{fallback}</>;
+  if (waiting) return <EnglishGateFallback />;
   return (
     <TeamErrorsTextProvider locale={locale} messages={english ?? undefined}>
       {children}
@@ -70,10 +71,10 @@ export function TeamErrorsTextGate({ locale, messages, fallback, children }: Gat
 }
 
 /** `/joueurs` et la fiche d'un joueur : l'espace `players`. */
-export function PlayersTextGate({ locale, messages, fallback, children }: GateProps<Messages["players"]>) {
+export function PlayersTextGate({ locale, messages, children }: GateProps<Messages["players"]>) {
   const { english, waiting } = useEnglishMessages(locale, englishPlayers, messages);
   useNestedEnglish(locale, PLAYER_ROUTES, englishPlayers, waiting);
-  if (waiting) return <>{fallback}</>;
+  if (waiting) return <EnglishGateFallback />;
   return (
     <PlayersTextProvider locale={locale} messages={english ?? undefined}>
       {children}
@@ -82,9 +83,9 @@ export function PlayersTextGate({ locale, messages, fallback, children }: GatePr
 }
 
 /** Le bloc de statistiques (fiche d'un joueur, d'une équipe). */
-export function StatsPanelGate({ locale, messages, fallback, children }: GateProps<StatsPanelMessages>) {
+export function StatsPanelGate({ locale, messages, children }: GateProps<StatsPanelMessages>) {
   const { english, waiting } = useEnglishMessages(locale, englishStatsPanel, messages);
-  if (waiting) return <>{fallback}</>;
+  if (waiting) return <EnglishGateFallback />;
   return <StatsPanelI18nProvider value={english ? { locale, messages: english } : undefined}>{children}</StatsPanelI18nProvider>;
 }
 
@@ -93,12 +94,11 @@ export function TeamPageTextGate({
   locale,
   messages,
   stats,
-  fallback,
   children,
 }: GateProps<Messages["team"]> & Readonly<{ stats?: StatsPanelMessages }>) {
   const team = useEnglishMessages(locale, englishTeam, messages);
   const panel = useEnglishMessages(locale, englishStatsPanel, stats);
-  if (team.waiting || panel.waiting) return <>{fallback}</>;
+  if (team.waiting || panel.waiting) return <EnglishGateFallback />;
   return (
     <TeamPageTextProvider locale={locale} messages={team.english ?? undefined}>
       <StatsPanelI18nProvider value={panel.english ? { locale, messages: panel.english } : undefined}>{children}</StatsPanelI18nProvider>

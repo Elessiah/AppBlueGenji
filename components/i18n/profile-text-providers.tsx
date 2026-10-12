@@ -8,6 +8,7 @@ import type { ProfileEnglishMessages } from "./profile-english";
 import { ProfileTextProvider } from "./profile-text-provider";
 import { TeamErrorsTextProvider } from "./team-errors-text-provider";
 import { useEnglishMessages } from "./use-english-messages";
+import { EnglishGateFallback } from "./english-gate-fallback";
 
 /**
  * Les fournisseurs de `/profil` (profil, refus d'équipe, notifications), posés
@@ -17,19 +18,18 @@ import { useEnglishMessages } from "./use-english-messages";
  * page ne le sérialise qu'au chargement complet ; sinon chacun des trois
  * espaces est repris de la session ou chargé à part, **en parallèle et chacun
  * pour soi** — un espace qui échoue retombe seul sur le français, les autres
- * restent en anglais. `fallback` (l'écran de chargement du segment) le temps
+ * restent en anglais. L'écran d'attente (`EnglishGateFallback`) le temps
  * qu'ils arrivent.
  */
 export function ProfileTextProviders({
   locale,
   messages,
-  fallback,
   children,
-}: Readonly<{ locale: Locale; messages?: ProfileEnglishMessages; fallback: ReactNode; children: ReactNode }>) {
+}: Readonly<{ locale: Locale; messages?: ProfileEnglishMessages; children: ReactNode }>) {
   const profile = useEnglishMessages(locale, englishProfile, messages?.profile);
   const teamErrors = useEnglishMessages(locale, englishTeamErrors, messages?.teamErrors);
   const push = useEnglishMessages(locale, englishPush, messages?.push);
-  if (profile.waiting || teamErrors.waiting || push.waiting) return <>{fallback}</>;
+  if (profile.waiting || teamErrors.waiting || push.waiting) return <EnglishGateFallback />;
   return (
     <TeamErrorsTextProvider locale={locale} messages={teamErrors.english ?? undefined}>
       <ProfileTextProvider locale={locale} messages={profile.english ?? undefined}>

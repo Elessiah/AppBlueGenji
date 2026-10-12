@@ -4,7 +4,6 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { PlayersTextGate } from "@/components/i18n/english-gates";
 import { isDocumentLoad } from "@/lib/server/layout-messages";
-import { SecuredLoadingView } from "../_shared/SecuredLoading";
 
 /**
  * Titre de l'annuaire des joueurs et, faute de mieux, de ses sous-pages —
@@ -33,7 +32,6 @@ export default async function PlayersLayout({ children }: Readonly<{ children: R
     <PlayersTextGate
       locale={locale}
       messages={messages}
-      fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}
     >
       {children}
     </PlayersTextGate>

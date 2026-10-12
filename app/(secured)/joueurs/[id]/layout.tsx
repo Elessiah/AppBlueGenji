@@ -9,7 +9,6 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { StatsPanelGate } from "@/components/i18n/english-gates";
 import { isDocumentLoad } from "@/lib/server/layout-messages";
-import { SecuredLoadingView } from "../../_shared/SecuredLoading";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -62,7 +61,6 @@ export default async function PlayerDetailLayout({ children }: Readonly<{ childr
     <StatsPanelGate
       locale={locale}
       messages={stats}
-      fallback={locale === "en" && !stats ? <SecuredLoadingView label={all.shell.loading} /> : null}
     >
       {children}
     </StatsPanelGate>

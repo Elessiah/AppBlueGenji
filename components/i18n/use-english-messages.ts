@@ -24,6 +24,8 @@ export function useEnglishMessages<T>(
   locale: Locale,
   loader: Pick<OnceLoader<T>, "load" | "loaded">,
   provided: T | undefined,
+  /** `"remount"` : un échec vaut jusqu'au prochain montage (fenêtre rouverte), pas à la navigation suivante. */
+  retry: "navigation" | "remount" = "navigation",
 ): { english: T | null; failed: boolean; waiting: boolean } {
   const [english, setEnglish] = useState<T | null>(() => {
     if (locale !== "en") return null;
@@ -31,8 +33,9 @@ export function useEnglishMessages<T>(
   });
   // L'adresse où le chargement a échoué : l'échec ne vaut que pour elle.
   const pathname = usePathname();
+  const scope = retry === "remount" ? "" : pathname;
   const [failedAt, setFailedAt] = useState<string | null | undefined>(undefined);
-  const failed = failedAt !== undefined && failedAt === pathname;
+  const failed = failedAt !== undefined && failedAt === scope;
   const waiting = locale === "en" && !english && !failed;
 
   useEffect(() => {
@@ -43,13 +46,13 @@ export function useEnglishMessages<T>(
         if (live) setEnglish(loaded);
       },
       () => {
-        if (live) setFailedAt(pathname);
+        if (live) setFailedAt(scope);
       },
     );
     return () => {
       live = false;
     };
-  }, [waiting, loader, pathname]);
+  }, [waiting, loader, scope]);
 
   // `waiting` : l'écran d'attente se montre — sous `/en`, ni anglais ni échec.
   return { english: locale === "en" ? english : null, failed, waiting };

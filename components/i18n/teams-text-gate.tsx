@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/shared/locales";
 import { englishTeams } from "./english-loaders-account";
 import { TeamsTextProvider } from "./teams-text";
 import { useEnglishMessages } from "./use-english-messages";
+import { EnglishGateFallback } from "./english-gate-fallback";
 
 /**
  * Les textes de l'annuaire `/equipes` et de la création d'une équipe, posés
@@ -18,11 +19,10 @@ import { useEnglishMessages } from "./use-english-messages";
 export function TeamsTextGate({
   locale,
   messages,
-  fallback,
   children,
-}: Readonly<{ locale: Locale; messages?: Messages["teams"]; fallback: ReactNode; children: ReactNode }>) {
+}: Readonly<{ locale: Locale; messages?: Messages["teams"]; children: ReactNode }>) {
   const { english, waiting } = useEnglishMessages(locale, englishTeams, messages);
-  if (waiting) return <>{fallback}</>;
+  if (waiting) return <EnglishGateFallback />;
   return (
     <TeamsTextProvider locale={locale} messages={english ?? undefined}>
       {children}

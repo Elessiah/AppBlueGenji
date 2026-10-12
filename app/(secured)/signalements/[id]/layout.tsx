@@ -6,7 +6,6 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { isDocumentLoad } from "@/lib/server/layout-messages";
 import { ConcernedReportsText } from "@/components/reports/concerned-reports-text";
-import { SecuredLoadingView } from "../../_shared/SecuredLoading";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -45,7 +44,6 @@ export default async function ConcernedReportLayout({ children }: Readonly<{ chi
     <ConcernedReportsText
       locale={locale}
       messages={messages}
-      fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}
     >
       {children}
     </ConcernedReportsText>

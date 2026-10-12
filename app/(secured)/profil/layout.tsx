@@ -5,7 +5,6 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { isDocumentLoad } from "@/lib/server/layout-messages";
 import { ProfileTextProviders } from "@/components/i18n/profile-text-providers";
-import { SecuredLoadingView } from "../_shared/SecuredLoading";
 
 /**
  * Titre de l'écran « Mon profil » — voir `app/(secured)/tournois/layout.tsx`
@@ -41,8 +40,6 @@ export default async function ProfileLayout({ children }: Readonly<{ children: R
     <ProfileTextProviders
       locale={locale}
       messages={messages}
-      // L'écran d'attente ne sert que si l'anglais manque au client : sérialisé alors seulement.
-      fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}
     >
       {children}
     </ProfileTextProviders>

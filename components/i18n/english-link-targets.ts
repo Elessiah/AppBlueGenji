@@ -5,12 +5,13 @@ import { quietPreload } from "@/lib/shared/lazy-component";
 import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";
 import { preloadProfileEnglish } from "./profile-english";
 
-/**
+/*
  * Ce que précharge le survol ou le focus d'un lien `/en/…` de l'espace
  * connecté, ou une navigation par le code (`EnglishLinkPreload`, revue de
  * performance du lot 9-2) : l'anglais de la page visée part avant la réponse
- * du routeur. Chargé lui-même au premier besoin.
+ * du routeur. Module chargé lui-même au premier besoin.
  */
+
 /** Précharge un groupe : rien s'il est déjà là, silence `PRELOAD_RETRY_MS` après un échec. */
 function group(loaders: readonly PageLoader[]): () => void {
   const preload = quietPreload(() => Promise.all(loaders.map((loader) => loader.load())));
@@ -34,6 +35,7 @@ const PRELOADS: Record<EnglishPage, () => void> = {
   ...PAGE_PRELOADS,
 };
 
+/** Lance l'anglais d'une page de la table (`ENGLISH_PAGES`). */
 export function preloadEnglishPage(page: EnglishPage): void {
   PRELOADS[page]();
 }

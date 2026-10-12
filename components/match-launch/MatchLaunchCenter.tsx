@@ -486,7 +486,7 @@ export function MatchLaunchCenter({
  * sans rien déplacer de ce qui se lit au-dessus.
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
-  const { english } = useEnglishMessages(locale, englishPush, undefined);
+  const { english } = useEnglishMessages(locale, englishPush, undefined, "remount");
   // Pas d'écran d'attente ici : rien tant que l'anglais manque (attente ou échec).
   if (locale === "en" && !english) return null;
   return (
