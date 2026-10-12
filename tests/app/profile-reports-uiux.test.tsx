@@ -81,8 +81,8 @@ describe("bouton du formulaire de signalement", () => {
     expect(button).toContain("onFocus: () => preloadForm(locale),");
     expect(button).toContain('"aria-busy": pending || undefined');
     // Un seul chargement partagé, retenté après un échec, qui le dit.
-    expect(button).toContain("dialogLoad ??= import(");
-    expect(button).toContain("dialogLoad = null;");
+    // Un seul chargement, un échec se retente (`onceLoader`, revue de performance).
+    expect(button).toContain('const dialogLoader = onceLoader<Dialog>(() => import("./ReportProblemDialog")');
     expect(button).toContain('const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");');
     expect(button).not.toContain('from "next/dynamic"');
   });

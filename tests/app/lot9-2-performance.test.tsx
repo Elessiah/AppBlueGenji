@@ -15,6 +15,7 @@ import { PushTextProvider } from "@/components/notifications/push-text-provider"
 import { FR_PROFILE, lookupCode } from "@/app/(secured)/profil/_lib/profile-text";
 import { FR_PROFILE_TEXT } from "@/components/i18n/profile-text";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
+import { onceLoader } from "@/lib/shared/lazy-component";
 import enReports from "@/messages/en/reports.json";
 import enPush from "@/messages/en/push.json";
 
@@ -40,12 +41,13 @@ describe("aucun anglais importé d'office", () => {
     expect(valueImports(path).filter((spec) => spec.startsWith("@/messages/en/"))).toEqual([]);
   });
 
-  it("la fenêtre de lancement, chargée à la demande, garde l'anglais du réglage dans son morceau", () => {
-    expect(readSource("components/match-launch/MatchLaunchCenterLazy.tsx")).toContain('import("./MatchLaunchCenter")');
-    expect(valueImports("components/match-launch/MatchLaunchCenter.tsx")).toContain("@/messages/en/push.json");
-    expect(readSource("components/match-launch/MatchLaunchCenter.tsx")).toContain(
-      'messages={text.locale === "en" ? enPush : undefined}',
-    );
+  it("la fenêtre de lancement ne charge l'anglais du réglage que sous /en", () => {
+    const launch = readSource("components/match-launch/MatchLaunchCenter.tsx");
+    expect(valueImports("components/match-launch/MatchLaunchCenter.tsx").filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+    expect(dynamicImports("components/match-launch/MatchLaunchCenter.tsx")).toEqual(["@/messages/en/push.json"]);
+    expect(launch).toContain('if (locale !== "en" || english) return;');
+    expect(launch).toContain('if (locale === "en" && !english) return null;');
+    expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
   });
 });
 
@@ -54,17 +56,24 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
 
   it("le formulaire et son anglais partent à la demande", () => {
     expect(dynamicImports("components/reports/ReportProblemButton.tsx")).toEqual(["./ReportProblemDialog", "@/messages/en/reports.json"]);
-    expect(button).toContain('if (locale !== "en") return loadDialog();');
-    expect(button).toContain('return locale === "en" && !loadedEnglish ? null : loadedDialog;');
+    expect(button).toContain('if (locale !== "en") return dialogLoader.load();');
+    expect(button).toContain('return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();');
   });
 
   it("le formulaire pose lui-même son fournisseur, anglais seulement sous /en", () => {
-    expect(button).toContain('englishMessages={locale === "en" ? (loadedEnglish ?? undefined) : undefined}');
+    expect(button).toContain('englishMessages={locale === "en" ? (englishLoader.loaded() ?? undefined) : undefined}');
     // Le bouton, au pied de chaque page, ne porte pas la mécanique du fournisseur.
     expect(valueImports("components/reports/ReportProblemButton.tsx")).not.toContain("./reports-text-provider");
     expect(readSource("components/reports/ReportProblemDialog.tsx")).toContain(
       '<ReportsTextProvider locale="en" messages={englishMessages}>',
     );
+  });
+
+  it("la page d'un signalement charge le formulaire de contestation à l'ouverture", () => {
+    const page = "app/(secured)/signalements/[id]/page.tsx";
+    expect(valueImports(page)).not.toContain("@/components/reports/ReportProblemDialog");
+    expect(dynamicImports(page)).toEqual(["@/components/reports/ReportProblemDialog"]);
+    expect(readSource(page)).toContain("{ ssr: false }");
   });
 
   it("la page d'un signalement : anglais sérialisé sous /en seulement", () => {
@@ -115,10 +124,28 @@ describe("modale de recadrage chargée à la demande", () => {
 
   it("le crochet ne charge la modale qu'à l'ouverture", () => {
     expect(dynamicImports("components/ui/image-crop-dialog.tsx")).toEqual(["./image-crop-dialog-view"]);
+    expect(hook).toContain("() => orReload(loadImageCropDialog()),");
     expect(hook).toContain('import type { ImageCropDialogProps } from "./image-crop-dialog-view";');
     expect(valueImports("components/ui/image-crop-dialog.tsx")).not.toContain("./image-crop-dialog-view");
     expect(hook).toContain("{ ssr: false }");
     expect(hook).toContain("orReload(");
+  });
+
+  it("chaque sélecteur de fichier précharge la modale pendant le choix du fichier", () => {
+    const pickers: Array<[string, number]> = [
+      ["app/(secured)/profil/page.tsx", 1],
+      ["app/(secured)/equipes/creer/CreateTeamForm.tsx", 1],
+      ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 1],
+      ["app/(secured)/tournois/_components/TournamentImagePicker.tsx", 1],
+      ["app/benevoles/BenevolesSection.tsx", 1],
+      ["components/cyber/landing/SponsorsGrid.tsx", 2],
+    ];
+    for (const [path, inputs] of pickers) {
+      const source = readSource(path);
+      expect(source.match(/type="file"\n\s*onClick=\{preloadImageCropDialog\}/g)).toHaveLength(inputs);
+      // Chaque attribut `type="file"` d'un champ (une ligne à lui), pas ceux des commentaires.
+      expect(source.match(/^\s*type="file"$/gm)).toHaveLength(inputs);
+    }
   });
 
   it("aucun écran n'importe la modale elle-même", () => {
@@ -168,5 +195,35 @@ describe("dates en heure de Paris, formateur réutilisé", () => {
     const dialog = readSource("components/reports/ReportProblemDialog.tsx");
     expect(dialog).toContain("return CONTEST_OPTION_DATE[locale].format(new Date(iso));");
     expect(dialog).not.toContain("date.toLocaleDateString(");
+  });
+});
+
+describe("onceLoader : un chargement partagé, un échec retenté", () => {
+  it("un seul appel pour plusieurs demandes, résultat gardé", async () => {
+    let calls = 0;
+    const loader = onceLoader(async () => {
+      calls += 1;
+      return "ok";
+    });
+    expect(loader.loaded()).toBeNull();
+    const [a, b] = await Promise.all([loader.load(), loader.load()]);
+    expect([a, b]).toEqual(["ok", "ok"]);
+    expect(await loader.load()).toBe("ok");
+    expect(calls).toBe(1);
+    expect(loader.loaded()).toBe("ok");
+  });
+
+  it("un échec n'est pas gardé : l'appel suivant retente", async () => {
+    let calls = 0;
+    const loader = onceLoader(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("Loading chunk 12 failed.");
+      return 42;
+    });
+    await expect(loader.load()).rejects.toThrow("Loading chunk 12 failed.");
+    expect(loader.loaded()).toBeNull();
+    expect(await loader.load()).toBe(42);
+    expect(calls).toBe(2);
+    expect(loader.loaded()).toBe(42);
   });
 });
