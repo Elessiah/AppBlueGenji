@@ -189,7 +189,10 @@ describe("middleware — avis de suspension sous /en/connexion", () => {
 describe("middleware — chargement complet ou requête du routeur (revue de performance du lot 9-2)", () => {
   it("dit au rendu un chargement complet, et une requête du routeur (navigation, router.refresh())", () => {
     expect(forwarded(call("/en/regles", { headers: { "sec-fetch-dest": "document" } }), DOCUMENT_REQUEST_HEADER)).toBe("1");
-    expect(forwarded(call("/en/regles"), DOCUMENT_REQUEST_HEADER)).toBe("1");
+    // Sans `Sec-Fetch-Dest` (Safari < 16.4) : `Accept` décide — un document demande du HTML, le routeur non.
+    expect(forwarded(call("/en/regles", { headers: { accept: "text/html,application/xhtml+xml" } }), DOCUMENT_REQUEST_HEADER)).toBe("1");
+    expect(forwarded(call("/en/regles", { headers: { accept: "*/*" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
+    expect(forwarded(call("/en/regles"), DOCUMENT_REQUEST_HEADER)).toBe("0");
     expect(forwarded(call("/en/regles", { headers: { "sec-fetch-dest": "empty" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
     expect(forwarded(call("/regles", { headers: { "sec-fetch-dest": "empty" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
   });

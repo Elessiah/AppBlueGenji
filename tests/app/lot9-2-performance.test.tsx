@@ -49,7 +49,9 @@ describe("aucun anglais importé d'office", () => {
   it("la fenêtre de lancement ne charge l'anglais du réglage que sous /en", () => {
     const launch = readSource("components/match-launch/MatchLaunchCenter.tsx");
     expect(valueImports("components/match-launch/MatchLaunchCenter.tsx").filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
-    expect(dynamicImports("components/match-launch/MatchLaunchCenter.tsx")).toEqual(["@/messages/en/push.json"]);
+    // Le chargeur partagé (`english-loaders.ts`) : déjà reçu par `/profil`, l'anglais ne repart pas.
+    expect(dynamicImports("components/match-launch/MatchLaunchCenter.tsx")).toEqual([]);
+    expect(valueImports("components/match-launch/MatchLaunchCenter.tsx")).toContain("@/components/i18n/english-loaders");
     expect(launch).toContain('if (locale !== "en" || english) return;');
     expect(launch).toContain('if (locale === "en" && !english) return null;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
@@ -66,7 +68,8 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
   const loader = readSource("components/reports/report-form-loader.ts");
 
   it("le formulaire et son anglais partent à la demande", () => {
-    expect(dynamicImports("components/reports/report-form-loader.ts")).toEqual(["./ReportProblemDialog", "@/messages/en/reports.json"]);
+    expect(dynamicImports("components/reports/report-form-loader.ts")).toEqual(["./ReportProblemDialog"]);
+    expect(loader).toContain('import { englishReports as englishLoader } from "@/components/i18n/english-loaders";');
     expect(dynamicImports("components/reports/ReportProblemButton.tsx")).toEqual([]);
     expect(loader).toContain('if (locale !== "en") return dialogLoader.load();');
     expect(loader).toContain('return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();');
@@ -77,9 +80,11 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
 
   it("l'anglais déjà servi par une page n'est pas retéléchargé par le pied de page", () => {
     expect(readSource("components/reports/reports-text-provider.tsx")).toContain(
-      'if (props.locale === "en" && props.messages) primeEnglishReports(props.messages);',
+      'if (props.locale === "en" && props.messages) englishReports.prime(props.messages);',
     );
-    expect(loader).toContain("englishLoader.prime(messages);");
+    // Le formulaire importé par la page d'un signalement amorce aussi le chargeur du pied.
+    expect(readSource("app/(secured)/signalements/[id]/page.tsx")).toContain("primeReportDialog(ReportProblemDialog);");
+    expect(loader).toContain("dialogLoader.prime(dialog);");
   });
 
   it("le formulaire pose lui-même son fournisseur, anglais seulement sous /en", () => {
@@ -103,9 +108,12 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
     expect(button).toContain("loadReportForm(locale)\n      .then(() => {");
   });
 
-  it("la page d'un signalement : anglais sérialisé sous /en seulement", () => {
-    expect(readSource("app/(secured)/signalements/[id]/layout.tsx")).toContain(
-      'messages={locale === "en" ? messagesFor(locale).reports : undefined}',
+  it("la page d'un signalement : anglais sérialisé sous /en, au chargement complet seulement", () => {
+    const layout = readSource("app/(secured)/signalements/[id]/layout.tsx");
+    expect(layout).toContain('const documentRequest = (await headers()).get(DOCUMENT_REQUEST_HEADER) !== "0";');
+    expect(layout).toContain('messages={locale === "en" && documentRequest ? all.reports : undefined}');
+    expect(readSource("components/reports/concerned-reports-text.tsx")).toContain(
+      "useEnglishMessages(locale, englishReports, messages)",
     );
   });
 });
@@ -167,7 +175,9 @@ describe("modale de recadrage chargée à la demande", () => {
     expect(hook).toContain("const cropDialog = request && ImageCropDialog ? (");
     // Le préchargement raté se tait un moment (`quietPreload`), rien s'il est déjà là.
     expect(hook).toContain("const preloadCropDialog = quietPreload(() => cropDialogLoader.load());");
-    expect(hook).toContain("if (cropDialogLoader.loaded()) return;");
+    expect(hook).toContain("if (!cropDialogLoader.loaded()) preloadCropDialog();");
+    // Sous `/en`, l'anglais de la modale est préchargé avec elle.
+    expect(hook).toContain("if (pageIsEnglish() && !englishCropLoader.loaded()) preloadCropEnglish();");
   });
 
   it("messages d'échec du recadrage dans les deux langues", () => {
