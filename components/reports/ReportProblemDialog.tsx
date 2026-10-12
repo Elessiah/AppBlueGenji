@@ -162,6 +162,7 @@ function ReportForm({
   const [goodFaith, setGoodFaith] = useState(false);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
   const [pageTarget, setPageTarget] = useState<ReportTargetOption | null>(null);
 
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
@@ -259,7 +260,9 @@ function ReportForm({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    // Garde par référence (revue de sécurité du lot 9-2) : deux envois dans le même
+    // instant feraient deux signalements, deux alertes et deux messages privés.
+    if (sending.current) return;
     if (!validation.ok) {
       showError(reportErrorText(text, validation.error));
       return;
@@ -268,6 +271,7 @@ function ReportForm({
       showError(reportErrorText(text, "REPORT_REPLY_CHANNEL_REQUIRED"));
       return;
     }
+    sending.current = true;
     setBusy(true);
     try {
       const response = await fetch("/api/reports", {
@@ -285,6 +289,7 @@ function ReportForm({
     } catch (error) {
       showError(reportErrorText(text, (error as Error).message));
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };

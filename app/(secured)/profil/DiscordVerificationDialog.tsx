@@ -11,7 +11,7 @@ import { FieldErrorText } from "@/components/ui/field-error-text";
 import { DISCORD_VERIFICATION_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
-import { INTL_LOCALE } from "@/lib/shared/locales";
+import { formatExpiryTime } from "@/lib/shared/dates";
 import { visibleText } from "@/lib/shared/visible-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
@@ -128,7 +128,7 @@ export function DiscordVerificationDialog({
       setChallenge(payload.challenge ?? "");
       showSuccess(
         t("verify.codeSent", {
-          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(INTL_LOCALE[text.locale]),
+          time: formatExpiryTime(payload.expiresAt, text.locale),
         }),
       );
     } catch (e) {

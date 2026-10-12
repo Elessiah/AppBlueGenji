@@ -35,9 +35,7 @@ import { SUSPENSION_REASON_MAX_LENGTH, SUSPENSION_REASON_MIN_LENGTH, cleanModera
 // Type seul : `content-reports.ts` importe les valeurs de ce module.
 import type { ReportCategory } from "./content-reports";
 import { cached } from "./intl-cache";
-
-/** Ce qu'affiche une date illisible : visible, sans langue. */
-export const UNREADABLE_DATE = "—";
+import { UNREADABLE_DATE } from "./dates";
 
 /** Durée de la quarantaine avant suppression définitive, en mois civils. */
 export const LOGO_QUARANTINE_MONTHS = 6;

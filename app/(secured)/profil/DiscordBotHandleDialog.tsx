@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { DISCORD_VERIFICATION_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { INTL_LOCALE } from "@/lib/shared/locales";
+import { formatExpiryTime } from "@/lib/shared/dates";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
@@ -89,7 +89,7 @@ export function DiscordBotHandleDialog({
       setChallenge(payload.challenge ?? "");
       showSuccess(
         t("botHandle.codeSent", {
-          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(INTL_LOCALE[text.locale]),
+          time: formatExpiryTime(payload.expiresAt, text.locale),
         }),
       );
     } catch (e) {

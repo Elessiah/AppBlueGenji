@@ -189,6 +189,7 @@ export default function ProfilePage() {
   });
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const saving = useRef(false);
   const [invitations, setInvitations] = useState<{ id: number; teamId: number; teamName: string; ownership?: boolean }[]>([]);
 
   const loadInvitations = async () => {
@@ -384,6 +385,10 @@ export default function ProfilePage() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    // Une sauvegarde à la fois (Entrée puis clic, double clic) : la seconde partirait
+    // avec des références pas encore réalignées (revue de sécurité du lot 9-2).
+    if (saving.current) return;
+    saving.current = true;
     fieldErrors.clear();
     try {
       // **On ne soumet que ce qu'on a changé.** Le formulaire renvoyait le tag
@@ -460,6 +465,8 @@ export default function ProfilePage() {
       const message = profileErrorMessage(code, text);
       fieldErrors.report(code, message);
       showError(message);
+    } finally {
+      saving.current = false;
     }
   };
 

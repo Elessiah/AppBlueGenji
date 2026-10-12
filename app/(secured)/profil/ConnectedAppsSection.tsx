@@ -21,7 +21,7 @@
  * (`lib/shared/account-connections.ts`), si bien qu'un bouton actif mène
  * toujours quelque part.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   checkConnectionUnlink,
@@ -93,6 +93,7 @@ export function ConnectedAppsSection({
   const { showError, showSuccess } = useToast();
   const text = useProfileText();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
+  const unlinking = useRef(false);
   // Le dialogue « Mettre à jour mon pseudo » de la ligne du bot, s'il est ouvert.
   const [botDialog, setBotDialog] = useState<"UPDATE" | "LINK" | null>(null);
   // Un retrait ferme les autres sessions : le compte d'à côté doit être relu.
@@ -131,6 +132,10 @@ export function ConnectedAppsSection({
   }, [showError, showSuccess, text]);
 
   const unlink = async (provider: OAuthProvider) => {
+    // Garde par référence, lue sans attendre de rendu : deux activations rapprochées
+    // n'envoient qu'un retrait (revue de sécurité du lot 9-2).
+    if (unlinking.current) return;
+    unlinking.current = true;
     setBusy(provider);
     try {
       const res = await fetch(`/api/profile/connections/${OAUTH_PROVIDER_SLUGS[provider]}`, {
@@ -147,6 +152,7 @@ export function ConnectedAppsSection({
       // dont le message anglais partait sinon tel quel dans la notification.
       showError(connectionErrorMessage((e as Error).message, text));
     } finally {
+      unlinking.current = false;
       setBusy(null);
     }
   };
