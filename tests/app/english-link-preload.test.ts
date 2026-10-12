@@ -318,3 +318,14 @@ describe("revue performance, trente-deuxième passe", () => {
     expect(teams).toContain("  }, [showError]);\n\n  useEffect(() => {\n    loadTeams();");
   });
 });
+
+describe("SonarCloud S8786 — barePath sans expression rationnelle", () => {
+  it("ôte requête, ancre et barres finales, garde la racine", () => {
+    expect(barePath("/equipes///")).toBe("/equipes");
+    expect(barePath("/")).toBe("/");
+    expect(barePath("//")).toBe("/");
+    expect(barePath("/joueurs/3/?a=1#b")).toBe("/joueurs/3");
+    expect(barePath("/profil#x/")).toBe("/profil");
+    expect(barePath("")).toBe("");
+  });
+});
