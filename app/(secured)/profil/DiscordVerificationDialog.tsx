@@ -186,6 +186,11 @@ export function DiscordVerificationDialog({
   // pas décoratif : une certification en cours d'envoi ne doit pas se faire
   // interrompre par une touche.
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: loading });
+  // « Annuler » suit la même règle, sans `disabled` : le focus n'en tombe pas
+  // hors de la modale pendant l'envoi (`aria-disabled`, clic ignoré).
+  const cancel = () => {
+    if (!loading) onClose();
+  };
   const backdrop = useBackdropDismiss(onClose, loading);
 
   if (!mounted) return null;
@@ -203,7 +208,7 @@ export function DiscordVerificationDialog({
             {richNodes(text.rich("verify.attested", { tag: initialTag }, { strong: (chunks) => <strong>{chunks}</strong> }))}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
+            <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
               {t("verify.cancel")}
             </CyberButton>
             <CyberButton variant="primary" type="submit" disabled={loading}>
@@ -223,7 +228,7 @@ export function DiscordVerificationDialog({
             {t("verify.linkedNoTag")}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
+            <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
               {t("verify.cancel")}
             </CyberButton>
             {/* Une navigation et non un appel de fond : l'aller-retour OAuth
@@ -266,7 +271,7 @@ export function DiscordVerificationDialog({
             </p>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
+            <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
               {t("verify.cancel")}
             </CyberButton>
             <CyberButton variant="primary" type="submit" disabled={loading}>
@@ -302,7 +307,7 @@ export function DiscordVerificationDialog({
         {/* Trois boutons : à la largeur d'un téléphone ils ne tiennent pas
             sur une ligne, la rangée passe à la ligne plutôt que de déborder. */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
-          <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
+          <CyberButton variant="ghost" type="button" aria-disabled={loading || undefined} onClick={cancel}>
             {t("verify.cancel")}
           </CyberButton>
           {/* Un code brûlé (cinq essais) ou expiré ne se corrige pas en le
