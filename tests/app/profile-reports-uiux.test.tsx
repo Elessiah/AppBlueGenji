@@ -499,3 +499,21 @@ describe("revue UI/UX, dix-huitième passe", () => {
     expect(pending).toContain("opacity: 1;");
   });
 });
+
+describe("revue UI/UX, dix-neuvième passe", () => {
+  it("bouton du système de design en attente : lisible (pas d'opacité), curseur d'attente", () => {
+    const css = source("components/cyber/CyberButton.module.css");
+    const rule = css.slice(css.indexOf('.root[aria-disabled="true"][aria-busy="true"] {'));
+    expect(rule.slice(0, rule.indexOf("}"))).toContain("opacity: 1;");
+    for (const dialog of ["DiscordVerificationDialog", "DiscordBotHandleDialog"]) {
+      const text = source(`app/(secured)/profil/${dialog}.tsx`);
+      expect(text).toContain('type="submit" aria-disabled={loading || undefined} aria-busy={loading || undefined}>');
+    }
+  });
+
+  it("ligne du bot : les deux boutons en `aria-disabled` pendant le geste", () => {
+    const apps = source("app/(secured)/profil/ConnectedAppsSection.tsx");
+    expect(apps).toContain("onClick={() => !busy && onUpdate(row.handleAction)}");
+    expect(apps).not.toContain("disabled={busy}");
+  });
+});
