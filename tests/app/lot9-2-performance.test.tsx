@@ -51,7 +51,7 @@ describe("aucun anglais importé d'office", () => {
     expect(valueImports("components/match-launch/MatchLaunchCenter.tsx").filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
     // Le chargeur partagé (`english-loaders.ts`) : déjà reçu par `/profil`, l'anglais ne repart pas.
     expect(dynamicImports("components/match-launch/MatchLaunchCenter.tsx")).toEqual([]);
-    expect(valueImports("components/match-launch/MatchLaunchCenter.tsx")).toContain("@/components/i18n/english-loaders");
+    expect(valueImports("components/match-launch/MatchLaunchCenter.tsx")).toContain("@/components/i18n/english-loaders-account");
     expect(launch).toContain('if (locale === "en" && !english) return null;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
     // Le crochet partagé ; préchargé au survol du bouton flottant, rien pour qui n'ouvre pas la fenêtre.

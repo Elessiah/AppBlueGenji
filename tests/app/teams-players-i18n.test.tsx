@@ -9,6 +9,9 @@ import type { ReactElement, ReactNode } from "react";
 
 let mockLocale: "fr" | "en" = "en";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
+// Chargement complet par défaut ; `"0"` : requête du routeur (navigation, `router.refresh()`).
+let mockDocument = "1";
+jest.mock("next/headers", () => ({ headers: async () => new Headers({ "x-bg-document": mockDocument }) }));
 jest.mock("next/navigation", () => ({
   usePathname: () => "/en/equipes/1",
   useParams: () => ({ id: "5" }),
@@ -204,6 +207,16 @@ describe("liste blanche et métadonnées", () => {
       mockLocale = "en";
       const english = (await layout({ children: child })) as ReactElement<{ messages?: unknown; value?: unknown }>;
       expect(english.props.messages ?? english.props.value).toBeDefined();
+      // Revue performance du lot 9-2 : jamais dans une réponse du routeur — le client garde le sien.
+      mockDocument = "0";
+      try {
+        const routed = (await layout({ children: child })) as ReactElement<{ messages?: unknown; stats?: unknown; fallback?: unknown }>;
+        expect(routed.props.messages).toBeUndefined();
+        expect(routed.props.stats).toBeUndefined();
+        expect(routed.props.fallback).toBeTruthy();
+      } finally {
+        mockDocument = "1";
+      }
     }
     for (const page of [TeamsPage, CreateTeamPage]) {
       mockLocale = "en";
