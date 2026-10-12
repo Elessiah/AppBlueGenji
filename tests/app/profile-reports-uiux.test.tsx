@@ -151,9 +151,9 @@ describe("revue UI/UX, troisième passe", () => {
     const html = renderToStaticMarkup(<ReportProblemButton authenticated={false} label="Report a problem" />);
     // Région d'état présente dès le rendu, vide tant que rien ne charge.
     expect(html).toContain('<output class="sr-only"></output>');
-    expect(html).not.toContain("…");
+    expect(html).not.toContain("Ouverture du formulaire");
     const button = source("components/reports/ReportProblemButton.tsx");
-    expect(button).toContain('const busyMark = pending ? <span aria-hidden="true">…</span> : null;');
+    expect(button).toContain('const visibleLabel = pending ? t("footer.reportLoading") : label;');
     expect(button).toContain('setStatus(t("footer.reportLoading"));');
     // L'échec s'annonce aussi dans la région d'état (hors toast, il resterait muet).
     expect(button).toMatch(/if \(toast\) \{\s*setStatus\(""\);\s*toast\.showError\(message\);\s*\} else \{\s*setStatus\(message\);/);
@@ -252,6 +252,8 @@ describe("revue UI/UX, cinquième passe", () => {
     expect(enReports.categories.CONTEST.label).toBe("Appeal");
     expect(enReports.concerned.myContests).toBe("Your appeals");
     expect(enReports.concerned.addContest).toBe("Add an appeal");
+    expect(enReports.concerned.contest).toBe("Appeal this report");
+    expect(enReports.dialog.contestOf).toBe("You're appealing report no. {id}.");
     expect(JSON.stringify(enReports)).not.toMatch(/the contest succeeds|your contest|contest deadline/i);
   });
 
@@ -319,6 +321,7 @@ describe("revue UI/UX, huitième passe", () => {
     expect(rgpd).not.toContain("other —,");
     const enProfile = (await import("@/messages/en/profile.json")).default;
     expect(JSON.stringify(enProfile)).not.toContain("Of age");
+    expect(enProfile.identity.adult).toBe("Age status");
   });
 });
 

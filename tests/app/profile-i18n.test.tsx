@@ -487,7 +487,7 @@ describe("anglais — écrans", () => {
       }
     }
     const contest = inEnglish(<ReportProblemDialog pathname="/signalements/9" authenticated contestOf={9} onClose={() => undefined} />);
-    expect(contest).toContain("You&#x27;re contesting report no. 9.");
+    expect(contest).toContain("You&#x27;re appealing report no. 9.");
     expectEnglish(contest);
   });
 
@@ -545,7 +545,13 @@ describe("équivalence avec next-intl, message par message", () => {
     );
   }
 
-  it.each(LOCALES.flatMap((locale) => (["profile", "reports", "imageCrop", "push"] as const).map((ns) => [locale, ns] as const)))(
+  type Namespace = "profile" | "reports" | "imageCrop" | "push";
+  const NAMESPACES: Namespace[] = ["profile", "reports", "imageCrop", "push"];
+  const CASES: Array<[(typeof LOCALES)[number], Namespace]> = LOCALES.flatMap((locale) =>
+    NAMESPACES.map((ns): [(typeof LOCALES)[number], Namespace] => [locale, ns]),
+  );
+
+  it.each(CASES)(
     "%s · %s",
     (locale, namespace) => {
       for (const { key, source } of leaves(messagesFor(locale)[namespace])) {
