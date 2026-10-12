@@ -96,6 +96,7 @@ describe("profil : fournisseurs sans français, anglais une seule fois", () => {
       "@/messages/en/profile.json",
       "@/messages/en/teamErrors.json",
       "@/messages/en/push.json",
+      "@/messages/en/teams.json",
       "@/messages/en/team.json",
       "@/messages/en/players.json",
       "@/messages/en/stats.json",
