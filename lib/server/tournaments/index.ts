@@ -498,8 +498,9 @@ export async function createTournament(
         payload.enduranceLossDelta ?? null,
         payload.endurancePlayoffSize ?? null,
         payload.enduranceMaxRounds ?? null,
-        // Déjà éteinte hors BG Survie par `validateTournamentInput`.
-        Number(payload.enduranceEarlyExit === true),
+        // Éteinte hors BG Survie, revérifié ici comme le format de l'arbre
+        // final : le service reste sûr appelé hors de la route HTTP.
+        Number(payload.format === "BG_SURVIE" && payload.enduranceEarlyExit === true),
         // Les deux colonnes vont par paire : une seule renseignée décrirait un
         // format incomplet, que `parseMatchFormat` relirait comme « libre ».
         matchFormat?.type ?? null,
