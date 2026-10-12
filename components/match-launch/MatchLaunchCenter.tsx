@@ -471,7 +471,6 @@ export function MatchLaunchCenter({
   );
 }
 
-/** Cadence de relève selon la phase la plus pressante de la liste. */
 /** L'anglais du réglage des notifications, chargé une fois, sous `/en` seulement. */
 const englishPush = onceLoader<typeof frPush>(() => import("@/messages/en/push.json").then((module) => module.default));
 
@@ -479,7 +478,9 @@ const englishPush = onceLoader<typeof frPush>(() => import("@/messages/en/push.j
  * Le réglage compact des notifications : un lecteur français ne télécharge pas
  * son anglais (revue de performance du lot 9-2). Sous `/en`, il paraît quand
  * l'anglais est là ; un échec le laisse caché — réglage facultatif, offert
- * aussi par `/profil` — plutôt que de le montrer en français.
+ * aussi par `/profil` — plutôt que de le montrer en français. Monté avec la
+ * fenêtre ouverte seulement (refermée, elle cède la place au bouton flottant),
+ * il retente à la réouverture suivante (`onceLoader` ne garde pas un échec).
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
   const [english, setEnglish] = useState<typeof frPush | null>(() => englishPush.loaded());
@@ -504,6 +505,7 @@ function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: stri
   );
 }
 
+/** Cadence de relève selon la phase la plus pressante de la liste. */
 function launchPollInterval(launches: readonly MatchLaunchInfo[]): number {
   const hasLobby = launches.some((info) => info.phase === "LOBBY");
   const hasActive = launches.some((info) => info.phase !== "SCHEDULED");

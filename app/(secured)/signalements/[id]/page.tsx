@@ -1,24 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import { orReload } from "@/lib/shared/lazy-component";
+// Import direct, voulu (revue de performance du lot 9-2) : contester est
+// l'action de cette page, ses textes sont déjà dans le morceau (la vue les
+// lit) ; chargé à l'ouverture, le formulaire ajouterait une attente et un échec
+// possible à ce geste pour ~4 Ko de code.
+import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
 import type { ConcernedReportView } from "@/lib/shared/content-reports";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useReportsText } from "@/components/reports/reports-text";
 import { ConcernedReport } from "./_components/ConcernedReport";
 import styles from "./concerned.module.css";
-
-/**
- * Le formulaire de contestation, chargé à l'ouverture (revue de performance du
- * lot 9-2) : le même morceau que celui du pied de page, qui n'alourdit plus la
- * page ; ses textes viennent du fournisseur de la mise en page.
- */
-const ReportProblemDialog = dynamic(
-  () => orReload(import("@/components/reports/ReportProblemDialog").then((module) => module.ReportProblemDialog)),
-  { ssr: false },
-);
 
 type LoadState = { status: "loading" } | { status: "missing" } | { status: "ready"; report: ConcernedReportView };
 

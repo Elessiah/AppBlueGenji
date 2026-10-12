@@ -1,37 +1,42 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useShellText } from "@/components/i18n/shell-text";
+import { useToast } from "@/components/ui/toast";
 import { IMAGE_CROP_FIELD, serializeCropRect, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
-import { onceLoader, orReload } from "@/lib/shared/lazy-component";
+import { isChunkLoadError, onceLoader } from "@/lib/shared/lazy-component";
 import type { ImageCropDialogProps } from "./image-crop-dialog-view";
 
 /**
  * La modale de recadrage, chargée **à la demande** (revue de performance du
  * lot 9-2) : elle ne s'ouvre qu'après le choix d'un fichier, et son code et ses
  * deux langues pesaient sur le premier chargement de chaque écran qui l'offre
- * — l'accueil compris. Un morceau disparu (déploiement entre la page et le
- * choix) recharge la page quand c'est sûr (`orReload`).
+ * — l'accueil compris.
+ *
+ * Chargement **à la main**, comme le formulaire de signalement, plutôt que
+ * `next/dynamic` + `orReload` : l'écran qui l'ouvre est un formulaire en cours
+ * de saisie — le recharger d'office la perdrait —, et `next/dynamic` garderait
+ * un échec réseau sous la forme d'un composant vide jusqu'au rechargement. Ici,
+ * un échec est dit (toast), `cropImage` rend `null` (rien ne part) et le choix
+ * suivant retente.
  */
-const ImageCropDialog = dynamic<ImageCropDialogProps>(
-  () => orReload(loadImageCropDialog()),
-  { ssr: false },
-);
+type CropDialog = ComponentType<ImageCropDialogProps>;
+const cropDialogLoader = onceLoader<CropDialog>(() => import("./image-crop-dialog-view").then((module) => module.ImageCropDialog));
 
-const cropDialogLoader = onceLoader(() => import("./image-crop-dialog-view").then((module) => module.ImageCropDialog));
-
-function loadImageCropDialog() {
-  return cropDialogLoader.load();
-}
+let preloadFailed = false;
 
 /**
  * Précharge la modale : à poser sur le `<input type="file">` qui la précède
  * (`onClick`, déclenché aussi par un `.click()` du bouton qui l'ouvre) — le
  * morceau arrive pendant que le lecteur choisit son fichier, et la modale
- * s'ouvre sans attente. Un échec reste muet : l'ouverture retente.
+ * s'ouvre sans attente. Un échec reste muet et ne se relance pas à chaque
+ * clic : l'ouverture, elle, retente et le dit.
  */
 export function preloadImageCropDialog(): void {
-  loadImageCropDialog().catch(() => undefined);
+  if (preloadFailed) return;
+  cropDialogLoader.load().catch(() => {
+    preloadFailed = true;
+  });
 }
 
 /** Une image choisie et sa zone gardée, prête à partir. */
@@ -145,6 +150,8 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
 } {
   const [request, setRequest] = useState<CropRequest | null>(null);
   const requestRef = useRef<CropRequest | null>(null);
+  const { showError } = useToast();
+  const { t } = useShellText();
 
   const settle = useCallback((image: CroppedImage | null) => {
     const current = requestRef.current;
@@ -153,20 +160,33 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
     current?.resolve(image);
   }, []);
 
-  const cropImage = useCallback((file: File, kind: ImageUploadKind, title: string) => {
-    requestRef.current?.resolve(null);
-    return new Promise<CroppedImage | null>((resolve) => {
-      const next = { file, kind, title, resolve };
-      requestRef.current = next;
-      setRequest(next);
-    });
-  }, []);
+  const cropImage = useCallback(
+    async (file: File, kind: ImageUploadKind, title: string) => {
+      try {
+        await cropDialogLoader.load();
+      } catch (error) {
+        // Rien ne part : l'écran garde sa saisie, le lecteur peut rechoisir.
+        showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));
+        return null;
+      }
+      return new Promise<CroppedImage | null>((resolve) => {
+        // Une demande neuve annule celle encore ouverte : seule la dernière image part.
+        requestRef.current?.resolve(null);
+        const next = { file, kind, title, resolve };
+        requestRef.current = next;
+        setRequest(next);
+      });
+    },
+    [showError, t],
+  );
 
   // Écran quitté modale ouverte : l'attente se résout en annulation plutôt
   // que de rester pendante.
   useEffect(() => () => requestRef.current?.resolve(null), []);
 
-  const cropDialog = request ? (
+  // Toujours là quand une demande existe : `cropImage` l'attend avant de la poser.
+  const ImageCropDialog = cropDialogLoader.loaded();
+  const cropDialog = request && ImageCropDialog ? (
     <ImageCropDialog
       key={`${request.file.name}-${request.file.size}-${request.file.lastModified}`}
       file={request.file}

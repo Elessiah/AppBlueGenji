@@ -55,8 +55,16 @@ function loadedForm(locale: Locale): Dialog | null {
   return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();
 }
 
+/**
+ * Un préchargement raté (hors ligne, déploiement) ne se relance pas à chaque
+ * survol ou focus : seul le clic retente — et dit l'échec.
+ */
+let preloadFailed = false;
 const preloadForm = (locale: Locale) => {
-  loadForm(locale).catch(() => undefined);
+  if (preloadFailed) return;
+  loadForm(locale).catch(() => {
+    preloadFailed = true;
+  });
 };
 
 interface ReportProblemButtonProps {
