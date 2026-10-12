@@ -95,7 +95,6 @@ function healthyRules(): Rule[] {
   return [
     { match: /^SELECT DELETE_RULE/, reply: () => [[{ deleteRule: "SET NULL" }], undefined] },
     { match: /^ALTER TABLE bg_matches ADD COLUMN launched_at/, reply: () => { throw mysqlError("ER_DUP_FIELDNAME"); } },
-    { match: /^ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit/, reply: () => { throw mysqlError("ER_DUP_FIELDNAME"); } },
     { match: /^SELECT COLUMN_DEFAULT/, reply: () => [[{ columnDefault: "0" }], undefined] },
     { match: /DROP COLUMN/, reply: () => { throw mysqlError("ER_CANT_DROP_FIELD_OR_KEY"); } },
     { match: /^UPDATE bg_site_visits SET authenticated/, reply: () => { throw mysqlError("ER_BAD_FIELD_ERROR"); } },
@@ -397,44 +396,6 @@ describe("backfillLaunchedAt", () => {
     await getDatabase();
 
     expect(errors()).toContain("ADD COLUMN launched_at DATETIME NULL AFTER lobby_opened_at");
-  });
-});
-
-describe("addEnduranceEarlyExit", () => {
-  const ADD = /^ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit/;
-  const DEFAULT_OFF = /^ALTER TABLE bg_tournaments ALTER COLUMN endurance_early_exit SET DEFAULT 0/;
-  const NARROW = /^UPDATE bg_tournaments SET endurance_early_exit = 0/;
-
-  it("fait naître la colonne à 1 (ajout et remplissage en une instruction), puis remet le défaut à 0 et resserre", async () => {
-    on(ADD, () => OK);
-
-    await getDatabase();
-
-    expect(issued[rank(ADD)]).toContain("NOT NULL DEFAULT 1 AFTER endurance_max_rounds");
-    expect(rank(DEFAULT_OFF)).toBeGreaterThan(rank(ADD));
-    expect(rank(NARROW)).toBeGreaterThan(rank(DEFAULT_OFF));
-    expect(issued[rank(NARROW)]).toContain("WHERE NOT (format = 'BG_SURVIE' AND endurance_max_rounds IS NOT NULL)");
-  });
-
-  it("colonne déjà là : remet le défaut à 0 à chaque démarrage, sans rien resserrer (un tournoi coché depuis le reste)", async () => {
-    await getDatabase();
-
-    expect(count(DEFAULT_OFF)).toBe(1);
-    expect(count(NARROW)).toBe(0);
-    expect(errors()).not.toContain("endurance_early_exit");
-  });
-
-  it("dit chaque échec sous sa propre instruction", async () => {
-    on(ADD, () => OK);
-    fail(DEFAULT_OFF, "ER_LOCK_WAIT_TIMEOUT");
-    fail(NARROW, "ER_LOCK_WAIT_TIMEOUT");
-
-    await getDatabase();
-
-    expect(errors()).toContain("ALTER COLUMN endurance_early_exit SET DEFAULT 0");
-    expect(errors()).toContain("UPDATE bg_tournaments SET endurance_early_exit = 0");
-    // L'ajout a réussi : le resserrement est tenté malgré l'échec du défaut.
-    expect(count(NARROW)).toBe(1);
   });
 });
 
