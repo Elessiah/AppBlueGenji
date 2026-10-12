@@ -1,7 +1,8 @@
 "use client";
 
 import type { ProfileMessages } from "./profile-text";
-import { createScopedTextSlot } from "./scoped-text-context";
+import { englishProfile, primeEnglish } from "./english-loaders";
+import { createScopedTextSlot, type ScopedTextProvider } from "./scoped-text-context";
 
 /**
  * Le fournisseur des textes de `/profil`, **sans** leur français : posé par
@@ -11,4 +12,8 @@ import { createScopedTextSlot } from "./scoped-text-context";
  */
 export const profileTextSlot = createScopedTextSlot<ProfileMessages>();
 
-export const ProfileTextProvider = profileTextSlot.Provider;
+/** L'anglais reçu amorce le chargeur partagé (`englishProfile`) : une navigation suivante ne le recharge pas. */
+export const ProfileTextProvider: ScopedTextProvider<ProfileMessages> = (props) => {
+  primeEnglish(englishProfile, props.locale, props.messages);
+  return <profileTextSlot.Provider {...props} />;
+};

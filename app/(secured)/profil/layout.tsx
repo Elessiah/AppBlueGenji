@@ -3,7 +3,7 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { clientShowsSegment } from "@/lib/server/layout-messages";
+import { isDocumentLoad } from "@/lib/server/layout-messages";
 import { ProfileTextProviders } from "@/components/i18n/profile-text-providers";
 import { SecuredLoadingView } from "../_shared/SecuredLoading";
 
@@ -26,16 +26,17 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Pose les textes du profil, ceux du réglage des notifications et la table des
  * refus d'équipe (réponses aux invitations, refus d'une image) : rien en
- * français, déjà dans le paquet ; l'anglais sous `/en` seulement — et pas au
- * `router.refresh()` qui suit chaque enregistrement (`clientShowsSegment`) :
- * le client le tient déjà. Chargement complet et arrivée par navigation le
- * reçoivent dans la réponse, sans aller-retour de plus.
+ * français, déjà dans le paquet ; l'anglais sous `/en` seulement, et au
+ * chargement complet seulement (`isDocumentLoad`) — jamais dans une réponse du
+ * routeur : ni au `router.refresh()` qui suit chaque enregistrement, ni à une
+ * navigation ou un préchargement. Le client garde ce qu'il a reçu, ou le
+ * charge par son morceau, gardé par le cache HTTP (`ProfileTextProviders`).
  */
 export default async function ProfileLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
   const all = messagesFor(locale);
   const messages =
-    locale === "en" && !(await clientShowsSegment("/profil")) ? { profile: all.profile, teamErrors: all.teamErrors, push: all.push } : undefined;
+    locale === "en" && (await isDocumentLoad()) ? { profile: all.profile, teamErrors: all.teamErrors, push: all.push } : undefined;
   return (
     <ProfileTextProviders
       locale={locale}

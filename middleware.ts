@@ -160,8 +160,7 @@ function isDocumentRequest(request: NextRequest): boolean {
  * dictionnaire à chaque rafraîchissement.
  */
 function isDocumentLoad(request: NextRequest): boolean {
-  const dest = request.headers.get("sec-fetch-dest");
-  if (dest !== null) return dest === "document";
+  if (request.headers.has("sec-fetch-dest")) return isDocumentRequest(request);
   return request.headers.get("accept")?.includes("text/html") ?? false;
 }
 

@@ -25,17 +25,10 @@ function loadProfileEnglish(): Promise<ProfileEnglishMessages> {
   }));
 }
 
-function primeProfileEnglish(messages: ProfileEnglishMessages): void {
-  englishProfile.prime(messages.profile);
-  englishTeamErrors.prime(messages.teamErrors);
-  englishPush.prime(messages.push);
-}
-
-/** Le chargeur composé de `/profil`, au format d'un `OnceLoader`. */
-export const englishProfileMessages: Pick<OnceLoader<ProfileEnglishMessages>, "load" | "loaded" | "prime"> = {
+/** Le chargeur composé de `/profil`, au format d'un `OnceLoader` (l'amorce passe par les fournisseurs). */
+export const englishProfileMessages: Pick<OnceLoader<ProfileEnglishMessages>, "load" | "loaded"> = {
   load: loadProfileEnglish,
   loaded: loadedProfileEnglish,
-  prime: primeProfileEnglish,
 };
 
 const preloadProfile = quietPreload(loadProfileEnglish);

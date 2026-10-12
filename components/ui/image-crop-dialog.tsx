@@ -28,9 +28,15 @@ const cropDialogLoader = onceLoader<CropDialog>(() => import("./image-crop-dialo
 const preloadCropDialog = quietPreload(() => cropDialogLoader.load());
 const preloadCropEnglish = quietPreload(() => englishCropLoader.load());
 
-/** La langue de la page, lue sur `<html lang>` (posé par la mise en page racine). */
-function pageIsEnglish(): boolean {
-  return typeof document !== "undefined" && document.documentElement.lang === "en";
+/**
+ * La langue de l'élément qui ouvre la modale (son `lang` le plus proche, `<html
+ * lang>` à défaut) : un outil du staff, en français sous `/en`, porte
+ * `lang="fr"` — sa modale aussi (`useImageCropper({ lang: "fr" })`).
+ */
+function opensInEnglish(target: EventTarget | null | undefined): boolean {
+  if (typeof document === "undefined") return false;
+  const element = target instanceof Element ? target : document.documentElement;
+  return (element.closest("[lang]")?.getAttribute("lang") ?? document.documentElement.lang) === "en";
 }
 
 /**
@@ -40,10 +46,10 @@ function pageIsEnglish(): boolean {
  * s'ouvre sans attente. Un échec reste muet et se tait un moment
  * (`quietPreload`) : l'ouverture, elle, retente et le dit.
  */
-export function preloadImageCropDialog(): void {
+export function preloadImageCropDialog(event?: { currentTarget: EventTarget | null }): void {
   if (!cropDialogLoader.loaded()) preloadCropDialog();
-  // Sous `/en`, l'anglais aussi — un écran du staff en français l'aura pour rien, quelques centaines d'octets.
-  if (pageIsEnglish() && !englishCropLoader.loaded()) preloadCropEnglish();
+  // Sous `/en`, l'anglais aussi — sauf pour un outil du staff, en français.
+  if (opensInEnglish(event?.currentTarget) && !englishCropLoader.loaded()) preloadCropEnglish();
 }
 
 /** Une image choisie et sa zone gardée, prête à partir. */
