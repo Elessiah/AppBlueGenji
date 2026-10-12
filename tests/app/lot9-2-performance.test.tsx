@@ -111,7 +111,10 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
 
   it("la page d'un signalement : anglais sérialisé sous /en, au chargement complet seulement", () => {
     const layout = readSource("app/(secured)/signalements/[id]/layout.tsx");
-    expect(layout).toContain('const messages = locale === "en" && !(await clientShowsSegment("/signalements")) ? all.reports : undefined;');
+    expect(layout).toContain('const messages = locale === "en" && (await isDocumentLoad()) ? all.reports : undefined;');
+    expect(readSource("app/(secured)/profil/layout.tsx")).toContain(
+      'locale === "en" && (await isDocumentLoad()) ? { profile: all.profile, teamErrors: all.teamErrors, push: all.push } : undefined;',
+    );
     // L'écran d'attente n'est sérialisé que s'il peut servir.
     expect(layout).toContain('fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}');
     expect(readSource("app/(secured)/profil/layout.tsx")).toContain(
@@ -184,7 +187,9 @@ describe("modale de recadrage chargée à la demande", () => {
     expect(hook).toContain("const preloadCropDialog = quietPreload(() => cropDialogLoader.load());");
     expect(hook).toContain("if (!cropDialogLoader.loaded()) preloadCropDialog();");
     // Sous `/en`, l'anglais de la modale est préchargé avec elle.
-    expect(hook).toContain("if (pageIsEnglish() && !englishCropLoader.loaded()) preloadCropEnglish();");
+    expect(hook).toContain("if (opensInEnglish(event?.currentTarget) && !englishCropLoader.loaded()) preloadCropEnglish();");
+    // La langue de l'élément qui ouvre : un outil du staff (`lang="fr"`) ne précharge pas l'anglais.
+    expect(hook).toContain('return (element.closest("[lang]")?.getAttribute("lang") ?? document.documentElement.lang) === "en";');
   });
 
   it("messages d'échec du recadrage dans les deux langues", () => {
@@ -347,5 +352,24 @@ describe("modale de recadrage : anglais passé par le crochet", () => {
     expect(readSource("components/ui/image-crop-dialog.tsx")).toContain(
       "englishMessages={english ? (englishCropLoader.loaded() ?? undefined) : undefined}",
     );
+  });
+});
+
+describe("une seule amorce par espace, préchargement de /profil sur ses liens", () => {
+  it("les fournisseurs amorcent ; le crochet ne fait que lire et charger", () => {
+    for (const path of [
+      "components/i18n/profile-text-provider.tsx",
+      "components/i18n/team-errors-text-provider.tsx",
+      "components/notifications/push-text-provider.tsx",
+      "components/reports/reports-text-provider.tsx",
+    ]) {
+      expect(readSource(path)).toMatch(/primeEnglish\(english\w+, props\.locale, props\.messages\);/);
+    }
+    expect(readSource("components/i18n/use-english-messages.ts")).not.toContain("primeEnglish(");
+  });
+
+  it("les liens vers /profil préchargent son anglais (morceau gardé par le cache HTTP)", () => {
+    expect(readSource("components/account-menu.tsx")).toContain("const preload = () => preloadProfileEnglish(locale);");
+    expect(readSource("app/(secured)/joueurs/PlayersList.tsx")).toContain("onPointerEnter={() => preloadProfileEnglish(text.locale)}");
   });
 });
