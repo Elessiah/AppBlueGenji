@@ -257,6 +257,12 @@ describe("revue UI/UX, quatrième passe", () => {
     expect(apps).toContain("unlinking.current = false;");
   });
 
+  it("date d'un signalement à contester : illisible, un tiret (le formulaire ne tombe pas)", () => {
+    expect(source("components/reports/ReportProblemDialog.tsx")).toContain(
+      "return Number.isNaN(date.getTime()) ? UNREADABLE_DATE : format.format(date);",
+    );
+  });
+
   it("heure d'expiration d'un code : jamais « Invalid Date »", () => {
     for (const file of ["app/(secured)/profil/DiscordVerificationDialog.tsx", "app/(secured)/profil/DiscordBotHandleDialog.tsx"]) {
       expect(source(file)).toContain("time: formatExpiryTime(payload.expiresAt, text.locale),");
