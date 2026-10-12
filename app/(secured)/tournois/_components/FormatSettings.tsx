@@ -195,7 +195,9 @@ export function FormatSettings({
                 id={EARLY_EXIT_FIELD_ID}
                 type="checkbox"
                 disabled={locked("enduranceEarlyExit") || earlyExitBlocked !== null}
-                checked={values.enduranceEarlyExit}
+                // Grisée faute de pouvoir jouer, elle se montre décochée, comme
+                // « Égalités » : la valeur enregistrée reste, sans effet.
+                checked={values.enduranceEarlyExit && earlyExitBlocked === null}
                 onChange={(e) => set("enduranceEarlyExit", e.target.checked)}
                 {...earlyExitAria}
               />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
