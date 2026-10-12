@@ -323,7 +323,8 @@ describe("anglais", () => {
         ))}
       </>,
     );
-    expect(html).toContain("View Glaciers&#x27;s profile");
+    expect(html).toContain('aria-label="View the Glaciers team page"');
+    expect(html).not.toContain("View Glaciers&#x27;s profile");
     expect(html).toContain("FOUNDED · MAR 2026");
     expect(html).toContain("GHOST");
     expect(html).toContain("No matches");
@@ -551,6 +552,23 @@ describe("revue UI/UX", () => {
     expect(html).toContain('aria-label="View the Glaciers team page"');
     expect(html).toContain("View Nova&#x27;s profile");
     expect(messagesFor("fr").teams.card.viewTeam).toBe(messagesFor("fr").teams.card.viewProfile);
+  });
+
+  it("carte joueur : son équipe se nomme comme une équipe", () => {
+    const html = inEnglish(<PlayerCard player={publicUserProfile({ id: 2, pseudo: "Nova", team: { id: 4, name: "Glaciers", colorIndex: 1 } })} />);
+    expect(html).toContain('title="View the Glaciers team page"');
+  });
+
+  it("fiche joueur : un échec de chargement dit sa raison, la même que la notification", () => {
+    const loader = jest.requireMock<{ useResourceLoader: unknown }>("@/lib/shared/hooks/useResourceLoader");
+    const original = loader.useResourceLoader;
+    loader.useResourceLoader = () => ({ status: "error", data: null, error: "UNAUTHORIZED", refresh: () => undefined, revalidate: () => undefined });
+    try {
+      expect(inEnglish(<PlayerDetailPage />)).toContain("Your session has expired: log in again to continue.");
+      expect(renderToStaticMarkup(<PlayerDetailPage />)).toContain("Ta session a expiré : reconnecte-toi pour continuer.");
+    } finally {
+      loader.useResourceLoader = original;
+    }
   });
 
   it("fiche joueur en français : « 3e », « 3 V – 1 D »", () => {
