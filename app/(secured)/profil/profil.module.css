@@ -235,10 +235,9 @@
   margin-top: 14px;
 }
 
-/* Pendant l'enregistrement, le champ garde le focus (`aria-disabled`, pas
-   `disabled`) : il prend l'apparence d'un champ désactivé (`globals.css`), et
-   le curseur dit l'attente. */
-.accountLocale select[aria-busy="true"][aria-disabled="true"] {
+/* Pendant l'enregistrement, le champ reste utilisable (un second choix part à
+   la suite) : seul le curseur dit l'attente. */
+.accountLocale select[aria-busy="true"] {
   cursor: progress;
 }
 
