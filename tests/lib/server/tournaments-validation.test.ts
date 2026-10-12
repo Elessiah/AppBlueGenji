@@ -674,6 +674,15 @@ describe("validateTournamentInput — sortie anticipée « hors course » (BG Su
     expect(value({ ...base, format: "SINGLE", enduranceEarlyExit: true }).enduranceEarlyExit).toBe(false);
   });
 
+  // Comme le reste du barème : hors BG Survie, une valeur douteuse est ignorée
+  // (éteinte), pas refusée — la case n'existe pas dans le formulaire.
+  it("ignore une valeur douteuse hors BG Survie", () => {
+    const body: Parameters<typeof validateTournamentInput>[0] = { ...base, format: "SINGLE" };
+    Object.assign(body, { enduranceEarlyExit: "true" });
+    const result = validateTournamentInput(body);
+    expect("value" in result && result.value.enduranceEarlyExit).toBe(false);
+  });
+
   it.each(["true", 1, "1", {}])("refuse une valeur qui n'est pas un booléen (%j)", (raw) => {
     const body: Parameters<typeof validateTournamentInput>[0] = { ...bgs };
     Object.assign(body, { enduranceEarlyExit: raw });

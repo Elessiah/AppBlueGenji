@@ -167,6 +167,14 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(400);
   });
 
+  it("transmet la sortie anticipée et traduit son refus en 400", async () => {
+    jest.mocked(service.updateTournament).mockRejectedValue(new Error("INVALID_ENDURANCE_EARLY_EXIT"));
+    const res = await PATCH(patchReq({ enduranceEarlyExit: "true" }), params("1"));
+    expect(service.updateTournament).toHaveBeenCalledWith(1, { enduranceEarlyExit: "true" });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_ENDURANCE_EARLY_EXIT" });
+  });
+
   it("rend 500 sur une panne inattendue", async () => {
     jest.mocked(service.updateTournament).mockRejectedValue(new Error("ECONNRESET"));
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(500);

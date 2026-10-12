@@ -320,4 +320,12 @@ describe("sortie anticipée « hors course » (BG Survie)", () => {
       "FIELD_NOT_EDITABLE:enduranceEarlyExit",
     );
   });
+
+  // Allumée en pleine qualification, elle écarterait des équipes au prochain
+  // rejeu : un tournoi lancé ou terminé la refuse, sans rien écrire.
+  it.each(["RUNNING", "FINISHED"])("est refusée sur un tournoi %s, sans rien écrire", async (state) => {
+    rowToReturn = bgsRow({ state, start_visibility_at: past });
+    await expect(updateTournament(1, { enduranceEarlyExit: true })).rejects.toThrow("TOURNAMENT_LOCKED");
+    expect(executed.some((q) => /UPDATE bg_tournaments/i.test(q.sql))).toBe(false);
+  });
 });
