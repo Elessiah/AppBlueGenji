@@ -441,18 +441,21 @@ describe("langue du compte (lot 9-3)", () => {
     expectEnglish(html.replace(/<option[^>]*>[^<]*<\/option>/g, ""));
   });
 
-  it("pendant l'envoi : focus gardé (aria-disabled + aria-busy, jamais disabled), second choix refusé", async () => {
+  it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const field = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/AccountLocaleField.tsx"), "utf8");
-    expect(field).toContain("aria-disabled={busy || undefined}");
+    expect(field).not.toContain("aria-disabled={");
     expect(field).toContain("aria-busy={busy || undefined}");
     expect(field).not.toMatch(/\sdisabled=\{/);
     // Un second choix pendant l'envoi n'est pas perdu : affiché, puis envoyé à la suite.
     expect(field).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = value;\s*setLocale\(value\);\s*return;/);
     expect(field).toContain("next = after !== null && after !== saved ? after : null;");
     // Une langue relue ailleurs est reprise sans remonter le champ (ni perdre l'envoi ou le focus).
-    expect(field).toContain("if (initial !== shown && !busy) {");
+    expect(field).toContain("if (initial !== shown && !busy && !chosenHere) {");
+    // Un seul toast de succès par geste, après le dernier envoi, et aucun au fil des envois.
+    expect(field.match(/showSuccess\(/g)).toHaveLength(1);
+    expect(field).toMatch(/if \(stored\) \{\s*setChosenHere\(true\);\s*showSuccess\(t\("accountLocale\.saved"\)\);/);
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
       "<AccountLocaleField initial={data.accountLocale} />",
     );
@@ -465,15 +468,12 @@ describe("langue du compte (lot 9-3)", () => {
     expect(html).not.toContain("disabled");
   });
 
-  it("pendant l'envoi : apparence d'un champ désactivé, sans perdre le focus", async () => {
+  it("pendant l'envoi : seul le curseur dit l'attente, le champ ne se donne pas pour inerte", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
-    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\]\[aria-disabled="true"\] \{\s*cursor: progress;/);
-    // L'apparence désactivée et l'absence d'invitation au survol viennent de la règle globale du champ.
-    const globals = readFileSync(join(__dirname, "..", "..", "app/globals.css"), "utf8");
-    expect(globals).toContain('.field select:hover:not(:disabled):not([aria-disabled="true"]) {');
-    expect(globals).toMatch(/\.field select:disabled,\s*\.field select\[aria-disabled="true"\] \{\s*opacity: 0\.6;/);
+    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\] \{\s*cursor: progress;\s*\}/);
+    expect(css).not.toMatch(/accountLocale[^{]*\{[^}]*opacity/);
     // Le commentaire de `.hint` reste collé à sa règle.
     expect(css).toMatch(/12 px et `--ink-soft`[^*]*avant\. \*\/\s*\.hint \{/);
   });
