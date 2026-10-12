@@ -12,6 +12,7 @@ import {
 import { formatQuarantineDate, isImmediateLogoRemoval } from "@/lib/shared/logo-quarantine";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { visibleText } from "@/lib/shared/visible-text";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useReportsText } from "@/components/reports/reports-text";
@@ -28,12 +29,15 @@ function formatParisDay(iso: string, locale: Locale): string {
 
 /** Le nom d'une cible : fiche d'un joueur ou d'une équipe par son lien dédié, tournoi par son adresse. */
 function TargetName({ target }: Readonly<{ target: ConcernedReportView["targets"][number] }>) {
-  if (!target.exists) return <span>{target.label}</span>;
-  if (target.type === "USER") return <PlayerLink userId={target.id}>{target.label}</PlayerLink>;
-  if (target.type === "TEAM") return <TeamLink teamId={target.id}>{target.label}</TeamLink>;
+  // Un nom enregistré avant `visibleText` n'est pas réécrit en base : nettoyé ici
+  // (commandes de direction, invisibles), il ne réordonne pas la phrase.
+  const label = visibleText(target.label);
+  if (!target.exists) return <span>{label}</span>;
+  if (target.type === "USER") return <PlayerLink userId={target.id}>{label}</PlayerLink>;
+  if (target.type === "TEAM") return <TeamLink teamId={target.id}>{label}</TeamLink>;
   return (
     <LocaleLink href={reportTargetHref(target)} className="entity-link">
-      {target.label}
+      {label}
     </LocaleLink>
   );
 }
@@ -89,7 +93,7 @@ export function ConcernedReport({
               text.rich(
                 "concerned.logoHidden",
                 {
-                  name: quarantine.targetName,
+                  name: visibleText(quarantine.targetName),
                   since: formatParisDay(quarantine.hiddenAt, locale),
                   purge: formatParisDay(quarantine.purgeAfter, locale),
                 },
@@ -116,7 +120,7 @@ export function ConcernedReport({
             {richNodes(
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.logoRemovedImmediately" : "concerned.logoRemoved",
-                { name: quarantine.targetName, date: formatParisDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
+                { name: visibleText(quarantine.targetName), date: formatParisDay(quarantine.closedAt ?? quarantine.hiddenAt, locale) },
                 teamTags(quarantine.targetId, teamExists(quarantine.targetId)),
               ),
             )}

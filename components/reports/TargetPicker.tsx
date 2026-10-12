@@ -7,6 +7,7 @@ import {
   type ReportTargetOption,
   type ReportTargetType,
 } from "@/lib/shared/content-reports";
+import { visibleText } from "@/lib/shared/visible-text";
 import { targetDetailText, useReportsText } from "./reports-text";
 import styles from "./ReportProblem.module.css";
 
@@ -30,7 +31,7 @@ export function TargetThumb({ option }: Readonly<{ option: Pick<ReportTargetOpti
   }
   return (
     <span className={styles.chipThumb} aria-hidden="true">
-      {Array.from(option.label.trim())[0]?.toUpperCase() ?? "?"}
+      {Array.from(visibleText(option.label))[0]?.toUpperCase() ?? "?"}
     </span>
   );
 }
@@ -127,12 +128,12 @@ export function TargetPicker({ type, selected, onChange, full }: Readonly<Target
           {selected.map((option) => (
             <li key={option.id} className={styles.chip}>
               <TargetThumb option={option} />
-              <span>{option.label}</span>
+              <span>{visibleText(option.label)}</span>
               <button
                 type="button"
                 className={styles.chipRemove}
                 onClick={() => remove(option.id)}
-                aria-label={t("targets.remove", { label: option.label })}
+                aria-label={t("targets.remove", { label: visibleText(option.label) })}
               >
                 ×
               </button>
@@ -184,7 +185,7 @@ export function TargetPicker({ type, selected, onChange, full }: Readonly<Target
                   onMouseEnter={() => setActive(index)}
                 >
                   <TargetThumb option={option} />
-                  <span>{option.label}</span>
+                  <span>{visibleText(option.label)}</span>
                   {option.detail && <span className={styles.suggestionDetail}>{targetDetailText(text, option.detail)}</span>}
                 </li>
               ))

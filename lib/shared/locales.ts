@@ -30,7 +30,9 @@ export const LOCALE_HEADER = "x-bg-locale";
  * préchargement, `router.refresh()` (`"0"`, `Sec-Fetch-Dest: empty`). Next
  * retire son propre en-tête `RSC` de `headers()`. Une mise en page s'en sert
  * pour ne sérialiser un dictionnaire qu'une fois (`app/(secured)/profil/layout.tsx`).
- * Toujours remplacé, comme `LOCALE_HEADER` ; absent : chargement complet.
+ * Toujours remplacé, comme `LOCALE_HEADER` ; absent (requête qui n'est pas
+ * passée par le middleware) : **pas** un chargement complet — rien n'est
+ * sérialisé, le client charge son texte (revue de sécurité du lot 9-2).
  */
 export const DOCUMENT_REQUEST_HEADER = "x-bg-document";
 

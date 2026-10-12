@@ -154,8 +154,9 @@ function isDocumentRequest(request: NextRequest): boolean {
 /**
  * Chargement complet d'une page, pour `DOCUMENT_REQUEST_HEADER` : `Sec-Fetch-Dest`
  * quand le navigateur l'envoie ; sinon (Safari avant 16.4, certaines vues web)
- * l'en-tête `Accept` — un document demande `text/html`, le routeur de Next
- * (`fetch`) non. Plus strict que `isDocumentRequest` : sans aucun des deux,
+ * l'en-tête `Accept` — un document demande `text/html` **en tête** de liste,
+ * le routeur de Next (`fetch`) non ; un client qui glisse `text/html` plus loin
+ * (`*/*, text/html`) n'est pas pris pour un document (revue de sécurité du lot 9-2). Plus strict que `isDocumentRequest` : sans aucun des deux,
  * la page sert le texte par son propre morceau plutôt que de renvoyer le
  * dictionnaire à chaque rafraîchissement.
  */
@@ -164,7 +165,7 @@ function isDocumentRequest(request: NextRequest): boolean {
 // `next dev`, revue de performance du lot 9-2) — d'où ces indices du navigateur.
 function loadsDocument(request: NextRequest): boolean {
   if (request.headers.has("sec-fetch-dest")) return isDocumentRequest(request);
-  return request.headers.get("accept")?.includes("text/html") ?? false;
+  return request.headers.get("accept")?.trimStart().startsWith("text/html") ?? false;
 }
 
 /**

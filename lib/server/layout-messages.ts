@@ -7,7 +7,9 @@ import { DOCUMENT_REQUEST_HEADER } from "@/lib/shared/locales";
  * anglais ? Seulement pour un **chargement complet** de page (et non une
  * requête du routeur : navigation, préchargement de lien, `router.refresh()`)
  * **d'un lecteur connecté**. `DOCUMENT_REQUEST_HEADER` est posé par le
- * middleware ; absent, chargement complet.
+ * middleware ; il faut qu'il dise `"1"` : absent (préchargement qui échappe au
+ * `matcher`, en-têtes alors tels que le client les a forgés) ou autre, rien
+ * n'est sérialisé — la règle échoue fermée (revue de sécurité du lot 9-2).
  *
  * Revue de performance du lot 9-2 : une réponse du routeur n'est jamais mise
  * en cache par le navigateur — la renvoyer à chaque navigation, préchargement
@@ -19,6 +21,6 @@ import { DOCUMENT_REQUEST_HEADER } from "@/lib/shared/locales";
  * mémoïsé par requête : aucune lecture de plus.
  */
 export async function isDocumentLoad(): Promise<boolean> {
-  if ((await headers()).get(DOCUMENT_REQUEST_HEADER) === "0") return false;
+  if ((await headers()).get(DOCUMENT_REQUEST_HEADER) !== "1") return false;
   return (await getCurrentUser()) !== null;
 }

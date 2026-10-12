@@ -30,9 +30,15 @@ export const metadata: Metadata = {
 export default async function SecuredLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser();
 
-  // Les enfants ne sont pas rendus : rien du contenu protégé n'atteint la
-  // réponse. Seules les métadonnées du segment demandé le font, et c'est
-  // exactement ce qu'on veut — c'est ce que lit le robot d'aperçu de Discord.
+  // `children` n'est pas affiché, mais Next rend **quand même** les mises en
+  // page et la page des segments enfants (en parallèle) et sérialise leur
+  // charge RSC dans la réponse — vérifié sur `next dev` (revue de sécurité du
+  // lot 9-2). Ce garde n'est donc pas une frontière : tout composant serveur
+  // enfant qui lit une donnée privée vérifie lui-même la session
+  // (`isDocumentLoad`, `getCurrentUser` des métadonnées d'une fiche, `can` de
+  // `admin/signalements`) ; les pages, clientes, ne lisent rien sans l'API.
+  // Les métadonnées du segment demandé partent aussi, et c'est voulu — c'est
+  // ce que lit le robot d'aperçu de Discord.
   if (!user) {
     // Fiche de tournoi : le tournoi se suit sans compte. Chemin et requête sont
     // ceux posés par le middleware (sans préfixe de langue). L'ancre
