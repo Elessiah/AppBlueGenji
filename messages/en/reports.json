@@ -19,6 +19,7 @@
     "sending": "Sending…",
     "contestSent": "Your contest has been sent to the association, which is reviewing the report again.",
     "sent": "Thanks, your report no. {id} has been sent to the association.",
+    "sentNoId": "Thanks, your report has been sent to the association.",
     "targetsAnon": "<login>Log in</login> to point out the players, teams or tournaments concerned directly. Without an account, give their name or the page address in your description.",
     "contestAnon": "<login>Log in</login> to contest a report: only the targeted players, the members of the targeted teams and the author of a copyright or moderation report, once the case is archived, can do so.",
     "contestOf": "You're contesting report no. {id}.",

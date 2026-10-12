@@ -74,6 +74,8 @@
     },
     "reportProblem": "Signaler un problème",
     "reportLoadFailed": "Le formulaire n'a pas pu s'ouvrir. Réessaie dans un instant.",
+    "reportReloading": "Le site vient d'être mis à jour : la page va se recharger, puis le formulaire s'ouvrira au prochain clic.",
+    "reportLoading": "Ouverture du formulaire…",
     "copyright": "© 2026 {association}",
     "contact": {
       "email": "Email",

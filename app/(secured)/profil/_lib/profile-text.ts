@@ -120,7 +120,7 @@ export function connectionMethodText(text: ProfileText, connection: AccountConne
 /** Ce que la ligne du bot dit, dans la langue du texte : la traduction des codes de `discordBotRowState`. */
 export function discordBotRowText(
   text: ProfileText,
-  row: Pick<DiscordBotRowState, "noteCode" | "handle" | "refusal">,
+  row: Pick<DiscordBotRowState, "noteCode" | "handle" | "refusalCode">,
 ): { note: string; refusal: string | null } {
   const { t } = text;
   const notes: Record<DiscordBotNoteCode, () => string> = {
@@ -133,6 +133,6 @@ export function discordBotRowText(
   return {
     note: notes[row.noteCode](),
     // Le seul refus de la ligne : le dernier moyen de connexion.
-    refusal: row.refusal === null ? null : t("connections.bot.lastConnection"),
+    refusal: row.refusalCode === "LAST_CONNECTION" ? t("connections.bot.lastConnection") : null,
   };
 }

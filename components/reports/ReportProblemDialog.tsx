@@ -235,7 +235,9 @@ export function ReportProblemDialog({
       });
       const body = (await response.json().catch(() => ({}))) as { id?: number; error?: string };
       if (!response.ok) throw new Error(body.error);
-      showSuccess(category === "CONTEST" ? t("dialog.contestSent") : t("dialog.sent", { id: String(body.id) }));
+      // Un corps illisible ne porte pas de numéro : l'accusé s'en passe plutôt que de dire « n° undefined ».
+      const sent = typeof body.id === "number" ? t("dialog.sent", { id: String(body.id) }) : t("dialog.sentNoId");
+      showSuccess(category === "CONTEST" ? t("dialog.contestSent") : sent);
       onSubmitted?.();
       onClose();
     } catch (error) {

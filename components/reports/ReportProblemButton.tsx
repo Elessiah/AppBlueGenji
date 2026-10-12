@@ -90,7 +90,13 @@ export function ReportProblemButton({
         setOpen(true);
       })
       .catch((error: unknown) => {
-        if (isChunkLoadError(error)) reloadAfterChunkError();
+        // Un morceau disparu (déploiement) : la page se recharge dès que c'est
+        // sûr — le dire, plutôt que d'inviter à réessayer sous un rechargement.
+        if (isChunkLoadError(error)) {
+          reloadAfterChunkError();
+          toast?.showError(t("footer.reportReloading"));
+          return;
+        }
         toast?.showError(t("footer.reportLoadFailed"));
       })
       .finally(() => setPending(false));
@@ -105,6 +111,9 @@ export function ReportProblemButton({
     "aria-busy": pending || undefined,
     style: pending ? BUSY_STYLE : undefined,
   };
+  // Le chargement se voit (points de suspension) et s'annonce (région d'état,
+  // toujours présente pour qu'un lecteur d'écran lise son changement).
+  const busyMark = pending ? <span aria-hidden="true">…</span> : null;
   // Route sans préfixe de langue : la cible se reconnaît sous `/en/equipes/5`
   // comme sous `/equipes/5`, et le journal retient une seule adresse par page.
   const { path: pathname } = useLocalePathname();
@@ -115,13 +124,16 @@ export function ReportProblemButton({
         <CyberButton variant="ghost" {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
           {label}
+          {busyMark}
         </CyberButton>
       ) : (
         <button {...triggerProps}>
           {icon && <span aria-hidden="true">⚑</span>}
           {label}
+          {busyMark}
         </button>
       )}
+      <output className="sr-only">{pending ? t("footer.reportLoading") : ""}</output>
       {open && ReportProblemDialog && (
         <ReportProblemDialog
           pathname={pathname}

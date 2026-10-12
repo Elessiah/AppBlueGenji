@@ -206,12 +206,13 @@ export type DiscordBotRowState = {
   handleAction: "UPDATE" | "LINK";
   /** « Se déconnecter » est-il offert ? */
   canDisconnect: boolean;
-  /** La phrase de la ligne, sous le libellé. */
-  note: string;
-  /** Le cas de cette phrase : un écran traduit la phrase par ce code (`discordBotRowText`). */
+  /**
+   * Le cas de la phrase de la ligne, sous le libellé : l'écran la rédige dans
+   * sa langue (`discordBotRowText`, `profile.json` de chaque langue).
+   */
   noteCode: DiscordBotNoteCode;
   /** Un refus à dire en ambre (dernier moyen de connexion), sinon `null`. */
-  refusal: string | null;
+  refusalCode: "LAST_CONNECTION" | null;
 };
 
 /** Les cas de la phrase de la ligne « Bot Discord ». */
@@ -232,27 +233,13 @@ export function discordBotRowState(connections: readonly AccountConnection[]): D
   } else {
     noteCode = "NOT_LINKED";
   }
-  const handle = linked ? (discord?.handle ?? null) : null;
-  const notes: Record<DiscordBotNoteCode, string> = {
-    HANDLE: `Pseudo Discord : ${handle ?? ""}`,
-    LINKED_BY_CODE: "Rattaché par code en message privé",
-    LINKED_BY_BUTTON:
-      "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour.",
-    LINKED_ELSEWHERE:
-      "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour.",
-    NOT_LINKED: "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
-  };
   return {
     linked,
-    handle,
+    handle: linked ? (discord?.handle ?? null) : null,
     handleAction: anyLinked ? "UPDATE" : "LINK",
     canDisconnect: linked && unlinkRefusal === null,
-    note: notes[noteCode],
     noteCode,
-    refusal:
-      unlinkRefusal === "LAST_CONNECTION"
-        ? "Impossible de te déconnecter du bot : c'est ton dernier moyen de connexion. Ajoutes-en un autre d'abord."
-        : null,
+    refusalCode: unlinkRefusal === "LAST_CONNECTION" ? "LAST_CONNECTION" : null,
   };
 }
 

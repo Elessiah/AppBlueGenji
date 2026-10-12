@@ -19,6 +19,7 @@
     "sending": "Envoi…",
     "contestSent": "Ta contestation a bien été transmise à l'association, qui réexamine le signalement.",
     "sent": "Merci, ton signalement n° {id} a bien été transmis à l'association.",
+    "sentNoId": "Merci, ton signalement a bien été transmis à l'association.",
     "targetsAnon": "<login>Connecte-toi</login> pour désigner directement les joueurs, équipes ou tournois concernés. Sans compte, indique leur nom ou l'adresse de la page dans ta description.",
     "contestAnon": "<login>Connecte-toi</login> pour contester un signalement : seuls les joueurs visés, les membres des équipes visées et l'auteur d'un signalement de droit d'auteur ou de modération, une fois le dossier archivé, peuvent le faire.",
     "contestOf": "Tu contestes le signalement n° {id}.",

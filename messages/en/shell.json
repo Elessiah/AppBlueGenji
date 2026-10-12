@@ -74,6 +74,8 @@
     },
     "reportProblem": "Report a problem",
     "reportLoadFailed": "The form couldn't open. Try again in a moment.",
+    "reportReloading": "The site has just been updated: the page will reload, then the form will open on your next click.",
+    "reportLoading": "Opening the form…",
     "copyright": "© 2026 {association}",
     "contact": {
       "email": "Email",
