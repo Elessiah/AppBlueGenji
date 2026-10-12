@@ -456,6 +456,7 @@ describe("langue du compte (lot 9-3)", () => {
     // Un seul toast de succès par geste, après le dernier envoi, et aucun au fil des envois.
     expect(field.match(/showSuccess\(/g)).toHaveLength(1);
     expect(field).toContain('if (outcome.confirmed) showSuccess(t("accountLocale.saved"));');
+    expect(field).toContain("if (outcome.upToDate) fieldErrors.clear();");
     // Une erreur n'est rattachée (focus repris) que si le champ a encore le focus.
     expect(field).toContain("if (document.activeElement?.id === FIELD_ID) fieldErrors.report(code, message);");
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(

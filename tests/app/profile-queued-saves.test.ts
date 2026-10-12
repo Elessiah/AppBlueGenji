@@ -56,7 +56,7 @@ describe("runQueuedSaves", () => {
     const h = harness([true]);
     const done = h.run("fr", "en");
     await h.settle();
-    expect(await done).toEqual({ saved: "en", stored: true, confirmed: true });
+    expect(await done).toEqual({ saved: "en", stored: true, confirmed: true, upToDate: true });
     expect(h.sent).toEqual(["en"]);
     expect(h.shown).toEqual(["en", "en"]);
   });
@@ -69,7 +69,7 @@ describe("runQueuedSaves", () => {
     await h.settle();
     expect(h.sent).toEqual(["en", "fr"]);
     await h.settle();
-    expect(await done).toEqual({ saved: "fr", stored: true, confirmed: true });
+    expect(await done).toEqual({ saved: "fr", stored: true, confirmed: true, upToDate: true });
     expect(h.shown.at(-1)).toBe("fr");
   });
 
@@ -79,7 +79,7 @@ describe("runQueuedSaves", () => {
     h.choose("fr");
     await h.settle();
     await h.settle();
-    expect(await done).toEqual({ saved: "en", stored: true, confirmed: false });
+    expect(await done).toEqual({ saved: "en", stored: true, confirmed: false, upToDate: false });
     expect(h.shown.at(-1)).toBe("en");
   });
 
@@ -87,8 +87,18 @@ describe("runQueuedSaves", () => {
     const h = harness([false]);
     const done = h.run("fr", "en");
     await h.settle();
-    expect(await done).toEqual({ saved: "fr", stored: false, confirmed: false });
+    expect(await done).toEqual({ saved: "fr", stored: false, confirmed: false, upToDate: false });
     expect(h.shown).toEqual(["en", "fr"]);
+  });
+
+  it("retour au départ pendant un envoi qui échoue : rien de confirmé, mais le champ est à jour (refus effacé)", async () => {
+    const h = harness([false]);
+    const done = h.run("fr", "en");
+    h.choose("fr");
+    await h.settle();
+    expect(await done).toEqual({ saved: "fr", stored: false, confirmed: false, upToDate: true });
+    expect(h.sent).toEqual(["en"]);
+    expect(h.shown.at(-1)).toBe("fr");
   });
 
   it("un choix mis de côté égal à ce qui vient d'être retenu ne repart pas", async () => {
@@ -96,7 +106,7 @@ describe("runQueuedSaves", () => {
     const done = h.run("fr", "en");
     h.choose("en");
     await h.settle();
-    expect(await done).toEqual({ saved: "en", stored: true, confirmed: true });
+    expect(await done).toEqual({ saved: "en", stored: true, confirmed: true, upToDate: true });
     expect(h.sent).toEqual(["en"]);
   });
 });
