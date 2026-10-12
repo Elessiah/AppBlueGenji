@@ -235,7 +235,7 @@ describe("correctifs de la première revue", () => {
 
   it("un échec de chargement garde sa phrase et sa notification, pas « introuvable »", () => {
     const hook = stripComments(read("_hooks", "useTeamDetail.ts"));
-    expect(hook).toContain('loadFailed: !redirecting && status === "error"');
+    expect(hook).toContain('loadFailed: !redirecting && status === "error" && error !== "INVALID_TEAM_ID"');
     const page = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "[id]", "page.tsx"), "utf8"));
     // La notification et la page disent la même raison.
     expect(page).toContain('{loadFailed ? failure : t("page.notFound")}');

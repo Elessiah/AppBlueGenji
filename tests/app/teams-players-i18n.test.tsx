@@ -290,6 +290,11 @@ describe("anglais", () => {
     expect(playerErrorMessage(text, "PLAYER_NOT_FOUND")).toBe("This player doesn't exist or no longer exists.");
     expect(playerErrorMessage(text, "HTTP_500", "PLAYER_LOAD_FAILED")).toBe("The player's profile couldn't be loaded.");
     expect(playerErrorMessage(text, "fallback")).toBe("The operation failed.");
+    // `/joueurs/abc` : un identifiant invalide est un joueur introuvable, pas un échec.
+    expect(playerErrorMessage(text, "INVALID_ID", "PLAYER_LOAD_FAILED")).toBe("This player doesn't exist or no longer exists.");
+    expect(playerErrorMessage(scopedText("fr", messagesFor("fr").players), "INVALID_ID", "PLAYER_LOAD_FAILED")).toBe(
+      "Ce joueur n'existe pas ou n'existe plus.",
+    );
   });
 
   it("rôles d'équipe : HEAL se dit Support (D8)", () => {
