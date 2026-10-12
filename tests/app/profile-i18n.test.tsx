@@ -74,15 +74,16 @@ import {
   FR_REPORTS_TEXT,
   legalBasisText,
   reportErrorText,
-  reportsText,
   retentionText,
   rightsText,
   targetDetailText,
 } from "@/components/reports/reports-text";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
-import { FR_PUSH_TEXT, pushErrorText, pushSupportNotice, pushText, pushTopicDescription, pushTopicLabel } from "@/components/notifications/push-text";
+import { FR_PUSH_TEXT, pushErrorText, pushSupportNotice, pushTopicDescription, pushTopicLabel } from "@/components/notifications/push-text";
+import { PushTextProvider } from "@/components/notifications/push-text-provider";
+import { ReportsTextProvider } from "@/components/reports/reports-text-provider";
 import { LogoutButton } from "@/components/logout-button";
-import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog-view";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { ProfileTextProvider } from "@/components/i18n/profile-text";
@@ -146,7 +147,11 @@ function inEnglish(ui: ReactElement): string {
       <ShellTextProvider locale="en" messages={EN.shell}>
         <TeamErrorsTextProvider locale="en" messages={EN.teamErrors}>
           <ProfileTextProvider locale="en" messages={EN.profile}>
-            {ui}
+            <ReportsTextProvider locale="en" messages={EN.reports}>
+              <PushTextProvider locale="en" messages={EN.push}>
+                {ui}
+              </PushTextProvider>
+            </ReportsTextProvider>
           </ProfileTextProvider>
         </TeamErrorsTextProvider>
       </ShellTextProvider>
@@ -360,7 +365,7 @@ describe("français inchangé — signalements et notifications", () => {
   });
 
   it("précision des cibles rédigée par le serveur", () => {
-    const en = reportsText("en");
+    const en = scopedText("en", EN.reports);
     expect(targetDetailText(en, "Équipe fantôme")).toBe("Ghost team");
     expect(targetDetailText(en, "Non publié")).toBe("Not published");
     expect(targetDetailText(en, "GLC")).toBe("GLC");
@@ -398,9 +403,9 @@ describe("anglais — phrases", () => {
   });
 
   it("aucun refus anglais n'est un code ni ne garde d'accent", () => {
-    const push = pushText("en");
+    const push = scopedText("en", EN.push);
     for (const code of Object.keys(PUSH_ERROR_MESSAGES)) expect(pushErrorText(push, code)).not.toMatch(ACCENTED);
-    const reports = reportsText("en");
+    const reports = scopedText("en", EN.reports);
     for (const code of Object.keys(EN.reports.errors)) expect(reportErrorText(reports, code)).not.toMatch(ACCENTED);
   });
 });

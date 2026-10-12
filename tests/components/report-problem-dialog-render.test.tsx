@@ -101,3 +101,19 @@ describe("ReportProblemDialog — contestation", () => {
     expect(html).toContain("/connexion?redirect=%2Fen%2Fequipes%2F12");
   });
 });
+
+describe("ReportProblemDialog — anglais chargé au clic (revue de performance du lot 9-2)", () => {
+  it("pose lui-même l'anglais que le bouton lui passe, le français sans lui", async () => {
+    const { default: enReports } = await import("@/messages/en/reports.json");
+    const english = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <ToastProvider>
+          <ReportProblemDialog pathname="/equipes/12" authenticated onClose={() => undefined} englishMessages={enReports} />
+        </ToastProvider>
+      </AppLocaleProvider>,
+    );
+    expect(english).toContain('aria-label="Choose a category"');
+    expect(english).not.toContain("Choix de la catégorie");
+    expect(render()).toContain('aria-label="Choix de la catégorie"');
+  });
+});

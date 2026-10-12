@@ -27,6 +27,9 @@ const LAYOUT_PROVIDERS = [
   // Lot 9-2 : le profil pose ses textes et la table des refus d'équipe.
   { layout: "app/(secured)/profil/layout.tsx", provider: "components/i18n/profile-text-provider.tsx" },
   { layout: "app/(secured)/profil/layout.tsx", provider: "components/i18n/team-errors-text-provider.tsx" },
+  // Lot 9-2, revue performance : le réglage des notifications et la page d'un signalement.
+  { layout: "app/(secured)/profil/layout.tsx", provider: "components/notifications/push-text-provider.tsx" },
+  { layout: "app/(secured)/signalements/[id]/layout.tsx", provider: "components/reports/reports-text-provider.tsx" },
 ];
 
 describe("fournisseur posé par une mise en page : sans le français", () => {
@@ -45,7 +48,7 @@ describe("fournisseur posé par une mise en page : sans le français", () => {
       .split("\n")
       .filter((line) => line.startsWith("import ") && !line.startsWith("import type "))
       .map((line) => /from\s+"([^"]+)"/.exec(line)?.[1]);
-    expect(valueImports).toEqual(["./scoped-text-context"]);
+    expect(valueImports).toEqual([expect.stringMatching(/^(\.|@\/components\/i18n)\/scoped-text-context$/)]);
   });
 });
 

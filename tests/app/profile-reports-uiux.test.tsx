@@ -77,8 +77,8 @@ describe("bouton du formulaire de signalement", () => {
 
   it("précharge au survol et au focus, se dit occupé pendant le chargement", () => {
     const button = source("components/reports/ReportProblemButton.tsx");
-    expect(button).toContain("onPointerEnter: preloadDialog");
-    expect(button).toContain("onFocus: preloadDialog");
+    expect(button).toContain("onPointerEnter: () => preloadForm(locale),");
+    expect(button).toContain("onFocus: () => preloadForm(locale),");
     expect(button).toContain('"aria-busy": pending || undefined');
     // Un seul chargement partagé, retenté après un échec, qui le dit.
     expect(button).toContain("dialogLoad ??= import(");
@@ -90,7 +90,10 @@ describe("bouton du formulaire de signalement", () => {
 
 describe("revue UI/UX, deuxième passe", () => {
   it("compteur de caractères manquants accordé au singulier", async () => {
-    const { reportsText } = await import("@/components/reports/reports-text");
+    const { FR_REPORTS_TEXT } = await import("@/components/reports/reports-text");
+    const { scopedText } = await import("@/lib/shared/scoped-text");
+    const { messagesFor } = await import("@/lib/server/i18n-messages");
+    const reportsText = (locale: "fr" | "en") => (locale === "fr" ? FR_REPORTS_TEXT : scopedText("en", messagesFor("en").reports));
     expect(reportsText("fr").t("dialog.tooShort", { count: 1 })).toBe("Encore 1 caractère au moins.");
     expect(reportsText("fr").t("dialog.tooShort", { count: 4 })).toBe("Encore 4 caractères au moins.");
     expect(reportsText("en").t("dialog.tooShort", { count: 1 })).toBe("At least 1 more character.");
@@ -169,7 +172,7 @@ describe("revue UI/UX, troisième passe", () => {
     // Après un clic, jamais de rechargement d'office (une saisie en cours serait perdue).
     expect(button).not.toContain("reloadAfterChunkError");
     // Préchargé au survol : le clic ouvre sans passer par l'attente.
-    expect(button).toContain("const ready = ReportProblemDialog ?? loadedDialog;");
+    expect(button).toContain("const ready = loadedForm(locale);");
     // Arrivé après un changement de page : ouvert quand même (suite du clic, page affichée retenue).
     expect(button).not.toContain("currentPath");
   });
@@ -227,7 +230,7 @@ describe("revue UI/UX, quatrième passe", () => {
   it("date d'un signalement à contester : français inchangé, mois nommé en anglais", () => {
     const dialog = source("components/reports/ReportProblemDialog.tsx");
     expect(dialog).toContain("date: contestOptionDate(option.createdAt, text.locale),");
-    expect(dialog).toContain('? date.toLocaleDateString(INTL_LOCALE.fr, { timeZone: "Europe/Paris" })');
+    expect(dialog).toContain('fr: new Intl.DateTimeFormat(INTL_LOCALE.fr, { timeZone: "Europe/Paris" }),');
     expect(dialog).toContain('{ day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }');
   });
 });
