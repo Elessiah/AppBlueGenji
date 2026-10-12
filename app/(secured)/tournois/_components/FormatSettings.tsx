@@ -20,6 +20,20 @@ const EARLY_EXIT_REASONS = {
 } as const satisfies Record<EarlyExitBlocker, string>;
 
 /**
+ * Raison à dire sous la case grisée, `null` s'il n'y a rien à dire. Elle n'est
+ * dite que si l'organisateur peut y remédier : figés, la case ou le réglage en
+ * cause relèvent du verrou, que son explication dit déjà.
+ */
+function earlyExitReasonKey(
+  blocker: EarlyExitBlocker | null,
+  locked: (field: TournamentField) => boolean,
+): (typeof EARLY_EXIT_REASONS)[EarlyExitBlocker] | null {
+  if (blocker === null || locked("enduranceEarlyExit")) return null;
+  const blockingField: TournamentField = blocker === "NO_CAP" ? "enduranceMaxRounds" : "matchFormat";
+  return locked(blockingField) ? null : EARLY_EXIT_REASONS[blocker];
+}
+
+/**
  * Réglages propres au format choisi : phases (MULTI), endurance (BG Survie),
  * cadence des coupes (Survie), rondes et barème (Suisse), petite finale
  * (élimination simple).
@@ -73,15 +87,8 @@ export function FormatSettings({
   // Sans plafond ou en saisie libre, la sortie anticipée ne peut pas jouer :
   // la case est grisée, comme « Égalités », et l'aide dit d'abord pourquoi.
   const earlyExitBlocked = earlyExitBlocker(values.enduranceMaxRounds, values.matchFormat);
-  // La raison n'est dite que si l'organisateur peut y remédier : figés, la case
-  // ou le réglage en cause relèvent du verrou, que son explication dit déjà.
-  let earlyExitReason = "";
-  if (earlyExitBlocked !== null) {
-    const blockingField = earlyExitBlocked === "NO_CAP" ? "enduranceMaxRounds" : "matchFormat";
-    if (!locked("enduranceEarlyExit") && !locked(blockingField)) {
-      earlyExitReason = `${t(EARLY_EXIT_REASONS[earlyExitBlocked])} `;
-    }
-  }
+  const reasonKey = earlyExitReasonKey(earlyExitBlocked, locked);
+  const earlyExitReason = reasonKey ? `${t(reasonKey)} ` : "";
 
   return (
     <>
