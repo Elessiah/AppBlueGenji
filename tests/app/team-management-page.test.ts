@@ -238,7 +238,19 @@ describe("correctifs de la première revue", () => {
     expect(hook).toContain('loadFailed: !redirecting && status === "error"');
     const page = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "[id]", "page.tsx"), "utf8"));
     expect(page).toContain('loadFailed ? t("page.loadError") : t("page.notFound")');
-    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(loadFailed\) showError\(t\("page\.loadError"\)\)/);
+    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(!loadFailed\) return;/);
+    // Session expirée ou droit manquant : la phrase qui dit quoi faire.
+    expect(page).toContain('new Set(["UNAUTHORIZED", "FORBIDDEN"])');
+    expect(page).toContain('AUTH_LOAD_ERRORS.has(error) ? teamErrorMessage(error) : t("page.loadError")');
+  });
+
+  it("la modale de recadrage, encore française, l'est entière sous `/en` (titre et `lang`)", () => {
+    const settings = stripComments(read("_components", "TeamSettings.tsx"));
+    expect(settings).toContain("useImageCropper({ lang: useStaffLang() })");
+    expect(settings).toContain('(useStaffLang() ? FR_TEAM_PAGE_TEXT : text).t("settings.cropTitle")');
+    const create = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "creer", "CreateTeamForm.tsx"), "utf8"));
+    expect(create).toContain("useImageCropper({ lang: cropLang })");
+    expect(create).toContain('(cropLang ? FR_TEAMS_TEXT : text).t("create.cropTitle")');
   });
 
   it("la piste d'actions du roster a une largeur fixe, jamais `auto`", () => {
