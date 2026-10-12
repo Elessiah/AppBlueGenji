@@ -666,6 +666,16 @@ describe("français inchangé — les messages égalent les tables d'origine", (
       const en = JSON.stringify(localizedTournamentSettingsGroups(input, "en", messagesFor("en")));
       expect(en).toContain(`"Early “out of contention” exit","value":"${earlyExit ? "Yes" : "No"}"`);
     }
+    // Saisie libre : l'option ne peut pas jouer, la ligne disparaît dans les deux langues.
+    const free: TournamentSettingsInput = {
+      card: tournamentCard({ format: "BG_SURVIE", matchFormat: null }),
+      phases: null,
+      swiss: null,
+      endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 5, earlyExit: true },
+      seedingSource: "RANKING",
+    };
+    expect(JSON.stringify(settingsGroupsFrom(free, "fr", messagesFor("fr")))).not.toContain("Sortie anticipée");
+    expect(JSON.stringify(localizedTournamentSettingsGroups(free, "en", messagesFor("en")))).not.toContain("Early “out of contention” exit");
   });
 
   it("description de partage : français d'origine, anglais rédigé", () => {

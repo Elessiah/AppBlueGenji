@@ -193,6 +193,16 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
     expect(group(groups, "BlueGenji Survie")["Sortie anticipée « hors course »"]).toBe("Non");
   });
 
+  it("BlueGenji Survie : en saisie de score libre, la sortie anticipée n'est pas affichée (elle n'y joue jamais)", () => {
+    const groups = tournamentSettingsGroups(
+      input({
+        card: tournamentCard({ format: "BG_SURVIE", matchFormat: null }),
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 4, earlyExit: true },
+      }),
+    );
+    expect(group(groups, "BlueGenji Survie")).not.toHaveProperty("Sortie anticipée « hors course »");
+  });
+
   it("BlueGenji Survie : sans plafond, la sortie anticipée n'est pas affichée", () => {
     const groups = tournamentSettingsGroups(
       input({

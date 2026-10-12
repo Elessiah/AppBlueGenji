@@ -457,8 +457,10 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     const fr = render("fr", ui());
     const en = render("en", ui());
     expect(fr).toMatch(/<input id="endurance-early-exit" type="checkbox"(?![^>]*checked)[^>]*aria-describedby="endurance-early-exit-hint"/);
-    expect(fr).toContain("Sortir avant la fin les équipes qui ne peuvent plus être qualifiées");
-    expect(en).toContain("Remove teams that can no longer qualify before the end");
+    expect(fr).toContain("Sortie anticipée « hors course »");
+    expect(en).toContain("Early “out of contention” exit");
+    // Utilisable par défaut (plafond et format de match posés) : pas grisée.
+    expect(fr).not.toMatch(/id="endurance-early-exit" type="checkbox" disabled/);
     expect(en).toContain("Unticked (default), every team plays until the end of the stage.");
     expectNoFrench(en);
   });
@@ -467,10 +469,24 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     expect(render("en", ui({ enduranceEarlyExit: true }))).toMatch(/id="endurance-early-exit" type="checkbox"[^>]*checked/);
   });
 
-  it("prévient qu'elle est sans effet sans plafond de manches", () => {
-    expect(render("fr", ui({ enduranceMaxRounds: 0 }))).toContain("Sans effet tant qu&#x27;aucun plafond de manches n&#x27;est fixé.");
+  it("sans plafond de manches, grisée et dite sans effet", () => {
+    const fr = render("fr", ui({ enduranceMaxRounds: 0 }));
+    expect(fr).toContain("Sans effet tant qu&#x27;aucun plafond de manches n&#x27;est fixé.");
+    expect(fr).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
     expect(render("en", ui({ enduranceMaxRounds: 0 }))).toContain("No effect until a round cap is set.");
     expect(render("en", ui())).not.toContain("No effect until a round cap is set.");
+  });
+
+  it("en saisie de score libre, grisée et dite sans effet (aucune élimination n'y est acquise)", () => {
+    const fr = render("fr", ui({ matchFormat: null, enduranceEarlyExit: true }));
+    const en = render("en", ui({ matchFormat: null }));
+    expect(fr).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
+    expect(fr).toContain("Sans effet en saisie de score libre");
+    expect(en).toContain("No effect with free score entry: a match format is needed to know what a team can still win.");
+    expect(en).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
+    // Une seule raison à la fois : sans plafond, c'est celle-là qui est donnée.
+    expect(render("en", ui({ matchFormat: null, enduranceMaxRounds: 0 }))).not.toContain("No effect with free score entry");
+    expect(render("en", ui())).not.toContain("No effect with free score entry");
   });
 
   it("n'apparaît qu'en BG Survie", () => {
