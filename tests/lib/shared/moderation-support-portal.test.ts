@@ -48,12 +48,13 @@ describe("ReportProblemDialog — lien vers le portail", () => {
   });
 
   it("annonce le nouvel onglet aux technologies d'assistance", () => {
-    // Lot 9-2 : la mention vient des messages (`dialog.newTab`, `dialog.portalSuffix`).
-    expect(source).toContain('<span className="sr-only">{t("dialog.newTab")}</span>');
-    expect(source).toContain('<span className="sr-only">{t("dialog.portalSuffix")}</span>');
+    // Lot 9-2 : la mention vient des messages (`dialog.newTab`, `dialog.portalSuffix`) ;
+    // l'espace qui la sépare du lien est dans le code, pas dans la traduction.
+    expect(source).toContain('<span className="sr-only">{` ${t("dialog.newTab")}`}</span>');
+    expect(source).toContain('<span className="sr-only">{` ${t("dialog.portalSuffix")}`}</span>');
     const fr = JSON.parse(readSource("messages/fr/reports.json")) as { dialog: { newTab: string; portalSuffix: string } };
-    expect(fr.dialog.newTab).toBe(" (nouvel onglet)");
-    expect(fr.dialog.portalSuffix).toBe(" (portail de support, nouvel onglet)");
+    expect(fr.dialog.newTab).toBe("(nouvel onglet)");
+    expect(fr.dialog.portalSuffix).toBe("(portail de support, nouvel onglet)");
   });
 
   it("place la carte juste après la catégorie Modération, et le rappel dans son étape", () => {

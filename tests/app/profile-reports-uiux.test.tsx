@@ -83,7 +83,7 @@ describe("bouton du formulaire de signalement", () => {
     // Un seul chargement partagé, retenté après un échec, qui le dit.
     expect(button).toContain("dialogLoad ??= import(");
     expect(button).toContain("dialogLoad = null;");
-    expect(button).toContain('toast?.showError(t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed"));');
+    expect(button).toContain('const message = t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed");');
     expect(button).not.toContain('from "next/dynamic"');
   });
 });
@@ -100,7 +100,7 @@ describe("revue UI/UX, deuxième passe", () => {
   it("lien d'invitation Discord : nouvel onglet annoncé aux lecteurs d'écran", () => {
     for (const dialog of ["DiscordBotHandleDialog", "DiscordVerificationDialog"]) {
       const text = source(`app/(secured)/profil/${dialog}.tsx`);
-      expect(text).toMatch(/target="_blank"[\s\S]{0,600}<span className="sr-only">\{t\("verify\.newTab"\)\}<\/span>/);
+      expect(text).toMatch(/target="_blank"[\s\S]{0,600}<span className="sr-only">\{` \$\{t\("verify\.newTab"\)\}`\}<\/span>/);
     }
   });
 
@@ -152,7 +152,9 @@ describe("revue UI/UX, troisième passe", () => {
     expect(html).not.toContain("…");
     const button = source("components/reports/ReportProblemButton.tsx");
     expect(button).toContain('const busyMark = pending ? <span aria-hidden="true">…</span> : null;');
-    expect(button).toContain('{pending ? t("footer.reportLoading") : ""}');
+    expect(button).toContain('setStatus(t("footer.reportLoading"));');
+    // L'échec s'annonce aussi dans la région d'état (hors toast, il resterait muet).
+    expect(button).toMatch(/setStatus\(message\);\s*toast\?\.showError\(message\);/);
     // Après un clic, jamais de rechargement d'office (une saisie en cours serait perdue).
     expect(button).not.toContain("reloadAfterChunkError");
     // Préchargé au survol : le clic ouvre sans passer par l'attente.
@@ -181,8 +183,9 @@ describe("revue UI/UX, troisième passe", () => {
     const button = source("components/logout-button.tsx");
     expect(button).toContain("const { leaving, logout } = useLogout();");
     expect(button).not.toContain('fetch("/api/auth/logout"');
-    const menu = source("components/account-menu.tsx");
-    expect(menu).toContain("useLogout(() => setOpen(false))");
+    expect(button).not.toContain("account-menu");
+    expect(source("components/account-menu.tsx")).toContain("useLogout(() => setOpen(false))");
+    const menu = source("components/use-logout.ts");
     // Occupé jusqu'à l'accueil : `leaving` ne retombe qu'après un échec.
     expect(menu).toMatch(/if \(!\(await requestLogout\(\)\)\) \{\s*setLeaving\(false\);\s*showError\(t\("account\.logoutFailed"\)\);/);
     expect(menu).toContain("if (leaving) return;");
@@ -207,8 +210,50 @@ describe("revue UI/UX, quatrième passe", () => {
     expect(view).toContain('<TeamLink teamId={target.id}>{target.label}</TeamLink>');
   });
 
-  it("date d'un signalement à contester : écrite en toutes lettres, sans ambiguïté jour/mois", () => {
+  it("date d'un signalement à contester : français inchangé, mois nommé en anglais", () => {
     const dialog = source("components/reports/ReportProblemDialog.tsx");
-    expect(dialog).toContain('toLocaleDateString(INTL_LOCALE[text.locale], { day: "numeric", month: "long", year: "numeric" })');
+    expect(dialog).toContain("date: contestOptionDate(option.createdAt, text.locale),");
+    expect(dialog).toContain("? date.toLocaleDateString(INTL_LOCALE.fr)");
+    expect(dialog).toContain('{ day: "numeric", month: "short", year: "numeric" }');
+  });
+});
+
+describe("revue UI/UX, cinquième passe", () => {
+  const NAMESPACES = ["profile", "reports", "imageCrop", "push"] as const;
+  function leaves(tree: unknown, prefix = ""): Array<[string, string]> {
+    if (typeof tree === "string") return [[prefix, tree]];
+    return Object.entries(tree as Record<string, unknown>).flatMap(([key, value]) => leaves(value, prefix ? `${prefix}.${key}` : key));
+  }
+
+  it.each(NAMESPACES)("%s : aucun message ne dépend d'une espace en tête ou en queue", async (ns) => {
+    for (const locale of ["fr", "en"] as const) {
+      const messages = (await import(`@/messages/${locale}/${ns}.json`)).default as unknown;
+      for (const [key, value] of leaves(messages)) expect([key, value]).toEqual([key, value.trim()]);
+    }
+  });
+
+  it("refus de saisie du profil : chacun a sa phrase, dans les deux langues", async () => {
+    const { PROFILE_INPUT_ERRORS } = await import("@/lib/shared/profile-input-errors");
+    for (const locale of ["fr", "en"] as const) {
+      const { errors } = (await import(`@/messages/${locale}/profile.json`)).default as { errors: { write: Record<string, string> } };
+      for (const code of PROFILE_INPUT_ERRORS) expect(Object.keys(errors.write)).toContain(code);
+    }
+    expect(source("app/(secured)/profil/profile-errors.ts")).toContain(
+      "type InputErrorsCovered = [ProfileInputError] extends [WriteErrorCode] ? true : never;",
+    );
+  });
+
+  it("anglais : la catégorie se nomme « Appeal », le nom suit (le verbe reste « contest »)", () => {
+    expect(enReports.categories.CONTEST.label).toBe("Appeal");
+    expect(enReports.concerned.myContests).toBe("Your appeals");
+    expect(enReports.concerned.addContest).toBe("Add an appeal");
+    expect(JSON.stringify(enReports)).not.toMatch(/the contest succeeds|your contest|contest deadline/i);
+  });
+
+  it("profil : plus de libellé « Déconnexion » en double (la coquille le porte)", async () => {
+    for (const locale of ["fr", "en"] as const) {
+      const { account } = (await import(`@/messages/${locale}/profile.json`)).default as { account: Record<string, string> };
+      expect(account).not.toHaveProperty("logout");
+    }
   });
 });
