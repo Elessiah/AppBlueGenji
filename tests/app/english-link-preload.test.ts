@@ -8,7 +8,7 @@ import { readSource } from "../helpers/read-source";
 import { englishReports } from "@/components/i18n/english-loaders";
 import { englishPlayers, englishProfile, englishPush, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "@/components/i18n/english-loaders-account";
 import { preloadEnglishFor } from "@/components/i18n/english-link-targets";
-import { barePath, englishPageOf, ENGLISH_PAGES } from "@/components/i18n/english-route-preload";
+import { barePath, englishPageOf, ENGLISH_PAGES } from "@/components/i18n/english-pages";
 import { preloadRoute, setRoutePreload } from "@/components/i18n/route-preload";
 
 type Name = "englishReports" | "englishPlayers" | "englishProfile" | "englishPush" | "englishStatsPanel" | "englishTeam" | "englishTeamErrors" | "englishTeams";
@@ -98,21 +98,25 @@ describe("écouteur délégué", () => {
     const gates = readSource("components/i18n/english-gates.tsx");
     // Seulement tant que la porte extérieure attend ; un échec se tait (`quietPreload`).
     // Seulement tant que la porte extérieure attend ; chargeurs de la fiche, hors celui de la porte.
-    expect(gates).toContain("useNestedEnglish(locale, TEAM_ROUTES, englishTeamErrors, !english && !failed);");
-    expect(gates).toContain("useNestedEnglish(locale, PLAYER_ROUTES, englishPlayers, !english && !failed);");
+    expect(gates).toContain("useNestedEnglish(locale, TEAM_ROUTES, englishTeamErrors, waiting);");
+    expect(gates).toContain("useNestedEnglish(locale, PLAYER_ROUTES, englishPlayers, waiting);");
+    // La table des pages, module pur : les portes n'emportent pas la mécanique du préchargement.
+    expect(gates).toContain('import { englishPageOf } from "./english-pages";');
+    expect(readSource("components/i18n/english-pages.ts")).not.toMatch(/import\("/);
     expect(gates).toContain("if (loader !== own) loader.load().catch(() => undefined);");
-    // Un seul préchargement par page, partagé par le survol (`PAGE_PRELOADS`).
+    // Les préchargements par page vivent dans le morceau à la demande.
     expect(readSource("components/i18n/english-link-targets.ts")).toContain("...PAGE_PRELOADS,");
+    expect(readSource("components/i18n/english-page-loaders.ts")).not.toContain("quietPreload");
     expect(gates).toContain('if (locale !== "en" || !waiting) return;');
     // Une seule table des pages (`ENGLISH_PAGES`), lue aussi par les portes.
     expect(gates).toContain('const TEAM_ROUTES = ["teamPage", "teams"] as const;');
     // Une seule correspondance page → espaces, lue par le survol et par les portes.
-    expect(readSource("components/i18n/english-link-targets.ts")).toContain('import { PAGE_PRELOADS } from "./english-page-loaders";');
+    expect(readSource("components/i18n/english-link-targets.ts")).toContain('import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";');
     expect(gates).toContain("const page = englishPageOf(path);");
     // Le chemin suivi : une navigation par le code sous une porte montée relance.
     expect(gates).toContain("}, [locale, waiting, path, pages, own]);");
     // Survol continu du même élément : rien à remonter.
-    expect(readSource("components/i18n/english-link-preload-install.ts")).toContain("let lastTarget: WeakRef<EventTarget> | null = null;");
+    expect(readSource("components/i18n/english-link-preload-install.ts")).not.toContain("lastTarget");
   });
 
   it("annuaire des équipes et création : anglais de `teams` au chargement complet seulement", () => {
