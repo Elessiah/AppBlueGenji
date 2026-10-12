@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   DEFAULT_ENDURANCE_CONFIG,
   resolveEnduranceConfig,
+  roundCutMayFire,
   type EnduranceConfig,
 } from "@/lib/shared/bg-survie/config";
 import { type EnduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
@@ -11,7 +12,6 @@ import {
   roundLimitReached,
 } from "@/lib/shared/bg-survie/qualification";
 import { replayEnduranceDetailed } from "@/lib/shared/bg-survie/replay";
-import { applyRoundCut } from "@/lib/shared/bg-survie/replay-steps";
 import { type EnduranceStanding } from "@/lib/shared/bg-survie/standings";
 
 const FT3 = { type: "FT", value: 3 } as const;
@@ -386,16 +386,15 @@ describe("sortie anticipée décochée — personne ne sort avant la fin", () =>
     expect(() => enduranceEliminationCut(untouchable, off, 0, FT3)).toThrow("classement lu");
   });
 
-  it("ne copie pas le classement du rejeu en cours de phase", () => {
-    class UntouchableStandings extends Map<number, EnduranceStanding> {
-      override values(): MapIterator<EnduranceStanding> {
-        throw new Error("classement copié");
-      }
-    }
-    const standings = new UntouchableStandings();
-    expect(() => applyRoundCut(standings, off, 1, 4, FT3)).not.toThrow();
-    // La dernière manche, elle, trace toujours le trait sous la cible.
-    expect(() => applyRoundCut(standings, off, 0, 5, FT3)).toThrow("classement copié");
+  // Une seule formulation de la règle, lue par le rejeu, la coupe et l'aperçu.
+  it("roundCutMayFire : trait final toujours, coupe anticipée option cochée seulement", () => {
+    const on = config({ playoffSize: 2, maxRounds: 5, earlyExit: true });
+    expect(roundCutMayFire(off, 0)).toBe(true);
+    expect(roundCutMayFire(off, -1)).toBe(true);
+    expect(roundCutMayFire(off, 1)).toBe(false);
+    expect(roundCutMayFire(off, 3)).toBe(false);
+    expect(roundCutMayFire(on, 0)).toBe(true);
+    expect(roundCutMayFire(on, 1)).toBe(true);
   });
 
   // La dernière manche n'est pas une sortie anticipée : le trait sous la cible
