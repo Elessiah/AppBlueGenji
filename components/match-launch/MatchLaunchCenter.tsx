@@ -479,8 +479,8 @@ export function MatchLaunchCenter({
  * repart pas) ; un échec le laisse caché — réglage facultatif, offert
  * aussi par `/profil` — plutôt que de le montrer en français. Monté avec la
  * fenêtre ouverte seulement (refermée, elle cède la place au bouton flottant),
- * il retente à la réouverture suivante (`onceLoader` ne garde pas un échec ;
- * `useEnglishMessages` le reprend aussi en fond, un cycle pour tout le site).
+ * il retente à la réouverture suivante (`onceLoader` ne garde pas un échec) —
+ * jamais par une boucle de fond.
  * Dernier élément de la zone défilante : paru après coup (fenêtre ouverte sans
  * survol du bouton — ouverture d'office, carte d'un match), il allonge la zone
  * sans rien déplacer de ce qui se lit au-dessus.
