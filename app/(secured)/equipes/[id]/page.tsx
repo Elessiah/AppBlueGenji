@@ -8,6 +8,7 @@ import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
 import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
 import { useTeamDetail } from "./_hooks/useTeamDetail";
+import { loadFailureMessage } from "./_lib/load-failure";
 import { useTeamPendingInvitations } from "./_hooks/useTeamPendingInvitations";
 import { TeamHeader } from "./_components/TeamHeader";
 import { MembersSection } from "./_components/MembersSection";
@@ -17,9 +18,6 @@ import { TeamHistory } from "./_components/TeamHistory";
 import { ModerationLogoBar } from "./_components/ModerationLogoBar";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import styles from "./team.module.css";
-
-/** Refus de chargement qui ont leur propre phrase (se reconnecter, droits). */
-const AUTH_LOAD_ERRORS: ReadonlySet<string> = new Set(["UNAUTHORIZED", "FORBIDDEN"]);
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
@@ -36,18 +34,18 @@ export default function TeamDetailPage() {
   const pending = useTeamPendingInvitations(teamId, managesRoster);
   const reloadPending = pending.reload;
   const onPendingChanged = useCallback(() => void reloadPending(), [reloadPending]);
-  // Une notification par échec ; « introuvable » a déjà la sienne (redirection).
-  // Session expirée ou droit manquant : la raison, qui dit quoi faire.
-  const failure = loadFailed && error && AUTH_LOAD_ERRORS.has(error) ? teamErrorMessage(error) : t("page.loadError");
+  // Une phrase par refus, la même en page et en notification ; un 404 a déjà la
+  // sienne (redirection). Seul endroit où se trie un échec de chargement.
+  const failure = loadFailed ? loadFailureMessage(error, teamErrorMessage, t("page.loadError")) : null;
   useEffect(() => {
-    if (loadFailed) showError(failure);
-  }, [loadFailed, failure, showError]);
+    if (failure) showError(failure);
+  }, [failure, showError]);
 
   if (error) {
     return (
       <section className={`ds-block ${styles.page}`}>
         <p className={styles.notice}>
-          {loadFailed ? failure : t("page.notFound")}{" "}
+          {failure ?? t("page.notFound")}{" "}
           <LocaleLink href="/equipes" className="entity-link">
             {t("page.backToTeams")}
           </LocaleLink>

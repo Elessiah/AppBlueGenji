@@ -139,7 +139,7 @@
     "title": "Transfer ownership",
     "cancel": "Cancel",
     "submit": "Transfer",
-    "confirm": "Confirm the transfer",
+    "confirm": "Confirm — this is final",
     "pending": "Transferring…",
     "bodyKeepsManagement": "The new owner will be able to rename, transfer and disband the team. You lose the owner role and keep your other roles — including manager: you keep managing the roster.",
     "bodyLosesManagement": "The new owner will be able to rename, transfer and disband the team. You lose the owner role and keep your other roles (DPS if you have no other): without the manager role, you no longer manage the team.",
