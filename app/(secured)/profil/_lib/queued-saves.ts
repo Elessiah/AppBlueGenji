@@ -12,6 +12,12 @@ export type QueuedSavesOutcome<V> = {
   stored: boolean;
   /** Le **dernier** choix du joueur est celui retenu : seul cas où dire « enregistré ». */
   confirmed: boolean;
+  /**
+   * Le champ montre le dernier choix du joueur, et c'est la valeur retenue —
+   * même si aucun envoi n'a réussi (retour au départ pendant un envoi qui
+   * échoue) : un refus rattaché au champ ne décrit plus rien.
+   */
+  upToDate: boolean;
 };
 
 export async function runQueuedSaves<V>(options: {
@@ -42,5 +48,5 @@ export async function runQueuedSaves<V>(options: {
     next = after !== null && after !== saved ? after : null;
   }
   show(saved);
-  return { saved, stored, confirmed: stored && saved === latest };
+  return { saved, stored, confirmed: stored && saved === latest, upToDate: saved === latest };
 }

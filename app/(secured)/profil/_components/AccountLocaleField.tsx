@@ -97,6 +97,7 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
       show: setLocale,
     });
     if (outcome.stored) setChosenHere(true);
+    if (outcome.upToDate) fieldErrors.clear();
     // « Enregistré » une fois, et seulement si le dernier choix l'est : après
     // l'échec de ce dernier, le toast d'erreur reste le dernier mot.
     if (outcome.confirmed) showSuccess(t("accountLocale.saved"));
