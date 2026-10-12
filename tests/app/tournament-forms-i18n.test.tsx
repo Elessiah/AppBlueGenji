@@ -508,4 +508,25 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     );
     expect(html).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""[^>]*aria-describedby="lock endurance-early-exit-hint"/);
   });
+
+  it("figée, elle ne renvoie pas vers un plafond qu'on ne peut plus fixer : le verrou suffit", () => {
+    const html = renderEdit(
+      <TournamentForm
+        mode="edit"
+        initialValues={{ ...defaultTournamentFormValues(), format: "BG_SURVIE", enduranceMaxRounds: 0 }}
+        editableFields={editableFieldsForWindow("RESTRICTED")}
+        submitLabel="Save changes"
+        explanationId="lock"
+        onSubmit={async () => undefined}
+      />,
+    );
+    expect(html).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
+    expect(html).not.toContain("No effect until a round cap is set.");
+    expect(html).not.toContain("Sans effet tant qu");
+  });
+
+  it("l'aide dit que la parité reporte la sortie, sans l'annuler (FR et EN)", () => {
+    expect(render("fr", ui())).toContain("sortie reportée d&#x27;une manche si elle laissait un nombre impair");
+    expect(render("en", ui())).toContain("the exit is postponed by one round if it would leave an odd number of teams");
+  });
 });
