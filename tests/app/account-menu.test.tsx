@@ -69,7 +69,7 @@ describe("AccountMenuPanel", () => {
   });
 
   it("désactive la déconnexion pendant la requête", () => {
-    expect(panel(null, true)).toMatch(/<button[^>]*disabled=""[^>]*>.*<span class="itemText">Déconnexion…<\/span><\/button>/);
+    expect(panel(null, true)).toMatch(/<button[^>]*disabled=""[^>]*>.*<span class="itemText">Déconnexion en cours…<\/span><\/button>/);
   });
 });
 

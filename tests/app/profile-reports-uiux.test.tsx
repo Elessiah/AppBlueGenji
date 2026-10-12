@@ -159,7 +159,7 @@ describe("revue UI/UX, troisième passe", () => {
     // Libellé inchangé (pas de saut de largeur) ; l'attente se voit par la classe, s'annonce par la région.
     expect(button).not.toContain("visibleLabel");
     expect(button).toContain('className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,');
-    expect(source("components/reports/ReportProblemButton.module.css")).toContain('.pending[aria-busy="true"]:hover');
+    expect(source("components/reports/ReportProblemButton.module.css")).toContain("pointer-events: none;");
     expect(button).toContain('setStatus(t("footer.reportLoading"));');
     // L'échec s'annonce aussi dans la région d'état (hors toast, il resterait muet).
     expect(button).toMatch(/if \(toast\) \{\s*setStatus\(""\);\s*toast\.showError\(message\);\s*\} else \{\s*setStatus\(message\);/);
@@ -390,7 +390,9 @@ describe("revue UI/UX, onzième passe", () => {
 describe("revue UI/UX, douzième passe", () => {
   it("dialogue de certification : « Annuler » bloqué pendant la requête, badge décoratif dans le titre", () => {
     const dialog = source("app/(secured)/profil/DiscordVerificationDialog.tsx");
-    expect(dialog.match(/<CyberButton variant="ghost" type="button" disabled=\{loading\} onClick=\{onClose\}>/g)).toHaveLength(4);
+    // `aria-disabled` (le focus reste dans la modale) et clic ignoré pendant l'envoi.
+    expect(dialog.match(/<CyberButton variant="ghost" type="button" aria-disabled=\{loading \|\| undefined\} onClick=\{cancel\}>/g)).toHaveLength(4);
+    expect(dialog).toContain("if (!loading) onClose();");
     expect(dialog).not.toContain('type="button" onClick={onClose}>');
     expect(dialog).toContain('<VerifiedBadge size={20} labels={{ alt: "", title: verifiedBadgeLabels(text).title }} />');
   });
@@ -423,5 +425,12 @@ describe("revue UI/UX, treizième passe", () => {
       const { sections } = (await import(`@/messages/${locale}/profile.json`)).default as { sections: Record<string, unknown> };
       for (const section of PROFILE_SECTIONS) expect(Object.keys(sections)).toContain(section.id);
     }
+  });
+});
+
+describe("revue UI/UX, quatorzième passe", () => {
+  it("« Déconnexion en cours… » : l'attente se lit, pas seulement trois points", async () => {
+    const frShell = (await import("@/messages/fr/shell.json")).default;
+    expect(frShell.account.loggingOut).toBe("Déconnexion en cours…");
   });
 });
