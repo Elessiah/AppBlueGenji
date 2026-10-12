@@ -6,8 +6,9 @@
  * map perdue en retire — un 3-0 coûte donc trois points au perdant et en
  * rapporte trois au vainqueur, là où un 3-2 n'en déplace qu'un. À 0, l'équipe
  * est éliminée sur-le-champ. Le classement se relit avant chaque manche
- * (`standings.ts`) ; sous plafond de manches, une équipe qui ne peut plus
- * **mathématiquement** rejoindre le plateau des play-offs est écartée sans
+ * (`standings.ts`) ; sous plafond de manches, et si le tournoi a coché l'option
+ * (`EnduranceConfig.earlyExit`, décochée par défaut), une équipe qui ne peut
+ * plus **mathématiquement** rejoindre le plateau des play-offs est écartée sans
  * attendre la fin (`enduranceEliminationCut`, `qualification.ts`). L'arbre
  * final se tire dans `playoffs.ts`.
  *

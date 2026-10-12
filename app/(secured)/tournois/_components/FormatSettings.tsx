@@ -94,10 +94,9 @@ export function FormatSettings({
   const entrantType = toParticipantType(values.participantType);
   const recommendedRounds = computeRecommendedRounds(maxTeams);
   // Sans plafond ou en saisie libre, la sortie anticipée ne peut pas jouer :
-  // la case est grisée, comme « Égalités », et l'aide dit d'abord pourquoi.
+  // la case est grisée, comme « Égalités », et l'aide dit pourquoi.
   const earlyExitBlocked = earlyExitBlocker(values.enduranceMaxRounds, values.matchFormat);
   const reasonKey = earlyExitReasonKey(earlyExitBlocked, locked);
-  const earlyExitReason = reasonKey ? `${t(reasonKey)} ` : "";
 
   return (
     <>
@@ -205,8 +204,9 @@ export function FormatSettings({
             </label>
             <FieldErrorText fieldId={EARLY_EXIT_FIELD_ID} message={earlyExitError} />
             <p id={EARLY_EXIT_HINT_ID} style={HINT}>
-              {earlyExitReason}
-              {t("settings.enduranceEarlyExitHint")}
+              {/* Comme « Égalités » : grisée, l'aide ne dit que la raison — le
+                  fonctionnement (« dernière manche », « trait ») ne vaut pas sans elle. */}
+              {reasonKey ? t(reasonKey) : t("settings.enduranceEarlyExitHint")}
             </p>
           </div>
 
