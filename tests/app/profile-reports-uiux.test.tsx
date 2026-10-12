@@ -55,7 +55,7 @@ describe("langue de la page dans les gestes du profil", () => {
   it("l'heure d'expiration d'un code suit la langue de la page, français compris", () => {
     for (const dialog of ["DiscordBotHandleDialog", "DiscordVerificationDialog"]) {
       const text = source(`app/(secured)/profil/${dialog}.tsx`);
-      expect(text).toContain("toLocaleTimeString(INTL_LOCALE[text.locale])");
+      expect(text).toContain("formatExpiryTime(payload.expiresAt, text.locale)");
       expect(text).not.toContain("toLocaleTimeString(undefined");
     }
   });
@@ -241,6 +241,26 @@ describe("revue UI/UX, quatrième passe", () => {
       expect(dialog.split("inFlight.current = true;").length - 1).toBe(2);
       expect(dialog.split("inFlight.current = false;").length - 1).toBe(2);
       expect(dialog).not.toContain("if (loading) return;");
+    }
+  });
+
+  it("envoi unique par référence : signalement, sauvegarde du profil, retrait d'une connexion", () => {
+    const dialog = source("components/reports/ReportProblemDialog.tsx");
+    expect(dialog).toContain("if (sending.current) return;");
+    expect(dialog).toContain("sending.current = false;");
+    expect(dialog).not.toContain("if (busy) return;");
+    const page = source("app/(secured)/profil/page.tsx");
+    expect(page).toContain("if (saving.current) return;");
+    expect(page).toContain("saving.current = false;");
+    const apps = source("app/(secured)/profil/ConnectedAppsSection.tsx");
+    expect(apps).toContain("if (unlinking.current) return;");
+    expect(apps).toContain("unlinking.current = false;");
+  });
+
+  it("heure d'expiration d'un code : jamais « Invalid Date »", () => {
+    for (const file of ["app/(secured)/profil/DiscordVerificationDialog.tsx", "app/(secured)/profil/DiscordBotHandleDialog.tsx"]) {
+      expect(source(file)).toContain("time: formatExpiryTime(payload.expiresAt, text.locale),");
+      expect(source(file)).not.toContain("toLocaleTimeString");
     }
   });
 

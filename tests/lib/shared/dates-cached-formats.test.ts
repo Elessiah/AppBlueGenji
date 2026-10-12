@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { compareLocalText, formatLocalDate, formatLocalDateTime, formatMonthYear } from "@/lib/shared/dates";
+import { UNREADABLE_DATE, compareLocalText, formatExpiryTime, formatLocalDate, formatLocalDateTime, formatMonthYear } from "@/lib/shared/dates";
 import { cached } from "@/lib/shared/intl-cache";
 import { ordinalForm } from "@/lib/shared/ordinal";
 import { INTL_LOCALE, LOCALES } from "@/lib/shared/locales";
@@ -128,5 +128,19 @@ describe("date invalide : le repli de toLocale*String, jamais une exception", ()
       );
       expect(formatLocalDate(bad, locale)).toBe("Invalid Date");
     }
+  });
+});
+
+describe("formatExpiryTime (revue de sécurité du lot 9-2)", () => {
+  it("heure dans la langue de la page, comme toLocaleTimeString", () => {
+    const iso = "2026-03-15T12:34:00.000Z";
+    for (const locale of LOCALES) {
+      expect(formatExpiryTime(iso, locale)).toBe(new Date(iso).toLocaleTimeString(INTL_LOCALE[locale]));
+    }
+  });
+
+  it("absente ou illisible : un tiret, jamais « Invalid Date »", () => {
+    expect(formatExpiryTime(undefined)).toBe(UNREADABLE_DATE);
+    expect(formatExpiryTime("pas une heure", "en")).toBe("—");
   });
 });
