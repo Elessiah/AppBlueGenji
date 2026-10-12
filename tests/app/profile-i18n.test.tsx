@@ -293,8 +293,27 @@ describe("français inchangé — profil", () => {
     }
     for (const set of CONNECTION_SETS) {
       for (const item of set) expect(connectionMethodText(FR_PROFILE, item)).toBe(connectionMethodLabel(item));
+    }
+    // Le français de la ligne du bot, mot pour mot celui d'avant le lot 9-2 (le module partagé
+    // ne rend plus que des codes) : chaque cas, et le refus.
+    const FR_BOT_NOTES = {
+      HANDLE: "Pseudo Discord : keryan",
+      LINKED_BY_CODE: "Rattaché par code en message privé",
+      LINKED_BY_BUTTON:
+        "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour.",
+      LINKED_ELSEWHERE:
+        "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour.",
+      NOT_LINKED: "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
+    } as const;
+    for (const [noteCode, note] of Object.entries(FR_BOT_NOTES) as Array<[keyof typeof FR_BOT_NOTES, string]>) {
+      expect(discordBotRowText(FR_PROFILE, { noteCode, handle: "keryan", refusalCode: null })).toEqual({ note, refusal: null });
+    }
+    expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "keryan", refusalCode: "LAST_CONNECTION" }).refusal).toBe(
+      "Impossible de te déconnecter du bot : c'est ton dernier moyen de connexion. Ajoutes-en un autre d'abord.",
+    );
+    for (const set of CONNECTION_SETS) {
       const row = discordBotRowState(set);
-      expect(discordBotRowText(FR_PROFILE, row)).toEqual({ note: row.note, refusal: row.refusal });
+      expect(Object.keys(FR_BOT_NOTES)).toContain(row.noteCode);
     }
   });
 });

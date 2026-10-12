@@ -216,14 +216,13 @@ describe("Discord : deux lignes, une seule identité", () => {
   it("offre « Se déconnecter » sur la ligne du bot quand une autre porte reste", () => {
     const row = discordBotRowState(withDiscord("DM_CODE", { GOOGLE: true }));
     expect(row).toMatchObject({ linked: true, handle: "keryan", handleAction: "UPDATE", canDisconnect: true });
-    expect(row.refusal).toBeNull();
-    expect(row.note).toContain("keryan");
+    expect(row).toMatchObject({ noteCode: "HANDLE", refusalCode: null });
   });
 
   it("ne mure jamais la dernière porte : le bot seul ne se déconnecte pas", () => {
     const row = discordBotRowState(withDiscord("DM_CODE"));
     expect(row.canDisconnect).toBe(false);
-    expect(row.refusal).toContain("dernier moyen de connexion");
+    expect(row.refusalCode).toBe("LAST_CONNECTION");
     // La mise à jour du pseudo, elle, reste offerte : elle ne retire rien.
     expect(row.handleAction).toBe("UPDATE");
   });
@@ -231,26 +230,24 @@ describe("Discord : deux lignes, une seule identité", () => {
   it("sur un compte rattaché par le bouton, renvoie la déconnexion à la ligne Discord", () => {
     const row = discordBotRowState(withDiscord("OAUTH", { GOOGLE: true }));
     expect(row).toMatchObject({ linked: false, handle: null, handleAction: "UPDATE", canDisconnect: false });
-    expect(row.refusal).toBeNull();
-    expect(row.note).toContain("bouton Discord");
+    expect(row).toMatchObject({ noteCode: "LINKED_BY_BUTTON", refusalCode: null });
   });
 
   it("n'affirme pas la porte d'un rattachement antérieur à la colonne", () => {
     // `null` = on ne sait pas : certains de ces comptes sont entrés par code.
     const row = discordBotRowState(withDiscord(null, { GOOGLE: true }));
     expect(row.linked).toBe(false);
-    expect(row.note).not.toContain("bouton");
-    expect(row.note).toContain("ligne Discord");
+    expect(row.noteCode).toBe("LINKED_ELSEWHERE");
   });
 
   it("propose de rattacher par code un compte sans Discord", () => {
     const row = discordBotRowState(connections({ GOOGLE: true }));
-    expect(row).toMatchObject({ linked: false, handleAction: "LINK", canDisconnect: false, refusal: null });
+    expect(row).toMatchObject({ linked: false, handleAction: "LINK", canDisconnect: false, noteCode: "NOT_LINKED", refusalCode: null });
   });
 
   it("nomme le rattachement sans pseudo plutôt qu'une ligne vide", () => {
     const row = discordBotRowState(withDiscord("DM_CODE", { GOOGLE: true }, null));
-    expect(row.note).toBe("Rattaché par code en message privé");
+    expect(row.noteCode).toBe("LINKED_BY_CODE");
   });
 });
 

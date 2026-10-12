@@ -134,12 +134,48 @@ describe("revue UI/UX, deuxième passe", () => {
     const enProfile = (await import("@/messages/en/profile.json")).default;
     const en = scopedText("en", enProfile);
     const codes = ["HANDLE", "LINKED_BY_CODE", "LINKED_BY_BUTTON", "LINKED_ELSEWHERE", "NOT_LINKED"] as const;
-    const notes = codes.map((noteCode) => discordBotRowText(en, { noteCode, handle: "gamer", refusal: null }).note);
+    const notes = codes.map((noteCode) => discordBotRowText(en, { noteCode, handle: "gamer", refusalCode: null }).note);
     expect(new Set(notes).size).toBe(codes.length);
     expect(notes[0]).toContain("gamer");
-    expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "gamer", refusal: "x" }).refusal).toBe(
+    expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "gamer", refusalCode: "LAST_CONNECTION" }).refusal).toBe(
       FR_PROFILE.t("connections.bot.lastConnection"),
     );
     expect(source("app/(secured)/profil/_lib/profile-text.ts")).not.toContain("checkConnectionUnlink");
+  });
+});
+
+describe("revue UI/UX, troisième passe", () => {
+  it("bouton du formulaire : chargement visible et annoncé, morceau disparu dit comme tel", () => {
+    const html = renderToStaticMarkup(<ReportProblemButton authenticated={false} label="Report a problem" />);
+    // Région d'état présente dès le rendu, vide tant que rien ne charge.
+    expect(html).toContain('<output class="sr-only"></output>');
+    expect(html).not.toContain("…");
+    const button = source("components/reports/ReportProblemButton.tsx");
+    expect(button).toContain('const busyMark = pending ? <span aria-hidden="true">…</span> : null;');
+    expect(button).toContain('{pending ? t("footer.reportLoading") : ""}');
+    expect(button).toMatch(/reloadAfterChunkError\(\);\s*toast\?\.showError\(t\("footer\.reportReloading"\)\);\s*return;/);
+  });
+
+  it("textes du chargement dans les deux langues", async () => {
+    const fr = (await import("@/messages/fr/shell.json")).default.footer;
+    const en = (await import("@/messages/en/shell.json")).default.footer;
+    expect(fr.reportLoading).toBe("Ouverture du formulaire…");
+    expect(en.reportLoading).toBe("Opening the form…");
+    expect(en.reportReloading).toContain("reload");
+    expect(en.reportLoadFailed).toContain("Try again");
+  });
+
+  it("accusé d'envoi : jamais « n° undefined »", () => {
+    const dialog = source("components/reports/ReportProblemDialog.tsx");
+    expect(dialog).toContain('const sent = typeof body.id === "number" ? t("dialog.sent", { id: String(body.id) }) : t("dialog.sentNoId");');
+    expect(enReports.dialog.sentNoId).toBe("Thanks, your report has been sent to the association.");
+  });
+
+  it("déconnexion du profil : échec dit, double clic sans effet", () => {
+    const button = source("components/logout-button.tsx");
+    expect(button).toContain("const done = await requestLogout();");
+    expect(button).toContain('showError(t("account.logoutFailed"));');
+    expect(button).toContain("if (leaving) return;");
+    expect(button).not.toContain('fetch("/api/auth/logout"');
   });
 });
