@@ -4,11 +4,14 @@ import { resolveTitle } from "next/dist/lib/metadata/resolvers/resolve-title";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/database");
+// Fiches traduites (lot 9) : la langue de la requête, simulée.
+let mockLocale: "fr" | "en" = "fr";
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 
 import { generateMetadata as teamMetadata } from "@/app/(secured)/equipes/[id]/layout";
 import { generateMetadata as playerMetadata } from "@/app/(secured)/joueurs/[id]/layout";
-import { metadata as teamsMetadata } from "@/app/(secured)/equipes/layout";
-import { metadata as playersMetadata } from "@/app/(secured)/joueurs/layout";
+import { generateMetadata as teamsLayoutMetadata } from "@/app/(secured)/equipes/layout";
+import { generateMetadata as playersLayoutMetadata } from "@/app/(secured)/joueurs/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
 import { getTeamPageIdentity } from "@/lib/server/teams/detail";
@@ -39,6 +42,7 @@ function tabTitle(parent: Metadata, own: Metadata): string {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockLocale = "fr";
   execute.mockReset();
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   mockedUser.mockResolvedValue(authUser({ id: 7 }));
@@ -49,14 +53,19 @@ describe("fiche d'équipe", () => {
     execute.mockResolvedValue([[{ name: "Dragon Squad" }]]);
     const metadata = await teamMetadata(params("12"));
 
-    expect(tabTitle(teamsMetadata, metadata)).toBe(`Dragon Squad · Équipe · ${SITE_NAME}`);
+    expect(tabTitle(await teamsLayoutMetadata(), metadata)).toBe(`Dragon Squad · Équipe · ${SITE_NAME}`);
     expect(execute).toHaveBeenCalledWith(expect.any(String), [12]);
   });
 
-  it("ni URL canonique ni og:url, et un encart générique même quand le nom est connu", async () => {
+  it("la canonique de **cette** fiche, pas d'og:url, et un encart générique même quand le nom est connu", async () => {
     execute.mockResolvedValue([[{ name: "Dragon Squad" }]]);
     const metadata = await teamMetadata(params("12"));
-    expect(Object.keys(metadata).sort((a, b) => a.localeCompare(b))).toEqual(["openGraph", "title", "twitter"]);
+    expect(Object.keys(metadata).sort((a, b) => a.localeCompare(b))).toEqual(["alternates", "openGraph", "title", "twitter"]);
+    // Lot 9 : la fiche est traduite — canonique et `hreflang` réciproques.
+    expect(metadata.alternates).toEqual({
+      canonical: "/equipes/12",
+      languages: { fr: "/equipes/12", en: "/en/equipes/12", "x-default": "/equipes/12" },
+    });
     // Le nom est dans l'onglet d'un membre connecté, jamais dans l'encart.
     expect(JSON.stringify([metadata.openGraph, metadata.twitter])).not.toContain("Dragon Squad");
     expect((metadata.openGraph as { url?: unknown }).url).toBeUndefined();
@@ -102,7 +111,7 @@ describe("fiche de joueur", () => {
     execute.mockResolvedValue([[{ pseudo: "Nova", is_deleted: 0 }]]);
     const metadata = await playerMetadata(params("5"));
 
-    expect(tabTitle(playersMetadata, metadata)).toBe(`Nova · Joueur · ${SITE_NAME}`);
+    expect(tabTitle(await playersLayoutMetadata(), metadata)).toBe(`Nova · Joueur · ${SITE_NAME}`);
     expect(execute).toHaveBeenCalledWith(expect.any(String), [5]);
     // Le pseudo n'atteint jamais l'encart de partage (RGPD).
     expect(JSON.stringify([metadata.openGraph, metadata.twitter])).not.toContain("Nova");
@@ -127,6 +136,31 @@ describe("fiche de joueur", () => {
   it("retombe sur le titre générique pour un identifiant invalide", async () => {
     expect(await playerMetadata(params("0"))).toMatchObject({ title: "Joueur" });
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("fiches en anglais (lot 9)", () => {
+  it("titre, canonique et image d'une fiche d'équipe dans la langue de l'adresse", async () => {
+    mockLocale = "en";
+    execute.mockResolvedValue([[{ name: "Dragon Squad" }]]);
+    const metadata = await teamMetadata(params("12"));
+    expect(tabTitle(await teamsLayoutMetadata(), metadata)).toBe(`Dragon Squad · Team · ${SITE_NAME}`);
+    expect(metadata.alternates).toMatchObject({ canonical: "/en/equipes/12" });
+    expect(metadata.twitter).toMatchObject({ images: ["/og/en/team-12.png"] });
+  });
+
+  it("un compte anonymisé s'annonce « Deleted account »", async () => {
+    mockLocale = "en";
+    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1 }]]);
+    const metadata = await playerMetadata(params("5"));
+    expect(metadata).toMatchObject({ title: "Deleted account · Player" });
+    expect(metadata.alternates).toMatchObject({ canonical: "/en/joueurs/5" });
+  });
+
+  it("les listes s'intitulent en anglais", async () => {
+    mockLocale = "en";
+    expect((await playersLayoutMetadata()).title).toEqual({ default: "Players", template: SITE_TITLE_TEMPLATE });
+    expect((await teamsLayoutMetadata()).title).toEqual({ default: "Teams", template: SITE_TITLE_TEMPLATE });
   });
 });
 

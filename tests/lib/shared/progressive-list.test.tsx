@@ -8,6 +8,9 @@ import {
   nextVisibleCount,
 } from "@/lib/shared/progressive-list";
 import { readSource } from "../../helpers/read-source";
+import { FR_PLAYERS_TEXT } from "@/components/i18n/players-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { scopedText } from "@/lib/shared/scoped-text";
 
 /**
  * Les annuaires rendaient toutes leurs cartes d'un coup (353 sur le jeu de
@@ -93,6 +96,11 @@ describe("useProgressiveList (source)", () => {
   });
 });
 
+// Libellés de l'annuaire (lot 9) : français, et anglais pour la forme.
+const frLabel = (step: number, hidden: number) => FR_PLAYERS_TEXT.t("list.showMore", { step, hidden });
+const enLabel = (step: number, hidden: number) =>
+  scopedText("en", messagesFor("en").players).t("list.showMore", { step, hidden });
+
 describe("DirectoryShowMore", () => {
   it("disparaît quand tout est affiché", () => {
     expect(
@@ -102,6 +110,7 @@ describe("DirectoryShowMore", () => {
           shown={48}
           gridRef={gridRef}
           noun="joueurs"
+          label={frLabel}
           onShowMore={noop}
         />,
       ),
@@ -115,6 +124,7 @@ describe("DirectoryShowMore", () => {
         shown={48}
         gridRef={gridRef}
         noun="joueurs"
+        label={frLabel}
         onShowMore={noop}
       />,
     );
@@ -128,6 +138,7 @@ describe("DirectoryShowMore", () => {
         shown={48}
         gridRef={gridRef}
         noun="équipes"
+        label={frLabel}
         onShowMore={noop}
       />,
     );
@@ -142,6 +153,7 @@ describe("DirectoryShowMore", () => {
         shown={48}
         gridRef={gridRef}
         noun="équipes"
+        label={frLabel}
         onShowMore={noop}
       />,
     );
@@ -149,6 +161,13 @@ describe("DirectoryShowMore", () => {
       'aria-label="Voir plus (20 sur 20 restants) · équipes"',
     );
     expect(html).toContain('type="button"');
+  });
+
+  it("parle anglais sous `/en` (lot 9)", () => {
+    const html = renderToStaticMarkup(
+      <DirectoryShowMore hidden={1} shown={48} gridRef={gridRef} noun="teams" label={enLabel} onShowMore={noop} />,
+    );
+    expect(html).toContain('aria-label="Show more (1 of 1 remaining) · teams"');
   });
 });
 
@@ -163,7 +182,7 @@ describe("DirectoryShowMore (focus)", () => {
 });
 
 describe("annuaires", () => {
-  it.each(["app/(secured)/joueurs/page.tsx", "app/(secured)/equipes/page.tsx"])(
+  it.each(["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"])(
     "%s borne son rendu et diffère la recherche",
     (file) => {
       const source = readSource(file);

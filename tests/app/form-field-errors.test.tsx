@@ -44,7 +44,7 @@ describe("FieldErrorText", () => {
  * ce balayage garde le câblage.
  */
 const WIRED_FORMS: { file: string; fields: string[] }[] = [
-  { file: "app/(secured)/equipes/creer/page.tsx", fields: ["name", "tag"] },
+  { file: "app/(secured)/equipes/creer/CreateTeamForm.tsx", fields: ["name", "tag"] },
   { file: "app/(secured)/equipes/GhostTeamDialog.tsx", fields: ["name", "tag"] },
   { file: "app/(secured)/equipes/[id]/_components/TeamSettings.tsx", fields: ["name", "tag"] },
   { file: "app/(secured)/profil/page.tsx", fields: ["pseudo", "battletag", "discord"] },

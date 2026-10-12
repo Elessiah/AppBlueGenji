@@ -586,7 +586,9 @@ describe("aller-retour OAuth — la langue du départ", () => {
     // Départ anglais vers une page traduite : la page anglaise.
     ["/en/regles/simple?x=1", "/en/regles/simple?x=1"],
     // Départ anglais vers une route pas encore traduite : la française.
-    ["/en/equipes/4", "/equipes/4"],
+    ["/en/admin/signalements", "/admin/signalements"],
+    // Départ anglais vers une fiche d'équipe (traduite au lot 9) : l'anglaise.
+    ["/en/equipes/4", "/en/equipes/4"],
     // Départ français : français.
     ["/regles", "/regles"],
     // Destination trafiquée dans le cookie : refiltrée.

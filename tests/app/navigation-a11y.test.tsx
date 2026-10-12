@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 
-let mockPathname: string | null = "/equipes/12";
+// Sous-adresse fictive : « Équipes » courante, route non traduite (lot 9).
+let mockPathname: string | null = "/equipes/12/roster";
 jest.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
@@ -31,7 +32,7 @@ const currentLinks = (html: string) =>
 
 describe("ArenaNav — page courante et pictogrammes", () => {
   afterEach(() => {
-    mockPathname = "/equipes/12";
+    mockPathname = "/equipes/12/roster";
   });
 
   it("signale la section courante autrement que par le style", () => {
@@ -144,7 +145,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
   });
 
   it("ne rend pas de groupe d'outils vide sur une route pas encore traduite", () => {
-    // `/equipes/12` n'est pas traduite : le sélecteur serait muet, le filet orphelin.
+    // `/equipes/12/roster` n'est pas traduite : le sélecteur serait muet, le filet orphelin.
     const html = renderToStaticMarkup(
       <ToastProvider>
         <ArenaNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />

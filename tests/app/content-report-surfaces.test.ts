@@ -76,7 +76,7 @@ describe("conditions d'utilisation à la création du compte", () => {
   });
 
   it("la création d'une équipe et l'envoi d'un logo portent leur case", () => {
-    const create = read("app/(secured)/equipes/creer/page.tsx");
+    const create = read("app/(secured)/equipes/creer/CreateTeamForm.tsx");
     expect(create).toContain("acceptTerms");
     expect(create).toContain("LOGO_RIGHTS_FIELD");
     expect(read("app/(secured)/equipes/[id]/_components/TeamSettings.tsx")).toContain("LOGO_RIGHTS_FIELD");
@@ -88,7 +88,7 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(settings).toMatch(/\{pendingLogo \? \([\s\S]*?checked=\{logoRights\}\s*disabled=\{logoBusy\}/);
     // L'envoi lui-même attend la case : choisir un fichier n'envoie rien.
     expect(settings).not.toMatch(/onLogoChange[\s\S]{0,400}teamApi\(/);
-    const create = read("app/(secured)/equipes/creer/page.tsx");
+    const create = read("app/(secured)/equipes/creer/CreateTeamForm.tsx");
     expect(create).toMatch(/checked=\{logoRights\}\s*disabled=\{loading\}/);
   });
 

@@ -8,7 +8,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 const UPLOAD_SCREENS = [
   "app/(secured)/profil/page.tsx",
-  "app/(secured)/equipes/creer/page.tsx",
+  "app/(secured)/equipes/creer/CreateTeamForm.tsx",
   "app/(secured)/equipes/[id]/_components/TeamSettings.tsx",
 ];
 

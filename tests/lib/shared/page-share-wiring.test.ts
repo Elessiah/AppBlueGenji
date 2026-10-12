@@ -99,7 +99,7 @@ describe("og:image:alt des cartes qui ne montrent pas le titre de l'encart", () 
 describe("fiche d'équipe : image nominative, texte générique", () => {
   it("la mise en page désigne la carte team-<id> sans lire la base pour elle", () => {
     const source = readSource("app/(secured)/equipes/[id]/layout.tsx");
-    expect(source).toContain('memberAreaShareMetadata("team", teamShareCardKey(teamId))');
+    expect(source).toContain('memberAreaShareMetadata("team", teamShareCardKey(teamId), locale)');
     expect(source).not.toContain("loadShareTeam");
   });
 
@@ -114,7 +114,7 @@ describe("fiche d'équipe : image nominative, texte générique", () => {
   });
 
   it("la fiche d'un joueur reste générique", () => {
-    expect(readSource("app/(secured)/joueurs/[id]/layout.tsx")).toContain('memberAreaShareMetadata("player")');
+    expect(readSource("app/(secured)/joueurs/[id]/layout.tsx")).toContain('memberAreaShareMetadata("player", "player", locale)');
     expect(readSource("app/(secured)/joueurs/[id]/layout.tsx")).not.toContain("ShareCardKey(");
   });
 });

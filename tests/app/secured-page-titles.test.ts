@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { resolveTitle } from "next/dist/lib/metadata/resolvers/resolve-title";
 import { generateMetadata as tournamentsLayoutMetadata } from "@/app/(secured)/tournois/layout";
 import { generateMetadata as createTournamentLayoutMetadata } from "@/app/(secured)/tournois/creer/layout";
-import { metadata as teamsMetadata } from "@/app/(secured)/equipes/layout";
-import { metadata as createTeamMetadata } from "@/app/(secured)/equipes/creer/layout";
-import { metadata as playersMetadata } from "@/app/(secured)/joueurs/layout";
+import { generateMetadata as teamsLayoutMetadata } from "@/app/(secured)/equipes/layout";
+import { generateMetadata as createTeamLayoutMetadata } from "@/app/(secured)/equipes/creer/layout";
+import { generateMetadata as playersLayoutMetadata } from "@/app/(secured)/joueurs/layout";
 import { metadata as profileMetadata } from "@/app/(secured)/profil/layout";
 import { generateMetadata as editTournamentLayoutMetadata } from "@/app/(secured)/tournois/[id]/modifier/layout";
 import { SITE_TITLE_TEMPLATE, pageMetadata, segmentTitle, siteTitle } from "@/lib/shared/page-metadata";
@@ -21,7 +21,14 @@ let tournamentsMetadata: Metadata;
 // la requête, comme la liste.
 let createTournamentMetadata: Metadata;
 let editTournamentMetadata: Metadata;
+// Équipes et joueurs sont traduits (lot 9) : même lecture de la langue.
+let teamsMetadata: Metadata;
+let createTeamMetadata: Metadata;
+let playersMetadata: Metadata;
 beforeAll(async () => {
+  teamsMetadata = await teamsLayoutMetadata();
+  createTeamMetadata = await createTeamLayoutMetadata();
+  playersMetadata = await playersLayoutMetadata();
   tournamentsMetadata = await tournamentsLayoutMetadata();
   createTournamentMetadata = await createTournamentLayoutMetadata();
   editTournamentMetadata = await editTournamentLayoutMetadata({ params: Promise.resolve({ id: "12" }) });

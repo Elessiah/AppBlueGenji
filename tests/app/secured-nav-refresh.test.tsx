@@ -29,7 +29,7 @@ describe("barre de navigation — rafraîchie après les gestes qui la changent"
     ["app/(secured)/profil/page.tsx", 'showSuccess("Avatar supprimé.")'],
     ["app/(secured)/profil/page.tsx", 'Invitation acceptée.'],
     ["app/(secured)/equipes/[id]/_components/MembershipActions.tsx", "showSuccess(await request())"],
-    ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'showSuccess("Équipe mise à jour.")'],
+    ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'showSuccess(t("settings.updated"))'],
     ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'router.push("/equipes")'],
     ["app/(secured)/admin/signalements/page.tsx", "showSuccess(success)"],
   ])("%s — %s", (file, marker) => {

@@ -34,8 +34,11 @@ describe("AnnuaireSearchField", () => {
   });
 
   it("est nommé par les deux annuaires", () => {
-    expect(readSource("app/(secured)/equipes/page.tsx")).toContain('label="Rechercher une équipe"');
-    expect(readSource("app/(secured)/joueurs/page.tsx")).toContain('label="Rechercher un joueur"');
+    // Lot 9 : le nom vient des messages, dans la langue de la page.
+    expect(readSource("app/(secured)/equipes/TeamsList.tsx")).toContain('label={t("list.searchLabel")}');
+    expect(readSource("app/(secured)/joueurs/PlayersList.tsx")).toContain('label={t("list.searchLabel")}');
+    expect(JSON.parse(readSource("messages/fr/teams.json")).list.searchLabel).toBe("Rechercher une équipe");
+    expect(JSON.parse(readSource("messages/fr/players.json")).list.searchLabel).toBe("Rechercher un joueur");
   });
 });
 
