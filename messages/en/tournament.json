@@ -370,6 +370,7 @@
       "enduranceScoring": "+{win} per map won · −{loss} per map lost",
       "playoffSize": "Qualified for the playoffs",
       "maxRounds": "Cap on qualifying rounds",
+      "earlyExit": "Early “out of contention” exit",
       "playoffFormat": "Playoff format",
       "phase": "Stage {position}",
       "phaseNamed": "Stage {position} — {name}",

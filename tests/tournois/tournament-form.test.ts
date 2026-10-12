@@ -185,6 +185,13 @@ describe("toFormValues", () => {
     expect(v.enduranceMaxRounds).toBe(0);
   });
 
+  it("relit la sortie anticipée « hors course » d'un tournoi BG Survie", () => {
+    expect(toFormValues({ ...apiValues, format: "BG_SURVIE", enduranceEarlyExit: true }).enduranceEarlyExit).toBe(true);
+    expect(toFormValues({ ...apiValues, format: "BG_SURVIE", enduranceEarlyExit: false }).enduranceEarlyExit).toBe(false);
+    // Hors du mode, la colonne ne dit rien : bascule vers BG Survie = défaut.
+    expect(toFormValues({ ...apiValues, format: "SINGLE", enduranceEarlyExit: true }).enduranceEarlyExit).toBe(false);
+  });
+
   it("garde le plafond enregistré d'un tournoi BG Survie", () => {
     const v = toFormValues({ ...apiValues, format: "BG_SURVIE", enduranceMaxRounds: 7 });
     expect(v.enduranceMaxRounds).toBe(7);
@@ -386,6 +393,7 @@ describe("toApiPayload — réglages du match nul", () => {
         enduranceLossDelta: null,
         endurancePlayoffSize: null,
         enduranceMaxRounds: null,
+        enduranceEarlyExit: false,
         matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
         endurancePlayoffFormat: { type: "BO", value: 5 },
         registrationDiscordRequirement: "ANY_PLAYER",
@@ -463,6 +471,7 @@ describe("conditions d'inscription", () => {
         enduranceLossDelta: null,
         endurancePlayoffSize: null,
         enduranceMaxRounds: null,
+        enduranceEarlyExit: false,
         matchFormat: null,
         endurancePlayoffFormat: null,
         registrationDiscordRequirement: "ALL_PLAYERS" as const,
@@ -480,5 +489,35 @@ describe("conditions d'inscription", () => {
     expect(toApiPayload(api).registrationDiscordRequirement).toBe("ALL_PLAYERS");
     expect(toApiPayload(api).registrationBlizzardRequirement).toBe("ANY_PLAYER");
     expect(toApiPayload(api).registrationMinPlayers).toBe(6);
+  });
+});
+
+describe("sortie anticipée « hors course » — formulaire", () => {
+  it("est décochée par défaut", () => {
+    expect(defaultTournamentFormValues().enduranceEarlyExit).toBe(false);
+  });
+
+  // Toujours un booléen en BG Survie : décocher doit pouvoir éteindre l'option,
+  // la liste blanche de l'édition ignorant un champ absent.
+  it("part en booléen en BG Survie, cochée comme décochée", () => {
+    const values = { ...defaultTournamentFormValues(), name: "Coupe", format: "BG_SURVIE" as const };
+    expect(toApiPayload({ ...values, enduranceEarlyExit: true }).enduranceEarlyExit).toBe(true);
+    const off = toApiPayload(values);
+    expect(off.enduranceEarlyExit).toBe(false);
+    expect("enduranceEarlyExit" in off).toBe(true);
+  });
+
+  it("ne part pas hors BG Survie", () => {
+    const values = { ...defaultTournamentFormValues(), name: "Coupe", enduranceEarlyExit: true };
+    expect(toApiPayload(values).enduranceEarlyExit).toBeUndefined();
+  });
+
+  it("est un champ éditable, figé avec le barème à la publication", () => {
+    expect(ALL_TOURNAMENT_FIELDS).toContain("enduranceEarlyExit");
+    const hidden = { state: "UPCOMING" as const, startVisibilityAt: "2999-01-01T00:00:00.000Z", maxTeams: 16 };
+    const visible = { ...hidden, startVisibilityAt: "2000-01-01T00:00:00.000Z" };
+    expect(isFieldEditable("enduranceEarlyExit", hidden)).toBe(true);
+    expect(isFieldEditable("enduranceEarlyExit", visible)).toBe(false);
+    expect(isFieldEditable("enduranceEarlyExit", { ...hidden, state: "RUNNING" })).toBe(false);
   });
 });

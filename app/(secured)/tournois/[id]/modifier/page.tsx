@@ -62,6 +62,7 @@ const LABELED_FIELDS = [
   "enduranceLossDelta",
   "endurancePlayoffSize",
   "enduranceMaxRounds",
+  "enduranceEarlyExit",
   "matchFormat",
   "endurancePlayoffFormat",
   "registrationDiscordRequirement",

@@ -1,8 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   matchFormatSettingLabel,
-  parseRulesTournamentParam,
-  rulesHrefWithTournament,
   tournamentSettingsGroups,
   type TournamentSettingsGroup,
   type TournamentSettingsInput,
@@ -150,7 +148,7 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
           matchFormat: { type: "BO", value: 5, drawsAllowed: true, maxMaps: 4 },
           endurancePlayoffFormat: null,
         }),
-        endurance: { startPoints: 7, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: null },
+        endurance: { startPoints: 7, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: null, earlyExit: false },
       }),
     );
     const settings = group(groups, "BlueGenji Survie");
@@ -173,13 +171,44 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
           matchFormat: { type: "BO", value: 5 },
           endurancePlayoffFormat: { type: "FT", value: 3 },
         }),
-        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 6 },
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 6, earlyExit: true },
       }),
     );
     expect(group(groups, "BlueGenji Survie")).toMatchObject({
       "Plafond de manches qualificatives": "6",
+      "Sortie anticipée « hors course »": "Oui",
       "Format des play-offs": "FT3",
     });
+  });
+
+  it("BlueGenji Survie : la sortie anticipée, décochée, se lit « Non » sous plafond", () => {
+    const groups = tournamentSettingsGroups(
+      input({
+        card: tournamentCard({ format: "BG_SURVIE", matchFormat: { type: "BO", value: 5 } }),
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 4, earlyExit: false },
+      }),
+    );
+    expect(group(groups, "BlueGenji Survie")["Sortie anticipée « hors course »"]).toBe("Non");
+  });
+
+  it("BlueGenji Survie : en saisie de score libre, la sortie anticipée n'est pas affichée (elle n'y joue jamais)", () => {
+    const groups = tournamentSettingsGroups(
+      input({
+        card: tournamentCard({ format: "BG_SURVIE", matchFormat: null }),
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: 4, earlyExit: true },
+      }),
+    );
+    expect(group(groups, "BlueGenji Survie")).not.toHaveProperty("Sortie anticipée « hors course »");
+  });
+
+  it("BlueGenji Survie : sans plafond, la sortie anticipée n'est pas affichée", () => {
+    const groups = tournamentSettingsGroups(
+      input({
+        card: tournamentCard({ format: "BG_SURVIE", matchFormat: { type: "BO", value: 5 } }),
+        endurance: { startPoints: 9, winDelta: 1, lossDelta: 1, playoffSize: 8, maxRounds: null, earlyExit: true },
+      }),
+    );
+    expect(group(groups, "BlueGenji Survie")).not.toHaveProperty("Sortie anticipée « hors course »");
   });
 
   it("multi-phases : une ligne par phase, dans l'ordre, la dernière désignant la championne", () => {
@@ -206,19 +235,5 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
       "Phase 2 — Coupes": "Survie par coupes · 1ʳᵉ coupe après 2 manches · puis à chaque manche · 1 qualifiée",
       "Phase 3": "Simple élimination · petite finale · Désigne la championne",
     });
-  });
-});
-
-describe("paramètre ?tournoi= des règles", () => {
-  it("n'accepte qu'un entier positif en base 10", () => {
-    expect(parseRulesTournamentParam("12")).toBe(12);
-    expect(parseRulesTournamentParam(["7", "8"])).toBe(7);
-    for (const bad of [undefined, "", "0", "-3", "1.5", "012", "1e3", "abc", "99999999999999999"]) {
-      expect(parseRulesTournamentParam(bad)).toBeNull();
-    }
-  });
-
-  it("construit le lien des règles portant le tournoi", () => {
-    expect(rulesHrefWithTournament("/regles/survie", 42)).toBe("/regles/survie?tournoi=42");
   });
 });

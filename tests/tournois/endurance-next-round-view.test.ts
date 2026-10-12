@@ -42,6 +42,7 @@ function meta(overrides: Partial<EnduranceMeta> = {}): EnduranceMeta {
     forfeitMaps: 3,
     playoffSize: 4,
     maxRounds: null,
+    earlyExit: false,
     currentRound: 1,
     playoffsStarted: false,
     rounds: [1],

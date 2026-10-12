@@ -7,7 +7,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `SURVIVAL_MODE.md` — Survie (`SURVIVAL`) : groupe unique, coupes des 2 derniers, rejeu complet depuis les matchs.
 - `SWISS_MODE.md` — Ronde suisse : rondes fixes, appariement par retour sur trace, départages.
 - `MULTI_PHASE_TOURNAMENTS.md` — Multi-phases (`MULTI`) : 2 à 8 phases, qualification fixe ou en pourcentage, plan re-résolu à chaque fin de phase.
-- `BG_SURVIE_MODE.md` — BlueGenji Survie (`BG_SURVIE`) : capital d'endurance, plafond de manches, arbre final imposé.
+- `BG_SURVIE_MODE.md` — BlueGenji Survie (`BG_SURVIE`) : capital d'endurance, plafond de manches, sortie « hors course » anticipée en option (décochée par défaut), arbre final imposé.
 - `ENDURANCE_NEXT_ROUND_PREVIEW.md` — BG Survie : aperçu, pour l'arbitrage, des rencontres de la manche suivante acquises quel que soit le score.
 - `ENDURANCE_PENALTIES.md` — BG Survie : pénalités, entrées du rejeu, qui se **retirent** (jamais une pénalité inverse).
 - `ENDURANCE_ROUND_PANELS.md` — BG Survie : un volet par manche, vrai arbre des play-offs.

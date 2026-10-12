@@ -172,6 +172,8 @@ export type TournamentInputBody = {
   enduranceLossDelta?: number;
   endurancePlayoffSize?: number;
   enduranceMaxRounds?: number;
+  /** Sortie « hors course » anticipée (BG Survie) ; absente = option éteinte. */
+  enduranceEarlyExit?: boolean | null;
   matchFormatType?: string | null;
   matchFormatValue?: number | null;
   matchFormatMaxMaps?: number | null;
@@ -205,6 +207,11 @@ export type ValidatedTournamentInput = {
   enduranceLossDelta: number | null;
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
+  /**
+   * Sortie « hors course » anticipée — BG Survie seulement, `false` ailleurs
+   * (`EnduranceConfig.earlyExit`).
+   */
+  enduranceEarlyExit: boolean;
   matchFormat: MatchFormat | null;
   /**
    * Format de l'arbre final en « BlueGenji Survie » (`null` = celui du
@@ -487,6 +494,7 @@ function validateEnduranceSettings(
     | "enduranceLossDelta"
     | "endurancePlayoffSize"
     | "enduranceMaxRounds"
+    | "enduranceEarlyExit"
   >
 > {
   // BlueGenji Survie : barème d'endurance. Tout est facultatif — le moteur
@@ -499,6 +507,16 @@ function validateEnduranceSettings(
   // calendrier. C'est le comportement d'origine du mode, et il reste le défaut.
   let enduranceMaxRounds: number | null = null;
   if (body.format === "BG_SURVIE") {
+    // Un booléen strict, comme la planification : « "true" » ou « 1 » venus d'un
+    // client mal écrit n'allument pas une règle qui sort des équipes du tournoi.
+    // Hors BG Survie, ignorée comme le reste du barème (éteinte plus bas).
+    if (
+      body.enduranceEarlyExit !== undefined &&
+      body.enduranceEarlyExit !== null &&
+      typeof body.enduranceEarlyExit !== "boolean"
+    ) {
+      return { error: "INVALID_ENDURANCE_EARLY_EXIT" };
+    }
     const settings: [unknown, number, number, (v: number) => void][] = [
       [body.endurancePoints, 1, 99, (v) => (endurancePoints = v)],
       [body.enduranceWinDelta, 1, 20, (v) => (enduranceWinDelta = v)],
@@ -523,6 +541,8 @@ function validateEnduranceSettings(
       enduranceLossDelta,
       endurancePlayoffSize,
       enduranceMaxRounds,
+      // Hors BG Survie, l'option ne veut rien dire : elle est éteinte.
+      enduranceEarlyExit: body.format === "BG_SURVIE" && body.enduranceEarlyExit === true,
     },
   };
 }

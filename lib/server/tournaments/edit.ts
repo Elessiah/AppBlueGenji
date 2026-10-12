@@ -56,6 +56,8 @@ export type EditableTournamentValues = {
   enduranceLossDelta: number | null;
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
+  /** BG Survie : sortie « hors course » anticipée (option, éteinte par défaut). */
+  enduranceEarlyExit: boolean;
   matchFormat: MatchFormat | null;
   /** BG Survie : format de l'arbre final (`null` = celui du tournoi). */
   endurancePlayoffFormat: MatchFormat | null;
@@ -90,7 +92,7 @@ async function loadEditRow(
       survival_rounds_before_first_cut, survival_rounds_per_cut,
       swiss_total_rounds, swiss_points_win, swiss_points_draw, swiss_points_loss,
       endurance_start_points, endurance_win_delta, endurance_loss_delta,
-      endurance_playoff_size, endurance_max_rounds,
+      endurance_playoff_size, endurance_max_rounds, endurance_early_exit,
       match_format_type, match_format_value,
       match_format_max_maps, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
@@ -139,6 +141,7 @@ function toValues(
     enduranceLossDelta: num(row.endurance_loss_delta),
     endurancePlayoffSize: num(row.endurance_playoff_size),
     enduranceMaxRounds: num(row.endurance_max_rounds),
+    enduranceEarlyExit: Number(row.endurance_early_exit) === 1,
     matchFormat: parseMatchFormat(
       row.match_format_type,
       row.match_format_value,
@@ -283,7 +286,7 @@ export async function updateTournament(
         survival_rounds_before_first_cut = ?, survival_rounds_per_cut = ?,
         swiss_total_rounds = ?, swiss_points_win = ?, swiss_points_draw = ?, swiss_points_loss = ?,
         endurance_start_points = ?, endurance_win_delta = ?, endurance_loss_delta = ?,
-        endurance_playoff_size = ?, endurance_max_rounds = ?,
+        endurance_playoff_size = ?, endurance_max_rounds = ?, endurance_early_exit = ?,
         match_format_type = ?, match_format_value = ?,
         match_format_max_maps = ?, match_format_draws = ?,
         endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
@@ -313,6 +316,7 @@ export async function updateTournament(
         valid.enduranceLossDelta,
         valid.endurancePlayoffSize,
         valid.enduranceMaxRounds,
+        valid.enduranceEarlyExit ? 1 : 0,
         valid.matchFormat?.type ?? null,
         valid.matchFormat?.value ?? null,
         valid.matchFormat?.maxMaps ?? null,
@@ -387,6 +391,7 @@ function validateEditedValues(next: EditableTournamentValues): {
     enduranceLossDelta: next.enduranceLossDelta ?? undefined,
     endurancePlayoffSize: next.endurancePlayoffSize ?? undefined,
     enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
+    enduranceEarlyExit: next.enduranceEarlyExit,
     matchFormatType: next.matchFormat?.type ?? null,
     matchFormatValue: next.matchFormat?.value ?? null,
     matchFormatMaxMaps: next.matchFormat?.maxMaps ?? null,

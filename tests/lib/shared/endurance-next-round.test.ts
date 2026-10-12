@@ -338,7 +338,10 @@ describe("previewEnduranceNextRound — force brute", () => {
     },
   );
 
-  it("n'annonce que des rencontres sûres sous plafond de manches (coupe approchée)", () => {
+  it.each([
+    ["cochée (coupe approchée)", true],
+    ["décochée (aucune coupe avant la fin)", false],
+  ])("n'annonce que des rencontres sûres sous plafond de manches, sortie anticipée %s", (_label, earlyExit) => {
     let checked = 0;
     for (let seed = 1; seed <= 24; seed += 1) {
       const rounds = 1 + (seed % 3);
@@ -347,6 +350,7 @@ describe("previewEnduranceNextRound — force brute", () => {
         startPoints: 4,
         playoffSize: 4,
         maxRounds: rounds + (seed % 2),
+        earlyExit,
       };
       const scenario = simulate(seed * 104729, {
         teamCount: 12,

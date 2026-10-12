@@ -19,10 +19,36 @@ import {
 } from "./tournament-settings";
 import type { TournamentPhase } from "./types";
 import type { Messages } from "./i18n-messages";
+import { earlyExitApplies } from "./bg-survie/config";
 
 type SettingsMessages = Pick<Messages["tournament"], "settings" | "matchFormat">;
 type SettingsText = ScopedText<Leaves<SettingsMessages>>;
 type LabelMessages = Messages["labels"];
+
+/** « Oui » / « Non » dans la langue de la page. */
+function yesNo(text: SettingsText, value: boolean): string {
+  return value ? text.t("settings.yes") : text.t("settings.no");
+}
+
+/** Barème d'endurance (BG Survie) : capital, barème, plateau, plafond, sortie anticipée. */
+function enduranceSettings(
+  text: SettingsText,
+  endurance: NonNullable<TournamentSettingsInput["endurance"]>,
+  matchFormat: MatchFormat | null,
+): TournamentSetting[] {
+  const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = endurance;
+  const settings: TournamentSetting[] = [
+    { label: text.t("settings.mode.startPoints"), value: text.t("settings.mode.startPointsValue", { count: startPoints }) },
+    { label: text.t("settings.mode.scoring"), value: text.t("settings.mode.enduranceScoring", { win: String(winDelta), loss: String(lossDelta) }) },
+    { label: text.t("settings.mode.playoffSize"), value: String(playoffSize) },
+    { label: text.t("settings.mode.maxRounds"), value: maxRounds === null ? text.t("settings.none") : String(maxRounds) },
+  ];
+  // L'option n'a d'effet que sous plafond et avec un format de match : ailleurs, la ligne ne dirait rien.
+  if (earlyExitApplies(maxRounds, matchFormat)) {
+    settings.push({ label: text.t("settings.mode.earlyExit"), value: yesNo(text, earlyExit) });
+  }
+  return settings;
+}
 
 function matchFormatSetting(text: SettingsText, format: MatchFormat | null): string {
   let label: string;
@@ -73,10 +99,9 @@ function phaseQualification(text: SettingsText, phase: TournamentPhase, isLast: 
 
 function modeSettings(text: SettingsText, labels: LabelMessages, input: TournamentSettingsInput): TournamentSetting[] {
   const { card } = input;
-  const yesNo = (value: boolean) => (value ? text.t("settings.yes") : text.t("settings.no"));
   switch (card.format) {
     case "SINGLE":
-      return [{ label: text.t("settings.mode.thirdPlace"), value: yesNo(card.hasThirdPlaceMatch) }];
+      return [{ label: text.t("settings.mode.thirdPlace"), value: yesNo(text, card.hasThirdPlaceMatch) }];
     case "DOUBLE":
       return [];
     case "SURVIVAL":
@@ -101,16 +126,7 @@ function modeSettings(text: SettingsText, labels: LabelMessages, input: Tourname
       ];
     }
     case "BG_SURVIE": {
-      const settings: TournamentSetting[] = [];
-      if (input.endurance) {
-        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds } = input.endurance;
-        settings.push(
-          { label: text.t("settings.mode.startPoints"), value: text.t("settings.mode.startPointsValue", { count: startPoints }) },
-          { label: text.t("settings.mode.scoring"), value: text.t("settings.mode.enduranceScoring", { win: String(winDelta), loss: String(lossDelta) }) },
-          { label: text.t("settings.mode.playoffSize"), value: String(playoffSize) },
-          { label: text.t("settings.mode.maxRounds"), value: maxRounds === null ? text.t("settings.none") : String(maxRounds) },
-        );
-      }
+      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(text, input.endurance, card.matchFormat) : [];
       settings.push({
         label: text.t("settings.mode.playoffFormat"),
         value: matchFormatSetting(text, card.endurancePlayoffFormat ?? withoutDraws(card.matchFormat)),

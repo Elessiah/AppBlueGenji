@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { dependentMatches, isScoreEditLocked, type MatchScoreState } from "@/lib/shared/match-lock";
-import { DEFAULT_ENDURANCE_CONFIG, resolveEnduranceConfig } from "@/lib/shared/bg-survie/config";
+import { DEFAULT_ENDURANCE_CONFIG, earlyExitApplies, earlyExitBlocker, resolveEnduranceConfig } from "@/lib/shared/bg-survie/config";
 import {
   enduranceMatchMaps,
   type EnduranceMatchOutcome,
@@ -60,6 +60,26 @@ const FT3 = { type: "FT", value: 3 } as const;
 const BO5 = { type: "BO", value: 5 } as const;
 const BO3 = { type: "BO", value: 3 } as const;
 
+describe("earlyExitApplies", () => {
+  it("joue sous plafond avec un format de match", () => {
+    expect(earlyExitApplies(5, { type: "FT", value: 3 })).toBe(true);
+    expect(earlyExitApplies(1, { type: "BO", value: 1 })).toBe(true);
+  });
+
+  it("ne joue ni sans plafond (null ou 0) ni en saisie de score libre", () => {
+    expect(earlyExitApplies(null, { type: "FT", value: 3 })).toBe(false);
+    expect(earlyExitApplies(0, { type: "FT", value: 3 })).toBe(false);
+    expect(earlyExitApplies(5, null)).toBe(false);
+  });
+
+  it("donne une seule raison, le plafond d'abord", () => {
+    expect(earlyExitBlocker(null, null)).toBe("NO_CAP");
+    expect(earlyExitBlocker(0, { type: "FT", value: 3 })).toBe("NO_CAP");
+    expect(earlyExitBlocker(4, null)).toBe("FREE_SCORE");
+    expect(earlyExitBlocker(4, { type: "FT", value: 3 })).toBeNull();
+  });
+});
+
 describe("resolveEnduranceConfig", () => {
   it("retombe sur 9 / ±1 / 8 quand rien n'est renseigné", () => {
     expect(resolveEnduranceConfig()).toEqual(DEFAULT_ENDURANCE_CONFIG);
@@ -74,6 +94,7 @@ describe("resolveEnduranceConfig", () => {
         lossDelta: 3,
         playoffSize: 4,
         maxRounds: 6,
+        earlyExit: true,
       }),
     ).toEqual({
       startPoints: 12,
@@ -81,6 +102,7 @@ describe("resolveEnduranceConfig", () => {
       lossDelta: 3,
       playoffSize: 4,
       maxRounds: 6,
+      earlyExit: true,
     });
   });
 

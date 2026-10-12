@@ -338,3 +338,16 @@ describe("déclaration d'accessibilité", () => {
     expect(menu).toContain("onNavigate={() => setOpen(false)}");
   });
 });
+
+describe("édition d'un tournoi : un refus nomme le champ en cause", () => {
+  it("tout champ libellé dans `edit.fields` (FR et EN) figure dans LABELED_FIELDS", () => {
+    const page = code("app/(secured)/tournois/[id]/modifier/page.tsx");
+    const list = /const LABELED_FIELDS = \[([\s\S]*?)\]/.exec(page)?.[1] ?? "";
+    const labeled = new Set([...list.matchAll(/"([A-Za-z]+)"/g)].map((m) => m[1]));
+    for (const locale of ["fr", "en"]) {
+      const fields = (JSON.parse(readSource(`messages/${locale}/tournamentForm.json`)) as { edit: { fields: Record<string, string> } }).edit.fields;
+      for (const key of Object.keys(fields)) expect([locale, key, labeled.has(key)]).toEqual([locale, key, true]);
+    }
+    expect(labeled.has("enduranceEarlyExit")).toBe(true);
+  });
+});

@@ -106,6 +106,7 @@ function seedTournamentInsertParams({
     isEndurance ? def.endurancePoints ?? null : null,
     isEndurance ? def.endurancePlayoffSize ?? null : null,
     isEndurance ? def.enduranceMaxRounds ?? null : null,
+    isEndurance && def.enduranceEarlyExit === true ? 1 : 0,
     matchFormat?.type ?? null,
     matchFormat?.value ?? null,
     matchFormatDraws ? 1 : 0,
@@ -218,12 +219,13 @@ export async function createTournament(
      (organizer_user_id, name, game, description, format, participant_type, has_third_place_match,
       survival_rounds_before_first_cut, survival_rounds_per_cut, swiss_total_rounds,
       endurance_start_points, endurance_playoff_size, endurance_max_rounds,
+      endurance_early_exit,
       match_format_type, match_format_value, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement, registration_min_players,
       referee_scheduling,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     seedTournamentInsertParams({
       organizerId,
       def,

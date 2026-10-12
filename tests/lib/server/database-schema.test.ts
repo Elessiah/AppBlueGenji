@@ -206,6 +206,15 @@ describe("Schéma — la règle des deux endroits", () => {
     );
   });
 
+  // Le défaut 0 **est** la migration : il éteint l'option sur tout tournoi
+  // existant, sans remplissage.
+  it("ajoute la sortie anticipée de BG Survie éteinte, aux deux endroits", () => {
+    expect(table("bg_tournaments")).toMatch(/endurance_early_exit TINYINT\(1\) NOT NULL DEFAULT 0/);
+    expect(migrations).toMatch(
+      /ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit TINYINT\(1\) NOT NULL DEFAULT 0/,
+    );
+  });
+
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {
     // Un triplet ne sait dire qu'`ADD COLUMN` : la règle des deux endroits ne
     // s'appliquait alors ni à un `ENUM` élargi, ni à un index posé, ni à une clé

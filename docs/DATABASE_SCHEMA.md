@@ -105,6 +105,7 @@ Ce qu'elle contient aujourd'hui :
 | — (lancement des matchs) | `bg_matches` | `caster_user_id` (+ index et clé étrangère `SET NULL`) — caster inscrit |
 | — (lancement des matchs) | `bg_matches` | `lobby_opened_at`, `launch_pairing`, `team1_ready_at`, `team2_ready_at`, `caster_ready_at` |
 | — (scores map par map) | `bg_match_maps` | table neuve (son `CREATE TABLE` est sa migration ; la clé unique sert les lectures par match) — détail map par map, voir `docs/features/MAP_SCORES.md` |
+| — (BG Survie, sortie anticipée) | `bg_tournaments` | `endurance_early_exit` — option « hors course » avant la fin, `0` par défaut : éteinte sur tout tournoi existant, sans remplissage (`docs/features/BG_SURVIE_MODE.md`) |
 | — (certification Discord volontaire) | `bg_users` | `discord_pseudo_from_discord` — `1` quand Discord a nommé le tag (connexion, rattachement, code), condition de la certification en un clic ; `0` sans remplissage pour les tags antérieurs |
 
 `bg_matches.launched_at` n'est **pas** dans la liste, et c'est volontaire : son

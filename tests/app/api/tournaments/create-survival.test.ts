@@ -67,6 +67,21 @@ describe("POST /api/tournaments — mode Survie", () => {
     expect(await res.json()).toEqual({ error: "INVALID_FORMAT" });
   });
 
+  it("BG Survie : transmet la sortie anticipée, refuse une valeur qui n'est pas un booléen", async () => {
+    const ok = await POST(jsonReq({ ...base, format: "BG_SURVIE", enduranceMaxRounds: 5, enduranceEarlyExit: true }));
+    expect(ok.status).toBe(201);
+    expect(service.createTournament).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ format: "BG_SURVIE", enduranceEarlyExit: true }),
+    );
+
+    jest.mocked(service.createTournament).mockClear();
+    const bad = await POST(jsonReq({ ...base, format: "BG_SURVIE", enduranceEarlyExit: "true" }));
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toEqual({ error: "INVALID_ENDURANCE_EARLY_EXIT" });
+    expect(service.createTournament).not.toHaveBeenCalled();
+  });
+
   it("n'exige pas survivalRoundsPerCut pour les autres formats", async () => {
     const res = await POST(jsonReq({ ...base, format: "SINGLE" }));
     expect(res.status).toBe(201);

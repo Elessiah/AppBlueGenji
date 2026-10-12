@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   DEFAULT_ENDURANCE_CONFIG,
   resolveEnduranceConfig,
+  roundCutMayFire,
   type EnduranceConfig,
 } from "@/lib/shared/bg-survie/config";
 import { type EnduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
@@ -56,6 +57,22 @@ function statuses(standings: EnduranceStanding[]): Record<number, string> {
 function pointsOf(standings: EnduranceStanding[]): Record<number, number> {
   return Object.fromEntries(standings.map((s) => [s.teamId, s.points]));
 }
+
+describe("resolveEnduranceConfig — sortie anticipée", () => {
+  it("est décochée par défaut", () => {
+    expect(DEFAULT_ENDURANCE_CONFIG.earlyExit).toBe(false);
+    expect(resolveEnduranceConfig().earlyExit).toBe(false);
+    expect(resolveEnduranceConfig({ maxRounds: 4 }).earlyExit).toBe(false);
+  });
+
+  it("ne s'allume que sur un vrai booléen", () => {
+    expect(resolveEnduranceConfig({ earlyExit: true }).earlyExit).toBe(true);
+    expect(resolveEnduranceConfig({ earlyExit: false }).earlyExit).toBe(false);
+    // Une valeur douteuse venue d'une ligne mal lue retombe sur le défaut.
+    const loose: Partial<EnduranceConfig> = JSON.parse('{"earlyExit": 1}');
+    expect(resolveEnduranceConfig(loose).earlyExit).toBe(false);
+  });
+});
 
 describe("resolveEnduranceConfig — plafond de manches", () => {
   it("laisse la phase à durée libre quand rien n'est renseigné", () => {
@@ -132,8 +149,8 @@ describe("enduranceEliminationCut — dernière manche", () => {
   });
 });
 
-describe("enduranceEliminationCut — élimination mathématique", () => {
-  const cfg = config({ playoffSize: 2, maxRounds: 5 });
+describe("enduranceEliminationCut — élimination mathématique (option cochée)", () => {
+  const cfg = config({ playoffSize: 2, maxRounds: 5, earlyExit: true });
 
   it("écarte une équipe que deux autres devancent quoi qu'il arrive", () => {
     // Une manche restante en FT3 : ±3 au maximum. Les têtes (plancher 17)
@@ -189,7 +206,7 @@ describe("enduranceEliminationCut — élimination mathématique", () => {
   // La parité ne protège que des équipes à qui il reste une manche à jouer :
   // ramenée pile à la cible, la phase s'arrête et personne ne chôme.
   it("coupe jusqu'à la cible même en nombre impair", () => {
-    const cible3 = config({ playoffSize: 3, maxRounds: 5 });
+    const cible3 = config({ playoffSize: 3, maxRounds: 5, earlyExit: true });
     const standings = [
       standing(1, 20),
       standing(2, 20),
@@ -287,7 +304,7 @@ describe("replayEndurance — plafond de manches", () => {
       teams: teams(4),
       matches: runawayRounds,
       forfeits: [],
-      config: config({ playoffSize: 2, maxRounds: 3 }),
+      config: config({ playoffSize: 2, maxRounds: 3, earlyExit: true }),
       lastRound: 2,
       matchFormat: FT3,
     });
@@ -312,7 +329,7 @@ describe("replayEndurance — plafond de manches", () => {
       teams: teams(4),
       matches: runawayRounds,
       forfeits: [],
-      config: config({ playoffSize: 2, maxRounds: 3 }),
+      config: config({ playoffSize: 2, maxRounds: 3, earlyExit: true }),
       lastRound: 3,
       matchFormat: FT3,
     });
@@ -333,5 +350,125 @@ describe("replayEndurance — plafond de manches", () => {
     });
 
     expect(statuses(standings)).toEqual({ 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" });
+  });
+});
+
+describe("sortie anticipée décochée — personne ne sort avant la fin", () => {
+  const off = config({ playoffSize: 2, maxRounds: 5 });
+
+  it("n'écarte rien en cours de phase, effectif pair", () => {
+    const standings = [standing(1, 20), standing(2, 20), standing(3, 1), standing(4, 1)];
+    expect(enduranceEliminationCut(standings, off, 1, FT3)).toEqual([]);
+  });
+
+  it("n'écarte rien en cours de phase, effectif impair", () => {
+    const standings = [
+      standing(1, 20),
+      standing(2, 20),
+      standing(3, 20),
+      standing(4, 20),
+      standing(5, 1),
+    ];
+    expect(enduranceEliminationCut(standings, off, 1, FT3)).toEqual([]);
+    expect(enduranceEliminationCut(standings, config({ playoffSize: 3, maxRounds: 5 }), 1, FT3)).toEqual([]);
+  });
+
+  // Appelée à chaque manche close de chaque rejeu (flux, REST, aperçu) : option
+  // décochée — le défaut —, elle répond sans parcourir ni trier le classement.
+  it("répond sans lire le classement en cours de phase", () => {
+    const untouchable = new Proxy<EnduranceStanding[]>([], {
+      get() {
+        throw new Error("classement lu");
+      },
+    });
+    expect(enduranceEliminationCut(untouchable, off, 1, FT3)).toEqual([]);
+    expect(enduranceEliminationCut(untouchable, config({ playoffSize: 2, maxRounds: 5, earlyExit: true }), 1, null)).toEqual([]);
+    expect(() => enduranceEliminationCut(untouchable, off, 0, FT3)).toThrow("classement lu");
+  });
+
+  // Une seule formulation de la règle, lue par le rejeu, la coupe et l'aperçu.
+  it("roundCutMayFire : trait final toujours, coupe anticipée option cochée seulement", () => {
+    const on = config({ playoffSize: 2, maxRounds: 5, earlyExit: true });
+    expect(roundCutMayFire(off, 0)).toBe(true);
+    expect(roundCutMayFire(off, -1)).toBe(true);
+    expect(roundCutMayFire(off, 1)).toBe(false);
+    expect(roundCutMayFire(off, 3)).toBe(false);
+    expect(roundCutMayFire(on, 0)).toBe(true);
+    expect(roundCutMayFire(on, 1)).toBe(true);
+  });
+
+  // La dernière manche n'est pas une sortie anticipée : le trait sous la cible
+  // tombe comme avant, option ou non — sans quoi la phase ne finirait jamais.
+  it("garde le trait de la dernière manche", () => {
+    const standings = [standing(1, 12), standing(2, 11), standing(3, 8), standing(4, 8), standing(5, 2)];
+    expect(enduranceEliminationCut(standings, off, 0, FT3)).toEqual([3, 4, 5]);
+  });
+
+  it("garde les équipes au rejeu, avec plafond", () => {
+    const { standings, history } = replayEnduranceDetailed({
+      teams: teams(4),
+      matches: [
+        winMaps(1, 1, 4, 3, 0),
+        winMaps(1, 2, 3, 3, 1),
+        winMaps(2, 1, 4, 3, 0),
+        winMaps(2, 2, 3, 3, 0),
+      ],
+      forfeits: [],
+      config: off,
+      lastRound: 2,
+      matchFormat: FT3,
+    });
+    expect(statuses(standings)).toEqual({ 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" });
+    expect(history.get(3)?.every((cell) => cell.kind === "POINTS")).toBe(true);
+  });
+
+  it("garde les équipes au rejeu, effectif impair (une exemptée par manche)", () => {
+    const input = {
+      teams: teams(5),
+      matches: [
+        winMaps(1, 1, 4, 3, 0),
+        winMaps(1, 2, 3, 3, 0),
+        winMaps(2, 1, 5, 3, 0),
+        winMaps(2, 2, 4, 3, 0),
+      ],
+      forfeits: [],
+      lastRound: 2,
+      matchFormat: FT3,
+    };
+    const { standings } = replayEnduranceDetailed({
+      ...input,
+      config: config({ playoffSize: 2, maxRounds: 3 }),
+    });
+    expect(standings.every((s) => s.status === "ACTIVE")).toBe(true);
+  });
+
+  it("n'a rien à changer sans plafond", () => {
+    const standings = [standing(1, 20), standing(2, 20), standing(3, 1)];
+    const noCap = config({ playoffSize: 2 });
+    expect(enduranceEliminationCut(standings, noCap, 1, FT3)).toEqual([]);
+  });
+
+  // Rien n'est accumulé : basculer l'option en cours de tournoi n'est qu'un
+  // autre rejeu de la même histoire — la coupe apparaît, puis se défait.
+  it("se rejoue à la bascule de l'option", () => {
+    const input = {
+      teams: teams(4),
+      matches: [
+        winMaps(1, 1, 4, 3, 0),
+        winMaps(1, 2, 3, 3, 1),
+        winMaps(2, 1, 4, 3, 0),
+        winMaps(2, 2, 3, 3, 0),
+      ],
+      forfeits: [],
+      lastRound: 2,
+      matchFormat: FT3,
+    };
+    const on = replayEnduranceDetailed({ ...input, config: config({ playoffSize: 2, maxRounds: 3, earlyExit: true }) });
+    const offAgain = replayEnduranceDetailed({ ...input, config: config({ playoffSize: 2, maxRounds: 3 }) });
+
+    expect(statuses(on.standings)[3]).toBe("OUT_OF_CONTENTION");
+    expect(statuses(offAgain.standings)).toEqual({ 1: "ACTIVE", 2: "ACTIVE", 3: "ACTIVE", 4: "ACTIVE" });
+    // Le capital ne dépend pas de l'option : seule la sortie change.
+    expect(pointsOf(offAgain.standings)).toEqual(pointsOf(on.standings));
   });
 });

@@ -6,8 +6,9 @@
  * map perdue en retire — un 3-0 coûte donc trois points au perdant et en
  * rapporte trois au vainqueur, là où un 3-2 n'en déplace qu'un. À 0, l'équipe
  * est éliminée sur-le-champ. Le classement se relit avant chaque manche
- * (`standings.ts`) ; sous plafond de manches, une équipe qui ne peut plus
- * **mathématiquement** rejoindre le plateau des play-offs est écartée sans
+ * (`standings.ts`) ; sous plafond de manches, et si le tournoi a coché l'option
+ * (`EnduranceConfig.earlyExit`, décochée par défaut), une équipe qui ne peut
+ * plus **mathématiquement** rejoindre le plateau des play-offs est écartée sans
  * attendre la fin (`enduranceEliminationCut`, `qualification.ts`). L'arbre
  * final se tire dans `playoffs.ts`.
  *
@@ -29,7 +30,7 @@
  */
 
 import type { MatchFormat } from "../match-format";
-import type { EnduranceConfig } from "./config";
+import { roundCutMayFire, type EnduranceConfig } from "./config";
 import type { EnduranceMatchOutcome } from "./match-outcome";
 import {
   applyEnduranceMatch,
@@ -218,9 +219,14 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
     applyRoundForfeits(standings, forfeitsByRound.get(round), round);
 
     // Coupe de fin de manche — seulement sous plafond de manches, seulement sur
-    // une manche close. Les équipes écartées gardent leur capital : c'est
-    // l'horizon qui leur manque, pas les points.
-    if (config.maxRounds !== null && roundIsClosed(round)) {
+    // une manche close, et avant la dernière seulement option cochée (sinon
+    // rien n'est copié ni trié pour rien). Les équipes écartées gardent leur
+    // capital : c'est l'horizon qui leur manque, pas les points.
+    if (
+      config.maxRounds !== null &&
+      roundCutMayFire(config, config.maxRounds - round) &&
+      roundIsClosed(round)
+    ) {
       applyRoundCut(standings, config, config.maxRounds - round, round, matchFormat);
     }
 

@@ -113,7 +113,9 @@ Une rencontre peut être acquise sans être annoncée, **jamais l'inverse** :
 - **Plafond de manches** — la coupe mathématique de fin de manche
   (`enduranceEliminationCut`) regarde tout le plateau à la fois et ne se découpe
   pas match par match. Elle est approchée par le haut : toute équipe qu'un
-  déroulé *pourrait* écarter est tenue pour possiblement absente.
+  déroulé *pourrait* écarter est tenue pour possiblement absente. Sans
+  l'option `earlyExit` (sortie anticipée, décochée par défaut), cette coupe
+  n'existe pas et l'aperçu ne l'approche pas (`withEliminationCut`).
 - **Glissement en bloc** — un couple que les résultats feraient passer d'une
   paire de places à une autre (1-2 dans un déroulé, 3-4 dans un autre) n'est pas
   reconnu : il faudrait qu'un nombre pair d'équipes passe toujours ensemble

@@ -7,6 +7,7 @@ import {
   RULE_MODE_LABELS_FR,
   TOURNAMENT_RULE_MODES,
   availableRuleModes,
+  localizedRuleModes,
   ruleModeBySlug,
   ruleModeForFormat,
   rulesHrefForFormat,
@@ -20,6 +21,7 @@ import { FORMAT_LABELS } from "@/lib/shared/tournament-labels";
 import type { TournamentFormat } from "@/lib/shared/types";
 import { formatMessage } from "@/lib/shared/message-format";
 import frRules from "@/messages/fr/rules.json";
+import enRules from "@/messages/en/rules.json";
 
 /** Un texte du registre tel que le lit le visiteur français (arguments remplis, balises retirées). */
 const plain = (text: string) => formatMessage("fr", text, ruleTextValues("fr", frRules));
@@ -112,6 +114,28 @@ describe("tournament-rules — Survie par coupes et BlueGenji Survie", () => {
   it("documente les pénalités d'endurance de BlueGenji Survie", () => {
     const titles = ruleModeForFormat("BG_SURVIE")?.sections.map((s) => s.title);
     expect(titles).toContain("Pénalités d'endurance");
+  });
+
+  it("présente la sortie anticipée « hors course » comme une option décochée par défaut (FR et EN)", () => {
+    const endOfQualifier = (rules: typeof frRules) =>
+      localizedRuleModes(rules)
+        .find((mode) => mode.format === "BG_SURVIE")
+        ?.sections.flatMap((s) => s.bullets ?? [])
+        .join(" ") ?? "";
+    const fr = endOfQualifier(frRules);
+    expect(fr).toContain("sortie anticipée « hors course »");
+    expect(fr).toContain("option décochée par défaut");
+    // Décochée, personne n'est écarté d'avance — mais le capital à zéro et le
+    // trait final font toujours sortir : « toutes jouent jusqu'au bout » serait faux.
+    expect(fr).toContain("personne n'est écarté d'avance : seuls un capital à zéro et le trait de la dernière manche font sortir");
+    expect(fr).toContain("Option activée, le calcul est prudent");
+    expect(fr).not.toContain("toutes jouent jusqu'à la dernière manche");
+    const en = endOfQualifier(enRules);
+    expect(en).toContain("early “out of contention” exit");
+    expect(en).toContain("off by default");
+    expect(en).toContain("no team is dropped in advance: only a pool at zero or the last-round cut takes a team out");
+    expect(en).toContain("With the option on, the math is cautious");
+    expect(en).not.toContain("every team plays until the last round");
   });
 });
 

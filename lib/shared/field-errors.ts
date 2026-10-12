@@ -265,12 +265,14 @@ export type TournamentFormField =
   | "startVisibilityAt"
   | "registrationOpenAt"
   | "registrationCloseAt"
-  | "startAt";
+  | "startAt"
+  | "enduranceEarlyExit";
 
 export const TOURNAMENT_FIELD_ERRORS: FieldErrorMap<TournamentFormField> = {
   MISSING_NAME: "name",
   INVALID_MAX_TEAMS: "maxTeams",
   INVALID_MATCH_FORMAT: "matchFormatValue",
+  INVALID_ENDURANCE_EARLY_EXIT: "enduranceEarlyExit",
 };
 
 /**

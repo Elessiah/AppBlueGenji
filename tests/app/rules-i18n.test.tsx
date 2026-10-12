@@ -224,10 +224,12 @@ describe("glossaire figé (I18N.md)", () => {
 
   it("n'emploie aucun terme français ni écart au glossaire", () => {
     const all = leaves(en).join("\n");
-    for (const banned of [/Survie/, /Ronde/, /\bBO\d/, /\bHeal\b/i, /\bManche\b/i, /petite finale/i, /bracket haut/i]) {
+    // Glossaire (I18N.md) : la notation BO5 / FT3 reste en capitales dans les deux langues.
+    for (const banned of [/Survie/, /Ronde/, /\bBo(\d|\/)/, /\bHeal\b/i, /\bManche\b/i, /petite finale/i, /bracket haut/i]) {
       expect(all).not.toMatch(banned);
     }
-    expect(all).toContain("Bo5");
+    expect(all).toContain("BO5");
+    expect(all).toContain("(BO/FT)");
     expect(all).toContain("Upper bracket");
     expect(all).toContain("Lower bracket");
     expect(all).toContain("Grand final");

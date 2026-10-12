@@ -22,6 +22,7 @@ type TournamentEnduranceRow = RowDataPacket & {
   endurance_loss_delta: number | null;
   endurance_playoff_size: number | null;
   endurance_max_rounds: number | null;
+  endurance_early_exit: number;
   endurance_current_round: number;
   endurance_playoffs_started: number;
   has_third_place_match: number;
@@ -47,8 +48,8 @@ export async function loadTournament(
     `SELECT format, state, match_format_type, match_format_value,
             match_format_max_maps, match_format_draws,
             endurance_start_points, endurance_win_delta, endurance_loss_delta,
-            endurance_playoff_size, endurance_max_rounds, endurance_current_round,
-            endurance_playoffs_started, has_third_place_match, manual_seeding
+            endurance_playoff_size, endurance_max_rounds, endurance_early_exit,
+            endurance_current_round, endurance_playoffs_started, has_third_place_match, manual_seeding
      FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
     [tournamentId],
   );
@@ -62,6 +63,7 @@ export function configOf(tournament: TournamentEnduranceRow): EnduranceConfig {
     lossDelta: tournament.endurance_loss_delta ?? undefined,
     playoffSize: tournament.endurance_playoff_size ?? undefined,
     maxRounds: tournament.endurance_max_rounds ?? undefined,
+    earlyExit: Number(tournament.endurance_early_exit) === 1,
   });
 }
 

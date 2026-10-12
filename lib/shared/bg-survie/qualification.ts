@@ -7,7 +7,7 @@
  */
 
 import { matchWinsRequired, type MatchFormat } from "../match-format";
-import type { EnduranceConfig } from "./config";
+import { roundCutMayFire, type EnduranceConfig } from "./config";
 import { assignRanks, rankActiveTeams, type EnduranceStanding } from "./standings";
 
 /** La phase qualificative est-elle terminée ? (effectif retombé à la cible) */
@@ -57,7 +57,8 @@ export function enduranceRoundSwing(
  *   qu'écarté : la phase est finie dans les deux cas, alors que ne rien couper
  *   laisserait un tournoi sans issue — plus de manche à poser (le plafond
  *   l'interdit) et jamais assez d'éliminations pour basculer en play-offs.
- * - `remainingRounds > 0` — élimination **mathématique** : une équipe sort dès
+ * - `remainingRounds > 0` — élimination **mathématique**, seulement si le
+ *   tournoi l'a activée (`config.earlyExit`, décochée par défaut) : une équipe sort dès
  *   qu'au moins `playoffSize` autres finiront devant elle quoi qu'il arrive. Le
  *   critère compare le **plafond** de l'équipe (elle gagne tout ce qui reste) au
  *   **plancher** des autres (elles perdent tout ce qui reste) : mieux vaut
@@ -79,13 +80,20 @@ export function enduranceEliminationCut(
   remainingRounds: number,
   format: MatchFormat | null | undefined,
 ): number[] {
-  const active = rankActiveTeams(standings);
+  // Option décochée (le défaut) : personne n'est écarté avant la dernière
+  // manche. Le rejeu n'appelle même pas la coupe dans ce cas ; la garde reste
+  // pour tout autre appelant de cette fonction publique, sans tri inutile.
+  if (!roundCutMayFire(config, remainingRounds)) return [];
 
   // Plus de manche à jouer : la coupe est un simple trait sous la cible.
-  if (remainingRounds <= 0) return active.slice(config.playoffSize).map((s) => s.teamId);
+  if (remainingRounds <= 0) {
+    return rankActiveTeams(standings).slice(config.playoffSize).map((s) => s.teamId);
+  }
 
   const swing = enduranceRoundSwing(config, format);
   if (!swing) return [];
+
+  const active = rankActiveTeams(standings);
 
   const gain = swing.gain * remainingRounds;
   const loss = swing.loss * remainingRounds;

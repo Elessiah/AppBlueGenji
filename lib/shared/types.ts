@@ -164,6 +164,11 @@ export type EnduranceMeta = {
    * s'arrête alors sur le seul effectif.
    */
   maxRounds: number | null;
+  /**
+   * Sortie « hors course » anticipée activée (option du tournoi, décochée par
+   * défaut) — sans effet sans plafond de manches.
+   */
+  earlyExit: boolean;
   /** Dernière manche générée en phase qualificative. */
   currentRound: number;
   /** Vrai dès que l'arbre des play-offs a été construit. */

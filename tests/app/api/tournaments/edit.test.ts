@@ -46,6 +46,7 @@ const values: EditableTournamentValues = {
   enduranceLossDelta: null,
   endurancePlayoffSize: null,
   enduranceMaxRounds: null,
+  enduranceEarlyExit: false,
   matchFormat: null,
   endurancePlayoffFormat: null,
   registrationDiscordRequirement: "ANY_PLAYER",
@@ -164,6 +165,15 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
       new Error("INVALID_DATE_ORDER"),
     );
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(400);
+  });
+
+  it("transmet la sortie anticipée et traduit son refus en 400", async () => {
+    jest.mocked(service.updateTournament).mockRejectedValue(new Error("INVALID_ENDURANCE_EARLY_EXIT"));
+    const res = await PATCH(patchReq({ enduranceEarlyExit: "true" }), params("1"));
+    // Le corps brut va au service tel quel : c'est lui qui le refuse.
+    expect(jest.mocked(service.updateTournament).mock.calls[0]?.[1]).toEqual({ enduranceEarlyExit: "true" });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_ENDURANCE_EARLY_EXIT" });
   });
 
   it("rend 500 sur une panne inattendue", async () => {

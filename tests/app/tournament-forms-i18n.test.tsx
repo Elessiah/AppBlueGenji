@@ -216,7 +216,7 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     expect(frForm.form.referee.description).toBe(REFEREE_SCHEDULING_DESCRIPTION);
     expect(frForm.form.referee.warning).toBe(ENABLE_PLANNING_WHILE_RUNNING_WARNING);
     expect(frForm.edit.fields.maxTeams).toBe("Nombre de places");
-    expect(Object.keys(frForm.edit.fields)).toHaveLength(28);
+    expect(Object.keys(frForm.edit.fields)).toHaveLength(29);
   });
 
   it("image : modes, refus, réussites", () => {
@@ -440,4 +440,99 @@ it("pluriels français : 0 et 1 au singulier, comme `> 1`", () => {
   expect(fr(frForm.phases.plan.teams, { count: 1 })).toBe("1 équipe");
   expect(fr(frForm.phases.plan.teams, { count: 0 })).toBe("0 équipe");
   expect(fr(frForm.phases.plan.teams, { count: 2 })).toBe("2 équipes");
+});
+
+describe("BG Survie — case « sortie anticipée hors course »", () => {
+  const ui = (over: Partial<ReturnType<typeof defaultTournamentFormValues>> = {}) => (
+    <TournamentForm
+      mode="create"
+      initialValues={{ ...defaultTournamentFormValues(), format: "BG_SURVIE", ...over }}
+      editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
+      submitLabel="Create"
+      onSubmit={async () => undefined}
+    />
+  );
+
+  it("décochée par défaut, libellée et expliquée en français et en anglais", () => {
+    const fr = render("fr", ui());
+    const en = render("en", ui());
+    expect(fr).toMatch(/<input id="endurance-early-exit" type="checkbox"(?![^>]*checked)[^>]*aria-describedby="endurance-early-exit-hint"/);
+    expect(fr).toContain("Sortie anticipée « hors course »");
+    expect(en).toContain("Early “out of contention” exit");
+    // Utilisable par défaut (plafond et format de match posés) : pas grisée.
+    expect(fr).not.toMatch(/id="endurance-early-exit" type="checkbox" disabled/);
+    expect(en).toContain("Unticked (default), no team is dropped in advance: only a pool at zero or the last-round cut takes a team out.");
+    expect(fr).toContain("Décochée (par défaut), personne n&#x27;est écarté d&#x27;avance : seuls un capital à zéro et le trait de la dernière manche font sortir.");
+    expectNoFrench(en);
+  });
+
+  it("cochée, elle se relit cochée", () => {
+    expect(render("en", ui({ enduranceEarlyExit: true }))).toMatch(/id="endurance-early-exit" type="checkbox"[^>]*checked/);
+  });
+
+  it("sans plafond de manches, grisée et dite sans effet", () => {
+    const fr = render("fr", ui({ enduranceMaxRounds: 0 }));
+    expect(fr).toContain("Indisponible tant que « Manches maximum » vaut 0 : sans dernière manche fixée, il n&#x27;y a rien à devancer.");
+    expect(fr).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
+    // Comme « Égalités », la raison remplace l'aide : « dernière manche » et
+    // « trait » n'y voudraient rien dire.
+    expect(fr).not.toContain("Cochée, une équipe");
+    const en = render("en", ui({ enduranceMaxRounds: 0 }));
+    expect(en).toContain("Unavailable while “Maximum rounds” is 0: with no last round set, there is nothing to get ahead of.");
+    expect(en).not.toContain("When ticked,");
+    expect(render("en", ui())).not.toContain("Unavailable while “Maximum rounds” is 0");
+  });
+
+  it("en saisie de score libre, grisée et dite sans effet (aucune élimination n'y est acquise)", () => {
+    const fr = render("fr", ui({ matchFormat: null, enduranceEarlyExit: true }));
+    // Cochée mais sans effet : grisée **et** décochée à l'écran, comme « Égalités ».
+    expect(fr).toMatch(/<input id="endurance-early-exit" type="checkbox" disabled=""(?![^>]*checked)[^>]*>/);
+    const en = render("en", ui({ matchFormat: null }));
+    expect(fr).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
+    expect(fr).toContain("Indisponible avec le format de match « Libre » : il faut un BO ou un FT");
+    expect(en).toContain("Unavailable with the “Free” match format: a BO or FT is needed to know what a team can still win.");
+    expect(en).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
+    // Une seule raison à la fois : sans plafond, c'est celle-là qui est donnée.
+    expect(render("en", ui({ matchFormat: null, enduranceMaxRounds: 0 }))).not.toContain("Unavailable with the “Free” match format");
+    expect(render("en", ui())).not.toContain("Unavailable with the “Free” match format");
+  });
+
+  it("n'apparaît qu'en BG Survie", () => {
+    expect(render("en", ui({ format: "SURVIVAL" }))).not.toContain("endurance-early-exit");
+  });
+
+  it("figée hors de la fenêtre complète, comme le reste du barème", () => {
+    const html = renderEdit(
+      <TournamentForm
+        mode="edit"
+        initialValues={{ ...defaultTournamentFormValues(), format: "BG_SURVIE" }}
+        editableFields={editableFieldsForWindow("RESTRICTED")}
+        submitLabel="Save changes"
+        explanationId="lock"
+        onSubmit={async () => undefined}
+      />,
+    );
+    expect(html).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""[^>]*aria-describedby="lock endurance-early-exit-hint"/);
+  });
+
+  it("figée, elle ne renvoie pas vers un plafond qu'on ne peut plus fixer : le verrou suffit", () => {
+    const html = renderEdit(
+      <TournamentForm
+        mode="edit"
+        initialValues={{ ...defaultTournamentFormValues(), format: "BG_SURVIE", enduranceMaxRounds: 0 }}
+        editableFields={editableFieldsForWindow("RESTRICTED")}
+        submitLabel="Save changes"
+        explanationId="lock"
+        onSubmit={async () => undefined}
+      />,
+    );
+    expect(html).toMatch(/id="endurance-early-exit" type="checkbox" disabled=""/);
+    expect(html).not.toContain("Unavailable while “Maximum rounds” is 0");
+    expect(html).not.toContain("Indisponible tant que");
+  });
+
+  it("l'aide dit que la parité reporte la sortie, sans l'annuler (FR et EN)", () => {
+    expect(render("fr", ui())).toContain("sortie reportée d&#x27;une manche si elle laissait un nombre impair");
+    expect(render("en", ui())).toContain("the exit is postponed by one round if it would leave an odd number of teams");
+  });
 });

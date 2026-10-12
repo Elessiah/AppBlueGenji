@@ -9,6 +9,38 @@ import { PhaseBuilder } from "../creer/PhaseBuilder";
 import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import type { TournamentFormValues } from "../_lib/tournament-form-values";
 import { NumberInput } from "@/components/ui/number-input";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+import type { FieldAria } from "@/lib/shared/field-errors";
+import { earlyExitBlocker, type EarlyExitBlocker } from "@/lib/shared/bg-survie/config";
+
+/**
+ * Identifiant de la case « sortie anticipée » : son `id`, la cible du refus
+ * (`FieldErrorText`) et l'entrée de `FIELD_IDS` du formulaire, qui en tire
+ * `aria-describedby` et le focus d'un refus — une seule source pour les trois.
+ */
+export const EARLY_EXIT_FIELD_ID = "endurance-early-exit";
+/** Aide de la case, toujours rattachée par `aria-describedby`. */
+export const EARLY_EXIT_HINT_ID = `${EARLY_EXIT_FIELD_ID}-hint`;
+
+/** Raison affichée sous la case « sortie anticipée » grisée, par empêchement. */
+const EARLY_EXIT_REASONS = {
+  NO_CAP: "settings.enduranceEarlyExitNoCap",
+  FREE_SCORE: "settings.enduranceEarlyExitFreeScore",
+} as const satisfies Record<EarlyExitBlocker, string>;
+
+/**
+ * Raison à dire sous la case grisée, `null` s'il n'y a rien à dire. Elle n'est
+ * dite que si l'organisateur peut y remédier : figés, la case ou le réglage en
+ * cause relèvent du verrou, que son explication dit déjà.
+ */
+function earlyExitReasonKey(
+  blocker: EarlyExitBlocker | null,
+  locked: (field: TournamentField) => boolean,
+): (typeof EARLY_EXIT_REASONS)[EarlyExitBlocker] | null {
+  if (blocker === null || locked("enduranceEarlyExit")) return null;
+  const blockingField: TournamentField = blocker === "NO_CAP" ? "enduranceMaxRounds" : "matchFormat";
+  return locked(blockingField) ? null : EARLY_EXIT_REASONS[blocker];
+}
 
 /**
  * Réglages propres au format choisi : phases (MULTI), endurance (BG Survie),
@@ -35,6 +67,15 @@ export type FormatSettingsProps = {
   onSwissTotalRoundsChange: (value: number) => void;
   /** Demande de focus sur le réglage de phase fautif (voir `PhaseBuilder`). */
   phaseFocusRequest?: number;
+  /**
+   * Attributs ARIA de la case « sortie anticipée » (BG Survie) : aide, verrou
+   * et refus du serveur rattaché, composés par le `fieldAttrs` du formulaire —
+   * obligatoires, pour qu'aucun appelant ne rende une case figée dont le
+   * verrou ne serait pas annoncé.
+   */
+  earlyExitAria: FieldAria;
+  /** Refus du serveur rattaché à cette case, `null` s'il n'y en a pas. */
+  earlyExitError: string | null;
 };
 
 export function FormatSettings({
@@ -44,12 +85,18 @@ export function FormatSettings({
   lockedAttr,
   onSwissTotalRoundsChange,
   phaseFocusRequest,
+  earlyExitAria,
+  earlyExitError,
 }: Readonly<FormatSettingsProps>) {
   const { format, maxTeams, phases } = values;
   const text = useFormText();
   const { t } = text;
   const entrantType = toParticipantType(values.participantType);
   const recommendedRounds = computeRecommendedRounds(maxTeams);
+  // Sans plafond ou en saisie libre, la sortie anticipée ne peut pas jouer :
+  // la case est grisée, comme « Égalités », et l'aide dit pourquoi.
+  const earlyExitBlocked = earlyExitBlocker(values.enduranceMaxRounds, values.matchFormat);
+  const reasonKey = earlyExitReasonKey(earlyExitBlocked, locked);
 
   return (
     <>
@@ -138,6 +185,28 @@ export function FormatSettings({
             />
             <p style={HINT}>
               {t("settings.enduranceMaxRoundsHint")}
+            </p>
+          </div>
+
+          <div className="field" style={FULL_WIDTH}>
+            <label htmlFor={EARLY_EXIT_FIELD_ID} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                id={EARLY_EXIT_FIELD_ID}
+                type="checkbox"
+                disabled={locked("enduranceEarlyExit") || earlyExitBlocked !== null}
+                // Grisée faute de pouvoir jouer, elle se montre décochée, comme
+                // « Égalités » : la valeur enregistrée reste, sans effet.
+                checked={values.enduranceEarlyExit && earlyExitBlocked === null}
+                onChange={(e) => set("enduranceEarlyExit", e.target.checked)}
+                {...earlyExitAria}
+              />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
+              {t("settings.enduranceEarlyExit")}
+            </label>
+            <FieldErrorText fieldId={EARLY_EXIT_FIELD_ID} message={earlyExitError} />
+            <p id={EARLY_EXIT_HINT_ID} style={HINT}>
+              {/* Comme « Égalités » : grisée, l'aide ne dit que la raison — le
+                  fonctionnement (« dernière manche », « trait ») ne vaut pas sans elle. */}
+              {reasonKey ? t(reasonKey) : t("settings.enduranceEarlyExitHint")}
             </p>
           </div>
 

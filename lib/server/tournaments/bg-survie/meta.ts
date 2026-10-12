@@ -137,6 +137,7 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
     forfeitMaps: forfeitMapCount(matchFormatOf(tournament)),
     playoffSize: config.playoffSize,
     maxRounds: config.maxRounds,
+    earlyExit: config.earlyExit,
     currentRound: Number(tournament.endurance_current_round),
     playoffsStarted: Number(tournament.endurance_playoffs_started) === 1,
     rounds: detailed.rounds,

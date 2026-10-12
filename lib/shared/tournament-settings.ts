@@ -15,6 +15,7 @@
 import { matchAllowsDraw, matchFormatLabel, withoutDraws, type MatchFormat } from "./match-format";
 import { PLAYER_REQUIREMENT_LABELS } from "./registration-filters";
 import { FORMAT_LABELS, GAME_LABELS } from "./tournament-labels";
+import { earlyExitApplies } from "./bg-survie/config";
 import type {
   EnduranceMeta,
   SeedingSource,
@@ -44,7 +45,7 @@ export type TournamentSettingsInput = {
   >;
   phases: TournamentPhase[] | null;
   swiss: Pick<SwissMeta, "totalRounds" | "pointsForWin" | "pointsForDraw" | "pointsForLoss" | "pointsForBye"> | null;
-  endurance: Pick<EnduranceMeta, "startPoints" | "winDelta" | "lossDelta" | "playoffSize" | "maxRounds"> | null;
+  endurance: Pick<EnduranceMeta, "startPoints" | "winDelta" | "lossDelta" | "playoffSize" | "maxRounds" | "earlyExit"> | null;
   seedingSource: SeedingSource;
 };
 
@@ -107,6 +108,26 @@ function phaseDetails(phase: TournamentPhase): string[] {
   return details;
 }
 
+/** Barème d'endurance (BG Survie) : capital, barème, plateau, plafond, sortie anticipée. */
+function enduranceSettings(
+  endurance: NonNullable<TournamentSettingsInput["endurance"]>,
+  matchFormat: MatchFormat | null,
+): TournamentSetting[] {
+  const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = endurance;
+  const settings: TournamentSetting[] = [
+    { label: "Capital de départ", value: plural(startPoints, "point") },
+    { label: "Barème", value: `+${winDelta} par map gagnée · −${lossDelta} par map perdue` },
+    { label: "Qualifiées pour les play-offs", value: String(playoffSize) },
+    {
+      label: "Plafond de manches qualificatives",
+      value: maxRounds === null ? "Aucun" : String(maxRounds),
+    },
+  ];
+  // L'option n'a d'effet que sous plafond et avec un format de match : ailleurs, la ligne ne dirait rien.
+  if (earlyExitApplies(maxRounds, matchFormat)) settings.push({ label: "Sortie anticipée « hors course »", value: yesNo(earlyExit) });
+  return settings;
+}
+
 function modeSettings(input: TournamentSettingsInput): TournamentSetting[] {
   const { card } = input;
   switch (card.format) {
@@ -131,19 +152,7 @@ function modeSettings(input: TournamentSettingsInput): TournamentSetting[] {
       ];
     }
     case "BG_SURVIE": {
-      const settings: TournamentSetting[] = [];
-      if (input.endurance) {
-        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds } = input.endurance;
-        settings.push(
-          { label: "Capital de départ", value: plural(startPoints, "point") },
-          { label: "Barème", value: `+${winDelta} par map gagnée · −${lossDelta} par map perdue` },
-          { label: "Qualifiées pour les play-offs", value: String(playoffSize) },
-          {
-            label: "Plafond de manches qualificatives",
-            value: maxRounds === null ? "Aucun" : String(maxRounds),
-          },
-        );
-      }
+      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(input.endurance, card.matchFormat) : [];
       settings.push({
         label: "Format des play-offs",
         value: matchFormatSettingLabel(card.endurancePlayoffFormat ?? withoutDraws(card.matchFormat)),
@@ -199,20 +208,4 @@ export function tournamentSettingsGroups(input: TournamentSettingsInput): Tourna
     { title: FORMAT_LABELS[card.format] ?? card.format, settings: modeSettings(input) },
     { title: "Conditions d'inscription", settings: conditions },
   ].filter((group) => group.settings.length > 0);
-}
-
-/**
- * Lit l'identifiant de tournoi passé aux règles (`?tournoi=12`) : un entier
- * positif en base 10, rien d'autre — la valeur vient de l'URL.
- */
-export function parseRulesTournamentParam(value: string | string[] | undefined): number | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (typeof raw !== "string" || !/^[1-9]\d{0,15}$/.test(raw)) return null;
-  const id = Number(raw);
-  return Number.isSafeInteger(id) ? id : null;
-}
-
-/** Lien vers les règles d'un mode, portant le tournoi dont afficher les réglages. */
-export function rulesHrefWithTournament(baseHref: string, tournamentId: number): string {
-  return `${baseHref}?tournoi=${tournamentId}`;
 }

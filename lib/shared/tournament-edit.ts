@@ -41,6 +41,7 @@ export const ALL_TOURNAMENT_FIELDS = [
   "enduranceLossDelta",
   "endurancePlayoffSize",
   "enduranceMaxRounds",
+  "enduranceEarlyExit",
   "matchFormat",
   "endurancePlayoffFormat",
   "registrationDiscordRequirement",

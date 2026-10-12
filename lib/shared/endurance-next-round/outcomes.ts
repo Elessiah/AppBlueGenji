@@ -11,7 +11,7 @@
  * Module pur : aucune dépendance base de données ni interface.
  */
 
-import type { EnduranceConfig } from "../bg-survie/config";
+import { roundCutMayFire, type EnduranceConfig } from "../bg-survie/config";
 import { enduranceMatchOutcome } from "../bg-survie/match-outcome";
 import { enduranceRoundSwing } from "../bg-survie/qualification";
 import { replayEnduranceDetailed } from "../bg-survie/replay";
@@ -191,6 +191,7 @@ export function qualificationUnits(input: EnduranceNextRoundInput): {
  * de plus, où elle est absente. Le calcul y perd des rencontres qu'il aurait pu
  * annoncer, jamais il n'en annonce une de trop.
  *
+ * Sans l'option `earlyExit` (décochée par défaut), la coupe n'existe pas.
  * La dernière manche n'est pas concernée : la coupe y est un simple trait sous
  * la cible, que l'ordre des équipes suffit à décrire.
  */
@@ -202,7 +203,7 @@ function withEliminationCut(
   const { config, format } = input;
   if (config.maxRounds === null) return units;
   const remaining = config.maxRounds - round;
-  if (remaining <= 0) return units;
+  if (remaining <= 0 || !roundCutMayFire(config, remaining)) return units;
 
   const swing = enduranceRoundSwing(config, format);
   if (!swing) return units;

@@ -4,7 +4,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import type { TournamentFormat } from "@/lib/shared/types";
 import { rulesHrefForFormat } from "@/lib/shared/rule-mode-definitions";
-import { rulesHrefWithTournament } from "@/lib/shared/tournament-settings";
+import { rulesHrefWithTournament } from "@/lib/shared/rules-tournament-link";
 
 /**
  * Bouton d'aide flottant des pages de tournoi : renvoie vers les règles du mode
