@@ -382,7 +382,7 @@
         {
           "title": "Draws in the qualifier",
           "body": [
-            "Overwatch and Marvel Rivals both have <b>drawn maps</b>. The tournament can therefore allow ties in its qualifier: a Bo5 is then played <b>without a tiebreaker</b>, and stops when the maps run out — even if nobody reached three map wins.",
+            "Overwatch and Marvel Rivals both have <b>drawn maps</b>. The tournament can therefore allow ties in its qualifier: a BO5 is then played <b>without a tiebreaker</b>, and stops when the maps run out — even if nobody reached three map wins.",
             "The pool needs no extra rule: it's counted <b>map by map</b>. A 2-2 gives each team two points and takes two away — so nothing, with the default scoring. A 2-1 follows the same math, one net point for the winner."
           ],
           "bullets": [
@@ -401,7 +401,7 @@
           "bullets": [
             "Under that cap, if the tournament has turned on the <b>early “out of contention” exit</b> (off by default), a team that can no longer mathematically reach the top eight in the remaining rounds is dropped without waiting for the end. Otherwise, no team is dropped in advance: only a pool at zero or the last-round cut takes a team out.",
             "With the option on, the math is cautious: eight teams must stay ahead of it no matter what, assuming it wins everything left and they lose everything left.",
-            "It therefore needs a known match format (Bo/FT), which caps the number of maps in a round. With free score entry, no team is ever dropped early.",
+            "It therefore needs a known match format (BO/FT), which caps the number of maps in a round. With free score entry, no team is ever dropped early.",
             "If dropping teams would leave an odd number of teams in the running, it's pushed back one round: an odd count forces one team to sit out, and a team still in the running shouldn't be penalized to remove teams that are already doomed."
           ]
         },
