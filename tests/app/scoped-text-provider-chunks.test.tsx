@@ -72,6 +72,8 @@ describe("profil : fournisseurs sans français, anglais une seule fois", () => {
       expect(importsOf(module).some((spec) => spec.endsWith(name))).toBe(true);
     }
     expect(source(module)).toContain("useEnglishMessages(locale, englishProfileMessages, messages)");
+    // Au pied de chaque page, le module des chargeurs reste sans crochet ni préchargement.
+    expect(source("components/i18n/english-loaders.ts")).not.toMatch(/useState|useEffect|quietPreload/);
     // Les chargeurs : aucun JSON importé d'office, un `import()` par espace.
     const loaders = "components/i18n/english-loaders.ts";
     expect(importsOf(loaders).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
@@ -80,7 +82,10 @@ describe("profil : fournisseurs sans français, anglais une seule fois", () => {
       "@/messages/en/teamErrors.json",
       "@/messages/en/push.json",
       "@/messages/en/reports.json",
+      "@/messages/en/imageCrop.json",
     ]);
+    // Rien sur le serveur : un module y est partagé entre requêtes.
+    expect(source(loaders)).toContain("if (inBrowser() && locale === \"en\" && messages) loader.prime(messages);");
   });
 
   it("la page d'un signalement : mise en page sans texte", () => {

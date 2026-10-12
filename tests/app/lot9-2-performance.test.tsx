@@ -52,11 +52,12 @@ describe("aucun anglais importé d'office", () => {
     // Le chargeur partagé (`english-loaders.ts`) : déjà reçu par `/profil`, l'anglais ne repart pas.
     expect(dynamicImports("components/match-launch/MatchLaunchCenter.tsx")).toEqual([]);
     expect(valueImports("components/match-launch/MatchLaunchCenter.tsx")).toContain("@/components/i18n/english-loaders");
-    expect(launch).toContain('if (locale !== "en" || english) return;');
     expect(launch).toContain('if (locale === "en" && !english) return null;');
     expect(launch).toContain('<LaunchPushPanel locale={text.locale} lead={t("pushLead")} />');
-    // Parti dès qu'un match se lance, avant l'ouverture de la fenêtre.
-    expect(launch).toContain('if (text.locale === "en" && hasLaunches) englishPush.load().catch(() => undefined);');
+    // Le crochet partagé ; préchargé au survol du bouton flottant, rien pour qui n'ouvre pas la fenêtre.
+    expect(launch).toContain("const { english } = useEnglishMessages(locale, englishPush, undefined);");
+    expect(launch).toContain("const preload = () => preloadEnglishPush(locale);");
+    expect(launch).not.toContain("hasLaunches");
     // La documentation de la cadence reste collée à sa fonction.
     expect(launch).toContain("/** Cadence de relève selon la phase la plus pressante de la liste. */\nfunction launchPollInterval(");
   });
@@ -80,7 +81,7 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
 
   it("l'anglais déjà servi par une page n'est pas retéléchargé par le pied de page", () => {
     expect(readSource("components/reports/reports-text-provider.tsx")).toContain(
-      'if (props.locale === "en" && props.messages) englishReports.prime(props.messages);',
+      "primeEnglish(englishReports, props.locale, props.messages);",
     );
     // Le formulaire importé par la page d'un signalement amorce aussi le chargeur du pied.
     expect(readSource("app/(secured)/signalements/[id]/page.tsx")).toContain("primeReportDialog(ReportProblemDialog);");
@@ -88,7 +89,7 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
   });
 
   it("le formulaire pose lui-même son fournisseur, anglais seulement sous /en", () => {
-    expect(button).toContain('englishMessages={locale === "en" ? (loadedEnglishReports() ?? undefined) : undefined}');
+    expect(button).toContain('englishMessages={locale === "en" ? (englishReports.loaded() ?? undefined) : undefined}');
     // Le bouton, au pied de chaque page, ne porte pas la mécanique du fournisseur.
     expect(valueImports("components/reports/ReportProblemButton.tsx")).not.toContain("./reports-text-provider");
     expect(readSource("components/reports/ReportProblemDialog.tsx")).toContain(
@@ -110,8 +111,12 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
 
   it("la page d'un signalement : anglais sérialisé sous /en, au chargement complet seulement", () => {
     const layout = readSource("app/(secured)/signalements/[id]/layout.tsx");
-    expect(layout).toContain('const documentRequest = (await headers()).get(DOCUMENT_REQUEST_HEADER) !== "0";');
-    expect(layout).toContain('messages={locale === "en" && documentRequest ? all.reports : undefined}');
+    expect(layout).toContain('const messages = locale === "en" && !(await clientShowsSegment("/signalements")) ? all.reports : undefined;');
+    // L'écran d'attente n'est sérialisé que s'il peut servir.
+    expect(layout).toContain('fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}');
+    expect(readSource("app/(secured)/profil/layout.tsx")).toContain(
+      'fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}',
+    );
     expect(readSource("components/reports/concerned-reports-text.tsx")).toContain(
       "useEnglishMessages(locale, englishReports, messages)",
     );
@@ -158,8 +163,10 @@ describe("modale de recadrage chargée à la demande", () => {
   const hook = readSource("components/ui/image-crop-dialog.tsx");
 
   it("le crochet ne charge la modale qu'à l'ouverture", () => {
-    expect(dynamicImports("components/ui/image-crop-dialog.tsx")).toEqual(["./image-crop-dialog-view", "@/messages/en/imageCrop.json"]);
-    expect(hook).toContain('import type { ImageCropDialogProps, ImageCropMessages } from "./image-crop-dialog-view";');
+    expect(dynamicImports("components/ui/image-crop-dialog.tsx")).toEqual(["./image-crop-dialog-view"]);
+    expect(hook).toContain('import type { ImageCropDialogProps } from "./image-crop-dialog-view";');
+    // L'anglais de la modale : le chargeur partagé de son espace.
+    expect(hook).toContain('import { englishImageCrop as englishCropLoader } from "@/components/i18n/english-loaders";');
     expect(valueImports("components/ui/image-crop-dialog.tsx")).not.toContain("./image-crop-dialog-view");
   });
 

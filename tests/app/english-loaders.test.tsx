@@ -1,10 +1,11 @@
 /**
  * Lot 9-2, revue performance — l'anglais d'un espace une seule fois par
- * session : sérialisé au chargement complet (amorce), sinon chargé à part,
- * l'écran de chargement affiché d'ici là. Fichier à part : les chargeurs sont
- * des états de module, l'ordre des cas compte.
+ * session : servi par la mise en page à toute requête qui ne vient pas d'une
+ * page qui le tient déjà, gardé par le navigateur (amorce), chargé à part en
+ * secours. Fichier à part : les chargeurs sont des états de module, l'ordre
+ * des cas compte.
  */
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterAll, describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { onceLoader } from "@/lib/shared/lazy-component";
 import { ProfileTextProviders } from "@/components/i18n/profile-text-providers";
@@ -12,7 +13,7 @@ import { useProfileText } from "@/components/i18n/profile-text";
 import { usePushText } from "@/components/notifications/push-text";
 import { ConcernedReportsText } from "@/components/reports/concerned-reports-text";
 import { useReportsText } from "@/components/reports/reports-text";
-import { englishProfile, englishPush, englishReports, englishTeamErrors } from "@/components/i18n/english-loaders";
+import { englishProfile, englishPush, englishReports, englishTeamErrors, primeEnglish } from "@/components/i18n/english-loaders";
 import enProfile from "@/messages/en/profile.json";
 import enPush from "@/messages/en/push.json";
 import enReports from "@/messages/en/reports.json";
@@ -30,6 +31,22 @@ function ReportsProbe() {
 }
 
 const FALLBACK = <span>loading</span>;
+const PROFILE_EN = { profile: enProfile, teamErrors: enTeamErrors, push: enPush };
+const globals = globalThis as { window?: unknown };
+
+/** Rendu « navigateur » : les chargeurs ne vivent que là (`inBrowser`). */
+function inBrowser<T>(run: () => T): T {
+  globals.window = globalThis;
+  try {
+    return run();
+  } finally {
+    delete globals.window;
+  }
+}
+
+afterAll(() => {
+  delete globals.window;
+});
 
 describe("onceLoader : un résultat amorcé ne relance rien", () => {
   it("load() rend la valeur fournie, sans appeler le chargement", async () => {
@@ -41,19 +58,21 @@ describe("onceLoader : un résultat amorcé ne relance rien", () => {
   });
 });
 
-describe("ProfileTextProviders", () => {
-  it("français : ni anglais ni attente", () => {
+describe("serveur : aucun dictionnaire gardé d'une requête à l'autre", () => {
+  it("rendu serveur avec l'anglais : rendu, mais rien d'amorcé", () => {
     const html = renderToStaticMarkup(
-      <ProfileTextProviders locale="fr" fallback={FALLBACK}>
+      <ProfileTextProviders locale="en" messages={PROFILE_EN} fallback={FALLBACK}>
         <ProfileProbe />
       </ProfileTextProviders>,
     );
-    expect(html).not.toContain("loading");
-    expect(html).toContain("Départ de match");
+    expect(html).toContain(enProfile.meta.title);
+    primeEnglish(englishReports, "en", enReports);
+    expect(englishProfile.loaded()).toBeNull();
+    expect(englishPush.loaded()).toBeNull();
+    expect(englishReports.loaded()).toBeNull();
   });
 
-  it("anglais arrivé par navigation, rien reçu : l'écran de chargement, l'anglais lancé dès le rendu", () => {
-    expect(englishProfile.loaded()).toBeNull();
+  it("rendu serveur sans l'anglais : l'écran d'attente, même si une requête précédente l'avait", () => {
     const html = renderToStaticMarkup(
       <ProfileTextProviders locale="en" fallback={FALLBACK}>
         <ProfileProbe />
@@ -61,42 +80,64 @@ describe("ProfileTextProviders", () => {
     );
     expect(html).toBe("<span>loading</span>");
   });
+});
 
-  it("anglais sérialisé au chargement complet : rendu tout de suite, et gardé pour la session", () => {
-    const html = renderToStaticMarkup(
-      <ProfileTextProviders locale="en" messages={{ profile: enProfile, teamErrors: enTeamErrors, push: enPush }} fallback={FALLBACK}>
-        <ProfileProbe />
-      </ProfileTextProviders>,
+describe("ProfileTextProviders (navigateur)", () => {
+  it("français : ni anglais ni attente", () => {
+    const html = inBrowser(() =>
+      renderToStaticMarkup(
+        <ProfileTextProviders locale="fr" fallback={FALLBACK}>
+          <ProfileProbe />
+        </ProfileTextProviders>,
+      ),
+    );
+    expect(html).not.toContain("loading");
+    expect(html).toContain("Départ de match");
+  });
+
+  it("anglais servi par la mise en page : rendu tout de suite, et gardé pour la session", () => {
+    const html = inBrowser(() =>
+      renderToStaticMarkup(
+        <ProfileTextProviders locale="en" messages={PROFILE_EN} fallback={FALLBACK}>
+          <ProfileProbe />
+        </ProfileTextProviders>,
+      ),
     );
     expect(html).toContain(`${enProfile.meta.title} / ${enPush.topics.MATCH_START.label}`);
-    // Amorcés : un rafraîchissement (sans dictionnaire) et la fenêtre de lancement s'en servent.
-    expect(englishPush.loaded()).toEqual(enPush);
-    expect(englishTeamErrors.loaded()).toEqual(enTeamErrors);
-    const refreshed = renderToStaticMarkup(
-      <ProfileTextProviders locale="en" fallback={FALLBACK}>
-        <ProfileProbe />
-      </ProfileTextProviders>,
+    // Amorcés : le rafraîchissement suivant (sans dictionnaire) et la fenêtre de lancement s'en servent.
+    expect(englishPush.loaded()).toBe(enPush);
+    expect(englishTeamErrors.loaded()).toBe(enTeamErrors);
+    const refreshed = inBrowser(() =>
+      renderToStaticMarkup(
+        <ProfileTextProviders locale="en" fallback={FALLBACK}>
+          <ProfileProbe />
+        </ProfileTextProviders>,
+      ),
     );
     expect(refreshed).toContain(enProfile.meta.title);
   });
 });
 
-describe("ConcernedReportsText", () => {
-  it("rien reçu : l'écran de chargement ; reçu : l'anglais, partagé avec le pied de page", () => {
+describe("ConcernedReportsText (navigateur)", () => {
+  it("rien reçu : l'écran d'attente ; reçu : l'anglais, partagé avec le pied de page", () => {
     expect(englishReports.loaded()).toBeNull();
     expect(
+      inBrowser(() =>
+        renderToStaticMarkup(
+          <ConcernedReportsText locale="en" fallback={FALLBACK}>
+            <ReportsProbe />
+          </ConcernedReportsText>,
+        ),
+      ),
+    ).toBe("<span>loading</span>");
+    const html = inBrowser(() =>
       renderToStaticMarkup(
-        <ConcernedReportsText locale="en" fallback={FALLBACK}>
+        <ConcernedReportsText locale="en" messages={enReports} fallback={FALLBACK}>
           <ReportsProbe />
         </ConcernedReportsText>,
       ),
-    ).toBe("<span>loading</span>");
-    const html = renderToStaticMarkup(
-      <ConcernedReportsText locale="en" messages={enReports} fallback={FALLBACK}>
-        <ReportsProbe />
-      </ConcernedReportsText>,
     );
     expect(html).toBe(enReports.concerned.title);
-    expect(englishReports.loaded()).toEqual(enReports);
+    expect(englishReports.loaded()).toBe(enReports);
   });
 });

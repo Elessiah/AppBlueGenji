@@ -10,8 +10,12 @@ import type { ReactElement, ReactNode } from "react";
 let mockLocale: "fr" | "en" = "en";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 // Chargement complet par défaut ; `"0"` : requête de navigation ou de `router.refresh()` (middleware).
-let mockDocument: string | null = null;
-jest.mock("next/headers", () => ({ headers: async () => new Headers(mockDocument === null ? {} : { "x-bg-document": mockDocument }) }));
+// Chargement complet par défaut ; un `router.refresh()` vient du routeur, depuis `/en/profil`.
+let mockRefresh = false;
+jest.mock("next/headers", () => ({
+  headers: async () =>
+    new Headers(mockRefresh ? { "x-bg-document": "0", host: "bluegenji.test", referer: "https://bluegenji.test/en/profil" } : {}),
+}));
 jest.mock("next/navigation", () => ({
   usePathname: () => "/en/profil",
   useParams: () => ({ id: "9" }),
@@ -245,12 +249,12 @@ describe("liste blanche et métadonnées", () => {
     const en = (await ProfileLayout({ children: null })) as ReactElement<Props>;
     expect(en.props.messages).toEqual({ profile: EN.profile, teamErrors: EN.teamErrors, push: EN.push });
     // `router.refresh()` ou navigation : aucun dictionnaire renvoyé, le client garde le sien.
-    mockDocument = "0";
+    mockRefresh = true;
     try {
       const refreshed = (await ProfileLayout({ children: null })) as ReactElement<Props>;
       expect(refreshed.props.messages).toBeUndefined();
     } finally {
-      mockDocument = null;
+      mockRefresh = false;
     }
   });
 });
