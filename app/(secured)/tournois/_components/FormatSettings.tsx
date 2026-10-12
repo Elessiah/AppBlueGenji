@@ -75,12 +75,13 @@ export function FormatSettings({
   const earlyExitBlocked = earlyExitBlocker(values.enduranceMaxRounds, values.matchFormat);
   // La raison n'est dite que si l'organisateur peut y remédier : figés, la case
   // ou le réglage en cause relèvent du verrou, que son explication dit déjà.
-  const earlyExitReason =
-    earlyExitBlocked !== null &&
-    !locked("enduranceEarlyExit") &&
-    !locked(earlyExitBlocked === "NO_CAP" ? "enduranceMaxRounds" : "matchFormat")
-      ? `${t(EARLY_EXIT_REASONS[earlyExitBlocked])} `
-      : "";
+  let earlyExitReason = "";
+  if (earlyExitBlocked !== null) {
+    const blockingField = earlyExitBlocked === "NO_CAP" ? "enduranceMaxRounds" : "matchFormat";
+    if (!locked("enduranceEarlyExit") && !locked(blockingField)) {
+      earlyExitReason = `${t(EARLY_EXIT_REASONS[earlyExitBlocked])} `;
+    }
+  }
 
   return (
     <>
