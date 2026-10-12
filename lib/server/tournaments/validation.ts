@@ -506,16 +506,17 @@ function validateEnduranceSettings(
   // `null` = phase à durée libre : elle s'arrête sur l'effectif, jamais sur le
   // calendrier. C'est le comportement d'origine du mode, et il reste le défaut.
   let enduranceMaxRounds: number | null = null;
-  // Un booléen strict, comme la planification : « "true" » ou « 1 » venus d'un
-  // client mal écrit n'allument pas une règle qui sort des équipes du tournoi.
-  if (
-    body.enduranceEarlyExit !== undefined &&
-    body.enduranceEarlyExit !== null &&
-    typeof body.enduranceEarlyExit !== "boolean"
-  ) {
-    return { error: "INVALID_ENDURANCE_EARLY_EXIT" };
-  }
   if (body.format === "BG_SURVIE") {
+    // Un booléen strict, comme la planification : « "true" » ou « 1 » venus d'un
+    // client mal écrit n'allument pas une règle qui sort des équipes du tournoi.
+    // Hors BG Survie, ignorée comme le reste du barème (éteinte plus bas).
+    if (
+      body.enduranceEarlyExit !== undefined &&
+      body.enduranceEarlyExit !== null &&
+      typeof body.enduranceEarlyExit !== "boolean"
+    ) {
+      return { error: "INVALID_ENDURANCE_EARLY_EXIT" };
+    }
     const settings: [unknown, number, number, (v: number) => void][] = [
       [body.endurancePoints, 1, 99, (v) => (endurancePoints = v)],
       [body.enduranceWinDelta, 1, 20, (v) => (enduranceWinDelta = v)],

@@ -193,7 +193,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_recruitment_ads ADD COLUMN body_en TEXT NULL AFTER body`,
     // BlueGenji Survie — sortie « hors course » anticipée devenue une option,
     // décochée par défaut : le défaut 0 l'éteint sur tout tournoi existant,
-    // sans autre migration (aucune équipe n'était encore « hors course »).
+    // sans autre migration. Décision de l'utilisateur (2026-10-12) : aucune
+    // équipe n'était encore « hors course » en production au déploiement.
     `ALTER TABLE bg_tournaments ADD COLUMN endurance_early_exit TINYINT(1) NOT NULL DEFAULT 0
        AFTER endurance_max_rounds`,
   ];
