@@ -7,8 +7,7 @@ import { CyberCard, CyberButton } from "@/components/cyber";
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, normalizeTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
 import { useMembershipErrorMessage, useTeamErrorMessage } from "@/components/i18n/team-errors-text";
-import { FR_TEAMS_TEXT, useTeamsText } from "@/components/i18n/teams-text";
-import { useStaffLang } from "@/components/i18n/staff-lang";
+import { useTeamsText } from "@/components/i18n/teams-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
@@ -31,11 +30,7 @@ export default function CreateTeamForm() {
   const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
   const [logo, setLogo] = useState<CroppedImage | null>(null);
-  // La modale de recadrage commune est encore française (traduite au lot 9-2) :
-  // sous `/en`, titre français et `lang="fr"` plutôt qu'un mélange (WCAG 3.1.2).
-  const cropLang = useStaffLang();
-  const cropTitle = (cropLang ? FR_TEAMS_TEXT : text).t("create.cropTitle");
-  const { cropImage, cropDialog } = useImageCropper({ lang: cropLang });
+  const { cropImage, cropDialog } = useImageCropper();
   // Créer une équipe, c'est accepter les conditions d'utilisation ; envoyer son
   // logo, c'est garantir en détenir les droits. Deux cases, deux engagements.
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -53,7 +48,7 @@ export default function CreateTeamForm() {
       showError(teamErrorMessage(refusal));
       return;
     }
-    const cropped = await cropImage(file, "team-logo", cropTitle);
+    const cropped = await cropImage(file, "team-logo", t("create.cropTitle"));
     if (!cropped) return;
     setLogo(cropped);
     setLogoRights(false);
@@ -63,7 +58,7 @@ export default function CreateTeamForm() {
   // sur le fichier, pas sur la zone gardée — elle n'est pas redemandée.
   const onLogoRecrop = async () => {
     if (!logo) return;
-    const cropped = await cropImage(logo.file, "team-logo", cropTitle);
+    const cropped = await cropImage(logo.file, "team-logo", t("create.cropTitle"));
     if (cropped) setLogo(cropped);
   };
 
