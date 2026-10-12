@@ -105,8 +105,8 @@ describe("formulaire de signalement : l'anglais chargé au clic, sous /en seulem
   });
 
   it("préchargement : rien si tout est là, discret après un échec ; le clic retente", () => {
-    expect(loader).toContain("if (loadedReportForm(locale)) return;");
-    expect(loader).toContain('const preloadEnglish = quietPreload(() => loadReportForm("en"));');
+    // `preloadMissing` : rien si tout est là, silence après un échec — une seule écriture de la règle.
+    expect(loader).toContain("const preloadEnglish = preloadMissing([dialogLoader, englishLoader]);");
     expect(button).toContain("loadReportForm(locale)\n      .then(() => {");
   });
 
@@ -184,10 +184,11 @@ describe("modale de recadrage chargée à la demande", () => {
     expect(hook).toMatch(/imageCropLoad\.failed"\)\);\s*return null;/);
     expect(hook).toContain("const cropDialog = request && ImageCropDialog ? (");
     // Le préchargement raté se tait un moment (`quietPreload`), rien s'il est déjà là.
-    expect(hook).toContain("const preloadCropDialog = quietPreload(() => cropDialogLoader.load());");
-    expect(hook).toContain("if (!cropDialogLoader.loaded()) preloadCropDialog();");
+    expect(hook).toContain("const preloadCropDialog = preloadMissing([cropDialogLoader]);");
     // Sous `/en`, l'anglais de la modale est préchargé avec elle.
-    expect(hook).toContain("if (opensInEnglish(event?.currentTarget) && !englishCropLoader.loaded()) preloadCropEnglish();");
+    expect(hook).toContain("if (opensInEnglish(event?.currentTarget)) preloadCropEnglish();");
+    // Écran quitté pendant le chargement : la demande se résout en annulation.
+    expect(hook).toContain("if (!mountedRef.current) return null;");
     // La langue de l'élément qui ouvre : un outil du staff (`lang="fr"`) ne précharge pas l'anglais.
     expect(hook).toContain('return (element.closest("[lang]")?.getAttribute("lang") ?? document.documentElement.lang) === "en";');
   });
@@ -417,4 +418,35 @@ describe("revue performance, treizième passe", () => {
     expect(preload()).toBe(true);
   });
 
+});
+
+describe("revue performance, vingt-septième passe", () => {
+  it("preloadMissing : rien si tout est là, chargement groupé sinon, silence après un échec", async () => {
+    const { preloadMissing } = await import("@/lib/shared/lazy-component");
+    let calls = 0;
+    let fail = true;
+    const loader = onceLoader(async () => {
+      calls += 1;
+      if (fail) throw new Error("hors ligne");
+      return "ok";
+    });
+    const preload = preloadMissing([loader]);
+    preload();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toBe(1);
+    preload(); // silence après l'échec
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toBe(1);
+    fail = false;
+    await loader.load();
+    expect(loader.loaded()).toBe("ok");
+    preload(); // déjà là : rien
+    expect(calls).toBe(2);
+  });
+
+  it("survol au toucher ignoré (début de défilement), focus et souris gardés", () => {
+    expect(readSource("components/i18n/english-link-preload-install.ts")).toContain(
+      'if (event.type === "pointerover" && (event as PointerEvent).pointerType === "touch") return;',
+    );
+  });
 });
