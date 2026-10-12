@@ -374,12 +374,9 @@ describe("revue UI/UX, onzième passe", () => {
     expect(enReports.dialog.contested).toBe("Appealed report");
   });
 
-  it("bouton « Déconnexion » occupé : état dit par les couleurs, sans survol ni opacité", () => {
-    const css = source("components/logout-button.module.css");
-    expect(css).toContain(":global(.btn).leaving:hover");
-    expect(css).toContain("color: var(--ink-mute);");
-    expect(css).not.toMatch(/opacity\s*:/);
-    expect(source("components/logout-button.tsx")).toContain("className={leaving ? s.leaving : undefined}");
+  it("bouton « Déconnexion » occupé : l'aspect d'attente vient de la page (une seule règle)", () => {
+    expect(source("components/logout-button.tsx")).not.toMatch(/import .*\.module\.css/);
+    expect(source("app/(secured)/profil/profil.module.css")).toContain('.page :global(.btn[aria-disabled="true"]) {');
   });
 
   it("alertes d'image du signalement : sans région d'annonce, clé morte du portail retirée", async () => {
