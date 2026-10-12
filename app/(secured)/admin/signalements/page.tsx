@@ -4,13 +4,13 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import {
-  REPORT_CATEGORY_DEFINITIONS,
   reportStatTone,
   type ReportAction,
   type ReportSummaryKey,
   type ReportTargetRef,
   type ReportView,
 } from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 import {
   CATEGORY_TABS,
   DEFAULT_FILTERS,

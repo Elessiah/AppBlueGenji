@@ -15,7 +15,11 @@
  */
 import { formatMatchStart } from "./discord-notifications";
 import { tournamentMatchHref } from "./match-anchor";
-import { REPORT_CATEGORY_DEFINITIONS, reportConcernedHref, type ReportCategory } from "./content-reports";
+import {
+  reportConcernedHref,
+  type ReportCategory,
+} from "./content-reports";
+import { REPORT_CATEGORY_DEFINITIONS } from "./content-report-categories";
 import { plural } from "./plural";
 import type { PushContent } from "./push-notifications";
 

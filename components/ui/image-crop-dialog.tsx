@@ -177,8 +177,10 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
 
   const cropImage = useCallback(
     async (file: File, kind: ImageUploadKind, title: string) => {
+      // Déjà là (préchargé au clic du sélecteur) : aucune attente, l'annulation de la demande précédente reste immédiate.
+      const ready = cropDialogLoader.loaded() !== null && (!english || englishCropLoader.loaded() !== null);
       try {
-        await Promise.all([cropDialogLoader.load(), english ? englishCropLoader.load() : null]);
+        if (!ready) await Promise.all([cropDialogLoader.load(), english ? englishCropLoader.load() : null]);
       } catch (error) {
         // Rien ne part : l'écran garde sa saisie, le lecteur peut rechoisir.
         showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));

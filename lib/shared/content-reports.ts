@@ -23,7 +23,6 @@
  */
 
 import { LOGO_QUARANTINE_MONTHS, logoQuarantinePurgeDate, type LogoQuarantineView } from "./logo-quarantine";
-import { discordInline } from "./discord-text";
 
 /**
  * Catégories d'un signalement.
@@ -75,10 +74,7 @@ export const REPORT_TARGET_TYPES: readonly ReportTargetType[] = ["USER", "TEAM",
 export const REPORT_STATUSES: readonly ReportStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED"];
 export const RIGHTS_RELATIONS: readonly RightsRelation[] = ["HOLDER", "AGENT", "THIRD_PARTY"];
 
-export interface ReportCategoryDefinition {
-  label: string;
-  /** Une ligne sous le titre, dans le choix de la catégorie. */
-  hint: string;
+export interface ReportCategoryRules {
   /** Pictogramme décoratif du choix de catégorie et du panneau. */
   icon: string;
   /** Ce que la catégorie permet de désigner — vide : aucun sélecteur. */
@@ -117,44 +113,40 @@ export interface ReportCategoryDefinition {
    * `CONSENT` : le reste (bug, autre), où la case d'accord est gardée.
    */
   legalBasis: ReportLegalBasis;
-  /** Aide du champ de description. */
-  descriptionPlaceholder: string;
 }
 
-export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryDefinition> = {
+/**
+ * Ce que chaque catégorie permet et exige (cibles, contact, déclaration, canal
+ * de réponse, base légale, pictogramme) — sans ses phrases françaises, qui
+ * vivent dans `content-report-categories.ts` (revue de performance du lot
+ * 9-2) : le formulaire et la page d'un signalement, traduits, lisent leurs
+ * textes dans `messages/<langue>/reports.json` et n'emportent plus ce
+ * français une seconde fois.
+ */
+export const REPORT_CATEGORY_RULES: Record<ReportCategory, ReportCategoryRules> = {
   COPYRIGHT: {
-    label: "Droit d'auteur",
-    hint: "Un logo, un avatar ou une image utilisé sans autorisation.",
     icon: "©",
     targets: ["USER", "TEAM", "TOURNAMENT"],
     requiresContact: true,
     requiresRightsDeclaration: true,
     requiresReplyChannel: false,
     legalBasis: "LEGAL_OBLIGATION",
-    descriptionPlaceholder:
-      "Quelle œuvre est reproduite, où la voir sur le site, et à qui elle appartient…",
   },
   MODERATION: {
-    label: "Modération",
-    hint: "Un pseudo, un nom d'équipe ou un contenu du site contraire aux règles.",
     icon: "⚑",
     targets: ["USER", "TEAM"],
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
     legalBasis: "LEGAL_OBLIGATION",
-    descriptionPlaceholder: "Quel contenu du site, sur quelle page, et ce qui ne va pas…",
   },
   BUG: {
-    label: "Bug",
-    hint: "Une page qui ne s'affiche pas, un bouton qui ne répond pas.",
     icon: "⚙",
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
     legalBasis: "CONSENT",
-    descriptionPlaceholder: "Ce que tu faisais, ce que tu attendais, ce qui s'est passé…",
   },
   // Les deux catégories suivantes trient les demandes faites à l'éditeur et à
   // l'hébergeur (`lib/shared/legal-contact.ts`) ; le courriel de l'association,
@@ -163,8 +155,6 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
   // ou d'une équipe se signale par « Droit d'auteur » ou « Modération », qui
   // savent le masquer et le faire contester.
   RGPD: {
-    label: "RGPD",
-    hint: "Exercer tes droits sur tes données : accès, rectification, effacement, opposition, portabilité.",
     // Glyphe texte, comme les autres : un émoji se peindrait en couleur.
     icon: "⚿",
     targets: [],
@@ -172,42 +162,30 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresRightsDeclaration: false,
     requiresReplyChannel: true,
     legalBasis: "LEGAL_OBLIGATION",
-    descriptionPlaceholder:
-      "Le droit que tu exerces, le compte concerné (pseudo), et ce que tu demandes précisément…",
   },
   HOSTING: {
-    label: "Hébergeur",
-    hint: "Écrire à l'éditeur ou à l'hébergeur du site : mentions légales, demande d'une autorité, question juridique.",
     icon: "§",
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: true,
     legalBasis: "LEGAL_OBLIGATION",
-    descriptionPlaceholder: "Qui tu es (particulier, organisme, autorité), l'objet de ta demande, et la page concernée…",
   },
   OTHER: {
-    label: "Autre",
-    hint: "Tout ce qui ne rentre dans aucune case ci-dessus.",
     icon: "✉",
     targets: ["USER", "TEAM", "TOURNAMENT"],
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
     legalBasis: "CONSENT",
-    descriptionPlaceholder: "Explique-nous le problème…",
   },
   CONTEST: {
-    label: "Contestation",
-    hint: "Répondre à un signalement qui te vise, toi ou ton équipe — ou contester la décision prise sur ton propre signalement de droit d'auteur ou de modération.",
     icon: "⚖",
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: true,
     legalBasis: "LEGAL_OBLIGATION",
-    descriptionPlaceholder:
-      "Pourquoi le signalement est infondé : licence, autorisation du titulaire, création de l'équipe, contexte…",
   },
 };
 
@@ -462,7 +440,7 @@ export function validateReportSubmission(input: unknown): ReportValidation {
 
   if (!isReportCategory(raw.category)) return { ok: false, error: "REPORT_INVALID_CATEGORY" };
   const category = raw.category;
-  const definition = REPORT_CATEGORY_DEFINITIONS[category];
+  const definition = REPORT_CATEGORY_RULES[category];
 
   // Une contestation se rattache à un signalement ; aucune autre catégorie ne
   // porte ce lien — il est ignoré ailleurs, pour ne pas ranger un signalement
@@ -511,7 +489,7 @@ export function validateReportSubmission(input: unknown): ReportValidation {
 
 /** La catégorie repose sur le consentement du signalant, donc demande la case d'accord. */
 export function reportRequiresConsent(category: ReportCategory): boolean {
-  return REPORT_CATEGORY_DEFINITIONS[category].legalBasis === "CONSENT";
+  return REPORT_CATEGORY_RULES[category].legalBasis === "CONSENT";
 }
 
 /**
@@ -531,7 +509,7 @@ export function missingReplyChannel(
   submission: Pick<ReportSubmission, "category" | "contactEmail">,
   replyReachable: boolean,
 ): boolean {
-  return REPORT_CATEGORY_DEFINITIONS[submission.category].requiresReplyChannel && !replyReachable && !submission.contactEmail;
+  return REPORT_CATEGORY_RULES[submission.category].requiresReplyChannel && !replyReachable && !submission.contactEmail;
 }
 
 /**
@@ -639,46 +617,6 @@ export interface ReportAlertTarget {
   label: string | null;
 }
 
-function plural(count: number, type: ReportTargetType): string {
-  const labels = REPORT_TARGET_LABELS[type];
-  return `${count} ${count > 1 ? labels.many : labels.one}`;
-}
-
-/**
- * Ligne Discord d'un nouveau signalement (canal de logs, et message privé au
- * propriétaire et au président de l'association).
- *
- * Les joueurs sont **comptés**, jamais nommés ; équipes et tournois sont nommés
- * — c'est ce qui permet de juger l'urgence sans ouvrir le panneau. Le lien mène
- * au signalement lui-même.
- */
-export function formatReportAlert(input: {
-  id: number;
-  category: ReportCategory;
-  targets: ReportAlertTarget[];
-  fromMember: boolean;
-  adminUrl: string;
-}): string {
-  const definition = REPORT_CATEGORY_DEFINITIONS[input.category];
-  const parts: string[] = [];
-  for (const type of REPORT_TARGET_TYPES) {
-    const ofType = input.targets.filter((target) => target.type === type);
-    if (ofType.length === 0) continue;
-    if (type === "USER") {
-      parts.push(plural(ofType.length, type));
-      continue;
-    }
-    const names = ofType
-      .map((target) => target.label)
-      .filter((label): label is string => Boolean(label))
-      .map(discordInline);
-    parts.push(names.length > 0 ? `${plural(ofType.length, type)} (${names.join(", ")})` : plural(ofType.length, type));
-  }
-  const scope = parts.length > 0 ? ` — ${parts.join(", ")}` : "";
-  const author = input.fromMember ? "un membre" : "un visiteur";
-  return `🚩 Signalement #${input.id} · ${definition.label}${scope}. Envoyé par ${author}. À traiter : ${input.adminUrl}`;
-}
-
 /** Adresse du panneau ouverte sur un signalement. */
 export function reportAdminHref(id: number): string {
   return `${REPORTS_ADMIN_PATH}?id=${id}`;
@@ -757,46 +695,6 @@ export function canContestReport(
     NOTIFIER_CONTESTABLE_CATEGORIES.includes(report.category) &&
     report.reporterUserId === viewer.userId &&
     report.status === "RESOLVED"
-  );
-}
-
-/**
- * Message privé aux personnes visées par un signalement : les joueurs désignés
- * et les membres des équipes désignées.
- *
- * Un seul texte pour tous — il ne nomme donc ni le joueur, ni l'équipe, ni
- * l'auteur du signalement : le lien mène à une page qui, elle, ne s'ouvre qu'à
- * qui est visé. Il dit ce qui est en cause (la catégorie), qu'aucune décision
- * n'est prise, et comment répondre.
- */
-export function formatTargetNotice(input: { category: ReportCategory; url: string }): string {
-  const label = REPORT_CATEGORY_DEFINITIONS[input.category].label;
-  return (
-    `⚠️ BlueGenji — Un signalement (${label}) te concerne, toi ou ton équipe. ` +
-    `L'association l'examine : aucune décision n'est prise à ce stade. ` +
-    `Consulte-le et, s'il est infondé, conteste-le ici : ${input.url}`
-  );
-}
-
-/**
- * Ligne Discord d'une contestation (canal de logs, propriétaire, président).
- * Même règle que `formatReportAlert` : ni pseudo, ni description.
- */
-export function formatContestAlert(input: {
-  contestId: number;
-  parentId: number;
-  parentCategory: ReportCategory;
-  reopened: boolean;
-  /** Qui conteste : une personne visée, ou l'auteur du signalement (`canContestReport`). */
-  by: "TARGET" | "NOTIFIER";
-  adminUrl: string;
-}): string {
-  const label = REPORT_CATEGORY_DEFINITIONS[input.parentCategory].label;
-  const state = input.reopened ? " Le signalement était archivé : il est réactivé." : "";
-  const author = input.by === "NOTIFIER" ? "l'auteur du signalement" : "une personne visée";
-  return (
-    `⚖️ Contestation #${input.contestId} du signalement #${input.parentId} (${label}), ` +
-    `envoyée par ${author}.${state} À traiter : ${input.adminUrl}`
   );
 }
 

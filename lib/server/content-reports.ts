@@ -38,10 +38,7 @@ import {
   NOTIFIER_CONTESTABLE_CATEGORIES,
   notifierMayContest,
   canContestReport,
-  formatContestAlert,
-  formatReportAlert,
   formatReportsSaturatedAlert,
-  formatTargetNotice,
   isConcernedByReport,
   missingReplyChannel,
   reportRequiresConsent,
@@ -67,6 +64,7 @@ import {
   type ReportView,
   type RightsRelation,
 } from "@/lib/shared/content-reports";
+import { formatContestAlert, formatReportAlert, formatTargetNotice } from "@/lib/shared/content-report-categories";
 
 /** Ce que le service sait de celui qui lit ou écrit. */
 export interface ReportViewer {

@@ -4,7 +4,7 @@ import { CyberButton, CyberCard } from "@/components/cyber";
 import { TargetThumb } from "@/components/reports/TargetPicker";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import {
-  REPORT_CATEGORY_DEFINITIONS,
+  REPORT_CATEGORY_RULES,
   REPORT_STATUS_PILL,
   reportTargetHref,
   type ConcernedReportView,
@@ -66,7 +66,7 @@ export function ConcernedReport({
 }: Readonly<{ report: ConcernedReportView; onContest: () => void }>) {
   const text = useReportsText();
   const { t, locale } = text;
-  const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
+  const definition = REPORT_CATEGORY_RULES[report.category];
   const hidden = report.quarantines.filter((quarantine) => quarantine.status === "HIDDEN");
   // Supprimé sans délai, ou masqué puis supprimé (échéance, contestation
   // rejetée) : la décision reste lisible, pas seulement tant qu'elle attend.

@@ -3,7 +3,6 @@
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import {
-  REPORT_CATEGORY_DEFINITIONS,
   REPORT_RESOLUTION_NOTE_MAX_LENGTH,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_STATUS_LABELS,
@@ -13,6 +12,7 @@ import {
   type ReportTargetRef,
   type ReportView,
 } from "@/lib/shared/content-reports";
+import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
 import { ReportTargetCard } from "./ReportTargetCard";

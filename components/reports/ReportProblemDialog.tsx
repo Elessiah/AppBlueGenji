@@ -11,7 +11,7 @@ import {
   MODERATION_SUPPORT_PORTAL_URL,
   OFF_SITE_CONDUCT_ENTRY,
   REPORT_CATEGORIES,
-  REPORT_CATEGORY_DEFINITIONS,
+  REPORT_CATEGORY_RULES,
   REPORT_CONTACT_EMAIL_MAX_LENGTH,
   REPORT_CONTACT_NAME_MAX_LENGTH,
   REPORT_DESCRIPTION_MAX_LENGTH,
@@ -24,7 +24,7 @@ import {
   validateReportSubmission,
   type ContestableReportOption,
   type ReportCategory,
-  type ReportCategoryDefinition,
+  type ReportCategoryRules,
   type ReportTargetOption,
   type ReportTargetType,
   type RightsRelation,
@@ -183,7 +183,7 @@ function ReportForm({
     };
   }, [pathname, authenticated]);
 
-  const definition = category ? REPORT_CATEGORY_DEFINITIONS[category] : null;
+  const definition = category ? REPORT_CATEGORY_RULES[category] : null;
 
   // Les signalements que le lecteur peut contester, chargés au choix de la
   // catégorie seulement : ils n'intéressent que lui, et que là.
@@ -227,7 +227,7 @@ function ReportForm({
 
   const chooseCategory = (next: ReportCategory) => {
     setCategory(next);
-    const allowed = REPORT_CATEGORY_DEFINITIONS[next].targets;
+    const allowed = REPORT_CATEGORY_RULES[next].targets;
     // Les cibles d'une autre catégorie ne survivent qu'à hauteur de ce que la
     // nouvelle autorise ; la fiche d'où l'on signale est proposée d'office.
     setSelection((current) => {
@@ -443,7 +443,7 @@ function CategoryChoice({ onChoose }: Readonly<{ onChoose: (category: ReportCate
       <p className={styles.lead}>{t("dialog.lead")}</p>
       <div className={styles.categories}>
         {REPORT_CATEGORIES.flatMap((key) => {
-          const item = REPORT_CATEGORY_DEFINITIONS[key];
+          const item = REPORT_CATEGORY_RULES[key];
           const card = (
             <button
               key={key}
@@ -633,7 +633,7 @@ function ContestField({
 
 interface ContactFieldsProps {
   fieldId: string;
-  definition: ReportCategoryDefinition;
+  definition: ReportCategoryRules;
   authenticated: boolean;
   contactName: string;
   onContactNameChange: (value: string) => void;
