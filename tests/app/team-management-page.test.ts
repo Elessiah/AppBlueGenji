@@ -237,11 +237,13 @@ describe("correctifs de la première revue", () => {
     const hook = stripComments(read("_hooks", "useTeamDetail.ts"));
     expect(hook).toContain('loadFailed: !redirecting && status === "error"');
     const page = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "[id]", "page.tsx"), "utf8"));
-    expect(page).toContain('loadFailed ? t("page.loadError") : t("page.notFound")');
-    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(!loadFailed\) return;/);
+    // La notification et la page disent la même raison.
+    expect(page).toContain('{loadFailed ? failure : t("page.notFound")}');
+    expect(page).toMatch(/useEffect\(\(\) => \{\s*if \(loadFailed\) showError\(failure\);/);
     // Session expirée ou droit manquant : la phrase qui dit quoi faire.
     expect(page).toContain('new Set(["UNAUTHORIZED", "FORBIDDEN"])');
     expect(page).toContain('AUTH_LOAD_ERRORS.has(error) ? teamErrorMessage(error) : t("page.loadError")');
+    expect(page.match(/page\.loadError/g)).toHaveLength(1);
   });
 
   it("la modale de recadrage, encore française, l'est entière sous `/en` (titre et `lang`)", () => {

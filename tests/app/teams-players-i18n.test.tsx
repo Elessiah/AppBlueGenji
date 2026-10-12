@@ -537,6 +537,22 @@ describe("revue UI/UX", () => {
     expect(rolesErrorMessage("constructor")).toBe("La mise à jour des rôles a échoué.");
   });
 
+  it("en-tête d'équipe : le taux au format anglais, comme le bloc de statistiques", () => {
+    const team = teamDetailResponse({ team: { id: 4, name: "Glaciers" } });
+    const html = inEnglish(<TeamHeader team={{ ...team, stats: { ...team.stats, winRate: 0.62 } }} />);
+    expect(html).toContain("62%");
+    expect(html).not.toMatch(/62\s%/);
+    const fr = renderToStaticMarkup(<TeamHeader team={{ ...team, stats: { ...team.stats, winRate: 0.62 } }} />);
+    expect(fr).toMatch(/62\s%/);
+  });
+
+  it("carte d'équipe : nom accessible propre à une équipe", () => {
+    const html = inEnglish(<TeamCard team={listTeam({ name: "Glaciers" })} />);
+    expect(html).toContain('aria-label="View the Glaciers team page"');
+    expect(html).toContain("View Nova&#x27;s profile");
+    expect(messagesFor("fr").teams.card.viewTeam).toBe(messagesFor("fr").teams.card.viewProfile);
+  });
+
   it("fiche joueur en français : « 3e », « 3 V – 1 D »", () => {
     mockLocale = "fr";
     mockPlayer = fullProfileResponse({
