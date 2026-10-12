@@ -14,7 +14,11 @@ export function installEnglishLinkPreload(): () => void {
   // fois par seconde (un nouvel essai reste possible ensuite).
   let last = "";
   let lastAt = 0;
+  // Le même élément survolé de suite : rien à remonter (survol continu d'une page dense).
+  let lastTarget: EventTarget | null = null;
   const onIntent = (event: Event) => {
+    if (event.target === lastTarget) return;
+    lastTarget = event.target;
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
     const href = link?.getAttribute("href") ?? "";
     if (!href.startsWith("/en/")) return;

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { quietPreload } from "@/lib/shared/lazy-component";
 import { useLocalePathname } from "./locale-navigation";
-import { englishPageOf, type EnglishPage } from "./english-route-preload";
+import { englishPageOf } from "./english-route-preload";
 import { PAGE_LOADERS } from "./english-page-loaders";
 import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
@@ -28,25 +29,29 @@ import { useEnglishMessages } from "./use-english-messages";
 type GateProps<T> = Readonly<{ locale: Locale; messages?: T; fallback: ReactNode; children: ReactNode }>;
 
 /**
- * Une porte extérieure (`/equipes`, `/joueurs`) attendant son anglais ne monte
- * pas encore la porte de la fiche (`/equipes/5`, `/joueurs/5`) : elle lance
- * donc aussi, en même temps, l'anglais de la fiche visée — sans quoi les deux
- * morceaux partiraient l'un après l'autre.
+ * Une porte extérieure (`/equipes`, `/joueurs`) **qui attend** son anglais ne
+ * monte pas encore la porte de la fiche (`/equipes/5`, `/joueurs/5`) : elle
+ * lance donc aussi, en même temps, l'anglais de la fiche visée — sans quoi les
+ * deux morceaux partiraient l'un après l'autre. Rien une fois l'anglais là (la
+ * fiche, montée, charge le sien) ; un échec se tait `PRELOAD_RETRY_MS`
+ * (`quietPreload`) au lieu de repartir à chaque navigation.
  */
-function useNestedEnglish(locale: Locale, pages: ReadonlyArray<Exclude<EnglishPage, "profile">>, received: boolean): void {
-  // Le chemin suivi : une navigation par le code sous une porte déjà montée la relance.
+type NestedPage = "teamPage" | "teams" | "playerPage";
+const NESTED_PRELOADS: Record<NestedPage, () => boolean> = {
+  teamPage: quietPreload(() => Promise.all(PAGE_LOADERS.teamPage.map((loader) => loader.load()))),
+  teams: quietPreload(() => Promise.all(PAGE_LOADERS.teams.map((loader) => loader.load()))),
+  playerPage: quietPreload(() => Promise.all(PAGE_LOADERS.playerPage.map((loader) => loader.load()))),
+};
+
+function useNestedEnglish(locale: Locale, pages: ReadonlyArray<NestedPage>, waiting: boolean): void {
+  // Le chemin suivi : une navigation sous une porte qui attend encore la relance.
   const { path } = useLocalePathname();
-  // Chargement complet (anglais reçu) : la fiche d'arrivée a reçu le sien aussi
-  // et l'amorce à son hydratation — le lancer ici le téléchargerait deux fois.
-  const arrival = useRef(received ? path : null);
   useEffect(() => {
-    if (locale !== "en" || path === arrival.current) return;
-    arrival.current = null;
+    if (locale !== "en" || !waiting) return;
     const page = englishPageOf(path);
-    if (!page || page === "profile" || !pages.includes(page)) return;
-    // La table commune (`PAGE_LOADERS`) : ce que la porte charge déjà elle-même est partagé, pas redemandé.
-    for (const loader of PAGE_LOADERS[page]) loader.load().catch(() => undefined);
-  }, [locale, path, pages]);
+    const nested = pages.find((candidate) => candidate === page);
+    if (nested) NESTED_PRELOADS[nested]();
+  }, [locale, waiting, path, pages]);
 }
 
 /** Les pages de la table (`ENGLISH_PAGES`) sous chaque porte extérieure. */
@@ -56,7 +61,7 @@ const PLAYER_ROUTES = ["playerPage"] as const;
 /** `/equipes` et ses sous-pages : la table des refus d'équipe. */
 export function TeamErrorsTextGate({ locale, messages, fallback, children }: GateProps<Messages["teamErrors"]>) {
   const { english, failed } = useEnglishMessages(locale, englishTeamErrors, messages);
-  useNestedEnglish(locale, TEAM_ROUTES, messages !== undefined);
+  useNestedEnglish(locale, TEAM_ROUTES, !english && !failed);
   if (locale === "en" && !english && !failed) return <>{fallback}</>;
   return (
     <TeamErrorsTextProvider locale={locale} messages={english ?? undefined}>
@@ -68,7 +73,7 @@ export function TeamErrorsTextGate({ locale, messages, fallback, children }: Gat
 /** `/joueurs` et la fiche d'un joueur : l'espace `players`. */
 export function PlayersTextGate({ locale, messages, fallback, children }: GateProps<Messages["players"]>) {
   const { english, failed } = useEnglishMessages(locale, englishPlayers, messages);
-  useNestedEnglish(locale, PLAYER_ROUTES, messages !== undefined);
+  useNestedEnglish(locale, PLAYER_ROUTES, !english && !failed);
   if (locale === "en" && !english && !failed) return <>{fallback}</>;
   return (
     <PlayersTextProvider locale={locale} messages={english ?? undefined}>
