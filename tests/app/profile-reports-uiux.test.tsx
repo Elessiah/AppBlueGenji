@@ -62,7 +62,8 @@ describe("langue de la page dans les gestes du profil", () => {
 
   it("la suppression du compte ramène à l'accueil de la langue de la page", () => {
     const page = source("app/(secured)/profil/page.tsx");
-    expect(page).toContain('window.location.href = localeHref("/", text.locale);');
+    // Langue de l'adresse, pas du texte (repli français possible) — revue de sécurité du lot 9-2.
+    expect(page).toContain('window.location.href = localeHref("/", pageLocale);');
     expect(page).not.toContain('window.location.href = "/";');
   });
 });
@@ -231,6 +232,21 @@ describe("revue UI/UX, quatrième passe", () => {
     const page = source("app/(secured)/profil/page.tsx");
     expect(page).toContain("<TeamLink teamId={inv.teamId}>{visibleText(inv.teamName)}</TeamLink>");
     expect(page).not.toContain("{inv.teamName}</TeamLink>");
+  });
+
+  it("fenêtres Discord du profil : un seul envoi à la fois, garde par référence (revue de sécurité du lot 9-2)", () => {
+    for (const file of ["app/(secured)/profil/DiscordVerificationDialog.tsx", "app/(secured)/profil/DiscordBotHandleDialog.tsx"]) {
+      const dialog = source(file);
+      expect(dialog.split("if (inFlight.current) return;").length - 1).toBe(2);
+      expect(dialog.split("inFlight.current = true;").length - 1).toBe(2);
+      expect(dialog.split("inFlight.current = false;").length - 1).toBe(2);
+      expect(dialog).not.toContain("if (loading) return;");
+    }
+  });
+
+  it("profil : la langue des retours (OAuth, suppression du compte) vient de l'adresse, pas du texte", () => {
+    expect(source("app/(secured)/profil/page.tsx")).toContain('window.location.href = localeHref("/", pageLocale);');
+    expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).toContain('oauthStartPath("DISCORD", { intent: "LINK", locale: pageLocale })');
   });
 
   it("date d'un signalement à contester : français inchangé, mois nommé en anglais", () => {
@@ -421,10 +437,10 @@ describe("revue UI/UX, douzième passe", () => {
     expect(JSON.stringify(enPlayers)).not.toContain("Age status");
   });
 
-  it("applications connectées : la langue du texte, une seule source", () => {
+  it("applications connectées : l'aller-retour OAuth dans la langue de l'adresse (revue de sécurité du lot 9-2, remplace « langue du texte »)", () => {
     const apps = source("app/(secured)/profil/ConnectedAppsSection.tsx");
-    expect(apps).not.toContain("useAppLocale");
-    expect(apps).toContain("const locale = text.locale;");
+    expect(apps).toContain("const locale = useAppLocale();");
+    expect(apps).not.toContain("const locale = text.locale;");
   });
 });
 
@@ -452,7 +468,7 @@ describe("revue UI/UX, quinzième passe", () => {
     for (const dialog of ["DiscordVerificationDialog", "DiscordBotHandleDialog"]) {
       const text = source(`app/(secured)/profil/${dialog}.tsx`);
       expect(text).not.toContain("disabled={loading}");
-      expect(text.match(/if \(loading\) return;/g)).toHaveLength(2);
+      expect(text.match(/if \(inFlight\.current\) return;/g)).toHaveLength(2);
       expect(text).toContain("aria-disabled={loading || undefined}");
     }
   });

@@ -58,7 +58,7 @@ describe("certification d'un compte relié dont Discord a nommé le pseudo", () 
 describe("certification d'un compte relié sans pseudo nommé par Discord", () => {
   it("repart chez Discord, en rattachement, pour qu'il nomme le pseudo", () => {
     // La langue de la page voyage avec le rattachement (retour sur `/en/profil`).
-    expect(relinkBranch()).toContain('oauthStartPath("DISCORD", { intent: "LINK", locale: text.locale })');
+    expect(relinkBranch()).toContain('oauthStartPath("DISCORD", { intent: "LINK", locale: pageLocale })');
     expect(relinkBranch()).toMatch(/<a href=\{oauthStartPath/);
   });
 

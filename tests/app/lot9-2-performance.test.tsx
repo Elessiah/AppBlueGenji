@@ -270,9 +270,9 @@ describe("dates en heure de Paris, formateur réutilisé", () => {
     expect(formatQuarantineDate(date, "en-US")).toBe("January 1, 2027");
   });
 
-  it("date illisible : chaîne vide, sans lever (la page d'un signalement ne tombe pas)", () => {
-    expect(formatQuarantineDate(new Date(""))).toBe("");
-    expect(formatQuarantineDate(new Date("pas une date"), "en-US")).toBe("");
+  it("date illisible : un tiret visible, sans lever (la page d'un signalement ne tombe pas)", () => {
+    expect(formatQuarantineDate(new Date(""))).toBe("—");
+    expect(formatQuarantineDate(new Date("pas une date"), "en-US")).toBe("—");
   });
 
   it("les dates du formulaire de contestation se forment une fois par langue", () => {

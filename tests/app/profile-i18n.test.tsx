@@ -461,6 +461,16 @@ describe("anglais — écrans", () => {
       />,
     );
     expect(trapped).not.toMatch(/[‮​]/u);
+    // Anglais du profil non chargé (texte retombé sur le français) sous /en : le retour OAuth suit l'adresse, pas le texte.
+    const fallback = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <ProfileTextProvider locale="fr">
+          <ConnectedAppsSection connections={CONNECTION_SETS[0]} reload={async () => undefined} />
+        </ProfileTextProvider>
+      </AppLocaleProvider>,
+    );
+    expect(fallback).toContain("Rattacher");
+    expect(fallback).toMatch(/href="\/api\/auth\/[a-z]+\/start\?lang=en&amp;intent=link"/u);
     expect(trapped).toContain("nova");
     expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "kery‮an", refusalCode: null }).note).not.toMatch(/‮/u);
     const linkHtml = inEnglish(<ConnectedAppsSection connections={CONNECTION_SETS[0]} reload={async () => undefined} />);
