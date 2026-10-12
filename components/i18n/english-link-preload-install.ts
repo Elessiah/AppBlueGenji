@@ -15,6 +15,8 @@ export function installEnglishLinkPreload(): () => void {
   let last = "";
   let lastAt = 0;
   const onIntent = (event: Event) => {
+    // Au toucher, `pointerover` part aussi au début d'un défilement : seul un vrai survol (souris, stylet) annonce l'intention.
+    if (event.type === "pointerover" && (event as PointerEvent).pointerType === "touch") return;
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
     const href = link?.getAttribute("href") ?? "";
     if (!href.startsWith("/en/")) return;

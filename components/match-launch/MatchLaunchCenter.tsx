@@ -9,7 +9,7 @@ import { PushNotificationsPanel } from "@/components/notifications/PushNotificat
 import { PushTextProvider } from "@/components/notifications/push-text-provider";
 import { englishPush } from "@/components/i18n/english-loaders-account";
 import { useEnglishMessagesUntilRemount } from "@/components/i18n/use-english-messages";
-import { quietPreload } from "@/lib/shared/lazy-component";
+import { preloadMissing } from "@/lib/shared/lazy-component";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -496,12 +496,11 @@ function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: stri
   );
 }
 
-const preloadPush = quietPreload(() => englishPush.load());
+const preloadPush = preloadMissing([englishPush]);
 
 /** Précharge l'anglais du réglage des notifications (bouton de la fenêtre de lancement). */
 function preloadEnglishPush(locale: Locale): void {
-  if (locale !== "en" || englishPush.loaded()) return;
-  preloadPush();
+  if (locale === "en") preloadPush();
 }
 
 /** Cadence de relève selon la phase la plus pressante de la liste. */

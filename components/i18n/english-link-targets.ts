@@ -1,7 +1,7 @@
 "use client";
 
 import { englishPageOf, type EnglishPage } from "./english-pages";
-import { quietPreload } from "@/lib/shared/lazy-component";
+import { preloadMissing } from "@/lib/shared/lazy-component";
 import { PAGE_LOADERS, type PageLoader } from "./english-page-loaders";
 import { preloadProfileEnglish } from "./profile-english";
 
@@ -12,14 +12,8 @@ import { preloadProfileEnglish } from "./profile-english";
  * du routeur. Module chargé lui-même au premier besoin.
  */
 
-/** Précharge un groupe : rien s'il est déjà là, silence `PRELOAD_RETRY_MS` après un échec. */
-function group(loaders: readonly PageLoader[]): () => void {
-  const preload = quietPreload(() => Promise.all(loaders.map((loader) => loader.load())));
-  return () => {
-    if (loaders.every((loader) => loader.loaded() !== null)) return;
-    preload();
-  };
-}
+/** Précharge un groupe (`preloadMissing`) : rien s'il est déjà là, silence après un échec. */
+const group = (loaders: readonly PageLoader[]): (() => void) => preloadMissing(loaders);
 
 /** Le préchargement de chaque page (survol, navigation par le code) — dans ce morceau à la demande. */
 const PAGE_PRELOADS: Record<keyof typeof PAGE_LOADERS, () => void> = {

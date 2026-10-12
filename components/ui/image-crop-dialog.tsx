@@ -5,7 +5,7 @@ import { useAppLocale } from "@/components/i18n/locale-context";
 import { useShellText } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { IMAGE_CROP_FIELD, serializeCropRect, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
-import { isChunkLoadError, onceLoader, quietPreload } from "@/lib/shared/lazy-component";
+import { isChunkLoadError, onceLoader, preloadMissing } from "@/lib/shared/lazy-component";
 import { englishImageCrop as englishCropLoader } from "@/components/i18n/english-loaders";
 import type { ImageCropDialogProps } from "./image-crop-dialog-view";
 
@@ -25,8 +25,8 @@ import type { ImageCropDialogProps } from "./image-crop-dialog-view";
 type CropDialog = ComponentType<ImageCropDialogProps>;
 const cropDialogLoader = onceLoader<CropDialog>(() => import("./image-crop-dialog-view").then((module) => module.ImageCropDialog));
 
-const preloadCropDialog = quietPreload(() => cropDialogLoader.load());
-const preloadCropEnglish = quietPreload(() => englishCropLoader.load());
+const preloadCropDialog = preloadMissing([cropDialogLoader]);
+const preloadCropEnglish = preloadMissing([englishCropLoader]);
 
 /**
  * La langue de l'élément qui ouvre la modale (son `lang` le plus proche, `<html
@@ -47,9 +47,9 @@ function opensInEnglish(target: EventTarget | null | undefined): boolean {
  * (`quietPreload`) : l'ouverture, elle, retente et le dit.
  */
 export function preloadImageCropDialog(event?: { currentTarget: EventTarget | null }): void {
-  if (!cropDialogLoader.loaded()) preloadCropDialog();
+  preloadCropDialog();
   // Sous `/en`, l'anglais aussi — sauf pour un outil du staff, en français.
-  if (opensInEnglish(event?.currentTarget) && !englishCropLoader.loaded()) preloadCropEnglish();
+  if (opensInEnglish(event?.currentTarget)) preloadCropEnglish();
 }
 
 /** Une image choisie et sa zone gardée, prête à partir. */
@@ -163,6 +163,14 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
 } {
   const [request, setRequest] = useState<CropRequest | null>(null);
   const requestRef = useRef<CropRequest | null>(null);
+  // Écran quitté pendant le chargement de la modale : la demande se résout en annulation.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const { showError } = useToast();
   const { t } = useShellText();
   // Le français imposé (écran du staff) n'a pas besoin de l'anglais.
@@ -186,6 +194,7 @@ export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
         showError(t(isChunkLoadError(error) ? "imageCropLoad.reloading" : "imageCropLoad.failed"));
         return null;
       }
+      if (!mountedRef.current) return null;
       return new Promise<CroppedImage | null>((resolve) => {
         // Une demande neuve annule celle encore ouverte : seule la dernière image part.
         requestRef.current?.resolve(null);

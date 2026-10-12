@@ -2,7 +2,7 @@
 
 import type { ComponentType } from "react";
 import { englishReports as englishLoader } from "@/components/i18n/english-loaders";
-import { onceLoader, quietPreload } from "@/lib/shared/lazy-component";
+import { onceLoader, preloadMissing } from "@/lib/shared/lazy-component";
 import type { Locale } from "@/lib/shared/locales";
 import type { ReportProblemDialogProps } from "./ReportProblemDialog";
 
@@ -38,11 +38,10 @@ export function loadedReportForm(locale: Locale): ReportDialog | null {
   return locale === "en" && !englishLoader.loaded() ? null : dialogLoader.loaded();
 }
 
-const preloadFrench = quietPreload(() => loadReportForm("fr"));
-const preloadEnglish = quietPreload(() => loadReportForm("en"));
+const preloadFrench = preloadMissing([dialogLoader]);
+const preloadEnglish = preloadMissing([dialogLoader, englishLoader]);
 
 /** Précharge au survol ou au focus ; rien si tout est déjà là (aucune promesse créée). */
 export function preloadReportForm(locale: Locale): void {
-  if (loadedReportForm(locale)) return;
   (locale === "en" ? preloadEnglish : preloadFrench)();
 }

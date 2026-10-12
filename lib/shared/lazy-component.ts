@@ -178,6 +178,23 @@ export function quietPreload(load: () => Promise<unknown>, now: () => number = D
   };
 }
 
+/** Ce qu'il faut d'un chargeur pour le précharger. */
+export type PreloadableLoader = { load(): Promise<unknown>; loaded(): unknown };
+
+/**
+ * Précharge **ce qui manque** : rien si chaque chargeur a déjà son résultat
+ * (aucune promesse créée), sinon les charge ensemble, silence `PRELOAD_RETRY_MS`
+ * après un échec (`quietPreload`). La seule écriture de cette règle pour tous
+ * les préchargements (survol, focus, clic sur un sélecteur de fichier).
+ */
+export function preloadMissing(loaders: readonly PreloadableLoader[]): () => void {
+  const preload = quietPreload(() => Promise.all(loaders.map((loader) => loader.load())));
+  return () => {
+    if (loaders.every((loader) => loader.loaded() !== null)) return;
+    preload();
+  };
+}
+
 /** Programme le rechargement de la page après un chargement raté, dès qu'il est sûr. */
 export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): void {
   if (!env) return;
