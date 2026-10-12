@@ -236,17 +236,10 @@
 }
 
 /* Pendant l'enregistrement, le champ garde le focus (`aria-disabled`, pas
-   `disabled`) : il en prend l'apparence, comme `.field select:disabled`. */
-.accountLocale select[aria-busy="true"] {
-  opacity: 0.6;
+   `disabled`) : il prend l'apparence d'un champ désactivé (`globals.css`), et
+   le curseur dit l'attente. */
+.accountLocale select[aria-busy="true"][aria-disabled="true"] {
   cursor: progress;
-}
-
-/* Ni l'invitation du survol (`.field select:hover:not(:disabled)`, qui ne voit
-   pas `aria-disabled`) : le focus, lui, garde son anneau. */
-.accountLocale select[aria-busy="true"][aria-disabled="true"]:hover:not(:focus) {
-  border-color: var(--line-strong);
-  background-color: rgba(10, 11, 15, 0.88);
 }
 
 /* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
