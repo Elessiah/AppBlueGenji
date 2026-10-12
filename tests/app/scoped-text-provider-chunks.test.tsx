@@ -112,4 +112,29 @@ describe("cartes des annuaires mémoïsées", () => {
     expect((TeamCard as unknown as { $$typeof: symbol }).$$typeof).toBe(memoType);
     expect((PlayerCard as unknown as { $$typeof: symbol }).$$typeof).toBe(memoType);
   });
+
+  it("le bandeau et le podium aussi, libellés du bandeau gardés", async () => {
+    const { Ticker } = await import("@/components/cyber/Ticker");
+    const { HighlightStrip } = await import("@/app/(secured)/equipes/cards/HighlightStrip");
+    const memoType = Symbol.for("react.memo");
+    expect((Ticker as unknown as { $$typeof: symbol }).$$typeof).toBe(memoType);
+    expect((HighlightStrip as unknown as { $$typeof: symbol }).$$typeof).toBe(memoType);
+    for (const list of ["app/(secured)/equipes/TeamsList.tsx", "app/(secured)/joueurs/PlayersList.tsx"]) {
+      expect(source(list)).toContain("<Ticker items={tickerItems} labels={tickerLabels} />");
+      expect(source(list)).toMatch(/const tickerItems = useMemo\(/);
+      expect(source(list)).toMatch(/const tickerLabels = useMemo\(/);
+    }
+  });
+
+  it("refus d'équipe : le français du registre, une seule table", async () => {
+    const { FR_TEAM_ERRORS_TEXT } = await import("@/app/(secured)/equipes/_lib/team-errors");
+    const { useTeamErrorsText } = await import("@/components/i18n/team-errors-text");
+    let seen: unknown;
+    function Probe() {
+      seen = useTeamErrorsText();
+      return null;
+    }
+    renderToStaticMarkup(<Probe />);
+    expect(seen).toBe(FR_TEAM_ERRORS_TEXT);
+  });
 });
