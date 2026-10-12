@@ -83,7 +83,7 @@
   },
   "page": {
     "loading": "Loading the player profile…",
-    "notFound": "Player not found.",
+    "notFound": "This player doesn't exist or no longer exists.",
     "backToPlayers": "Back to players",
     "back": "← Players",
     "deletedBadge": "Deleted account",

@@ -83,7 +83,7 @@
   },
   "page": {
     "loading": "Chargement du profil joueur…",
-    "notFound": "Joueur non trouvé.",
+    "notFound": "Ce joueur n'existe pas ou n'existe plus.",
     "backToPlayers": "Retour aux joueurs",
     "back": "← Joueurs",
     "deletedBadge": "Compte supprimé",
@@ -118,7 +118,7 @@
       "tournament": "Tournoi",
       "state": "Statut",
       "record": "Bilan",
-      "rank": "Classement"
+      "rank": "Place"
     },
     "record": "{wins} V – <loss>{losses} D</loss>",
     "rank": {
