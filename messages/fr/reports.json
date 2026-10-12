@@ -8,7 +8,6 @@
     "lead": "De quoi s'agit-il ? Le signalement est lu par les administrateurs de l'association, qui le traitent au plus vite.",
     "portalSuffix": "(portail de support, nouvel onglet)",
     "changeCategory": "← CHANGER DE CATÉGORIE",
-    "portalLink": "portail de support BlueGenji",
     "newTab": "(nouvel onglet)",
     "description": "Description",
     "tooShort": "{count, plural, one {Encore 1 caractère au moins.} other {Encore {count} caractères au moins.}}",

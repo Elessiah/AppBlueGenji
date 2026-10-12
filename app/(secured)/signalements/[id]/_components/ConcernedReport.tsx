@@ -70,9 +70,11 @@ export function ConcernedReport({
       <h1 className={`display ${styles.title}`}>{t("concerned.heading")}</h1>
       <p className={styles.lead}>{t("concerned.lead")}</p>
 
+      {/* Alertes rendues avec la page, jamais mises à jour : pas de région
+          d'annonce (`role="status"`), qui relirait aussi le lien d'équipe. */}
       {hidden.map((quarantine) =>
         quarantine.targetType === "TEAM" ? (
-          <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ key={quarantine.id} className={styles.alert} role="status">
+          <div key={quarantine.id} className={styles.alert}>
             {richNodes(
               text.rich(
                 "concerned.logoHidden",
@@ -86,7 +88,7 @@ export function ConcernedReport({
             )}
           </div>
         ) : (
-          <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ key={quarantine.id} className={styles.alert} role="status">
+          <div key={quarantine.id} className={styles.alert}>
             {richNodes(
               text.rich(
                 "concerned.avatarHidden",
@@ -100,7 +102,7 @@ export function ConcernedReport({
 
       {removed.map((quarantine) =>
         quarantine.targetType === "TEAM" ? (
-          <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ key={quarantine.id} className={styles.alert} role="status">
+          <div key={quarantine.id} className={styles.alert}>
             {richNodes(
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.logoRemovedImmediately" : "concerned.logoRemoved",
@@ -110,7 +112,7 @@ export function ConcernedReport({
             )}
           </div>
         ) : (
-          <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ key={quarantine.id} className={styles.alert} role="status">
+          <div key={quarantine.id} className={styles.alert}>
             {richNodes(
               text.rich(
                 isImmediateLogoRemoval(quarantine) ? "concerned.avatarRemovedImmediately" : "concerned.avatarRemoved",

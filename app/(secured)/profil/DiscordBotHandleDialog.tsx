@@ -9,10 +9,10 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { DISCORD_VERIFICATION_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { INTL_LOCALE } from "@/lib/shared/locales";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
+import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordHandleUpdateErrorMessage } from "./discord-errors";
 
 const FIELD_IDS = {
@@ -246,18 +246,7 @@ export function DiscordBotHandleDialog({
               >
                 {richNodes(
                   text.rich("botHandle.handleHelp", {}, {
-                    join: (chunks) => (
-                      <a
-                        href={DISCORD_INVITE_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-                      >
-                        {chunks}
-                        {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
-                        <span className="sr-only">{` ${t("verify.newTab")}`}</span>
-                      </a>
-                    ),
+                    join: (chunks) => <DiscordInviteLink>{richNodes(chunks)}</DiscordInviteLink>,
                   }),
                 )}
               </p>

@@ -141,7 +141,7 @@ interface ImageCropDialogProps {
    * du staff (en français, D4) ouvert sous `/en` — portée dans `document.body`,
    * elle n'hérite pas du `lang` de l'éditeur qui l'ouvre.
    */
-  lang?: string;
+  lang?: "fr";
 }
 
 type Drag =
@@ -458,7 +458,7 @@ interface CropRequest {
  * qu'une autre est ouverte annule la première : seule la dernière image
  * choisie peut partir.
  */
-export function useImageCropper(options: Readonly<{ lang?: string }> = {}): {
+export function useImageCropper(options: Readonly<{ lang?: "fr" }> = {}): {
   cropImage: (file: File, kind: ImageUploadKind, title: string) => Promise<CroppedImage | null>;
   cropDialog: ReactNode;
 } {

@@ -1,11 +1,9 @@
 ﻿"use client";
 
-import type { CSSProperties } from "react";
 import { useLogout } from "@/components/use-logout";
 import { useShellText } from "@/components/i18n/shell-text";
 import { Button } from "./Button";
-
-const BUSY_STYLE: CSSProperties = { cursor: "progress" };
+import s from "./logout-button.module.css";
 
 /** « Déconnexion » de `/profil` — le geste et le mot du menu du compte, dans la langue de la page. */
 export function LogoutButton() {
@@ -21,7 +19,7 @@ export function LogoutButton() {
       onClick={logout}
       aria-disabled={leaving || undefined}
       aria-busy={leaving || undefined}
-      style={leaving ? BUSY_STYLE : undefined}
+      className={leaving ? s.leaving : undefined}
     >
       {leaving ? t("account.loggingOut") : t("account.logout")}
     </Button>
