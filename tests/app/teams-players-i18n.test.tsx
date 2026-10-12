@@ -48,7 +48,7 @@ import { MembershipActions } from "@/app/(secured)/equipes/[id]/_components/Memb
 import { TeamSettings } from "@/app/(secured)/equipes/[id]/_components/TeamSettings";
 import { RolePicker } from "@/app/(secured)/equipes/[id]/_components/RolePicker";
 import { ModerationLogoBar } from "@/app/(secured)/equipes/[id]/_components/ModerationLogoBar";
-import { rolesErrorMessage } from "@/app/(secured)/joueurs/[id]/_components/PlayerRolesPanel";
+import { rolesErrorMessage } from "@/app/(secured)/joueurs/[id]/_lib/roles-errors";
 import { SecuredLoading } from "@/app/(secured)/_shared/SecuredLoading";
 import { localizedFinalRank } from "@/app/(secured)/equipes/[id]/_lib/team-history";
 import { teamPointsHint } from "@/app/(secured)/equipes/_lib/team-points";
@@ -330,7 +330,7 @@ describe("anglais", () => {
         ))}
       </>,
     );
-    expect(html).toContain('aria-label="View the Glaciers team page"');
+    expect(html).toContain('aria-label="Open Glaciers&#x27;s page"');
     expect(html).not.toContain("View Glaciers&#x27;s profile");
     expect(html).toContain("FOUNDED · MAR 2026");
     expect(html).toContain("GHOST");
@@ -556,14 +556,14 @@ describe("revue UI/UX", () => {
 
   it("carte d'équipe : nom accessible propre à une équipe", () => {
     const html = inEnglish(<TeamCard team={listTeam({ name: "Glaciers" })} />);
-    expect(html).toContain('aria-label="View the Glaciers team page"');
+    expect(html).toContain('aria-label="Open Glaciers&#x27;s page"');
     expect(html).toContain("View Nova&#x27;s profile");
     expect(messagesFor("fr").teams.card.viewTeam).toBe(messagesFor("fr").teams.card.viewProfile);
   });
 
   it("carte joueur : son équipe se nomme comme une équipe", () => {
     const html = inEnglish(<PlayerCard player={publicUserProfile({ id: 2, pseudo: "Nova", team: { id: 4, name: "Glaciers", colorIndex: 1 } })} />);
-    expect(html).toContain('title="View the Glaciers team page"');
+    expect(html).toContain('title="Open Glaciers&#x27;s page"');
   });
 
   it("fiche joueur : un échec de chargement dit sa raison, la même que la notification", () => {
