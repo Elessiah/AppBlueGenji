@@ -35,6 +35,39 @@ export function shortMonthLabel(month: string, locale: Locale = DEFAULT_LOCALE):
   return format.format(new Date(Date.UTC(year, index, 15)));
 }
 
+const monthYearFormats = new Map<Locale, Intl.DateTimeFormat>();
+
+/**
+ * Mois abrégé et année (« mars 2026 » / « Mar 2026 »), à l'heure du lecteur —
+ * `toLocaleDateString(langue, { month: "short", year: "numeric" })`, le
+ * formateur gardé d'un appel à l'autre (une grille de cartes le demandait à
+ * chaque carte et chaque frappe).
+ */
+export function formatMonthYear(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
+  let format = monthYearFormats.get(locale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "short", year: "numeric" });
+    monthYearFormats.set(locale, format);
+  }
+  return format.format(new Date(date));
+}
+
+const collators = new Map<Locale, Intl.Collator>();
+
+/**
+ * Comparateur de noms dans la langue de la page, pour `Array.sort` : un
+ * `Intl.Collator` gardé par langue plutôt que `localeCompare(b, langue)`, qui
+ * en résout un à chaque comparaison.
+ */
+export function compareLocalText(locale: Locale = DEFAULT_LOCALE): (a: string, b: string) => number {
+  let collator = collators.get(locale);
+  if (!collator) {
+    collator = new Intl.Collator(INTL_LOCALE[locale]);
+    collators.set(locale, collator);
+  }
+  return collator.compare;
+}
+
 /** Nombre dans la langue de la page (`1 500` / `1,500`, `1,5` / `1.5`). */
 export function formatLocalNumber(value: number, locale: Locale = DEFAULT_LOCALE): string {
   return value.toLocaleString(INTL_LOCALE[locale]);

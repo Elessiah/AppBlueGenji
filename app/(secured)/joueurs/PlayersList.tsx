@@ -14,7 +14,7 @@ import { PlayerCard } from "./cards/PlayerCard";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import { usePlayersText } from "@/components/i18n/players-text";
-import { INTL_LOCALE } from "@/lib/shared/locales";
+import { compareLocalText } from "@/lib/shared/dates";
 import { playerErrorMessage } from "./_lib/player-errors";
 import s from "../_shared/annuaire.module.css";
 
@@ -73,7 +73,10 @@ export default function PlayersList() {
       return true;
     });
     r = [...r];
-    if (sort === "pseudo") r.sort((a, b) => a.pseudo.localeCompare(b.pseudo, INTL_LOCALE[text.locale]));
+    if (sort === "pseudo") {
+      const compare = compareLocalText(text.locale);
+      r.sort((a, b) => compare(a.pseudo, b.pseudo));
+    }
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
     return r;
   }, [listed, deferredQuery, roleFilter, statusFilter, sort, text.locale]);

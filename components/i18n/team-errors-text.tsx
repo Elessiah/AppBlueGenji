@@ -8,15 +8,19 @@ import {
   type TeamErrorsMessages,
   type TeamErrorsText,
 } from "@/app/(secured)/equipes/_lib/team-errors";
-import { createScopedTextContext } from "./scoped-text-context";
+import { withFrenchFallback } from "./scoped-text-context";
+import { teamErrorsTextSlot } from "./team-errors-text-provider";
 
 /**
  * Table des refus des écrans d'équipe (espace `teamErrors`, lot 9) : le
  * français du paquet, l'anglais posé par la mise en page `/equipes` sous `/en`
- * seulement (`/profil` la posera au lot 9-2).
+ * seulement (`/profil` la posera au lot 9-2) — par le fournisseur de
+ * `team-errors-text-provider.tsx`, sans ce français (une mise en page qui
+ * importerait ce module-ci l'enverrait une seconde fois).
  */
-const context = createScopedTextContext<TeamErrorsMessages>(frTeamErrors);
+const context = withFrenchFallback<TeamErrorsMessages>(teamErrorsTextSlot, frTeamErrors);
 
+/** Pour une **page** ; une mise en page importe `team-errors-text-provider.tsx`. */
 export const TeamErrorsTextProvider = context.Provider;
 
 export function useTeamErrorsText(): TeamErrorsText {

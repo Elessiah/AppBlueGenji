@@ -15,7 +15,7 @@ import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
 import { useTeamsText } from "@/components/i18n/teams-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { INTL_LOCALE } from "@/lib/shared/locales";
+import { compareLocalText } from "@/lib/shared/dates";
 import s from "../_shared/annuaire.module.css";
 
 // Violet néon (`--violet-400-rgb`, littéral : le canevas de fond ne lit pas les variables CSS).
@@ -78,7 +78,10 @@ export default function TeamsList() {
     });
     r = [...r];
     if (sort === "rank") r.sort((a, b) => a.rank - b.rank);
-    if (sort === "name") r.sort((a, b) => a.name.localeCompare(b.name, INTL_LOCALE[text.locale]));
+    if (sort === "name") {
+      const compare = compareLocalText(text.locale);
+      r.sort((a, b) => compare(a.name, b.name));
+    }
     if (sort === "wins") r.sort((a, b) => b.wins - a.wins);
     if (sort === "members") r.sort((a, b) => b.membersCount - a.membersCount);
     return r;

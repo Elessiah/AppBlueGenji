@@ -7,7 +7,7 @@ import { PlayerLink } from "@/components/entity-link";
 import { TeamPodiumName } from "@/components/podium-tiers";
 import { displayTeamTag } from "@/lib/shared/team-tag";
 import { isRankedTeam } from "@/lib/shared/ranking";
-import { INTL_LOCALE } from "@/lib/shared/locales";
+import { formatMonthYear } from "@/lib/shared/dates";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTeamsText } from "@/components/i18n/teams-text";
 import { teamPointsHint } from "../_lib/team-points";
@@ -195,9 +195,7 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
       <div className={s.foot}>
         <span className={s.footMeta}>
           {t("card.founded", {
-            date: new Date(team.createdAt)
-              .toLocaleDateString(INTL_LOCALE[text.locale], { month: "short", year: "numeric" })
-              .toUpperCase(),
+            date: formatMonthYear(team.createdAt, text.locale).toUpperCase(),
           })}
         </span>
         <span className={s.cta}>{t("card.cta")}</span>
