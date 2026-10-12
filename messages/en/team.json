@@ -132,7 +132,7 @@
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving…",
-    "ownerNotice": "The owner role isn't ticked: it's transferred, from the team settings.",
+    "ownerNotice": "The owner role can't be ticked here: transfer it from the team settings.",
     "dropsManagement": "Without the manager role, you'll no longer be able to manage the team's roster."
   },
   "transfer": {
