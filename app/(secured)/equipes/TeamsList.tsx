@@ -53,6 +53,13 @@ export default function TeamsList() {
   const [canManageGhostTeams, setCanManageGhostTeams] = useState(false);
   const [ghostDialogOpen, setGhostDialogOpen] = useState(false);
 
+  // La table des refus par une référence : la liste ne se relit jamais sur un
+  // simple changement de texte (revue de performance du lot 9-2).
+  const teamErrorMessageRef = useRef(teamErrorMessage);
+  useEffect(() => {
+    teamErrorMessageRef.current = teamErrorMessage;
+  }, [teamErrorMessage]);
+
   const loadTeams = useCallback(() => {
     fetch("/api/teams", { cache: "no-store" })
       .then(async (response) => {
@@ -69,8 +76,8 @@ export default function TeamsList() {
         setActiveTeam(payload.activeTeam || null);
         setCanManageGhostTeams(payload.canManageGhostTeams === true);
       })
-      .catch((e) => showError(teamErrorMessage((e as Error).message, "TEAMS_LOAD_FAILED")));
-  }, [showError, teamErrorMessage]);
+      .catch((e) => showError(teamErrorMessageRef.current((e as Error).message, "TEAMS_LOAD_FAILED")));
+  }, [showError]);
 
   useEffect(() => {
     loadTeams();
@@ -79,9 +86,9 @@ export default function TeamsList() {
   // Recherche différée : le champ suit la frappe, la grille suit sans la bloquer.
   const deferredQuery = useDeferredValue(query);
   // Le sigle est un nom court : on cherche une équipe par « BG » comme par son
-  // nom complet. Clé calculée une fois par liste, non à chaque frappe (revue de performance du lot 9-2).
-  // Calculée à la première recherche qui la lit, puis gardée pour la liste chargée : rien sans recherche.
-  // Une table faible pour toute la vie de l'écran : une liste rechargée apporte des entrées neuves, les anciennes s'en vont seules.
+  // nom complet. Clé calculée à la première recherche qui la lit, puis gardée
+  // (table faible pour la vie de l'écran : une liste rechargée apporte des
+  // entrées neuves) — rien sans recherche (revue de performance du lot 9-2).
   const [searchKeys] = useState(() => new WeakMap<(typeof teams)[number], string>());
   const searchKeyOf = useCallback((team: (typeof teams)[number]): string => {
     let key = searchKeys.get(team);
@@ -91,16 +98,10 @@ export default function TeamsList() {
     }
     return key;
   }, [searchKeys]);
-  const filtered = useMemo(() => {
-    const q = deferredQuery.trim().toLowerCase();
-    const r = teams.filter((team) => {
-      if (q && !searchKeyOf(team).includes(q)) return false;
-      if (gameFilter === "all") return true;
-      if (gameFilter === "ow") return team.games.includes("OW");
-      if (gameFilter === "mr") return team.games.includes("MR");
-      return true;
-    });
-    // `filter` rend déjà un tableau neuf : le tri ne touche pas la liste source.
+  // Trié une fois par liste et par ordre choisi ; la recherche ne fait ensuite
+  // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2).
+  const sorted = useMemo(() => {
+    const r = [...teams];
     if (sort === "rank") r.sort((a, b) => a.rank - b.rank);
     if (sort === "name") {
       const compare = compareLocalText(text.locale);
@@ -109,7 +110,17 @@ export default function TeamsList() {
     if (sort === "wins") r.sort((a, b) => b.wins - a.wins);
     if (sort === "members") r.sort((a, b) => b.membersCount - a.membersCount);
     return r;
-  }, [searchKeyOf, teams, deferredQuery, gameFilter, sort, text.locale]);
+  }, [teams, sort, text.locale]);
+  const filtered = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    return sorted.filter((team) => {
+      if (q && !searchKeyOf(team).includes(q)) return false;
+      if (gameFilter === "all") return true;
+      if (gameFilter === "ow") return team.games.includes("OW");
+      if (gameFilter === "mr") return team.games.includes("MR");
+      return true;
+    });
+  }, [searchKeyOf, sorted, deferredQuery, gameFilter]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);

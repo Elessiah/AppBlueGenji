@@ -290,7 +290,9 @@ export default function ProfilePage() {
   // champs qu'elle fait) ne repart jamais sur un simple changement de texte —
   // une saisie en cours serait perdue (revue de performance du lot 9-2).
   const textRef = useRef(text);
-  textRef.current = text;
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
   useEffect(() => {
     const load = async () => {
       const response = await fetch("/api/profile", { cache: "no-store" });

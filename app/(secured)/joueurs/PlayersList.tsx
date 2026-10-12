@@ -55,7 +55,9 @@ export default function PlayersList() {
   // Le texte par une référence : l'annuaire ne se relit jamais sur un simple
   // changement de texte (revue de performance du lot 9-2).
   const textRef = useRef(text);
-  textRef.current = text;
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
 
   useEffect(() => {
     fetch("/api/players", { cache: "no-store" })
@@ -83,7 +85,7 @@ export default function PlayersList() {
   // Clé de recherche de chaque joueur : calculée à la première recherche qui le
   // lit, puis gardée pour l'annuaire chargé — rien sans recherche, rien à
   // chaque frappe ni au cochage des comptes supprimés (revue de performance du lot 9-2).
-  // Une table faible pour toute la vie de l'écran : une liste rechargée apporte des entrées neuves, les anciennes s'en vont seules.
+  // Table faible pour la vie de l'écran : une liste rechargée apporte des entrées neuves.
   const [searchKeys] = useState(() => new WeakMap<(typeof players)[number], string>());
   const searchKeyOf = useCallback((p: (typeof players)[number]): string => {
     let key = searchKeys.get(p);
@@ -93,9 +95,20 @@ export default function PlayersList() {
     }
     return key;
   }, [searchKeys]);
+  // Trié une fois par liste et par ordre choisi ; la recherche ne fait ensuite
+  // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2).
+  const sorted = useMemo(() => {
+    const r = [...listed];
+    if (sort === "pseudo") {
+      const compare = compareLocalText(text.locale);
+      r.sort((a, b) => compare(a.pseudo, b.pseudo));
+    }
+    if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
+    return r;
+  }, [listed, sort, text.locale]);
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
-    const r = listed.filter((p) => {
+    return sorted.filter((p) => {
       if (q && !searchKeyOf(p).includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
       // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
@@ -103,14 +116,7 @@ export default function PlayersList() {
       if (statusFilter === "free" && !isFreeAgent(p)) return false;
       return true;
     });
-    // `filter` rend déjà un tableau neuf : le tri ne touche pas la liste source.
-    if (sort === "pseudo") {
-      const compare = compareLocalText(text.locale);
-      r.sort((a, b) => compare(a.pseudo, b.pseudo));
-    }
-    if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
-    return r;
-  }, [searchKeyOf, listed, deferredQuery, roleFilter, statusFilter, sort, text.locale]);
+  }, [searchKeyOf, sorted, deferredQuery, roleFilter, statusFilter]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);
