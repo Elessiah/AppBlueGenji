@@ -53,6 +53,13 @@ describe("playerPageTitle", () => {
   it("retombe sur le titre générique quand le pseudo est vide", () => {
     expect(playerPageTitle({ pseudo: "", isDeleted: false })).toBe(PLAYER_PAGE_FALLBACK_TITLE);
   });
+
+  it("titre un compte supprimé dans la langue des mots fournis, sans repli français", () => {
+    const words = { fallback: "Player", deleted: "Deleted account" };
+    const title = playerPageTitle({ pseudo: "Renard_Discret", isDeleted: true }, words);
+    expect(title).toBe("Deleted account · Player");
+    expect(title).not.toContain(DELETED_PLAYER_PAGE_TITLE);
+  });
 });
 
 describe("parseEntityPageId", () => {
