@@ -5,8 +5,10 @@
  * `localeCompare(b, langue)`).
  */
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { compareLocalText, formatLocalDate, formatLocalDateTime, formatMonthYear } from "@/lib/shared/dates";
-import { cached } from "@/lib/shared/message-format";
+import { cached } from "@/lib/shared/intl-cache";
 import { ordinalForm } from "@/lib/shared/ordinal";
 import { INTL_LOCALE, LOCALES } from "@/lib/shared/locales";
 
@@ -103,5 +105,15 @@ describe("cached", () => {
     const spy = jest.spyOn(Intl, "PluralRules");
     expect([1, 2, 3, 4, 11, 21].map((n) => ordinalForm("en", n))).toEqual(["one", "two", "few", "other", "other", "one"]);
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("modules légers", () => {
+  // `dates.ts` et `ordinal.ts` sont lus par de nombreux écrans : le cache vit
+  // dans un module neutre, pas dans l'analyseur de messages.
+  it.each(["lib/shared/dates.ts", "lib/shared/ordinal.ts"])("%s n'importe pas message-format", (path) => {
+    const code = readFileSync(join(__dirname, "..", "..", "..", path), "utf8");
+    expect(code).not.toMatch(/from "[^"]*message-format"/);
+    expect(code).toMatch(/from "[^"]*intl-cache"/);
   });
 });
