@@ -335,7 +335,12 @@ describe("français inchangé — signalements et notifications", () => {
     expect(fr.reports.status).toEqual(REPORT_STATUS_LABELS);
     expect(fr.reports.relation).toEqual(RIGHTS_RELATION_LABELS);
     for (const type of ["USER", "TEAM", "TOURNAMENT"] as const) expect(fr.reports.targets[type].picker).toBe(REPORT_TARGET_LABELS[type].picker);
-    expect(fr.reports.offSite).toEqual({ label: OFF_SITE_CONDUCT_ENTRY.label, hint: OFF_SITE_CONDUCT_ENTRY.hint, notice: OFF_SITE_CONDUCT_NOTICE });
+    expect(fr.reports.offSite).toEqual({
+      label: OFF_SITE_CONDUCT_ENTRY.label,
+      hint: OFF_SITE_CONDUCT_ENTRY.hint,
+      // Même phrase, lien compris : `<portal>` porte le libellé du lien, le point suit.
+      notice: `${OFF_SITE_CONDUCT_NOTICE} <portal>${fr.reports.dialog.portalLink}</portal>.`,
+    });
   });
 
   it("mentions de confidentialité du formulaire, mot pour mot", () => {

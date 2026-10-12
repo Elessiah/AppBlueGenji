@@ -161,8 +161,8 @@ describe("revue UI/UX, troisième passe", () => {
     expect(button).not.toContain("reloadAfterChunkError");
     // Préchargé au survol : le clic ouvre sans passer par l'attente.
     expect(button).toContain("const ready = ReportProblemDialog ?? loadedDialog;");
-    // Arrivé après un changement de page : ne s'ouvre pas sur la nouvelle.
-    expect(button).toContain("if (currentPath.current === clickedOn) setOpen(true);");
+    // Arrivé après un changement de page : ouvert quand même (suite du clic, page affichée retenue).
+    expect(button).not.toContain("currentPath");
   });
 
   it("textes du chargement dans les deux langues", async () => {
@@ -188,8 +188,11 @@ describe("revue UI/UX, troisième passe", () => {
     expect(button).not.toContain("account-menu");
     expect(source("components/account-menu.tsx")).toContain("useLogout(() => setOpen(false))");
     const menu = source("components/use-logout.ts");
-    // Occupé jusqu'à l'accueil : `leaving` ne retombe qu'après un échec.
-    expect(menu).toMatch(/if \(!\(await requestLogout\(\)\)\) \{\s*setLeaving\(false\);\s*showError\(t\("account\.logoutFailed"\)\);/);
+    // `leaving` retombe après chaque tentative ; l'échec se dit.
+    expect(menu).toMatch(/const done = await requestLogout\(\);\s*setLeaving\(false\);\s*if \(!done\) \{\s*showError\(t\("account\.logoutFailed"\)\);/);
+    // Le bouton du profil garde le focus pendant la requête.
+    expect(button).toContain("aria-disabled={leaving || undefined}");
+    expect(button).not.toMatch(/\sdisabled=\{leaving\}/);
     expect(menu).toContain("if (leaving) return;");
   });
 });
@@ -296,5 +299,25 @@ describe("revue UI/UX, septième passe", () => {
     const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
     expect(view).toContain("team: (chunks: React.ReactNode[]) => <TeamLink teamId={teamId}>{chunks}</TeamLink>");
     expect(view.match(/teamTags\(quarantine\.targetId\)/g)).toHaveLength(2);
+  });
+});
+
+describe("revue UI/UX, huitième passe", () => {
+  it("avis hors site : une phrase, lien compris, dans chaque langue", async () => {
+    const frReports = (await import("@/messages/fr/reports.json")).default;
+    expect(frReports.offSite.notice).toMatch(/<portal>[^<]+<\/portal>\.$/);
+    expect(enReports.offSite.notice).toMatch(/<portal>[^<]+<\/portal>\.$/);
+    const dialog = source("components/reports/ReportProblemDialog.tsx");
+    expect(dialog).toContain('text.rich("offSite.notice", {}, {');
+    expect(dialog).not.toContain('{t("offSite.notice")}');
+  });
+
+  it("anglais : ponctuation anglaise, libellés du formulaire cités", async () => {
+    expect(enReports.concerned.lead).not.toContain("—,");
+    const rgpd = source("app/rgpd/RgpdEn.tsx");
+    expect(rgpd).toContain("“Copyright”, “Moderation”, “Bug”, “GDPR”, “Host” or “Other”");
+    expect(rgpd).not.toContain("other —,");
+    const enProfile = (await import("@/messages/en/profile.json")).default;
+    expect(JSON.stringify(enProfile)).not.toContain("Of age");
   });
 });
