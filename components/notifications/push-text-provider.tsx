@@ -1,7 +1,8 @@
 "use client";
 
 import type frPush from "@/messages/fr/push.json";
-import { englishPush, primeEnglish } from "@/components/i18n/english-loaders";
+import { primeEnglish } from "@/components/i18n/english-loaders";
+import { englishPush } from "@/components/i18n/english-loaders-account";
 import { createScopedTextSlot, type ScopedTextProvider } from "@/components/i18n/scoped-text-context";
 
 /**

@@ -126,18 +126,27 @@ export function discordBotRowText(
   row: Pick<DiscordBotRowState, "noteCode" | "handle" | "refusalCode">,
 ): { note: string; refusal: string | null } {
   const { t } = text;
-  const notes: Record<DiscordBotNoteCode, () => string> = {
-    HANDLE: () => t("connections.bot.handleNote", { handle: row.handle ?? "" }),
-    LINKED_BY_CODE: () => t("connections.bot.linkedByCode"),
-    LINKED_BY_BUTTON: () => t("connections.bot.linkedByButton"),
-    LINKED_ELSEWHERE: () => t("connections.bot.linkedElsewhere"),
-    NOT_LINKED: () => t("connections.bot.notLinked"),
-  };
   return {
-    note: notes[row.noteCode](),
+    note: discordBotNote(text, row.noteCode, row.handle),
     // Le seul refus de la ligne : le dernier moyen de connexion.
     refusal: row.refusalCode === "LAST_CONNECTION" ? t("connections.bot.lastConnection") : null,
   };
+}
+
+/** La note de la ligne du bot, par son code (exhaustif : un code ajouté ne compile pas sans sa phrase). */
+function discordBotNote(text: ProfileText, code: DiscordBotNoteCode, handle: string | null): string {
+  switch (code) {
+    case "HANDLE":
+      return text.t("connections.bot.handleNote", { handle: handle ?? "" });
+    case "LINKED_BY_CODE":
+      return text.t("connections.bot.linkedByCode");
+    case "LINKED_BY_BUTTON":
+      return text.t("connections.bot.linkedByButton");
+    case "LINKED_ELSEWHERE":
+      return text.t("connections.bot.linkedElsewhere");
+    case "NOT_LINKED":
+      return text.t("connections.bot.notLinked");
+  }
 }
 
 /** Libellés du badge « tag certifié » (`VerifiedBadge`), communs au profil et au dialogue de certification. */

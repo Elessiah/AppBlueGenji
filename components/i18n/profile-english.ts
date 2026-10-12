@@ -3,7 +3,7 @@
 import { quietPreload, type OnceLoader } from "@/lib/shared/lazy-component";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
-import { englishProfile, englishPush, englishTeamErrors } from "./english-loaders";
+import { englishProfile, englishPush, englishTeamErrors } from "./english-loaders-account";
 
 /** L'anglais de `/profil` : ses trois espaces. */
 export type ProfileEnglishMessages = Pick<Messages, "profile" | "teamErrors" | "push">;
@@ -31,7 +31,7 @@ export const englishProfileMessages: Pick<OnceLoader<ProfileEnglishMessages>, "l
   loaded: loadedProfileEnglish,
 };
 
-const preloadProfile = quietPreload(loadProfileEnglish);
+const preloadProfile = /* @__PURE__ */ quietPreload(loadProfileEnglish);
 
 /**
  * Précharge l'anglais de `/profil` (survol ou focus du lien « My profile ») :

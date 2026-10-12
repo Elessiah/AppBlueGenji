@@ -17,8 +17,8 @@ export type ProfileText = ScopedText<Leaves<ProfileMessages>>;
 
 const context = withFrenchFallback(profileTextSlot, frProfile);
 
-/** Pour une **page** ou un test ; une mise en page importe `profile-text-provider.tsx`. */
-export const ProfileTextProvider = context.Provider;
+/** Pour une **page** ou un test : le fournisseur de `profile-text-provider.tsx` (il amorce le chargeur de l'anglais). */
+export { ProfileTextProvider } from "./profile-text-provider";
 export const FR_PROFILE_TEXT: ProfileText = context.fr;
 
 export function useProfileText(): ProfileText {

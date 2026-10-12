@@ -1,7 +1,8 @@
 "use client";
 
 import type { ProfileMessages } from "./profile-text";
-import { englishProfile, primeEnglish } from "./english-loaders";
+import { primeEnglish } from "./english-loaders";
+import { englishProfile } from "./english-loaders-account";
 import { createScopedTextSlot, type ScopedTextProvider } from "./scoped-text-context";
 
 /**

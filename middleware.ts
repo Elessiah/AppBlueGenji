@@ -159,7 +159,7 @@ function isDocumentRequest(request: NextRequest): boolean {
  * la page sert le texte par son propre morceau plutôt que de renvoyer le
  * dictionnaire à chaque rafraîchissement.
  */
-function isDocumentLoad(request: NextRequest): boolean {
+function loadsDocument(request: NextRequest): boolean {
   if (request.headers.has("sec-fetch-dest")) return isDocumentRequest(request);
   return request.headers.get("accept")?.includes("text/html") ?? false;
 }
@@ -182,7 +182,7 @@ function localizedRequestHeaders(request: NextRequest, locale: Locale, path: str
   requestHeaders.set(LOCALE_HEADER, locale);
   requestHeaders.set(PATHNAME_HEADER, path);
   requestHeaders.set(SEARCH_HEADER, request.nextUrl.search);
-  requestHeaders.set(DOCUMENT_REQUEST_HEADER, isDocumentLoad(request) ? "1" : "0");
+  requestHeaders.set(DOCUMENT_REQUEST_HEADER, loadsDocument(request) ? "1" : "0");
   return requestHeaders;
 }
 

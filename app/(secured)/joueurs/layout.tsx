@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { PlayersTextProvider } from "@/components/i18n/players-text-provider";
+import { PlayersTextGate } from "@/components/i18n/english-gates";
+import { isDocumentLoad } from "@/lib/server/layout-messages";
+import { SecuredLoadingView } from "../_shared/SecuredLoading";
 
 /**
  * Titre de l'annuaire des joueurs et, faute de mieux, de ses sous-pages —
@@ -24,10 +26,16 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function PlayersLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? messagesFor(locale).players : undefined;
+  // L'anglais au chargement complet seulement (revue de performance du lot 9-2).
+  const all = messagesFor(locale);
+  const messages = locale === "en" && (await isDocumentLoad()) ? all.players : undefined;
   return (
-    <PlayersTextProvider locale={locale} messages={messages}>
+    <PlayersTextGate
+      locale={locale}
+      messages={messages}
+      fallback={locale === "en" && !messages ? <SecuredLoadingView label={all.shell.loading} /> : null}
+    >
       {children}
-    </PlayersTextProvider>
+    </PlayersTextGate>
   );
 }

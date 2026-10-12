@@ -7,7 +7,7 @@ import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { PushTextProvider } from "@/components/notifications/push-text-provider";
-import { englishPush } from "@/components/i18n/english-loaders";
+import { englishPush } from "@/components/i18n/english-loaders-account";
 import { useEnglishMessages } from "@/components/i18n/use-english-messages";
 import { quietPreload } from "@/lib/shared/lazy-component";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
@@ -480,6 +480,9 @@ export function MatchLaunchCenter({
  * aussi par `/profil` — plutôt que de le montrer en français. Monté avec la
  * fenêtre ouverte seulement (refermée, elle cède la place au bouton flottant),
  * il retente à la réouverture suivante (`onceLoader` ne garde pas un échec).
+ * Dernier élément de la zone défilante : paru après coup (fenêtre ouverte sans
+ * survol du bouton — ouverture d'office, carte d'un match), il allonge la zone
+ * sans rien déplacer de ce qui se lit au-dessus.
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
   const { english } = useEnglishMessages(locale, englishPush, undefined);

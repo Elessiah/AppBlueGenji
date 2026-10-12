@@ -16,8 +16,8 @@ import { teamErrorsTextSlot } from "./team-errors-text-provider";
  * `team-errors-text-provider.tsx`, sans ce français (une mise en page qui
  * importerait ce module-ci l'enverrait une seconde fois).
  */
-/** Pour une **page** ; une mise en page importe `team-errors-text-provider.tsx`. */
-export const TeamErrorsTextProvider = teamErrorsTextSlot.Provider;
+/** Pour une **page** ou un test : le fournisseur de `team-errors-text-provider.tsx` (il amorce le chargeur de l'anglais). */
+export { TeamErrorsTextProvider } from "./team-errors-text-provider";
 
 /** La table posée, la française du registre (`FR_TEAM_ERRORS_TEXT`) à défaut. */
 export function useTeamErrorsText(): TeamErrorsText {

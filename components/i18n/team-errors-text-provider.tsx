@@ -1,7 +1,8 @@
 "use client";
 
 import type { TeamErrorsMessages } from "@/app/(secured)/equipes/_lib/team-errors";
-import { englishTeamErrors, primeEnglish } from "./english-loaders";
+import { primeEnglish } from "./english-loaders";
+import { englishTeamErrors } from "./english-loaders-account";
 import { createScopedTextSlot, type ScopedTextProvider } from "./scoped-text-context";
 
 /**

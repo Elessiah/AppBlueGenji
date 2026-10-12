@@ -1,7 +1,9 @@
 "use client";
 
 import type { TeamPageMessages } from "./team-page-text";
-import { createScopedTextSlot } from "./scoped-text-context";
+import { primeEnglish } from "./english-loaders";
+import { englishTeam } from "./english-loaders-account";
+import { createScopedTextSlot, type ScopedTextProvider } from "./scoped-text-context";
 
 /**
  * Le fournisseur des textes de la fiche `/equipes/[id]`, **sans** leur
@@ -11,4 +13,8 @@ import { createScopedTextSlot } from "./scoped-text-context";
  */
 export const teamPageTextSlot = createScopedTextSlot<TeamPageMessages>();
 
-export const TeamPageTextProvider = teamPageTextSlot.Provider;
+/** L'anglais reçu amorce le chargeur partagé (`englishTeam`, revue de performance du lot 9-2) : une navigation suivante ne le recharge pas. */
+export const TeamPageTextProvider: ScopedTextProvider<TeamPageMessages> = (props) => {
+  primeEnglish(englishTeam, props.locale, props.messages);
+  return <teamPageTextSlot.Provider {...props} />;
+};
