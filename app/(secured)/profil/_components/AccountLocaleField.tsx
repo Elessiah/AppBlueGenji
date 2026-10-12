@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { isLocale, LOCALE_NATIVE_NAME, LOCALES, type Locale } from "@/lib/shared/locales";
 import { profileErrorMessage } from "../profile-errors";
+import { runQueuedSaves } from "../_lib/queued-saves";
 import s from "../profil.module.css";
 
 const FIELD_ID = "profile-account-locale";
@@ -61,7 +62,10 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
     } catch (e) {
       const code = (e as Error).message;
       const message = profileErrorMessage(code, text);
-      fieldErrors.report(code, message);
+      // Rattaché au champ s'il a encore le focus : un envoi mis de côté peut
+      // échouer après que le joueur est passé à un autre champ, qu'on ne lui
+      // reprend pas.
+      if (document.activeElement?.id === FIELD_ID) fieldErrors.report(code, message);
       showError(message);
       return false;
     }
@@ -77,29 +81,25 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
       setLocale(value);
       return;
     }
-    let saved = locale;
-    let next: Locale | null = value === saved ? null : value;
-    if (next === null) return;
+    if (value === locale) return;
     busyRef.current = true;
     setBusy(true);
     fieldErrors.clear();
-    let stored = false;
-    while (next !== null) {
-      setLocale(next);
-      if (await put(next)) {
-        saved = next;
-        stored = true;
-      }
-      const after: Locale | null = queued.current;
-      queued.current = null;
-      next = after !== null && after !== saved ? after : null;
-    }
-    // Ce que le serveur a retenu : le dernier envoi réussi, confirmé une fois.
-    setLocale(saved);
-    if (stored) {
-      setChosenHere(true);
-      showSuccess(t("accountLocale.saved"));
-    }
+    const outcome = await runQueuedSaves<Locale>({
+      start: locale,
+      first: value,
+      put,
+      takeQueued: () => {
+        const choice = queued.current;
+        queued.current = null;
+        return choice;
+      },
+      show: setLocale,
+    });
+    if (outcome.stored) setChosenHere(true);
+    // « Enregistré » une fois, et seulement si le dernier choix l'est : après
+    // l'échec de ce dernier, le toast d'erreur reste le dernier mot.
+    if (outcome.confirmed) showSuccess(t("accountLocale.saved"));
     busyRef.current = false;
     setBusy(false);
   };

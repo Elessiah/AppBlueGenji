@@ -26,7 +26,7 @@ import {
   type PushSubscriptionInput,
   type PushTopic,
 } from "@/lib/shared/push-notifications";
-import type { Locale } from "@/lib/shared/locales";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
 
@@ -202,8 +202,10 @@ export async function pushToUsers(
       const locale = accountLocaleFromRow(raw);
       let payload = payloads.get(locale);
       if (payload === undefined) {
+        // Un contenu non traduit est français : sa langue déclarée aussi.
         const localized = typeof content === "function" ? content(locale) : content;
-        payload = JSON.stringify(buildPushPayload(topic, localized, origin, locale));
+        const lang = typeof content === "function" ? locale : DEFAULT_LOCALE;
+        payload = JSON.stringify(buildPushPayload(topic, localized, origin, lang));
         payloads.set(locale, payload);
       }
       return payload;
