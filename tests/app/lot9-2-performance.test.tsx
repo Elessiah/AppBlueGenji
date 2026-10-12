@@ -15,7 +15,8 @@ import { PushTextProvider } from "@/components/notifications/push-text-provider"
 import { FR_PROFILE, lookupCode } from "@/app/(secured)/profil/_lib/profile-text";
 import { FR_PROFILE_TEXT } from "@/components/i18n/profile-text";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
-import { onceLoader, PRELOAD_RETRY_MS, quietPreload, retryInBackground } from "@/lib/shared/lazy-component";
+import { onceLoader, PRELOAD_RETRY_MS, quietPreload } from "@/lib/shared/lazy-component";
+import { retryInBackground } from "@/components/i18n/use-english-messages";
 import enReports from "@/messages/en/reports.json";
 import enPush from "@/messages/en/push.json";
 import FR_SHELL from "@/messages/fr/shell.json";
