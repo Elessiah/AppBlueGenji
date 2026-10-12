@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type PointerEvent } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
@@ -112,7 +112,10 @@ export function ReportProblemButton({
     type: "button" as const,
     className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,
     onClick: openDialog,
-    onPointerEnter: () => preloadReportForm(locale),
+    // Au toucher, `pointerenter` part aussi au début d'un défilement : seul un vrai survol précharge.
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== "touch") preloadReportForm(locale);
+    },
     onFocus: () => preloadReportForm(locale),
     "aria-haspopup": "dialog" as const,
     "aria-busy": pending || undefined,

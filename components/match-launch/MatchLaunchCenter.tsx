@@ -486,13 +486,15 @@ export function MatchLaunchCenter({
  * sans rien déplacer de ce qui se lit au-dessus.
  */
 function LaunchPushPanel({ locale, lead }: Readonly<{ locale: Locale; lead: string }>) {
-  const { english } = useEnglishMessagesUntilRemount(locale, englishPush);
-  // Monté tout de suite, caché tant que l'anglais manque (attente ou échec) :
-  // la lecture de l'état des notifications part en même temps que l'anglais,
-  // pas après lui. Rien de français ne se montre.
+  const { english, failed } = useEnglishMessagesUntilRemount(locale, englishPush);
+  // Échec : rien (pas de lecture d'état pour un réglage qui ne paraîtra pas).
+  if (locale === "en" && failed) return null;
+  // Monté tout de suite, caché tant que l'anglais arrive : la lecture de l'état
+  // des notifications part en même temps que lui, pas après. Rien de français
+  // ne se montre ; sans boîte (`display: contents`), aucun écart dans la colonne.
   const hidden = locale === "en" && !english;
   return (
-    <div hidden={hidden}>
+    <div className={styles.pushSlot} data-waiting={hidden || undefined}>
       <PushTextProvider locale={locale} messages={locale === "en" ? (english ?? undefined) : undefined}>
         <PushNotificationsPanel variant="compact" topics={["MATCH_START"]} lead={lead} />
       </PushTextProvider>
@@ -618,7 +620,10 @@ function LaunchFab({
       className={styles.fab}
       data-phase={target.phase}
       onClick={() => onOpen(target.matchId)}
-      onPointerEnter={preload}
+      onPointerEnter={(event) => {
+        // Au toucher, `pointerenter` part aussi au début d'un défilement : seul un vrai survol compte.
+        if (event.pointerType !== "touch") preload();
+      }}
       onFocus={preload}
     >
       <span aria-hidden="true">{lobby ? "⏳" : "▶"}</span>
