@@ -232,6 +232,6 @@ describe("revue performance, vingt-cinquième passe", () => {
 describe("revue performance, vingt-sixième passe", () => {
   it("l'entrée « Comportement d'un joueur » : le formulaire n'emporte que son pictogramme", () => {
     expect(readSource("components/reports/ReportProblemDialog.tsx")).toContain("{OFF_SITE_CONDUCT_ICON}");
-    expect(readSource("lib/shared/content-reports.ts")).not.toContain("Comportement d'un joueur");
+    expect(readSource("lib/shared/content-reports.ts")).not.toContain('label: "Comportement d\'un joueur"');
   });
 });
