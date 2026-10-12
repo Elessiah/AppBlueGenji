@@ -11,6 +11,7 @@ import {
   roundLimitReached,
 } from "@/lib/shared/bg-survie/qualification";
 import { replayEnduranceDetailed } from "@/lib/shared/bg-survie/replay";
+import { applyRoundCut } from "@/lib/shared/bg-survie/replay-steps";
 import { type EnduranceStanding } from "@/lib/shared/bg-survie/standings";
 
 const FT3 = { type: "FT", value: 3 } as const;
@@ -383,6 +384,18 @@ describe("sortie anticipée décochée — personne ne sort avant la fin", () =>
     expect(enduranceEliminationCut(untouchable, off, 1, FT3)).toEqual([]);
     expect(enduranceEliminationCut(untouchable, config({ playoffSize: 2, maxRounds: 5, earlyExit: true }), 1, null)).toEqual([]);
     expect(() => enduranceEliminationCut(untouchable, off, 0, FT3)).toThrow("classement lu");
+  });
+
+  it("ne copie pas le classement du rejeu en cours de phase", () => {
+    class UntouchableStandings extends Map<number, EnduranceStanding> {
+      override values(): MapIterator<EnduranceStanding> {
+        throw new Error("classement copié");
+      }
+    }
+    const standings = new UntouchableStandings();
+    expect(() => applyRoundCut(standings, off, 1, 4, FT3)).not.toThrow();
+    // La dernière manche, elle, trace toujours le trait sous la cible.
+    expect(() => applyRoundCut(standings, off, 0, 5, FT3)).toThrow("classement copié");
   });
 
   // La dernière manche n'est pas une sortie anticipée : le trait sous la cible
