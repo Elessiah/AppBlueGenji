@@ -28,8 +28,13 @@ describe("isDocumentLoad", () => {
     expect(await isDocumentLoad()).toBe(false);
   });
 
-  it("en-tête absent (requête que le middleware n'a pas vue) : vrai — le dictionnaire part, comme avant", async () => {
-    expect(await isDocumentLoad()).toBe(true);
+  it("en-tête absent (requête que le middleware n'a pas vue, en-têtes forgés par le client) : faux — la règle échoue fermée", async () => {
+    expect(await isDocumentLoad()).toBe(false);
+  });
+
+  it("valeur forgée autre que « 1 » : faux", async () => {
+    mockHeaders = { "x-bg-document": "true" };
+    expect(await isDocumentLoad()).toBe(false);
   });
 
   it("sans session : faux — la carte « Connexion requise » remplace les pages, le dictionnaire ne servirait à rien", async () => {

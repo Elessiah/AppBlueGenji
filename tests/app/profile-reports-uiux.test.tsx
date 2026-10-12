@@ -223,8 +223,8 @@ describe("revue UI/UX, quatrième passe", () => {
 
   it("cibles d'un signalement : TeamLink / PlayerLink, pas de chemin écrit à la main", () => {
     const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
-    expect(view).toContain('<PlayerLink userId={target.id}>{target.label}</PlayerLink>');
-    expect(view).toContain('<TeamLink teamId={target.id}>{target.label}</TeamLink>');
+    expect(view).toContain('<PlayerLink userId={target.id}>{label}</PlayerLink>');
+    expect(view).toContain('<TeamLink teamId={target.id}>{label}</TeamLink>');
   });
 
   it("date d'un signalement à contester : français inchangé, mois nommé en anglais", () => {

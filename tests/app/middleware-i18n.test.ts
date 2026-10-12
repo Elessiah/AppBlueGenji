@@ -192,6 +192,8 @@ describe("middleware — chargement complet ou requête du routeur (revue de per
     // Sans `Sec-Fetch-Dest` (Safari < 16.4) : `Accept` décide — un document demande du HTML, le routeur non.
     expect(forwarded(call("/en/regles", { headers: { accept: "text/html,application/xhtml+xml" } }), DOCUMENT_REQUEST_HEADER)).toBe("1");
     expect(forwarded(call("/en/regles", { headers: { accept: "*/*" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
+    // `text/html` ailleurs qu'en tête (client qui l'ajoute à `*/*`) : pas un document.
+    expect(forwarded(call("/en/regles", { headers: { accept: "*/*, text/html" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
     expect(forwarded(call("/en/regles"), DOCUMENT_REQUEST_HEADER)).toBe("0");
     expect(forwarded(call("/en/regles", { headers: { "sec-fetch-dest": "empty" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");
     expect(forwarded(call("/regles", { headers: { "sec-fetch-dest": "empty" } }), DOCUMENT_REQUEST_HEADER)).toBe("0");

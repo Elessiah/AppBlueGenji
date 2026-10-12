@@ -16,7 +16,7 @@ jest.mock("@/lib/server/auth", () => ({ ...jest.requireActual<object>("@/lib/ser
 let mockRefresh = false;
 jest.mock("next/headers", () => ({
   headers: async () =>
-    new Headers(mockRefresh ? { "x-bg-document": "0", host: "bluegenji.test", referer: "https://bluegenji.test/en/profil" } : {}),
+    new Headers(mockRefresh ? { "x-bg-document": "0", host: "bluegenji.test", referer: "https://bluegenji.test/en/profil" } : { "x-bg-document": "1" }),
 }));
 jest.mock("next/navigation", () => ({
   usePathname: () => "/en/profil",
@@ -79,6 +79,7 @@ import { avatarUploadErrorMessage, profileErrorMessage } from "@/app/(secured)/p
 import { connectionErrorMessage, otherSessionsSummary, sessionsRevokedMessage, unlinkSuccessMessage } from "@/app/(secured)/profil/connection-errors";
 import { discordVerificationErrorMessage } from "@/app/(secured)/profil/discord-errors";
 import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
+import { TargetThumb } from "@/components/reports/TargetPicker";
 import {
   FR_REPORTS_TEXT,
   legalBasisText,
@@ -532,6 +533,35 @@ describe("anglais — écrans", () => {
     expect(html).toContain("deleted</strong> immediately on March 1, 2026");
     expect(html).toContain('href="/en/equipes/4"');
     expectEnglish(html.replace("Logo copied", "").replace("We made it", ""));
+  });
+
+  it("page d'un signalement : un nom enregistré avant visibleText ne réordonne pas la phrase (revue de sécurité du lot 9-2)", () => {
+    // U+202E (commande de direction) et U+200B (largeur nulle) dans un nom resté tel quel en base.
+    const legacy = "Gla‮ciers​";
+    const report: ConcernedReportView = {
+      id: 9,
+      category: "COPYRIGHT",
+      status: "RESOLVED",
+      description: "",
+      createdAt: "2026-03-01T10:00:00.000Z",
+      targets: [
+        { type: "TEAM", id: 4, label: legacy, exists: true, imageUrl: null, detail: null },
+        { type: "USER", id: 6, label: legacy, exists: false, imageUrl: null, detail: null },
+      ],
+      myContests: [],
+      quarantines: [
+        { id: 1, targetType: "TEAM", targetId: 4, targetName: legacy, reportId: 9, status: "HIDDEN", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: null },
+        { id: 2, targetType: "TEAM", targetId: 4, targetName: legacy, reportId: 9, status: "PURGED", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: "2026-03-01T10:00:00.000Z" },
+      ],
+    };
+    const html = inEnglish(<ConcernedReport report={report} onContest={() => undefined} />);
+    expect(html).not.toMatch(/[‮​]/u);
+    expect(html.split("Glaciers").length - 1).toBeGreaterThanOrEqual(4);
+  });
+
+  it("choix des cibles : vignette tirée du nom nettoyé", () => {
+    const html = renderToStaticMarkup(<TargetThumb option={{ label: "​‮abc", imageUrl: null }} />);
+    expect(html).toContain(">A<");
   });
 
   it("réglage des notifications, chaque état de l'appareil", () => {
