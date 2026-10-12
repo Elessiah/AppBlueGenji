@@ -97,6 +97,7 @@ export function ReportProblemButton({
     }
     if (pending) return;
     setPending(true);
+    // Un nouvel essai efface l'échec précédent de la région d'état.
     setStatus(t("footer.reportLoading"));
     loadDialog()
       .then((loaded) => {
