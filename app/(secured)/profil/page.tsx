@@ -286,6 +286,11 @@ export default function ProfilePage() {
     }
   };
 
+  // Le texte par une référence : la lecture du profil (et la remise à zéro des
+  // champs qu'elle fait) ne repart jamais sur un simple changement de texte —
+  // une saisie en cours serait perdue (revue de performance du lot 9-2).
+  const textRef = useRef(text);
+  textRef.current = text;
   useEffect(() => {
     const load = async () => {
       const response = await fetch("/api/profile", { cache: "no-store" });
@@ -298,7 +303,7 @@ export default function ProfilePage() {
           // aujourd'hui la même phrase — mais le jour où ce code en sortirait,
           // celle-ci annoncerait « La sauvegarde a échoué » à un visiteur qui
           // vient d'ouvrir la page, le défaut même que ce registre sépare.
-          showError(profileLoadErrorMessage(errorCode, text));
+          showError(profileLoadErrorMessage(errorCode, textRef.current));
           setTimeout(() => router.push("/"), 1500);
           return;
         }
@@ -329,8 +334,8 @@ export default function ProfilePage() {
     // visiteur qui vient d'ouvrir la page l'échec d'un geste qu'il n'a pas
     // fait. Les codes nommés (session expirée, compte introuvable) gardent
     // leur phrase, qui vaut des deux côtés.
-    load().catch((e) => showError(profileLoadErrorMessage((e as Error).message, text)));
-  }, [showError, router, text]);
+    load().catch((e) => showError(profileLoadErrorMessage((e as Error).message, textRef.current)));
+  }, [showError, router]);
 
   /**
    * **Le saut vers l'ancre se rejoue une fois la section montée.**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
 import { useToast } from "@/components/ui/toast";
@@ -75,12 +75,23 @@ export default function PlayersList() {
   // La recherche filtre sur une valeur **différée** : la frappe met le champ à
   // jour tout de suite, le refiltrage de la grille suit sans la bloquer.
   const deferredQuery = useDeferredValue(query);
-  // Clé de recherche de chaque joueur, calculée une fois par liste et non à chaque frappe (revue de performance du lot 9-2).
-  const searchKeys = useMemo(() => new Map(listed.map((p) => [p, `${p.pseudo} ${p.team?.name || ""}`.toLowerCase()])), [listed]);
+  // Clé de recherche de chaque joueur : calculée à la première recherche qui le
+  // lit, puis gardée pour l'annuaire chargé — rien sans recherche, rien à
+  // chaque frappe ni au cochage des comptes supprimés (revue de performance du lot 9-2).
+  // Une table faible pour toute la vie de l'écran : une liste rechargée apporte des entrées neuves, les anciennes s'en vont seules.
+  const [searchKeys] = useState(() => new WeakMap<(typeof players)[number], string>());
+  const searchKeyOf = useCallback((p: (typeof players)[number]): string => {
+    let key = searchKeys.get(p);
+    if (key === undefined) {
+      key = `${p.pseudo} ${p.team?.name || ""}`.toLowerCase();
+      searchKeys.set(p, key);
+    }
+    return key;
+  }, [searchKeys]);
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
     const r = listed.filter((p) => {
-      if (q && !(searchKeys.get(p) ?? "").includes(q)) return false;
+      if (q && !searchKeyOf(p).includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
       // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
       // décoché « ouvert aux propositions » ne veut pas être démarché.
@@ -94,7 +105,7 @@ export default function PlayersList() {
     }
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
     return r;
-  }, [listed, searchKeys, deferredQuery, roleFilter, statusFilter, sort, text.locale]);
+  }, [searchKeyOf, listed, deferredQuery, roleFilter, statusFilter, sort, text.locale]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);

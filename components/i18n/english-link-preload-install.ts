@@ -18,6 +18,12 @@ export function installEnglishLinkPreload(): () => void {
     // Au toucher, `pointerover` part aussi au début d'un défilement : seul un vrai survol (souris, stylet) annonce l'intention.
     if (event.type === "pointerover" && (event as PointerEvent).pointerType === "touch") return;
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+    // Un clic qui n'ouvre pas la page **ici** (nouvel onglet, téléchargement) n'a rien à précharger.
+    if (event.type === "click" && link) {
+      const click = event as MouseEvent;
+      if (click.button !== 0 || click.ctrlKey || click.metaKey || click.shiftKey || click.altKey) return;
+      if (link.hasAttribute("download") || (link.getAttribute("target") ?? "_self") !== "_self") return;
+    }
     const href = link?.getAttribute("href") ?? "";
     if (!href.startsWith("/en/")) return;
     const now = Date.now();
