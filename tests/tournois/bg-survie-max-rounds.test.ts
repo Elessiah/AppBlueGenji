@@ -372,6 +372,19 @@ describe("sortie anticipée décochée — personne ne sort avant la fin", () =>
     expect(enduranceEliminationCut(standings, config({ playoffSize: 3, maxRounds: 5 }), 1, FT3)).toEqual([]);
   });
 
+  // Appelée à chaque manche close de chaque rejeu (flux, REST, aperçu) : option
+  // décochée — le défaut —, elle répond sans parcourir ni trier le classement.
+  it("répond sans lire le classement en cours de phase", () => {
+    const untouchable = new Proxy<EnduranceStanding[]>([], {
+      get() {
+        throw new Error("classement lu");
+      },
+    });
+    expect(enduranceEliminationCut(untouchable, off, 1, FT3)).toEqual([]);
+    expect(enduranceEliminationCut(untouchable, config({ playoffSize: 2, maxRounds: 5, earlyExit: true }), 1, null)).toEqual([]);
+    expect(() => enduranceEliminationCut(untouchable, off, 0, FT3)).toThrow("classement lu");
+  });
+
   // La dernière manche n'est pas une sortie anticipée : le trait sous la cible
   // tombe comme avant, option ou non — sans quoi la phase ne finirait jamais.
   it("garde le trait de la dernière manche", () => {

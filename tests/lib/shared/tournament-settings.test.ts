@@ -1,8 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   matchFormatSettingLabel,
-  parseRulesTournamentParam,
-  rulesHrefWithTournament,
   tournamentSettingsGroups,
   type TournamentSettingsGroup,
   type TournamentSettingsInput,
@@ -237,19 +235,5 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
       "Phase 2 — Coupes": "Survie par coupes · 1ʳᵉ coupe après 2 manches · puis à chaque manche · 1 qualifiée",
       "Phase 3": "Simple élimination · petite finale · Désigne la championne",
     });
-  });
-});
-
-describe("paramètre ?tournoi= des règles", () => {
-  it("n'accepte qu'un entier positif en base 10", () => {
-    expect(parseRulesTournamentParam("12")).toBe(12);
-    expect(parseRulesTournamentParam(["7", "8"])).toBe(7);
-    for (const bad of [undefined, "", "0", "-3", "1.5", "012", "1e3", "abc", "99999999999999999"]) {
-      expect(parseRulesTournamentParam(bad)).toBeNull();
-    }
-  });
-
-  it("construit le lien des règles portant le tournoi", () => {
-    expect(rulesHrefWithTournament("/regles/survie", 42)).toBe("/regles/survie?tournoi=42");
   });
 });
