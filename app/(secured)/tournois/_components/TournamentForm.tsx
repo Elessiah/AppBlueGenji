@@ -502,11 +502,7 @@ export function TournamentForm({
               lockedAttr={lockedAttr}
               onSwissTotalRoundsChange={setSwissTotalRounds}
               phaseFocusRequest={phaseFocusRequest}
-              earlyExitAria={fieldErrors.aria(
-                "enduranceEarlyExit",
-                locked("enduranceEarlyExit") && explanationId,
-                "endurance-early-exit-hint",
-              )}
+              earlyExitAria={fieldAttrs("enduranceEarlyExit", "endurance-early-exit-hint")}
               earlyExitError={fieldErrors.message("enduranceEarlyExit")}
             />
           </div>

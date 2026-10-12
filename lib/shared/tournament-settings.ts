@@ -15,6 +15,7 @@
 import { matchAllowsDraw, matchFormatLabel, withoutDraws, type MatchFormat } from "./match-format";
 import { PLAYER_REQUIREMENT_LABELS } from "./registration-filters";
 import { FORMAT_LABELS, GAME_LABELS } from "./tournament-labels";
+import { earlyExitApplies } from "./bg-survie/config";
 import type {
   EnduranceMeta,
   SeedingSource,
@@ -108,7 +109,10 @@ function phaseDetails(phase: TournamentPhase): string[] {
 }
 
 /** Barème d'endurance (BG Survie) : capital, barème, plateau, plafond, sortie anticipée. */
-function enduranceSettings(endurance: NonNullable<TournamentSettingsInput["endurance"]>): TournamentSetting[] {
+function enduranceSettings(
+  endurance: NonNullable<TournamentSettingsInput["endurance"]>,
+  matchFormat: MatchFormat | null,
+): TournamentSetting[] {
   const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = endurance;
   const settings: TournamentSetting[] = [
     { label: "Capital de départ", value: plural(startPoints, "point") },
@@ -119,8 +123,8 @@ function enduranceSettings(endurance: NonNullable<TournamentSettingsInput["endur
       value: maxRounds === null ? "Aucun" : String(maxRounds),
     },
   ];
-  // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
-  if (maxRounds !== null) settings.push({ label: "Sortie anticipée « hors course »", value: yesNo(earlyExit) });
+  // L'option n'a d'effet que sous plafond et avec un format de match : ailleurs, la ligne ne dirait rien.
+  if (earlyExitApplies(maxRounds, matchFormat)) settings.push({ label: "Sortie anticipée « hors course »", value: yesNo(earlyExit) });
   return settings;
 }
 
@@ -148,7 +152,7 @@ function modeSettings(input: TournamentSettingsInput): TournamentSetting[] {
       ];
     }
     case "BG_SURVIE": {
-      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(input.endurance) : [];
+      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(input.endurance, card.matchFormat) : [];
       settings.push({
         label: "Format des play-offs",
         value: matchFormatSettingLabel(card.endurancePlayoffFormat ?? withoutDraws(card.matchFormat)),

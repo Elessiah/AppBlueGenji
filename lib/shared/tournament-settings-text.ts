@@ -19,16 +19,17 @@ import {
 } from "./tournament-settings";
 import type { TournamentPhase } from "./types";
 import type { Messages } from "./i18n-messages";
+import { earlyExitApplies } from "./bg-survie/config";
 
 type SettingsMessages = Pick<Messages["tournament"], "settings" | "matchFormat">;
 type SettingsText = ScopedText<Leaves<SettingsMessages>>;
 type LabelMessages = Messages["labels"];
 
-
 /** Barème d'endurance (BG Survie) : capital, barème, plateau, plafond, sortie anticipée. */
 function enduranceSettings(
   text: SettingsText,
   endurance: NonNullable<TournamentSettingsInput["endurance"]>,
+  matchFormat: MatchFormat | null,
 ): TournamentSetting[] {
   const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = endurance;
   const settings: TournamentSetting[] = [
@@ -37,8 +38,8 @@ function enduranceSettings(
     { label: text.t("settings.mode.playoffSize"), value: String(playoffSize) },
     { label: text.t("settings.mode.maxRounds"), value: maxRounds === null ? text.t("settings.none") : String(maxRounds) },
   ];
-  // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
-  if (maxRounds !== null) {
+  // L'option n'a d'effet que sous plafond et avec un format de match : ailleurs, la ligne ne dirait rien.
+  if (earlyExitApplies(maxRounds, matchFormat)) {
     settings.push({ label: text.t("settings.mode.earlyExit"), value: text.t(earlyExit ? "settings.yes" : "settings.no") });
   }
   return settings;
@@ -121,7 +122,7 @@ function modeSettings(text: SettingsText, labels: LabelMessages, input: Tourname
       ];
     }
     case "BG_SURVIE": {
-      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(text, input.endurance) : [];
+      const settings: TournamentSetting[] = input.endurance ? enduranceSettings(text, input.endurance, card.matchFormat) : [];
       settings.push({
         label: text.t("settings.mode.playoffFormat"),
         value: matchFormatSetting(text, card.endurancePlayoffFormat ?? withoutDraws(card.matchFormat)),

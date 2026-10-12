@@ -5,6 +5,8 @@
  * Module pur : aucune dépendance base de données.
  */
 
+import type { MatchFormat } from "../match-format";
+
 /** Barème d'endurance d'un tournoi. */
 export type EnduranceConfig = {
   /** Capital de départ (défaut 9). */
@@ -67,4 +69,18 @@ export function resolveEnduranceConfig(input?: Partial<EnduranceConfig> | null):
     // retombe sur le défaut, l'option décochée.
     earlyExit: input?.earlyExit === true,
   };
+}
+
+/**
+ * La sortie « hors course » anticipée peut-elle jouer ? Il lui faut un plafond
+ * de manches (sans lui, aucune « dernière manche » à devancer) **et** un format
+ * de match (en saisie libre, `enduranceRoundSwing` ne borne rien : aucune
+ * élimination n'est mathématiquement acquise). Hors de ces conditions, la case
+ * du formulaire est grisée et la ligne des réglages masquée : l'option cochée
+ * n'y aurait aucun effet.
+ *
+ * @param maxRounds - plafond de manches, `null` ou `0` = aucun.
+ */
+export function earlyExitApplies(maxRounds: number | null, matchFormat: MatchFormat | null): boolean {
+  return maxRounds !== null && maxRounds >= 1 && matchFormat !== null;
 }

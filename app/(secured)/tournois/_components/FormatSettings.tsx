@@ -11,6 +11,7 @@ import type { TournamentFormValues } from "../_lib/tournament-form-values";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import type { FieldAria } from "@/lib/shared/field-errors";
+import { earlyExitApplies } from "@/lib/shared/bg-survie/config";
 
 /**
  * Réglages propres au format choisi : phases (MULTI), endurance (BG Survie),
@@ -39,11 +40,13 @@ export type FormatSettingsProps = {
   phaseFocusRequest?: number;
   /**
    * Attributs ARIA de la case « sortie anticipée » (BG Survie) : aide, verrou
-   * et refus du serveur rattaché (`useFieldErrors`), composés par le formulaire.
+   * et refus du serveur rattaché, composés par le `fieldAttrs` du formulaire —
+   * obligatoires, pour qu'aucun appelant ne rende une case figée dont le
+   * verrou ne serait pas annoncé.
    */
-  earlyExitAria?: FieldAria;
+  earlyExitAria: FieldAria;
   /** Refus du serveur rattaché à cette case, `null` s'il n'y en a pas. */
-  earlyExitError?: string | null;
+  earlyExitError: string | null;
 };
 
 export function FormatSettings({
@@ -53,14 +56,20 @@ export function FormatSettings({
   lockedAttr,
   onSwissTotalRoundsChange,
   phaseFocusRequest,
-  earlyExitAria = { "aria-describedby": "endurance-early-exit-hint" },
-  earlyExitError = null,
+  earlyExitAria,
+  earlyExitError,
 }: Readonly<FormatSettingsProps>) {
   const { format, maxTeams, phases } = values;
   const text = useFormText();
   const { t } = text;
   const entrantType = toParticipantType(values.participantType);
   const recommendedRounds = computeRecommendedRounds(maxTeams);
+  // Sans plafond ou en saisie libre, la sortie anticipée ne peut pas jouer :
+  // la case est grisée, comme « Égalités », et l'aide dit pourquoi.
+  const earlyExitUsable = earlyExitApplies(values.enduranceMaxRounds, values.matchFormat);
+  let earlyExitUnusable = "";
+  if (values.enduranceMaxRounds <= 0) earlyExitUnusable = ` ${t("settings.enduranceEarlyExitNoCap")}`;
+  else if (values.matchFormat === null) earlyExitUnusable = ` ${t("settings.enduranceEarlyExitFreeScore")}`;
 
   return (
     <>
@@ -157,7 +166,7 @@ export function FormatSettings({
               <input
                 id="endurance-early-exit"
                 type="checkbox"
-                disabled={locked("enduranceEarlyExit")}
+                disabled={locked("enduranceEarlyExit") || !earlyExitUsable}
                 checked={values.enduranceEarlyExit}
                 onChange={(e) => set("enduranceEarlyExit", e.target.checked)}
                 {...earlyExitAria}
@@ -167,7 +176,7 @@ export function FormatSettings({
             <FieldErrorText fieldId="endurance-early-exit" message={earlyExitError} />
             <p id="endurance-early-exit-hint" style={HINT}>
               {t("settings.enduranceEarlyExitHint")}
-              {values.enduranceMaxRounds > 0 ? "" : ` ${t("settings.enduranceEarlyExitNoCap")}`}
+              {earlyExitUnusable}
             </p>
           </div>
 
