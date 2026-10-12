@@ -259,13 +259,13 @@ describe("correctifs de la première revue", () => {
     expect(list).toContain('showError(teamErrorMessage((e as Error).message, "TEAMS_LOAD_FAILED"))');
   });
 
-  it("la modale de recadrage, encore française, l'est entière sous `/en` (titre et `lang`)", () => {
+  it("la modale de recadrage, traduite (lot 9-2), suit la langue de la page : titre traduit, aucun `lang` imposé", () => {
     const settings = stripComments(read("_components", "TeamSettings.tsx"));
-    expect(settings).toContain("useImageCropper({ lang: useStaffLang() })");
-    expect(settings).toContain('(useStaffLang() ? FR_TEAM_PAGE_TEXT : text).t("settings.cropTitle")');
+    expect(settings).toContain("useImageCropper()");
+    expect(settings).toContain('t("settings.cropTitle")');
     const create = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "creer", "CreateTeamForm.tsx"), "utf8"));
-    expect(create).toContain("useImageCropper({ lang: cropLang })");
-    expect(create).toContain('(cropLang ? FR_TEAMS_TEXT : text).t("create.cropTitle")');
+    expect(create).toContain("useImageCropper()");
+    expect(create).toContain('t("create.cropTitle")');
   });
 
   it("la piste d'actions du roster a une largeur fixe, jamais `auto`", () => {
