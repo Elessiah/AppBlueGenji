@@ -171,7 +171,11 @@ export function ConcernedReport({
         </ul>
 
         <h2 className={styles.subtitle}>{t("concerned.reproachTitle")}</h2>
-        <blockquote className={styles.quote}>{report.description}</blockquote>
+        {/* Texte libre d'un tiers, sauts de ligne gardés : `dir="auto"` isole sa
+            direction (une commande U+202E n'en déborde pas) — revue de sécurité du lot 9-2. */}
+        <blockquote className={styles.quote} dir="auto">
+          {report.description}
+        </blockquote>
 
         {report.myContests.length > 0 && (
           <>
@@ -180,7 +184,7 @@ export function ConcernedReport({
               {report.myContests.map((contest) => (
                 <li key={contest.id}>
                   <span className={styles.muted}>{t("concerned.sentOn", { date: formatParisDay(contest.createdAt, locale) })}</span>
-                  <p>{contest.description}</p>
+                  <p dir="auto">{contest.description}</p>
                 </li>
               ))}
             </ul>
