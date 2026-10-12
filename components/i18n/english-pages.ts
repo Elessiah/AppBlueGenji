@@ -20,10 +20,17 @@ export const ENGLISH_PAGES = {
 
 export type EnglishPage = keyof typeof ENGLISH_PAGES;
 
-/** Le chemin sans requête, ancre ni barre finale. */
+/** Le chemin sans requête, ancre ni barre finale (sans expression rationnelle : coût linéaire, SonarCloud S8786). */
 export function barePath(path: string): string {
-  const bare = path.split(/[?#]/)[0];
-  return bare.length > 1 ? bare.replace(/\/+$/, "") : bare;
+  let end = path.length;
+  for (let i = 0; i < path.length; i += 1) {
+    if (path[i] === "?" || path[i] === "#") {
+      end = i;
+      break;
+    }
+  }
+  while (end > 1 && path[end - 1] === "/") end -= 1;
+  return path.slice(0, end);
 }
 
 const ENTRIES = Object.entries(ENGLISH_PAGES) as Array<[EnglishPage, RegExp]>;
