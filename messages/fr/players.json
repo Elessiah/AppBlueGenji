@@ -38,7 +38,7 @@
     "showDeleted": "Afficher les comptes supprimés ({count})",
     "sectionTitle": "PROFILS",
     "sectionAccent": "· COMMUNAUTÉ ACTIVE",
-    "sectionCount": "{count} JOUEURS",
+    "sectionCount": "{count, plural, one {# JOUEUR} other {# JOUEURS}}",
     "showMore": "Voir plus ({step} sur {hidden, plural, one {# restant} other {# restants}})",
     "showMoreNoun": "joueurs"
   },
@@ -80,7 +80,7 @@
     "fallback": "L'opération a échoué."
   },
   "page": {
-    "loading": "Chargement du profil joueur...",
+    "loading": "Chargement du profil joueur…",
     "notFound": "Joueur non trouvé.",
     "loadError": "Erreur lors du chargement du joueur.",
     "backToPlayers": "Retour aux joueurs",
@@ -119,7 +119,13 @@
       "record": "Bilan",
       "rank": "Classement"
     },
-    "record": "{wins}V / <loss>{losses}D</loss>",
+    "record": "{wins} V – <loss>{losses} D</loss>",
+    "rank": {
+      "one": "{rank}er",
+      "two": "{rank}e",
+      "few": "{rank}e",
+      "other": "{rank}e"
+    },
     "state": {
       "UPCOMING": "Prochainement",
       "REGISTRATION": "Inscriptions ouvertes",

@@ -33,7 +33,7 @@
     },
     "sectionTitle": "ROSTERS",
     "sectionAccent": "· SAISON ACTUELLE",
-    "sectionCount": "{count} ÉQUIPES",
+    "sectionCount": "{count, plural, one {# ÉQUIPE} other {# ÉQUIPES}}",
     "showMore": "Voir plus ({step} sur {hidden, plural, one {# restant} other {# restants}})",
     "showMoreNoun": "équipes"
   },
@@ -119,7 +119,7 @@
     "terms": "J'ai lu et j'accepte les conditions d'utilisation (<terms>lire les conditions</terms>) — notamment la garantie des droits sur le nom, le logo et la description de l'équipe.",
     "cancel": "Annuler",
     "submit": "Créer l'équipe",
-    "pending": "Création...",
+    "pending": "Création…",
     "createdWithoutLogo": "Équipe créée, mais sans logo : {reason}"
   }
 }

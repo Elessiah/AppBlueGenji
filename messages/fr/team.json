@@ -33,8 +33,8 @@
       "record": "Bilan",
       "rank": "Place"
     },
-    "recordLabel": "Bilan ",
-    "rankLabel": "Place ",
+    "recordLabel": "Bilan",
+    "rankLabel": "Place",
     "record": "{wins} V – <loss>{losses} D</loss>",
     "rank": {
       "one": "{rank}er",
@@ -94,7 +94,7 @@
     },
     "you": "Toi",
     "rolesOf": "Rôles de {pseudo}",
-    "joinedOnLabel": "Arrivée le ",
+    "joinedOnLabel": "Arrivée le",
     "editRoles": "Rôles",
     "editRolesLabel": "Modifier les rôles de {pseudo}",
     "kick": "Exclure",

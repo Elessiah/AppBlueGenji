@@ -80,7 +80,7 @@
     "fallback": "The operation failed."
   },
   "page": {
-    "loading": "Loading the player profile...",
+    "loading": "Loading the player profile…",
     "notFound": "Player not found.",
     "loadError": "Error while loading the player.",
     "backToPlayers": "Back to players",
@@ -119,7 +119,13 @@
       "record": "Record",
       "rank": "Placement"
     },
-    "record": "{wins}W / <loss>{losses}L</loss>",
+    "record": "{wins} W – <loss>{losses} L</loss>",
+    "rank": {
+      "one": "{rank}st",
+      "two": "{rank}nd",
+      "few": "{rank}rd",
+      "other": "{rank}th"
+    },
     "state": {
       "UPCOMING": "Upcoming",
       "REGISTRATION": "Registration open",

@@ -169,7 +169,9 @@ export default function PlayersList() {
               ).map((k) => (
                 <button
                   key={k}
+                  type="button"
                   className={`${s.chip} ${roleFilter === k ? s.chipOn : ""}`}
+                  aria-pressed={roleFilter === k}
                   onClick={() => setRoleFilter(k)}
                 >
                   {t(`list.roleFilter.${k}`)}
@@ -188,8 +190,10 @@ export default function PlayersList() {
                 ).map((k) => (
                   <button
                     key={k}
+                    type="button"
                     onClick={() => setStatusFilter(k)}
                     className={`${s.sortBtn} ${statusFilter === k ? s.sortBtnOn : ""}`}
+                    aria-pressed={statusFilter === k}
                   >
                     {t(`list.statusFilter.${k}`)}
                   </button>
@@ -201,7 +205,9 @@ export default function PlayersList() {
               {(["pseudo", "tournaments"] as const).map((k) => (
                 <button
                   key={k}
+                  type="button"
                   className={`${s.sortBtn} ${sort === k ? s.sortBtnOn : ""}`}
+                  aria-pressed={sort === k}
                   onClick={() => setSort(k)}
                 >
                   {t(`list.sort.${k}`)}

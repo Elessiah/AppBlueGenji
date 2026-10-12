@@ -7,8 +7,7 @@ import { teamErrorMessage } from "../../_lib/team-errors";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { ModerationReasonField, isModerationReasonReady } from "@/components/moderation/ModerationReasonField";
-import { useAppLocale } from "@/components/i18n/locale-context";
-import { DEFAULT_LOCALE } from "@/lib/shared/locales";
+import { useStaffLang } from "@/components/i18n/staff-lang";
 import styles from "../team.module.css";
 
 /**
@@ -26,7 +25,7 @@ import styles from "../team.module.css";
  */
 export function ModerationLogoBar({ team, onChanged }: Readonly<{ team: TeamDetailResponse; onChanged: () => void }>) {
   const { showError, showSuccess } = useToast();
-  const staffLang = useAppLocale() === DEFAULT_LOCALE ? undefined : "fr";
+  const staffLang = useStaffLang();
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");

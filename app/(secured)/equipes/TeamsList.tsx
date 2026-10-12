@@ -178,7 +178,9 @@ export default function TeamsList() {
                 ).map(([k, n]) => (
                   <button
                     key={k}
+                    type="button"
                     className={`${s.chip} ${gameFilter === k ? s.chipOn : ""}`}
+                    aria-pressed={gameFilter === k}
                     onClick={() => setGameFilter(k)}
                   >
                     {t(`list.filters.${k}`)}
@@ -202,7 +204,9 @@ export default function TeamsList() {
                 ).map((k) => (
                   <button
                     key={k}
+                    type="button"
                     className={`${s.sortBtn} ${sort === k ? s.sortBtnOn : ""}`}
+                    aria-pressed={sort === k}
                     onClick={() => setSort(k)}
                   >
                     {t(`list.sort.${k}`)}

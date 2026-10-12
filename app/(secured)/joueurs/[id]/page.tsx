@@ -4,6 +4,7 @@ import { TeamLink } from "@/components/entity-link";
 import { PlayerPodiumName } from "@/components/podium-tiers";
 import { DiscordTag } from "@/components/discord-tag";
 import { useParams } from "next/navigation";
+import { useEffect } from "react";
 import { UserX } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
@@ -18,6 +19,7 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { usePlayersText, type PlayersText } from "@/components/i18n/players-text";
 import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
 import { formatTeamRoles } from "@/lib/shared/team-role-display";
+import { finalRankLabel } from "@/lib/shared/ordinal";
 import type { TeamRole } from "@/lib/shared/types";
 import { playerErrorMessage } from "../_lib/player-errors";
 import styles from "./player.module.css";
@@ -52,6 +54,10 @@ export default function PlayerDetailPage() {
       },
     },
   );
+  // Une notification par échec, pas à chaque rendu de l'état d'erreur.
+  useEffect(() => {
+    if (status === "error") showError(playerErrorMessage(text, error, "PLAYER_LOAD_FAILED"));
+  }, [status, error, showError, text]);
   if (status === "loading")
     return <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>{t("page.loading")}</section>;
 
@@ -66,7 +72,6 @@ export default function PlayerDetailPage() {
     );
 
   if (status === "error") {
-    showError(playerErrorMessage(text, error, "PLAYER_LOAD_FAILED"));
     return (
       <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>
         {t("page.loadError")}{" "}
@@ -319,7 +324,7 @@ export default function PlayerDetailPage() {
                   }),
                 )}
               </span>
-              <span data-label={t("page.tournamentsColumn.rank")}>{entry.finalRank ?? "-"}</span>
+              <span data-label={t("page.tournamentsColumn.rank")}>{finalRankLabel(locale, entry.finalRank, (form, rank) => t(`page.rank.${form}`, { rank }))}</span>
             </div>
           ))}
         </div>

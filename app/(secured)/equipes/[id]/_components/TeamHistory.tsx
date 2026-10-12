@@ -54,7 +54,7 @@ export function TeamHistory({ tournaments }: Readonly<{ tournaments: TeamHistory
                   {historyStateLabel(text, entry.state)}
                 </span>
                 <span role="cell">
-                  <span className={styles.cellLabel}>{t("history.recordLabel")}</span>
+                  <span className={styles.cellLabel}>{t("history.recordLabel")}</span>{" "}
                   {richNodes(
                     text.rich("history.record", { wins: entry.wins, losses: entry.losses }, {
                       loss: (chunks) => <span className="result-loss">{chunks}</span>,
@@ -62,7 +62,7 @@ export function TeamHistory({ tournaments }: Readonly<{ tournaments: TeamHistory
                   )}
                 </span>
                 <span role="cell">
-                  <span className={styles.cellLabel}>{t("history.rankLabel")}</span>
+                  <span className={styles.cellLabel}>{t("history.rankLabel")}</span>{" "}
                   {localizedFinalRank(text, entry.finalRank)}
                 </span>
               </div>

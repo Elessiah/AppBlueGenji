@@ -119,7 +119,7 @@
     "terms": "I have read and accept the terms of use (<terms>read the terms</terms>) — in particular the warranty of rights over the team's name, logo and description.",
     "cancel": "Cancel",
     "submit": "Create the team",
-    "pending": "Creating...",
+    "pending": "Creating…",
     "createdWithoutLogo": "Team created, but without a logo: {reason}"
   }
 }

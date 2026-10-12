@@ -156,7 +156,7 @@ export function MembersSection({
                       <RolePills roles={member.roles} label={t("members.rolesOf", { pseudo: member.pseudo })} />
                     </span>
                     <span role="cell" className={styles.joinedAt}>
-                      <span className={styles.cellLabel}>{t("members.joinedOnLabel")}</span>
+                      <span className={styles.cellLabel}>{t("members.joinedOnLabel")}</span>{" "}
                       {formatLocalDate(member.joinedAt, locale)}
                     </span>
                     {canManage ? (
