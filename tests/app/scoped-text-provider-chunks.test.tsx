@@ -23,23 +23,26 @@ const importsOf = (path: string) => [...source(path).matchAll(/from\s+"([^"]+)"/
 const LAYOUT_PROVIDERS = [
   { layout: "app/(secured)/equipes/[id]/layout.tsx", provider: "components/i18n/team-page-text-provider.tsx" },
   { layout: "app/(secured)/joueurs/layout.tsx", provider: "components/i18n/players-text-provider.tsx" },
+  { layout: "app/(secured)/equipes/layout.tsx", provider: "components/i18n/team-errors-text-provider.tsx" },
 ];
 
 describe("fournisseur posé par une mise en page : sans le français", () => {
   it.each(LAYOUT_PROVIDERS)("$layout importe le fournisseur seul", ({ layout, provider }) => {
     const target = `@/${provider.replace(/\.tsx$/, "")}`;
     expect(importsOf(layout)).toContain(target);
+    // Ni le module de textes (qui porte le JSON) ni un JSON directement.
+    expect(importsOf(layout)).not.toContain(target.replace(/-provider$/, ""));
     expect(importsOf(layout).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
   });
 
-  it.each(LAYOUT_PROVIDERS)("$provider n'importe aucun message", ({ provider }) => {
-    const text = source(provider);
-    expect(importsOf(provider).filter((spec) => spec.includes("messages/"))).toEqual([]);
-    // Un `import type` du module de textes s'efface à la compilation ; un
-    // import de valeur y ramènerait le JSON.
-    for (const line of text.split("\n").filter((l) => /from\s+"\.\/(team-page|players)-text"/.test(l))) {
-      expect(line).toMatch(/^import type /);
-    }
+  it.each(LAYOUT_PROVIDERS)("$provider n'importe que l'emplacement", ({ provider }) => {
+    // Un `import type` s'efface à la compilation ; tout autre import de valeur
+    // que la mécanique ramènerait un module de textes, et son JSON.
+    const valueImports = source(provider)
+      .split("\n")
+      .filter((line) => line.startsWith("import ") && !line.startsWith("import type "))
+      .map((line) => /from\s+"([^"]+)"/.exec(line)?.[1]);
+    expect(valueImports).toEqual(["./scoped-text-context"]);
   });
 });
 
