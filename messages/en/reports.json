@@ -75,7 +75,7 @@
       "placeholder": "Tell us about the problem…"
     },
     "CONTEST": {
-      "label": "Contest",
+      "label": "Appeal",
       "hint": "Respond to a report that targets you or your team — or contest the decision taken on your own copyright or moderation report.",
       "placeholder": "Why the report is unfounded: license, rights holder's permission, the team's own creation, context…"
     }
@@ -132,7 +132,7 @@
     "rightsChannel": "through this form (“GDPR” category) or from the person to contact about your data (privacy policy, “Exercising your rights” section)",
     "rightsConsent": "You can request access to, rectification or erasure of this data, or withdraw your consent, {channel}.",
     "rightsNoConsent": "You can request access to this data or its rectification {channel}; its erasure once the request has been handled — not before, as the association is required to handle it (GDPR, art. 17.3.b).",
-    "followUp": "The author of a notice receives, at the address they provide (required for copyright, optional otherwise), an acknowledgment of receipt, then the decision taken on it and the remedies available to them. If they reported from their account, they can contest that decision — including a decision not to act — through the “Contest” category of the same form, once the report is archived."
+    "followUp": "The author of a notice receives, at the address they provide (required for copyright, optional otherwise), an acknowledgment of receipt, then the decision taken on it and the remedies available to them. If they reported from their account, they can contest that decision — including a decision not to act — through the “Appeal” category of the same form, once the report is archived."
   },
   "errors": {
     "REPORT_INVALID_CATEGORY": "Choose a category.",
@@ -165,8 +165,8 @@
     "eyebrow": "REPORT NO. {id}",
     "heading": "A report concerns you",
     "lead": "The Bluegenji Esport association is reviewing this report. If you believe it's unfounded — you hold the rights to the logo, the content is yours, the context is different —, contest it: your response is read by the administrators before any final decision.",
-    "logoHidden": "<strong>The logo of “{name}” is hidden</strong> since {since}. Unless you contest it, it will be <strong>permanently deleted on {purge}</strong>. If the contest succeeds, it's restored as it was.",
-    "avatarHidden": "<strong>Your avatar is hidden</strong> since {since}. Unless you contest it, it will be <strong>permanently deleted on {purge}</strong>. If the contest succeeds, it's restored as it was.",
+    "logoHidden": "<strong>The logo of “{name}” has been hidden</strong> since {since}. Unless you contest it, it will be <strong>permanently deleted on {purge}</strong>. If the contest succeeds, it's restored as it was.",
+    "avatarHidden": "<strong>Your avatar has been hidden</strong> since {since}. Unless you contest it, it will be <strong>permanently deleted on {purge}</strong>. If the contest succeeds, it's restored as it was.",
     "logoRemoved": "<strong>The logo of “{name}” was deleted</strong> on {date} following this report. If you hold the rights to it, contest it: if the contest succeeds, you'll be able to upload it again.",
     "logoRemovedImmediately": "<strong>The logo of “{name}” was deleted</strong> immediately on {date} following this report. If you hold the rights to it, contest it: if the contest succeeds, you'll be able to upload it again.",
     "avatarRemoved": "<strong>Your avatar was deleted</strong> on {date} following this report. If you hold the rights to it, contest it: if the contest succeeds, you'll be able to upload it again.",

@@ -596,10 +596,7 @@ export function RgpdEn({
           <h3>1. Reporting a problem</h3>
           <p>
             The <strong>“{REPORT_FORM_NAME_EN}”</strong> button, at the bottom of every page, is open to{" "}
-            <strong>everyone</strong>, with or without an account. You choose a category — copyright (
-            <span lang="fr">« Droit d&apos;auteur »</span>), moderation (<span lang="fr">« Modération »</span>), bug,
-            GDPR (<span lang="fr">« RGPD »</span>), host (<span lang="fr">« Hébergeur »</span>), other (
-            <span lang="fr">« Autre »</span>) —, describe the problem and, when logged in, designate the players, teams or
+            <strong>everyone</strong>, with or without an account. You choose a category — copyright, moderation, bug, GDPR, host, other —, describe the problem and, when logged in, designate the players, teams or
             tournaments concerned. A <strong>copyright</strong> report states {copyrightNoticeElementsTextEn()}: this
             is what the EU Digital Services Act requires of a notice of illegal content (art. 16).{" "}
             <EnglishLegalText text={NOTIFIER_FOLLOW_UP_EN} /> <strong>In-game behavior</strong> (insults, cheating, unsportsmanlike play, dispute on
@@ -654,14 +651,13 @@ export function RgpdEn({
             the items that concern them. So that repeated sending does not make the bot write in a loop, a person
             already targeted by another report less than {REPORT_TARGET_NOTICE_COOLDOWN_HOURS} hours earlier is not
             notified a second time: the new report remains viewable and can be contested through the form (“Appeal”
-            category, <span lang="fr">« Contestation »</span>).
+            category).
           </p>
 
           <h3>3. The right to contest</h3>
           <p>
             A person targeted can contest — a designated player, or a current member of a designated team —, from
-            the report&apos;s page or through the <strong>“Appeal”</strong> category (
-            <span lang="fr">« Contestation »</span>) of the same form. The author of a copyright or moderation report
+            the report&apos;s page or through the <strong>“Appeal”</strong> category of the same form. The author of a copyright or moderation report
             can, for their part, contest the decision taken — including a decision not to act — through the same
             category, once the report has been archived, if they sent it from their account. The appeal is filed
             under the original report and read by the administrators, who are notified of it on Discord. Contesting
@@ -722,7 +718,7 @@ export function RgpdEn({
               <strong>Information</strong>: the holder receives the decision, the facts relied on, the clause
               invoked and the means of contesting it, by Discord direct message if their account is linked to it,
               and at each login attempt during the suspension. They contest it without logging in, through “
-              {REPORT_FORM_NAME_EN}” (“Other” category, <span lang="fr">« Autre »</span>), quoting the reference of
+              {REPORT_FORM_NAME_EN}” (“Other” category), quoting the reference of
               the decision; the association reviews it, and the matter can then be brought before the competent court. The staff&apos;s
               log on Discord carries neither their username nor the reason.
             </li>
@@ -916,7 +912,7 @@ export function RgpdEn({
             To exercise one of your rights or ask a question about the processing of your data, write to or phone
             the person the association has appointed for these requests, <strong>{DATA_CONTACT_NAME}</strong>,{" "}
             {DATA_CONTACT_ROLE_EN} (contact details below). The “{REPORT_FORM_NAME_EN}” form, at the bottom of every
-            page, <strong>GDPR</strong> category (<span lang="fr">« RGPD »</span>), and the association&apos;s contact details (section&nbsp;01) also
+            page, <strong>GDPR</strong> category, and the association&apos;s contact details (section&nbsp;01) also
             remain open. We answer within <strong>one month</strong> at most (art. 12 GDPR).
           </p>
           <p>
@@ -944,7 +940,7 @@ export function RgpdEn({
             {" · "}Phone:{" "}
             <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`of ${DATA_CONTACT_NAME}`} />
           </span>
-          <span className={styles.contactSub}>Or the “{REPORT_FORM_NAME_EN}” form, “GDPR” category (<span lang="fr">« RGPD »</span>):</span>
+          <span className={styles.contactSub}>Or the “{REPORT_FORM_NAME_EN}” form, “GDPR” category:</span>
           <div style={{ marginTop: 12 }}>
             <ReportProblemButton authenticated={authenticated} initialCategory="RGPD" label="Make a GDPR request" cyber />
           </div>

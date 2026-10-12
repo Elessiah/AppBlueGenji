@@ -25,10 +25,9 @@ export function pushText(locale: Locale): PushText {
   return locale === "en" ? EN_PUSH_TEXT : FR_PUSH_TEXT;
 }
 
-/** Le texte dans une langue imposée (`"fr"` pour un écran resté français), sinon celle de la page. */
-export function usePushText(lang?: string): PushText {
-  const locale = useAppLocale();
-  return pushText(lang === "fr" ? "fr" : locale);
+/** Le texte dans la langue de la page. */
+export function usePushText(): PushText {
+  return pushText(useAppLocale());
 }
 
 /** `pushErrorMessage` dans la langue du texte : jamais le jeton. */

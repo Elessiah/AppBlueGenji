@@ -43,6 +43,7 @@ import {
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useTeamErrorsText } from "@/components/i18n/team-errors-text";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { localeHref } from "@/lib/shared/locales";
 import { ProfileSection } from "./_components/ProfileSection";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
@@ -545,7 +546,8 @@ export default function ProfilePage() {
       const applied: ConfirmationSubject = payload.mode ? payload.reason ?? null : previewed;
       showSuccess(deletionOutcomeText(text, applied));
       setTimeout(() => {
-        window.location.href = "/";
+        // L'accueil dans la langue de la page (`/en` sous `/en/profil`).
+        window.location.href = localeHref("/", text.locale);
       }, 1200);
       return true;
     } catch (e) {

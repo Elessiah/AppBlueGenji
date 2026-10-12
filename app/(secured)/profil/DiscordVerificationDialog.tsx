@@ -117,7 +117,7 @@ export function DiscordVerificationDialog({
       setChallenge(payload.challenge ?? "");
       showSuccess(
         t("verify.codeSent", {
-          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(text.locale === "fr" ? undefined : INTL_LOCALE[text.locale]),
+          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(INTL_LOCALE[text.locale]),
         }),
       );
     } catch (e) {

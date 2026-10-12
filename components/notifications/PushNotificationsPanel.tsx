@@ -40,27 +40,20 @@ export type PushNotificationsPanelProps = {
   topics?: readonly PushTopic[];
   /** Phrase d'accroche de la forme compacte. */
   lead?: string;
-  /**
-   * Langue imposée au panneau (`"fr"`) quand il est posé dans un écran resté
-   * français sous `/en` : ses textes **et** ses notifications — rendues hors du
-   * panneau, elles n'héritent pas de son `lang` — la suivent. Sans elle : la
-   * langue de la page (lot 9-2).
-   */
-  toastLang?: string;
 };
 
 export function PushNotificationsPanel({
   variant = "full",
   topics,
   lead,
-  toastLang,
 }: Readonly<PushNotificationsPanelProps>): React.ReactElement | null {
   const { showError } = useToast();
-  const text = usePushText(toastLang);
+  // Textes et notifications dans la langue de la page (lot 9-2).
+  const text = usePushText();
   const { t } = text;
   const onError = useCallback(
-    (code: string) => showError(pushErrorText(text, code), toastLang ? { lang: toastLang } : undefined),
-    [showError, toastLang, text],
+    (code: string) => showError(pushErrorText(text, code)),
+    [showError, text],
   );
   const push = usePushNotifications(onError, {
     syncExisting: variant === "full",
@@ -96,7 +89,7 @@ export function PushNotificationsPanel({
   if (variant === "compact" && (!push.checked || push.subscribed || !configured || blocked)) return null;
 
   const deviceControl = (
-    <DeviceControl push={push} configured={configured} blocked={blocked} toastLang={toastLang} text={text} />
+    <DeviceControl push={push} configured={configured} blocked={blocked} text={text} />
   );
 
   if (variant === "compact") {
@@ -159,18 +152,15 @@ function DeviceControl({
   push,
   configured,
   blocked,
-  toastLang,
   text,
 }: Readonly<{
   push: ReturnType<typeof usePushNotifications>;
   configured: boolean;
   blocked: string | null;
-  toastLang?: string;
   text: PushText;
 }>): React.ReactElement {
   const { showSuccess } = useToast();
   const { t } = text;
-  const toastOptions = toastLang ? { lang: toastLang } : undefined;
   if (!configured) {
     return <p className={s.notice}>{t("panel.notConfigured")}</p>;
   }
@@ -198,7 +188,7 @@ function DeviceControl({
           variant="ghost"
           disabled={push.busy}
           onClick={async () => {
-            if (await push.disable()) showSuccess(t("panel.disabled"), toastOptions);
+            if (await push.disable()) showSuccess(t("panel.disabled"));
           }}
         >
           {t("panel.disable")}
@@ -213,7 +203,7 @@ function DeviceControl({
         aria-busy={push.busy}
         disabled={push.busy}
         onClick={async () => {
-          if (await push.enable()) showSuccess(t("panel.enabled"), toastOptions);
+          if (await push.enable()) showSuccess(t("panel.enabled"));
         }}
       >
         {push.busy ? t("panel.enabling") : t("panel.enable")}

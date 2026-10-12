@@ -82,7 +82,7 @@ export function DiscordBotHandleDialog({
       setChallenge(payload.challenge ?? "");
       showSuccess(
         t("botHandle.codeSent", {
-          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(text.locale === "fr" ? undefined : INTL_LOCALE[text.locale]),
+          time: new Date(payload.expiresAt ?? "").toLocaleTimeString(INTL_LOCALE[text.locale]),
         }),
       );
     } catch (e) {

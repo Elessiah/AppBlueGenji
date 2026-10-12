@@ -226,7 +226,7 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
         </p>
         <p>
           To write to the host or the publisher: <strong>“{REPORT_FORM_NAME_EN}”</strong> button at
-          the bottom of every page, “Host” category (<span lang="fr">« Hébergeur »</span>).
+          the bottom of every page, “Host” category.
         </p>
       </>
     ),
@@ -330,7 +330,7 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
           through a <strong>single point of contact</strong>: its email,{" "}
           <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="of the association" />
           , or the <strong>“{REPORT_FORM_NAME_EN}”</strong> button at the bottom of every page, “Host”
-          category (<span lang="fr">« Hébergeur »</span>).
+          category.
         </p>
         <p>Accepted languages: {AUTHORITY_CONTACT_LANGUAGES_EN.join(" and ")}.</p>
       </>
@@ -369,7 +369,7 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
           , phone:{" "}
           <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`of ${DATA_CONTACT_NAME}`} />
           . Your rights can also be exercised with the “{REPORT_FORM_NAME_EN}” button at the bottom of
-          every page, “GDPR” category (<span lang="fr">« RGPD »</span>), or with the association, using
+          every page, “GDPR” category, or with the association, using
           the contact details given above. This person is not a data protection officer within the
           meaning of Article 37 of the GDPR: the association remains the data controller. The details of
           the processing activities, their retention periods and their register are given in the{" "}

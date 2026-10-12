@@ -3,7 +3,7 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { ProfileTextProvider } from "@/components/i18n/profile-text";
+import { ProfileTextProvider } from "@/components/i18n/profile-text-provider";
 import { TeamErrorsTextProvider } from "@/components/i18n/team-errors-text-provider";
 
 /**
