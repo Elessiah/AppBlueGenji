@@ -25,6 +25,11 @@ type SettingsMessages = Pick<Messages["tournament"], "settings" | "matchFormat">
 type SettingsText = ScopedText<Leaves<SettingsMessages>>;
 type LabelMessages = Messages["labels"];
 
+/** « Oui » / « Non » dans la langue de la page. */
+function yesNo(text: SettingsText, value: boolean): string {
+  return value ? text.t("settings.yes") : text.t("settings.no");
+}
+
 /** Barème d'endurance (BG Survie) : capital, barème, plateau, plafond, sortie anticipée. */
 function enduranceSettings(
   text: SettingsText,
@@ -40,7 +45,7 @@ function enduranceSettings(
   ];
   // L'option n'a d'effet que sous plafond et avec un format de match : ailleurs, la ligne ne dirait rien.
   if (earlyExitApplies(maxRounds, matchFormat)) {
-    settings.push({ label: text.t("settings.mode.earlyExit"), value: text.t(earlyExit ? "settings.yes" : "settings.no") });
+    settings.push({ label: text.t("settings.mode.earlyExit"), value: yesNo(text, earlyExit) });
   }
   return settings;
 }
@@ -94,10 +99,9 @@ function phaseQualification(text: SettingsText, phase: TournamentPhase, isLast: 
 
 function modeSettings(text: SettingsText, labels: LabelMessages, input: TournamentSettingsInput): TournamentSetting[] {
   const { card } = input;
-  const yesNo = (value: boolean) => (value ? text.t("settings.yes") : text.t("settings.no"));
   switch (card.format) {
     case "SINGLE":
-      return [{ label: text.t("settings.mode.thirdPlace"), value: yesNo(card.hasThirdPlaceMatch) }];
+      return [{ label: text.t("settings.mode.thirdPlace"), value: yesNo(text, card.hasThirdPlaceMatch) }];
     case "DOUBLE":
       return [];
     case "SURVIVAL":

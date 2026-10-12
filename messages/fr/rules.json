@@ -400,7 +400,7 @@
           ],
           "bullets": [
             "Sous ce plafond, si le tournoi a activé la <b>sortie anticipée « hors course »</b> (option décochée par défaut), une équipe qui ne peut plus mathématiquement rejoindre les huit premières dans les manches restantes est écartée sans attendre la fin. Sinon, personne n'est écarté d'avance : seuls un capital à zéro et le trait de la dernière manche font sortir.",
-            "Dans ce cas, le calcul est prudent : il faut que huit équipes la devancent quoi qu'il arrive, en supposant qu'elle gagne tout ce qui reste et qu'elles perdent tout ce qui reste.",
+            "Option activée, le calcul est prudent : il faut que huit équipes la devancent quoi qu'il arrive, en supposant qu'elle gagne tout ce qui reste et qu'elles perdent tout ce qui reste.",
             "Il suppose donc un format de match connu (BO/FT), qui borne le nombre de maps d'une manche. En saisie libre, aucune équipe n'est jamais écartée d'avance.",
             "Si cette sortie devait laisser un nombre impair d'équipes en course, elle est reportée d'une manche : un effectif impair condamne une équipe au repos, et on ne pénalise pas une équipe en course pour sortir des équipes déjà condamnées."
           ]
