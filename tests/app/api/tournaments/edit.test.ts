@@ -170,7 +170,8 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
   it("transmet la sortie anticipée et traduit son refus en 400", async () => {
     jest.mocked(service.updateTournament).mockRejectedValue(new Error("INVALID_ENDURANCE_EARLY_EXIT"));
     const res = await PATCH(patchReq({ enduranceEarlyExit: "true" }), params("1"));
-    expect(service.updateTournament).toHaveBeenCalledWith(1, { enduranceEarlyExit: "true" });
+    // Le corps brut va au service tel quel : c'est lui qui le refuse.
+    expect(jest.mocked(service.updateTournament).mock.calls[0]?.[1]).toEqual({ enduranceEarlyExit: "true" });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "INVALID_ENDURANCE_EARLY_EXIT" });
   });
