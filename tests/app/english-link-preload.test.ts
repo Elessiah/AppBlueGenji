@@ -70,8 +70,13 @@ describe("écouteur délégué", () => {
     // Une page sans anglais à précharger ne télécharge pas la table ; un préchargement par page,
     // requête de la table partagée en vol, silence après échec : rien de retenu d'un essai à l'autre.
     expect(route).toContain("if (!page) return;");
-    expect(route).toContain("quietPreload(() => targets.load().then((module) => module.preloadEnglishPage(page))),");
+    expect(route).toContain(".then((module) => module.preloadEnglishPage(page))");
+    // Une seule attente par page tant que la table arrive.
+    expect(route).toContain("if (pending.has(page)) return;");
     expect(route).not.toMatch(/wanted|warming/);
+    expect(readSource("components/i18n/use-english-messages.ts")).toMatch(
+      /export function useEnglishMessagesUntilRemount<T>\([^)]*\): EnglishMessagesState<T> \{\s*return useEnglishMessagesIn\(locale, loader, undefined, ""\);/,
+    );
     expect(listener).toContain("preloadEnglishRoute(href.slice(3));");
     // Un même lien une fois par seconde au plus (enfants traversés), nouvel essai possible ensuite.
     expect(listener).toContain("if (href === last && now - lastAt < 1000) return;");
