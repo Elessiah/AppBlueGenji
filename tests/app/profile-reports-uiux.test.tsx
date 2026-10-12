@@ -160,7 +160,7 @@ describe("revue UI/UX, troisième passe", () => {
     expect(button).not.toContain("visibleLabel");
     expect(button).toContain('className: pending ? [className, s.pending].filter(Boolean).join(" ") : className,');
     const pendingCss = source("components/reports/ReportProblemButton.module.css");
-    expect(pendingCss).toContain('.pending[aria-busy="true"]:hover');
+    expect(pendingCss).toContain('.pending.pending[aria-busy="true"]:hover');
     expect(pendingCss).toContain("cursor: progress;");
     expect(pendingCss).not.toContain("pointer-events");
     expect(button).toContain('setStatus(t("footer.reportLoading"));');
@@ -484,5 +484,18 @@ describe("revue UI/UX, dix-septième passe", () => {
     ]) {
       expect(css).toContain(selector);
     }
+  });
+});
+
+describe("revue UI/UX, dix-huitième passe", () => {
+  it("attente en `aria-disabled` : jamais d'opacité, curseur d'attente", () => {
+    const css = source("app/(secured)/profil/profil.module.css");
+    const rule = css.slice(css.indexOf('.page :global(.btn[aria-disabled="true"]) {'));
+    const body = rule.slice(0, rule.indexOf("}"));
+    expect(body).toContain("color: var(--ink-mute);");
+    expect(body).toContain("cursor: progress;");
+    expect(body).not.toMatch(/opacity\s*:/);
+    const pending = source("components/reports/ReportProblemButton.module.css");
+    expect(pending).toContain("opacity: 1;");
   });
 });
