@@ -456,11 +456,11 @@ describe("anglais — écrans", () => {
     // Pseudo du fournisseur et pseudo vu par le bot, nettoyés (commande de direction, largeur nulle) : revue de sécurité du lot 9-2.
     const trapped = inEnglish(
       <ConnectedAppsSection
-        connections={[connection("GOOGLE", { linked: true }), connection("DISCORD", { linked: true, method: "OAUTH", handle: "no‮va​" }), connection("BLIZZARD", { linked: true, handle: "‮Nova#1234" })]}
+        connections={[connection("GOOGLE", { linked: true }), connection("DISCORD", { linked: true, method: "OAUTH", handle: "no\u202Eva\u200B" }), connection("BLIZZARD", { linked: true, handle: "\u202ENova#1234" })]}
         reload={async () => undefined}
       />,
     );
-    expect(trapped).not.toMatch(/[‮​]/u);
+    expect(trapped).not.toMatch(/[\u202E\u200B]/u);
     // Anglais du profil non chargé (texte retombé sur le français) sous /en : le retour OAuth suit l'adresse, pas le texte.
     const fallback = renderToStaticMarkup(
       <AppLocaleProvider locale="en">
@@ -472,7 +472,7 @@ describe("anglais — écrans", () => {
     expect(fallback).toContain("Rattacher");
     expect(fallback).toMatch(/href="\/api\/auth\/[a-z]+\/start\?lang=en&amp;intent=link"/u);
     expect(trapped).toContain("nova");
-    expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "kery‮an", refusalCode: null }).note).not.toMatch(/‮/u);
+    expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "kery\u202Ean", refusalCode: null }).note).not.toMatch(/\u202E/u);
     const linkHtml = inEnglish(<ConnectedAppsSection connections={CONNECTION_SETS[0]} reload={async () => undefined} />);
     // Le rattachement emporte la langue : retour sur `/en/profil`.
     expect(linkHtml).toContain("/api/auth/google/start?lang=en&amp;intent=link");
@@ -496,10 +496,10 @@ describe("anglais — écrans", () => {
     // Un tag enregistré avec une commande de direction ne réordonne pas la phrase.
     effects.armed = true;
     const attested = inEnglish(
-      <DiscordVerificationDialog initialTag={"no‮va​"} linked attested onClose={() => undefined} onVerified={() => undefined} />,
+      <DiscordVerificationDialog initialTag={"no\u202Eva\u200B"} linked attested onClose={() => undefined} onVerified={() => undefined} />,
     );
     expect(attested).toContain("<strong>nova</strong>");
-    expect(attested).not.toMatch(/[‮​]/u);
+    expect(attested).not.toMatch(/[\u202E\u200B]/u);
     for (const mode of ["LINK", "UPDATE"] as const) {
       effects.armed = true;
       const html = inEnglish(<DiscordBotHandleDialog mode={mode} onClose={() => undefined} onUpdated={() => undefined} />);
@@ -564,7 +564,7 @@ describe("anglais — écrans", () => {
 
   it("page d'un signalement : un nom enregistré avant visibleText ne réordonne pas la phrase (revue de sécurité du lot 9-2)", () => {
     // U+202E (commande de direction) et U+200B (largeur nulle) dans un nom resté tel quel en base.
-    const legacy = "Gla‮ciers​";
+    const legacy = "Gla\u202Eciers\u200B";
     const report: ConcernedReportView = {
       id: 9,
       category: "COPYRIGHT",
@@ -582,21 +582,21 @@ describe("anglais — écrans", () => {
       ],
     };
     const html = inEnglish(<ConcernedReport report={report} onContest={() => undefined} />);
-    expect(html).not.toMatch(/[‮​]/u);
+    expect(html).not.toMatch(/[\u202E\u200B]/u);
     expect(html.split("Glaciers").length - 1).toBeGreaterThanOrEqual(4);
     // Textes libres (signalement, contestations) : direction isolée, sauts de ligne gardés.
     const withText = inEnglish(
       <ConcernedReport
-        report={{ ...report, description: "a‮b", myContests: [{ id: 3, createdAt: "2026-03-02T10:00:00.000Z", description: "c‮d" }] }}
+        report={{ ...report, description: "a\u202Eb", myContests: [{ id: 3, createdAt: "2026-03-02T10:00:00.000Z", description: "c\u202Ed" }] }}
         onContest={() => undefined}
       />,
     );
-    expect(withText).toMatch(/<blockquote[^>]*dir="auto"[^>]*>a‮b<\/blockquote>/u);
-    expect(withText).toContain('<p dir="auto">c‮d</p>');
+    expect(withText).toMatch(/<blockquote[^>]*dir="auto"[^>]*>a\u202Eb<\/blockquote>/u);
+    expect(withText).toContain('<p dir="auto">c\u202Ed</p>');
   });
 
   it("choix des cibles : vignette tirée du nom nettoyé", () => {
-    const html = renderToStaticMarkup(<TargetThumb option={{ label: "​‮abc", imageUrl: null }} />);
+    const html = renderToStaticMarkup(<TargetThumb option={{ label: "\u200B\u202Eabc", imageUrl: null }} />);
     expect(html).toContain(">A<");
   });
 
