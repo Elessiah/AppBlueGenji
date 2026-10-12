@@ -16,24 +16,37 @@ import { cached } from "./intl-cache";
 const dateFormats = new Map<Locale, Intl.DateTimeFormat>();
 const dateTimeFormats = new Map<Locale, Intl.DateTimeFormat>();
 
+/**
+ * `format` d'un formateur gardé, avec le repli de `toLocale*String` : une date
+ * invalide y rend « Invalid Date », là où `Intl.DateTimeFormat#format` lève
+ * (`RangeError`) — une seule donnée abîmée ferait tomber tout l'écran.
+ */
+function formatWith(format: Intl.DateTimeFormat, date: Date | string): string {
+  const value = new Date(date);
+  return Number.isNaN(value.getTime()) ? String(value) : format.format(value);
+}
+
 export function formatLocalDate(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  return cached(dateFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l])).format(new Date(date));
+  return formatWith(cached(dateFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l])), date);
 }
 
 export function formatLocalDateTime(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  return cached(
-    dateTimeFormats,
-    locale,
-    (l) =>
-      new Intl.DateTimeFormat(INTL_LOCALE[l], {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "numeric",
-        minute: "numeric",
-        second: "numeric",
-      }),
-  ).format(new Date(date));
+  return formatWith(
+    cached(
+      dateTimeFormats,
+      locale,
+      (l) =>
+        new Intl.DateTimeFormat(INTL_LOCALE[l], {
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          second: "numeric",
+        }),
+    ),
+    date,
+  );
 }
 
 const monthFormats = new Map<Locale, Intl.DateTimeFormat>();
@@ -60,8 +73,9 @@ const monthYearFormats = new Map<Locale, Intl.DateTimeFormat>();
  * chaque carte et chaque frappe).
  */
 export function formatMonthYear(date: Date | string, locale: Locale = DEFAULT_LOCALE): string {
-  return cached(monthYearFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l], { month: "short", year: "numeric" })).format(
-    new Date(date),
+  return formatWith(
+    cached(monthYearFormats, locale, (l) => new Intl.DateTimeFormat(INTL_LOCALE[l], { month: "short", year: "numeric" })),
+    date,
   );
 }
 
