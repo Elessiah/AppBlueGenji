@@ -83,7 +83,7 @@ describe("bouton du formulaire de signalement", () => {
     // Un seul chargement partagé, retenté après un échec, qui le dit.
     expect(button).toContain("dialogLoad ??= import(");
     expect(button).toContain("dialogLoad = null;");
-    expect(button).toContain('toast?.showError(t("footer.reportLoadFailed"))');
+    expect(button).toContain('toast?.showError(t(isChunkLoadError(error) ? "footer.reportReloading" : "footer.reportLoadFailed"));');
     expect(button).not.toContain('from "next/dynamic"');
   });
 });
@@ -153,7 +153,12 @@ describe("revue UI/UX, troisième passe", () => {
     const button = source("components/reports/ReportProblemButton.tsx");
     expect(button).toContain('const busyMark = pending ? <span aria-hidden="true">…</span> : null;');
     expect(button).toContain('{pending ? t("footer.reportLoading") : ""}');
-    expect(button).toMatch(/reloadAfterChunkError\(\);\s*toast\?\.showError\(t\("footer\.reportReloading"\)\);\s*return;/);
+    // Après un clic, jamais de rechargement d'office (une saisie en cours serait perdue).
+    expect(button).not.toContain("reloadAfterChunkError");
+    // Préchargé au survol : le clic ouvre sans passer par l'attente.
+    expect(button).toContain("const ready = ReportProblemDialog ?? loadedDialog;");
+    // Arrivé après un changement de page : ne s'ouvre pas sur la nouvelle.
+    expect(button).toContain("if (currentPath.current === clickedOn) setOpen(true);");
   });
 
   it("textes du chargement dans les deux langues", async () => {
@@ -161,7 +166,7 @@ describe("revue UI/UX, troisième passe", () => {
     const en = (await import("@/messages/en/shell.json")).default.footer;
     expect(fr.reportLoading).toBe("Ouverture du formulaire…");
     expect(en.reportLoading).toBe("Opening the form…");
-    expect(en.reportReloading).toContain("reload");
+    expect(en.reportReloading).toBe("The site has just been updated: reload the page to open the form.");
     expect(en.reportLoadFailed).toContain("Try again");
   });
 
@@ -172,10 +177,38 @@ describe("revue UI/UX, troisième passe", () => {
   });
 
   it("déconnexion du profil : échec dit, double clic sans effet", () => {
+    // Un seul geste pour le menu du compte et le bouton du profil.
     const button = source("components/logout-button.tsx");
-    expect(button).toContain("const done = await requestLogout();");
-    expect(button).toContain('showError(t("account.logoutFailed"));');
-    expect(button).toContain("if (leaving) return;");
+    expect(button).toContain("const { leaving, logout } = useLogout();");
     expect(button).not.toContain('fetch("/api/auth/logout"');
+    const menu = source("components/account-menu.tsx");
+    expect(menu).toContain("useLogout(() => setOpen(false))");
+    // Occupé jusqu'à l'accueil : `leaving` ne retombe qu'après un échec.
+    expect(menu).toMatch(/if \(!\(await requestLogout\(\)\)\) \{\s*setLeaving\(false\);\s*showError\(t\("account\.logoutFailed"\)\);/);
+    expect(menu).toContain("if (leaving) return;");
+  });
+});
+
+describe("revue UI/UX, quatrième passe", () => {
+  it("boutons Discord du profil : le nom accessible anglais contient le texte visible (WCAG 2.5.3)", async () => {
+    for (const locale of ["fr", "en"] as const) {
+      const { discord } = (await import(`@/messages/${locale}/profile.json`)).default as {
+        discord: Record<string, string>;
+      };
+      for (const key of ["certify", "recertify", "register", "remove", "retry"]) {
+        expect(discord[`${key}Label`]).toContain(discord[key]);
+      }
+    }
+  });
+
+  it("cibles d'un signalement : TeamLink / PlayerLink, pas de chemin écrit à la main", () => {
+    const view = source("app/(secured)/signalements/[id]/_components/ConcernedReport.tsx");
+    expect(view).toContain('<PlayerLink userId={target.id}>{target.label}</PlayerLink>');
+    expect(view).toContain('<TeamLink teamId={target.id}>{target.label}</TeamLink>');
+  });
+
+  it("date d'un signalement à contester : écrite en toutes lettres, sans ambiguïté jour/mois", () => {
+    const dialog = source("components/reports/ReportProblemDialog.tsx");
+    expect(dialog).toContain('toLocaleDateString(INTL_LOCALE[text.locale], { day: "numeric", month: "long", year: "numeric" })');
   });
 });
