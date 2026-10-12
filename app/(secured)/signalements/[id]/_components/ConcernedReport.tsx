@@ -38,7 +38,8 @@ function TargetName({ target }: Readonly<{ target: ConcernedReportView["targets"
   );
 }
 
-const strong = { strong: (chunks: React.ReactNode[]) => <strong>{chunks}</strong> };
+// `richNodes` : un lien (`<team>`) imbriqué dans le gras reçoit sa clé.
+const strong = { strong: (chunks: React.ReactNode[]) => <strong>{richNodes(chunks)}</strong> };
 
 /** Le nom de l'équipe d'un logo, cliquable vers sa fiche (`TeamLink`), dans la phrase en gras. */
 function teamTags(teamId: number) {

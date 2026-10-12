@@ -136,3 +136,8 @@ export function discordBotRowText(
     refusal: row.refusalCode === "LAST_CONNECTION" ? t("connections.bot.lastConnection") : null,
   };
 }
+
+/** Libellés du badge « tag certifié » (`VerifiedBadge`), communs au profil et au dialogue de certification. */
+export function verifiedBadgeLabels(text: ProfileText): { alt: string; title: string } {
+  return { alt: text.t("discord.verifiedAlt"), title: text.t("discord.verifiedTitle") };
+}

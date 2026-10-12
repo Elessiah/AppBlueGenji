@@ -16,9 +16,11 @@ import { INTL_LOCALE } from "@/lib/shared/locales";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { discordVerificationErrorMessage } from "./discord-errors";
+import { verifiedBadgeLabels } from "./_lib/profile-text";
 
 /** Les cinq lignes de l'exposition (`DISCORD_VERIFICATION_EXPOSURE`), dans l'ordre. */
-const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
+/** Les lignes de l'exposition, dans l'ordre du registre (`DISCORD_VERIFICATION_EXPOSURE`, testé). */
+export const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
 
 const FIELD_IDS = { handle: "discord-verify-handle", code: "discord-verify-code" } as const;
 
@@ -371,7 +373,7 @@ export function DiscordVerificationDialog({
           style={{ fontSize: 22, margin: "12px 0 8px", display: "flex", alignItems: "center", gap: 8 }}
         >
           {t("verify.title")}
-          <VerifiedBadge size={20} labels={{ alt: t("discord.verifiedAlt"), title: t("discord.verifiedTitle") }} />
+          <VerifiedBadge size={20} labels={verifiedBadgeLabels(text)} />
         </h2>
 
         <p style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>

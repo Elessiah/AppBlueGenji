@@ -38,6 +38,7 @@ import {
   deletionErrorText,
   deletionOutcomeText,
   discordTagLockText,
+  verifiedBadgeLabels,
   type ProfileText,
 } from "./_lib/profile-text";
 import { useProfileText } from "@/components/i18n/profile-text";
@@ -122,7 +123,6 @@ export default function ProfilePage() {
   const text = useProfileText();
   const { t } = text;
   const teamErrorsText = useTeamErrorsText();
-  const verifiedBadgeLabels = { alt: t("discord.verifiedAlt"), title: t("discord.verifiedTitle") };
   const { cropImage, cropDialog } = useImageCropper();
   const fieldErrors = useFieldErrors(PROFILE_FIELD_ERRORS, PROFILE_FIELD_IDS);
   const [data, setData] = useState<FullProfileResponse | null>(null);
@@ -863,7 +863,7 @@ export default function ProfilePage() {
             <label htmlFor="profile-discord">
               <span className={s.fieldLabelRow}>
                 {t("discord.label")}
-                {discordState.verified ? <VerifiedBadge labels={verifiedBadgeLabels} /> : null}
+                {discordState.verified ? <VerifiedBadge labels={verifiedBadgeLabels(text)} /> : null}
               </span>
             </label>
             <input

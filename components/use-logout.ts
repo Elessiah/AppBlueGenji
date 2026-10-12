@@ -8,9 +8,10 @@ import { useToast } from "@/components/ui/toast";
 /**
  * Le geste « Déconnexion », commun au menu du compte et au bouton de `/profil` :
  * un échec se dit (toast) au lieu de ramener à l'accueil un joueur toujours
- * connecté ; un second clic pendant la requête n'envoie rien de plus. `leaving`
- * retombe après chaque tentative : un composant qui survit à la navigation (menu
- * de la barre, déconnexion depuis l'accueil) ne reste pas figé sur « … ».
+ * connecté ; un second clic n'envoie rien de plus. `leaving` ne retombe
+ * qu'après un échec : réussie, la déconnexion mène à l'accueil et la barre se
+ * relit sans compte (le menu disparaît), sans repasser par « Déconnexion »
+ * actif pendant la navigation.
  */
 export function useLogout(onSuccess?: () => void): { leaving: boolean; logout: () => Promise<void> } {
   const router = useLocaleRouter();
@@ -20,9 +21,8 @@ export function useLogout(onSuccess?: () => void): { leaving: boolean; logout: (
   const logout = async () => {
     if (leaving) return;
     setLeaving(true);
-    const done = await requestLogout();
-    setLeaving(false);
-    if (!done) {
+    if (!(await requestLogout())) {
+      setLeaving(false);
       showError(t("account.logoutFailed"));
       return;
     }
