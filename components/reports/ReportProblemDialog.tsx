@@ -34,6 +34,7 @@ import { TargetPicker } from "./TargetPicker";
 import { richNodes } from "@/components/i18n/shell-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { cached } from "@/lib/shared/intl-cache";
+import { UNREADABLE_DATE } from "@/lib/shared/dates";
 import {
   legalBasisText,
   reportErrorText,
@@ -65,7 +66,9 @@ const CONTEST_OPTION_DATE_OPTIONS: Readonly<Record<Locale, Intl.DateTimeFormatOp
  */
 function contestOptionDate(iso: string, locale: Locale): string {
   const format = cached(CONTEST_OPTION_DATE, locale, (key) => new Intl.DateTimeFormat(INTL_LOCALE[key], CONTEST_OPTION_DATE_OPTIONS[key]));
-  return format.format(new Date(iso));
+  const date = new Date(iso);
+  // Une date illisible ne fait pas tomber le formulaire (`format` lève sur une date invalide).
+  return Number.isNaN(date.getTime()) ? UNREADABLE_DATE : format.format(date);
 }
 
 export interface ReportProblemDialogProps {
