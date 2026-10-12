@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
@@ -29,16 +29,22 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
   const { showError, showSuccess } = useToast();
   const [locale, setLocale] = useState<Locale>(initial);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  /** Choix fait pendant un envoi : affiché tout de suite, envoyé juste après. */
+  const queued = useRef<Locale | null>(null);
   const fieldErrors = useFieldErrors(ACCOUNT_LOCALE_FIELD_ERRORS, FIELD_IDS);
 
-  const save = async (next: string) => {
-    // Pendant l'envoi, le champ garde le focus (`aria-disabled`, pas `disabled`
-    // qui le ferait perdre) : ce garde refuse un second choix.
-    if (busy || !isLocale(next) || next === locale) return;
-    const previous = locale;
-    setLocale(next);
-    setBusy(true);
-    fieldErrors.clear();
+  // Langue relue ailleurs (connexion dans un autre onglet, puis rechargement
+  // des données de la page) : le champ la reprend, hors envoi en cours — le
+  // remonter perdrait l'envoi et le focus.
+  const [shown, setShown] = useState<Locale>(initial);
+  if (initial !== shown && !busy) {
+    setShown(initial);
+    setLocale(initial);
+  }
+
+  /** Un envoi : `true` si la langue est enregistrée (toast dans les deux cas). */
+  const put = async (next: Locale): Promise<boolean> => {
     try {
       const response = await fetch("/api/profile/locale", {
         method: "PUT",
@@ -47,16 +53,45 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
+      fieldErrors.clear();
       showSuccess(t("accountLocale.saved"));
+      return true;
     } catch (e) {
-      setLocale(previous);
       const code = (e as Error).message;
       const message = profileErrorMessage(code, text);
       fieldErrors.report(code, message);
       showError(message);
-    } finally {
-      setBusy(false);
+      return false;
     }
+  };
+
+  const save = async (value: string) => {
+    if (!isLocale(value)) return;
+    // Pendant l'envoi, le champ garde le focus (`aria-disabled`, pas `disabled`
+    // qui le ferait perdre) ; un second choix n'est pas perdu : il s'affiche
+    // et part à la suite.
+    if (busyRef.current) {
+      queued.current = value;
+      setLocale(value);
+      return;
+    }
+    let saved = locale;
+    let next: Locale | null = value === saved ? null : value;
+    if (next === null) return;
+    busyRef.current = true;
+    setBusy(true);
+    fieldErrors.clear();
+    while (next !== null) {
+      setLocale(next);
+      if (await put(next)) saved = next;
+      const after: Locale | null = queued.current;
+      queued.current = null;
+      next = after !== null && after !== saved ? after : null;
+    }
+    // Ce que le serveur a retenu : le dernier envoi réussi.
+    setLocale(saved);
+    busyRef.current = false;
+    setBusy(false);
   };
 
   return (
