@@ -25,6 +25,16 @@ export type EnduranceConfig = {
    * sont encore trente.
    */
   maxRounds: number | null;
+  /**
+   * Sortie « hors course » anticipée (`OUT_OF_CONTENTION`) : sous plafond de
+   * manches, écarter avant la fin une équipe qui ne peut plus mathématiquement
+   * rejoindre le plateau. **Désactivée par défaut** — option du tournoi
+   * (`endurance_early_exit`). Désactivée, les équipes restent en lice jusqu'à
+   * la fin normale de la phase (capital à zéro, effectif retombé à la cible ou
+   * dernière manche du plafond, où le trait sous la cible tombe comme avant).
+   * Sans plafond, l'option n'a aucun effet.
+   */
+  earlyExit: boolean;
 };
 
 export const DEFAULT_ENDURANCE_CONFIG: EnduranceConfig = {
@@ -33,6 +43,7 @@ export const DEFAULT_ENDURANCE_CONFIG: EnduranceConfig = {
   lossDelta: 1,
   playoffSize: 8,
   maxRounds: null,
+  earlyExit: false,
 };
 
 /** Normalise un barème partiel (valeurs manquantes ou absurdes → défauts). */
@@ -52,5 +63,8 @@ export function resolveEnduranceConfig(input?: Partial<EnduranceConfig> | null):
     // Une limite absurde (0, négative, absente) n'est pas une limite : le mode
     // retombe alors sur la phase à durée libre, son comportement d'origine.
     maxRounds: Number.isFinite(maxRounds) && maxRounds >= 1 ? Math.floor(maxRounds) : null,
+    // Seul `true` active la sortie anticipée : une valeur absente ou douteuse
+    // retombe sur le défaut, l'option décochée.
+    earlyExit: input?.earlyExit === true,
   };
 }

@@ -41,6 +41,7 @@ export function enduranceNextRoundInput(
       lossDelta: endurance.lossDelta,
       playoffSize: endurance.playoffSize,
       maxRounds: endurance.maxRounds,
+      earlyExit: endurance.earlyExit,
     }),
     format,
     currentRound: endurance.currentRound,

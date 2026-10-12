@@ -66,6 +66,7 @@ const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
   registrationOpenAt: "registration-open-at",
   registrationCloseAt: "registration-close-at",
   startAt: "start-at",
+  enduranceEarlyExit: "endurance-early-exit",
 };
 
 // Les valeurs et leurs conversions vivent dans `_lib/tournament-form-values`.
@@ -501,6 +502,12 @@ export function TournamentForm({
               lockedAttr={lockedAttr}
               onSwissTotalRoundsChange={setSwissTotalRounds}
               phaseFocusRequest={phaseFocusRequest}
+              earlyExitAria={fieldErrors.aria(
+                "enduranceEarlyExit",
+                locked("enduranceEarlyExit") && explanationId,
+                "endurance-early-exit-hint",
+              )}
+              earlyExitError={fieldErrors.message("enduranceEarlyExit")}
             />
           </div>
         </section>

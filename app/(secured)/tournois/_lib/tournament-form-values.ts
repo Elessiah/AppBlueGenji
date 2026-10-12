@@ -92,6 +92,11 @@ export type TournamentFormValues = {
    * ce zéro en `null`, donc en `NULL` côté base.
    */
   enduranceMaxRounds: number;
+  /**
+   * BG Survie : sortie « hors course » anticipée sous plafond de manches
+   * (`EnduranceConfig.earlyExit`). Décochée par défaut.
+   */
+  enduranceEarlyExit: boolean;
   matchFormat: MatchFormat | null;
   /**
    * BG Survie : format de l'**arbre final**. `null` = le même que la
@@ -148,6 +153,7 @@ export type TournamentApiValues = {
   enduranceLossDelta: number | null;
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
+  enduranceEarlyExit: boolean;
   matchFormat: MatchFormat | null;
   endurancePlayoffFormat: MatchFormat | null;
   registrationDiscordRequirement: PlayerRequirement;
@@ -187,6 +193,8 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     // soirée. 0 (aucun plafond, la phase s'arrête sur l'effectif) reste un
     // choix explicite.
     enduranceMaxRounds: DEFAULT_ENDURANCE_MAX_ROUNDS,
+    // Sortie « hors course » anticipée : option, décochée par défaut.
+    enduranceEarlyExit: false,
     // « Libre » (`null`) conserve la saisie de score sans contrainte, comme les
     // tournois créés avant la fonctionnalité.
     matchFormat: { ...DEFAULT_MATCH_FORMAT, drawsAllowed: DEFAULT_QUALIFICATION_DRAWS },
@@ -277,6 +285,10 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // en revanche, on ne touche effectivement à rien (comme le reste du barème
     // d'endurance).
     enduranceMaxRounds: onlyFor(format === "BG_SURVIE", enduranceMaxRounds),
+    // Un booléen toujours envoyé en BG Survie (jamais `undefined`) : décocher
+    // doit pouvoir éteindre une option allumée, la liste blanche de l'édition
+    // ignorant un champ absent.
+    enduranceEarlyExit: onlyFor(format === "BG_SURVIE", values.enduranceEarlyExit),
     matchFormatType: values.matchFormat?.type ?? null,
     matchFormatValue: values.matchFormat?.value ?? null,
     // Le plafond de maps et les égalités voyagent **aplatis** eux aussi, comme
@@ -345,6 +357,7 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
       apiValues.format === "BG_SURVIE"
         ? (apiValues.enduranceMaxRounds ?? 0)
         : defaults.enduranceMaxRounds,
+    enduranceEarlyExit: apiValues.format === "BG_SURVIE" && apiValues.enduranceEarlyExit,
     // Même règle pour les égalités : hors BG Survie, la valeur stockée est
     // toujours fermée (le serveur la ferme), elle ne dit pas un choix — une
     // bascule vers le mode présente donc le défaut de création, comme le

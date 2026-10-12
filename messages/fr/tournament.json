@@ -370,6 +370,7 @@
       "enduranceScoring": "+{win} par map gagnée · −{loss} par map perdue",
       "playoffSize": "Qualifiées pour les play-offs",
       "maxRounds": "Plafond de manches qualificatives",
+      "earlyExit": "Sortie anticipée « hors course »",
       "playoffFormat": "Format des play-offs",
       "phase": "Phase {position}",
       "phaseNamed": "Phase {position} — {name}",

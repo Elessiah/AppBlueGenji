@@ -9,6 +9,8 @@ import { PhaseBuilder } from "../creer/PhaseBuilder";
 import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import type { TournamentFormValues } from "../_lib/tournament-form-values";
 import { NumberInput } from "@/components/ui/number-input";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+import type { FieldAria } from "@/lib/shared/field-errors";
 
 /**
  * Réglages propres au format choisi : phases (MULTI), endurance (BG Survie),
@@ -35,6 +37,13 @@ export type FormatSettingsProps = {
   onSwissTotalRoundsChange: (value: number) => void;
   /** Demande de focus sur le réglage de phase fautif (voir `PhaseBuilder`). */
   phaseFocusRequest?: number;
+  /**
+   * Attributs ARIA de la case « sortie anticipée » (BG Survie) : aide, verrou
+   * et refus du serveur rattaché (`useFieldErrors`), composés par le formulaire.
+   */
+  earlyExitAria?: FieldAria;
+  /** Refus du serveur rattaché à cette case, `null` s'il n'y en a pas. */
+  earlyExitError?: string | null;
 };
 
 export function FormatSettings({
@@ -44,6 +53,8 @@ export function FormatSettings({
   lockedAttr,
   onSwissTotalRoundsChange,
   phaseFocusRequest,
+  earlyExitAria = { "aria-describedby": "endurance-early-exit-hint" },
+  earlyExitError = null,
 }: Readonly<FormatSettingsProps>) {
   const { format, maxTeams, phases } = values;
   const text = useFormText();
@@ -138,6 +149,25 @@ export function FormatSettings({
             />
             <p style={HINT}>
               {t("settings.enduranceMaxRoundsHint")}
+            </p>
+          </div>
+
+          <div className="field" style={FULL_WIDTH}>
+            <label htmlFor="endurance-early-exit" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                id="endurance-early-exit"
+                type="checkbox"
+                disabled={locked("enduranceEarlyExit")}
+                checked={values.enduranceEarlyExit}
+                onChange={(e) => set("enduranceEarlyExit", e.target.checked)}
+                {...earlyExitAria}
+              />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
+              {t("settings.enduranceEarlyExit")}
+            </label>
+            <FieldErrorText fieldId="endurance-early-exit" message={earlyExitError} />
+            <p id="endurance-early-exit-hint" style={HINT}>
+              {t("settings.enduranceEarlyExitHint")}
+              {values.enduranceMaxRounds > 0 ? "" : ` ${t("settings.enduranceEarlyExitNoCap")}`}
             </p>
           </div>
 

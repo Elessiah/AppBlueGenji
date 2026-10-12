@@ -44,7 +44,7 @@ export type TournamentSettingsInput = {
   >;
   phases: TournamentPhase[] | null;
   swiss: Pick<SwissMeta, "totalRounds" | "pointsForWin" | "pointsForDraw" | "pointsForLoss" | "pointsForBye"> | null;
-  endurance: Pick<EnduranceMeta, "startPoints" | "winDelta" | "lossDelta" | "playoffSize" | "maxRounds"> | null;
+  endurance: Pick<EnduranceMeta, "startPoints" | "winDelta" | "lossDelta" | "playoffSize" | "maxRounds" | "earlyExit"> | null;
   seedingSource: SeedingSource;
 };
 
@@ -133,7 +133,7 @@ function modeSettings(input: TournamentSettingsInput): TournamentSetting[] {
     case "BG_SURVIE": {
       const settings: TournamentSetting[] = [];
       if (input.endurance) {
-        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds } = input.endurance;
+        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = input.endurance;
         settings.push(
           { label: "Capital de départ", value: plural(startPoints, "point") },
           { label: "Barème", value: `+${winDelta} par map gagnée · −${lossDelta} par map perdue` },
@@ -143,6 +143,10 @@ function modeSettings(input: TournamentSettingsInput): TournamentSetting[] {
             value: maxRounds === null ? "Aucun" : String(maxRounds),
           },
         );
+        // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
+        if (maxRounds !== null) {
+          settings.push({ label: "Sortie anticipée « hors course »", value: earlyExit ? "Oui" : "Non" });
+        }
       }
       settings.push({
         label: "Format des play-offs",

@@ -322,6 +322,8 @@ export async function createTournament(
     endurancePlayoffSize?: number | null;
     /** Plafond de manches qualificatives (null = phase à durée libre). */
     enduranceMaxRounds?: number | null;
+    /** Sortie « hors course » anticipée (BG Survie) ; absente = option éteinte. */
+    enduranceEarlyExit?: boolean | null;
     /**
      * Phases du format MULTI, brutes (non normalisées : `position`, `name`…
      * peuvent être absents) — voir `normalizePhaseConfigs` juste en dessous,
@@ -454,6 +456,7 @@ export async function createTournament(
         endurance_loss_delta,
         endurance_playoff_size,
         endurance_max_rounds,
+        endurance_early_exit,
         match_format_type,
         match_format_value,
         match_format_max_maps,
@@ -464,7 +467,7 @@ export async function createTournament(
         registration_blizzard_requirement,
         registration_min_players,
         referee_scheduling
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -495,6 +498,7 @@ export async function createTournament(
         payload.enduranceLossDelta ?? null,
         payload.endurancePlayoffSize ?? null,
         payload.enduranceMaxRounds ?? null,
+        payload.format === "BG_SURVIE" && payload.enduranceEarlyExit === true ? 1 : 0,
         // Les deux colonnes vont par paire : une seule renseignée décrirait un
         // format incomplet, que `parseMatchFormat` relirait comme « libre ».
         matchFormat?.type ?? null,

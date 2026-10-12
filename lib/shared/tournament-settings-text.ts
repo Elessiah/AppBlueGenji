@@ -103,13 +103,17 @@ function modeSettings(text: SettingsText, labels: LabelMessages, input: Tourname
     case "BG_SURVIE": {
       const settings: TournamentSetting[] = [];
       if (input.endurance) {
-        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds } = input.endurance;
+        const { startPoints, winDelta, lossDelta, playoffSize, maxRounds, earlyExit } = input.endurance;
         settings.push(
           { label: text.t("settings.mode.startPoints"), value: text.t("settings.mode.startPointsValue", { count: startPoints }) },
           { label: text.t("settings.mode.scoring"), value: text.t("settings.mode.enduranceScoring", { win: String(winDelta), loss: String(lossDelta) }) },
           { label: text.t("settings.mode.playoffSize"), value: String(playoffSize) },
           { label: text.t("settings.mode.maxRounds"), value: maxRounds === null ? text.t("settings.none") : String(maxRounds) },
         );
+        // L'option n'a d'effet que sous plafond : sans lui, la ligne ne dirait rien.
+        if (maxRounds !== null) {
+          settings.push({ label: text.t("settings.mode.earlyExit"), value: text.t(earlyExit ? "settings.yes" : "settings.no") });
+        }
       }
       settings.push({
         label: text.t("settings.mode.playoffFormat"),

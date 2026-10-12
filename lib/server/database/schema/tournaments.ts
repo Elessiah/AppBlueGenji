@@ -58,6 +58,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       endurance_loss_delta INT NULL,
       endurance_playoff_size INT NULL,
       endurance_max_rounds INT NULL,
+      -- Sortie « hors course » anticipée sous plafond de manches : option
+      -- décochée par défaut (\`docs/features/BG_SURVIE_MODE.md\`).
+      endurance_early_exit TINYINT(1) NOT NULL DEFAULT 0,
       endurance_current_round INT NOT NULL DEFAULT 0,
       endurance_playoffs_started TINYINT(1) NOT NULL DEFAULT 0,
       endurance_playoff_format_type ENUM('BO', 'FT') NULL,

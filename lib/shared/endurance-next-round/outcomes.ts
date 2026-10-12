@@ -191,6 +191,7 @@ export function qualificationUnits(input: EnduranceNextRoundInput): {
  * de plus, où elle est absente. Le calcul y perd des rencontres qu'il aurait pu
  * annoncer, jamais il n'en annonce une de trop.
  *
+ * Sans l'option `earlyExit` (décochée par défaut), la coupe n'existe pas.
  * La dernière manche n'est pas concernée : la coupe y est un simple trait sous
  * la cible, que l'ordre des équipes suffit à décrire.
  */
@@ -200,7 +201,7 @@ function withEliminationCut(
   round: number,
 ): Unit[] {
   const { config, format } = input;
-  if (config.maxRounds === null) return units;
+  if (config.maxRounds === null || !config.earlyExit) return units;
   const remaining = config.maxRounds - round;
   if (remaining <= 0) return units;
 
