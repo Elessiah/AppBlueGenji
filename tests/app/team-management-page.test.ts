@@ -246,6 +246,11 @@ describe("correctifs de la première revue", () => {
     expect(page.match(/page\.loadError/g)).toHaveLength(1);
   });
 
+  it("l'annuaire nomme son échec de chargement, réseau coupé compris", () => {
+    const list = stripComments(readFileSync(join(ROOT, "app", "(secured)", "equipes", "TeamsList.tsx"), "utf8"));
+    expect(list).toContain('showError(teamErrorMessage((e as Error).message, "TEAMS_LOAD_FAILED"))');
+  });
+
   it("la modale de recadrage, encore française, l'est entière sous `/en` (titre et `lang`)", () => {
     const settings = stripComments(read("_components", "TeamSettings.tsx"));
     expect(settings).toContain("useImageCropper({ lang: useStaffLang() })");

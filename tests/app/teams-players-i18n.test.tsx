@@ -276,6 +276,8 @@ describe("anglais", () => {
     expect(teamErrorMessage("IMAGE_TOO_LARGE", undefined, EN_TEAM_ERRORS)).toBe("Image too large: 5 MB maximum.");
     expect(teamErrorMessage("TEAM_TAG_TOO_LONG", undefined, EN_TEAM_ERRORS)).toBe("The tag can't be longer than 4 characters.");
     expect(teamErrorMessage("WHATEVER", "TEAM_JOIN_FAILED", EN_TEAM_ERRORS)).toBe("The request couldn't be sent.");
+    // Réseau coupé (`TypeError`) : l'annuaire dit ce qui a échoué, comme celui des joueurs.
+    expect(teamErrorMessage("Failed to fetch", "TEAMS_LOAD_FAILED", EN_TEAM_ERRORS)).toBe("The team list couldn't be loaded.");
     expect(teamErrorMessage("constructor", undefined, EN_TEAM_ERRORS)).toBe("The operation failed.");
     expect(membershipErrorMessage("USER_ALREADY_IN_TEAM", undefined, EN_TEAM_ERRORS)).toBe("You already belong to a team: leave it first.");
     for (const code of Object.keys(frTeamErrorsBefore.codes)) {
