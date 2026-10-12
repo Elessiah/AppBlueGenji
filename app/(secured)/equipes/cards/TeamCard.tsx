@@ -42,7 +42,7 @@ export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
       <LocaleLink
         href={`/equipes/${team.id}`}
         className={s.cardOverlay}
-        aria-label={t("card.viewProfile", { name: team.name })}
+        aria-label={t("card.viewTeam", { name: team.name })}
       />
 
       <div className={`${s.rank} ${isTop3 ? s.rankTop : ""}`}>

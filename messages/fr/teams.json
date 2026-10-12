@@ -49,6 +49,7 @@
   },
   "card": {
     "viewProfile": "Voir la fiche de {name}",
+    "viewTeam": "Voir la fiche de {name}",
     "ghostTitle": "Équipe fantôme, créée par le staff",
     "ghostBadge": "FANTÔME",
     "form": "Forme",

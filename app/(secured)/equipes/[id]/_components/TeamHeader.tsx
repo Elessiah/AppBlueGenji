@@ -7,6 +7,7 @@ import { displayTeamTag } from "@/lib/shared/team-tag";
 import { statsRate, statsText } from "@/lib/shared/stats-text";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
 import headerStyles from "./TeamHeader.module.css";
 
 interface TeamHeaderProps {
@@ -23,13 +24,15 @@ interface TeamHeaderProps {
  */
 export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
   const { t, locale } = useTeamPageText();
+  // Les messages du bloc de statistiques de la langue (sous `/en`), sinon le français.
+  const statsMessages = useStatsPanelI18n()?.messages.stats;
   const stats: { label: string; value: string | number; loss?: true }[] = [
     { label: t("header.stats.tournamentsPlayed"), value: team.stats.tournamentsPlayed },
     { label: t("header.stats.podiums"), value: team.stats.podiums },
     { label: t("header.stats.wins"), value: team.stats.matchesWon },
     { label: t("header.stats.losses"), value: team.stats.matchesLost, loss: true },
     // « 62 % » / « 62% » : le taux du bloc de statistiques, dans la langue de la page.
-    { label: t("header.stats.winRate"), value: statsRate(statsText(locale), team.stats.winRate) },
+    { label: t("header.stats.winRate"), value: statsRate(statsText(locale, statsMessages), team.stats.winRate) },
   ];
   // Absent des réponses de mutation, qui ne calculent pas le classement.
   if (team.ranking) {

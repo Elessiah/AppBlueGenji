@@ -38,16 +38,16 @@ export default function TeamDetailPage() {
   const onPendingChanged = useCallback(() => void reloadPending(), [reloadPending]);
   // Une notification par échec ; « introuvable » a déjà la sienne (redirection).
   // Session expirée ou droit manquant : la raison, qui dit quoi faire.
+  const failure = loadFailed && error && AUTH_LOAD_ERRORS.has(error) ? teamErrorMessage(error) : t("page.loadError");
   useEffect(() => {
-    if (!loadFailed) return;
-    showError(error && AUTH_LOAD_ERRORS.has(error) ? teamErrorMessage(error) : t("page.loadError"));
-  }, [loadFailed, error, showError, t, teamErrorMessage]);
+    if (loadFailed) showError(failure);
+  }, [loadFailed, failure, showError]);
 
   if (error) {
     return (
       <section className={`ds-block ${styles.page}`}>
         <p className={styles.notice}>
-          {loadFailed ? t("page.loadError") : t("page.notFound")}{" "}
+          {loadFailed ? failure : t("page.notFound")}{" "}
           <LocaleLink href="/equipes" className="entity-link">
             {t("page.backToTeams")}
           </LocaleLink>

@@ -67,13 +67,13 @@ export default function TeamsList() {
   const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
-    let r = teams.filter((t) => {
+    let r = teams.filter((team) => {
       // Le sigle est un nom court : on cherche une équipe par « BG » comme par
       // son nom complet.
-      if (q && !`${t.name} ${t.tag || ""} ${t.region || ""}`.toLowerCase().includes(q)) return false;
+      if (q && !`${team.name} ${team.tag || ""} ${team.region || ""}`.toLowerCase().includes(q)) return false;
       if (gameFilter === "all") return true;
-      if (gameFilter === "ow") return t.games.includes("OW");
-      if (gameFilter === "mr") return t.games.includes("MR");
+      if (gameFilter === "ow") return team.games.includes("OW");
+      if (gameFilter === "mr") return team.games.includes("MR");
       return true;
     });
     r = [...r];
@@ -91,9 +91,9 @@ export default function TeamsList() {
     JSON.stringify([deferredQuery.trim().toLowerCase(), gameFilter, sort]),
   );
 
-  const totalMembers = teams.reduce((sum, t) => sum + t.membersCount, 0);
-  const countOw = teams.filter((t) => t.games.includes("OW")).length;
-  const countMr = teams.filter((t) => t.games.includes("MR")).length;
+  const totalMembers = teams.reduce((sum, team) => sum + team.membersCount, 0);
+  const countOw = teams.filter((team) => team.games.includes("OW")).length;
+  const countMr = teams.filter((team) => team.games.includes("MR")).length;
 
   const accentStyle = {
     "--g-rgb": ACCENT_RGB,
@@ -243,8 +243,8 @@ export default function TeamsList() {
 
           <div style={{ paddingTop: 24 }}>
             <div className={s.tmGrid} ref={gridRef}>
-              {page.visible.map((t) => (
-                <TeamCard key={t.id} team={t} />
+              {page.visible.map((team) => (
+                <TeamCard key={team.id} team={team} />
               ))}
             </div>
             <DirectoryShowMore
