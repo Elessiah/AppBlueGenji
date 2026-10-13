@@ -47,6 +47,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { ALL_MAP_SOURCES, clearMapSets } from "./match-maps";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
+import { forgetMatchReminders } from "./reminder-marks";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import {
   planRoundRollback,
@@ -290,11 +291,10 @@ async function loadPosters(connection: PoolConnection, matchIds: readonly number
  * changé** une fois re-remplies : leurs nouvelles engagées n'ont reçu aucun
  * horaire et doivent recevoir l'annonce (même règle que `bracket-cascade.ts`).
  * Une rencontre rendue aux mêmes engagées garde les siennes — sans quoi elle
- * serait annoncée une seconde fois. Limite connue : une rencontre laissée
+ * serait annoncée une seconde fois (`./reminder-marks.ts`). Limite connue : une rencontre laissée
  * incomplète (le résultat défait ne la remplit plus) perd ses marques, et sera
  * annoncée de nouveau si le même résultat est ressaisi — une annonce en double
- * vaut mieux que de nouvelles engagées jamais prévenues. Table tolérée
- * absente, comme dans `deleteMatches`.
+ * vaut mieux que de nouvelles engagées jamais prévenues.
  */
 async function forgetChangedPosters(
   connection: PoolConnection,
@@ -302,12 +302,10 @@ async function forgetChangedPosters(
   matchIds: readonly number[],
 ): Promise<void> {
   const after = await loadPosters(connection, matchIds);
-  const changed = matchIds.filter((id) => before.get(id) !== after.get(id));
-  for (const ids of chunk(changed)) {
-    await ignoreMissingTable(
-      connection.execute(`DELETE FROM bg_match_reminders WHERE match_id IN (${ids.map(() => "?").join(", ")})`, ids),
-    );
-  }
+  await forgetMatchReminders(
+    connection,
+    matchIds.filter((id) => before.get(id) !== after.get(id)),
+  );
 }
 
 /**
@@ -416,12 +414,7 @@ async function deleteMatches(
     // trois tables est avalée par un `catch` dans `database/schema/`, et une base à
     // qui l'une manque rendrait sinon tout retour en arrière impossible — pour
     // une table de notifications, où il n'y aurait de toute façon rien à effacer.
-    await ignoreMissingTable(
-      connection.execute(
-        `DELETE FROM bg_match_reminders WHERE match_id IN (${placeholders})`,
-        ids,
-      ),
-    );
+    await forgetMatchReminders(connection, ids);
     await ignoreMissingTable(
       connection.execute(
         `DELETE FROM bg_referee_alerts WHERE match_id IN (${placeholders})`,

@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { statusFromTeams } from "./_internal";
+import { forgetMatchReminders } from "./reminder-marks";
 
 /**
  * **Effets en cascade** d'une correction de résultat dans un tableau à
@@ -123,7 +123,7 @@ async function reopenEngineResolved(
  * observation, palier) appartenaient à l'ancienne, la remplaçante n'a rien
  * reçu et doit recevoir l'annonce — même règle que `pushTeamToTarget`, qui ne
  * la verrait plus (le créneau étant vide quand la nouvelle équipe y arrive).
- * Table tolérée absente, comme dans `./rollback.ts`.
+ * (`./reminder-marks.ts`).
  */
 async function forgetDepartedPosterReminders(
   connection: PoolConnection,
@@ -131,7 +131,7 @@ async function forgetDepartedPosterReminders(
   leaving: boolean,
 ): Promise<void> {
   if (!leaving) return;
-  await ignoreMissingTable(connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [targetId]));
+  await forgetMatchReminders(connection, [targetId]);
 }
 
 /**

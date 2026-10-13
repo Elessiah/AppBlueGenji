@@ -206,16 +206,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Données seulement, rejouées à chaque démarrage sans effet une seconde fois.
     // 1. Un palier posé par l'ancien code l'était toujours avec un message :
     //    il prouve un horaire reçu. `P7D` et `PT1H` n'existent plus — le nouveau
-    //    code ne les écrit jamais —, toujours sûrs ; `P1D`, que le nouveau code
-    //    réserve avant l'envoi, seulement tant qu'aucune marque `TOLD` n'existe
-    //    (donc au premier démarrage, avant tout envoi du nouveau code).
+    //    code ne les écrit jamais. `P1D` n'est pas lu : le nouveau code le
+    //    réserve avant l'envoi, et l'ancien ne le posait jamais sans `P7D`
+    //    (consommé avec lui, ou envoyé avant lui).
     `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
        SELECT DISTINCT match_id, 'TOLD' FROM bg_match_reminders
         WHERE offset_key IN ('P7D', 'PT1H')`,
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
-       SELECT DISTINCT r.match_id, 'TOLD' FROM bg_match_reminders r
-        WHERE r.offset_key = 'P1D'
-          AND NOT EXISTS (SELECT 1 FROM bg_match_reminders t WHERE t.offset_key = 'TOLD')`,
     // 2. Une marque d'observation seule, posée en silence par l'ancien balayage
     //    (sept à huit jours avant, dans l'attente du palier « une semaine »
     //    retiré) : sans elle, la manche sera annoncée par le nouveau balayage.

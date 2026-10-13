@@ -42,7 +42,6 @@ import {
   MATCH_REMINDER_OFFSETS,
   MATCH_SEEN_KEY,
   MATCH_TOLD_KEY,
-  MATCH_TOLD_KEYS,
   buildMatchReminderMessage,
   buildMatchScheduleAnnouncement,
   buildMatchScheduleClearedNotice,
@@ -153,6 +152,12 @@ async function claimReminder(matchId: number, offsetKey: string): Promise<boolea
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
+/** Rend une marque réservée pour un envoi qui n'a rien donné. */
+async function releaseReminder(matchId: number, offsetKey: string): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ?`, [matchId, offsetKey]);
+}
+
 /** Les deux engagées d'une manche, chacune face à l'autre. */
 function matchSides(match: ScheduledMatchRow): { teamId: number; teamName: string; opponentName: string }[] {
   return [
@@ -214,7 +219,7 @@ async function planMatchSends(
     const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
     // Les joueurs avaient déjà reçu un horaire (manche programmée avant la
     // marque d'observation, par exemple) : la date découverte en remplace une.
-    const announcement = { rescheduled: MATCH_TOLD_KEYS.some((key) => alreadySent.has(key)) };
+    const announcement = { rescheduled: alreadySent.has(MATCH_TOLD_KEY) };
     return [{ match, offset: null, remaining: [...remaining], announcement }];
   }
 
@@ -247,6 +252,15 @@ async function dispatchPlannedSend(
   let delivered = false;
   const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
   const url = tournamentPageUrl(Number(match.tournament_id));
+
+  // Un horaire parti le dit en base : une date posée plus tard se lira
+  // « reprogrammée », une date effacée « retirée » (`setMatchStartAt`) — ce que
+  // ni la marque d'observation ni celle d'un palier ne prouvent. Posée **avant**
+  // l'envoi (un arbitre qui corrige sa saisie dans la seconde doit déjà la
+  // lire), retirée si rien n'a abouti. Un avis de retrait n'en pose pas : la
+  // marque est déjà là, c'est elle qui l'a permis.
+  const hasRecipients = matchSides(match).some((side) => (recipientsByTeam.get(side.teamId) ?? []).length > 0);
+  const toldClaimed = !clearedStartAt && hasRecipients && (await claimReminder(Number(match.id), MATCH_TOLD_KEY));
 
   // Un message par engagée, pas un pour tout le monde : chaque joueur lit
   // « ton équipe contre l'autre », dans le bon sens.
@@ -304,12 +318,7 @@ async function dispatchPlannedSend(
     dispatched += 1;
     if ((report.discord?.sent ?? 0) > 0 || report.pushed > 0) delivered = true;
   }
-  // Un horaire parti le dit en base : une date posée plus tard se lira
-  // « reprogrammée », une date effacée « retirée » (`setMatchStartAt`) — ce que
-  // ni la marque d'observation ni celle d'un palier ne prouvent — à condition
-  // qu'un message privé ou un push ait réellement abouti. Un avis de
-  // retrait n'en pose pas : la marque est déjà là, c'est elle qui l'a permis.
-  if (delivered && !clearedStartAt) await claimReminder(Number(match.id), MATCH_TOLD_KEY);
+  if (toldClaimed && !delivered) await releaseReminder(Number(match.id), MATCH_TOLD_KEY);
   return dispatched;
 }
 

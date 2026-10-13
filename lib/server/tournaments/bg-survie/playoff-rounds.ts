@@ -4,11 +4,11 @@
  */
 
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import type { PlayoffRoundPlan } from "@/lib/shared/bg-survie/playoffs";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { createMatch } from "../repository";
 import { clearMapSets } from "../match-maps";
+import { forgetMatchReminders } from "../reminder-marks";
 
 /** Une rencontre d'arbre final telle qu'elle est posée en base. */
 type PlayoffMatchRow = {
@@ -212,12 +212,5 @@ function rewrittenPlayoffMatchIds(reusable: PlayoffMatchRow[], plan: PlayoffRoun
  * à effacer — ce n'est pas une raison de laisser l'arbre sur un tour périmé.
  */
 async function clearRewrittenReminders(conn: PoolConnection, rewritten: number[]): Promise<void> {
-  if (rewritten.length > 0) {
-    await ignoreMissingTable(
-      conn.execute(
-        `DELETE FROM bg_match_reminders WHERE match_id IN (${rewritten.map(() => "?").join(", ")})`,
-        rewritten,
-      ),
-    );
-  }
+  await forgetMatchReminders(conn, rewritten);
 }

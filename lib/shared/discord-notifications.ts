@@ -147,15 +147,11 @@ export const MATCH_SEEN_KEY = "SEEN";
  * message par une annonce) ne le prouvent. C'est elle qui fait dire
  * « reprogrammé » à une nouvelle date et « retiré » à une date effacée.
  * Survit aux changements de date ; tient dans `offset_key` (`VARCHAR(8)`).
+ * Seule source : les preuves héritées de l'ancien code des rappels (`P7D`,
+ * `PT1H`) y sont recopiées au démarrage (`RECENT_SCHEMA_CHANGES`).
  */
 export const MATCH_TOLD_KEY = "TOLD";
 
-/**
- * Marques qui prouvent qu'un horaire a été reçu : `TOLD` seule. Les preuves
- * héritées de l'ancien code des rappels (`P7D`, `PT1H`, `P1D`) sont recopiées
- * en `TOLD` au démarrage (`RECENT_SCHEMA_CHANGES`) — une seule source.
- */
-export const MATCH_TOLD_KEYS: readonly string[] = [MATCH_TOLD_KEY];
 
 /**
  * Paliers dont la fenêtre est **déjà ouverte** à `now`.

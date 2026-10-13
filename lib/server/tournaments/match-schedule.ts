@@ -21,7 +21,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
-import { MATCH_SEEN_KEY, MATCH_TOLD_KEY, MATCH_TOLD_KEYS } from "@/lib/shared/discord-notifications";
+import { MATCH_SEEN_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
@@ -139,10 +139,8 @@ async function resetReminderMarks(
   let told: RowDataPacket[];
   try {
     [told] = await connection.execute<RowDataPacket[]>(
-      `SELECT 1 FROM bg_match_reminders
-        WHERE match_id = ? AND offset_key IN (${MATCH_TOLD_KEYS.map(() => "?").join(", ")})
-        LIMIT 1`,
-      [matchId, ...MATCH_TOLD_KEYS],
+      `SELECT 1 FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
+      [matchId, MATCH_TOLD_KEY],
     );
   } catch (error) {
     if (isMissingTableError(error)) return false;

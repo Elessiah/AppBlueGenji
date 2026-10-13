@@ -24,7 +24,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { notifyStaff } from "@/lib/server/notify";
+import { loadEntrantPlayerIds, notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/shared/bot-logs";
 import type { ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
@@ -36,6 +36,8 @@ import { announceMatchSchedule, announceMatchScheduleCleared } from "./match-rem
 type ScheduledMatchInfoRow = RowDataPacket & {
   id: number;
   status: string;
+  team1_id: number | null;
+  team2_id: number | null;
   tournament_id: number;
   tournament_name: string;
   participant_type: string;
@@ -99,7 +101,7 @@ export function isAnnounceableSchedule(change: MatchScheduleChange, now: Date = 
 async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<ScheduledMatchInfoRow[]>(
-    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status,
+    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status, m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type,
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
@@ -147,9 +149,14 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string },
   // tracée au journal mais annoncée à personne (les joueurs non plus).
   if (!push || row.status === "COMPLETED") return 0;
 
+  // L'auteur ne se prévient pas lui-même, et un arbitre qui joue ce match
+  // reçoit déjà l'annonce des joueurs (même étiquette) : la version arbitre
+  // (« Un match » en solo) ne doit pas la remplacer sur son appareil.
+  const teamIds = [row.team1_id, row.team2_id].filter((id): id is number => id !== null).map(Number);
+  const players = [...(await loadEntrantPlayerIds(teamIds)).values()].flat();
   const { pushed } = await notifyStaff({
     topic: "MATCH_SCHEDULED",
-    excludeUserIds: change.actor ? [change.actor.id] : [],
+    excludeUserIds: [...(change.actor ? [change.actor.id] : []), ...players],
     push: (locale) =>
       matchScheduledStaffPush(
         {
