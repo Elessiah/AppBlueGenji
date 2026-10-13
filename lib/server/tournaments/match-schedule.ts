@@ -185,7 +185,18 @@ async function resetReminderMarks(
   // date déjà passée (correction d'archive, saisie de travers) n'est annoncée à
   // personne : elle laisse aussi les marques en place, que le balayage — qui ne
   // lit que les dates à venir — ignore, et que la date suivante retrouve.
-  if (result.toldStartAt !== null && result.toldStartAt === startAt) return result;
+  if (result.toldStartAt !== null && result.toldStartAt === startAt) {
+    // Le palier pris pour l'horaire intermédiaire (son annonce n'a atteint
+    // personne) ne vaut pas pour celui-ci : gardé, il ferait sauter au balayage
+    // le rappel 24 h de l'horaire rendu, pour de bon. Les marques de l'horaire
+    // rendu (ou héritées, sans horaire) restent.
+    await connection.execute(
+      `DELETE FROM bg_match_reminders
+        WHERE match_id = ? AND offset_key NOT IN (?, ?) AND start_at IS NOT NULL AND start_at <> ?`,
+      [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY, new Date(startAt)],
+    );
+    return result;
+  }
   if (startAt !== null && new Date(startAt).getTime() <= Date.now()) return result;
   if (startAt !== null && announceable) {
     // L'insertion **avant** l'effacement : un `DELETE` sur une manche sans
