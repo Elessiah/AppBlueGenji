@@ -44,6 +44,7 @@ barre. Sont refusés, et remplacés par `/tournois` :
 | `/en//exemple.invalid`, `/regles//x` | `//` **n'importe où** dans le chemin : le préfixe de langue, retiré puis reposé, le démasquerait (lot 6) |
 | `/en/\exemple.invalid` | contre-barre n'importe où dans le chemin (lue comme une barre) |
 | `/en/%2F%2Fexemple.invalid`, `%5C` | barre ou contre-barre encodée, qu'un relais peut décoder |
+| `/api/auth/google/start?terms=1`, `/en/api/…`, `/%61pi/…`, `/x/../api/…` | route d'API, résolue comme le navigateur : ouverte depuis la page de connexion, elle passerait pour un clic sur le site (`Sec-Fetch-Site: same-origin`) et ouvrirait la session d'un autre compte (revue sécurité, lot 9-3) |
 | tout ce qui n'est pas une chaîne | paramètre absent, tableau, objet |
 
 Le dernier cas de refus n'est pas une précaution de forme : les navigateurs
