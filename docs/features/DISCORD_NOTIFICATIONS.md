@@ -437,7 +437,8 @@ d'annonce) : une date corrigée pour l'archive n'est que journalisée.
 
 Le retrait d'un horaire n'est poussé aux arbitres que s'ils l'avaient reçu :
 la marque `STAFF` (`MATCH_STAFF_KEY`) retient l'horaire de « Match programmé »,
-réservée **avant** l'envoi (`markStaffPushed`, conditionnée à l'horaire encore
+réservée **avant** l'envoi (`markStaffPushed` : une transaction qui verrouille
+la manche puis sa marque, comme le moteur ; conditionnée à l'horaire encore
 en place : un retrait qui suit de près la trouve ; refusée, la manche ne tient
 plus cet horaire et rien n'est poussé) et rendue si aucun appareil n'est
 atteint (`releaseStaffPush`), sur sa ligne, à ce qu'elle tenait avant — jamais
