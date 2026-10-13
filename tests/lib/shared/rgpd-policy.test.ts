@@ -51,8 +51,18 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 10 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(10);
+  it("has exactly 11 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(11);
+  });
+
+  it("déclare la langue du compte (lot 9-3) : exécution du contrat, durée du compte, remise au français", () => {
+    const locale = DONNEES_PROFIL.find((d) => d.donnee === "Langue du compte");
+    expect(locale?.base).toBe("Exécution du contrat");
+    expect(locale?.duree).toBe("Durée du compte");
+    expect(locale?.extraBases).toBeUndefined();
+    expect(locale?.finalite).toMatch(/notifications push/);
+    expect(locale?.finalite).toMatch(/Mon profil/);
+    expect(locale?.finalite).toMatch(/remise au français si le compte est anonymisé/);
   });
 
   it("déclare la majorité, facultative et affichée seulement sur choix du joueur", () => {
