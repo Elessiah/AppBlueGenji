@@ -1,10 +1,24 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   LIVE_ANNOUNCEMENT_MAX_LENGTH,
-  formatLiveAnnouncement,
   formatLiveAnnouncementGroup,
   liveAnnouncementUrl,
 } from "@/lib/shared/live-announcements";
+import type { ParticipantType } from "@/lib/shared/participants";
+
+/** L'annonce d'un seul match. */
+function formatLiveAnnouncement(match: {
+  tournamentName: string;
+  participantType: ParticipantType;
+  team1Name: string;
+  team2Name: string;
+}): string {
+  return formatLiveAnnouncementGroup({
+    tournamentName: match.tournamentName,
+    participantType: match.participantType,
+    pairings: [{ team1Name: match.team1Name, team2Name: match.team2Name }],
+  });
+}
 
 describe("formatLiveAnnouncement", () => {
   it("nomme les deux équipes et le tournoi", () => {
@@ -73,6 +87,35 @@ describe("formatLiveAnnouncementGroup", () => {
     const shown = lines.length - 2;
     expect(lines[lines.length - 1]).toBe(`• et ${40 - shown} autres matchs`);
     expect(lines.slice(1, -1).every((line) => /^• A+\d+ contre B+\d+$/.test(line))).toBe(true);
+  });
+
+  it("ne cache aucune affiche quand toute la liste tient", () => {
+    // Taillée pour finir pile à la limite : aucune place gardée pour « et N autres ».
+    const header = "🔴 En direct — T :";
+    const line = (name: string) => `\n• ${name} contre ${name}`;
+    const pairs: { team1Name: string; team2Name: string }[] = [];
+    let length = header.length;
+    while (length + line("x".repeat(60)).length <= LIVE_ANNOUNCEMENT_MAX_LENGTH - 40) {
+      pairs.push({ team1Name: "x".repeat(60), team2Name: "x".repeat(60) });
+      length += line("x".repeat(60)).length;
+    }
+    const filler = Math.floor((LIVE_ANNOUNCEMENT_MAX_LENGTH - length - "\n•  contre ".length) / 2);
+    pairs.push({ team1Name: "y".repeat(filler), team2Name: "y".repeat(filler) });
+    const text = formatLiveAnnouncementGroup({ tournamentName: "T", participantType: "TEAM", pairings: pairs });
+    expect(text.length).toBeLessThanOrEqual(LIVE_ANNOUNCEMENT_MAX_LENGTH);
+    expect(text).not.toContain("autre");
+    expect(text.split("\n")).toHaveLength(pairs.length + 1);
+  });
+
+  it("au singulier : « et 1 autre match », et le compte juste", () => {
+    const pairs = Array.from({ length: 3 }, () => ({ team1Name: "z".repeat(60), team2Name: "z".repeat(60) }));
+    pairs.push({ team1Name: "w".repeat(700), team2Name: "w".repeat(700) });
+    const text = formatLiveAnnouncementGroup({ tournamentName: "T", participantType: "TEAM", pairings: pairs });
+    expect(text.split("\n")).toEqual([
+      "🔴 En direct — T :",
+      ...Array.from({ length: 3 }, () => `• ${"z".repeat(60)} contre ${"z".repeat(60)}`),
+      "• et 1 autre match",
+    ]);
   });
 
   it("compte les matchs d'un tournoi individuel au lieu d'aligner des « un joueur »", () => {

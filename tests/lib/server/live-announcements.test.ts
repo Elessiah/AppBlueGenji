@@ -36,6 +36,8 @@ const AUTO_LIVE = {
   pairing: "1:2",
   team1_name: "Renards",
   team2_name: "Nova",
+  team1_solo_user_id: null,
+  team2_solo_user_id: null,
 };
 
 type Db = { query: jest.Mock<SqlQuery>; execute: jest.Mock<SqlQuery> };
@@ -94,6 +96,14 @@ describe("runLiveAnnouncementSweep", () => {
     expect(releasesOf(execute)).toEqual([]);
     // Trace pm2 : identifiants, aucun nom.
     expect(console.info).toHaveBeenCalledWith("[live-announce] match 40 (tournoi 4) annoncé dans #live");
+  });
+
+  it("écrit « un joueur » pour une entrée individuelle même si le type du tournoi est illisible", async () => {
+    mockDb([{ ...AUTO_LIVE, participant_type: null, team1_name: "PseudoA", team2_name: "PseudoB", team1_solo_user_id: 7, team2_solo_user_id: 8 }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe(
+      "🔴 En direct : un joueur contre un joueur — Coupe d'hiver",
+    );
   });
 
   it("n'annonce pas un match `AUTO` pas encore lancé, ni lancé pour une autre affiche", async () => {
@@ -198,7 +208,9 @@ describe("runLiveAnnouncementSweep", () => {
     const { execute } = mockDb([AUTO_LIVE]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(releasesOf(execute)).toEqual([]);
-    expect(String(jest.mocked(console.error).mock.calls[0][0])).toContain("peut-être publiée, non réessayée");
+    expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
+      "[live-announce] match 40 (tournoi 4) : bot sans réponse à temps, annonce peut-être publiée, non réessayée",
+    );
   });
 
   it("publié sans pouvoir mentionner @everyone : gardé, et la trace pm2 le dit", async () => {
