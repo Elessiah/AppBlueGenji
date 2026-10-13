@@ -120,8 +120,8 @@ ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 utilisateur, 2026-10-13, étendue par la revue de sécurité). Quand une engagée
 quitte une manche dont ses joueurs tenaient l'horaire, ils apprennent qu'il ne
 les concerne plus : « **Match retiré de ton programme** » / "Match removed from
-your schedule" (« Après une correction des résultats… » / "After a change to
-the results…") — message privé Discord (français, « Ton match » en tournoi
+your schedule" (« Le tournoi a été mis à jour et tu ne joues plus ce match… » /
+"The tournament has been updated and you no longer play this match…") — message privé Discord (français, « Ton match » en tournoi
 individuel, aucun pseudo) et push `MATCH_REMINDER` dans la langue de chacun,
 même étiquette que l'annonce qu'il remplace. Chemins couverts :
 
@@ -131,7 +131,12 @@ même étiquette que l'annonce qu'il remplace. Chemins couverts :
   statut écrits ensemble, le statut calculé par la base sur la valeur actuelle
   de l'autre place), `detachDownstreamOutcome` vide une place ;
 - retour en arrière (`rollback.ts`) : affiche détachée qui a changé une fois
-  re-remplie, manches supprimées ;
+  re-remplie, manches supprimées. L'horaire des rencontres détachées est
+  relevé **avant** le détachement (`holdDepartures`) et les sorties se
+  constatent sur l'état d'arrivée (`settleDepartures`) : une pose
+  intermédiaire de la réconciliation (exemption tranchée) ne prévient pas une
+  engagée qui n'avait rien reçu, et n'efface pas l'horaire de celles qui
+  l'avaient ;
 - manches **supprimées** par le moteur — ronde suisse ou de Survie
   réappariée, manche de BlueGenji Survie défaite, arbre final refait, plateau
   périmé reconstruit — et rencontres d'arbre final réécrites sur place.
@@ -150,7 +155,8 @@ verrouillante sans jointure pour toutes les sortantes (`noteDepartedEntrants`,
 — une manche supprimée n'est plus lisible après le commit —, et l'adversaire
 est celui **de l'horaire reçu**, relevé avant le changement (si les deux
 engagées sortent l'une après l'autre, chacune a l'autre pour adversaire),
-jamais l'occupant actuel de l'autre place. L'avis part après le commit avec le
+jamais l'occupant actuel de l'autre place. Une engagée n'est notée qu'une
+fois par manche et par transaction. L'avis part après le commit avec le
 journal (`flushBotLogs`) et se jette avec lui si le changement échoue
 (`discardBotLogs`) — même contrat de cycle de vie ; plafond de 512 avis par
 transaction (une ronde suisse entière réappariée en compte deux par manche ;
@@ -161,9 +167,21 @@ horaire passé depuis plus de 12 h. Limite connue (marques par manche) : `TOLD`
 est posée dès qu'une des deux engagées a été atteinte, et l'avis part alors aux
 deux — une engagée qu'aucun message n'avait atteinte peut recevoir le retrait
 d'un horaire qu'elle n'a pas reçu (un message de trop, jamais à un tiers).
-Trois lectures pour tous les avis (`announceEntrantsWithdrawn` : places
-actuelles, noms des sortantes et de leurs adversaires, destinataires), puis les
-envois, quatre à la fois.
+Ce que dit l'avis se décide sur l'état d'arrivée, relu après le commit : une
+engagée **reposée contre le même adversaire dans la même manche** (même
+tournoi, phase, partie de plateau et numéro — une ronde réappariée ou un
+plateau refait recrée ses rencontres) n'a perdu que son horaire et lit
+« Horaire du match retiré » (un nouvel horaire lui sera annoncé), ou rien si la
+nouvelle rencontre a déjà un horaire (son annonce suit) ; les autres lisent
+« Match retiré de ton programme ». L'étiquette reste celle de l'ancienne
+rencontre (l'avis remplace son annonce sur l'appareil) ; le lien du push mène à
+la rencontre qui existe, ou à la page du tournoi quand elle a disparu. Trois
+lectures pour tous les avis (`announceEntrantsWithdrawn` : manches d'avant et
+celles des sortantes dans le tournoi, noms des sortantes et de leurs
+adversaires, destinataires), puis les envois, quatre à la fois. Les deux
+suppressions écrivent leur filtre deux fois (`noteDeletedMatches` puis le
+`DELETE`) : accepté, le test de balayage des sources garde la règle, et
+regrouper l'écriture changerait les relevés exacts du moteur.
 
 ### La marque `TOLD` : un horaire reçu
 
