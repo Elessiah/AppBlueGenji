@@ -200,7 +200,7 @@ function warnOnce(kind: string, message: string, error?: unknown): void {
 }
 
 /** Longueur maximale de la liste d'identifiants dans l'étiquette envoyée au bot (200 caractères en tout). */
-const CONTEXT_IDS_MAX_LENGTH = 170;
+const CONTEXT_IDS_MAX_LENGTH = 150;
 
 /** « 40,41,42 », ou « 40,41,…+12 » quand la liste ne tient pas : jamais un identifiant coupé. */
 function contextIds(ids: readonly number[]): string {
@@ -268,7 +268,8 @@ async function announce(group: AnnouncementGroup): Promise<number> {
   const plural = ids.length > 1;
   const noun = plural ? "matchs" : "match";
   const label = `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`;
-  const context = `live-announce match-${contextIds(ids)}`;
+  // Le tournoi en tête : le staff ouvre `/tournois/<id>` depuis le canal de logs.
+  const context = `live-announce tournoi-${Number(first.tournament_id)} match-${contextIds(ids)}`;
   const outcome = await pushLiveAnnouncement(message, group.url, context);
   if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
