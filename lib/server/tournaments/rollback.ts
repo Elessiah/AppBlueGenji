@@ -48,6 +48,7 @@ import { ALL_MAP_SOURCES, clearMapSets } from "./match-maps";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { forgetMatchReminders } from "./reminder-marks";
+import { departuresBetween, noteDeletedMatches, noteDepartedEntrants, type Poster } from "./departed-notices";
 import { pushTeamToTarget } from "./target-slot";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import {
@@ -267,24 +268,36 @@ async function detachMatchParticipants(
   }
 }
 
-type Poster = { id: number; team1_id: number | null; team2_id: number | null };
+type PosterRow = RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null };
 
 /** Affiches (engagées des deux créneaux) des rencontres données. */
-async function loadPosters(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, string>> {
-  const posters = new Map<number, string>();
+async function loadPosters(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, Poster>> {
+  const posters = new Map<number, Poster>();
   for (const ids of chunk(matchIds)) {
-    const [rows] = await connection.execute<(RowDataPacket & Poster)[]>(
+    const [rows] = await connection.execute<PosterRow[]>(
       `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
-    // Paire non ordonnée : les mêmes engagées reposées dans l'autre sens
-    // forment la même affiche.
     for (const row of rows) {
-      const pair = [row.team1_id, row.team2_id].map((id) => (id === null ? "" : String(Number(id)))).sort((a, b) => a.localeCompare(b));
-      posters.set(Number(row.id), pair.join(":"));
+      posters.set(Number(row.id), {
+        team1Id: row.team1_id === null ? null : Number(row.team1_id),
+        team2Id: row.team2_id === null ? null : Number(row.team2_id),
+      });
     }
   }
   return posters;
+}
+
+/**
+ * Paire non ordonnée : les mêmes engagées reposées dans l'autre sens forment
+ * la même affiche.
+ */
+function posterKey(poster: Poster | undefined): string {
+  if (!poster) return "";
+  return [poster.team1Id, poster.team2Id]
+    .map((id) => (id === null ? "" : String(id)))
+    .sort((a, b) => a.localeCompare(b))
+    .join(":");
 }
 
 /**
@@ -296,17 +309,25 @@ async function loadPosters(connection: PoolConnection, matchIds: readonly number
  * incomplète (le résultat défait ne la remplit plus) perd ses marques, et sera
  * annoncée de nouveau si le même résultat est ressaisi — une annonce en double
  * vaut mieux que de nouvelles engagées jamais prévenues.
+ *
+ * Les engagées qui ont **quitté** une affiche changée apprennent, après le
+ * commit, que l'horaire qu'elles en avaient reçu ne les concerne plus
+ * (`./departed-notices`) — lu avant l'effacement des marques.
  */
 async function forgetChangedPosters(
   connection: PoolConnection,
-  before: Map<number, string>,
+  before: Map<number, Poster>,
   matchIds: readonly number[],
 ): Promise<void> {
   const after = await loadPosters(connection, matchIds);
-  await forgetMatchReminders(
-    connection,
-    matchIds.filter((id) => before.get(id) !== after.get(id)),
-  );
+  const changed = matchIds.filter((id) => posterKey(before.get(id)) !== posterKey(after.get(id)));
+  if (changed.length === 0) return;
+  const changedBefore = new Map(changed.flatMap((id) => {
+    const poster = before.get(id);
+    return poster ? [[id, poster] as const] : [];
+  }));
+  await noteDepartedEntrants(connection, departuresBetween(changedBefore, after));
+  await forgetMatchReminders(connection, changed);
 }
 
 /**
@@ -413,6 +434,9 @@ async function deleteMatches(
     // trois tables est avalée par un `catch` dans `database/schema/`, et une base à
     // qui l'une manque rendrait sinon tout retour en arrière impossible — pour
     // une table de notifications, où il n'y aurait de toute façon rien à effacer.
+    // Leurs engagées tenaient peut-être un horaire : l'avis se note avant que
+    // marques et manches ne partent (`./departed-notices`).
+    await noteDeletedMatches(connection, `id IN (${placeholders})`, ids);
     await forgetMatchReminders(connection, ids);
     await ignoreMissingTable(
       connection.execute(
@@ -641,13 +665,13 @@ async function applyRollback(
   format: TournamentFormat,
   plan: RollbackPlan,
   phases: readonly RollbackPhase[],
-): Promise<Map<number, string>> {
+): Promise<Map<number, Poster>> {
   // Les détachés sont vidés de leur résultat au même titre que le stade défait :
   // ils n'ont pas été joués, mais le moteur a pu en *résoudre* certains (byes).
   await clearMatchResults(connection, [...plan.clearedMatchIds, ...plan.detachedMatchIds]);
 
   const posters =
-    plan.detachedMatchIds.length > 0 ? await loadPosters(connection, plan.detachedMatchIds) : new Map<number, string>();
+    plan.detachedMatchIds.length > 0 ? await loadPosters(connection, plan.detachedMatchIds) : new Map<number, Poster>();
   if (plan.detachedMatchIds.length > 0) {
     await detachMatchParticipants(connection, plan.detachedMatchIds);
     await repopulateDetachedMatches(connection, tournamentId, plan.detachedMatchIds);

@@ -8,6 +8,7 @@ import {
   deletePhaseMatches,
 } from "./repository";
 import { loadPhaseTeamIds } from "./phases-repository";
+import { noteDeletedMatches } from "./departed-notices";
 import { createSingleEliminationBracket } from "./bracket-single";
 import { createDoubleEliminationBracket } from "./bracket-double";
 
@@ -48,9 +49,13 @@ async function discardStaleBracket(
   tournamentId: number,
   phaseId: number,
 ): Promise<void> {
+  // Un plateau programmé à l'avance a pu annoncer ses horaires : l'avis se
+  // note avant la suppression (`./departed-notices`).
   if (phaseId > 0) {
+    await noteDeletedMatches(connection, "tournament_id = ? AND phase_id = ?", [tournamentId, phaseId]);
     await deletePhaseMatches(connection, tournamentId, phaseId);
   } else {
+    await noteDeletedMatches(connection, "tournament_id = ?", [tournamentId]);
     await deleteAllMatches(connection, tournamentId);
   }
 }

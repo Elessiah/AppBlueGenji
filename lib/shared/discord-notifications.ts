@@ -341,7 +341,7 @@ export function buildMatchWithdrawnNotice(context: MatchReminderContext): string
     "**Match retiré de ton programme**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     pairingLine(context),
-    `Après une correction de score, tu ne joues plus ce match : l'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) ne te concerne plus.`,
+    `Après une correction des résultats, tu ne joues plus ce match : l'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) ne te concerne plus.`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
   return lines.join("\n");

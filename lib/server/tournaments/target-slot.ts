@@ -60,7 +60,11 @@ export async function pushTeamToTarget(
     // commit, que l'horaire qu'elle avait reçu ne la concerne plus
     // (`./departed-notices`) — lu avant l'effacement.
     await noteDepartedEntrants(connection, [
-      { matchId: targetMatchId, teamId: Number(previousTeamId), slot: targetSlot === 1 ? 1 : 2 },
+      {
+        matchId: targetMatchId,
+        teamId: Number(previousTeamId),
+        opponentId: before[otherColumn] === null ? null : Number(before[otherColumn]),
+      },
     ]);
     await forgetMatchReminders(connection, [targetMatchId]);
   }

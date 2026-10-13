@@ -16,7 +16,7 @@
     "bodyRescheduled": "Nouveau coup d'envoi : {start} (heure de Paris), au lieu du {previous}. {pairing} · {tournament}, {round}.",
     "bodyCleared": "L'horaire du {previous} (heure de Paris) est retiré : un nouvel horaire te sera annoncé. {pairing} · {tournament}, {round}.",
     "titleWithdrawn": "Match retiré de ton programme",
-    "bodyWithdrawn": "Après une correction de score, tu ne joues plus ce match : l'horaire du {previous} (heure de Paris) ne te concerne plus. {pairing} · {tournament}, {round}.",
+    "bodyWithdrawn": "Après une correction des résultats, tu ne joues plus ce match : l'horaire du {previous} (heure de Paris) ne te concerne plus. {pairing} · {tournament}, {round}.",
     "offset": {
       "P1D": "moins de 24 heures"
     }

@@ -17,6 +17,7 @@ import { finalizeEndurance } from "./finalization";
 import { loadPlayoffRoundMatches, loadPlayoffRoundNumbers, writePlayoffRound } from "./playoff-rounds";
 import { loadEnduranceStandings } from "./standings-store";
 import { configOf, loadTournament } from "./tournament-row";
+import { noteDeletedMatches } from "../departed-notices";
 
 /**
  * Construit la phase éliminatoire.
@@ -98,6 +99,7 @@ export async function repairPlayoffBracket(
       if (matches.some((match) => match.hasScoreInput)) return false;
 
       await writePlayoffRound(conn, tournamentId, round, plan, matches);
+      await noteDeletedMatches(conn, "tournament_id = ? AND round_number > ?", [tournamentId, round]);
       await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number > ?`, [
         tournamentId,
         round,

@@ -130,12 +130,16 @@ async function reopenEngineResolved(
  */
 function recordDeparture(
   departed: Departure[],
+  target: CascadeRow,
   targetId: number,
   slot: number,
   teamId: number | null,
   leaving: boolean,
 ): void {
-  if (leaving && teamId !== null) departed.push({ matchId: targetId, teamId, slot: slot === 1 ? 1 : 2 });
+  if (!leaving || teamId === null) return;
+  // L'adversaire de l'horaire reçu : l'autre place, lue avant d'être vidée.
+  const opponent = slot === 1 ? target.team2_id : target.team1_id;
+  departed.push({ matchId: targetId, teamId, opponentId: opponent === null ? null : Number(opponent) });
 }
 
 /**
@@ -147,8 +151,6 @@ async function forgetDepartures(connection: PoolConnection, departed: Departure[
   await noteDepartedEntrants(connection, departed);
   await forgetMatchReminders(connection, [...new Set(departed.map((departure) => departure.matchId))]);
 }
-
-
 
 /**
  * Vide un créneau d'aval et défait tout ce qui en était descendu.
@@ -201,7 +203,7 @@ async function vacateSlot(
      WHERE id = ?`,
     [statusFromTeams(team1 === null ? null : Number(team1), team2 === null ? null : Number(team2)), targetId],
   );
-  recordDeparture(departed, targetId, slot, currentId, leaving);
+  recordDeparture(departed, target, targetId, slot, currentId, leaving);
   return reopened;
 }
 
