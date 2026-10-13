@@ -97,6 +97,25 @@ describe("safeRedirectPath — ce qui est refusé", () => {
   it("accepte un repli explicite, pour les appelants qui en ont un autre", () => {
     expect(safeRedirectPath("https://exemple.invalid", "/")).toBe("/");
   });
+
+  it.each([
+    "/api/auth/google/start?terms=1&lang=en",
+    "/api",
+    "/api/",
+    "/API/auth/discord/start",
+    "/en/api/auth/google/start",
+    "/tournois/../api/auth/google/start",
+    "/./api/profile",
+    "/%61pi/auth/google/start",
+    "/%E0%A4%A",
+  ])("refuse une route d'API, même déguisée — elle partirait du site comme un clic sur la page (%s)", (value) => {
+    expect(safeRedirectPath(value)).toBe(DEFAULT_REDIRECT);
+  });
+
+  it("garde les pages dont le nom commence comme l'API", () => {
+    expect(safeRedirectPath("/apiculture")).toBe("/apiculture");
+    expect(safeRedirectPath("/tournois/4?q=/api/x")).toBe("/tournois/4?q=/api/x");
+  });
 });
 
 describe("safeRedirectPath — ce que le résultat garantit", () => {
