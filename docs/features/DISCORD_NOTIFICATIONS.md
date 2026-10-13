@@ -119,7 +119,8 @@ ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 **Engagée retirée par une correction de score** (décision utilisateur,
 2026-10-13). Quand une correction sort une engagée d'une manche
 (`pushTeamToTarget` remplace l'occupant — seule implémentation, dans
-`lib/server/tournaments/target-slot.ts`, que les exemptions empruntent aussi —,
+`lib/server/tournaments/target-slot.ts`, que les exemptions empruntent aussi ;
+deux instructions par pose, la place et le statut écrits ensemble —,
 `detachDownstreamOutcome` vide une place), ses joueurs apprennent que l'horaire reçu ne les concerne plus :
 « **Match retiré de ton programme** » / "Match removed from your schedule" —
 message privé Discord (français, « Ton match » en tournoi individuel, aucun
@@ -323,7 +324,15 @@ même horaire fait taire le perdant (l'autre envoi la remet), qui n'a rien à
 rendre. Un envoi qui échoue avant d'atteindre les joueurs (pose de `TOLD` en
 attente de verrou, destinataires illisibles) **rend** les marques qu'il avait
 réservées (`PlannedSend.claimed` : observation, palier) — sans quoi le rappel,
-ou l'annonce, serait consommé sans message et jamais retenté ; l'annonce d'un
+ou l'annonce, serait consommé sans message et jamais retenté. Chaque marque
+réservée retient l'horaire pour lequel elle l'est (`bg_match_reminders.start_at`,
+recopié de la manche ; `setMatchStartAt` y date l'observation), et seul l'envoi
+de cet horaire la rend (`start_at <=> ?`) : un ancien envoi en échec n'efface
+pas les marques d'un changement plus récent. Une réservation vérifie aussi les
+engagées de la manche ; si `schedule-notices` ne peut relire la manche après
+le commit, il rend l'observation de la date, et le balayage l'annoncera (un
+redémarrage dans cet intervalle reste une limite connue : seul le rappel 24 h
+partirait) ; l'annonce d'un
 arbitre rend aussi l'observation posée par `setMatchStartAt`, et le balayage
 annoncera la manche. `setMatchStartAt` est rejoué sur interblocage
 (`retryOnDeadlock`, `lib/server/tournaments/deadlock-retry.ts`, partagé avec le
