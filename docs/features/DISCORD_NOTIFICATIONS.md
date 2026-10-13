@@ -124,12 +124,16 @@ La ligne `TOLD` retient aussi **l'horaire envoyé** (`bg_match_reminders.start_a
 colonne ajoutée par cette PR, aux deux endroits du schéma) : c'est l'horaire que
 les joueurs tiennent. « Au lieu du … » le cite, et « Horaire du match retiré »
 le retire — jamais une date intermédiaire seulement journalisée (date passée
-saisie de travers). Une marque héritée de l'ancien code n'en a pas (`NULL`) :
-on retombe alors sur la date d'avant. L'horaire tenu vaut tant qu'il est devant
+saisie de travers). Une marque sans horaire (`NULL`) ne dit qu'une chose : un
+retrait remis — les joueurs ne tiennent plus d'horaire, rien n'est cité ni
+retiré (les marques héritées reçoivent au démarrage l'horaire de leur manche,
+voir « Passage à `TOLD` »). L'horaire tenu vaut tant qu'il est devant
 ou passé depuis moins de 12 h (un match en retard qu'on décale ou dont on
 retire l'horaire). L'horaire est posé dans la marque **avant** l'envoi (un
 arbitre qui corrige sa saisie dans la seconde le lit déjà) et rendu à son
-état d'avant si rien n'a abouti ; un avis de retrait le remet à `NULL` : la
+état d'avant si rien n'a abouti — seulement si la marque porte encore
+l'horaire de cet envoi (`start_at <=> ?`) : un changement plus récent, remis
+entre-temps, garde le sien ; un avis de retrait le remet à `NULL` : la
 date suivante se dit « reprogrammée », sans rien citer. Une date rendue à
 l'horaire que les joueurs tiennent déjà (après une saisie de travers seulement
 journalisée) ne leur est pas réannoncée, et garde ses marques (le rappel déjà
@@ -154,7 +158,8 @@ attend alors le balayage, dans les 48 h qui précèdent le coup d'envoi).
 
 **Passage à `TOLD` (déploiement de la PR #441).** Deux reprises de données,
 au démarrage (`RECENT_SCHEMA_CHANGES`), sans effet une seconde fois : tout
-palier hérité `P7D` / `PT1H` est recopié en `TOLD` (l'ancien code ne les
+palier hérité `P7D` / `PT1H` est recopié en `TOLD`, avec l'horaire de sa
+manche (l'ancien code effaçait ses paliers à chaque changement de date, et ne les
 posait qu'avec un message, le nouveau ne les écrit jamais ; `P1D` n'est pas
 lu — le nouveau code le réserve avant l'envoi, et l'ancien ne le posait jamais
 sans `P7D`) ; et une marque `SEEN` posée seule, en silence, par
@@ -259,7 +264,13 @@ concurrentes déclenchent le même balayage, et sans ce verrou le joueur recevra
 son rappel en double.
 
 **Coût du balayage.** Sa fenêtre se lit par l'index `idx_bg_matches_start_at`
-(sans lui, chaque passage relisait toute l'histoire des matchs). Réservations
+(sans lui, chaque passage relisait toute l'histoire des matchs), et une manche
+dont le dernier palier (`P1D`) est déjà pris n'y est plus relue. Une première
+observation dont un palier ne peut être réservé rend sa marque `SEEN` : le
+passage suivant annoncera la manche. L'horaire écrit par `setMatchStartAt`
+perd ses millisecondes (la colonne `DATETIME` les arrondirait), pour que les
+comparaisons d'horaires de `schedule-notices` portent sur la valeur gardée ;
+l'option du tournoi se lit dans la lecture verrouillante qui le tient. Réservations
 et envois vont quatre manches à la fois (`inBatches`, `SWEEP_CONCURRENCY`), les
 deux engagées d'une manche ensemble : une ronde suisse appariée sur des
 horaires déjà posés donne autant d'annonces que de manches, et chacune attend
