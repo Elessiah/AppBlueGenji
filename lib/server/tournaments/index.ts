@@ -169,6 +169,7 @@ import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore, type ProposalConfirmation } from "./scoring";
 import { loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { retryOnDeadlock } from "./deadlock-retry";
 import type { AdminResolveEntry, AdminScoreEntry } from "./admin";
 import {
@@ -617,7 +618,8 @@ export async function listTournamentBuckets(
   // Un passage en échec (fenêtre, destinataires) rend ses réservations et se
   // dit dans pm2 : sans trace, des rappels pourraient manquer en silence.
   void dispatchDueMatchReminders().catch((error: unknown) => {
-    console.error("[match-reminders] balayage en échec", error);
+    // Table absente (création avalée au démarrage) : rien à dire à chaque lecture.
+    if (!isMissingTableError(error)) console.error("[match-reminders] balayage en échec", error);
   });
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.

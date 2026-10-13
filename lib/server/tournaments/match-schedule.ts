@@ -165,7 +165,8 @@ async function resetReminderMarks(
   connection: PoolConnection,
   matchId: number,
   startAt: string | null,
-  bothEntrants: boolean,
+  /** Deux engagées connues, et la rencontre reste à jouer (aucun score saisi). */
+  announceable: boolean,
 ): Promise<ToldSchedule> {
   let told: ToldRow[];
   try {
@@ -186,7 +187,7 @@ async function resetReminderMarks(
   // lit que les dates à venir — ignore, et que la date suivante retrouve.
   if (result.toldStartAt !== null && result.toldStartAt === startAt) return result;
   if (startAt !== null && new Date(startAt).getTime() <= Date.now()) return result;
-  if (startAt !== null && bothEntrants) {
+  if (startAt !== null && announceable) {
     // L'insertion **avant** l'effacement : un `DELETE` sur une manche sans
     // marque verrouille l'intervalle de l'index qui l'entoure, et une insertion
     // qui suivrait dans la même transaction attendrait celui qu'une autre
@@ -215,6 +216,11 @@ async function resetReminderMarks(
 }
 
 type ToldRow = RowDataPacket & { start_at: Date | string | null };
+
+/** La rencontre a eu lieu : jouée, ou score saisi en attente de confirmation. */
+function isPlayedStatus(status: string): boolean {
+  return status === "COMPLETED" || status === "AWAITING_CONFIRMATION";
+}
 
 /** Identifiant d'une place de la manche (`null` : vide). */
 function nullableId(value: number | string | null): number | null {
@@ -299,7 +305,15 @@ export async function setMatchStartAt(
       const told =
         previousStartAt === startAt
           ? NOTHING_TOLD
-          : await resetReminderMarks(connection, matchId, startAt, row.team1_id !== null && row.team2_id !== null);
+          : await resetReminderMarks(
+              connection,
+              matchId,
+              startAt,
+              // Un match joué (score saisi) n'est annoncé à personne : pas
+              // d'observation posée pour lui — s'il revient à jouer, le
+              // balayage l'annoncera.
+              row.team1_id !== null && row.team2_id !== null && !isPlayedStatus(row.status),
+            );
       await connection.commit();
       written = {
         tournamentId: Number(row.tournament_id),

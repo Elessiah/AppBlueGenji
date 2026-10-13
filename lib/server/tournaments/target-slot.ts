@@ -22,7 +22,10 @@ export async function pushTeamToTarget(
   const [beforeRows] = await connection.execute<
     (RowDataPacket & { team1_id: number | null; team2_id: number | null })[]
   >(
-    `SELECT team1_id, team2_id FROM bg_matches WHERE id = ? LIMIT 1`,
+    // Lecture verrouillante : la place remplacée (marques, avis à la sortante)
+    // se décide sur l'état actuel, pas sur une image figée de la transaction —
+    // l'écriture qui suit prend ce verrou de toute façon.
+    `SELECT team1_id, team2_id FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
     [targetMatchId],
   );
   const before = beforeRows[0];

@@ -329,7 +329,11 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
     reportFailures([{ status: "rejected", reason: error }], "[notify] horaire de match non annoncé");
     // L'observation posée avec la date ferait taire le balayage : rendue, il
     // annoncera la manche (au meilleur effort — la base peut être injoignable).
-    if (startAt !== null) await releaseDatedMarks(change.matchId, [MATCH_SEEN_KEY], startAt);
+    // Pas quand la date est rendue à l'horaire que les joueurs tiennent :
+    // `setMatchStartAt` a alors gardé les marques telles quelles.
+    if (startAt !== null && change.toldStartAt !== startAt) {
+      await releaseDatedMarks(change.matchId, [MATCH_SEEN_KEY], startAt);
+    }
     return;
   }
   if (!row) return;

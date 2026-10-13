@@ -9,7 +9,7 @@
  */
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { ignoreMissingTable } from "@/lib/server/mysql-errors";
+import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 
 const CHUNK = 500;
 
@@ -39,8 +39,9 @@ export async function releaseDatedMarks(
         WHERE match_id = ? AND offset_key IN (${keys.map(() => "?").join(", ")}) AND start_at <=> ?`,
       [matchId, ...keys, new Date(startAt)],
     );
-  } catch {
-    // Base injoignable : la marque attendra le changement d'horaire suivant.
+  } catch (error) {
+    // La marque attendra le changement d'horaire suivant ; pm2 le dit.
+    if (!isMissingTableError(error)) console.error("[match-reminders] marque non rendue", error);
   }
 }
 
