@@ -250,6 +250,29 @@ describe("notifyMatchScheduleChange — arbitre engagé dans le match", () => {
     expect(loadEntrantPlayerIds).toHaveBeenCalledWith([101, 102]);
     expect(staffCall().excludeUserIds).toEqual([ACTOR.id, 1, 2, 3]);
   });
+
+  it("garde la version arbitre pour les joueurs du match quand aucune annonce ne leur est partie", async () => {
+    // Place encore vide : l'annonce aux joueurs ne part pas, l'arbitre qui joue
+    // ce match n'apprendrait l'horaire de nulle part.
+    mockMatch({ ...ROW, team2_name: null, team2_id: null });
+    jest.mocked(announceMatchSchedule).mockResolvedValue(0);
+
+    await notifyMatchScheduleChange(change());
+
+    expect(loadEntrantPlayerIds).not.toHaveBeenCalled();
+    expect(staffCall().excludeUserIds).toEqual([ACTOR.id]);
+  });
+
+  it("garde la version arbitre quand l'annonce aux joueurs a échoué", async () => {
+    mockMatch();
+    jest.mocked(announceMatchSchedule).mockRejectedValue(new Error("bot éteint"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await notifyMatchScheduleChange(change());
+
+    expect(staffCall().excludeUserIds).toEqual([ACTOR.id]);
+    error.mockRestore();
+  });
 });
 
 describe("notifyMatchScheduleChange — match déjà joué", () => {
