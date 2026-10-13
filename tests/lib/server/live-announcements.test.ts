@@ -50,7 +50,7 @@ function mockDb(candidates: unknown[], claims: boolean[] = []): Db {
     if (sql.startsWith("INSERT IGNORE INTO bg_live_announcements")) {
       return [{ affectedRows: (queue.length > 0 ? queue.shift() : true) ? 1 : 0 }];
     }
-    if (sql.startsWith("DELETE FROM bg_live_announcements")) return [{ affectedRows: 1 }];
+    if (sql.startsWith("DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (")) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -61,8 +61,16 @@ function claimsOf(execute: Db["execute"]): unknown[] {
   return execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE")).map(([, params]) => params);
 }
 
+/** Réservations rendues, une paire `[match, affiche]` par ligne (une requête par groupe). */
 function releasesOf(execute: Db["execute"]): unknown[] {
-  return execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE")).map(([, params]) => params);
+  return execute.mock.calls
+    .filter(([sql]) => sql.startsWith("DELETE"))
+    .flatMap(([, params]) => {
+      const flat = params as unknown[];
+      const pairs: unknown[] = [];
+      for (let i = 0; i < flat.length; i += 2) pairs.push([flat[i], flat[i + 1]]);
+      return pairs;
+    });
 }
 
 beforeEach(() => {
@@ -190,6 +198,17 @@ describe("runLiveAnnouncementSweep", () => {
     // Le balayage réessaie toutes les dix secondes : pm2 n'est pas inondé.
     expect(console.warn).toHaveBeenCalledTimes(1);
     expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("salon #live fermé au bot");
+  });
+
+  it("un autre match reporté pour la même cause laisse aussi sa trace", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
+    mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 55, tournament_id: 7, pairing: "5:6", launch_pairing: "5:6" }]);
+    await runLiveAnnouncementSweep(NOW);
+    await runLiveAnnouncementSweep(NOW);
+    const warnings = jest.mocked(console.warn).mock.calls.map(([text]) => String(text));
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("match 40 (tournoi 4)");
+    expect(warnings[1]).toContain("match 55 (tournoi 7)");
   });
 
   it("bot injoignable ou antérieur : un avertissement distinct de celui du salon fermé", async () => {
