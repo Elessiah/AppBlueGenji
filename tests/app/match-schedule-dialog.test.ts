@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 
 /**
@@ -52,5 +53,23 @@ describe("MatchScheduleDialog — heure", () => {
     expect(SOURCE).toContain('{t("schedule.wrongYear")}');
     expect(frDialogs.schedule.preview).toBe("Date retenue :");
     expect(frDialogs.schedule.wrongYear).toBe("Mauvaise année ?");
+  });
+});
+
+describe("MatchScheduleDialog — qui l'horaire prévient", () => {
+  it("dit aux arbitres que l'horaire est annoncé, et quand", () => {
+    expect(SOURCE).toContain("startAtHint(text, refereeScheduling, match.team1Id !== null && match.team2Id !== null)");
+    expect(SOURCE).toMatch(/if \(!entrantsKnown\) return text\.t\("schedule\.noticeTbd"\);/);
+    expect(SOURCE).toContain('text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice")');
+  });
+
+  it("ne promet un avis de retrait qu'en tournoi planifié par l'arbitrage, et l'attente d'une place vide", () => {
+    expect(frDialogs.schedule.noticePlanning).toContain("posé, changé ou retiré");
+    expect(frDialogs.schedule.notice).toContain("posé ou changé");
+    expect(frDialogs.schedule.notice).not.toContain("retiré");
+    expect(frDialogs.schedule.noticeTbd).toContain("dans les 48 h qui précèdent le coup d'envoi");
+    expect(enDialogs.schedule.noticePlanning).toContain("set, changed or removed");
+    expect(enDialogs.schedule.notice).not.toContain("removed");
+    expect(enDialogs.schedule.noticeTbd).toContain("within the 48 h before kickoff");
   });
 });
