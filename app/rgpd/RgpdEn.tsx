@@ -769,8 +769,9 @@ export function RgpdEn({
               delivered.
             </li>
             <li>
-              <strong>In which language</strong>: your account&apos;s, French or English — the language of the page
-              at your last login (French for an account that has not logged in again since this setting arrived), or the
+              <strong>In which language</strong>: your account&apos;s, French or English — the language of the site
+              page you last logged in from (a login started elsewhere, from a link or a bookmark, does not change it;
+              French for an account that has not logged in again since this setting arrived), or the
               one you choose in <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>,
               until you next log in from a page in the other language. This point does not depend on your agreement: the
               site keeps this single choice with every account, subscribed or not, for the lifetime of the account, to

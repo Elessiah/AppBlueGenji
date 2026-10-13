@@ -309,7 +309,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)",
       "Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)",
       "Exporter ses données et supprimer son compte depuis « Mon profil »",
-      "Rédiger les notifications push dans la langue du compte : celle de la page à la dernière connexion, ou celle choisie dans « Mon profil »",
+      "Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion, ou celle choisie dans « Mon profil »",
     ],
     legalBasis:
       "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles",

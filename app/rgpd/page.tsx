@@ -940,8 +940,9 @@ function RgpdFr({
             </li>
             <li>
               <strong>Dans quelle langue</strong> : celle de votre compte, français ou anglais — la
-              langue de la page lors de votre dernière connexion (le français pour un compte qui ne s&apos;est
-              pas reconnecté depuis l&apos;arrivée de ce réglage), ou celle que vous choisissez dans{" "}
+              langue de la page du site d&apos;où vous vous êtes connecté la dernière fois (une connexion
+              lancée d&apos;ailleurs, par un lien ou un favori, ne la change pas ; le français pour un compte
+              qui ne s&apos;est pas reconnecté depuis l&apos;arrivée de ce réglage), ou celle que vous choisissez dans{" "}
               <Link href="/profil#notifications">Mon profil</Link>, jusqu&apos;à votre prochaine connexion
               faite dans l&apos;autre langue. Ce point ne dépend pas de votre accord : le site garde ce seul
               choix avec tout compte, abonné ou non, le temps du compte, pour vous écrire dans votre langue
