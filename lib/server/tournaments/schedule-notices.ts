@@ -58,6 +58,11 @@ export type MatchScheduleChange = {
    */
   alreadyAnnounced: boolean;
   /**
+   * L'horaire que les joueurs ont reçu en dernier (`null` : inconnu — marque
+   * héritée de l'ancien code des rappels ; on retombe alors sur la date d'avant).
+   */
+  toldStartAt: string | null;
+  /**
    * Le tournoi est planifié par l'arbitrage. Sans l'option, un match sans
    * horaire part en lancement : un horaire retiré ne sera pas remplacé, et
    * l'avis « le nouvel horaire te sera annoncé » mentirait (le départ du match,
@@ -68,23 +73,31 @@ export type MatchScheduleChange = {
   actor: StaffActor | null;
 };
 
-/** Une date d'avant passée depuis moins longtemps se cite encore (match en retard). */
+/** Un horaire passé depuis moins longtemps vaut encore (match en retard). */
 const RECENT_PREVIOUS_MS = 12 * 60 * 60 * 1000;
 
 /**
- * Ce que l'annonce dit aux **joueurs** : « reprogrammé », avec l'ancienne date,
- * seulement s'ils avaient reçu un horaire — une date posée quand une place était
- * encore vide, jamais annoncée, ne se cite pas.
+ * L'horaire que les joueurs tiennent : le dernier reçu (`toldStartAt`), sinon la
+ * date d'avant — et seulement s'il vaut encore, devant ou passé de peu (un
+ * match en retard). Un horaire passé depuis longtemps ne se cite ni ne se retire.
+ */
+export function heldStartAt(change: MatchScheduleChange, now: Date = new Date()): string | null {
+  if (!change.alreadyAnnounced) return null;
+  const held = change.toldStartAt ?? change.previousStartAt;
+  if (held === null || held === change.startAt) return null;
+  const time = new Date(held).getTime();
+  return time > now.getTime() - RECENT_PREVIOUS_MS ? held : null;
+}
+
+/**
+ * Ce que l'annonce dit aux **joueurs** : « reprogrammé » s'ils avaient reçu un
+ * horaire — une date posée quand une place était encore vide, jamais annoncée,
+ * ne compte pas —, avec l'horaire qu'ils tenaient (« au lieu du … »), pas une
+ * date intermédiaire qui ne leur a jamais été envoyée.
  */
 export function playerAnnouncement(change: MatchScheduleChange, now: Date = new Date()): ScheduleAnnouncement {
   if (!change.alreadyAnnounced) return { rescheduled: false, previousStartAt: null };
-  // L'ancienne date se cite si les joueurs ont pu la recevoir : encore devant,
-  // ou passée de peu (un match en retard qu'on décale). Une date passée depuis
-  // longtemps n'a été que journalisée (correction d'archive, mois saisi de
-  // travers) : les joueurs ne l'ont jamais reçue, on ne la leur cite pas.
-  const previous = change.previousStartAt === null ? Number.NaN : new Date(change.previousStartAt).getTime();
-  const citable = previous > now.getTime() - RECENT_PREVIOUS_MS;
-  return { rescheduled: true, previousStartAt: citable ? change.previousStartAt : null };
+  return { rescheduled: true, previousStartAt: heldStartAt(change, now) };
 }
 
 /**
@@ -193,10 +206,8 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string },
  * viendra).
  */
 export function isAnnounceableClearing(change: MatchScheduleChange, now: Date = new Date()): boolean {
-  if (change.startAt !== null || change.previousStartAt === null) return false;
-  if (!change.alreadyAnnounced || !change.refereeScheduling) return false;
-  const previous = new Date(change.previousStartAt).getTime();
-  return Number.isFinite(previous) && previous > now.getTime();
+  if (change.startAt !== null || change.previousStartAt === null || !change.refereeScheduling) return false;
+  return heldStartAt(change, now) !== null;
 }
 
 /** Ligne du journal pour un horaire retiré. */
@@ -219,7 +230,7 @@ async function logScheduleCleared(change: MatchScheduleChange & { previousStartA
   // Les arbitres avaient reçu « Match programmé » pour cet horaire encore
   // devant : l'avis de retrait le remplace sur leur appareil (même étiquette).
   const previous = new Date(change.previousStartAt).getTime();
-  if (isPlayed(row.status) || !Number.isFinite(previous) || previous <= Date.now()) return;
+  if (isPlayed(row.status) || !Number.isFinite(previous) || previous <= Date.now() - RECENT_PREVIOUS_MS) return;
   await notifyStaff({
     topic: "MATCH_SCHEDULED",
     excludeUserIds: change.actor ? [change.actor.id] : [],
@@ -247,7 +258,9 @@ async function notifyScheduleCleared(change: MatchScheduleChange): Promise<void>
   if (previousStartAt === null) return;
   const results = await Promise.allSettled([
     logScheduleCleared({ ...change, previousStartAt }),
-    isAnnounceableClearing(change) ? announceMatchScheduleCleared(change.matchId, previousStartAt) : Promise.resolve(0),
+    isAnnounceableClearing(change)
+      ? announceMatchScheduleCleared(change.matchId, heldStartAt(change) ?? previousStartAt)
+      : Promise.resolve(0),
   ]);
   for (const result of results) {
     if (result.status === "rejected" && !isMissingTableError(result.reason)) {

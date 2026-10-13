@@ -128,22 +128,23 @@ async function lockScheduleRow(
  * refus que l'arbitre peut rejouer qu'un horaire changé dont personne n'est
  * prévenu.
  *
- * @returns Les joueurs avaient-ils reçu un horaire ?
+ * @returns Les joueurs avaient-ils reçu un horaire, et lequel (`null` : inconnu,
+ *          marque héritée de l'ancien code des rappels) ?
  */
 async function resetReminderMarks(
   connection: PoolConnection,
   matchId: number,
   startAt: string | null,
   bothEntrants: boolean,
-): Promise<boolean> {
-  let told: RowDataPacket[];
+): Promise<ToldSchedule> {
+  let told: ToldRow[];
   try {
-    [told] = await connection.execute<RowDataPacket[]>(
-      `SELECT 1 FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
+    [told] = await connection.execute<ToldRow[]>(
+      `SELECT start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
       [matchId, MATCH_TOLD_KEY],
     );
   } catch (error) {
-    if (isMissingTableError(error)) return false;
+    if (isMissingTableError(error)) return NOTHING_TOLD;
     throw error;
   }
   if (startAt !== null && bothEntrants) {
@@ -161,8 +162,12 @@ async function resetReminderMarks(
       MATCH_TOLD_KEY,
     ]);
   }
-  return told.length > 0;
+  return told.length > 0 ? { alreadyAnnounced: true, toldStartAt: toIso(told[0].start_at) } : NOTHING_TOLD;
 }
+
+type ToldRow = RowDataPacket & { start_at: Date | string | null };
+type ToldSchedule = { alreadyAnnounced: boolean; toldStartAt: string | null };
+const NOTHING_TOLD: ToldSchedule = { alreadyAnnounced: false, toldStartAt: null };
 
 /**
  * Fixe (ou efface) la date de début d'un match.
@@ -197,6 +202,7 @@ export async function setMatchStartAt(
       tournamentId: number;
       previousStartAt: string | null;
       alreadyAnnounced: boolean;
+      toldStartAt: string | null;
       refereeScheduling: boolean;
     };
     await connection.beginTransaction();
@@ -226,15 +232,15 @@ export async function setMatchStartAt(
         await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [matchId]);
       }
       const previousStartAt = toIso(row.start_at);
-      const alreadyAnnounced =
+      const told =
         previousStartAt === startAt
-          ? false
+          ? NOTHING_TOLD
           : await resetReminderMarks(connection, matchId, startAt, row.team1_id !== null && row.team2_id !== null);
       await connection.commit();
       written = {
         tournamentId: Number(row.tournament_id),
         previousStartAt,
-        alreadyAnnounced,
+        ...told,
         refereeScheduling,
       };
     } catch (error) {
@@ -254,6 +260,7 @@ export async function setMatchStartAt(
     startAt,
     previousStartAt: outcome.previousStartAt,
     alreadyAnnounced: outcome.alreadyAnnounced,
+    toldStartAt: outcome.toldStartAt,
     refereeScheduling: outcome.refereeScheduling,
     actor,
   }).catch(() => undefined);

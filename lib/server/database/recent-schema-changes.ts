@@ -202,6 +202,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // choisit la langue des notifications push. Défaut `fr` : tout compte
     // existant garde le français jusqu'à sa prochaine connexion.
     `ALTER TABLE bg_users ADD COLUMN locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr' AFTER terms_accepted_at`,
+    // PR #441 — la marque `TOLD` retient l'horaire reçu par les joueurs : c'est
+    // lui que cite « au lieu du … » et que retire « Horaire du match retiré ».
+    `ALTER TABLE bg_match_reminders ADD COLUMN start_at DATETIME NULL AFTER sent_at`,
     // PR #441 — marque `TOLD` (un horaire reçu, `lib/shared/discord-notifications.ts`).
     // Données seulement, rejouées à chaque démarrage sans effet une seconde fois.
     // 1. Un palier posé par l'ancien code l'était toujours avec un message :

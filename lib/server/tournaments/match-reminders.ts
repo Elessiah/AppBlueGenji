@@ -152,6 +152,54 @@ async function claimReminder(matchId: number, offsetKey: string): Promise<boolea
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
+type ToldMark = { matchId: number; startAt: Date; claimed: boolean };
+
+/**
+ * Ouvre la marque d'horaire reçu avant l'envoi, avec l'horaire envoyé (`start_at`) :
+ * c'est lui que les joueurs tiendront, et qu'une date suivante citera. `null` :
+ * personne à prévenir.
+ */
+async function openToldMark(
+  match: ScheduledMatchRow,
+  recipientsByTeam: Map<number, NotificationRecipient[]>,
+): Promise<ToldMark | null> {
+  const hasRecipients = matchSides(match).some((side) => (recipientsByTeam.get(side.teamId) ?? []).length > 0);
+  if (!hasRecipients) return null;
+  const matchId = Number(match.id);
+  const startAt = new Date(match.start_at);
+  return { matchId, startAt, claimed: await claimToldMark(matchId, startAt) };
+}
+
+/**
+ * Referme la marque après l'envoi : réservée pour rien (rien n'a abouti), elle
+ * est rendue ; déjà là (un horaire reçu avant), elle prend le nouveau s'il est parti.
+ */
+async function closeToldMark(told: ToldMark | null, delivered: boolean): Promise<void> {
+  if (!told) return;
+  if (told.claimed && !delivered) await releaseReminder(told.matchId, MATCH_TOLD_KEY);
+  if (!told.claimed && delivered) await updateToldMark(told.matchId, told.startAt);
+}
+
+/** Réserve la marque d'horaire reçu, avec l'horaire envoyé. `false` : elle existait. */
+async function claimToldMark(matchId: number, startAt: Date): Promise<boolean> {
+  const db = await getDatabase();
+  const [result] = await db.execute(
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)`,
+    [matchId, MATCH_TOLD_KEY, startAt],
+  );
+  return (result as { affectedRows?: number }).affectedRows === 1;
+}
+
+/** Retient le dernier horaire reçu par les joueurs. */
+async function updateToldMark(matchId: number, startAt: Date): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
+    startAt,
+    matchId,
+    MATCH_TOLD_KEY,
+  ]);
+}
+
 /** Rend une marque réservée pour un envoi qui n'a rien donné. */
 async function releaseReminder(matchId: number, offsetKey: string): Promise<void> {
   const db = await getDatabase();
@@ -259,8 +307,7 @@ async function dispatchPlannedSend(
   // l'envoi (un arbitre qui corrige sa saisie dans la seconde doit déjà la
   // lire), retirée si rien n'a abouti. Un avis de retrait n'en pose pas : la
   // marque est déjà là, c'est elle qui l'a permis.
-  const hasRecipients = matchSides(match).some((side) => (recipientsByTeam.get(side.teamId) ?? []).length > 0);
-  const toldClaimed = !clearedStartAt && hasRecipients && (await claimReminder(Number(match.id), MATCH_TOLD_KEY));
+  const told = clearedStartAt ? null : await openToldMark(match, recipientsByTeam);
 
   // Un message par engagée, pas un pour tout le monde : chaque joueur lit
   // « ton équipe contre l'autre », dans le bon sens.
@@ -318,7 +365,7 @@ async function dispatchPlannedSend(
     dispatched += 1;
     if ((report.discord?.sent ?? 0) > 0 || report.pushed > 0) delivered = true;
   }
-  if (toldClaimed && !delivered) await releaseReminder(Number(match.id), MATCH_TOLD_KEY);
+  await closeToldMark(told, delivered);
   return dispatched;
 }
 
