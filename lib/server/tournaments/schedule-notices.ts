@@ -45,9 +45,22 @@ export type MatchScheduleChange = {
   startAt: string | null;
   /** Horaire d'avant (ISO), `null` si la manche n'en avait pas. */
   previousStartAt: string | null;
+  /**
+   * Les joueurs avaient déjà reçu un horaire (marque d'observation posée),
+   * même si la date a été effacée entre-temps.
+   */
+  alreadyAnnounced?: boolean;
   /** Auteur du geste, `null` hors d'une requête du staff. */
   actor: StaffActor | null;
 };
+
+/**
+ * La date en remplace-t-elle une que les joueurs connaissaient ? Une date
+ * précédente, ou une annonce déjà faite d'une date effacée depuis.
+ */
+export function isReschedule(change: MatchScheduleChange): boolean {
+  return change.previousStartAt !== null || change.alreadyAnnounced === true;
+}
 
 /** L'horaire mérite-t-il d'être annoncé ? Posé, changé, et encore devant. */
 export function isAnnounceableSchedule(change: MatchScheduleChange, now: Date = new Date()): boolean {
@@ -78,7 +91,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
   if (!row) return 0;
   const participantType = toParticipantType(row.participant_type);
   const entrant = (name: string | null): LogEntrant | null => (name === null ? null : { name, participantType });
-  const rescheduled = change.previousStartAt !== null;
+  const announcement = { rescheduled: isReschedule(change), previousStartAt: change.previousStartAt };
   const tournament = { id: Number(row.tournament_id), name: String(row.tournament_name) };
 
   const line = formatMatchScheduledLog({
@@ -90,6 +103,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
     team2: entrant(row.team2_name),
     startAt: change.startAt,
     previousStartAt: change.previousStartAt,
+    rescheduled: announcement.rescheduled,
   });
   if (change.actor) publishStaffAction(line, change.actor);
 
@@ -109,7 +123,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
           roundNumber: Number(row.round_number),
           startAt: change.startAt,
         },
-        rescheduled,
+        announcement,
         locale,
       ),
   });
@@ -124,7 +138,10 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   const { startAt } = change;
   if (startAt === null || !isAnnounceableSchedule(change)) return;
   const results = await Promise.allSettled([
-    announceMatchSchedule(change.matchId, change.previousStartAt !== null),
+    announceMatchSchedule(change.matchId, {
+      rescheduled: isReschedule(change),
+      previousStartAt: change.previousStartAt,
+    }),
     notifyReferees({ ...change, startAt }),
   ]);
   for (const result of results) {

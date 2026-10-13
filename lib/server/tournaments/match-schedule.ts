@@ -21,6 +21,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
+import { MATCH_SEEN_KEY } from "@/lib/shared/discord-notifications";
 import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
@@ -174,14 +175,25 @@ export async function setMatchStartAt(
     // nouvelle date — c'est précisément ce qu'un déplacement de manche doit
     // produire. Après le commit, sur la même connexion, et au meilleur effort :
     // une manche reprogrammée ne doit pas échouer parce que le ménage a échoué.
-    if (written.previousStartAt !== startAt) {
+    //
+    // Une date **effacée** garde ses marques (inertes : le balayage ne lit que
+    // les manches datées) : quand une date est reposée, la marque
+    // d'observation dit encore que les joueurs connaissaient un horaire, et
+    // l'annonce se lit « Match reprogrammé » plutôt que « programmé ».
+    let alreadyAnnounced = false;
+    if (startAt !== null && written.previousStartAt !== startAt) {
       try {
+        const [seen] = await connection.execute<RowDataPacket[]>(
+          `SELECT 1 FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
+          [matchId, MATCH_SEEN_KEY],
+        );
+        alreadyAnnounced = seen.length > 0;
         await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [matchId]);
       } catch {
         // Meilleur effort : au pire, le cycle des rappels garde son ancien état.
       }
     }
-    return written;
+    return { ...written, alreadyAnnounced };
   });
 
   publishMatchUpdatedEvent(outcome.tournamentId, { landingLive: true });
@@ -192,6 +204,7 @@ export async function setMatchStartAt(
     matchId,
     startAt,
     previousStartAt: outcome.previousStartAt,
+    alreadyAnnounced: outcome.alreadyAnnounced,
     actor,
   }).catch(() => undefined);
   return startAt;

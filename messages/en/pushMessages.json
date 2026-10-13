@@ -12,16 +12,14 @@
     "titleScheduled": "Match scheduled",
     "titleRescheduled": "Match rescheduled",
     "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
+    "bodyRescheduled": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time), instead of {previous}.",
     "offset": {
       "P7D": "a week",
       "P1D": "24 hours"
     }
   },
   "matchScheduled": {
-    "title": "Match scheduled",
-    "titleRescheduled": "Match rescheduled",
-    "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
-    "soloPairing": "A match",
+    "pairingSolo": "A match",
     "tbd": "TBD"
   },
   "round": {

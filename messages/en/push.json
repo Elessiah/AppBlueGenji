@@ -14,7 +14,7 @@
     },
     "MATCH_REMINDER": {
       "label": "Match reminders",
-      "description": "The announcement of a match's time (or of its change), then a reminder one week and 24 h before."
+      "description": "The announcement of a match's time (or of its change), then reminders one week and 24 h before."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Join requests",
@@ -34,11 +34,11 @@
     },
     "REFEREE_ALERT": {
       "label": "Referee alerts",
-      "description": "A score conflict, an unresolved score report or a reported problem is waiting for a referee."
+      "description": "A score conflict, a score left unconfirmed for too long or a reported problem is waiting for a referee."
     },
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",
-      "description": "A referee schedules or reschedules a match."
+      "description": "Another member of the refereeing staff schedules or reschedules a match."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",

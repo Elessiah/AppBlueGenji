@@ -249,12 +249,15 @@ export function formatMatchScheduledLog(context: {
   team2: LogEntrant | null;
   startAt: string | Date;
   previousStartAt: string | Date | null;
+  /** Date effacée puis reposée : « reprogrammé » sans ancienne date à citer. */
+  rescheduled?: boolean;
 }): string {
   const team1 = context.team1 ? entrantLabel(context.team1) : "TBD";
   const team2 = context.team2 ? entrantLabel(context.team2) : "TBD";
-  const kind = context.previousStartAt === null ? "Match programmé" : "Match reprogrammé";
+  const rescheduled = context.rescheduled ?? context.previousStartAt !== null;
+  const kind = rescheduled ? "Match reprogrammé" : "Match programmé";
   const previous =
-    context.previousStartAt === null ? "" : ` (au lieu du ${formatMatchStart(context.previousStartAt)})`;
+    context.previousStartAt === null ? "" : `, au lieu du ${formatMatchStart(context.previousStartAt)}`;
   return (
     `${lead("🗓️", kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber)} — ` +
     `${team1} vs ${team2} (#${context.matchId}), coup d'envoi ${formatMatchStart(context.startAt)} ` +

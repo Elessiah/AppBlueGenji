@@ -45,6 +45,7 @@ import {
   matchRoundLabel,
   openedMatchReminders,
   type MatchReminderOffset,
+  type ScheduleAnnouncement,
 } from "@/lib/shared/discord-notifications";
 import { tournamentPageUrl } from "./app-url";
 
@@ -157,7 +158,7 @@ type PlannedSend = {
   /** Paliers encore devant, pour dire à quand le prochain rappel (annonce). */
   remaining: MatchReminderOffset[];
   /** Annonce d'une date qui en remplace une autre (« Match reprogrammé »). */
-  rescheduled?: boolean;
+  announcement?: ScheduleAnnouncement;
 };
 
 /**
@@ -221,7 +222,7 @@ async function planMatchSends(
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 async function dispatchPlannedSend(
-  { match, offset, remaining, rescheduled = false }: PlannedSend,
+  { match, offset, remaining, announcement = { rescheduled: false } }: PlannedSend,
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
 ): Promise<number> {
   let dispatched = 0;
@@ -259,7 +260,7 @@ async function dispatchPlannedSend(
 
     const message = offset
       ? buildMatchReminderMessage(offset, context)
-      : buildMatchScheduleAnnouncement(context, remaining, rescheduled);
+      : buildMatchScheduleAnnouncement(context, remaining, announcement);
 
     await notifyUsers(recipients, {
       topic: "MATCH_REMINDER",
@@ -279,7 +280,7 @@ async function dispatchPlannedSend(
           },
           offset ? offset.key : null,
           locale,
-          rescheduled,
+          announcement,
         ),
     });
     dispatched += 1;
@@ -322,12 +323,13 @@ const SCHEDULED_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round
  * Meilleur effort : rien n'est annoncé pour une manche passée, jouée, ou dont
  * une engagée manque encore (le balayage l'annoncera quand elle sera connue).
  *
- * @param rescheduled La nouvelle date remplace une date déjà posée.
+ * @param announcement La nouvelle date remplace une date déjà annoncée
+ *                     (« Match reprogrammé »), et l'ancienne quand elle est connue.
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 export async function announceMatchSchedule(
   matchId: number,
-  rescheduled: boolean,
+  announcement: ScheduleAnnouncement,
   now: Date = new Date(),
 ): Promise<number> {
   const db = await getDatabase();
@@ -344,7 +346,7 @@ export async function announceMatchSchedule(
   const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
 
   const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
-  return dispatchPlannedSend({ match, offset: null, remaining: [...remaining], rescheduled }, recipientsByTeam);
+  return dispatchPlannedSend({ match, offset: null, remaining: [...remaining], announcement }, recipientsByTeam);
 }
 
 async function runSweep(now: Date): Promise<number> {

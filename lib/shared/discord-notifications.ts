@@ -209,6 +209,16 @@ export interface MatchReminderContext {
   solo?: boolean;
 }
 
+/**
+ * Ce qu'une annonce d'horaire dit du changement : « reprogrammé » quand la date
+ * en remplace une que les joueurs connaissaient, et l'ancienne date quand elle
+ * est connue (une date effacée puis reposée n'en a plus).
+ */
+export type ScheduleAnnouncement = {
+  rescheduled: boolean;
+  previousStartAt?: string | Date | null;
+};
+
 /** Ligne « qui contre qui » d'un message privé de match. */
 function pairingLine(context: MatchReminderContext): string {
   if (context.solo) return "**Ton match**";
@@ -252,20 +262,23 @@ export function buildMatchReminderMessage(
  *
  * @param context Ce qu'il y a à dire du match.
  * @param remaining Paliers encore à venir, pour annoncer la suite.
- * @param rescheduled La date remplace une date déjà posée.
+ * @param announcement Date qui en remplace une autre (« Match reprogrammé »),
+ *                     et l'ancienne quand elle est connue.
  * @returns Le message privé à envoyer, en français.
  */
 export function buildMatchScheduleAnnouncement(
   context: MatchReminderContext,
   remaining: readonly MatchReminderOffset[] = [],
-  rescheduled = false,
+  announcement: ScheduleAnnouncement = { rescheduled: false },
 ): string {
+  const previous = announcement.rescheduled ? announcement.previousStartAt : null;
   const lines = [
-    rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
+    announcement.rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     pairingLine(context),
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
+  if (previous) lines.push(`Au lieu du ${formatMatchStart(previous)}`);
   if (remaining.length > 0) {
     // Le prochain rappel est le palier restant le plus **lointain** : la liste
     // est ordonnée du plus lointain au plus proche, c'est donc le premier.
