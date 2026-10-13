@@ -47,7 +47,7 @@ import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integra
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
-import { toParticipantType } from "@/lib/shared/participants";
+import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { MatchStatus } from "@/lib/shared/types";
 
 type LiveCandidateRow = RowDataPacket & {
@@ -66,6 +66,8 @@ type LiveCandidateRow = RowDataPacket & {
   launch_pairing: string | null;
   team1_name: string;
   team2_name: string;
+  team1_solo_user_id: number | null;
+  team2_solo_user_id: number | null;
 };
 
 /**
@@ -107,7 +109,8 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
             t.live_url AS tournament_live_url, m.status, m.start_at, m.live_trigger,
             m.live_started_at, m.live_url, m.launched_at, m.launch_pairing,
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
-            t1.name AS team1_name, t2.name AS team2_name
+            t1.name AS team1_name, t2.name AS team2_name,
+            t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
                             AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
@@ -182,24 +185,34 @@ function matchIdsOf(group: AnnouncementGroup): string {
   return group.rows.map((row) => Number(row.id)).join(", ");
 }
 
+/**
+ * Type d'engagés d'un groupe. Une entrée individuelle (`solo_user_id`) porte le
+ * nom de son joueur : elle s'écrit « un joueur » même si le type du tournoi
+ * était illisible — un pseudo ne part jamais devant tout le serveur.
+ */
+function groupParticipantType(rows: readonly LiveCandidateRow[]): ParticipantType {
+  const solo = rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null);
+  return solo ? "SOLO" : toParticipantType(rows[0].participant_type);
+}
+
 /** Annonce un groupe réservé. @returns Le nombre de matchs publiés. */
 async function announce(group: AnnouncementGroup): Promise<number> {
   const [first] = group.rows;
   const message = formatLiveAnnouncementGroup({
     tournamentName: String(first.tournament_name),
-    participantType: toParticipantType(first.participant_type),
+    participantType: groupParticipantType(group.rows),
     pairings: group.rows.map((row) => ({ team1Name: String(row.team1_name), team2Name: String(row.team2_name) })),
   });
   const ids = matchIdsOf(group);
   const plural = group.rows.length > 1;
-  const label = plural ? `matchs ${ids}` : `match ${ids}`;
+  const label = `${plural ? `matchs ${ids}` : `match ${ids}`} (tournoi ${Number(first.tournament_id)})`;
   const context = `live-announce match-${group.rows.map((row) => Number(row.id)).join(",")}`;
   const outcome = await pushLiveAnnouncement(message, group.url, context);
   if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner @everyone absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
-    console.info(`[live-announce] ${label} (tournoi ${Number(first.tournament_id)}) ${announced} dans #live${silent}`);
+    console.info(`[live-announce] ${label} ${announced} dans #live${silent}`);
     return group.rows.length;
   }
   if (outcome === "rejected") {

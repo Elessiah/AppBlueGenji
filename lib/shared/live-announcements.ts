@@ -23,14 +23,6 @@ import { entrantLabel } from "./log-privacy";
 import { normalizeStreamUrl } from "./live-streams";
 import type { ParticipantType } from "./participants";
 
-/** Ce que l'annonce dit d'un match. */
-export interface LiveAnnouncementMatch {
-  tournamentName: string;
-  participantType: ParticipantType;
-  team1Name: string;
-  team2Name: string;
-}
-
 /** Les deux engagés d'une affiche. */
 export interface LiveAnnouncementPairing {
   team1Name: string;
@@ -84,32 +76,21 @@ export function formatLiveAnnouncementGroup(group: LiveAnnouncementGroup): strin
   if (group.participantType === "SOLO") {
     return `🔴 En direct : ${count} matchs — ${tournament}`;
   }
-  let text = `🔴 En direct — ${tournament} :`;
-  for (let index = 0; index < count; index += 1) {
-    const line = `\n• ${pairingLine(group.pairings[index], group.participantType)}`;
-    const rest = count - index;
-    // Place gardée pour la ligne qui compterait le reste.
-    const reserve = rest > 1 ? `\n• et ${otherMatches(rest)}`.length : 0;
-    if (text.length + line.length + reserve > LIVE_ANNOUNCEMENT_MAX_LENGTH) {
-      return `${text}\n• et ${otherMatches(rest)}`;
-    }
-    text += line;
+  const header = `🔴 En direct — ${tournament} :`;
+  const lines = group.pairings.map((pairing) => `\n• ${pairingLine(pairing, group.participantType)}`);
+  const full = header + lines.join("");
+  if (full.length <= LIVE_ANNOUNCEMENT_MAX_LENGTH) return full;
+  // Trop long : autant d'affiches que possible, puis une ligne qui compte le
+  // reste (au moins une affiche, pour que l'annonce dise quelque chose).
+  let text = header + lines[0];
+  let shown = 1;
+  while (shown < count - 1) {
+    const next = text + lines[shown];
+    if (`${next}\n• et ${otherMatches(count - shown - 1)}`.length > LIVE_ANNOUNCEMENT_MAX_LENGTH) break;
+    text = next;
+    shown += 1;
   }
-  return text;
-}
-
-/**
- * Texte de l'annonce d'un match, sans la mention ni le lien (ajoutés par le bot).
- *
- * @param match Les deux engagés et le tournoi.
- * @returns Une ligne, prête à partir.
- */
-export function formatLiveAnnouncement(match: LiveAnnouncementMatch): string {
-  return formatLiveAnnouncementGroup({
-    tournamentName: match.tournamentName,
-    participantType: match.participantType,
-    pairings: [{ team1Name: match.team1Name, team2Name: match.team2Name }],
-  });
+  return `${text}\n• et ${otherMatches(count - shown)}`;
 }
 
 /**

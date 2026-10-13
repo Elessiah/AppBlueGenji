@@ -635,7 +635,7 @@ async function announcedWithoutMention(response: Response): Promise<boolean> {
  * Trafic de fond (le balayage des annonces) : le coupe-circuit est respecté,
  * et jamais d'exception.
  *
- * @param message Texte rédigé par `formatLiveAnnouncement`, noms neutralisés.
+ * @param message Texte rédigé par `formatLiveAnnouncementGroup`, noms neutralisés.
  * @param streamUrl Lien déjà validé par la liste blanche.
  * @param context Étiquette de journalisation côté bot.
  */
@@ -676,9 +676,12 @@ export async function pushLiveAnnouncement(
     recordFailure();
     return "unavailable";
   } catch (error) {
-    recordFailure();
     // Le délai écoulé ne dit pas que rien n'est parti : la requête a pu
-    // atteindre le bot, qui publie encore.
-    return isTimeoutError(error) ? "uncertain" : "unavailable";
+    // atteindre le bot, qui publie encore (Discord lent ou limitant #live). Il
+    // n'est pas compté comme une panne : quelques envois lents dans un salon ne
+    // doivent pas suspendre les rappels et alertes de fond.
+    if (isTimeoutError(error)) return "uncertain";
+    recordFailure();
+    return "unavailable";
   }
 }
