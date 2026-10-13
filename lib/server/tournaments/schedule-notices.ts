@@ -68,6 +68,9 @@ export type MatchScheduleChange = {
   actor: StaffActor | null;
 };
 
+/** Une date d'avant passée depuis moins longtemps se cite encore (match en retard). */
+const RECENT_PREVIOUS_MS = 12 * 60 * 60 * 1000;
+
 /**
  * Ce que l'annonce dit aux **joueurs** : « reprogrammé », avec l'ancienne date,
  * seulement s'ils avaient reçu un horaire — une date posée quand une place était
@@ -75,11 +78,13 @@ export type MatchScheduleChange = {
  */
 export function playerAnnouncement(change: MatchScheduleChange, now: Date = new Date()): ScheduleAnnouncement {
   if (!change.alreadyAnnounced) return { rescheduled: false, previousStartAt: null };
-  // Une date d'avant déjà passée n'a été que journalisée (correction
-  // d'archive, saisie de travers) : les joueurs ne l'ont jamais reçue, on ne
-  // la leur cite pas.
+  // L'ancienne date se cite si les joueurs ont pu la recevoir : encore devant,
+  // ou passée de peu (un match en retard qu'on décale). Une date passée depuis
+  // longtemps n'a été que journalisée (correction d'archive, mois saisi de
+  // travers) : les joueurs ne l'ont jamais reçue, on ne la leur cite pas.
   const previous = change.previousStartAt === null ? Number.NaN : new Date(change.previousStartAt).getTime();
-  return { rescheduled: true, previousStartAt: previous > now.getTime() ? change.previousStartAt : null };
+  const citable = previous > now.getTime() - RECENT_PREVIOUS_MS;
+  return { rescheduled: true, previousStartAt: citable ? change.previousStartAt : null };
 }
 
 /**
