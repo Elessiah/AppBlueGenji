@@ -486,10 +486,10 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   langue — plutôt qu'un choix figé que personne ne retrouverait. Détail : `I18N.md` § Langue du
   compte.
 - **Seules les notifications push** suivent la langue du compte ; Discord reste français (D6), le
-  staff aussi (D4). L'alerte d'arbitrage anglaise est une phrase générique par nature d'alerte : le
-  texte Discord n'est pas traduit.
-- **Décision requise** : base légale de la langue du compte, rangée par défaut sous T01
-  (« exécution du service »).
+  staff aussi (D4). L'alerte d'arbitrage anglaise nomme le tournoi et la manche quand l'alerte
+  porte sur un match (sinon une phrase par nature d'alerte) : le texte Discord n'est pas traduit.
+- **Base légale** de la langue du compte : T01 (« exécution du service »), décision de
+  l'utilisateur (2026-10-13).
 
 ### Raccordement, sujet par sujet
 
