@@ -22,6 +22,9 @@ aujourd'hui et demain. D'où trois pièces, et une seule règle pour la suite.
 **La règle pour demain** : une notification nouvelle est une entrée de
 `PUSH_TOPICS`, un rédacteur dans `lib/shared/push-messages.ts`, et un appel à
 `notifyUsers` / `notifyStaff`. Son réglage paraît de lui-même sur `/profil`.
+`notifyStaff` écarte les comptes **suspendus** (`subscribedStaffCandidates`,
+même règle SQL que la session : `lib/server/suspension-sql.ts`) : un arbitre
+suspendu n'a plus de droit effectif, il ne reçoit plus rien du staff.
 Un balayage (`tests/lib/server/notification-channels.test.ts`) refuse tout
 `pushDiscordDirectMessages` hors de `notify.ts`, et tout `pushRefereeAlert` /
 `pushLeadershipAlert` hors d'un `notifyStaff` : une notification qui passerait à
