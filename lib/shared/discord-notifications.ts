@@ -5,11 +5,13 @@
  * des appels reste app → bot (comme l'auth, les logs et la fréquentation), le
  * bot n'appelant jamais le site en retour.
  *
- * 1. **Rappels de match** — une semaine, 24 h puis 1 h avant le coup d'envoi
- *    d'une manche programmée (`bg_matches.start_at`), en message privé à chaque
- *    joueur des deux engagées. Une date posée tardivement — à trois jours, à
- *    cinq heures — donne d'abord une **annonce** unique portant la date, puis
- *    les paliers qui restent devant.
+ * 1. **Rappels de match** — une semaine puis 24 h avant le coup d'envoi d'une
+ *    manche programmée (`bg_matches.start_at`), en message privé à chaque
+ *    joueur des deux engagées. Poser ou changer la date donne d'abord une
+ *    **annonce** unique qui la porte (« Match programmé » / « Match
+ *    reprogrammé »), puis les paliers qui restent devant. Le rappel « 1 heure
+ *    avant » a été retiré (demande de l'association, 2026-10 : trop de
+ *    notifications) — le départ du match (`MATCH_START`) en tient lieu.
  * 2. **Signalement d'un problème** — un inscrit alerte le staff depuis la page
  *    du tournoi ou depuis un match ; le bot le relaie au canal de logs et au
  *    rôle arbitre.
@@ -22,8 +24,14 @@ import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/round
 import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { discordInline, discordQuote } from "./discord-text";
 
-/** Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`). */
-export type MatchReminderOffsetKey = "P7D" | "P1D" | "PT1H";
+/**
+ * Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`).
+ *
+ * `PT1H` (une heure avant) n'existe plus : les lignes déjà posées sous cette
+ * clé restent en base, inertes — le balayage ne lit que les clés de
+ * {@link MATCH_REMINDER_OFFSETS}.
+ */
+export type MatchReminderOffsetKey = "P7D" | "P1D";
 
 /** Palier de rappel : combien de temps avant le match, et comment le dire. */
 export interface MatchReminderOffset {
@@ -43,7 +51,6 @@ export interface MatchReminderOffset {
 export const MATCH_REMINDER_OFFSETS: readonly MatchReminderOffset[] = [
   { key: "P7D", minutesBefore: 7 * 24 * 60, label: "une semaine" },
   { key: "P1D", minutesBefore: 24 * 60, label: "24 heures" },
-  { key: "PT1H", minutesBefore: 60, label: "1 heure" },
 ];
 
 const MINUTE_MS = 60_000;
@@ -53,10 +60,10 @@ const MINUTE_MS = 60_000;
  *
  * Chaque palier ne vaut que dans **sa propre fenêtre** : `[début − palier,
  * début − palier suivant)`, le dernier s'arrêtant au coup d'envoi. Sans ce
- * découpage, une manche programmée pour dans trente minutes déclencherait d'un
- * coup les trois rappels — « dans une semaine », « dans 24 heures » et « dans
- * 1 heure » — pour le même match, dans la même seconde. Ici, elle ne déclenche
- * que le rappel d'une heure, le seul qui soit vrai.
+ * découpage, une manche programmée pour dans trois heures déclencherait d'un
+ * coup les deux rappels — « dans une semaine » et « dans 24 heures » — pour le
+ * même match, dans la même seconde. Ici, elle ne déclenche que le rappel de
+ * 24 heures, le seul qui soit vrai.
  *
  * Rien ne part une fois le match commencé : un rappel en retard n'est plus un
  * rappel, et un match reprogrammé vers le passé (correction d'archive) ne doit
@@ -112,7 +119,7 @@ export const MATCH_REMINDER_HORIZON_MS =
  * découverte **au moment même** où le palier « une semaine » s'ouvre, donc
  * toujours par le régime d'annonce — et ce palier ne partirait jamais. Une
  * journée d'avance laisse le site observer la manche avant que quoi que ce soit
- * ne soit dû, et les trois paliers courent alors normalement.
+ * ne soit dû, et les paliers courent alors normalement.
  */
 export const MATCH_REMINDER_LOOKAHEAD_MS = MATCH_REMINDER_HORIZON_MS + 24 * 60 * MINUTE_MS;
 
@@ -221,7 +228,9 @@ export function buildMatchReminderMessage(
 }
 
 /**
- * Rédige l'annonce d'une manche programmée tardivement.
+ * Rédige l'annonce de l'horaire d'une manche : date posée ou changée par
+ * l'arbitrage (`rescheduled` quand elle en remplace une), ou découverte
+ * tardivement par le balayage.
  *
  * Un seul message, qui porte la date, là où les paliers manqués en auraient
  * envoyé deux ou trois d'affilée — et de travers : « ton match est dans une
@@ -231,14 +240,16 @@ export function buildMatchReminderMessage(
  *
  * @param context Ce qu'il y a à dire du match.
  * @param remaining Paliers encore à venir, pour annoncer la suite.
+ * @param rescheduled La date remplace une date déjà posée.
  * @returns Le message privé à envoyer, en français.
  */
 export function buildMatchScheduleAnnouncement(
   context: MatchReminderContext,
   remaining: readonly MatchReminderOffset[] = [],
+  rescheduled = false,
 ): string {
   const lines = [
-    "**Match programmé**",
+    rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`,
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,

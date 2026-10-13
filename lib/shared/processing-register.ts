@@ -424,7 +424,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
-      "Envoyer des rappels de match en message privé Discord (une semaine, 24 h et 1 h avant)",
+      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé ou changé) et des rappels de match (une semaine et 24 h avant)",
       "Alerter le rôle arbitre (conflit de score, report expiré, signalement d'un joueur)",
     ],
     legalBasis:
@@ -713,7 +713,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, rappels de match",
       "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
-      "Alertes d'arbitrage et de modération pour le staff qui détient ces rôles",
+      "Alertes d'arbitrage (dont les matchs programmés ou reprogrammés) et de modération pour le staff qui détient ces rôles",
     ],
     legalBasis: "Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)",
     dataSubjects: ["Joueurs inscrits qui activent les notifications sur un appareil"],

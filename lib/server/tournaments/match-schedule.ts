@@ -24,7 +24,9 @@ import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
 import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
+import type { StaffActor } from "@/lib/shared/log-privacy";
 import { publishMatchUpdatedEvent } from "./notifications";
+import { notifyMatchScheduleChange } from "./schedule-notices";
 
 type MatchScheduleRow = RowDataPacket & {
   id: number;
@@ -113,19 +115,25 @@ async function lockScheduleRow(
  * de refuser l'effacement : le calendrier ne doit pas être pris en otage par
  * une configuration de diffusion.
  *
+ * Une date posée ou changée, encore devant, est annoncée aux joueurs des deux
+ * engagées et aux arbitres, et journalisée (`./schedule-notices`).
+ *
+ * @param actor Membre du staff qui programme : nommé dans pm2, anonyme sur
+ *              Discord, et seul arbitre à ne pas recevoir la notification.
  * @returns la date normalisée en ISO, ou `null` si elle a été effacée.
  * @throws `MATCH_NOT_FOUND` | `INVALID_MATCH_START_AT`
  */
 export async function setMatchStartAt(
   matchId: number,
   rawStartAt: string | Date | null,
+  actor: StaffActor | null = null,
 ): Promise<string | null> {
   const blank =
     rawStartAt === null || (typeof rawStartAt === "string" && rawStartAt.trim() === "");
   const startAt = blank ? null : normalizeMatchStartAt(rawStartAt);
   if (!blank && startAt === null) throw new Error("INVALID_MATCH_START_AT");
 
-  const tournamentId = await withConnection(async (connection) => {
+  const outcome = await withConnection(async (connection) => {
     let written: { tournamentId: number; previousStartAt: string | null };
     await connection.beginTransaction();
     try {
@@ -173,9 +181,18 @@ export async function setMatchStartAt(
         // Meilleur effort : au pire, le cycle des rappels garde son ancien état.
       }
     }
-    return written.tournamentId;
+    return written;
   });
 
-  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  publishMatchUpdatedEvent(outcome.tournamentId, { landingLive: true });
+  // Joueurs, arbitres et journal apprennent l'horaire posé ou changé
+  // (`./schedule-notices`) — sans retenir la réponse, et seulement après le
+  // ménage des rappels, dont l'annonce réserve la marque à neuf.
+  void notifyMatchScheduleChange({
+    matchId,
+    startAt,
+    previousStartAt: outcome.previousStartAt,
+    actor,
+  }).catch(() => undefined);
   return startAt;
 }

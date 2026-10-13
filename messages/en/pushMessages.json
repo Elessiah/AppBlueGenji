@@ -10,12 +10,19 @@
   "matchReminder": {
     "title": "Match in {offset}",
     "titleScheduled": "Match scheduled",
+    "titleRescheduled": "Match rescheduled",
     "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
     "offset": {
       "P7D": "a week",
-      "P1D": "24 hours",
-      "PT1H": "1 hour"
+      "P1D": "24 hours"
     }
+  },
+  "matchScheduled": {
+    "title": "Match scheduled",
+    "titleRescheduled": "Match rescheduled",
+    "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
+    "soloPairing": "A match",
+    "tbd": "TBD"
   },
   "round": {
     "playoff": "Playoffs · round {round}",

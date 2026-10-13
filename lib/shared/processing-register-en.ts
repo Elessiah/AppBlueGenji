@@ -247,7 +247,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
-      "Sending match reminders by Discord direct message (one week, 24 h and 1 h before)",
+      "Sending by Discord direct message the announcement of a match's time (set or changed) and match reminders (one week and 24 h before)",
       "Alerting the referee role (score conflict, expired postponement, report on a player)",
     ],
     legalBasis:
@@ -534,7 +534,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Start of their matches, score to confirm, tournament kick-off, match reminders",
       "Requests to join a team they manage, reports and moderation decisions concerning them, changes to the data policy",
-      "Refereeing and moderation alerts for the staff holding these roles",
+      "Refereeing alerts (including scheduled or rescheduled matches) and moderation alerts for the staff holding these roles",
     ],
     legalBasis: "Consent (activation on each device, withdrawable at any time, topic by topic)",
     dataSubjects: ["Registered players who turn on notifications on a device"],

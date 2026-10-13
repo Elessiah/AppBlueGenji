@@ -86,7 +86,7 @@ export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", loc
 }
 
 /** Palier d'un rappel (`MATCH_REMINDER_OFFSETS`), par sa clé. */
-export type MatchReminderOffsetKey = "P7D" | "P1D" | "PT1H";
+export type MatchReminderOffsetKey = "P7D" | "P1D";
 
 /**
  * Libellé d'une manche (`matchRoundLabel`, français du journal Discord) dans
@@ -129,15 +129,26 @@ function pushMatchStart(startAt: string | Date, locale: Locale): string {
   ).format(date);
 }
 
-/** Rappel d'un match programmé (`offset` : son palier), ou annonce de son horaire (`null`). */
+type ScheduledMatchSide = MatchSide & { bracket: string; roundNumber: number; startAt: string | Date };
+
+function announcementTitle(offset: MatchReminderOffsetKey | null, rescheduled: boolean, text: PushText): string {
+  if (offset) return text.t("matchReminder.title", { offset: text.t(`matchReminder.offset.${offset}`) });
+  return rescheduled ? text.t("matchReminder.titleRescheduled") : text.t("matchReminder.titleScheduled");
+}
+
+/**
+ * Rappel d'un match programmé (`offset` : son palier), ou annonce de son
+ * horaire (`null`) — « reprogrammé » quand la date en remplace une autre.
+ */
 export function matchReminderPush(
-  side: MatchSide & { bracket: string; roundNumber: number; startAt: string | Date },
+  side: ScheduledMatchSide,
   offset: MatchReminderOffsetKey | null,
   locale: Locale = DEFAULT_LOCALE,
+  rescheduled = false,
 ): PushContent {
   const text = TEXT[locale];
   return {
-    title: offset ? text.t("matchReminder.title", { offset: text.t(`matchReminder.offset.${offset}`) }) : text.t("matchReminder.titleScheduled"),
+    title: announcementTitle(offset, rescheduled, text),
     body: text.t("matchReminder.body", {
       pairing: pairing(side, text),
       tournament: side.tournamentName,
@@ -146,6 +157,47 @@ export function matchReminderPush(
     }),
     url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-reminder`,
+  };
+}
+
+/**
+ * Match programmé ou reprogrammé, pour l'arbitrage (`MATCH_SCHEDULED`).
+ *
+ * Les deux engagées sont nommées quand ce sont des équipes ; en tournoi
+ * individuel, leurs noms sont des pseudos et la notification dit « Un match »
+ * (même règle que pour les joueurs). Une manche dont les engagées ne sont pas
+ * encore connues se lit « À déterminer ».
+ */
+export function matchScheduledStaffPush(
+  input: {
+    tournamentId: number;
+    tournamentName: string;
+    matchId: number;
+    team1Name: string | null;
+    team2Name: string | null;
+    solo: boolean;
+    bracket: string;
+    roundNumber: number;
+    startAt: string | Date;
+  },
+  rescheduled: boolean,
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
+  const tbd = text.t("matchScheduled.tbd");
+  const pairingText = input.solo
+    ? text.t("matchScheduled.soloPairing")
+    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+  return {
+    title: rescheduled ? text.t("matchScheduled.titleRescheduled") : text.t("matchScheduled.title"),
+    body: text.t("matchScheduled.body", {
+      pairing: pairingText,
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale),
+      start: pushMatchStart(input.startAt, locale),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `${matchTag(input.matchId)}-schedule`,
   };
 }
 

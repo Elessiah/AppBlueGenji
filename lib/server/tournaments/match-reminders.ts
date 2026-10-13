@@ -156,6 +156,8 @@ type PlannedSend = {
   offset: MatchReminderOffset | null;
   /** Paliers encore devant, pour dire à quand le prochain rappel (annonce). */
   remaining: MatchReminderOffset[];
+  /** Annonce d'une date qui en remplace une autre (« Match reprogrammé »). */
+  rescheduled?: boolean;
 };
 
 /**
@@ -219,7 +221,7 @@ async function planMatchSends(
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 async function dispatchPlannedSend(
-  { match, offset, remaining }: PlannedSend,
+  { match, offset, remaining, rescheduled = false }: PlannedSend,
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
 ): Promise<number> {
   let dispatched = 0;
@@ -256,7 +258,7 @@ async function dispatchPlannedSend(
 
     const message = offset
       ? buildMatchReminderMessage(offset, context)
-      : buildMatchScheduleAnnouncement(context, remaining);
+      : buildMatchScheduleAnnouncement(context, remaining, rescheduled);
 
     await notifyUsers(recipients, {
       topic: "MATCH_REMINDER",
@@ -276,11 +278,72 @@ async function dispatchPlannedSend(
           },
           offset ? offset.key : null,
           locale,
+          rescheduled,
         ),
     });
     dispatched += 1;
   }
   return dispatched;
+}
+
+/**
+ * Manches à venir, non jouées, aux deux engagées connues — le balayage y ajoute
+ * sa fenêtre de lecture, l'annonce d'un horaire le numéro de la manche.
+ */
+const SCHEDULED_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
+            m.team1_id, m.team2_id,
+            t.name AS tournament_name, t.participant_type,
+            t1.name AS team1_name, t2.name AS team2_name
+       FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id
+       JOIN bg_teams t1 ON t1.id = m.team1_id
+       JOIN bg_teams t2 ON t2.id = m.team2_id
+      WHERE m.start_at IS NOT NULL
+        AND m.start_at > NOW()
+        AND m.status <> 'COMPLETED'`;
+
+/**
+ * Annonce aux joueurs des deux engagées l'horaire qu'un arbitre vient de poser
+ * ou de changer (`setMatchStartAt`), **sans attendre** le balayage.
+ *
+ * Le balayage seul laissait deux trous : il ne passe qu'à la lecture de la
+ * liste des tournois, et une date posée au-delà de sa fenêtre de lecture (plus
+ * de huit jours) n'était annoncée par rien — le joueur l'apprenait au rappel
+ * « une semaine ». Ici l'annonce part tout de suite, quelle que soit
+ * l'échéance.
+ *
+ * L'appelant a déjà effacé les rappels de l'ancienne date : la marque
+ * d'observation se réserve donc à neuf, et c'est elle qui interdit le doublon
+ * avec un balayage concurrent — celui qui la pose annonce, l'autre se tait. Les
+ * paliers déjà ouverts sont consommés comme au premier passage du balayage ;
+ * ceux qui restent devant suivent leur cours.
+ *
+ * Meilleur effort : rien n'est annoncé pour une manche passée, jouée, ou dont
+ * une engagée manque encore (le balayage l'annoncera quand elle sera connue).
+ *
+ * @param rescheduled La nouvelle date remplace une date déjà posée.
+ * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
+ */
+export async function announceMatchSchedule(
+  matchId: number,
+  rescheduled: boolean,
+  now: Date = new Date(),
+): Promise<number> {
+  const db = await getDatabase();
+  const [matches] = await db.query<ScheduledMatchRow[]>(`${SCHEDULED_MATCH_SELECT} AND m.id = ? LIMIT 1`, [
+    matchId,
+  ]);
+  const match = matches[0];
+  if (!match) return 0;
+  if (!(await claimReminder(matchId, MATCH_SEEN_KEY))) return 0;
+
+  const opened = openedMatchReminders(match.start_at, now);
+  for (const offset of opened) await claimReminder(matchId, offset.key);
+  const openedKeys = new Set(opened.map((offset) => offset.key));
+  const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
+
+  const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
+  return dispatchPlannedSend({ match, offset: null, remaining: [...remaining], rescheduled }, recipientsByTeam);
 }
 
 async function runSweep(now: Date): Promise<number> {
@@ -297,18 +360,8 @@ async function runSweep(now: Date): Promise<number> {
   // seconde où le palier « une semaine » s'ouvre, donc toujours par le régime
   // d'annonce, et ce palier ne partirait jamais.
   const [matches] = await db.query<ScheduledMatchRow[]>(
-    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
-            m.team1_id, m.team2_id,
-            t.name AS tournament_name, t.participant_type,
-            t1.name AS team1_name, t2.name AS team2_name
-       FROM bg_matches m
-       JOIN bg_tournaments t ON t.id = m.tournament_id
-       JOIN bg_teams t1 ON t1.id = m.team1_id
-       JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.start_at IS NOT NULL
-        AND m.start_at > NOW()
-        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
-        AND m.status <> 'COMPLETED'`,
+    `${SCHEDULED_MATCH_SELECT}
+        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)`,
     [Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000)],
   );
   if (matches.length === 0) return 0;

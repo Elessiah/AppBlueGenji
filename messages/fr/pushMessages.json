@@ -10,12 +10,19 @@
   "matchReminder": {
     "title": "Match dans {offset}",
     "titleScheduled": "Match programmé",
+    "titleRescheduled": "Match reprogrammé",
     "body": "{pairing} · {tournament}, {round}. Coup d'envoi {start} (heure de Paris).",
     "offset": {
       "P7D": "une semaine",
-      "P1D": "24 heures",
-      "PT1H": "1 heure"
+      "P1D": "24 heures"
     }
+  },
+  "matchScheduled": {
+    "title": "Match programmé",
+    "titleRescheduled": "Match reprogrammé",
+    "body": "{pairing} · {tournament}, {round}. Coup d'envoi {start} (heure de Paris).",
+    "soloPairing": "Un match",
+    "tbd": "À déterminer"
   },
   "round": {
     "playoff": "Play-offs · tour {round}",

@@ -232,6 +232,37 @@ export function formatForfeitCancelledLog(context: {
 }
 
 /**
+ * Match programmé ou reprogrammé par l'arbitrage
+ * (`lib/server/tournaments/match-schedule.ts`).
+ *
+ * Les engagées passent par `entrantLabel` (« un joueur » en tournoi
+ * individuel), une place encore vide se lit « TBD ». L'auteur y est « le
+ * staff », nommé dans pm2 (`publishStaffAction`). Une reprogrammation rappelle
+ * l'ancien horaire : l'arbitre qui lit le canal sait ce qui a bougé.
+ */
+export function formatMatchScheduledLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  startAt: string | Date;
+  previousStartAt: string | Date | null;
+}): string {
+  const team1 = context.team1 ? entrantLabel(context.team1) : "TBD";
+  const team2 = context.team2 ? entrantLabel(context.team2) : "TBD";
+  const kind = context.previousStartAt === null ? "Match programmé" : "Match reprogrammé";
+  const previous =
+    context.previousStartAt === null ? "" : ` (au lieu du ${formatMatchStart(context.previousStartAt)})`;
+  return (
+    `${lead("🗓️", kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber)} — ` +
+    `${team1} vs ${team2} (#${context.matchId}), coup d'envoi ${formatMatchStart(context.startAt)} ` +
+    `(heure de Paris)${previous}, par ${ANONYMOUS_STAFF_LABEL}.`
+  );
+}
+
+/**
  * Retrait d'une inscription par le staff, avant le coup d'envoi
  * (`lib/shared/entrant-removal.ts`).
  *

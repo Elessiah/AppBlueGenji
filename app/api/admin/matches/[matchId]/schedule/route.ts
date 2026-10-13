@@ -32,7 +32,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (raw !== null && typeof raw !== "string") return fail("INVALID_MATCH_START_AT", 400);
 
   try {
-    const startAt = await setMatchStartAt(matchId, raw);
+    const startAt = await setMatchStartAt(matchId, raw, { id: user.id, pseudo: user.pseudo });
     return ok({ startAt });
   } catch (error) {
     const message = (error as Error).message;

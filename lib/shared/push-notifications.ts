@@ -57,7 +57,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_REMINDER: {
     label: "Rappels de match",
-    description: "Une semaine, 24 h puis 1 h avant un match programmé, et l'annonce de son horaire.",
+    description: "L'annonce de l'horaire d'un match (ou de son changement), puis un rappel une semaine et 24 h avant.",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {
@@ -83,6 +83,11 @@ export const PUSH_TOPICS = {
   REFEREE_ALERT: {
     label: "Alertes d'arbitrage",
     description: "Un conflit de score, un report non tranché ou un problème signalé attend un arbitre.",
+    audience: "tournaments",
+  },
+  MATCH_SCHEDULED: {
+    label: "Matchs programmés",
+    description: "Un membre de l'arbitrage programme ou reprogramme un match.",
     audience: "tournaments",
   },
   STAFF_REPORT: {
