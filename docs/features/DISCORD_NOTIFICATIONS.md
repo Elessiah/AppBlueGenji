@@ -151,7 +151,11 @@ après l'image de la transaction n'échappe pas, et un envoi qui n'a pas encore
 posé la sienne attend la suppression puis ne trouve plus la manche ; un test
 balaie les sources pour qu'aucune suppression n'y échappe
 (`departed-notices-wiring.test.ts`). La suppression d'un tournoi entier n'est
-pas couverte (le tournoi disparaît).
+pas couverte (le tournoi disparaît). Une manche supprimée dont l'horaire avait
+été poussé aux arbitres (marque `STAFF` encore valable, lue sous verrou avec
+les places) leur vaut aussi « Horaire du match retiré » après le commit
+(`announceDeletedMatchesToStaff`, personne exclu : c'est le moteur qui l'a
+retirée) — la marque part avec la manche.
 
 L'horaire est celui que tient la marque `TOLD`, lu dans la transaction
 **avant** l'effacement des marques ou la suppression, par une seule lecture
@@ -438,7 +442,7 @@ d'annonce) : une date corrigée pour l'archive n'est que journalisée.
 Le retrait d'un horaire n'est poussé aux arbitres que s'ils l'avaient reçu :
 la marque `STAFF` (`MATCH_STAFF_KEY`) retient l'horaire de « Match programmé »,
 réservée **avant** l'envoi (`markStaffPushed` : une transaction qui verrouille
-la manche puis sa marque, comme le moteur ; conditionnée à l'horaire encore
+la manche puis sa marque, comme le moteur, rejouée sur interblocage ; conditionnée à l'horaire encore
 en place : un retrait qui suit de près la trouve ; refusée, la manche ne tient
 plus cet horaire et rien n'est poussé) et rendue si aucun appareil n'est
 atteint (`releaseStaffPush`), sur sa ligne, à ce qu'elle tenait avant — jamais
