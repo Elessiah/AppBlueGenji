@@ -22,11 +22,11 @@ import {
   buildPushPayload,
   isPushTopic,
   type LocalizedPushContent,
-  type PushContent,
   type PushSubscriptionInput,
   type PushTopic,
 } from "@/lib/shared/push-notifications";
-import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
+import { type Locale } from "@/lib/shared/locales";
+import { cached } from "@/lib/shared/intl-cache";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
 
@@ -173,7 +173,7 @@ export type PushOptions = {
 export async function pushToUsers(
   userIds: readonly number[],
   topic: PushTopic,
-  content: PushContent | LocalizedPushContent,
+  content: LocalizedPushContent,
   options: PushOptions = {},
   config: WebPushConfig | null = webPushConfig(),
 ): Promise<number> {
@@ -198,18 +198,10 @@ export async function pushToUsers(
     // titulaire.
     const origin = siteBaseUrl();
     const payloads = new Map<Locale, string>();
-    const payloadFor = (raw: unknown): string => {
-      // Un contenu non traduit est français, pour tous : une seule charge,
-      // quelle que soit la langue des comptes, et sa langue déclarée est `fr`.
-      const locale = typeof content === "function" ? accountLocaleFromRow(raw) : DEFAULT_LOCALE;
-      let payload = payloads.get(locale);
-      if (payload === undefined) {
-        const localized = typeof content === "function" ? content(locale) : content;
-        payload = JSON.stringify(buildPushPayload(topic, localized, origin, locale));
-        payloads.set(locale, payload);
-      }
-      return payload;
-    };
+    const payloadFor = (raw: unknown): string =>
+      cached(payloads, accountLocaleFromRow(raw), (locale) =>
+        JSON.stringify(buildPushPayload(topic, content(locale), origin, locale)),
+      );
     const sent: number[] = [];
     const gone: number[] = [];
     await inBatches(rows, PUSH_CONCURRENCY, async (row) => {
