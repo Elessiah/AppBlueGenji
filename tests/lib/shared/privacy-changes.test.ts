@@ -794,7 +794,7 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
     expect(text()).toMatch(/notifications push/);
     expect(text()).toMatch(/connecté la dernière fois/);
     // Une connexion lancée hors du site ne pose pas la langue (revue sécurité) : le texte le dit.
-    expect(text()).toMatch(/lancée d'ailleurs, par un lien ou un favori, ou depuis un navigateur trop ancien pour l'indiquer, ne la change pas/);
+    expect(text()).toMatch(/lancée d'ailleurs, par un lien ou un favori, ne la change pas, ni une connexion par Google, Discord ou Blizzard depuis un navigateur trop ancien/);
     expect(text()).toMatch(/Mon profil/);
     expect(text()).toMatch(/prochaine connexion faite dans l'autre langue/);
     expect(text()).toMatch(/le temps du compte/);

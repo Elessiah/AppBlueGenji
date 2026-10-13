@@ -220,7 +220,17 @@ describe("service worker du site", () => {
 
   it("ramène une route d'API à l'accueil du site, même déguisée (lot 9-3)", async () => {
     const worker = loadWorker();
-    const urls = ["/api/auth/google/start?terms=1", "/en/api/x", "/%61pi/auth/x", "/API", "/tournois/../api/x", "/%E0%A4%A"];
+    const urls = [
+      "/api/auth/google/start?terms=1",
+      "/en/api/x",
+      "/de/api/x",
+      "/%61pi/auth/x",
+      "/API",
+      "/tournois/../api/x",
+      "/%E0%A4%A",
+      "/\t/evil.test",
+      "/\n/evil.test/tournois",
+    ];
     for (const url of urls) worker.fire("push", { data: { json: () => ({ title: "x", url }) } });
     worker.fire("push", { data: { json: () => ({ title: "x", url: "/apiculture" }) } });
     await Promise.all(worker.waited);
