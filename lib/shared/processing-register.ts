@@ -429,7 +429,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     legalBasis:
       "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match et les alertes d'arbitrage",
-    dataSubjects: ["Joueurs engagés dans un tournoi", "Arbitres", "Casters inscrits sur un match"],
+    dataSubjects: ["Joueurs engagés dans un tournoi", "Autres membres des équipes engagées (coachs, managers, propriétaires)", "Arbitres", "Casters inscrits sur un match"],
     dataCategories: [
       "Pseudo et identifiant Discord",
       "BattleTag",
