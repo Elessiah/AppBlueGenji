@@ -84,7 +84,8 @@ remplacé par une **annonce unique** portant la date
 
 | Date posée par l'arbitrage | Ce que reçoit le joueur |
 | --- | --- |
-| à J-10 ou J-3 | annonce tout de suite (« Match programmé, le … »), puis P1D |
+| à J-10 ou J-3 | annonce tout de suite (« Match programmé » + « Coup d'envoi : … »), puis P1D |
+| changée | « Match reprogrammé » + « Nouveau coup d'envoi : …, au lieu du … », s'il avait reçu l'ancienne |
 | à H-5 | annonce, et rien après |
 | retirée | « Horaire du match retiré », s'il l'avait reçue, qu'elle était encore devant et que le tournoi est planifié par l'arbitrage |
 | posée quand une place était vide | rien tant qu'elle l'est ; annonce par le balayage dès que les deux engagées sont connues, au plus tard 48 h avant (une journée avant le rappel) |
@@ -104,11 +105,14 @@ découvre parte une journée avant l'ouverture du rappel, plutôt qu'à sa place
 Une engagée **remplacée** sur l'affiche (correction d'un score amont :
 `vacateSlot` dans `bracket-cascade.ts`, ou `pushTeamToTarget` dans
 `scoring.ts`) efface les marques de la manche, comme un retour en arrière
-(`detachMatchParticipants`, `rollback.ts`) : la
+(`forgetChangedPosters`, `rollback.ts`, qui épargne une rencontre rendue aux
+mêmes engagées) : la
 remplaçante n'a reçu aucun horaire, le balayage lui annoncera la date. Limite
 connue : l'engagée restée en place perd aussi sa marque `TOLD` (les marques
 sont par manche, pas par engagée) — un changement ou un retrait d'horaire
-ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
+ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu ; et
+l'engagée **retirée** de l'affiche n'est pas prévenue que l'horaire reçu ne la
+concerne plus (le plateau le montre).
 
 ### La marque `TOLD` : un horaire reçu
 
@@ -119,9 +123,10 @@ l'arrivée de `TOLD` est lue par ses paliers retirés `P7D` / `PT1H`, posés
 seulement avec un message (`MATCH_TOLD_KEYS`). Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
 annonce) ne le prouvent. `TOLD` survit aux changements de date : c'est elle qui
-fait dire « reprogrammé » à la date suivante — y compris quand c'est le
-balayage qui l'annonce, la place s'étant vidée entre-temps — et « retiré » à
-une date effacée.
+fait dire « reprogrammé » à la date suivante et « retiré » à une date effacée.
+Une preuve héritée (`P7D` / `PT1H`) est recopiée en `TOLD` au premier
+changement de date, avant que le ménage ne l'emporte. Une date posée sur un
+match **déjà joué** n'est que journalisée (ni joueurs, ni arbitres).
 
 ### Programmer, reprogrammer ou retirer l'horaire d'une manche
 
