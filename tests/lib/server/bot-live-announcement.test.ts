@@ -120,7 +120,8 @@ describe("pushLiveAnnouncement", () => {
   it("rend « channel-closed » sur un salon fermé (503) sans ouvrir le coupe-circuit des autres appels", async () => {
     jest
       .spyOn(global, "fetch")
-      .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE" }, { status: 503 }));
+      // Un corps neuf à chaque appel : une réponse ne se lit qu'une fois.
+      .mockImplementation(async () => Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE" }, { status: 503 }));
     for (let i = 0; i < 4; i++) {
       await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("channel-closed");
     }
