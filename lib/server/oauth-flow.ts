@@ -160,6 +160,20 @@ function linkFailure(base: string, provider: OAuthProvider, code: string, locale
 }
 
 /**
+ * Le départ vient-il d'un clic sur une page du site ? `Sec-Fetch-Site`, posé
+ * par le navigateur et hors de portée d'une page, le dit : `same-origin`
+ * seulement. Un lien d'un autre site (`cross-site`), d'un sous-domaine
+ * (`same-site`) ou un favori, une adresse tapée (`none`) n'ont pas choisi la
+ * langue de la page — la route de départ est un `GET` sans contrôle de
+ * provenance, qu'un autre site peut faire ouvrir. Sans l'en-tête (navigateur
+ * ancien, qui ne le pose jamais), la langue est retenue comme avant.
+ */
+function startedFromSitePage(req: NextRequest): boolean {
+  const site = req.headers.get("sec-fetch-site");
+  return site === null || site === "same-origin";
+}
+
+/**
  * Départ : pose l'état et envoie le navigateur chez le fournisseur.
  *
  * `intent=link` **exige une session ici**, et non au retour. Les deux contrôles
@@ -177,6 +191,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
   const redirectTo = sealedReturnPath(req.nextUrl.searchParams.get("redirect"), locale);
   const intent: OAuthIntent = req.nextUrl.searchParams.get("intent") === "link" ? "LINK" : "LOGIN";
   const termsAccepted = req.nextUrl.searchParams.get("terms") === "1";
+  const localeFromPage = startedFromSitePage(req);
 
   if (intent === "LINK") {
     const user = await getCurrentUser();
@@ -187,7 +202,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
 
   try {
     const authorizationUrl = OAUTH_CLIENTS[provider].authorizationUrl(state);
-    await saveOAuthState({ provider, state, redirectTo, intent, termsAccepted });
+    await saveOAuthState({ provider, state, redirectTo, intent, termsAccepted, localeFromPage });
     return NextResponse.redirect(authorizationUrl);
   } catch (error) {
     const missing = isMissingConfiguration(error);
@@ -319,8 +334,10 @@ async function completeLogin(
     const userId = await createOrGetOAuthUser(identity, { termsAccepted: saved.termsAccepted });
     await createSession(userId, `LOGIN_${provider}`);
     // La langue du compte suit celle de la page d'où l'on s'est connecté
-    // (lot 9-3, `lib/server/users/account-locale.ts`) ; jamais bloquant.
-    await recordLoginLocale(userId, locale);
+    // (lot 9-3, `lib/server/users/account-locale.ts`) ; jamais bloquant. Un
+    // départ venu d'ailleurs que d'une page du site ne la change pas
+    // (`startedFromSitePage`) : il n'a pas choisi de langue.
+    if (saved.localeFromPage) await recordLoginLocale(userId, locale);
   } catch (error) {
     // Un compte neuf sans les conditions acceptées : la page de connexion le
     // dit, plutôt qu'un « échec de connexion » qui ferait réessayer pour rien.

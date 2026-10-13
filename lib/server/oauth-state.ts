@@ -1,7 +1,7 @@
 /**
  * Le cookie qui traverse un aller-retour OAuth.
  *
- * Il porte quatre choses, et chacune est là pour une raison distincte :
+ * Il porte six choses, et chacune est là pour une raison distincte :
  *
  * - **`state`** — le jeton anti-CSRF. Le rappel n'est accepté que si le `state`
  *   de l'URL est celui du cookie : sans lui, n'importe qui pourrait faire
@@ -16,7 +16,9 @@
  *   qui a vérifié la session ;
  * - **`redirectTo`** — la destination d'après connexion, déjà filtrée à l'aller
  *   par `safeRedirectPath` et **refiltrée au retour** : ce cookie n'est pas
- *   signé, il ne fait pas foi (voir `lib/shared/safe-redirect.ts`).
+ *   signé, il ne fait pas foi (voir `lib/shared/safe-redirect.ts`) ;
+ * - **`termsAccepted`**, **`localeFromPage`** — décidés à l'aller, comme
+ *   l'intention : lus dans l'URL du rappel, ils seraient choisis par l'appelant.
  *
  * Un seul cookie, `bg_oauth`, qui remplace l'ancien `bg_google_oauth` : trois
  * cookies auraient laissé traîner deux états périmés à chaque connexion, et
@@ -37,6 +39,13 @@ export type OAuthStatePayload = {
   intent: OAuthIntent;
   /** Conditions d'utilisation acceptées à l'aller (case de `/connexion`). */
   termsAccepted: boolean;
+  /**
+   * Départ cliqué **sur une page du site** (`Sec-Fetch-Site: same-origin`) :
+   * seule cette langue-là devient celle du compte au retour (lot 9-3). Un
+   * lien posé ailleurs — autre site, favori, adresse tapée — connecte sans
+   * toucher à la langue choisie dans « Mon profil ».
+   */
+  localeFromPage: boolean;
 };
 
 function baseCookieOptions() {
@@ -83,6 +92,7 @@ export async function consumeOAuthState(): Promise<OAuthStatePayload | null> {
       redirectTo: parsed.redirectTo,
       intent,
       termsAccepted: parsed.termsAccepted === true,
+      localeFromPage: parsed.localeFromPage === true,
     };
   } catch {
     return null;

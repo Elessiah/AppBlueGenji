@@ -11,7 +11,9 @@
  * - à chaque **connexion**, la langue de la page d'où le joueur se connecte
  *   (`/connexion` ou `/en/connexion` : langue scellée dans l'aller-retour
  *   OAuth, ou envoyée avec le code Discord) — c'est la langue dans laquelle il
- *   utilise le site ;
+ *   utilise le site. Un départ OAuth venu d'ailleurs que d'une page du site
+ *   (lien d'un autre site, favori) connecte sans la changer
+ *   (`localeFromPage`, `lib/server/oauth-state.ts`) ;
  * - par un **choix explicite** dans « Mon profil », qui vaut jusqu'à la
  *   prochaine connexion faite dans l'autre langue (l'écran le dit).
  *
