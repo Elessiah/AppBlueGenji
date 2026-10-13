@@ -26,6 +26,7 @@ import {
   type MatchStartEntryField,
   type MatchStartEntryState,
 } from "@/lib/shared/match-start-entry";
+import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
@@ -480,7 +481,7 @@ export function MatchScheduleDialog({
               text,
               refereeScheduling,
               match.team1Id !== null && match.team2Id !== null,
-              match.status === "COMPLETED" || match.status === "AWAITING_CONFIRMATION",
+              isPlayedMatchStatus(match.status),
             )}
           </p>
 
