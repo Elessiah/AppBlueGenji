@@ -163,7 +163,7 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   depuis moins de deux heures ; un succès (même sans mention) ou un refus du
   corps (`400`) la garde. Un **délai dépassé** (15 s) la garde aussi : le bot a
   pu publier quand même, et une annonce perdue vaut mieux qu'un second
-  `@everyone` à tout le serveur (`uncertain`, `console.error` dans pm2) ; il
+  `@everyone` à tout le serveur (`timed-out`, `console.error` dans pm2, qui dit d'attendre quelques minutes avant de vérifier #live) ; il
   n'est pas compté comme une panne du bot. Le bot
   répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
   croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
