@@ -80,6 +80,7 @@ describe("startOAuth", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: false,
+      localeFromPage: true,
     });
   });
 
@@ -190,6 +191,7 @@ describe("completeOAuth — contrôles d'état", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
 
     const response = await callback("GOOGLE");
@@ -209,6 +211,7 @@ describe("completeOAuth — contrôles d'état", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
 
     const response = await callback("BLIZZARD");
@@ -225,6 +228,7 @@ describe("completeOAuth — contrôles d'état", () => {
     redirectTo: "/profil",
     intent: "LINK" as const,
     termsAccepted: false,
+    localeFromPage: true,
   });
 
   it("ramène au profil un **rattachement** annulé chez le fournisseur", async () => {
@@ -280,6 +284,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
     return completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
@@ -318,12 +323,51 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "/en/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
     await completeOAuth(request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`), "GOOGLE");
     expect(recordLoginLocale).toHaveBeenCalledWith(7, "en");
     expect(jest.mocked(recordLoginLocale).mock.invocationCallOrder[0]).toBeGreaterThan(
       jest.mocked(createSession).mock.invocationCallOrder[0],
     );
+  });
+
+  it.each([
+    ["un lien d'un autre site", "cross-site"],
+    ["un sous-domaine", "same-site"],
+    ["un favori ou une adresse tapée", "none"],
+  ])("ne scelle pas la langue d'un départ venu par %s (lot 9-3)", async (_label, site) => {
+    await startOAuth(
+      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": site } }),
+      "DISCORD",
+    );
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/en/tournois", localeFromPage: false }));
+  });
+
+  it("scelle la langue d'un départ cliqué sur une page du site, ou d'un navigateur sans l'en-tête", async () => {
+    await startOAuth(
+      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": "same-origin" } }),
+      "GOOGLE",
+    );
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: true }));
+    await startOAuth(request("http://localhost:3000/api/auth/x/start"), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: true }));
+  });
+
+  it("une connexion partie d'ailleurs que d'une page du site ouvre la session sans toucher à la langue du compte", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    jest.mocked(consumeOAuthState).mockResolvedValue({
+      provider: "GOOGLE",
+      state: STATE,
+      redirectTo: "/en/tournois",
+      intent: "LOGIN",
+      termsAccepted: true,
+      localeFromPage: false,
+    });
+    const response = await completeOAuth(request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`), "GOOGLE");
+    expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/tournois");
+    expect(recordLoginLocale).not.toHaveBeenCalled();
   });
 
   it("retient le **pseudo** Discord, pas son nom d'affichage", async () => {
@@ -414,6 +458,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "https://exemple.invalid/phishing",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
 
     const response = await completeOAuth(
@@ -445,6 +490,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/tournois",
       intent: "LINK",
       termsAccepted: true,
+      localeFromPage: true,
     });
     return completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
@@ -493,6 +539,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/en/tournois",
       intent: "LINK",
       termsAccepted: true,
+      localeFromPage: true,
     });
     const response = await completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
@@ -506,6 +553,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/en/tournois",
       intent: "LINK",
       termsAccepted: true,
+      localeFromPage: true,
     });
     const cancelled = await completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?error=access_denied&state=${STATE}`),
@@ -594,7 +642,7 @@ describe("aller-retour OAuth — la langue du départ", () => {
   const callback = (provider: OAuthProvider, query = `?code=abc&state=${STATE}`) =>
     completeOAuth(request(`http://localhost:3000/api/auth/x/callback${query}`), provider);
   const sealed = (redirectTo: string, provider: OAuthProvider = "GOOGLE") =>
-    jest.mocked(consumeOAuthState).mockResolvedValue({ provider, state: STATE, redirectTo, intent: "LOGIN", termsAccepted: true });
+    jest.mocked(consumeOAuthState).mockResolvedValue({ provider, state: STATE, redirectTo, intent: "LOGIN", termsAccepted: true, localeFromPage: true });
 
   it("scelle la destination dans la langue du départ, même vers une route pas encore traduite", async () => {
     await startOAuth(request("http://localhost:3000/api/auth/x/start?redirect=%2Ftournois%2F4&lang=en"), "DISCORD");
@@ -612,10 +660,10 @@ describe("aller-retour OAuth — la langue du départ", () => {
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/regles" }));
   });
 
-  it("n'ajoute aucun champ au cookie d'état", async () => {
+  it("n'ajoute au cookie d'état que la provenance du départ, jamais la langue à part", async () => {
     await startOAuth(request("http://localhost:3000/api/auth/x/start?lang=en"), "GOOGLE");
     expect(Object.keys(jest.mocked(saveOAuthState).mock.calls[0][0]).sort()).toEqual(
-      ["intent", "provider", "redirectTo", "state", "termsAccepted"],
+      ["intent", "localeFromPage", "provider", "redirectTo", "state", "termsAccepted"],
     );
   });
 
