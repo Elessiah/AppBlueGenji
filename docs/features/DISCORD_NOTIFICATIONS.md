@@ -429,12 +429,22 @@ assez pour planifier une ronde entière, pas pour qu'un client qui boucle fasse
 écrire le bot en rafale.
 
 Un tournoi **clos** (`FINISHED`) ne se joue plus : ses manches restées
-ouvertes comptent pour jouées (`loadMatchInfo` les lit `COMPLETED`, le
-balayage les écarte) — une date corrigée pour l'archive n'est que
-journalisée. Le retrait d'un horaire n'est poussé aux arbitres que s'ils
-l'avaient reçu (`refereesWerePushed`) : encore devant, ou passé de peu et tenu
-par les joueurs (annoncé, donc devant à l'annonce) ; une date passée saisie
-pour l'archive n'a été que journalisée, son retrait aussi. Une date posée sur un match au score saisi ne pose pas
+ouvertes comptent pour jouées — une seule règle, `isMatchOver`
+(`lib/shared/match-schedule.ts`), pour l'écriture de la date (aucune
+observation posée), les avis (`loadMatchInfo` les lit `COMPLETED`), le
+balayage (qui les écarte) et le dialogue de l'arbitre (aucune promesse
+d'annonce) : une date corrigée pour l'archive n'est que journalisée.
+
+Le retrait d'un horaire n'est poussé aux arbitres que s'ils l'avaient reçu :
+la marque `STAFF` (`MATCH_STAFF_KEY`) retient l'horaire de « Match programmé »
+quand il a atteint au moins un appareil (`markStaffPushed`, conditionnée à
+l'horaire encore en place), se lit avec `TOLD` sous les verrous de l'écriture
+de la date, et s'oublie une fois le retrait poussé (`forgetStaffPush`).
+`refereesWerePushed` exige qu'elle tienne l'horaire retiré, encore valable
+(devant, ou passé de moins de 12 h) : une date seulement journalisée — passée,
+posée sur un match joué ou dans un tournoi clos, même rouvert ensuite — n'a
+rien à remplacer. `forgetMatchReminders` la garde : une affiche changée ne
+change pas l'horaire que les arbitres ont reçu. Une date posée sur un match au score saisi ne pose pas
 d'observation (tout part sauf `TOLD`) : si la rencontre revient à jouer, le
 balayage l'annoncera. La place remplacée par `pushTeamToTarget` se lit sous
 verrou (`FOR UPDATE`).
