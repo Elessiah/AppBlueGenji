@@ -387,7 +387,9 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
 
     const release = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) => sql.startsWith("DELETE"));
-    expect(release?.[1]).toEqual([31, "SEEN"]);
+    // Seulement l'observation prise pour cet horaire (un changement plus récent garde la sienne).
+    expect(release?.[0]).toMatch(/AND start_at <=> \?$/);
+    expect(release?.[1]).toEqual([31, "SEEN", START]);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalled();
   });

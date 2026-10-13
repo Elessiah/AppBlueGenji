@@ -455,7 +455,7 @@ describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
     expect(notifyStaff).not.toHaveBeenCalled();
     // L'observation posée avec la date est rendue : le balayage annoncera la manche.
     const [sql, params] = execute.mock.calls[1] as unknown as [string, unknown[]];
-    expect(sql).toMatch(/^DELETE FROM bg_match_reminders WHERE match_id = \? AND offset_key = \? AND start_at <=> \?/);
+    expect(sql).toMatch(/^DELETE FROM bg_match_reminders\s+WHERE match_id = \? AND offset_key IN \(\?\) AND start_at <=> \?/);
     expect(params).toEqual([42, "SEEN", new Date(NEW_START)]);
     error.mockRestore();
   });
