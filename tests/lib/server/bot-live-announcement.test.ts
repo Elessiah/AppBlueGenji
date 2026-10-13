@@ -55,10 +55,20 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
-  it("rend « unavailable » sur un salon fermé (503) ou un bot injoignable, puis court-circuite", async () => {
+  it("rend « unavailable » sur un salon fermé (503) sans ouvrir le coupe-circuit des autres appels", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE" }, { status: 503 }));
+    for (let i = 0; i < 4; i++) {
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
+    }
+    expect(isBotCircuitOpen()).toBe(false);
+  });
+
+  it("rend « unavailable » sur un bot injoignable, puis court-circuite", async () => {
     const fetchMock = jest
       .spyOn(global, "fetch")
-      .mockResolvedValueOnce(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE" }, { status: 503 }))
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
       .mockRejectedValueOnce(new TypeError("fetch failed"))
       .mockRejectedValueOnce(new TypeError("fetch failed"));
 
