@@ -22,16 +22,9 @@ import type {
   SurvivalStandingRow,
   TournamentCard,
 } from "@/lib/shared/types";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 export type CardSummary = Pick<TournamentCard, "champion" | "runningProgress">;
-
-/**
- * Placeholders `?, ?, ?` d'un `IN (...)` : `execute` ne développe pas les
- * tableaux, les identifiants restent des paramètres liés.
- */
-function placeholders(count: number): string {
-  return Array.from({ length: count }, () => "?").join(", ");
-}
 
 function groupBy<T>(rows: readonly T[], key: (row: T) => number): Map<number, T[]> {
   const groups = new Map<number, T[]>();
@@ -65,7 +58,7 @@ async function loadChampions(
     `SELECT r.tournament_id, r.team_id, tm.name AS team_name, r.final_rank
      FROM bg_tournament_registrations r
      JOIN bg_teams tm ON tm.id = r.team_id
-     WHERE r.final_rank = 1 AND r.tournament_id IN (${placeholders(tournamentIds.length)})`,
+     WHERE r.final_rank = 1 AND r.tournament_id IN (${sqlPlaceholders(tournamentIds.length)})`,
     [...tournamentIds],
   );
 
@@ -128,7 +121,7 @@ async function loadRunningProgress(
   const [[metaRows], matchRows, survivalRows, enduranceRows, phaseRows] = await Promise.all([
     db.execute<TournamentMetaRow[]>(
       `SELECT id, swiss_total_rounds, swiss_current_round, current_phase_id
-       FROM bg_tournaments WHERE id IN (${placeholders(ids.length)})`,
+       FROM bg_tournaments WHERE id IN (${sqlPlaceholders(ids.length)})`,
       ids,
     ),
     matchIds.length
@@ -138,7 +131,7 @@ async function loadRunningProgress(
                COUNT(*) AS total,
                SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
              FROM bg_matches
-             WHERE tournament_id IN (${placeholders(matchIds.length)})
+             WHERE tournament_id IN (${sqlPlaceholders(matchIds.length)})
              GROUP BY tournament_id, phase_id, round_number`,
             matchIds,
           )
@@ -148,7 +141,7 @@ async function loadRunningProgress(
       ? db
           .execute<StatusRow<SurvivalStandingRow["status"]>[]>(
             `SELECT tournament_id, status FROM bg_survival_standings
-             WHERE phase_id = 0 AND tournament_id IN (${placeholders(survivalIds.length)})`,
+             WHERE phase_id = 0 AND tournament_id IN (${sqlPlaceholders(survivalIds.length)})`,
             survivalIds,
           )
           .then(([rows]) => rows)
@@ -157,7 +150,7 @@ async function loadRunningProgress(
       ? db
           .execute<StatusRow<EnduranceStandingRow["status"]>[]>(
             `SELECT tournament_id, status FROM bg_endurance_standings
-             WHERE tournament_id IN (${placeholders(enduranceIds.length)})`,
+             WHERE tournament_id IN (${sqlPlaceholders(enduranceIds.length)})`,
             enduranceIds,
           )
           .then(([rows]) => rows)
@@ -167,7 +160,7 @@ async function loadRunningProgress(
           .execute<PhaseSqlRow[]>(
             `SELECT id, tournament_id, state, format, swiss_total_rounds
              FROM bg_tournament_phases
-             WHERE tournament_id IN (${placeholders(multiIds.length)})`,
+             WHERE tournament_id IN (${sqlPlaceholders(multiIds.length)})`,
             multiIds,
           )
           .then(([rows]) => rows)

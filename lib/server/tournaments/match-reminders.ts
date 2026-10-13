@@ -30,6 +30,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import {
   loadEntrantPlayerIds,
   loadNotificationRecipients,
@@ -689,6 +690,8 @@ export type WithdrawnMatch = {
   phaseId: number;
   /** Tournoi individuel : aucun nom dans l'avis (« Ton match »). */
   solo: boolean;
+  /** Horaires posés par l'arbitrage : un horaire retiré sera remplacé. */
+  refereeScheduling: boolean;
   bracket: string;
   roundNumber: number;
   swiss: boolean;
@@ -720,16 +723,18 @@ type TeamNameRow = RowDataPacket & { id: number; name: string };
 
 /** Ce que l'avis dira à une engagée sortie, une fois l'état d'arrivée relu. */
 type WithdrawnOutcome =
-  /** Revenue sur la manche (seconde correction) : rien à dire. */
-  | { kind: "back" }
+  /**
+   * Rien à dire : revenue sur sa manche (seconde correction), reposée sur une
+   * rencontre au même horaire, ou sur une rencontre sans horaire d'un tournoi
+   * qui ne les pose pas (le lancement préviendra, comme après un retrait).
+   */
+  | { kind: "silent" }
   /**
    * Reposée contre le même adversaire dans la même manche (ronde réappariée,
-   * plateau refait), sur une rencontre sans horaire : seul l'horaire est
-   * retiré. `linkMatchId` : la nouvelle rencontre.
+   * plateau refait) : seul l'horaire est retiré, un nouveau lui sera annoncé.
+   * `linkMatchId` : la nouvelle rencontre.
    */
   | { kind: "cleared"; linkMatchId: number }
-  /** Reposée de même, mais la nouvelle rencontre a déjà un horaire : son annonce suivra. */
-  | { kind: "rescheduled" }
   /** Elle ne joue plus ce match. `linkMatchId` : `null` si la manche a disparu. */
   | { kind: "withdrawn"; linkMatchId: number | null };
 
@@ -762,13 +767,14 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
   const [currentRows] = await db.query<CurrentMatchRow[]>(
     `SELECT id, tournament_id, phase_id, bracket, round_number, team1_id, team2_id, start_at
        FROM bg_matches
-      WHERE id IN (${placeholders(matchIds)})
-         OR (tournament_id IN (${placeholders(tournamentIds)})
-             AND (team1_id IN (${placeholders(departedIds)}) OR team2_id IN (${placeholders(departedIds)})))`,
+      WHERE id IN (${sqlPlaceholders(matchIds.length)})
+         OR (tournament_id IN (${sqlPlaceholders(tournamentIds.length)})
+             AND (team1_id IN (${sqlPlaceholders(departedIds.length)})
+                  OR team2_id IN (${sqlPlaceholders(departedIds.length)})))`,
     [...matchIds, ...tournamentIds, ...departedIds, ...departedIds],
   );
   const [nameRows] = await db.query<TeamNameRow[]>(
-    `SELECT id, name FROM bg_teams WHERE id IN (${placeholders(teamIds)})`,
+    `SELECT id, name FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
     teamIds,
   );
   const names = new Map(nameRows.map((row) => [Number(row.id), String(row.name)]));
@@ -798,10 +804,6 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
   return dispatched;
 }
 
-function placeholders(values: readonly unknown[]): string {
-  return values.map(() => "?").join(", ");
-}
-
 /**
  * Ce que l'état d'arrivée dit d'une sortie : revenue sur sa manche, reposée
  * contre le même adversaire dans la même manche (même tournoi, phase, partie
@@ -810,7 +812,7 @@ function placeholders(values: readonly unknown[]): string {
  */
 function withdrawnOutcome(departure: DepartedEntrant, current: readonly CurrentMatchRow[]): WithdrawnOutcome {
   const original = current.find((row) => Number(row.id) === departure.matchId);
-  if (original && onPoster(toPoster(original), departure.teamId)) return { kind: "back" };
+  if (original && onPoster(toPoster(original), departure.teamId)) return { kind: "silent" };
   const { match, opponentId, teamId } = departure;
   const repaired =
     opponentId === null
@@ -827,10 +829,23 @@ function withdrawnOutcome(departure: DepartedEntrant, current: readonly CurrentM
             onPoster(poster, opponentId)
           );
         });
-  if (repaired) {
-    return repaired.start_at === null ? { kind: "cleared", linkMatchId: Number(repaired.id) } : { kind: "rescheduled" };
-  }
+  if (repaired) return repairedOutcome(departure, repaired);
   return { kind: "withdrawn", linkMatchId: original ? departure.matchId : null };
+}
+
+/**
+ * Engagée reposée contre le même adversaire dans la même manche : rien si la
+ * nouvelle rencontre tient le même horaire ; sinon l'horaire reçu est retiré
+ * — un nouvel horaire suivra (posé par l'arbitrage, ou déjà posé et annoncé
+ * par le balayage). Un tournoi sans horaires d'arbitrage dont la rencontre
+ * n'en a pas se tait, comme pour un retrait (`schedule-notices.ts`).
+ */
+function repairedOutcome(departure: DepartedEntrant, repaired: CurrentMatchRow): WithdrawnOutcome {
+  if (repaired.start_at === null) {
+    return departure.match.refereeScheduling ? { kind: "cleared", linkMatchId: Number(repaired.id) } : { kind: "silent" };
+  }
+  const same = new Date(repaired.start_at).getTime() === new Date(departure.heldStartAt).getTime();
+  return same ? { kind: "silent" } : { kind: "cleared", linkMatchId: Number(repaired.id) };
 }
 
 /** L'avis d'une engagée sortie, à ses joueurs. */

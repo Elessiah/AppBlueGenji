@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { statusFromTeams } from "./_internal";
-import { noteDepartedEntrants, type Departure } from "./departed-notices";
+import { noteDepartedEntrants, withoutSettledLater, type Departure } from "./departed-notices";
 import { forgetMatchReminders } from "./reminder-marks";
 
 /**
@@ -149,7 +149,11 @@ function recordDeparture(
  */
 async function forgetDepartures(connection: PoolConnection, departed: Departure[]): Promise<void> {
   await noteDepartedEntrants(connection, departed);
-  await forgetMatchReminders(connection, [...new Set(departed.map((departure) => departure.matchId))]);
+  // Sauf les manches qu'un retour en arrière réglera lui-même (`./rollback.ts`).
+  await forgetMatchReminders(
+    connection,
+    withoutSettledLater(connection, [...new Set(departed.map((departure) => departure.matchId))]),
+  );
 }
 
 /**

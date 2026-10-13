@@ -1,5 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { noteDepartedEntrants } from "./departed-notices";
+import { noteDepartedEntrants, withoutSettledLater } from "./departed-notices";
 import { forgetMatchReminders } from "./reminder-marks";
 
 /**
@@ -66,6 +66,8 @@ export async function pushTeamToTarget(
         opponentId: before[otherColumn] === null ? null : Number(before[otherColumn]),
       },
     ]);
-    await forgetMatchReminders(connection, [targetMatchId]);
+    // Une manche qu'un retour en arrière réglera lui-même garde ses marques :
+    // il les effacera si l'affiche d'arrivée a changé (`./rollback.ts`).
+    await forgetMatchReminders(connection, withoutSettledLater(connection, [targetMatchId]));
   }
 }

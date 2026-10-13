@@ -38,6 +38,9 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     const message = (error as Error).message;
     if (message === "MATCH_NOT_FOUND") return fail(message, 404);
     if (message === "INVALID_MATCH_START_AT") return fail(message, 400);
-    return fail(message || "MATCH_SCHEDULE_UPDATE_FAILED", 500);
+    // Une panne inattendue (SQL, interblocage rejoué en vain) ne sort qu'en
+    // code : son texte reste dans pm2.
+    console.error("[match-schedule] mise à jour en échec", error);
+    return fail("MATCH_SCHEDULE_UPDATE_FAILED", 500);
   }
 }

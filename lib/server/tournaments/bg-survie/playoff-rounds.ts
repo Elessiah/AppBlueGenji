@@ -196,12 +196,15 @@ async function writePlayoffPairing(
  * correction n'a pas touchée.
  */
 function rewrittenPlayoffMatchIds(reusable: PlayoffMatchRow[], plan: PlayoffRoundPlan): number[] {
+  // Paire non ordonnée : les mêmes engagées reposées dans l'autre sens jouent
+  // le même match, à l'horaire qu'elles tiennent.
+  const key = (a: number | null, b: number | null) =>
+    [a, b].map((id) => (id === null ? "" : String(id))).sort((x, y) => x.localeCompare(y)).join(":");
   return reusable
     .filter(
       (match, index) =>
         index < plan.length &&
-        (match.teamAId !== plan[index].pairing.teamAId ||
-          match.teamBId !== plan[index].pairing.teamBId),
+        key(match.teamAId, match.teamBId) !== key(plan[index].pairing.teamAId, plan[index].pairing.teamBId),
     )
     .map((match) => match.id);
 }

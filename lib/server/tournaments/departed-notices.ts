@@ -24,6 +24,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { announceEntrantsWithdrawn, type DepartedEntrant, type WithdrawnMatch } from "./match-reminders";
 import { toPoster, type Poster, type PosterRow } from "./match-poster";
@@ -49,6 +50,14 @@ const pending = new WeakMap<PoolConnection, DepartedEntrant[]>();
  */
 const settledLater = new WeakMap<PoolConnection, Set<number>>();
 
+/**
+ * Horaires tenus déjà lus dans la transaction, par manche (`null` : aucun).
+ * Une seconde sortie sur la même manche (deux remplacements, ou une exemption
+ * puis une correction) retrouve l'horaire que la première a lu, alors que ses
+ * marques ont été effacées entre-temps. Le moteur n'écrit jamais `TOLD`.
+ */
+const heldRead = new WeakMap<PoolConnection, Map<number, HeldTime | null>>();
+
 type HeldRow = RowDataPacket & { match_id: number; start_at: Date | string | null };
 
 type ContextRow = RowDataPacket & {
@@ -57,6 +66,7 @@ type ContextRow = RowDataPacket & {
   phase_id: number;
   tournament_name: string;
   participant_type: string;
+  referee_scheduling: number | null;
   bracket: string;
   round_number: number;
   swiss_round: number;
@@ -131,6 +141,16 @@ export async function holdDepartures(connection: PoolConnection, matchIds: reado
   return { matchIds, held };
 }
 
+/**
+ * Les manches données, moins celles dont un appelant réglera lui-même les
+ * sorties ({@link holdDepartures}) : leurs marques ne s'effacent pas sur une
+ * pose intermédiaire — l'appelant les effacera si l'affiche d'arrivée a changé.
+ */
+export function withoutSettledLater(connection: PoolConnection, matchIds: readonly number[]): number[] {
+  const owned = settledLater.get(connection);
+  return owned ? matchIds.filter((id) => !owned.has(id)) : [...matchIds];
+}
+
 /** Note les sorties constatées à l'arrivée, sur les horaires relevés par {@link holdDepartures}. */
 export function settleDepartures(connection: PoolConnection, times: HeldTimes, departures: readonly Departure[]): void {
   const owned = settledLater.get(connection);
@@ -141,27 +161,49 @@ export function settleDepartures(connection: PoolConnection, times: HeldTimes, d
   enqueue(connection, times.held, departures);
 }
 
-/** Horaires tenus encore valables des manches données, avec leur contexte. */
+/**
+ * Horaires tenus encore valables des manches données, avec leur contexte. Une
+ * manche déjà lue dans la transaction n'est pas relue ({@link heldRead}).
+ */
 async function readHeldTimes(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, HeldTime>> {
+  const known = heldRead.get(connection) ?? new Map<number, HeldTime | null>();
+  const unread = matchIds.filter((id) => !known.has(id));
+  if (unread.length > 0) {
+    const fetched = await fetchHeldTimes(connection, unread);
+    // Table absente : rien n'a jamais été reçu.
+    if (fetched === null) return new Map();
+    for (const id of unread) known.set(id, fetched.get(id) ?? null);
+    heldRead.set(connection, known);
+  }
+  const held = new Map<number, HeldTime>();
+  for (const id of matchIds) {
+    const time = known.get(id);
+    if (time) held.set(id, time);
+  }
+  return held;
+}
+
+/** Lecture verrouillante des marques `TOLD`, puis du contexte des seules manches à prévenir. `null` : table absente. */
+async function fetchHeldTimes(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, HeldTime> | null> {
   let rows: HeldRow[];
   try {
     [rows] = await connection.execute<HeldRow[]>(
       `SELECT match_id, start_at FROM bg_match_reminders
-        WHERE match_id IN (${matchIds.map(() => "?").join(", ")}) AND offset_key = ?
+        WHERE match_id IN (${sqlPlaceholders(matchIds.length)}) AND offset_key = ?
         FOR UPDATE`,
       [...matchIds, MATCH_TOLD_KEY],
     );
   } catch (error) {
-    if (isMissingTableError(error)) return new Map();
+    if (isMissingTableError(error)) return null;
     throw error;
   }
   const times = stillValidTimes(rows);
-  if (times.size === 0) return new Map();
-  const matches = await loadWithdrawnMatches(connection, [...times.keys()]);
   const held = new Map<number, HeldTime>();
-  for (const [matchId, heldStartAt] of times) {
-    const match = matches.get(matchId);
-    if (match) held.set(matchId, { heldStartAt, match });
+  if (times.size === 0) return held;
+  const matches = await loadWithdrawnMatches(connection, [...times.keys()]);
+  for (const [id, heldStartAt] of times) {
+    const match = matches.get(id);
+    if (match) held.set(id, { heldStartAt, match });
   }
   return held;
 }
@@ -224,10 +266,11 @@ async function loadWithdrawnMatches(
 ): Promise<Map<number, WithdrawnMatch>> {
   const [rows] = await connection.execute<ContextRow[]>(
     `SELECT m.id, m.tournament_id, m.phase_id, m.bracket, m.round_number,
-            t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")}
+            t.name AS tournament_name, t.participant_type, t.referee_scheduling,
+            ${swissRoundSql("m", "t")}
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
-      WHERE m.id IN (${matchIds.map(() => "?").join(", ")})`,
+      WHERE m.id IN (${sqlPlaceholders(matchIds.length)})`,
     [...matchIds],
   );
   return new Map(
@@ -238,6 +281,7 @@ async function loadWithdrawnMatches(
         tournamentName: String(row.tournament_name),
         phaseId: Number(row.phase_id ?? 0),
         solo: row.participant_type === "SOLO",
+        refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
         bracket: String(row.bracket),
         roundNumber: Number(row.round_number),
         swiss: isSwissRound(row),
@@ -250,7 +294,12 @@ async function loadWithdrawnMatches(
  * Note les engagées des manches **sur le point d'être supprimées** dont les
  * joueurs tiennent un horaire. À appeler juste avant le `DELETE`, avec le même
  * filtre (un test balaie les sources pour qu'aucune suppression du moteur n'y
- * échappe). Une seule lecture quand aucune manche visée n'a d'horaire reçu.
+ * échappe).
+ *
+ * Les manches visées se lisent **sous verrou** : une marque `TOLD` posée par un
+ * envoi concurrent après l'image de la transaction serait sinon manquée — et
+ * un envoi qui n'a pas encore posé la sienne attend la suppression, puis ne
+ * trouve plus la manche (réservation conditionnée, rien n'est envoyé).
  *
  * @param filterSql Filtre **constant** sur `bg_matches` (colonnes sans
  *        préfixe, valeurs en `?`) — jamais une valeur saisie.
@@ -264,10 +313,8 @@ export async function noteDeletedMatches(
   let rows: PosterRow[];
   try {
     [rows] = await connection.execute<PosterRow[]>(
-      `SELECT m.id, m.team1_id, m.team2_id FROM bg_matches m
-        WHERE ${filterSql}
-          AND EXISTS (SELECT 1 FROM bg_match_reminders r WHERE r.match_id = m.id AND r.offset_key = ?)`,
-      [...params, MATCH_TOLD_KEY],
+      `SELECT id, team1_id, team2_id FROM bg_matches WHERE ${filterSql} FOR UPDATE`,
+      [...params],
     );
   } catch (error) {
     if (isMissingTableError(error)) return;
@@ -282,6 +329,7 @@ export async function noteDeletedMatches(
 export function discardDepartedNotices(connection: PoolConnection): void {
   pending.delete(connection);
   settledLater.delete(connection);
+  heldRead.delete(connection);
 }
 
 /**
@@ -292,6 +340,7 @@ export function flushDepartedNotices(connection: PoolConnection): void {
   const notices = pending.get(connection) ?? [];
   pending.delete(connection);
   settledLater.delete(connection);
+  heldRead.delete(connection);
   if (notices.length === 0) return;
   void announceEntrantsWithdrawn(notices).catch((error: unknown) => {
     if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", error);
