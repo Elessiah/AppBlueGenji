@@ -58,7 +58,7 @@ describe("forgetMatchReminders", () => {
     await forgetMatchReminders(fakeConnection(connection), ids);
 
     expect(connection.execute).toHaveBeenCalledTimes(2);
-    const [sql, params] = connection.execute.mock.calls[0] as unknown as [string, number[]];
+    const [sql, params] = connection.execute.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toMatch(/^DELETE FROM bg_match_reminders WHERE match_id IN \(\?(, \?){499}\) AND offset_key <> \?$/);
     expect(params).toHaveLength(501);
     // L'horaire poussé aux arbitres reste : une affiche changée ne change pas ce qu'ils ont reçu.
