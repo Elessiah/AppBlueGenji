@@ -11,7 +11,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
 import {
   heldStartAt,
-  isAnnounceableClearing,
+  clearedHeldStartAt,
   isAnnounceableSchedule,
   notifyMatchScheduleChange,
   playerAnnouncement,
@@ -378,7 +378,7 @@ describe("heldStartAt — après un retrait remis", () => {
       toldStartAt: null,
     });
     expect(heldStartAt(mistyped, now)).toBeNull();
-    expect(isAnnounceableClearing(mistyped, now)).toBe(false);
+    expect(clearedHeldStartAt(mistyped, now)).toBeNull();
     expect(playerAnnouncement(change({ alreadyAnnounced: true, toldStartAt: null }), now)).toEqual({
       rescheduled: true,
       previousStartAt: null,
@@ -386,33 +386,31 @@ describe("heldStartAt — après un retrait remis", () => {
   });
 });
 
-describe("isAnnounceableClearing", () => {
+describe("clearedHeldStartAt", () => {
   const now = new Date("2099-01-01T00:00:00Z");
 
   it("annonce le retrait de l'horaire d'un match en retard (passé de peu)", () => {
     expect(
-      isAnnounceableClearing(
+      clearedHeldStartAt(
         change({ startAt: null, previousStartAt: "2098-12-31T20:00:00.000Z", alreadyAnnounced: true, toldStartAt: "2098-12-31T20:00:00.000Z" }),
         now,
       ),
-    ).toBe(true);
+    ).toBe("2098-12-31T20:00:00.000Z");
   });
 
   it("retient un horaire reçu par les joueurs et encore devant", () => {
-    expect(isAnnounceableClearing(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).toBe(
-      true,
-    );
+    expect(clearedHeldStartAt(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).not.toBeNull();
   });
 
   it("écarte un horaire jamais reçu, déjà passé, absent, ou une date posée", () => {
     const cleared = { startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START };
-    expect(isAnnounceableClearing(change({ ...cleared, alreadyAnnounced: false }), now)).toBe(false);
-    expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: "2020-01-01T00:00:00.000Z", toldStartAt: "2020-01-01T00:00:00.000Z" }), now)).toBe(false);
-    expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: null }), now)).toBe(false);
+    expect(clearedHeldStartAt(change({ ...cleared, alreadyAnnounced: false }), now)).toBeNull();
+    expect(clearedHeldStartAt(change({ ...cleared, previousStartAt: "2020-01-01T00:00:00.000Z", toldStartAt: "2020-01-01T00:00:00.000Z" }), now)).toBeNull();
+    expect(clearedHeldStartAt(change({ ...cleared, previousStartAt: null }), now)).toBeNull();
     // Sans planification par l'arbitrage, un match sans horaire part en
     // lancement : aucun « nouvel horaire » ne viendra.
-    expect(isAnnounceableClearing(change({ ...cleared, refereeScheduling: false }), now)).toBe(false);
-    expect(isAnnounceableClearing(change({ previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).toBe(false);
+    expect(clearedHeldStartAt(change({ ...cleared, refereeScheduling: false }), now)).toBeNull();
+    expect(clearedHeldStartAt(change({ previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).toBeNull();
   });
 });
 

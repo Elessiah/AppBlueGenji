@@ -346,8 +346,9 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const told = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql, params]) =>
       sql.includes("(match_id, offset_key, start_at)") && params[1] === "TOLD",
     );
-    expect(told?.[0]).toMatch(/SELECT \?, \?, \? FROM bg_matches\s+WHERE id = \? AND start_at = \? AND team1_id = \? AND team2_id = \?/);
-    expect(told?.[1]).toEqual([31, "TOLD", START, 31, START, 101, 102]);
+    // Même réservation datée que les paliers : l'horaire recopié de la manche.
+    expect(told?.[0]).toMatch(/SELECT \?, \?, start_at FROM bg_matches\s+WHERE id = \? AND start_at = \? AND team1_id = \? AND team2_id = \?/);
+    expect(told?.[1]).toEqual([31, "TOLD", 31, START, 101, 102]);
 
     // Rien n'est à rendre : la marque n'est pas celle de cet envoi.
     const writes = (execute.mock.calls as unknown as [string, unknown[]][]).filter(
@@ -465,7 +466,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const reserve = (fresh.execute.mock.calls as unknown as [string, unknown[]][]).find(([sql, params]) =>
       sql.startsWith("INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)") && params[1] === "TOLD",
     );
-    expect(reserve?.[1]).toEqual([31, "TOLD", START, 31, START, 101, 102]);
+    expect(reserve?.[1]).toEqual([31, "TOLD", 31, START, 101, 102]);
 
     // Marque déjà là (un horaire reçu avant) : mise à jour avant l'envoi.
     resetMatchReminderThrottle();

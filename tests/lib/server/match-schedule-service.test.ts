@@ -418,16 +418,18 @@ describe("setMatchStartAt", () => {
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
-  it("rendue à l'horaire tenu sur un match au score saisi, ne fait que redater l'observation", async () => {
+  it("rendue à l'horaire tenu sur un match au score saisi, repose aussi l'observation", async () => {
     const { writes } = world({
       row: matchRow({ status: "AWAITING_CONFIRMATION", start_at: new Date("2099-08-28T18:30:00Z") }),
       announced: true,
       toldStartAt: new Date(FUTURE),
     });
     await setMatchStartAt(42, FUTURE);
+    // Un passage par un match joué l'a retirée : reposée, elle évite que le
+    // balayage réannonce l'horaire tenu si la rencontre revient à jouer.
     const seen = writes.find((w) => w.sql.includes("bg_match_reminders") && w.params.includes("SEEN"));
-    expect(seen?.sql).toMatch(/^UPDATE bg_match_reminders SET start_at = \?/);
-    expect(writes.some((w) => w.sql.startsWith("INSERT"))).toBe(false);
+    expect(seen?.sql).toMatch(/^INSERT INTO bg_match_reminders/);
+    expect(seen?.params).toEqual([42, "SEEN", new Date(FUTURE), new Date(FUTURE)]);
   });
 
   it("ne pose pas d'observation sur un match au score saisi : s'il revient à jouer, le balayage l'annoncera", async () => {
