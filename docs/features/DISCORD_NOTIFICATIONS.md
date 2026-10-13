@@ -125,7 +125,7 @@ rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
 reçoit « reprogrammé »), puis la rend si rien n'a **abouti** (aucun message
 privé remis, aucun appareil atteint — bot injoignable sans appareil abonné). Une manche programmée avant
 l'arrivée de `TOLD` a ses preuves héritées recopiées en `TOLD` au démarrage
-(voir « Passage à `TOLD` ») : `TOLD` est la seule source (`MATCH_TOLD_KEYS`). Ni `SEEN` (le balayage la pose aussi en silence) ni
+(voir « Passage à `TOLD` ») : `TOLD` est la seule source. Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
 annonce) ne le prouvent. `TOLD` survit aux changements de date : c'est elle qui
 fait dire « reprogrammé » à la date suivante et « retiré » à une date effacée.
@@ -150,7 +150,7 @@ jour **dans la transaction** qui écrit la date (`resetReminderMarks`) : un
 balayage ne voit jamais la nouvelle date avec les marques de l'ancienne. Une
 erreur (autre qu'une table absente) défait l'écriture de la date — un refus que
 l'arbitre peut rejouer plutôt qu'un horaire changé dont personne n'est prévenu.
-Il lit d'abord `MATCH_TOLD_KEYS` (`alreadyAnnounced`) puis, si une date est
+Il lit d'abord `TOLD` (`alreadyAnnounced`) puis, si une date est
 posée :
 
 - les deux engagées connues, efface les lignes de la manche **sauf** `SEEN` et
@@ -190,8 +190,10 @@ balayage** :
   aucun pseudo de joueur ne passe par Discord — même règle que le push.
 - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la permission
   `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`),
-  et **sauf les joueurs du match** (un arbitre engagé reçoit déjà l'annonce
-  des joueurs, que la version arbitre ne doit pas remplacer sur son appareil),
+  et **sauf les joueurs du match** quand l'annonce aux joueurs est partie (un
+  arbitre engagé l'a reçue, la version arbitre ne doit pas la remplacer sur
+  son appareil ; sans annonce — place encore vide —, il garde la version
+  arbitre),
   pour une date posée ou changée (pas pour un retrait). « Reprogrammé » dès
   qu'une date précédait (ils la voyaient sur le plateau). Même étiquette que
   l'annonce aux joueurs (`rencontre-<id>-reminder`) : un arbitre engagé dans le
