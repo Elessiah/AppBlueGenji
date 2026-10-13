@@ -431,9 +431,10 @@ report de score) ; une panne qui persiste ne sort de la route qu'en code
 corps illisible ou sans `startAt` (400 `INVALID_MATCH_START_AT`) : seul un
 `null` (ou une chaîne vide) explicite efface l'horaire, puisque l'effacement
 prévient tous les joueurs ; et elle plafonne les gestes d'un arbitre
-(`MATCH_SCHEDULE_WRITE_RULE`, 60 en 5 minutes, 429 `TOO_MANY_REQUESTS`) —
-assez pour planifier une ronde entière, pas pour qu'un client qui boucle fasse
-écrire le bot en rafale.
+(`MATCH_SCHEDULE_WRITE_RULE`, 300 en 5 minutes, 429 `TOO_MANY_REQUESTS`) —
+assez pour planifier d'une traite un plateau entier (126 manches en double
+élimination à 64, réenregistrements compris), pas pour qu'un client qui boucle
+fasse écrire le bot en rafale.
 
 Un tournoi **clos** (`FINISHED`) ne se joue plus : ses manches restées
 ouvertes comptent pour jouées — une seule règle, `isMatchOver`
