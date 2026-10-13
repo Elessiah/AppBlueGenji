@@ -132,6 +132,28 @@ describe("pushToUsers", () => {
     expect(sent.map((payload) => payload.lang)).toEqual(["en", "fr", "en", "fr"]);
   });
 
+  it("rédige toutes les langues avant le premier envoi : un échec de rédaction n'envoie rien à moitié", async () => {
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest.fn<SqlQuery>().mockResolvedValueOnce([
+      [
+        { id: 50, ...SUB, locale: "fr" },
+        { id: 51, ...SUB, locale: "en" },
+      ],
+    ]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+    const content = (locale: "fr" | "en") => {
+      if (locale === "en") throw new Error("rédaction impossible");
+      return { title: "Ton match commence", body: "b", url: "/" };
+    };
+
+    expect(await pushToUsers([1, 2], "MATCH_START", content, {}, CONFIG)).toBe(0);
+
+    expect(sendWebPush).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
   it("ne lève jamais : une panne rend zéro", async () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     pool({ query: jest.fn<SqlQuery>().mockRejectedValue(new Error("panne")) });

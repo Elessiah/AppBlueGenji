@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import ts from "typescript";
 
 /**
  * Revue performance du lot 9-3 : le texte des notifications push existe
@@ -10,8 +11,9 @@ import { dirname, join, relative, resolve } from "node:path";
  * l'atteindrait, même par un détour, enverrait l'anglais à toutes les pages
  * françaises qui chargent ce module.
  *
- * Le graphe des imports (statiques, `export … from`, `import()` littéraux) est
- * construit une fois, puis parcouru **à rebours** depuis chaque cible : exact,
+ * Le graphe des imports (statiques, `export … from`, `import()` littéraux, lus
+ * sur l'arbre syntaxique TypeScript : commentaires et retours à la ligne n'y
+ * changent rien, un import de type seul n'y compte pas) est construit une fois, puis parcouru **à rebours** depuis chaque cible : exact,
  * cycles compris, et chaque entrée `"use client"` qui fuit est nommée avec son
  * chemin. Un `import()` à gabarit (`` import(`@/messages/${x}.json`) ``) ne se
  * résout pas : il est refusé dans tout module atteint par le client.
@@ -25,8 +27,6 @@ const TARGETS = [
   join(ROOT, "messages", "fr", "pushMessages.json"),
 ];
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs"];
-const IMPORT_RE = /(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["']/g;
-const TEMPLATE_IMPORT_RE = /import\s*\(\s*`/;
 
 function sourceFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -50,21 +50,47 @@ function resolveImport(from: string, specifier: string): string | null {
 
 type SourceFile = { path: string; client: boolean; templateImport: boolean; imports: string[] };
 
-function readSource(path: string): SourceFile {
-  const source = readFileSync(path, "utf8");
-  const imports: string[] = [];
-  for (const match of source.matchAll(IMPORT_RE)) {
-    // Un import de type seul n'atteint pas le bundle.
-    if (/^(?:import|export)\s+type\s/.test(match[0])) continue;
-    const target = resolveImport(path, match[1] ?? match[2] ?? match[3]);
-    if (target) imports.push(target);
+/** Une clause d'import qui n'apporte que des types n'atteint pas le bundle. */
+function typeOnlyImport(node: ts.ImportDeclaration): boolean {
+  const clause = node.importClause;
+  if (!clause) return false; // `import "x"` : effet de bord, compté
+  if (clause.isTypeOnly) return true;
+  const bindings = clause.namedBindings;
+  return clause.name === undefined && bindings !== undefined && ts.isNamedImports(bindings) && bindings.elements.length > 0 && bindings.elements.every((element) => element.isTypeOnly);
+}
+
+/** Directive de tête : seules d'autres directives la précèdent, quelle que soit la longueur des commentaires. */
+function hasUseClient(source: ts.SourceFile): boolean {
+  for (const statement of source.statements) {
+    if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression)) return false;
+    if (statement.expression.text === "use client") return true;
   }
-  return {
-    path,
-    client: /^\s*["']use client["']/m.test(source.slice(0, 400)),
-    templateImport: TEMPLATE_IMPORT_RE.test(source),
-    imports,
+  return false;
+}
+
+function parseSource(path: string, text: string): SourceFile {
+  const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false);
+  const specifiers: string[] = [];
+  let templateImport = false;
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && !typeOnlyImport(node)) {
+      specifiers.push(node.moduleSpecifier.text);
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && !node.isTypeOnly) {
+      specifiers.push(node.moduleSpecifier.text);
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const [argument] = node.arguments;
+      if (argument && ts.isStringLiteralLike(argument)) specifiers.push(argument.text);
+      else templateImport = true;
+    }
+    ts.forEachChild(node, visit);
   };
+  visit(source);
+  const imports = specifiers.map((specifier) => resolveImport(path, specifier)).filter((target): target is string => target !== null);
+  return { path, client: hasUseClient(source), templateImport, imports };
+}
+
+function readSource(path: string): SourceFile {
+  return parseSource(path, readFileSync(path, "utf8"));
 }
 
 /** Pour chaque fichier qui atteint une cible : le suivant sur son chemin. */
@@ -136,6 +162,28 @@ describe("le texte des notifications push reste côté serveur", () => {
   it("le détecteur reconnaît un import du module", () => {
     expect(byPath.get(join(ROOT, "lib", "server", "tournaments", "player-pushes.ts"))?.imports).toContain(TARGETS[0]);
     expect(byPath.get(TARGETS[0])?.imports).toEqual(expect.arrayContaining([TARGETS[1], TARGETS[2]]));
+  });
+
+  it("le détecteur lit l'arbre syntaxique : commentaires, retours à la ligne et types seuls", () => {
+    const fake = join(ROOT, "components", "fake-client.tsx");
+    const text = [
+      "/**",
+      ...Array.from({ length: 12 }, () => " * l'en-tête d'un composant, assez long pour dépasser quelques lignes."),
+      " */",
+      '"use client";',
+      "export {",
+      "  // l'instantané entier",
+      "  pushRoundLabel,",
+      '} from "@/lib/shared/push-messages";',
+      'import type { Locale } from "@/lib/shared/locales";',
+      'import { type Leaves } from "@/lib/shared/scoped-text";',
+      "const lazy = (x: string) => import(`@/messages/${x}.json`);",
+    ].join("\n");
+    const parsed = parseSource(fake, text);
+    expect(parsed.client).toBe(true);
+    expect(parsed.imports).toEqual([TARGETS[0]]);
+    expect(parsed.templateImport).toBe(true);
+    expect(parseSource(fake, 'const a = 1;\n"use client";\n').client).toBe(false);
   });
 
   it("le détecteur suit un détour par un autre module", () => {
