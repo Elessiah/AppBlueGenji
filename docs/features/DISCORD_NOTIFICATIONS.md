@@ -114,9 +114,24 @@ est ressaisi — un doublon plutôt que des engagées jamais prévenues) : la
 remplaçante n'a reçu aucun horaire, le balayage lui annoncera la date. Limite
 connue : l'engagée restée en place perd aussi sa marque `TOLD` (les marques
 sont par manche, pas par engagée) — un changement ou un retrait d'horaire
-ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu ; et
-l'engagée **retirée** de l'affiche n'est pas prévenue que l'horaire reçu ne la
-concerne plus (le plateau le montre).
+ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
+
+**Engagée retirée par une correction de score** (décision utilisateur,
+2026-10-13). Quand une correction sort une engagée d'une manche
+(`pushTeamToTarget` remplace l'occupant, `detachDownstreamOutcome` vide une
+place), ses joueurs apprennent que l'horaire reçu ne les concerne plus :
+« **Match retiré de ton programme** » / "Match removed from your schedule" —
+message privé Discord (français, « Ton match » en tournoi individuel, aucun
+pseudo) et push `MATCH_REMINDER` dans la langue de chacun, même étiquette que
+l'annonce qu'il remplace. L'horaire est celui que tient la marque `TOLD`, lu
+dans la transaction **avant** l'effacement des marques
+(`noteDepartedEntrant`, `lib/server/tournaments/departed-notices.ts`) ; l'avis
+part après le commit avec le journal (`flushBotLogs`) et se jette avec lui si
+la correction échoue (`discardBotLogs`). Rien ne part sans horaire reçu (pas
+de `TOLD`, ou plus d'horaire après un retrait remis), ni pour un horaire passé
+depuis plus de 12 h. Une requête par sortante (sa manche, son nom, l'ancien
+adversaire : l'occupant de l'autre place), puis ses destinataires — chemin
+rare, celui d'une correction.
 
 ### La marque `TOLD` : un horaire reçu
 
