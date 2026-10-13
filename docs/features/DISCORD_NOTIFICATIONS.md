@@ -118,8 +118,9 @@ ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 
 **Engagée retirée par une correction de score** (décision utilisateur,
 2026-10-13). Quand une correction sort une engagée d'une manche
-(`pushTeamToTarget` remplace l'occupant, `detachDownstreamOutcome` vide une
-place), ses joueurs apprennent que l'horaire reçu ne les concerne plus :
+(`pushTeamToTarget` remplace l'occupant — seule implémentation, dans
+`lib/server/tournaments/target-slot.ts`, que les exemptions empruntent aussi —,
+`detachDownstreamOutcome` vide une place), ses joueurs apprennent que l'horaire reçu ne les concerne plus :
 « **Match retiré de ton programme** » / "Match removed from your schedule" —
 message privé Discord (français, « Ton match » en tournoi individuel, aucun
 pseudo) et push `MATCH_REMINDER` dans la langue de chacun, même étiquette que
@@ -313,11 +314,20 @@ un avis de retrait dont la marque `TOLD` a disparu entre-temps ne part pas non
 plus.
 Une réservation qui échoue (attente de verrou, interblocage) est journalisée
 et réessayée au passage suivant, sans retenir les autres manches. La pose de `TOLD` porte elle-même la condition (horaire et engagées de
-la manche, dans l'`INSERT … SELECT` ou l'`UPDATE … JOIN bg_matches`) : une
+la manche, dans un `INSERT … SELECT … FROM bg_matches` — la manche lue avant
+la marque, dans l'ordre de verrouillage du moteur ; `ON DUPLICATE KEY UPDATE`
+pour une marque déjà là) : une
 correction ou un déplacement qui tombe entre la relecture et l'écriture fait
 échouer la pose, et rien ne part. Une marque prise par un envoi concurrent du
 même horaire fait taire le perdant (l'autre envoi la remet), qui n'a rien à
-rendre.
+rendre. Un envoi qui échoue avant d'atteindre les joueurs (pose de `TOLD` en
+attente de verrou, destinataires illisibles) **rend** les marques qu'il avait
+réservées (`PlannedSend.claimed` : observation, palier) — sans quoi le rappel,
+ou l'annonce, serait consommé sans message et jamais retenté ; l'annonce d'un
+arbitre rend aussi l'observation posée par `setMatchStartAt`, et le balayage
+annoncera la manche. `setMatchStartAt` est rejoué sur interblocage
+(`retryOnDeadlock`, `lib/server/tournaments/deadlock-retry.ts`, partagé avec le
+report de score).
 
 Accepté, non changé : un message par engagée (chacune lit « ton équipe contre
 l'autre »), donc une lecture des abonnements push par message ; et la
