@@ -697,7 +697,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "L'annonce part dans le salon #live du serveur Discord de l'association, avec une mention @everyone : le nom des deux équipes, celui du tournoi et le lien de la diffusion.",
       "Elle ne porte aucun pseudo de joueur : en tournoi individuel, chaque engagé s'écrit « un joueur ».",
-      "Le site ne garde qu'une trace de l'annonce (le match et les identifiants de ses deux engagés), effacée avec le match. Le message reste dans le salon, chez Discord (États-Unis), jusqu'à sa suppression par l'association.",
+      "Le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), effacée avec le match. Le message reste dans le salon, chez Discord (États-Unis), jusqu'à sa suppression par l'association.",
     ],
     links: [
       { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
