@@ -291,6 +291,13 @@ insérée **avant** l'envoi, et seule l'insertion qui gagne envoie : deux requê
 concurrentes déclenchent le même balayage, et sans ce verrou le joueur recevrait
 son rappel en double.
 
+**Destinataires atteignables.** Ne comptent que les joueurs qu'un message
+atteindrait : un tag Discord, ou un appareil abonné aux rappels
+(`usersReachableByPush`, une lecture pour tout le passage, et seulement pour les
+joueurs sans Discord). Une engagée que rien n'atteint ne pose pas `TOLD` — qui
+ferait dire « reprogrammé » à des joueurs n'ayant rien reçu — et ne coûte ni
+écriture ni lecture d'abonnements.
+
 **Coût du balayage.** Sa fenêtre se lit par l'index `idx_bg_matches_start_at`
 (sans lui, chaque passage relisait toute l'histoire des matchs), et une manche
 dont le dernier palier (`P1D`) est déjà pris n'y est plus relue ; une manche
