@@ -599,10 +599,14 @@ export async function pushLeadershipAlert(
  * - `discord-held` — le bot a répondu `503` : Discord a refusé l'annonce
  *   (AutoMod, autre refus) ou n'a pas répondu en lisant le salon, rien n'est
  *   parti ;
- * - `uncertain` — le bot n'a pas répondu à temps, ou il a répondu que Discord
- *   a lâché pendant l'envoi (`503`, `reason` `discord-down`) : l'annonce a pu
- *   partir. L'appelant **garde** sa réservation : une annonce perdue vaut
- *   mieux qu'un second `@everyone` à tout le serveur ;
+ * - `uncertain` — le bot a répondu que Discord a lâché pendant l'envoi
+ *   (`503`, `reason` `discord-down`) : l'annonce a pu partir, l'envoi est
+ *   terminé ;
+ * - `timed-out` — le bot n'a pas répondu à temps : son envoi peut **encore**
+ *   être en cours (Discord lent, mode lent, limite de débit).
+ *
+ * Sur `uncertain` et `timed-out`, l'appelant **garde** sa réservation : une
+ * annonce perdue vaut mieux qu'un second `@everyone` à tout le serveur ;
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
  *
@@ -617,6 +621,7 @@ export type LiveAnnouncementOutcome =
   | "slowed"
   | "discord-held"
   | "uncertain"
+  | "timed-out"
   | "unavailable";
 
 /** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
@@ -718,7 +723,7 @@ export async function pushLiveAnnouncement(
     // atteindre le bot, qui publie encore (Discord lent ou limitant #live). Il
     // n'est pas compté comme une panne : quelques envois lents dans un salon ne
     // doivent pas suspendre les rappels et alertes de fond.
-    if (isTimeoutError(error)) return "uncertain";
+    if (isTimeoutError(error)) return "timed-out";
     recordFailure();
     return "unavailable";
   }

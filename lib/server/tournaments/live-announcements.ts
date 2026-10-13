@@ -258,12 +258,19 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     console.error(`[live-announce] ${label} : annonce refusée par le bot, abandonnée`);
     return 0;
   }
+  // Le bot a pu publier : réessayer risquerait un second `@everyone` à tout
+  // le serveur. Les réservations sont gardées.
   if (outcome === "uncertain") {
-    // Le bot a pu publier (délai dépassé, ou Discord lâché pendant l'envoi) :
-    // réessayer risquerait un second `@everyone` à tout le serveur. Les
-    // réservations sont gardées.
+    // L'envoi est terminé : ce que montre #live fait foi.
     console.error(
-      `[live-announce] ${label} : publication non confirmée (bot sans réponse à temps ou Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live`,
+      `[live-announce] ${label} : publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live et ne la poster à la main que si elle n'y est pas`,
+    );
+    return 0;
+  }
+  if (outcome === "timed-out") {
+    // L'envoi du bot peut encore aboutir : #live vide maintenant ne prouve rien.
+    console.error(
+      `[live-announce] ${label} : bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, mode lent), annonce non réessayée — attendre plusieurs minutes avant de vérifier #live, et ne la poster à la main que si elle n'y est toujours pas`,
     );
     return 0;
   }
