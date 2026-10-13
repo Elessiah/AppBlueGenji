@@ -561,10 +561,16 @@ async function dispatchPlannedSend(
   );
   // Une engagée atteinte suffit : l'horaire est reçu, même si l'autre envoi a
   // échoué. Rien d'atteint (ou tout en échec) : la marque reprend son état.
-  await closeToldMark(
-    told,
-    results.some((result) => result.status === "fulfilled" && result.value),
-  );
+  try {
+    await closeToldMark(
+      told,
+      results.some((result) => result.status === "fulfilled" && result.value),
+    );
+  } catch (error) {
+    // La marque garde l'horaire écrit avant l'envoi : pm2 le dit, et l'échec
+    // de l'envoi lui-même reste celui qui remonte.
+    console.error("[match-reminders] marque d'horaire reçu non rendue", error);
+  }
   const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
   if (failure) throw failure.reason;
   return targets.length;

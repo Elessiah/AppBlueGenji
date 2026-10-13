@@ -189,7 +189,14 @@ async function resetReminderMarks(
     // Le palier pris pour l'horaire intermédiaire (son annonce n'a atteint
     // personne) ne vaut pas pour celui-ci : gardé, il ferait sauter au balayage
     // le rappel 24 h de l'horaire rendu, pour de bon. Les marques de l'horaire
-    // rendu (ou héritées, sans horaire) restent.
+    // rendu (ou héritées, sans horaire) restent. L'observation, elle, est
+    // redatée : un échec tardif de l'avis intermédiaire ne doit pas la rendre
+    // (`releaseDatedMarks` ne rend que les marques de son horaire).
+    await connection.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
+      new Date(startAt),
+      matchId,
+      MATCH_SEEN_KEY,
+    ]);
     await connection.execute(
       `DELETE FROM bg_match_reminders
         WHERE match_id = ? AND offset_key NOT IN (?, ?) AND start_at IS NOT NULL AND start_at <> ?`,
