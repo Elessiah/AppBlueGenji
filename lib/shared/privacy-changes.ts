@@ -662,8 +662,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
   },
   // PR #441 : l'horaire d'un match annoncé dès qu'il est posé, changé ou
-  // retiré (et l'engagée retirée d'un match prévenue), un seul rappel la
-  // veille, un nouveau sujet push pour le staff des tournois. `publishedAt` :
+  // retiré (et l'engagée retirée d'un match prévenue), un seul rappel dans
+  // les 24 h qui précèdent le coup d'envoi, un nouveau sujet push pour le staff des tournois. `publishedAt` :
   // lendemain de la mise en ligne.
   {
     id: "2026-10-horaires-de-match",

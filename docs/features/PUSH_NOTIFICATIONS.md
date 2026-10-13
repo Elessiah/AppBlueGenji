@@ -38,7 +38,7 @@ ait un producteur côté serveur.
 | `MATCH_START` | Match entré en lancement (« déclare-toi prêt »), ou lancé sans être passé par là (lancement forcé) | Non |
 | `SCORE_TO_CONFIRM` | L'adversaire a saisi un score | Non |
 | `TOURNAMENT_START` | Coup d'envoi d'un tournoi où l'on est engagé | Non |
-| `MATCH_REMINDER` (« Horaires et rappels de match ») | Annonce de l'horaire posé, changé ou retiré par l'arbitrage (« Match programmé / reprogrammé », avec l'ancienne date ; « Horaire du match retiré »), « Match retiré de ton programme » quand un changement des résultats (correction de score, retour en arrière, ronde réappariée) sort l'engagée de la manche, puis rappel J-1 (les rappels J-7 et H-1 sont retirés) | Oui |
+| `MATCH_REMINDER` (« Horaires et rappels de match ») | Annonce de l'horaire posé, changé ou retiré par l'arbitrage (« Match programmé / reprogrammé », avec l'ancienne date ; « Horaire du match retiré »), « Match retiré de ton programme » quand une mise à jour du tournoi (correction de score, retour en arrière, ronde réappariée, plateau refait avant le départ, finales BG Survie réécrites) sort l'engagée de la manche, puis rappel J-1 (les rappels J-7 et H-1 sont retirés) | Oui |
 | `TEAM_JOIN_REQUEST` | Demande d'adhésion (gestion de l'équipe) | Oui |
 | `CONTENT_REPORT` | Signalement qui vise le compte ou son équipe | Oui |
 | `MODERATION` | Avatar ou logo masqué, supprimé, rétabli | Oui |

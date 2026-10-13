@@ -116,7 +116,7 @@ connue : l'engagée restée en place perd aussi sa marque `TOLD` (les marques
 sont par manche, pas par engagée) — un changement ou un retrait d'horaire
 ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 
-**Engagée retirée de sa manche par un changement des résultats** (décision
+**Engagée retirée de sa manche par une mise à jour du tournoi** (décision
 utilisateur, 2026-10-13, étendue par la revue de sécurité). Quand une engagée
 quitte une manche dont ses joueurs tenaient l'horaire, ils apprennent qu'il ne
 les concerne plus : « **Match retiré de ton programme** » / "Match removed from
