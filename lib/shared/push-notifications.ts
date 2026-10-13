@@ -191,8 +191,9 @@ export function pushTargetPath(url: string, siteOrigin: string | null = null): s
 export function buildPushPayload(
   topic: PushTopic,
   content: PushContent,
-  siteOrigin: string | null = null,
-  lang: Locale = "fr",
+  siteOrigin: string | null,
+  /** Obligatoire : un texte anglais déclaré français serait lu avec la mauvaise voix. */
+  lang: Locale,
 ): PushPayload {
   return {
     topic,
