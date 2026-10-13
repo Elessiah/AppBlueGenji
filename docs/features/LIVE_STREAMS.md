@@ -238,9 +238,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   « Envoyer des messages », « Mentionner @everyone, @here et tous les rôles »
   et « Intégrer des liens ». Sans la mention, le message part sans notifier ;
   sans l'intégration, sans aperçu de la chaîne ; sans les deux premières, rien
-  ne part et le site réessaie. Pas de mode lent sur #live (ou « Gérer les
-  messages » pour le bot) : l'envoi resterait en attente, le bot le refuse et
-  le signale ; une règle AutoMod qui bloque l'annonce est signalée de même.
+  ne part et le site réessaie. Un mode lent sur #live retiendrait une annonce
+  postée pendant son délai après la précédente (sauf « Gérer les messages »
+  pour le bot) : le bot la refuse alors et le signale ; une règle AutoMod qui bloque l'annonce est signalée de même.
 
 ## Information des joueurs (RGPD)
 
