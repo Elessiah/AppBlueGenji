@@ -15,6 +15,8 @@
     "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
     "bodyRescheduled": "New kickoff: {start} (Paris time), instead of {previous}. {pairing} · {tournament}, {round}.",
     "bodyCleared": "The time set for {previous} (Paris time) has been removed: a new time will be announced. {pairing} · {tournament}, {round}.",
+    "titleWithdrawn": "Match removed from your schedule",
+    "bodyWithdrawn": "After a score correction, you no longer play this match: the time set for {previous} (Paris time) no longer applies to you. {pairing} · {tournament}, {round}.",
     "offset": {
       "P1D": "less than 24 hours"
     }

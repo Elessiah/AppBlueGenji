@@ -36,7 +36,7 @@ import {
   notifyUsers,
   type NotificationRecipient,
 } from "@/lib/server/notify";
-import { matchReminderPush, matchScheduleClearedPush } from "@/lib/shared/push-messages";
+import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush } from "@/lib/shared/push-messages";
 import {
   FIRST_SCHEDULE,
   MATCH_REMINDER_LOOKAHEAD_MS,
@@ -46,6 +46,7 @@ import {
   buildMatchReminderMessage,
   buildMatchScheduleAnnouncement,
   buildMatchScheduleClearedNotice,
+  buildMatchWithdrawnNotice,
   dueMatchReminders,
   matchRoundLabel,
   openedMatchReminders,
@@ -611,6 +612,91 @@ export async function announceMatchScheduleCleared(notice: MatchNotice, previous
 
   const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
   return dispatchPlannedSend({ match, offset: null, remaining: [], clearedStartAt: previousStartAt }, recipientsByTeam);
+}
+
+/**
+ * Une engagée retirée d'une manche par une correction de score, avec l'horaire
+ * qu'elle avait reçu (`./departed-notices`).
+ */
+export type DepartedEntrant = {
+  matchId: number;
+  teamId: number;
+  /** Sa place dans la manche : l'autre est son ancien adversaire. */
+  slot: 1 | 2;
+  heldStartAt: string | Date;
+};
+
+type WithdrawnMatchRow = RowDataPacket & {
+  id: number;
+  tournament_id: number;
+  tournament_name: string;
+  participant_type: string;
+  bracket: string;
+  round_number: number;
+  swiss_round: number;
+  departed_name: string | null;
+  opponent_name: string | null;
+};
+
+/**
+ * Prévient les joueurs d'une engagée **retirée** d'une manche par une
+ * correction de score que l'horaire qu'ils avaient reçu ne les concerne plus :
+ * message privé Discord (français, « Ton match » en tournoi individuel) et
+ * push dans la langue de chacun, même étiquette que l'annonce qu'il remplace.
+ * Après le commit de la correction, au meilleur effort.
+ *
+ * @returns Le nombre de messages déclenchés (0 ou 1).
+ */
+export async function announceEntrantWithdrawn(departed: DepartedEntrant): Promise<number> {
+  const db = await getDatabase();
+  // L'ancien adversaire est l'occupant de l'autre place, s'il y est encore.
+  const opponentColumn = departed.slot === 1 ? "m.team2_id" : "m.team1_id";
+  const [rows] = await db.query<WithdrawnMatchRow[]>(
+    `SELECT m.id, m.tournament_id, m.bracket, m.round_number,
+            t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
+            d.name AS departed_name, o.name AS opponent_name
+       FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id
+       LEFT JOIN bg_teams d ON d.id = ?
+       LEFT JOIN bg_teams o ON o.id = ${opponentColumn}
+      WHERE m.id = ? LIMIT 1`,
+    [departed.teamId, departed.matchId],
+  );
+  const row = rows[0];
+  if (!row || row.departed_name === null) return 0;
+  const recipients = (await loadRecipientsByTeam([departed.teamId])).get(departed.teamId) ?? [];
+  if (recipients.length === 0) return 0;
+
+  const swiss = isSwissRound(row);
+  const solo = row.participant_type === "SOLO";
+  const opponentName = row.opponent_name ?? "TBD";
+  const context = {
+    tournamentName: String(row.tournament_name),
+    tournamentUrl: tournamentPageUrl(Number(row.tournament_id)),
+    teamName: String(row.departed_name),
+    opponentName,
+    roundLabel: matchRoundLabel(String(row.bracket), Number(row.round_number), swiss),
+    startAt: departed.heldStartAt,
+    solo,
+  };
+  const pushSide = {
+    tournamentId: Number(row.tournament_id),
+    tournamentName: context.tournamentName,
+    matchId: departed.matchId,
+    teamName: context.teamName,
+    opponentName,
+    bracket: String(row.bracket),
+    roundNumber: Number(row.round_number),
+    swiss,
+    startAt: departed.heldStartAt,
+    solo,
+  };
+  await notifyUsers(recipients, {
+    topic: "MATCH_REMINDER",
+    discord: { message: buildMatchWithdrawnNotice(context), context: "match-withdrawn" },
+    push: (locale) => matchWithdrawnPush(pushSide, locale),
+  });
+  return 1;
 }
 
 async function runSweep(now: Date): Promise<number> {

@@ -13,6 +13,12 @@ import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 const CHUNK = 500;
 
 /**
+ * Un horaire reçu vaut encore tant qu'il est devant, ou passé depuis moins de
+ * 12 h (un match en retard) : il se cite, se retire, et son retrait se dit.
+ */
+export const HELD_TIME_GRACE_MS = 12 * 60 * 60 * 1000;
+
+/**
  * Efface les marques de rappel des manches données.
  *
  * Sous `ignoreMissingTable` : la création de la table est avalée par un

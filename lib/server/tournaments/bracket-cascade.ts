@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { statusFromTeams } from "./_internal";
+import { noteDepartedEntrant } from "./departed-notices";
 import { forgetMatchReminders } from "./reminder-marks";
 
 /**
@@ -98,7 +99,7 @@ async function reopenEngineResolved(
   target: CascadeRow,
   targetId: number,
   depth: number,
-  departed: number[],
+  departed: Departure[],
 ): Promise<number> {
   if (!isEngineResolved(target)) {
     // Une rencontre disputée derrière : le verrou aurait dû refuser. On
@@ -124,11 +125,31 @@ async function reopenEngineResolved(
  * observation, palier) appartenaient à l'ancienne, la remplaçante n'a rien
  * reçu et doit recevoir l'annonce — même règle que `pushTeamToTarget`, qui ne
  * la verrait plus (`./reminder-marks.ts`). Notée ici, effacée en une seule
- * instruction à la fin de la cascade (`detachDownstreamOutcome`).
+ * instruction à la fin de la cascade (`detachDownstreamOutcome`), après que
+ * l'horaire tenu par la sortante a été lu pour son avis (`./departed-notices`).
  */
-function recordDeparture(departed: number[], targetId: number, leaving: boolean): void {
-  if (leaving) departed.push(targetId);
+function recordDeparture(
+  departed: Departure[],
+  targetId: number,
+  slot: number,
+  teamId: number | null,
+  leaving: boolean,
+): void {
+  if (leaving && teamId !== null) departed.push({ matchId: targetId, teamId, slot: slot === 1 ? 1 : 2 });
 }
+
+/**
+ * Les manches quittées : l'horaire que les sortantes tenaient se lit d'abord —
+ * leurs joueurs apprendront, après le commit, qu'il ne les concerne plus
+ * (`./departed-notices`) —, puis les marques partent en une instruction.
+ */
+async function forgetDepartures(connection: PoolConnection, departed: Departure[]): Promise<void> {
+  for (const { matchId, teamId, slot } of departed) await noteDepartedEntrant(connection, matchId, teamId, slot);
+  await forgetMatchReminders(connection, [...new Set(departed.map((departure) => departure.matchId))]);
+}
+
+/** Une engagée sortie d'une manche, et la place qu'elle y occupait. */
+type Departure = { matchId: number; teamId: number; slot: 1 | 2 };
 
 /**
  * Vide un créneau d'aval et défait tout ce qui en était descendu.
@@ -153,7 +174,7 @@ async function vacateSlot(
   keepTeamId: number | null,
   depth: number,
   force: boolean,
-  departed: number[],
+  departed: Departure[],
 ): Promise<number> {
   if (depth > MAX_DEPTH) return 0;
   const target = await loadRow(connection, targetId);
@@ -181,7 +202,7 @@ async function vacateSlot(
      WHERE id = ?`,
     [statusFromTeams(team1 === null ? null : Number(team1), team2 === null ? null : Number(team2)), targetId],
   );
-  recordDeparture(departed, targetId, leaving);
+  recordDeparture(departed, targetId, slot, currentId, leaving);
   return reopened;
 }
 
@@ -197,7 +218,7 @@ async function undoPropagation(
   nextLoserTeamId: number | null,
   depth: number,
   force: boolean,
-  departed: number[],
+  departed: Departure[],
 ): Promise<number> {
   const links: [number | null, number | null, number | null][] = [
     [match.next_winner_match_id, match.next_winner_slot, nextWinnerTeamId],
@@ -230,8 +251,8 @@ export async function detachDownstreamOutcome(
   match: CascadeLinks,
   next: { winnerTeamId: number | null; loserTeamId: number | null },
 ): Promise<number> {
-  const departed: number[] = [];
+  const departed: Departure[] = [];
   const reopened = await undoPropagation(connection, match, next.winnerTeamId, next.loserTeamId, 0, false, departed);
-  if (departed.length > 0) await forgetMatchReminders(connection, departed);
+  if (departed.length > 0) await forgetDepartures(connection, departed);
   return reopened;
 }

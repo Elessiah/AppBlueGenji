@@ -218,6 +218,26 @@ export function matchScheduleClearedPush(side: ScheduledMatchSide, locale: Local
 }
 
 /**
+ * Engagée retirée d'une manche par une correction de score : `side.startAt`
+ * porte l'horaire qu'elle avait reçu et qui ne la concerne plus. Même
+ * étiquette que l'annonce, qu'il remplace sur l'appareil.
+ */
+export function matchWithdrawnPush(side: ScheduledMatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("matchReminder.titleWithdrawn"),
+    body: text.t("matchReminder.bodyWithdrawn", {
+      pairing: pairing(side, text),
+      tournament: side.tournamentName,
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
+      previous: pushMatchStart(side.startAt, locale),
+    }),
+    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
+    tag: `${matchTag(side.matchId)}-reminder`,
+  };
+}
+
+/**
  * Match programmé ou reprogrammé, pour l'arbitrage (`MATCH_SCHEDULED`) — mêmes
  * titre et corps que l'annonce aux joueurs.
  *

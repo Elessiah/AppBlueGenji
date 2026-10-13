@@ -7,6 +7,7 @@ import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-laun
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
+import { noteDepartedEntrant } from "./departed-notices";
 import { forgetMatchReminders } from "./reminder-marks";
 import {
   dropQueuedRefereeAlerts,
@@ -76,7 +77,10 @@ export async function pushTeamToTarget(
     // Les marques de rappel appartenaient aussi à l'ancienne affiche : la
     // nouvelle engagée n'a reçu aucun horaire (« reprogrammé, au lieu du … »
     // lui mentirait) et doit recevoir l'annonce — comme après un retour en
-    // arrière (`./reminder-marks.ts`).
+    // arrière (`./reminder-marks.ts`). L'engagée remplacée apprend, après le
+    // commit, que l'horaire qu'elle avait reçu ne la concerne plus
+    // (`./departed-notices`) — lu avant l'effacement.
+    await noteDepartedEntrant(connection, targetMatchId, Number(previousTeamId), targetSlot === 1 ? 1 : 2);
     await forgetMatchReminders(connection, [targetMatchId]);
   }
 

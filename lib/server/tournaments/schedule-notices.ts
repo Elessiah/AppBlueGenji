@@ -35,6 +35,7 @@ import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
 import { announceMatchSchedule, announceMatchScheduleCleared, type MatchNotice } from "./match-reminders";
+import { HELD_TIME_GRACE_MS } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 type ScheduledMatchInfoRow = RowDataPacket & MatchNotice;
@@ -75,7 +76,7 @@ export type MatchScheduleChange = {
 };
 
 /** Un horaire passé depuis moins longtemps vaut encore (match en retard). */
-const RECENT_PREVIOUS_MS = 12 * 60 * 60 * 1000;
+const RECENT_PREVIOUS_MS = HELD_TIME_GRACE_MS;
 
 /**
  * L'horaire que les joueurs tiennent : le dernier reçu (`toldStartAt`) — et

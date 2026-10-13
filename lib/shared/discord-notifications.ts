@@ -330,6 +330,24 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
 }
 
 /**
+ * Rédige l'avis à une engagée **retirée** d'une manche par une correction de
+ * score : l'horaire qu'elle avait reçu (`context.startAt`) ne la concerne plus.
+ * Mêmes lignes que l'annonce, pour que le joueur rapproche les deux messages.
+ *
+ * @returns Le message privé à envoyer, en français.
+ */
+export function buildMatchWithdrawnNotice(context: MatchReminderContext): string {
+  const lines = [
+    "**Match retiré de ton programme**",
+    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
+    pairingLine(context),
+    `Après une correction de score, tu ne joues plus ce match : l'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) ne te concerne plus.`,
+  ];
+  if (context.tournamentUrl) lines.push(context.tournamentUrl);
+  return lines.join("\n");
+}
+
+/**
  * Libellé lisible d'une manche : « Manche 3 », « Tableau perdants · manche 2 »
  * (le nom du tableau sur le site, `tournament.json` → `bracketLabels.LOWER`),
  * « Ronde 2 » en ronde suisse — le mot du site (`tournamentViews.json` →

@@ -41,6 +41,7 @@ import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot
 import { notifyStaff } from "@/lib/server/notify";
 import { refereeAlertPush, type RefereeAlertKind, type RefereeAlertMatch } from "@/lib/shared/push-messages";
 import { notifyTournamentStart } from "./player-pushes";
+import { discardDepartedNotices, flushDepartedNotices } from "./departed-notices";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
@@ -271,6 +272,8 @@ export function markMatchResolved(connection: PoolConnection, matchId: number): 
 /** Jette les lignes réservées : la transaction n'a pas abouti. */
 export function discardBotLogs(connection: PoolConnection): void {
   pending.delete(connection);
+  // Les avis aux engagées retirées suivent la même transaction.
+  discardDepartedNotices(connection);
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.delete(connection);
@@ -286,6 +289,8 @@ export function discardBotLogs(connection: PoolConnection): void {
  * À appeler juste après le commit ; `discardBotLogs` couvre le chemin d'échec.
  */
 export function flushBotLogs(connection: PoolConnection): void {
+  // Les avis aux engagées retirées par une correction partent avec le journal.
+  flushDepartedNotices(connection);
   const queue = pending.get(connection) ?? [];
   pending.delete(connection);
   const settled = resolvedMatches.get(connection) ?? new Set<number>();
