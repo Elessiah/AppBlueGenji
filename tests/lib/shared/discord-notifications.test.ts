@@ -188,7 +188,7 @@ describe("buildMatchWithdrawnNotice", () => {
     expect(message.split("\n")[0]).toBe("**Match retiré de ton programme**");
     expect(message).toContain("Coupe BlueGenji · Manche 2");
     expect(message).toContain("**Les Renards** contre **Team Nova**");
-    expect(message).toContain("Après une correction des résultats, tu ne joues plus ce match : l'horaire du ");
+    expect(message).toContain("Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du ");
     expect(message).toContain("(heure de Paris) ne te concerne plus.");
     expect(message).toContain("https://bluegenji.fr/tournois/7");
   });

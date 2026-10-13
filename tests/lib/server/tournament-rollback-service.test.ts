@@ -20,6 +20,8 @@ jest.mock("@/lib/server/tournaments/departed-notices", () => ({
   ),
   noteDepartedEntrants: jest.fn(),
   noteDeletedMatches: jest.fn(),
+  holdDepartures: jest.fn(async (_connection: unknown, matchIds: readonly number[]) => ({ matchIds, held: new Map() })),
+  settleDepartures: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
@@ -33,7 +35,7 @@ import { loadPhases } from "@/lib/server/tournaments/phases-repository";
 import { resetRegistrationRanks } from "@/lib/server/tournaments/repository";
 import { pushTeamToTarget } from "@/lib/server/tournaments/target-slot";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
-import { noteDeletedMatches, noteDepartedEntrants } from "@/lib/server/tournaments/departed-notices";
+import { holdDepartures, noteDeletedMatches, settleDepartures } from "@/lib/server/tournaments/departed-notices";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -372,11 +374,20 @@ describe("rollbackCurrentRound — écritures", () => {
 
     await rollbackCurrentRound(7);
 
+    // L'horaire tenu est relevé avant le détachement : une pose intermédiaire
+    // de la réconciliation ne prévient personne.
+    expect(holdDepartures).toHaveBeenCalledWith(expect.anything(), [3]);
+    const detach = execute.mock.calls.findIndex(([sql]) => String(sql).includes("SET team1_id = NULL"));
+    expect(jest.mocked(holdDepartures).mock.invocationCallOrder[0]).toBeLessThan(execute.mock.invocationCallOrder[detach]);
     // 20 sort ; 10 reste sur l'affiche et n'est pas prévenue.
-    expect(noteDepartedEntrants).toHaveBeenCalledWith(expect.anything(), [{ matchId: 3, teamId: 20, opponentId: 10 }]);
+    expect(settleDepartures).toHaveBeenCalledWith(
+      expect.anything(),
+      { matchIds: [3], held: new Map() },
+      [{ matchId: 3, teamId: 20, opponentId: 10 }],
+    );
     const forget = execute.mock.calls.findIndex(([sql]) => String(sql).includes("DELETE FROM bg_match_reminders WHERE match_id IN"));
     expect(execute.mock.invocationCallOrder[forget]).toBeGreaterThan(
-      jest.mocked(noteDepartedEntrants).mock.invocationCallOrder[0],
+      jest.mocked(settleDepartures).mock.invocationCallOrder[0],
     );
   });
 

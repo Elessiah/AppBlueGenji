@@ -6,8 +6,10 @@ import {
   departuresBetween,
   discardDepartedNotices,
   flushDepartedNotices,
+  holdDepartures,
   noteDeletedMatches,
   noteDepartedEntrants,
+  settleDepartures,
 } from "@/lib/server/tournaments/departed-notices";
 import { announceEntrantsWithdrawn } from "@/lib/server/tournaments/match-reminders";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
@@ -20,6 +22,7 @@ function contextRow(id: number, overrides: Record<string, unknown> = {}) {
   return {
     id,
     tournament_id: 7,
+    phase_id: 0,
     tournament_name: "Coupe BlueGenji",
     participant_type: "TEAM",
     bracket: "UPPER",
@@ -32,6 +35,7 @@ function contextRow(id: number, overrides: Record<string, unknown> = {}) {
 const MATCH_31 = {
   tournamentId: 7,
   tournamentName: "Coupe BlueGenji",
+  phaseId: 0,
   solo: false,
   bracket: "UPPER",
   roundNumber: 2,
@@ -266,5 +270,51 @@ describe("noteDeletedMatches", () => {
     const failing = connectionMock();
     failing.execute.mockRejectedValue(new Error("deadlock"));
     await expect(noteDeletedMatches(fakeConnection(failing), "tournament_id = ?", [7])).rejects.toThrow("deadlock");
+  });
+});
+
+describe("holdDepartures puis settleDepartures (retour en arrière)", () => {
+  it("relève l'horaire avant le geste, ignore les poses intermédiaires, et note les sorties de l'état d'arrivée", async () => {
+    const { connection } = connectionHolding({ 31: AHEAD });
+    const held = await holdDepartures(connection, [31]);
+
+    // Une exemption tranchée pendant la réconciliation remplace l'occupante
+    // intermédiaire : elle n'avait reçu aucun horaire, rien n'est noté.
+    await noteDepartedEntrants(connection, [{ matchId: 31, teamId: 109, opponentId: 102 }]);
+    settleDepartures(connection, held, [DEPARTURE]);
+    flushDepartedNotices(connection);
+
+    expect(announceEntrantsWithdrawn).toHaveBeenCalledWith([{ ...DEPARTURE, heldStartAt: AHEAD, match: MATCH_31 }]);
+  });
+
+  it("rend la main une fois réglé, ou quand la transaction échoue", async () => {
+    const settled = connectionHolding({ 31: AHEAD });
+    settleDepartures(settled.connection, await holdDepartures(settled.connection, [31]), []);
+    await noteDepartedEntrants(settled.connection, [DEPARTURE]);
+    flushDepartedNotices(settled.connection);
+    expect(announceEntrantsWithdrawn).toHaveBeenCalledTimes(1);
+
+    const failed = connectionHolding({ 31: AHEAD });
+    await holdDepartures(failed.connection, [31]);
+    discardDepartedNotices(failed.connection);
+    await noteDepartedEntrants(failed.connection, [DEPARTURE]);
+    flushDepartedNotices(failed.connection);
+    expect(announceEntrantsWithdrawn).toHaveBeenCalledTimes(2);
+  });
+
+  it("ne lit rien sans manche détachée", async () => {
+    const { mock, connection } = connectionHolding({});
+    expect(await holdDepartures(connection, [])).toEqual({ matchIds: [], held: new Map() });
+    expect(mock.execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("une engagée n'est prévenue qu'une fois par transaction", () => {
+  it("ignore une seconde sortie de la même engagée sur la même manche", async () => {
+    const { connection } = connectionHolding({ 31: AHEAD });
+    await noteDepartedEntrants(connection, [DEPARTURE]);
+    await noteDepartedEntrants(connection, [DEPARTURE, { ...DEPARTURE, teamId: 102, opponentId: 101 }]);
+    flushDepartedNotices(connection);
+    expect(jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0].map(({ teamId }) => teamId)).toEqual([101, 102]);
   });
 });

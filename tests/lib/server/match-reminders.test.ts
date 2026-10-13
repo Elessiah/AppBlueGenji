@@ -969,10 +969,20 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
 
 describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () => {
   // Après la correction : Les Renards (101) sont sortis ; Orion (109) a pris leur place.
-  const POSTER = { id: 31, team1_id: 109, team2_id: 102 };
+  const CURRENT = {
+    id: 31,
+    tournament_id: 7,
+    phase_id: 0,
+    bracket: "UPPER",
+    round_number: 2,
+    team1_id: 109,
+    team2_id: 102,
+    start_at: START,
+  };
   const MATCH = {
     tournamentId: 7,
     tournamentName: "Coupe BlueGenji",
+    phaseId: 0,
     solo: false,
     bracket: "UPPER",
     roundNumber: 2,
@@ -985,15 +995,15 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     { id: 102, name: "Team Nova" },
   ];
 
-  /** `query` : places actuelles, noms (sortantes et adversaires), joueurs des engagées, comptes. */
+  /** `query` : manches d'avant et d'arrivée, noms (sortantes et adversaires), joueurs des engagées, comptes. */
   async function mockWithdrawnDb(
-    posters: object[] = [POSTER],
+    current: object[] = [CURRENT],
     names: object[] = NAMES,
     recipients: Recipient[] = RECIPIENTS,
   ) {
     const query = jest
       .fn<() => Promise<unknown>>()
-      .mockResolvedValueOnce([posters])
+      .mockResolvedValueOnce([current])
       .mockResolvedValueOnce([names])
       .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
       .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
@@ -1007,8 +1017,10 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
 
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(1);
 
-    // Une lecture pour toutes les manches, une pour tous les noms.
-    expect((query.mock.calls[0] as unknown as [string, unknown[]])[1]).toEqual([31]);
+    // Une lecture pour les manches (d'avant, et celles des sortantes dans le tournoi), une pour les noms.
+    const [currentSql, currentParams] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(currentSql).toMatch(/WHERE id IN \(\?\)\s+OR \(tournament_id IN \(\?\)/);
+    expect(currentParams).toEqual([31, 7, 101, 101]);
     expect((query.mock.calls[1] as unknown as [string, unknown[]])[1]).toEqual([101, 102]);
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
     expect(calls).toHaveLength(1);
@@ -1017,7 +1029,7 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     // L'adversaire de l'horaire reçu, pas l'occupant actuel de l'autre place.
     expect(calls[0][0]).toContain("**Les Renards** contre **Team Nova**");
     expect(calls[0][0]).toContain(
-      "Après une correction des résultats, tu ne joues plus ce match : l'horaire du jeudi 10 septembre à 20:00 (heure de Paris) ne te concerne plus.",
+      "Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du jeudi 10 septembre à 20:00 (heure de Paris) ne te concerne plus.",
     );
 
     const pushes = jest.mocked(pushToUsers).mock.calls;
@@ -1025,28 +1037,68 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     expect(pushes[0][1]).toBe("MATCH_REMINDER");
     expect(resolvePush(pushes[0][2]).title).toBe("Match retiré de ton programme");
     expect(resolvePush(pushes[0][2]).tag).toBe("rencontre-31-reminder");
+    expect(resolvePush(pushes[0][2]).url).toBe("/tournois/7#match-31");
     expect(resolvePush(pushes[0][2], "en").title).toBe("Match removed from your schedule");
     expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
   });
 
   it("nomme l'adversaire d'avant même quand il a lui aussi quitté la manche", async () => {
     // Les deux places ont changé : C (109) et D (110) y sont désormais.
-    await mockWithdrawnDb([{ id: 31, team1_id: 109, team2_id: 110 }]);
+    await mockWithdrawnDb([{ ...CURRENT, team2_id: 110 }]);
     await announceEntrantsWithdrawn([DEPARTED]);
     const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(message).toContain("**Les Renards** contre **Team Nova**");
     expect(message).not.toMatch(/Orion/);
   });
 
-  it("prévient l'engagée d'une manche supprimée depuis (ronde réappariée, retour en arrière)", async () => {
+  it("prévient l'engagée d'une manche supprimée, avec un lien vers la page du tournoi", async () => {
     await mockWithdrawnDb([]);
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(1);
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]).toContain("Coupe BlueGenji · Manche 2");
+    const content = jest.mocked(pushToUsers).mock.calls[0][2];
+    // L'ancre de la rencontre n'existe plus ; l'étiquette remplace toujours l'annonce.
+    expect(resolvePush(content).url).toBe("/tournois/7");
+    expect(resolvePush(content, "en").url).toBe("/en/tournois/7");
+    expect(resolvePush(content).tag).toBe("rencontre-31-reminder");
+  });
+
+  it("ne dit que « Horaire du match retiré » à l'engagée reposée contre le même adversaire dans la même manche", async () => {
+    // Ronde réappariée : la manche 31 a disparu, Les Renards retrouvent Team Nova sur la 45, sans horaire.
+    await mockWithdrawnDb([{ ...CURRENT, id: 45, team1_id: 102, team2_id: 101, start_at: null }]);
+    expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(1);
+    const [message, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(context).toBe("match-schedule-cleared");
+    expect(message).toContain("**Horaire du match retiré**");
+    expect(message).not.toContain("ne joues plus");
+    const content = jest.mocked(pushToUsers).mock.calls[0][2];
+    expect(resolvePush(content).title).toBe("Horaire du match retiré");
+    // Lien vers la nouvelle rencontre, étiquette de l'ancienne.
+    expect(resolvePush(content).url).toBe("/tournois/7#match-45");
+    expect(resolvePush(content).tag).toBe("rencontre-31-reminder");
+  });
+
+  it("se tait quand la nouvelle rencontre a déjà un horaire : son annonce suivra", async () => {
+    await mockWithdrawnDb([{ ...CURRENT, id: 45, team1_id: 101, team2_id: 102 }]);
+    expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dit « Match retiré » quand l'engagée est reposée contre un autre adversaire, ou dans une autre manche", async () => {
+    for (const current of [
+      { ...CURRENT, id: 45, team1_id: 101, team2_id: 110, start_at: null },
+      { ...CURRENT, id: 45, round_number: 3, team1_id: 101, team2_id: 102, start_at: null },
+      { ...CURRENT, id: 45, phase_id: 2, team1_id: 101, team2_id: 102, start_at: null },
+    ]) {
+      jest.mocked(pushDiscordDirectMessages).mockClear();
+      await mockWithdrawnDb([current]);
+      await announceEntrantsWithdrawn([DEPARTED]);
+      expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("match-withdrawn");
+    }
   });
 
   it("ne nomme aucun joueur en tournoi individuel", async () => {
     await mockWithdrawnDb(
-      [{ id: 31, team1_id: 103, team2_id: 109 }],
+      [{ ...CURRENT, team1_id: 103 }],
       [
         { id: 101, name: "Kiro" },
         { id: 102, name: "Nova" },
@@ -1065,7 +1117,7 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
   });
 
   it("dit « Ronde N » en ronde suisse, et « TBD » sans adversaire", async () => {
-    const query = await mockWithdrawnDb([POSTER], [{ id: 101, name: "Les Renards" }]);
+    const query = await mockWithdrawnDb([CURRENT], [{ id: 101, name: "Les Renards" }]);
     await announceEntrantsWithdrawn([{ ...DEPARTED, opponentId: null, match: { ...MATCH, swiss: true } }]);
     expect((query.mock.calls[1] as unknown as [string, unknown[]])[1]).toEqual([101]);
     const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
@@ -1075,7 +1127,7 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
   });
 
   it("ne prévient pas une engagée revenue sur la manche (seconde correction)", async () => {
-    const query = await mockWithdrawnDb([{ ...POSTER, team1_id: 101 }]);
+    const query = await mockWithdrawnDb([{ ...CURRENT, team1_id: 101 }]);
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
     // Ni destinataires lus, ni message.
     expect(query).toHaveBeenCalledTimes(2);
@@ -1084,9 +1136,9 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
 
   it("ne fait rien sans avis, pour une engagée disparue ou sans joueur à prévenir", async () => {
     expect(await announceEntrantsWithdrawn([])).toBe(0);
-    await mockWithdrawnDb([POSTER], []);
+    await mockWithdrawnDb([CURRENT], []);
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
-    await mockWithdrawnDb([POSTER], NAMES, []);
+    await mockWithdrawnDb([CURRENT], NAMES, []);
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
