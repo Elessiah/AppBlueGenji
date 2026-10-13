@@ -85,6 +85,16 @@ describe("pushTargetPath", () => {
   ])("refuse %j et retombe sur l'accueil", (url) => {
     expect(pushTargetPath(url, "https://site.test")).toBe("/");
   });
+
+  it.each([
+    "/api/auth/google/start?terms=1&lang=en",
+    "https://site.test/api/auth/discord/start",
+    "/en/api/profile/locale",
+    "/%61pi/auth/google/start",
+    "/tournois/../api/x",
+  ])("ne mène jamais à une route d'API, qui partirait du site comme un clic (%s)", (url) => {
+    expect(pushTargetPath(url, "https://site.test")).toBe("/");
+  });
 });
 
 describe("buildPushPayload", () => {

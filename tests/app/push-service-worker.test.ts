@@ -218,6 +218,16 @@ describe("service worker du site", () => {
     expect(calls[1][0]).toBe("BlueGenji Esport");
   });
 
+  it("ramène une route d'API à l'accueil du site, même déguisée (lot 9-3)", async () => {
+    const worker = loadWorker();
+    const urls = ["/api/auth/google/start?terms=1", "/en/api/x", "/%61pi/auth/x", "/API", "/tournois/../api/x", "/%E0%A4%A"];
+    for (const url of urls) worker.fire("push", { data: { json: () => ({ title: "x", url }) } });
+    worker.fire("push", { data: { json: () => ({ title: "x", url: "/apiculture" }) } });
+    await Promise.all(worker.waited);
+    const calls = worker.showNotification.mock.calls as unknown as [string, { data: { url: string } }][];
+    expect(calls.map((call) => call[1].data.url)).toEqual([...urls.map(() => "/"), "/apiculture"]);
+  });
+
   it("au clic, rend le focus à l'onglet déjà ouvert sur la page", async () => {
     const focus = jest.fn(async () => undefined);
     const worker = loadWorker([{ url: "https://site.test/tournois/4", focus }]);
