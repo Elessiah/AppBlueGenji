@@ -93,7 +93,7 @@ describe("buildPushPayload", () => {
       title: "T".repeat(200),
       body: `  ${"b".repeat(1000)}  `,
       url: "/tournois",
-    });
+    }, null, "fr");
     expect(Array.from(payload.title)).toHaveLength(PUSH_TITLE_MAX);
     expect(payload.title.endsWith("…")).toBe(true);
     expect(Array.from(payload.body)).toHaveLength(PUSH_BODY_MAX);
@@ -101,24 +101,24 @@ describe("buildPushPayload", () => {
     expect(payload.topic).toBe("MATCH_START");
   });
 
-  it("déclare la langue du texte, le français par défaut (lot 9-3)", () => {
-    expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "/" }).lang).toBe("fr");
+  it("déclare la langue du texte (lot 9-3)", () => {
+    expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "/" }, null, "fr").lang).toBe("fr");
     expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "/" }, null, "en").lang).toBe("en");
   });
 
   it("replie les espaces et retombe sur le nom du site sans titre", () => {
-    const payload = buildPushPayload("MATCH_START", { title: "   ", body: "a\n\n b", url: "/", tag: "x" });
+    const payload = buildPushPayload("MATCH_START", { title: "   ", body: "a\n\n b", url: "/", tag: "x" }, null, "fr");
     expect(payload.title).toBe("BlueGenji Esport");
     expect(payload.body).toBe("a b");
     expect(payload.tag).toBe("x");
   });
 
   it("filtre le lien", () => {
-    expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "https://evil.test" }).url).toBe("/");
+    expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "https://evil.test" }, null, "fr").url).toBe("/");
   });
 
   it("coupe par caractère, sans casser un emoji", () => {
-    const payload = buildPushPayload("MATCH_START", { title: "🎮".repeat(100), body: "", url: "/" });
+    const payload = buildPushPayload("MATCH_START", { title: "🎮".repeat(100), body: "", url: "/" }, null, "fr");
     expect(Array.from(payload.title).every((char) => char === "🎮" || char === "…")).toBe(true);
   });
 });

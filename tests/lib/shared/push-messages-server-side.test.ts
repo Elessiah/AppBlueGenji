@@ -11,7 +11,8 @@ import ts from "typescript";
  * l'atteindrait, même par un détour, enverrait l'anglais à toutes les pages
  * françaises qui chargent ce module.
  *
- * Le graphe des imports (statiques, `export … from`, `import()` littéraux, lus
+ * Le graphe des imports (statiques, `export … from`, `import()` et `require()`
+ * littéraux, lus
  * sur l'arbre syntaxique TypeScript : commentaires et retours à la ligne n'y
  * changent rien, un import de type seul n'y compte pas) est construit une fois, puis parcouru **à rebours** depuis chaque cible : exact,
  * cycles compris, et chaque entrée `"use client"` qui fuit est nommée avec son
@@ -59,6 +60,17 @@ function typeOnlyImport(node: ts.ImportDeclaration): boolean {
   return clause.name === undefined && bindings !== undefined && ts.isNamedImports(bindings) && bindings.elements.length > 0 && bindings.elements.every((element) => element.isTypeOnly);
 }
 
+/** Un `export { type A } from` (ou `export type { … } from`) n'apporte que des types. */
+function typeOnlyExport(node: ts.ExportDeclaration): boolean {
+  if (node.isTypeOnly) return true;
+  const clause = node.exportClause;
+  return clause !== undefined && ts.isNamedExports(clause) && clause.elements.length > 0 && clause.elements.every((element) => element.isTypeOnly);
+}
+
+function isModuleLoad(callee: ts.Expression): boolean {
+  return callee.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(callee) && callee.text === "require");
+}
+
 /** Directive de tête : seules d'autres directives la précèdent, quelle que soit la longueur des commentaires. */
 function hasUseClient(source: ts.SourceFile): boolean {
   for (const statement of source.statements) {
@@ -75,9 +87,14 @@ function parseSource(path: string, text: string): SourceFile {
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && !typeOnlyImport(node)) {
       specifiers.push(node.moduleSpecifier.text);
-    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && !node.isTypeOnly) {
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && !typeOnlyExport(node)) {
       specifiers.push(node.moduleSpecifier.text);
-    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+    } else if (ts.isImportEqualsDeclaration(node) && !node.isTypeOnly && ts.isExternalModuleReference(node.moduleReference)) {
+      // `import x = require("…")`
+      const reference = node.moduleReference.expression;
+      if (ts.isStringLiteralLike(reference)) specifiers.push(reference.text);
+    } else if (ts.isCallExpression(node) && isModuleLoad(node.expression)) {
+      // `import("…")` et `require("…")` : un argument qui n'est pas un littéral ne se suit pas.
       const [argument] = node.arguments;
       if (argument && ts.isStringLiteralLike(argument)) specifiers.push(argument.text);
       else templateImport = true;
@@ -178,10 +195,13 @@ describe("le texte des notifications push reste côté serveur", () => {
       'import type { Locale } from "@/lib/shared/locales";',
       'import { type Leaves } from "@/lib/shared/scoped-text";',
       "const lazy = (x: string) => import(`@/messages/${x}.json`);",
+      'export { type RefereeAlertKind } from "@/lib/shared/push-messages";',
+      'const en = require("@/messages/en/pushMessages.json");',
+      'import fr = require("@/messages/fr/pushMessages.json");',
     ].join("\n");
     const parsed = parseSource(fake, text);
     expect(parsed.client).toBe(true);
-    expect(parsed.imports).toEqual([TARGETS[0]]);
+    expect(parsed.imports).toEqual([TARGETS[0], TARGETS[1], TARGETS[2]]);
     expect(parsed.templateImport).toBe(true);
     expect(parseSource(fake, 'const a = 1;\n"use client";\n').client).toBe(false);
   });
