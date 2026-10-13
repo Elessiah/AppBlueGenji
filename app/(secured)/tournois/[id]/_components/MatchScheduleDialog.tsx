@@ -90,9 +90,13 @@ function scheduleNotice(text: TournamentDialogsText, refereeScheduling: boolean,
   return text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice");
 }
 
-/** Confirmation après enregistrement. */
-function savedMessage(text: TournamentDialogsText, touched: boolean, planning: boolean): string {
-  if (!touched) return text.t("schedule.cleared");
+/**
+ * Confirmation après enregistrement. Vider une date qui n'existait pas ne
+ * retire rien : la confirmation ne doit pas reprendre le titre de l'avis
+ * « Horaire du match retiré », qui, lui, n'est pas parti.
+ */
+function savedMessage(text: TournamentDialogsText, touched: boolean, planning: boolean, hadTime: boolean): string {
+  if (!touched) return text.t(hadTime ? "schedule.cleared" : "schedule.noTime");
   return text.t(planning ? "schedule.planned" : "schedule.saved");
 }
 
@@ -277,7 +281,7 @@ export function MatchScheduleDialog({
         const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
         throw new CodedError(code, mapError(code));
       }
-      showSuccess(savedMessage(text, entry.kind === "ready", planning));
+      showSuccess(savedMessage(text, entry.kind === "ready", planning, match.startAt !== null));
       onSaved();
       onClose();
     } catch (error) {

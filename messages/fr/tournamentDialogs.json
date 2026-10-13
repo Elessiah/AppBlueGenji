@@ -142,6 +142,7 @@
     "noticePlanning": "Pour un match à jouer, un horaire à venir posé, changé ou retiré est annoncé aux joueurs des deux engagées (message privé Discord et notification push).",
     "noticeTbd": "Une place est encore vide : l'horaire sera annoncé aux joueurs quand les deux engagées seront connues, dans les 48 h qui précèdent le coup d'envoi.",
     "cleared": "Horaire du match retiré.",
+    "noTime": "Aucun horaire posé.",
     "planned": "Match planifié.",
     "saved": "Date de début enregistrée.",
     "saving": "Enregistrement…",
