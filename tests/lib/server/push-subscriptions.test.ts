@@ -94,6 +94,37 @@ describe("pushToUsers", () => {
     expect(query.mock.calls[2][1]).toEqual([10]);
   });
 
+  it("compte les appareils atteints même si la tenue des abonnements échoue ensuite", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
+      .mockRejectedValue(new Error("deadlock"));
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockResolvedValueOnce("GONE");
+
+    const count = await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG);
+
+    // Un appelant qui lirait 0 croirait n'avoir prévenu personne (marques « reçu »).
+    expect(count).toBe(1);
+    expect(error).toHaveBeenCalledWith("[push] tenue des abonnements impossible", expect.any(Error));
+    error.mockRestore();
+  });
+
+  it("compte les envois aboutis même si un autre envoi lève", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockRejectedValueOnce(new Error("réseau"));
+
+    expect(await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(1);
+    expect(error).toHaveBeenCalledWith("[push] envoi interrompu", expect.any(Error));
+    error.mockRestore();
+  });
+
   it("rédige chaque appareil dans la langue de son titulaire, une fois par langue", async () => {
     const query = jest
       .fn<SqlQuery>()

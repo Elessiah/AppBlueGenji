@@ -9,7 +9,7 @@ jest.mock("@/lib/server/tournaments/reminder-marks", () => ({
   ...jest.requireActual<typeof import("@/lib/server/tournaments/reminder-marks")>(
     "@/lib/server/tournaments/reminder-marks",
   ),
-  markStaffPushed: jest.fn(),
+  markStaffPushed: jest.fn(async () => true),
   releaseStaffPush: jest.fn(),
   forgetStaffPush: jest.fn(),
 }));
@@ -461,6 +461,14 @@ describe("marque STAFF", () => {
     jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
     await notifyMatchScheduleChange(change());
     expect(releaseStaffPush).toHaveBeenCalledWith(42, NEW_START);
+  });
+
+  it("ne pousse rien aux arbitres quand la réservation échoue : la manche ne tient plus cet horaire", async () => {
+    mockMatch();
+    jest.mocked(markStaffPushed).mockResolvedValueOnce(false);
+    await notifyMatchScheduleChange(change());
+    expect(notifyStaff).not.toHaveBeenCalled();
+    expect(releaseStaffPush).not.toHaveBeenCalled();
   });
 
   it("oublie l'horaire une fois son retrait poussé, et ne pousse pas le retrait d'un horaire jamais poussé", async () => {

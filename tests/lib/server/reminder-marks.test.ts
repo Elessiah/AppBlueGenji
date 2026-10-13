@@ -95,6 +95,22 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     expect(params).toEqual(["STAFF", 31, new Date("2099-01-01T18:00:00.000Z"), new Date("2099-01-01T18:00:00.000Z")]);
   });
 
+  it("dit si la réservation a pris : rien quand la manche ne tient plus cet horaire, oui sur table absente", async () => {
+    const held = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: held }));
+    expect(await markStaffPushed(31, "2099-01-01T18:00:00.000Z")).toBe(true);
+
+    const moved = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: moved }));
+    expect(await markStaffPushed(31, "2099-01-01T18:00:00.000Z")).toBe(false);
+
+    const missing = jest
+      .fn<SqlQuery>()
+      .mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: missing }));
+    expect(await markStaffPushed(31, "2099-01-01T18:00:00.000Z")).toBe(true);
+  });
+
   it("rend la marque réservée de cet horaire seulement", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
@@ -117,7 +133,8 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const failing = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: failing }));
-    await expect(markStaffPushed(31, "2099-01-01T18:00:00.000Z")).resolves.toBeUndefined();
+    // Marque illisible : on pousse quand même (sans marque, le retrait ne sera pas poussé).
+    await expect(markStaffPushed(31, "2099-01-01T18:00:00.000Z")).resolves.toBe(true);
     await expect(forgetStaffPush(31, "2099-01-01T18:00:00.000Z")).resolves.toBeUndefined();
     expect(error).toHaveBeenCalledTimes(2);
 
