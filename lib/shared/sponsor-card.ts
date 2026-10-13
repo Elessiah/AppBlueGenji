@@ -1,6 +1,7 @@
 import { type Sponsor, isStoredSponsorBanner } from "./sponsors";
 import { sponsorLogoSrc } from "./sponsor-logo";
 import { toServedUploadUrl } from "./uploads";
+import { leadsToApi } from "./safe-redirect";
 
 /**
  * Présentation d'une carte partenaire de l'accueil (`SponsorsGrid`).
@@ -62,7 +63,10 @@ function mediaLayout(bannerSrc: string | null, logoSrc: string | null): SponsorM
  * L'ancienne vitrine rendait `href="#"` pour un partenaire sans site : une carte
  * cliquable qui ne menait nulle part (et remontait en haut de page). Seuls
  * `http:` et `https:` passent — un `javascript:` saisi dans le champ ne doit
- * jamais devenir un lien.
+ * jamais devenir un lien. Un chemin de route d'API est refusé, quel que soit
+ * l'hôte : un clic sur `/api/auth/<p>/start?terms=1` partirait d'une page du
+ * site et enregistrerait une acceptation des conditions que personne n'a donnée
+ * (même règle que le lien « Postuler », `isSafeRecruitmentContactUrl`).
  */
 export function sponsorWebsiteHref(websiteUrl: string | null | undefined): string | null {
   const raw = websiteUrl?.trim();
@@ -70,6 +74,7 @@ export function sponsorWebsiteHref(websiteUrl: string | null | undefined): strin
   try {
     const url = new URL(raw);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (leadsToApi(url.pathname)) return null;
     return url.href;
   } catch {
     return null;

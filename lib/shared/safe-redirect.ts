@@ -86,10 +86,15 @@ function resolvedSitePath(href: string): string | null {
   // Barre ou contre-barre encodée : décodée **après** la résolution des `..`,
   // elle en ferait apparaître de nouveaux (`/x/..%2fapi`). Aucun chemin du
   // site n'en porte.
-  if (/%2f|%5c/i.test(pathPart(href))) return null;
+  const rawPath = pathPart(href);
+  if (/%2f|%5c/i.test(rawPath)) return null;
+  // Barres (et contre-barres, lues comme des barres) répétées réduites **avant**
+  // l'analyse : `new URL("//api/…", base)` y lirait un hôte (`api`) et rendrait
+  // `/`, alors que le serveur mène `//api/…` à `/api/…` (renvoi 308 sur le site).
+  const flattened = rawPath.replaceAll("\\", "/").replaceAll(/\/{2,}/g, "/") + href.slice(rawPath.length);
   let path: string;
   try {
-    path = decodeURIComponent(new URL(href, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
+    path = decodeURIComponent(new URL(flattened, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
   } catch {
     return null;
   }
