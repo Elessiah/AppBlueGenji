@@ -205,6 +205,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // PR #441 — la marque `TOLD` retient l'horaire reçu par les joueurs : c'est
     // lui que cite « au lieu du … » et que retire « Horaire du match retiré ».
     `ALTER TABLE bg_match_reminders ADD COLUMN start_at DATETIME NULL AFTER sent_at`,
+    // PR #441 — le balayage des rappels lit les manches par leur horaire (dans
+    // les 8 jours) à chaque lecture de `/tournois`, une fois par minute au plus :
+    // sans index, toute l'histoire des matchs était relue à chaque passage.
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_start_at (start_at)`,
     // PR #441 — marque `TOLD` (un horaire reçu, `lib/shared/discord-notifications.ts`).
     // Données seulement, rejouées à chaque démarrage sans effet une seconde fois.
     // 1. Un palier posé par l'ancien code l'était toujours avec un message :

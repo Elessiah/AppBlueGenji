@@ -157,14 +157,21 @@ async function resetReminderMarks(
   if (result.toldStartAt !== null && result.toldStartAt === startAt) return result;
   if (startAt !== null && new Date(startAt).getTime() <= Date.now()) return result;
   if (startAt !== null && bothEntrants) {
-    await connection.execute(
-      `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
-      [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY],
-    );
+    // L'insertion **avant** l'effacement : un `DELETE` sur une manche sans
+    // marque verrouille l'intervalle de l'index qui l'entoure, et une insertion
+    // qui suivrait dans la même transaction attendrait celui qu'une autre
+    // programmation (manche voisine, même intervalle) tient de la même façon —
+    // un interblocage, que la transaction perdante rendrait en refus de
+    // l'horaire. Dans cet ordre, la transaction n'insère plus rien après avoir
+    // verrouillé un intervalle : au pire, l'autre attend son tour.
     await connection.execute(`INSERT IGNORE INTO bg_match_reminders (match_id, offset_key) VALUES (?, ?)`, [
       matchId,
       MATCH_SEEN_KEY,
     ]);
+    await connection.execute(
+      `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
+      [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY],
+    );
   } else if (startAt !== null) {
     await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key <> ?`, [
       matchId,

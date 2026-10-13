@@ -32,21 +32,10 @@ import type { ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
 import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
-import { announceMatchSchedule, announceMatchScheduleCleared } from "./match-reminders";
+import { announceMatchSchedule, announceMatchScheduleCleared, type MatchNotice } from "./match-reminders";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
-type ScheduledMatchInfoRow = RowDataPacket & {
-  id: number;
-  status: string;
-  tournament_id: number;
-  tournament_name: string;
-  participant_type: string;
-  bracket: string;
-  round_number: number;
-  swiss_round: number;
-  team1_name: string | null;
-  team2_name: string | null;
-};
+type ScheduledMatchInfoRow = RowDataPacket & MatchNotice;
 
 export type MatchScheduleChange = {
   matchId: number;
@@ -120,10 +109,14 @@ export function isAnnounceableSchedule(change: MatchScheduleChange, now: Date = 
   return Number.isFinite(start) && start > now.getTime();
 }
 
+/**
+ * La manche, lue **une fois** pour tous les avis d'un changement : journal,
+ * arbitres et joueurs (`announceMatchSchedule` la reçoit au lieu de la relire).
+ */
 async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<ScheduledMatchInfoRow[]>(
-    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status,
+    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status, m.start_at, m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
@@ -152,9 +145,11 @@ function logEntrants(row: ScheduledMatchInfoRow): { team1: LogEntrant | null; te
  * Écrit la ligne du journal et, pour une date à annoncer (`push`), prévient les
  * arbitres.
  */
-async function notifyReferees(change: MatchScheduleChange & { startAt: string }, push: boolean): Promise<number> {
-  const row = await loadMatchInfo(change.matchId);
-  if (!row) return 0;
+async function notifyReferees(
+  row: ScheduledMatchInfoRow,
+  change: MatchScheduleChange & { startAt: string },
+  push: boolean,
+): Promise<number> {
   const participantType = toParticipantType(row.participant_type);
   const { team1, team2 } = logEntrants(row);
   const announcement = staffAnnouncement(change);
@@ -215,9 +210,10 @@ export function isAnnounceableClearing(change: MatchScheduleChange, now: Date = 
 }
 
 /** Ligne du journal pour un horaire retiré. */
-async function logScheduleCleared(change: MatchScheduleChange & { previousStartAt: string }): Promise<void> {
-  const row = await loadMatchInfo(change.matchId);
-  if (!row) return;
+async function logScheduleCleared(
+  row: ScheduledMatchInfoRow,
+  change: MatchScheduleChange & { previousStartAt: string },
+): Promise<void> {
   if (change.actor) {
     publishStaffAction(
       formatMatchScheduleClearedLog({
@@ -259,19 +255,22 @@ async function logScheduleCleared(change: MatchScheduleChange & { previousStartA
 }
 
 /** Horaire effacé : journal, avis aux arbitres, et aux joueurs qui l'avaient reçu. */
-async function notifyScheduleCleared(change: MatchScheduleChange): Promise<void> {
+async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchScheduleChange): Promise<void> {
   const { previousStartAt } = change;
   if (previousStartAt === null) return;
   const results = await Promise.allSettled([
-    logScheduleCleared({ ...change, previousStartAt }),
+    logScheduleCleared(row, { ...change, previousStartAt }),
     isAnnounceableClearing(change)
-      ? announceMatchScheduleCleared(change.matchId, heldStartAt(change) ?? previousStartAt)
+      ? announceMatchScheduleCleared(row, heldStartAt(change) ?? previousStartAt)
       : Promise.resolve(0),
   ]);
+  reportFailures(results, "[notify] horaire retiré non annoncé");
+}
+
+/** Un avis manqué se dit dans pm2 ; une table absente (base en création) se tait. */
+function reportFailures(results: PromiseSettledResult<unknown>[], label: string): void {
   for (const result of results) {
-    if (result.status === "rejected" && !isMissingTableError(result.reason)) {
-      console.error("[notify] horaire retiré non annoncé", result.reason);
-    }
+    if (result.status === "rejected" && !isMissingTableError(result.reason)) console.error(label, result.reason);
   }
 }
 
@@ -281,11 +280,19 @@ async function notifyScheduleCleared(change: MatchScheduleChange): Promise<void>
  */
 export async function notifyMatchScheduleChange(change: MatchScheduleChange): Promise<void> {
   const { startAt } = change;
-  if (startAt === null) {
-    await notifyScheduleCleared(change);
+  if (startAt === change.previousStartAt) return;
+  let row: ScheduledMatchInfoRow | null;
+  try {
+    row = await loadMatchInfo(change.matchId);
+  } catch (error) {
+    reportFailures([{ status: "rejected", reason: error }], "[notify] horaire de match non annoncé");
     return;
   }
-  if (startAt === change.previousStartAt) return;
+  if (!row) return;
+  if (startAt === null) {
+    await notifyScheduleCleared(row, change);
+    return;
+  }
   // Une date déjà passée (correction d'archive) n'est que journalisée. Une
   // date rendue à l'horaire que les joueurs tiennent déjà (après une saisie de
   // travers seulement journalisée) ne leur apprend rien : ils n'en reçoivent
@@ -294,13 +301,9 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   const playersAlreadyHoldIt = change.alreadyAnnounced && change.toldStartAt === startAt;
   const results = await Promise.allSettled([
     announceable && !playersAlreadyHoldIt
-      ? announceMatchSchedule(change.matchId, playerAnnouncement(change))
+      ? announceMatchSchedule(row, playerAnnouncement(change))
       : Promise.resolve(0),
-    notifyReferees({ ...change, startAt }, announceable),
+    notifyReferees(row, { ...change, startAt }, announceable),
   ]);
-  for (const result of results) {
-    if (result.status === "rejected" && !isMissingTableError(result.reason)) {
-      console.error("[notify] horaire de match non annoncé", result.reason);
-    }
-  }
+  reportFailures(results, "[notify] horaire de match non annoncé");
 }

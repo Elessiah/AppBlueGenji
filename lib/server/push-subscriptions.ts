@@ -27,6 +27,7 @@ import {
 } from "@/lib/shared/push-notifications";
 import { type Locale } from "@/lib/shared/locales";
 import { cached } from "@/lib/shared/intl-cache";
+import { inBatches } from "@/lib/shared/in-batches";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
 
@@ -150,11 +151,6 @@ type SubscriptionRow = RowDataPacket & {
 /** Envois simultanés au plus : un tournoi prévient des dizaines d'appareils. */
 const PUSH_CONCURRENCY = 8;
 
-async function inBatches<T>(items: readonly T[], size: number, run: (item: T) => Promise<void>): Promise<void> {
-  for (let start = 0; start < items.length; start += size) {
-    await Promise.all(items.slice(start, start + size).map(run));
-  }
-}
 
 export type PushOptions = {
   /** `high` pour ce qui n'attend pas (départ de match) : réveille un téléphone en veille. */

@@ -166,6 +166,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       INDEX idx_bg_matches_phase (tournament_id, phase_id),
       INDEX idx_bg_matches_live (live_trigger, status),
       INDEX idx_bg_matches_caster (caster_user_id),
+      INDEX idx_bg_matches_start_at (start_at),
       CONSTRAINT fk_bg_matches_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_matches_team1 FOREIGN KEY (team1_id)
