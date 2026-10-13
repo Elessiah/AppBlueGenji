@@ -67,7 +67,7 @@ import {
 import { DEFAULT_LOCALE, isLocale, localeHref, type Locale } from "@/lib/shared/locales";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
-import { requestNavigationProvenance } from "@/lib/server/request-origin";
+import { startedOnSitePage } from "@/lib/server/request-origin";
 
 /** Où retombe un rattachement, réussi ou non. */
 const PROFILE_PATH = "/profil";
@@ -178,16 +178,13 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
   const redirectTo = sealedReturnPath(req.nextUrl.searchParams.get("redirect"), locale);
   const intent: OAuthIntent = req.nextUrl.searchParams.get("intent") === "link" ? "LINK" : "LOGIN";
   // Ce que la route de départ — un `GET` sans contrôle de provenance, qu'un
-  // autre site peut faire ouvrir — scelle de la page de départ ne doit pas
-  // pouvoir être choisi par ce site (`navigationProvenance`) :
-  // - la **langue** ne devient celle du compte que pour un départ prouvé venu
-  //   d'une page du site — un doute la laisse telle qu'elle est (lot 9-3) ;
-  // - les **conditions** cochées sont écartées pour un départ prouvé venu
-  //   d'ailleurs ; dans le doute (navigateur ancien sans en-têtes), elles
-  //   valent comme avant, sans quoi une inscription y bouclerait sur « terms ».
-  const provenance = requestNavigationProvenance(req);
-  const localeFromPage = provenance === "site";
-  const termsAccepted = provenance !== "elsewhere" && req.nextUrl.searchParams.get("terms") === "1";
+  // autre site peut faire ouvrir — scelle de la page de départ (langue du
+  // compte, lot 9-3 ; conditions cochées) ne vaut que pour un départ **prouvé**
+  // cliqué sur une page du site (`startedOnSitePage`) : un lien posé ailleurs
+  // ne choisit ni l'un ni l'autre. Sans preuve, la langue reste telle qu'elle
+  // est, et une inscription se voit redemander les conditions (« terms »).
+  const localeFromPage = startedOnSitePage(req);
+  const termsAccepted = localeFromPage && req.nextUrl.searchParams.get("terms") === "1";
 
   if (intent === "LINK") {
     const user = await getCurrentUser();

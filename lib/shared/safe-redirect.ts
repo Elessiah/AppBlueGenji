@@ -21,7 +21,7 @@
  * ne fait pas foi).
  */
 
-import { DEFAULT_LOCALE, localeHref, splitLocalePrefix, type Locale } from "./locales";
+import { DEFAULT_LOCALE, isApiPath, localeHref, splitLocalePrefix, type Locale } from "./locales";
 import { trimTrailingSlashes } from "./trim-trailing";
 
 /** Destination de repli : l'accueil de l'espace compétitif. */
@@ -52,7 +52,12 @@ const STRIPPED_BY_BROWSERS = /[\u0000-\u001f\u007f]/;
  * - sa variante à contre-barre (`/\exemple.invalid`), que les navigateurs
  *   traitent comme la précédente ;
  * - tout ce qui porte un caractère de contrôle, retiré par le navigateur avant
- *   résolution et qui ferait réapparaître les cas ci-dessus.
+ *   résolution et qui ferait réapparaître les cas ci-dessus ;
+ * - une route d'API (`/api/…`, préfixe de langue, `.`/`..` ou encodage
+ *   compris) : ce n'est pas une page. Ouverte depuis la page de connexion, elle
+ *   partirait **du site** — `/api/auth/google/start?terms=1&lang=en` y
+ *   passerait pour un clic sur la page (`Sec-Fetch-Site: same-origin`) et
+ *   ouvrirait, sitôt connecté, la session d'un autre compte (revue sécurité).
  */
 export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDIRECT): string {
   if (typeof value !== "string") return fallback;
@@ -64,8 +69,24 @@ export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDI
   // `//` comme `/\` : le navigateur y lit une autorité, pas un chemin.
   if (candidate.startsWith("//") || candidate.startsWith("/\\")) return fallback;
   if (UNSAFE_PATH_SEPARATOR.test(pathPart(candidate))) return fallback;
+  if (leadsToApi(candidate)) return fallback;
 
   return candidate;
+}
+
+/**
+ * Le chemin mène-t-il à une route d'API, **tel que le navigateur le
+ * résoudra** (`.`/`..` retirés, encodage défait, préfixe de langue ôté) ? Un
+ * encodage illisible est tenu pour suspect.
+ */
+function leadsToApi(href: string): boolean {
+  let path: string;
+  try {
+    path = decodeURIComponent(new URL(href, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
+  } catch {
+    return true;
+  }
+  return isApiPath(splitLocalePrefix(trimTrailingSlashes(path.toLowerCase()) || "/").path);
 }
 
 /**

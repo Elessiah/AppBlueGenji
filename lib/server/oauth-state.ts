@@ -40,8 +40,8 @@ export type OAuthStatePayload = {
   /** Conditions d'utilisation acceptées à l'aller (case de `/connexion`). */
   termsAccepted: boolean;
   /**
-   * Départ prouvé cliqué **sur une page du site** (`navigationProvenance` =
-   * `site`) : seule cette langue-là devient celle du compte au retour (lot
+   * Départ prouvé cliqué **sur une page du site** (`startedOnSitePage`,
+   * `Sec-Fetch-Site: same-origin`) : seule cette langue-là devient celle du compte au retour (lot
    * 9-3). Un lien posé ailleurs — autre site, favori, adresse tapée — ou un
    * départ sans preuve connecte sans toucher à la langue choisie dans « Mon
    * profil ».

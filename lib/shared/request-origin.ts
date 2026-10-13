@@ -153,30 +153,17 @@ export function requestOriginRefusal(
 }
 
 /**
- * D'où vient une **navigation** (`GET` de haut niveau, sans `Origin`) :
- *
- * - `site` : un clic sur une page du site — `Sec-Fetch-Site: same-origin`, ou,
- *   sans cet en-tête (navigateur ancien), un `Referer` d'un hôte du site ;
- * - `elsewhere` : un autre site, un sous-domaine, un favori ou une adresse
- *   tapée (`Sec-Fetch-Site` autre), ou un `Referer` d'un autre hôte ;
- * - `unknown` : ni l'un ni l'autre en-tête — rien ne permet de trancher.
+ * Une **navigation** (`GET` de haut niveau, sans `Origin`) vient-elle d'un clic
+ * sur une page du site ? Seul `Sec-Fetch-Site: same-origin` le prouve : posé
+ * par le navigateur, hors de portée d'une page. Tout le reste — autre site,
+ * sous-domaine (`same-site`), favori ou adresse tapée (`none`), en-tête absent
+ * (navigateur d'avant 2023) — n'en est pas une preuve. Le `Referer` n'est pas
+ * lu : une page peut le taire, et un hôte seul n'en dit pas le schéma.
  *
  * Sert au départ OAuth (`lib/server/oauth-flow.ts`), route `GET` qu'un autre
  * site peut faire ouvrir : ce qu'il scelle de la page de départ (langue,
  * conditions acceptées) ne doit pas pouvoir être choisi par ce site.
  */
-export type NavigationProvenance = "site" | "elsewhere" | "unknown";
-
-export function navigationProvenance(signals: {
-  secFetchSite: string | null;
-  referer: string | null;
-  siteHosts: readonly string[];
-}): NavigationProvenance {
-  const fetchSite = signals.secFetchSite?.trim().toLowerCase() || null;
-  if (fetchSite !== null) return fetchSite === "same-origin" ? "site" : "elsewhere";
-  const referer = signals.referer?.trim() || null;
-  if (referer === null) return "unknown";
-  const host = originHost(referer);
-  const hosts = new Set(signals.siteHosts.map((h) => h.toLowerCase()));
-  return host !== null && hosts.has(host) ? "site" : "elsewhere";
+export function isSitePageNavigation(secFetchSite: string | null): boolean {
+  return secFetchSite?.trim().toLowerCase() === "same-origin";
 }
