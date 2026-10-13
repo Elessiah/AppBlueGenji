@@ -155,13 +155,15 @@ retire l'horaire). L'horaire est posé dans la marque **avant** l'envoi (un
 arbitre qui corrige sa saisie dans la seconde le lit déjà) et rendu à son
 état d'avant si rien n'a abouti — seulement si la marque porte encore
 l'horaire de cet envoi (`start_at <=> ?`) : un changement plus récent, remis
-entre-temps, garde le sien ; un avis de retrait le remet à `NULL` : la
+entre-temps, garde le sien (un rendu en échec est écrit dans pm2, l'échec de
+l'envoi restant celui qui remonte) ; un avis de retrait le remet à `NULL` : la
 date suivante se dit « reprogrammée », sans rien citer. Une date rendue à
 l'horaire que les joueurs tiennent déjà (après une saisie de travers seulement
 journalisée) ne leur est pas réannoncée, et garde ses marques (le rappel déjà
 parti ne repart pas) — sauf un palier daté d'un **autre** horaire (pris pour
 une date intermédiaire dont l'annonce n'a atteint personne), qui ferait sauter
-au balayage le rappel 24 h de l'horaire rendu ; une date déjà passée, annoncée
+au balayage le rappel 24 h de l'horaire rendu ; l'observation y est redatée,
+pour qu'un échec tardif de l'avis intermédiaire ne la rende pas ; une date déjà passée, annoncée
 à personne, laisse elle aussi les marques en place.
 
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
