@@ -8,6 +8,7 @@
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
 import type { PoolConnection } from "mysql2/promise";
+import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 
 const CHUNK = 500;
@@ -17,6 +18,31 @@ const CHUNK = 500;
  * 12 h (un match en retard) : il se cite, se retire, et son retrait se dit.
  */
 export const HELD_TIME_GRACE_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Rend des marques réservées (observation, palier) — **seulement celles prises
+ * pour cet horaire** (`start_at <=> ?` : chaque réservation date la sienne,
+ * `setMatchStartAt` aussi). Un ancien envoi en échec n'efface ainsi jamais les
+ * marques d'un changement plus récent. Seul chemin de rendu : un appelant qui
+ * oublierait la condition rouvrirait le doublon. Ne lève jamais.
+ */
+export async function releaseDatedMarks(
+  matchId: number,
+  keys: readonly string[],
+  startAt: string | Date,
+): Promise<void> {
+  if (keys.length === 0) return;
+  try {
+    const db = await getDatabase();
+    await db.execute(
+      `DELETE FROM bg_match_reminders
+        WHERE match_id = ? AND offset_key IN (${keys.map(() => "?").join(", ")}) AND start_at <=> ?`,
+      [matchId, ...keys, new Date(startAt)],
+    );
+  } catch {
+    // Base injoignable : la marque attendra le changement d'horaire suivant.
+  }
+}
 
 /**
  * Efface les marques de rappel des manches données.

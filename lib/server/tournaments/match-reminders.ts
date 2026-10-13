@@ -55,6 +55,7 @@ import {
 } from "@/lib/shared/discord-notifications";
 import { inBatches } from "@/lib/shared/in-batches";
 import { tournamentPageUrl } from "./app-url";
+import { releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 /** Un horaire tel que la base le rend (`dateStrings`) ou que le code le passe ; `null` : aucun. */
@@ -353,11 +354,6 @@ async function claimToldMark(match: ScheduledMatch, startAt: Date): Promise<bool
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
-/** Rend une marque réservée pour un envoi qui n'a rien donné. */
-async function releaseReminder(matchId: number, offsetKey: string): Promise<void> {
-  const db = await getDatabase();
-  await db.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ?`, [matchId, offsetKey]);
-}
 
 /** Les deux engagées d'une manche, chacune face à l'autre. */
 function matchSides(match: ScheduledMatch): { teamId: number; teamName: string; opponentName: string }[] {
@@ -390,19 +386,7 @@ type PlannedSend = {
 
 /** Rend les marques d'un envoi qui n'a pu partir. Ne lève jamais. */
 async function releaseClaims(send: PlannedSend): Promise<void> {
-  const keys = send.claimed ?? [];
-  if (keys.length === 0) return;
-  const db = await getDatabase();
-  // Seulement les marques prises pour **cet** horaire : un changement plus
-  // récent a posé les siennes (`setMatchStartAt` date l'observation), qu'un
-  // ancien envoi en échec n'a pas à effacer.
-  await db
-    .execute(
-      `DELETE FROM bg_match_reminders
-        WHERE match_id = ? AND offset_key IN (${keys.map(() => "?").join(", ")}) AND start_at <=> ?`,
-      [Number(send.match.id), ...keys, new Date(send.match.start_at)],
-    )
-    .catch(() => undefined);
+  await releaseDatedMarks(Number(send.match.id), send.claimed ?? [], send.match.start_at);
 }
 
 /**
@@ -444,7 +428,7 @@ async function planMatchSends(
     } catch (error) {
       // Rendue, l'observation laisse l'annonce au passage suivant ; gardée,
       // elle la ferait taire pour de bon (seul le rappel 24 h partirait).
-      await releaseReminder(Number(match.id), MATCH_SEEN_KEY).catch(() => undefined);
+      await releaseDatedMarks(Number(match.id), [MATCH_SEEN_KEY], match.start_at);
       throw error;
     }
     const openedKeys = new Set(opened.map((offset) => offset.key));

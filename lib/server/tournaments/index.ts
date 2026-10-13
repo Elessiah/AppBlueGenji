@@ -614,7 +614,11 @@ export async function listTournamentBuckets(
   // entraîne, comme la bascule d'état juste au-dessus. Étranglé à une minute et
   // sans attente ici — un bot lent ou injoignable ne doit pas retarder la
   // liste, et le prochain passage rattrapera ce qui reste dû.
-  void dispatchDueMatchReminders().catch(() => undefined);
+  // Un passage en échec (fenêtre, destinataires) rend ses réservations et se
+  // dit dans pm2 : sans trace, des rappels pourraient manquer en silence.
+  void dispatchDueMatchReminders().catch((error: unknown) => {
+    console.error("[match-reminders] balayage en échec", error);
+  });
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
   void dispatchMatchStartNotices().catch(() => undefined);

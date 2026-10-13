@@ -28,8 +28,8 @@ export async function pushTeamToTarget(
   const before = beforeRows[0];
   if (!before) return;
   const previousTeamId = targetSlot === 1 ? before.team1_id : before.team2_id;
-  const otherTeamId = targetSlot === 1 ? before.team2_id : before.team1_id;
   const column = targetSlot === 1 ? "team1_id" : "team2_id";
+  const otherColumn = targetSlot === 1 ? "team2_id" : "team1_id";
 
   // Remplacer un engagé par un **autre** (correction d'un score amont) fait de
   // cette ligne une autre affiche : l'antenne ouverte sur l'ancienne ne vaut
@@ -38,11 +38,15 @@ export async function pushTeamToTarget(
   // Remplir un créneau encore vide, en revanche, ne fait que matérialiser le
   // match prévu : une diffusion programmée à l'avance doit lui survivre.
   const replacing = previousTeamId !== null && Number(previousTeamId) !== teamId;
-  // Une seule écriture : la place, le statut (l'autre place est connue de la
-  // lecture d'avant) et, sur un remplacement, l'antenne.
+  // Une seule écriture : la place, le statut — calculé par la base sur la
+  // valeur **actuelle** de l'autre place, pas sur la lecture d'avant, qu'une
+  // image figée de la transaction pourrait avoir laissée en arrière — et, sur
+  // un remplacement, l'antenne.
   await connection.execute(
-    `UPDATE bg_matches SET ${column} = ?, status = ?${replacing ? ", live_started_at = NULL" : ""} WHERE id = ?`,
-    [teamId, otherTeamId === null ? "PENDING" : "READY", targetMatchId],
+    `UPDATE bg_matches
+        SET ${column} = ?, status = IF(${otherColumn} IS NULL, 'PENDING', 'READY')${replacing ? ", live_started_at = NULL" : ""}
+      WHERE id = ?`,
+    [teamId, targetMatchId],
   );
 
   if (replacing) {
