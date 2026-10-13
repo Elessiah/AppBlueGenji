@@ -99,7 +99,7 @@ describe("runLiveAnnouncementSweep", () => {
     expect(pushLiveAnnouncement).toHaveBeenCalledWith(
       "🔴 En direct : Renards contre Nova — Coupe d'hiver",
       "https://www.twitch.tv/caster",
-      "live-announce match-40",
+      "live-announce tournoi-4 match-40",
     );
     expect(releasesOf(execute)).toEqual([]);
     // Trace pm2 : identifiants, aucun nom.
@@ -286,7 +286,7 @@ describe("runLiveAnnouncementSweep", () => {
     expect(pushLiveAnnouncement).toHaveBeenCalledWith(
       "🔴 En direct — Coupe d'hiver :\n• Renards contre Nova\n• Orques contre Lynx",
       "https://twitch.tv/bluegenji",
-      "live-announce match-40,41",
+      "live-announce tournoi-4 match-40,41",
     );
     expect(console.info).toHaveBeenCalledWith("[live-announce] matchs 40, 41 (tournoi 4) annoncés dans #live");
   });
@@ -330,7 +330,7 @@ describe("runLiveAnnouncementSweep", () => {
     });
     expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]).toBe("live-announce match-41");
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]).toBe("live-announce tournoi-4 match-41");
     expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
       "[live-announce] match 40 (tournoi 4) : réservation impossible, réessayée à chaque passage pendant les deux heures qui suivent le début du direct (avertissement répété au plus une fois par heure)",
     );
@@ -370,7 +370,7 @@ describe("runLiveAnnouncementSweep", () => {
     await runLiveAnnouncementSweep(NOW);
     const context = String(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]);
     expect(context.length).toBeLessThanOrEqual(200);
-    const match = /^live-announce match-([\d,]+),…\+(\d+)$/.exec(context);
+    const match = /^live-announce tournoi-4 match-([\d,]+),…\+(\d+)$/.exec(context);
     expect(match).not.toBeNull();
     const shown = match![1].split(",");
     expect(shown.every((id, i) => id === String(10_000 + i))).toBe(true);
