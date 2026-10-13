@@ -174,7 +174,9 @@ balayage** :
   le palier déjà ouvert et envoie « Match programmé » ou « Match reprogrammé »
   — reprogrammé seulement si les joueurs avaient reçu un horaire (`TOLD`), avec
   « , au lieu du … » quand l'ancienne date est connue (pas après un
-  effacement). Une date posée quand une place était vide n'a jamais été
+  effacement) et que les joueurs ont pu la recevoir : encore devant, ou passée
+  depuis moins de 12 h (match en retard qu'on décale) — une date passée depuis
+  longtemps n'a été que journalisée. Une date posée quand une place était vide n'a jamais été
   annoncée : sa remplaçante se dit « programmé », sans ancienne date. Une date
   **retirée** (`announceMatchScheduleCleared`) donne « Horaire du match
   retiré » — seulement si les joueurs l'avaient reçue, qu'elle était encore
