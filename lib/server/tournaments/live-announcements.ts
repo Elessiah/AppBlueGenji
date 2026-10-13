@@ -26,6 +26,11 @@
  * relancé est annoncé de nouveau. Une affiche changée (ré-appariement) est une
  * autre rencontre, donc une autre annonce.
  *
+ * **Fraîcheur : deux heures.** Un match n'est annoncé que dans les deux heures
+ * qui suivent son passage à l'antenne (`LIVE_ANNOUNCE_MAX_AGE_MINUTES`) : un
+ * déploiement, une table recréée ou une longue panne du bot ne réveillent
+ * jamais `@everyone` pour un match commencé depuis longtemps.
+ *
  * **Production seulement** : une base de développement (seed `Test_`) ne doit
  * jamais faire écrire `@everyone` à 1 200 personnes, même devant un bot local
  * branché par erreur sur le vrai serveur.
@@ -57,14 +62,35 @@ type LiveCandidateRow = RowDataPacket & {
   team2_name: string;
 };
 
+/**
+ * Âge maximal, en minutes, d'un passage à l'antenne encore annonçable. Mesuré
+ * par l'horloge de la base (`NOW()`), comme les autres colonnes `DATETIME` du
+ * moteur : aucun décalage de fuseau entre le processus et le serveur SQL.
+ */
+export const LIVE_ANNOUNCE_MAX_AGE_MINUTES = 120;
+
+/**
+ * Passage à l'antenne récent, selon le mode : lancement (`AUTO`), heure dite
+ * — ou, pour un match devenu jouable après son heure, son lancement — en
+ * `START_TIME`, ouverture d'antenne en `MANUAL`. Une colonne vide ne passe pas.
+ */
+const FRESH_ON_AIR_SQL = `(
+        (m.live_trigger = 'AUTO' AND m.launched_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE)
+        OR (m.live_trigger = 'START_TIME'
+            AND (m.start_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE
+                 OR (m.launched_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE
+                     AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id))))
+        OR (m.live_trigger = 'MANUAL' AND m.live_started_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE)
+      )`;
+
 /** Vrai si les annonces peuvent partir : en production seulement. */
 export function liveAnnouncementsEnabled(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
 /**
- * Matchs castés, jouables, d'un tournoi en cours, dont l'affiche courante n'a
- * pas encore été annoncée. Le passage à l'antenne se décide ensuite **en
+ * Matchs castés, jouables, d'un tournoi en cours, passés à l'antenne depuis
+ * moins de deux heures, dont l'affiche courante n'a pas encore été annoncée. Le passage à l'antenne se décide ensuite **en
  * mémoire** (`isMatchLive`), comme pour le bouton d'accueil : leur nombre est
  * marginal, et aucune requête ne réimplémente la règle en SQL.
  */
@@ -82,6 +108,7 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
       WHERE m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
+        AND ${FRESH_ON_AIR_SQL}
         AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
                          WHERE a.match_id = m.id AND a.pairing = CONCAT(m.team1_id, ':', m.team2_id))
       ORDER BY m.id`,
