@@ -153,6 +153,9 @@ describe("dossier du panneau", () => {
     expect(detail).toContain("{REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard");
     expect(detail).not.toMatch(/effacé 30 jours/);
   });
+  it("n'ouvre jamais d'un clic une page d'origine qui mène à l'API (revue juridique #439)", () => {
+    expect(detail).toContain("report.pagePath && !leadsToApi(report.pagePath) ? (");
+  });
 });
 
 describe("stockage déclaré sur /rgpd", () => {
