@@ -122,10 +122,10 @@ describe("rédacteurs", () => {
     expect(privacyChangePush([]).url).toBe("/rgpd");
   });
 
-  it("arbitrage : reprend la ligne sans Markdown, et mène à son lien", () => {
+  it("arbitrage : reprend la ligne sans Markdown, sans jamais en tirer le lien", () => {
     const content = refereeAlertPush("⚠️ **Conflit de score** — Coupe · https://site.test/tournois/4", "score_conflict-40");
     expect(content.body).toBe("⚠️ Conflit de score — Coupe ·");
-    expect(content.url).toBe("https://site.test/tournois/4");
+    expect(content.url).toBe("/tournois");
     expect(refereeAlertPush("sans lien", "k").url).toBe("/tournois");
   });
 

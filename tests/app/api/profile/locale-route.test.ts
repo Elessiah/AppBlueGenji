@@ -49,11 +49,43 @@ describe("PUT /api/profile/locale", () => {
     ["une langue absente", JSON.stringify({})],
     ["une langue qui n'est pas du texte", JSON.stringify({ locale: 1 })],
     ["un préfixe d'adresse", JSON.stringify({ locale: "/en" })],
-    ["un corps illisible", "{pas du json"],
+    ["une casse différente", JSON.stringify({ locale: "EN" })],
+    ["une langue entourée d'espaces", JSON.stringify({ locale: " en" })],
+    ["une langue en tableau", JSON.stringify({ locale: ["en"] })],
   ])("refuse %s par un code seul", async (_label, body) => {
     const response = await put(body);
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "INVALID_LOCALE" });
+    expect(recordAccountLocale).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["un corps illisible", "{pas du json"],
+    ["un corps nul", "null"],
+  ])("refuse %s comme un corps invalide, sans le dire langue invalide", async (_label, body) => {
+    const response = await put(body);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "INVALID_BODY" });
+    expect(recordAccountLocale).not.toHaveBeenCalled();
+  });
+
+  it("refuse un corps non déclaré en JSON sans le lire", async () => {
+    const response = await PUT(
+      new Request("http://localhost:3000/api/profile/locale", {
+        method: "PUT",
+        headers: { "content-type": "text/plain" },
+        body: JSON.stringify({ locale: "en" }),
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "INVALID_BODY" });
+    expect(recordAccountLocale).not.toHaveBeenCalled();
+  });
+
+  it("refuse un corps trop lourd", async () => {
+    const response = await put(JSON.stringify({ locale: "en", pad: "x".repeat(40 * 1024) }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "INVALID_BODY" });
     expect(recordAccountLocale).not.toHaveBeenCalled();
   });
 

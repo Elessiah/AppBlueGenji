@@ -95,7 +95,10 @@ function allCases(locale: Locale): Record<string, PushContent> {
 
 describe("notifications push — français inchangé", () => {
   it("rend chaque cas à l'identique de la version d'avant le lot 9-3", () => {
-    expect(allCases("fr")).toEqual(FR_BEFORE);
+    // Seule différence voulue (revue sécurité) : le lien d'une alerte d'arbitrage
+    // n'est plus la première URL de la ligne Discord — le texte, lui, est inchangé.
+    const before = { ...FR_BEFORE, "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" } };
+    expect(allCases("fr")).toEqual(before);
   });
 
   it("le français est la langue par défaut de chaque rédacteur", () => {
@@ -181,12 +184,15 @@ describe("notifications push — anglais", () => {
     expect(refereeAlertPush(REFEREE_LINE, "k", "en").body).toBe("An alert is waiting for a referee.");
   });
 
-  it("sans manche connue : l'anglais mène à la liste des tournois, jamais au chemin d'une URL lue dans la ligne", () => {
+  it("sans manche connue : mène à la liste des tournois, jamais au chemin d'une URL lue dans la ligne", () => {
     expect(en["refereeAlert.url"].url).toBe("/en/tournois");
     expect(en["refereeAlert.nourl"].url).toBe("/en/tournois");
-    // Une URL dans un nom d'équipe, avant celle du tournoi, ne mène nulle part en anglais.
-    expect(refereeAlertPush("Conflit · https://x.y/foo vs Nova https://site.test/tournois/7", "k", "en").url).toBe("/en/tournois");
-    expect(fr["refereeAlert.url"].url).toBe("https://site.test/tournois/7#match-31");
+    expect(fr["refereeAlert.url"].url).toBe("/tournois");
+    // Une URL du site glissée dans un nom de tournoi ou d'équipe ne choisit le lien dans aucune langue.
+    const forged = "Conflit · Coupe https://site.test/connexion?redirect=//evil.test vs Nova https://site.test/tournois/7";
+    expect(refereeAlertPush(forged, "k", "en").url).toBe("/en/tournois");
+    expect(refereeAlertPush(forged, "k", "fr").url).toBe("/tournois");
+    expect(refereeAlertPush("Conflit · https://site.test/api/profile/locale", "k").url).toBe("/tournois");
   });
 
   it("avec la manche : nomme le tournoi et la manche en anglais, et mène à la manche dans la langue du destinataire", () => {
