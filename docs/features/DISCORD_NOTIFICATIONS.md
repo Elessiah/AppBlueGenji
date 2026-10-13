@@ -124,14 +124,18 @@ place), ses joueurs apprennent que l'horaire reçu ne les concerne plus :
 message privé Discord (français, « Ton match » en tournoi individuel, aucun
 pseudo) et push `MATCH_REMINDER` dans la langue de chacun, même étiquette que
 l'annonce qu'il remplace. L'horaire est celui que tient la marque `TOLD`, lu
-dans la transaction **avant** l'effacement des marques
-(`noteDepartedEntrant`, `lib/server/tournaments/departed-notices.ts`) ; l'avis
-part après le commit avec le journal (`flushBotLogs`) et se jette avec lui si
-la correction échoue (`discardBotLogs`). Rien ne part sans horaire reçu (pas
+dans la transaction **avant** l'effacement des marques, par une seule lecture
+verrouillante pour toutes les sortantes (`noteDepartedEntrants`,
+`lib/server/tournaments/departed-notices.ts`) ; l'avis part après le commit avec
+le journal (`flushBotLogs`) et se jette avec lui si la correction échoue
+(`discardBotLogs`) — même contrat de cycle de vie, même plafond (32) par
+transaction. Une engagée revenue sur la manche entre-temps (seconde
+correction) n'est pas prévenue. Rien ne part sans horaire reçu (pas
 de `TOLD`, ou plus d'horaire après un retrait remis), ni pour un horaire passé
-depuis plus de 12 h. Une requête par sortante (sa manche, son nom, l'ancien
-adversaire : l'occupant de l'autre place), puis ses destinataires — chemin
-rare, celui d'une correction.
+depuis plus de 12 h. Trois lectures pour tous les avis
+(`announceEntrantsWithdrawn` : manches, noms des sortantes, destinataires ;
+l'ancien adversaire est l'occupant de l'autre place), puis les envois, quatre à
+la fois.
 
 ### La marque `TOLD` : un horaire reçu
 
@@ -290,7 +294,8 @@ passage suivant annoncera la manche. L'horaire écrit par `setMatchStartAt`
 perd ses millisecondes (la colonne `DATETIME` les arrondirait), pour que les
 comparaisons d'horaires de `schedule-notices` portent sur la valeur gardée ;
 l'option du tournoi se lit dans la lecture verrouillante qui le tient. Réservations
-et envois vont quatre manches à la fois (`inBatches`, `SWEEP_CONCURRENCY`), les
+et envois vont quatre manches à la fois (`inBatches` : une réserve de quatre
+exécutants, dont aucun n'attend le plus lent des autres ; `SWEEP_CONCURRENCY`), les
 deux engagées d'une manche ensemble : une ronde suisse appariée sur des
 horaires déjà posés donne autant d'annonces que de manches, et chacune attend
 le bot puis les appareils — les réservations, prises avant, interdisent le
