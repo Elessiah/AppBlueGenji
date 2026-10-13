@@ -354,7 +354,8 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "When the referees set, change or remove the time of one of your matches, you are told; a single reminder remains, within the 24 h before kickoff.",
     details: [
-      "The announcement goes to the players on both sides of the match — as soon as the time is set if both sides are known, otherwise as the match approaches (within the 48 h before it) —, by Discord direct message and by push notification if you turned them on (topic “Match times and reminders”). You are also told when a tournament update removes you, or your team, from a match whose time you had received.",
+      "The announcement goes to the players on both sides of the match — as soon as the time is set if both sides are known, otherwise as the match approaches (within the 48 h before it) —, by Discord direct message and by push notification if you turned them on (topic “Match times and reminders”). You are also told when a tournament update removes you, or your team, from a match whose time you had received. In a tournament whose referees do not schedule the matches, a removed time is not announced: without a time, the match goes into launch as soon as it is playable.",
+      "The “Match times and reminders” topic in “My profile” only controls push notifications. These direct messages rest on legitimate interest (smooth running of tournaments): you can object to them (right to object, see “Your rights” on /rgpd).",
       "The reminders one week and one hour before the match are gone.",
       "These messages carry no player username: team names, or “Your match” in a solo tournament.",
       "The site keeps, with the match, the time that was announced, to tell you “instead of …” if it changes; it does not keep the text of the messages.",

@@ -33,7 +33,7 @@ import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/shared/bot-logs";
 import { MATCH_SEEN_KEY, type ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
-import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
+import { staffAuditLine, type LogEntrant, type StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
 import type { DeletedStaffTime } from "./departed-notices";
@@ -407,6 +407,20 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
   });
 }
 
+/**
+ * La trace du geste quand la manche n'a pu être relue après le commit (base
+ * injoignable, manche supprimée entre-temps) : l'horaire a changé, son auteur
+ * reste nommé dans pm2 — sans la ligne Discord, faute de tournoi et
+ * d'engagées à citer. La trace de modération n'est pas optionnelle
+ * (`staff-audit.ts`).
+ */
+function auditUnreadSchedule(change: MatchScheduleChange): void {
+  if (!change.actor) return;
+  const before = change.previousStartAt ?? "vide";
+  const what = change.startAt === null ? `retiré (était ${before})` : `posé au ${change.startAt} (était ${before})`;
+  console.info(staffAuditLine(`🗓️ Horaire du match #${change.matchId} ${what} — manche illisible après l'enregistrement`, change.actor));
+}
+
 /** Retraits aux arbitres envoyés en même temps. */
 const STAFF_REMOVAL_CONCURRENCY = 4;
 
@@ -429,6 +443,7 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
     row = await loadMatchInfo(change.matchId);
   } catch (error) {
     reportFailures([{ status: "rejected", reason: error }], "[notify] horaire de match non annoncé");
+    auditUnreadSchedule(change);
     // L'observation posée avec la date ferait taire le balayage : rendue, il
     // annoncera la manche (au meilleur effort — la base peut être injoignable).
     // Pas quand la date est rendue à l'horaire que les joueurs tiennent :
@@ -438,7 +453,10 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
     }
     return;
   }
-  if (!row) return;
+  if (!row) {
+    auditUnreadSchedule(change);
+    return;
+  }
   if (startAt === null) {
     await notifyScheduleCleared(row, change);
     return;
