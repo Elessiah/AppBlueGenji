@@ -33,6 +33,7 @@ import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "./match-reminders";
+import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 type ScheduledMatchInfoRow = RowDataPacket & {
   id: number;
@@ -42,6 +43,7 @@ type ScheduledMatchInfoRow = RowDataPacket & {
   participant_type: string;
   bracket: string;
   round_number: number;
+  swiss_round: number;
   team1_name: string | null;
   team2_name: string | null;
 };
@@ -122,7 +124,7 @@ async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | n
   const db = await getDatabase();
   const [rows] = await db.execute<ScheduledMatchInfoRow[]>(
     `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status,
-            t.name AS tournament_name, t.participant_type,
+            t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -163,6 +165,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string },
     matchId: change.matchId,
     bracket: String(row.bracket),
     roundNumber: Number(row.round_number),
+    swiss: isSwissRound(row),
     team1,
     team2,
     startAt: change.startAt,
@@ -191,6 +194,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string },
           solo: participantType === "SOLO",
           bracket: String(row.bracket),
           roundNumber: Number(row.round_number),
+          swiss: isSwissRound(row),
           startAt: change.startAt,
         },
         announcement,
@@ -221,6 +225,7 @@ async function logScheduleCleared(change: MatchScheduleChange & { previousStartA
         matchId: change.matchId,
         bracket: String(row.bracket),
         roundNumber: Number(row.round_number),
+        swiss: isSwissRound(row),
         ...logEntrants(row),
         previousStartAt: change.previousStartAt,
       }),
@@ -245,6 +250,7 @@ async function logScheduleCleared(change: MatchScheduleChange & { previousStartA
           solo: toParticipantType(row.participant_type) === "SOLO",
           bracket: String(row.bracket),
           roundNumber: Number(row.round_number),
+          swiss: isSwissRound(row),
           startAt: change.previousStartAt,
         },
         locale,

@@ -250,6 +250,8 @@ export function formatMatchScheduledLog(context: {
   matchId: number;
   bracket: string;
   roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
   team1: LogEntrant | null;
   team2: LogEntrant | null;
   startAt: string | Date;
@@ -263,7 +265,7 @@ export function formatMatchScheduledLog(context: {
   const previous =
     context.previousStartAt === null ? "" : `, au lieu du ${formatMatchStart(context.previousStartAt)}`;
   return (
-    `${lead("🗓️", kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber)} — ` +
+    `${lead("🗓️", kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
     `${pair} (#${context.matchId}), coup d'envoi ${formatMatchStart(context.startAt)} ` +
     `(heure de Paris)${previous}, par ${ANONYMOUS_STAFF_LABEL}.`
   );
@@ -279,12 +281,14 @@ export function formatMatchScheduleClearedLog(context: {
   matchId: number;
   bracket: string;
   roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
   team1: LogEntrant | null;
   team2: LogEntrant | null;
   previousStartAt: string | Date;
 }): string {
   return (
-    `${lead("🗓️", "Horaire retiré", context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber)} — ` +
+    `${lead("🗓️", "Horaire retiré", context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
     `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), l'horaire du ` +
     `${formatMatchStart(context.previousStartAt)} (heure de Paris) est retiré, par ${ANONYMOUS_STAFF_LABEL}.`
   );
@@ -326,6 +330,8 @@ export function formatMatchResultLog(context: {
   tournament: BotLogTournament;
   bracket: string;
   roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
   team1: LogEntrant;
   team2: LogEntrant;
   /** `null` sur un forfait arbitré : le moteur n'y écrit aucun score. */
@@ -339,7 +345,7 @@ export function formatMatchResultLog(context: {
    */
   doubleForfeit?: boolean;
 }): string {
-  const round = matchRoundLabel(context.bracket, context.roundNumber);
+  const round = matchRoundLabel(context.bracket, context.roundNumber, context.swiss);
   // Un forfait prononcé par un arbitre laisse les deux scores à `null` : la
   // rencontre n'a pas été jouée. Écrire « 0–0 » raconterait un match nul.
   const team1 = entrantLabel(context.team1);

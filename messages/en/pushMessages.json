@@ -29,7 +29,8 @@
     "lower": "Lower bracket · round {round}",
     "grand": "Grand final",
     "thirdPlace": "Third-place match",
-    "default": "Round {round}"
+    "default": "Round {round}",
+    "swiss": "Round {round}"
   },
   "scoreToConfirm": {
     "title": "Score to confirm",

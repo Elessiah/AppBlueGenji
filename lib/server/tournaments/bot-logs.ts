@@ -66,6 +66,7 @@ import {
   type RefereeAlertContext,
 } from "@/lib/shared/referee-alerts";
 import { tournamentPageUrl } from "./app-url";
+import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -767,6 +768,7 @@ type MatchLogRow = RowDataPacket & {
   id: number;
   bracket: string;
   round_number: number;
+  swiss_round: number;
   team1_score: number | null;
   team2_score: number | null;
   forfeit_team_id: number | null;
@@ -786,6 +788,7 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         m.id,
         m.bracket,
         m.round_number,
+        ${swissRoundSql("m", "tr")},
         m.team1_score,
         m.team2_score,
         m.forfeit_team_id,
@@ -824,6 +827,7 @@ async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertCon
     matchId: Number(match.id),
     bracket: String(match.bracket),
     roundNumber: Number(match.round_number),
+    swiss: isSwissRound(match),
     team1: { name: match.team1_name, participantType },
     team2: { name: match.team2_name, participantType },
   };
@@ -906,6 +910,7 @@ async function resolveMatchFinishedLog(
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },
     bracket: String(match.bracket),
     roundNumber: Number(match.round_number),
+    swiss: isSwissRound(match),
     team1: { name: match.team1_name, participantType: toParticipantType(match.participant_type) },
     team2: { name: match.team2_name, participantType: toParticipantType(match.participant_type) },
     team1Score: match.team1_score === null ? null : Number(match.team1_score),
@@ -923,6 +928,7 @@ function refereeMatchOf(context: RefereeAlertContext): RefereeAlertMatch {
     matchId: context.matchId,
     bracket: context.bracket,
     roundNumber: context.roundNumber,
+    swiss: context.swiss,
   };
 }
 

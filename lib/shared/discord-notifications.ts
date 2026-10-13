@@ -331,7 +331,9 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
 
 /**
  * Libellé lisible d'une manche : « Manche 3 », « Tableau perdants · manche 2 »
- * (le nom du tableau sur le site, `tournament.json` → `bracketLabels.LOWER`).
+ * (le nom du tableau sur le site, `tournament.json` → `bracketLabels.LOWER`),
+ * « Ronde 2 » en ronde suisse — le mot du site (`tournamentViews.json` →
+ * `swiss.roundNoun`), tournoi `SWISS` ou phase suisse d'un `MULTI`.
  *
  * Partagé par les rappels et les signalements — les deux désignent la même
  * manche au même staff, et deux formulations différentes pour un seul match
@@ -339,9 +341,10 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
  *
  * @param bracket Partie de plateau (`UPPER`, `LOWER`, `GRAND`, `THIRD_PLACE`).
  * @param roundNumber Numéro de manche.
+ * @param swiss La manche est une ronde suisse (`swissRoundSql`).
  * @returns Le libellé en français.
  */
-export function matchRoundLabel(bracket: string, roundNumber: number): string {
+export function matchRoundLabel(bracket: string, roundNumber: number, swiss = false): string {
   // L'arbre final de BlueGenji Survie numérote ses tours à partir de
   // `PLAYOFF_ROUND_OFFSET` : affiché tel quel, le journal passait de
   // « Manche 5 » à « Manche 1000 ». Même libellé que le retour en arrière.
@@ -357,7 +360,7 @@ export function matchRoundLabel(bracket: string, roundNumber: number): string {
     case "THIRD_PLACE":
       return "Petite finale";
     default:
-      return `Manche ${roundNumber}`;
+      return swiss ? `Ronde ${roundNumber}` : `Manche ${roundNumber}`;
   }
 }
 

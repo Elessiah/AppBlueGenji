@@ -97,7 +97,12 @@ export type { MatchReminderOffsetKey } from "./discord-notifications";
  * Libellé d'une manche (`matchRoundLabel`, français du journal Discord) dans
  * la langue du texte ; le français égale `matchRoundLabel` (testé).
  */
-export function pushRoundLabel(bracket: string, roundNumber: number, locale: Locale = DEFAULT_LOCALE): string {
+export function pushRoundLabel(
+  bracket: string,
+  roundNumber: number,
+  locale: Locale = DEFAULT_LOCALE,
+  swiss = false,
+): string {
   const text = TEXT[locale];
   if (isEndurancePlayoffRound(roundNumber) && bracket !== "THIRD_PLACE") {
     return text.t("round.playoff", { round: roundNumber - PLAYOFF_ROUND_OFFSET + 1 });
@@ -110,7 +115,7 @@ export function pushRoundLabel(bracket: string, roundNumber: number, locale: Loc
     case "THIRD_PLACE":
       return text.t("round.thirdPlace");
     default:
-      return text.t("round.default", { round: roundNumber });
+      return text.t(swiss ? "round.swiss" : "round.default", { round: roundNumber });
   }
 }
 
@@ -134,7 +139,7 @@ function pushMatchStart(startAt: string | Date, locale: Locale): string {
   ).format(date);
 }
 
-type ScheduledMatchSide = MatchSide & { bracket: string; roundNumber: number; startAt: string | Date };
+type ScheduledMatchSide = MatchSide & { bracket: string; roundNumber: number; swiss?: boolean; startAt: string | Date };
 
 export type { ScheduleAnnouncement } from "./discord-notifications";
 
@@ -182,7 +187,7 @@ export function matchReminderPush(
       {
         pairing: pairing(side, text),
         tournament: side.tournamentName,
-        round: pushRoundLabel(side.bracket, side.roundNumber, locale),
+        round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
         startAt: side.startAt,
       },
       change,
@@ -204,7 +209,7 @@ export function matchScheduleClearedPush(side: ScheduledMatchSide, locale: Local
     body: text.t("matchReminder.bodyCleared", {
       pairing: pairing(side, text),
       tournament: side.tournamentName,
-      round: pushRoundLabel(side.bracket, side.roundNumber, locale),
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
       previous: pushMatchStart(side.startAt, locale),
     }),
     url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
@@ -230,6 +235,7 @@ type StaffScheduleInput = {
   solo: boolean;
   bracket: string;
   roundNumber: number;
+  swiss?: boolean;
   startAt: string | Date;
 };
 
@@ -254,7 +260,7 @@ export function matchScheduledStaffPush(
       {
         pairing: pairingText,
         tournament: input.tournamentName,
-        round: pushRoundLabel(input.bracket, input.roundNumber, locale),
+        round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
         startAt: input.startAt,
       },
       announcement,
@@ -281,7 +287,7 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
       previous: pushMatchStart(input.startAt, locale),
       pairing: staffPairing(input, text),
       tournament: input.tournamentName,
-      round: pushRoundLabel(input.bracket, input.roundNumber, locale),
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
     tag: `${matchTag(input.matchId)}-schedule`,
@@ -419,6 +425,8 @@ export type RefereeAlertMatch = {
   matchId: number;
   bracket: string;
   roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`swissRoundSql`). */
+  swiss?: boolean;
 };
 
 /**
@@ -449,7 +457,7 @@ export function refereeAlertPush(
   else if (match) {
     body = text.t(`refereeAlert.${kind}Match`, {
       tournament: match.tournamentName,
-      round: pushRoundLabel(match.bracket, match.roundNumber, locale),
+      round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
     });
   } else body = text.t(`refereeAlert.${kind}`);
   return {
@@ -465,7 +473,7 @@ export function refereeAlertPush(
 
 /** Problème signalé par un engagé pendant un match (`issue-reports.ts`). */
 export function issueReportPush(
-  input: { tournamentId: number; tournamentName: string; match: { id: number; bracket: string; roundNumber: number } | null },
+  input: { tournamentId: number; tournamentName: string; match: { id: number; bracket: string; roundNumber: number; swiss?: boolean } | null },
   locale: Locale = DEFAULT_LOCALE,
 ): PushContent {
   const text = TEXT[locale];
@@ -474,7 +482,7 @@ export function issueReportPush(
     body: input.match
       ? text.t("issueReport.bodyRound", {
           tournament: input.tournamentName,
-          round: pushRoundLabel(input.match.bracket, input.match.roundNumber, locale),
+          round: pushRoundLabel(input.match.bracket, input.match.roundNumber, locale, input.match.swiss),
         })
       : text.t("issueReport.body", { tournament: input.tournamentName }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.match?.id ?? null), locale),

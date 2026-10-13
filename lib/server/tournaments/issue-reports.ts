@@ -36,6 +36,7 @@ import {
 import type { LogEntrant } from "@/lib/shared/log-privacy";
 import { tournamentPageUrl } from "./app-url";
 import { resolveUserEntrantTeamId } from "./registration";
+import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import { loadTournamentRow } from "./repository";
 
 type EntrantRow = RowDataPacket & {
@@ -49,6 +50,7 @@ type MatchRow = RowDataPacket & {
   team2_id: number | null;
   bracket: string;
   round_number: number;
+  swiss_round: number;
   team1_name: string | null;
   team2_name: string | null;
 };
@@ -68,6 +70,7 @@ type ReportedMatch = {
   /** Plateau et manche, pour nommer la manche hors du français du journal (lot 9-3). */
   bracket: string;
   roundNumber: number;
+  swiss: boolean;
 };
 
 /**
@@ -83,9 +86,10 @@ async function loadReportedMatch(
   participantType: ParticipantType,
 ): Promise<ReportedMatch> {
   const [matchRows] = await db.execute<MatchRow[]>(
-    `SELECT m.team1_id, m.team2_id, m.bracket, m.round_number,
+    `SELECT m.team1_id, m.team2_id, m.bracket, m.round_number, ${swissRoundSql("m", "tr")},
               t1.name AS team1_name, t2.name AS team2_name
          FROM bg_matches m
+         JOIN bg_tournaments tr ON tr.id = m.tournament_id
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
          LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
         WHERE m.id = ? AND m.tournament_id = ?
@@ -102,12 +106,13 @@ async function loadReportedMatch(
     throw new Error("NOT_MATCH_PARTICIPANT");
   }
   return {
-    round: matchRoundLabel(String(row.bracket), Number(row.round_number)),
+    round: matchRoundLabel(String(row.bracket), Number(row.round_number), isSwissRound(row)),
     team1: row.team1_name ? { name: row.team1_name, participantType } : null,
     team2: row.team2_name ? { name: row.team2_name, participantType } : null,
     id: matchId,
     bracket: String(row.bracket),
     roundNumber: Number(row.round_number),
+    swiss: isSwissRound(row),
   };
 }
 

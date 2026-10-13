@@ -53,6 +53,7 @@ import {
   type ScheduleAnnouncement,
 } from "@/lib/shared/discord-notifications";
 import { tournamentPageUrl } from "./app-url";
+import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 type ScheduledMatchRow = RowDataPacket & {
   id: number;
@@ -61,6 +62,7 @@ type ScheduledMatchRow = RowDataPacket & {
   participant_type: string;
   bracket: string;
   round_number: number;
+  swiss_round: number;
   start_at: string | Date;
   team1_id: number;
   team2_id: number;
@@ -315,7 +317,8 @@ async function dispatchPlannedSend(
 ): Promise<number> {
   let dispatched = 0;
   let delivered = false;
-  const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
+  const swiss = isSwissRound(match);
+  const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number), swiss);
   const url = tournamentPageUrl(Number(match.tournament_id));
 
   // Un horaire parti le dit en base, avec l'horaire envoyé : une date posée
@@ -352,6 +355,7 @@ async function dispatchPlannedSend(
       opponentName: side.opponentName,
       bracket: String(match.bracket),
       roundNumber: Number(match.round_number),
+      swiss,
       startAt,
       solo,
     };
@@ -392,7 +396,7 @@ async function dispatchPlannedSend(
  */
 const MATCH_WITH_ENTRANTS_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
-            t.name AS tournament_name, t.participant_type,
+            t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
