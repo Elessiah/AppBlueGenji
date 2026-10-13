@@ -12,7 +12,14 @@ const source = readFileSync(join(process.cwd(), "lib/server/database/recent-sche
 describe("reprise des marques de rappel héritées", () => {
   it("recopie en `TOLD` les paliers posés par l'ancien code, toujours avec un message", () => {
     expect(MATCH_TOLD_KEY).toBe("TOLD");
-    expect(source).toMatch(/SELECT DISTINCT match_id, 'TOLD' FROM bg_match_reminders\s+WHERE offset_key IN \('P7D', 'PT1H'\)`/);
+    expect(source).toMatch(
+      /INSERT IGNORE INTO bg_match_reminders \(match_id, offset_key, start_at\)\s+SELECT DISTINCT r\.match_id, 'TOLD', m\.start_at FROM bg_match_reminders r\s+JOIN bg_matches m ON m\.id = r\.match_id\s+WHERE r\.offset_key IN \('P7D', 'PT1H'\)`/,
+    );
+  });
+
+  it("donne à la marque reprise l'horaire de la manche : une marque sans horaire ne dit qu'un retrait remis", () => {
+    const statement = source.slice(source.indexOf("SELECT DISTINCT r.match_id, 'TOLD'"));
+    expect(statement.slice(0, statement.indexOf("`"))).toContain("m.start_at");
   });
 
   it("ne lit pas `P1D`, que le nouveau code réserve avant l'envoi", () => {

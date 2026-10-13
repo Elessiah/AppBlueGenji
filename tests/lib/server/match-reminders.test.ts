@@ -180,8 +180,9 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // Réservée avant l'envoi, la marque est rendue : rien n'a abouti.
     expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
     const release = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) => sql.startsWith("DELETE"));
-    expect(release?.[0]).toMatch(/^DELETE FROM bg_match_reminders WHERE match_id = \? AND offset_key = \?/);
-    expect(release?.[1]).toEqual([31, "TOLD"]);
+    // Rendue seulement si elle porte encore l'horaire de cet envoi.
+    expect(release?.[0]).toMatch(/^DELETE FROM bg_match_reminders WHERE match_id = \? AND offset_key = \? AND start_at <=> \?/);
+    expect(release?.[1]).toEqual([31, "TOLD", START]);
   });
 
   it("rend à une marque déjà là son horaire d'avant quand rien n'a abouti", async () => {
@@ -198,7 +199,9 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // Posé avant l'envoi, puis rendu.
     expect(updates).toEqual([
       [START, 31, "TOLD"],
-      [before, 31, "TOLD"],
+      // Rendu à condition de porter encore l'horaire écrit par cet envoi : un
+      // changement plus récent, remis entre-temps, garde le sien.
+      [before, 31, "TOLD", START],
     ]);
   });
 
@@ -265,7 +268,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const releases = (execute.mock.calls as unknown as [string, unknown[]][])
       .filter(([sql]) => sql.startsWith("DELETE FROM bg_match_reminders"))
       .map(([, params]) => params);
-    expect(releases).toEqual([[31, "TOLD"]]);
+    expect(releases).toEqual([[31, "TOLD", START]]);
   });
 
   it("garde la marque d'horaire reçu quand une seule engagée a été atteinte", async () => {
@@ -328,6 +331,23 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
     expect(error).toHaveBeenCalled();
     for (const message of sentMessages()) expect(message).toContain("Les Loups");
+  });
+
+  it("rend l'observation quand un palier ne peut être réservé : l'annonce repartira", async () => {
+    const { execute } = await mockDb({ sent: [], matches: [{ ...MATCH, start_at: START }] });
+    const base = execute.getMockImplementation();
+    execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith("INSERT IGNORE") && params?.[1] === "P1D") throw new Error("Deadlock found");
+      return base!(sql, params);
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+
+    const release = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) => sql.startsWith("DELETE"));
+    expect(release?.[1]).toEqual([31, "SEEN"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
   });
 
   it("réserve la marque d'horaire reçu avant l'envoi : une correction immédiate la lit déjà", async () => {
@@ -465,7 +485,9 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // soit observée avant que le palier 24 h ne s'ouvre.
     expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
     const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
-    expect(params).toEqual([2 * 24 * 60 * 60]);
+    expect(params).toEqual([2 * 24 * 60 * 60, "P1D"]);
+    // Une manche dont le rappel 24 h est déjà pris n'est plus relue.
+    expect(sql).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_match_reminders done\s+WHERE done\.match_id = m\.id AND done\.offset_key = \?\)/);
     expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
     // Jointure interne sur les deux engagées : un bye n'est pas un match.
     expect(sql).toMatch(/JOIN bg_teams t1/);

@@ -40,15 +40,21 @@ function matchRow(overrides: Partial<Row> = {}): Row {
 }
 
 /** Lecture du tournoi, puis verrous du tournoi et de la manche, notés dans `order`. */
-function lockReply(sql: string, params: unknown, row: Row | null, order: string[]): [unknown[]] | null {
+function lockReply(
+  sql: string,
+  params: unknown,
+  { row, refereeScheduling }: { row: Row | null; refereeScheduling: boolean },
+  order: string[],
+): [unknown[]] | null {
   if (sql.startsWith("SELECT tournament_id FROM bg_matches")) {
     order.push("tournament_id");
     return [row ? [{ tournament_id: row.tournament_id }] : []];
   }
-  if (sql.startsWith("SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE")) {
+  if (sql.startsWith("SELECT referee_scheduling FROM bg_tournaments")) {
     order.push("lock_tournament");
+    expect(sql).toContain("FOR UPDATE");
     expect(params).toEqual([7]);
-    return [[{ id: 7 }]];
+    return [[{ referee_scheduling: refereeScheduling ? 1 : 0 }]];
   }
   if (sql.startsWith("SELECT id, tournament_id, status")) {
     order.push("lock_match");
@@ -80,11 +86,8 @@ function world(
   const order: string[] = [];
   connection.execute.mockImplementation(async (raw: string, params?: unknown) => {
     const sql = raw.replace(/\s+/g, " ").trim();
-    const locked = lockReply(sql, params, row, order);
+    const locked = lockReply(sql, params, { row, refereeScheduling: options.refereeScheduling === true }, order);
     if (locked) return locked;
-    if (sql.startsWith("SELECT referee_scheduling FROM bg_tournaments")) {
-      return [[{ referee_scheduling: options.refereeScheduling ? 1 : 0 }]];
-    }
     if (options.missingReminders && sql.includes("bg_match_reminders")) {
       throw Object.assign(new Error("Table 'bg_match_reminders' doesn't exist"), { code: "ER_NO_SUCH_TABLE", errno: 1146 });
     }
@@ -138,6 +141,16 @@ describe("setMatchStartAt", () => {
     const begin = connection.beginTransaction.mock.invocationCallOrder[0];
     const firstRead = connection.execute.mock.invocationCallOrder[0];
     expect(firstRead).toBeLessThan(begin);
+  });
+
+  it("retire les millisecondes, que la colonne arrondirait", async () => {
+    const { writes } = world();
+    expect(await setMatchStartAt(42, "2099-08-29T18:30:00.999Z")).toBe("2099-08-29T18:30:00.000Z");
+    const update = writes.find((w) => w.sql.startsWith("UPDATE bg_matches"));
+    expect((update?.params[0] as Date).toISOString()).toBe("2099-08-29T18:30:00.000Z");
+    expect(notifyMatchScheduleChange).toHaveBeenCalledWith(
+      expect.objectContaining({ startAt: "2099-08-29T18:30:00.000Z" }),
+    );
   });
 
   it("accepte la valeur brute d'un champ datetime-local", async () => {

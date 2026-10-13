@@ -10,6 +10,7 @@ import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
 import {
+  heldStartAt,
   isAnnounceableClearing,
   isAnnounceableSchedule,
   notifyMatchScheduleChange,
@@ -155,7 +156,7 @@ describe("notifyMatchScheduleChange — date changée", () => {
   it("dit « reprogrammé » partout et rappelle l'ancien horaire au journal", async () => {
     mockMatch();
 
-    await notifyMatchScheduleChange(change({ previousStartAt: OLD_START, alreadyAnnounced: true }));
+    await notifyMatchScheduleChange(change({ previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }));
 
     expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), { rescheduled: true, previousStartAt: OLD_START });
     expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
@@ -293,9 +294,9 @@ describe("notifyMatchScheduleChange — match déjà joué", () => {
 describe("notifyMatchScheduleChange — horaire retiré, arbitres", () => {
   it("ne prévient pas les arbitres d'un horaire déjà passé ni d'un match joué", async () => {
     mockMatch(CLEARED_ROW);
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true }));
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true, toldStartAt: "2020-01-01T00:00:00.000Z" }));
     mockMatch({ ...CLEARED_ROW, status: "COMPLETED" });
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }));
     expect(notifyStaff).not.toHaveBeenCalled();
   });
 
@@ -324,7 +325,7 @@ describe("playerAnnouncement", () => {
   });
 
   it("cite l'ancienne date reçue, encore devant", () => {
-    expect(playerAnnouncement(change({ previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toEqual({
+    expect(playerAnnouncement(change({ previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).toEqual({
       rescheduled: true,
       previousStartAt: OLD_START,
     });
@@ -332,7 +333,7 @@ describe("playerAnnouncement", () => {
 
   it("cite encore une date passée de peu : un match en retard qu'on décale", () => {
     const lateStart = "2098-12-31T20:00:00.000Z"; // quatre heures avant `now`
-    expect(playerAnnouncement(change({ previousStartAt: lateStart, alreadyAnnounced: true }), now)).toEqual({
+    expect(playerAnnouncement(change({ previousStartAt: lateStart, alreadyAnnounced: true, toldStartAt: lateStart }), now)).toEqual({
       rescheduled: true,
       previousStartAt: lateStart,
     });
@@ -340,7 +341,7 @@ describe("playerAnnouncement", () => {
 
   it("ne cite pas une date d'avant passée depuis longtemps, que les joueurs n'ont jamais reçue", () => {
     expect(
-      playerAnnouncement(change({ previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true }), now),
+      playerAnnouncement(change({ previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true, toldStartAt: "2020-01-01T00:00:00.000Z" }), now),
     ).toEqual({ rescheduled: true, previousStartAt: null });
   });
 
@@ -365,33 +366,53 @@ describe("notifyMatchScheduleChange — horaire rendu à celui que les joueurs t
   });
 });
 
+describe("heldStartAt — après un retrait remis", () => {
+  it("ne cite ni ne retire un horaire que les joueurs n'ont jamais reçu", () => {
+    const now = new Date("2099-01-01T00:00:00Z");
+    // Retrait remis (marque sans horaire), puis une date passée saisie de
+    // travers (journalisée seulement), effacée à son tour.
+    const mistyped = change({
+      startAt: null,
+      previousStartAt: "2098-12-31T22:00:00.000Z",
+      alreadyAnnounced: true,
+      toldStartAt: null,
+    });
+    expect(heldStartAt(mistyped, now)).toBeNull();
+    expect(isAnnounceableClearing(mistyped, now)).toBe(false);
+    expect(playerAnnouncement(change({ alreadyAnnounced: true, toldStartAt: null }), now)).toEqual({
+      rescheduled: true,
+      previousStartAt: null,
+    });
+  });
+});
+
 describe("isAnnounceableClearing", () => {
   const now = new Date("2099-01-01T00:00:00Z");
 
   it("annonce le retrait de l'horaire d'un match en retard (passé de peu)", () => {
     expect(
       isAnnounceableClearing(
-        change({ startAt: null, previousStartAt: "2098-12-31T20:00:00.000Z", alreadyAnnounced: true }),
+        change({ startAt: null, previousStartAt: "2098-12-31T20:00:00.000Z", alreadyAnnounced: true, toldStartAt: "2098-12-31T20:00:00.000Z" }),
         now,
       ),
     ).toBe(true);
   });
 
   it("retient un horaire reçu par les joueurs et encore devant", () => {
-    expect(isAnnounceableClearing(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toBe(
+    expect(isAnnounceableClearing(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).toBe(
       true,
     );
   });
 
   it("écarte un horaire jamais reçu, déjà passé, absent, ou une date posée", () => {
-    const cleared = { startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true };
+    const cleared = { startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START };
     expect(isAnnounceableClearing(change({ ...cleared, alreadyAnnounced: false }), now)).toBe(false);
-    expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: "2020-01-01T00:00:00.000Z" }), now)).toBe(false);
+    expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: "2020-01-01T00:00:00.000Z", toldStartAt: "2020-01-01T00:00:00.000Z" }), now)).toBe(false);
     expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: null }), now)).toBe(false);
     // Sans planification par l'arbitrage, un match sans horaire part en
     // lancement : aucun « nouvel horaire » ne viendra.
     expect(isAnnounceableClearing(change({ ...cleared, refereeScheduling: false }), now)).toBe(false);
-    expect(isAnnounceableClearing(change({ previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toBe(false);
+    expect(isAnnounceableClearing(change({ previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).toBe(false);
   });
 });
 
@@ -410,7 +431,7 @@ describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
   it("lit la manche une fois pour un horaire retiré", async () => {
     const execute = mockMatch(CLEARED_ROW);
 
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }));
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining(CLEARED_ROW), OLD_START);
@@ -450,7 +471,7 @@ describe("notifyMatchScheduleChange — engagées changées après l'écriture",
   it("ne prévient pas d'un retrait une engagée qui a remplacé celle qui l'avait reçu", async () => {
     mockMatch(CLEARED_ROW);
     await notifyMatchScheduleChange(
-      change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, entrantIds: [101, 999] }),
+      change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START, entrantIds: [101, 999] }),
     );
     expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
     expect(logLine()).toContain("Horaire retiré");
@@ -469,7 +490,7 @@ describe("notifyMatchScheduleChange — changement déjà remplacé", () => {
 
   it("ne prévient pas d'un retrait quand un horaire a été reposé depuis", async () => {
     mockMatch();
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }));
     expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
     expect(notifyStaff).not.toHaveBeenCalled();
     expect(logLine()).toContain("Horaire retiré");
@@ -480,7 +501,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
   it("prévient les joueurs qui l'avaient reçu, les arbitres sauf l'auteur, et journalise", async () => {
     mockMatch(CLEARED_ROW);
 
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }));
 
     expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), OLD_START);
     expect(announceMatchSchedule).not.toHaveBeenCalled();
@@ -509,7 +530,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
   it("ne journalise rien sans auteur, mais prévient les joueurs", async () => {
     mockMatch(CLEARED_ROW);
     await notifyMatchScheduleChange(
-      change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, actor: null }),
+      change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START, actor: null }),
     );
     expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), OLD_START);
     expect(publishStaffAction).not.toHaveBeenCalled();
@@ -517,7 +538,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
 
   it("ne nomme aucun joueur au journal en tournoi individuel", async () => {
     mockMatch({ ...CLEARED_ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }));
     expect(logLine()).toContain("un joueur vs un joueur");
     expect(logLine()).not.toMatch(/Kiro|Nova/);
   });
@@ -527,7 +548,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
     jest.mocked(announceMatchScheduleCleared).mockRejectedValue(new Error("bot éteint"));
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     await expect(
-      notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true })),
+      notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START })),
     ).resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
     error.mockRestore();
