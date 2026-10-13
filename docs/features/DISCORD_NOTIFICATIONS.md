@@ -190,14 +190,13 @@ balayage** :
   aucun pseudo de joueur ne passe par Discord — même règle que le push.
 - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la permission
   `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`),
-  et **sauf les joueurs du match** quand l'annonce aux joueurs est partie (un
-  arbitre engagé l'a reçue, la version arbitre ne doit pas la remplacer sur
-  son appareil ; sans annonce — place encore vide —, il garde la version
-  arbitre),
+
   pour une date posée ou changée (pas pour un retrait). « Reprogrammé » dès
-  qu'une date précédait (ils la voyaient sur le plateau). Même étiquette que
-  l'annonce aux joueurs (`rencontre-<id>-reminder`) : un arbitre engagé dans le
-  match ne garde qu'une notification. Le push reprend le titre et le corps de
+  qu'une date précédait (ils la voyaient sur le plateau). Étiquette
+  distincte de l'annonce aux joueurs (`rencontre-<id>-schedule`) : un arbitre
+  qui joue ce match reçoit les deux versions — un doublon plutôt que sa
+  version joueur (« Ton match ») remplacée par la version arbitre, ou
+  aucune. Le push reprend le titre et le corps de
   l'annonce aux joueurs (clés `matchReminder.*`) ; une place vide s'y lit
   « TBD », comme sur le plateau et au journal.
 - **Journal Discord** : une ligne `formatMatchScheduledLog` (« 🗓️ Match
