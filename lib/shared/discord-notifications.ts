@@ -238,6 +238,9 @@ export type ScheduleAnnouncement = {
   previousStartAt?: string | Date | null;
 };
 
+/** Première annonce d'un horaire : rien à remplacer. */
+export const FIRST_SCHEDULE: ScheduleAnnouncement = { rescheduled: false };
+
 /** Ligne « qui contre qui » d'un message privé de match. */
 function pairingLine(context: MatchReminderContext): string {
   if (context.solo) return "**Ton match**";
@@ -288,7 +291,7 @@ export function buildMatchReminderMessage(
 export function buildMatchScheduleAnnouncement(
   context: MatchReminderContext,
   remaining: readonly MatchReminderOffset[] = [],
-  announcement: ScheduleAnnouncement = { rescheduled: false },
+  announcement: ScheduleAnnouncement = FIRST_SCHEDULE,
 ): string {
   const previous = announcement.rescheduled ? announcement.previousStartAt : null;
   const lines = [

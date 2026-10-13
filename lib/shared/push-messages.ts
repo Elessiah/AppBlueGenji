@@ -27,7 +27,12 @@ import enPush from "@/messages/en/pushMessages.json";
 import frPush from "@/messages/fr/pushMessages.json";
 import enReports from "@/messages/en/reports.json";
 import frReports from "@/messages/fr/reports.json";
-import { formatMatchStart, type MatchReminderOffsetKey, type ScheduleAnnouncement } from "./discord-notifications";
+import {
+  FIRST_SCHEDULE,
+  formatMatchStart,
+  type MatchReminderOffsetKey,
+  type ScheduleAnnouncement,
+} from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
@@ -133,7 +138,6 @@ type ScheduledMatchSide = MatchSide & { bracket: string; roundNumber: number; st
 
 export type { ScheduleAnnouncement } from "./discord-notifications";
 
-const FIRST_SCHEDULE: ScheduleAnnouncement = { rescheduled: false };
 
 function announcementTitle(offset: MatchReminderOffsetKey | null, rescheduled: boolean, text: PushText): string {
   if (offset) return text.t("matchReminder.title", { offset: text.t(`matchReminder.offset.${offset}`) });

@@ -38,6 +38,7 @@ import {
 } from "@/lib/server/notify";
 import { matchReminderPush, matchScheduleClearedPush } from "@/lib/shared/push-messages";
 import {
+  FIRST_SCHEDULE,
   MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
   MATCH_SEEN_KEY,
@@ -309,7 +310,7 @@ async function planMatchSends(
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 async function dispatchPlannedSend(
-  { match, offset, remaining, announcement = { rescheduled: false }, clearedStartAt }: PlannedSend,
+  { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt }: PlannedSend,
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
 ): Promise<number> {
   let dispatched = 0;

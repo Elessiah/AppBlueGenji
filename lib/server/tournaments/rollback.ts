@@ -279,7 +279,7 @@ async function loadPosters(connection: PoolConnection, matchIds: readonly number
     // Paire non ordonnée : les mêmes engagées reposées dans l'autre sens
     // forment la même affiche.
     for (const row of rows) {
-      const pair = [row.team1_id, row.team2_id].map((id) => (id === null ? "" : String(Number(id)))).sort();
+      const pair = [row.team1_id, row.team2_id].map((id) => (id === null ? "" : String(Number(id)))).sort((a, b) => a.localeCompare(b));
       posters.set(Number(row.id), pair.join(":"));
     }
   }
