@@ -100,15 +100,15 @@ function sitePath(value) {
   // `/\t/autre.site` deviendrait une adresse d'un autre site.
   if (/[\u0000-\u001f\u007f]/.test(value)) return "/";
   // Résolu, le lien doit rester sur le site, et ne jamais mener à une route
-  // d'API (règle de `leadsToApi` côté serveur ; tout préfixe de deux lettres
-  // compte pour une langue) : ouverte d'ici, elle partirait du site comme un
+  // d'API (règle de `leadsToApi` côté serveur ; tout préfixe de deux lettres,
+  // même enchaîné, compte pour une langue) : ouverte d'ici, elle partirait du site comme un
   // clic sur la page.
   try {
     const url = new URL(value, self.location.origin);
     if (url.origin !== self.location.origin) return "/";
     // Barres répétées réduites : `/en//api/…` mène à `/api/…`.
     const path = decodeURIComponent(url.pathname).toLowerCase().replace(/\/{2,}/g, "/");
-    if (/^\/(?:[a-z]{2}\/)?api(?:\/|$)/.test(path)) return "/";
+    if (/^\/(?:[a-z]{2}\/)*api(?:\/|$)/.test(path)) return "/";
   } catch {
     return "/";
   }

@@ -76,7 +76,7 @@ export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDI
 
 /**
  * Le chemin d'une destination **tel que le navigateur le résoudra** (`.`/`..`
- * retirés, encodage défait, barres répétées réduites), en minuscules, sans barre finale ni préfixe de
+ * retirés, encodage défait, barres répétées réduites), en minuscules, sans barre finale ni préfixes de
  * langue (`/en/connexion` est la même page que `/connexion`, lot 6) — ou
  * `null` si l'encodage est illisible. Seule lecture de « où mène vraiment ce
  * chemin » : refus des routes d'API ({@link safeRedirectPath}) et de la page de
@@ -90,9 +90,11 @@ function resolvedSitePath(href: string): string | null {
     return null;
   }
   // Barres répétées ramenées à une : `/en//api/…` mène à `/api/…` (le
-  // middleware retire les barres de tête après le préfixe de langue).
-  const collapsed = path.toLowerCase().replaceAll(/\/{2,}/g, "/");
-  return splitLocalePrefix(trimTrailingSlashes(collapsed) || "/").path;
+  // middleware retire les barres de tête après le préfixe de langue). Les
+  // préfixes sont ôtés **tous** : `/fr/en/api/…` y mène aussi, par deux renvois.
+  let rest = trimTrailingSlashes(path.toLowerCase().replaceAll(/\/{2,}/g, "/")) || "/";
+  for (let split = splitLocalePrefix(rest); split.prefixed !== null; split = splitLocalePrefix(rest)) rest = split.path;
+  return rest;
 }
 
 /**
