@@ -795,8 +795,10 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
     expect(text()).toMatch(/connecté la dernière fois/);
     // Une connexion lancée hors du site ne pose pas la langue (revue sécurité) : le texte le dit.
     expect(text()).toMatch(/lancée d'ailleurs, par un lien ou un favori, ne la change pas, ni une connexion par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas/);
-    // Un compte créé par une connexion non prouvée reste au français (revue juridique).
-    expect(text()).toMatch(/le français par défaut, y compris pour un compte créé ainsi/);
+    // Défaut français ; aucune inscription ne naît d'un départ non prouvé
+    // (conditions non retenues → refus « terms ») : le texte n'en parle pas.
+    expect(text()).toMatch(/le français par défaut, notamment pour un compte qui ne s'est pas reconnecté/);
+    expect(text()).not.toMatch(/créé ainsi/);
     expect(text()).toMatch(/Mon profil/);
     expect(text()).toMatch(/prochaine connexion faite dans l'autre langue/);
     expect(text()).toMatch(/le temps du compte/);

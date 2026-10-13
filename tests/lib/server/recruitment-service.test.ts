@@ -89,6 +89,24 @@ describe("recruitment-service", () => {
       expect(execute.mock.calls[0][0]).toContain("WHERE active = 1");
     });
 
+    it("ne sert plus un lien de candidature enregistré que la règle refuse (route d'API, autre schéma)", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([
+        [
+          { ...HIGHLIGHT_ROW, id: 1, contact_url: "/api/auth/google/start?terms=1&lang=en" },
+          { ...HIGHLIGHT_ROW, id: 2, contact_url: "javascript:alert(1)" },
+          { ...HIGHLIGHT_ROW, id: 3, contact_url: "https://support.example/ticket/3" },
+        ],
+      ]);
+      await mockDb(execute);
+
+      const result = await listRecruitmentAds();
+      expect(result.map((ad) => [ad.id, ad.contactUrl])).toEqual([
+        [1, null],
+        [2, null],
+        [3, "https://support.example/ticket/3"],
+      ]);
+    });
+
     it("range par statut, l'ordre d'affichage ne valant qu'à l'intérieur d'un statut", async () => {
       // La requête rend l'ordre d'affichage brut : une facultative placée en
       // tête ne doit pas pour autant passer devant une prioritaire.

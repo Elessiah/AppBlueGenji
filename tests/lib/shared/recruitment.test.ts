@@ -23,6 +23,7 @@ import {
   recruitmentAdHasEnglish,
   recruitmentErrorMessage,
   validateRecruitmentAdInput,
+  isSafeRecruitmentContactUrl,
   RECRUITMENT_FIELD_ERRORS,
   type RecruitmentAd,
 } from "@/lib/shared/recruitment";
@@ -485,5 +486,33 @@ describe("recruitmentSeenKept", () => {
   it("cookie absent ou illisible : rien à garder", () => {
     expect(recruitmentSeenKept(undefined, [5], [])).toEqual([]);
     expect(recruitmentSeenKept("abc", [5], [])).toEqual([]);
+  });
+});
+
+describe("lien de candidature (contactUrl) — revue juridique #439", () => {
+  it("accepte une adresse https:// ou mailto:", () => {
+    for (const url of ["https://support.example/ticket/42", "https://discord.gg/x", "mailto:recrutement@example.org"]) {
+      expect(isSafeRecruitmentContactUrl(url)).toBe(true);
+      expect(validateRecruitmentAdInput({ ...EN, title: "X", contactUrl: url }).ok).toBe(true);
+    }
+  });
+
+  it("refuse un lien relatif, un autre schéma ou une route d'API, rattaché au champ", () => {
+    for (const url of [
+      "/api/auth/google/start?terms=1&lang=en",
+      "https://bluegenji.example/api/auth/discord/start?terms=1",
+      "https://bluegenji.example/en/api/auth/google/start",
+      "https://bluegenji.example/%61pi/x/../api/auth/google/start",
+      "javascript:alert(1)",
+      "http://support.example/ticket",
+      "data:text/html,x",
+      "pas une adresse",
+    ]) {
+      expect(isSafeRecruitmentContactUrl(url)).toBe(false);
+      const result = validateRecruitmentAdInput({ ...EN, title: "X", contactUrl: url });
+      expect(result).toEqual({ ok: false, error: "CONTACT_URL_INVALID" });
+    }
+    expect(RECRUITMENT_FIELD_ERRORS.CONTACT_URL_INVALID).toBe("contactUrl");
+    expect(recruitmentErrorMessage("CONTACT_URL_INVALID", "x")).toMatch(/https:\/\//);
   });
 });
