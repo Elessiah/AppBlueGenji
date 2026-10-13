@@ -191,10 +191,6 @@ async function loadRollbackMatches(
  */
 const ID_CHUNK = 200;
 
-function chunk(ids: readonly number[]): number[][] {
-  return chunkIds(ids, ID_CHUNK);
-}
-
 /**
  * Ramène des rencontres à l'état « pas encore jouées ».
  *
@@ -211,7 +207,7 @@ async function clearMatchResults(
   connection: PoolConnection,
   matchIds: readonly number[],
 ): Promise<void> {
-  for (const ids of chunk(matchIds)) {
+  for (const ids of chunkIds(matchIds, ID_CHUNK)) {
     await connection.execute(
       `UPDATE bg_matches
        SET team1_score = NULL,
@@ -259,7 +255,7 @@ async function detachMatchParticipants(
   connection: PoolConnection,
   matchIds: readonly number[],
 ): Promise<void> {
-  for (const ids of chunk(matchIds)) {
+  for (const ids of chunkIds(matchIds, ID_CHUNK)) {
     await connection.execute(
       `UPDATE bg_matches
        SET team1_id = NULL,
@@ -275,7 +271,7 @@ async function detachMatchParticipants(
 /** Affiches (engagées des deux créneaux) des rencontres données. */
 async function loadPosters(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, Poster>> {
   const posters = new Map<number, Poster>();
-  for (const ids of chunk(matchIds)) {
+  for (const ids of chunkIds(matchIds, ID_CHUNK)) {
     const [rows] = await connection.execute<PosterRow[]>(
       `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${sqlPlaceholders(ids.length)})`,
       ids,
@@ -360,7 +356,7 @@ async function repopulateDetachedMatches(
   tournamentId: number,
   matchIds: readonly number[],
 ): Promise<void> {
-  for (const ids of chunk(matchIds)) {
+  for (const ids of chunkIds(matchIds, ID_CHUNK)) {
     const placeholders = sqlPlaceholders(ids.length);
     const [feeders] = await connection.execute<
       (RowDataPacket & {
@@ -430,7 +426,7 @@ async function deleteMatches(
   connection: PoolConnection,
   matchIds: readonly number[],
 ): Promise<void> {
-  for (const ids of chunk(matchIds)) {
+  for (const ids of chunkIds(matchIds, ID_CHUNK)) {
     const placeholders = sqlPlaceholders(ids.length);
     // Sous `ignoreMissingTable` comme dans `./deletion.ts` : la création de ces
     // trois tables est avalée par un `catch` dans `database/schema/`, et une base à

@@ -764,14 +764,17 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
   const teamIds = [
     ...new Set(departures.flatMap((departure) => [departure.teamId, departure.opponentId ?? departure.teamId])),
   ];
+  // Trois branches réunies, chacune sur son index (clé, tournoi + place) :
+  // un `OR` entre index différents pousserait à balayer la table.
+  const columns = "id, tournament_id, phase_id, bracket, round_number, team1_id, team2_id, start_at";
+  const inTournaments = `tournament_id IN (${sqlPlaceholders(tournamentIds.length)})`;
   const [currentRows] = await db.query<CurrentMatchRow[]>(
-    `SELECT id, tournament_id, phase_id, bracket, round_number, team1_id, team2_id, start_at
-       FROM bg_matches
-      WHERE id IN (${sqlPlaceholders(matchIds.length)})
-         OR (tournament_id IN (${sqlPlaceholders(tournamentIds.length)})
-             AND (team1_id IN (${sqlPlaceholders(departedIds.length)})
-                  OR team2_id IN (${sqlPlaceholders(departedIds.length)})))`,
-    [...matchIds, ...tournamentIds, ...departedIds, ...departedIds],
+    `SELECT ${columns} FROM bg_matches WHERE id IN (${sqlPlaceholders(matchIds.length)})
+     UNION
+     SELECT ${columns} FROM bg_matches WHERE ${inTournaments} AND team1_id IN (${sqlPlaceholders(departedIds.length)})
+     UNION
+     SELECT ${columns} FROM bg_matches WHERE ${inTournaments} AND team2_id IN (${sqlPlaceholders(departedIds.length)})`,
+    [...matchIds, ...tournamentIds, ...departedIds, ...tournamentIds, ...departedIds],
   );
   const [nameRows] = await db.query<TeamNameRow[]>(
     `SELECT id, name FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,

@@ -16,6 +16,7 @@ export const SQL_ID_CHUNK = 500;
  * contrôle.
  */
 export function chunkIds<T>(ids: readonly T[], size: number = SQL_ID_CHUNK): T[][] {
+  if (!Number.isInteger(size) || size <= 0) throw new RangeError(`chunkIds: taille invalide (${size})`);
   const chunks: T[][] = [];
   for (let from = 0; from < ids.length; from += size) chunks.push(ids.slice(from, from + size));
   return chunks;

@@ -68,6 +68,7 @@ import {
 } from "@/lib/shared/referee-alerts";
 import { tournamentPageUrl } from "./app-url";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -559,13 +560,8 @@ async function clearRefereeAlertsOnPool(matchIds: ReadonlySet<number>): Promise<
   if (matchIds.size === 0) return;
   try {
     const db = await getDatabase();
-    const ids = [...matchIds];
-    for (let from = 0; from < ids.length; from += CLEAR_ALERTS_CHUNK) {
-      const chunk = ids.slice(from, from + CLEAR_ALERTS_CHUNK);
-      await db.execute(
-        `DELETE FROM bg_referee_alerts WHERE match_id IN (${chunk.map(() => "?").join(", ")})`,
-        chunk,
-      );
+    for (const chunk of chunkIds([...matchIds], CLEAR_ALERTS_CHUNK)) {
+      await db.execute(`DELETE FROM bg_referee_alerts WHERE match_id IN (${sqlPlaceholders(chunk.length)})`, chunk);
     }
   } catch {
     // Meilleur effort.

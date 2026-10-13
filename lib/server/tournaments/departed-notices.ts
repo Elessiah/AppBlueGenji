@@ -45,29 +45,42 @@ export type { Poster } from "./match-poster";
  */
 const MAX_PENDING_NOTICES = 512;
 
-/** Avis en attente, par connexion. */
-const pending = new WeakMap<PoolConnection, DepartedEntrant[]>();
-
 /**
- * Manches dont un appelant (`./rollback.ts`) a relevé l'horaire tenu et
- * réglera lui-même les sorties (`holdDepartures` / `settleDepartures`) : une
- * pose intermédiaire de la même transaction ne les note pas.
+ * Ce que la transaction en cours a relevé, sur sa connexion. **Un seul objet**,
+ * jeté d'un coup à la fin de la transaction (`flushDepartedNotices`,
+ * `discardDepartedNotices`) : rien ne passe d'une transaction à la suivante
+ * sur une connexion réutilisée.
  */
-const settledLater = new WeakMap<PoolConnection, Set<number>>();
+type TransactionState = {
+  /** Avis en attente. */
+  pending: DepartedEntrant[];
+  /**
+   * Manches dont un appelant (`./rollback.ts`) a relevé l'horaire tenu et
+   * réglera lui-même les sorties (`holdDepartures` / `settleDepartures`) : une
+   * pose intermédiaire de la même transaction ne les note pas.
+   */
+  settledLater: Set<number>;
+  /**
+   * Horaires tenus déjà lus, par manche (`null` : aucun). Une seconde sortie
+   * sur la même manche (deux remplacements, ou une exemption puis une
+   * correction) retrouve l'horaire que la première a lu, alors que ses
+   * marques ont été effacées entre-temps. Le moteur n'écrit jamais `TOLD`.
+   */
+  heldRead: Map<number, HeldTime | null>;
+  /** Les engagées qui ont reçu l'horaire de chaque manche ({@link holdersOf}). */
+  heldBy: Map<number, ReadonlySet<number>>;
+};
 
-/**
- * Horaires tenus déjà lus dans la transaction, par manche (`null` : aucun).
- * Une seconde sortie sur la même manche (deux remplacements, ou une exemption
- * puis une correction) retrouve l'horaire que la première a lu, alors que ses
- * marques ont été effacées entre-temps. Le moteur n'écrit jamais `TOLD`.
- */
-const heldRead = new WeakMap<PoolConnection, Map<number, HeldTime | null>>();
+const states = new WeakMap<PoolConnection, TransactionState>();
 
-/**
- * Les engagées qui ont reçu l'horaire de chaque manche, fixées à la première
- * sortie notée sur elle dans la transaction ({@link holdersOf}).
- */
-const heldBy = new WeakMap<PoolConnection, Map<number, ReadonlySet<number>>>();
+function stateOf(connection: PoolConnection): TransactionState {
+  let state = states.get(connection);
+  if (!state) {
+    state = { pending: [], settledLater: new Set(), heldRead: new Map(), heldBy: new Map() };
+    states.set(connection, state);
+  }
+  return state;
+}
 
 type HeldRow = RowDataPacket & { match_id: number; start_at: Date | string | null };
 
@@ -130,7 +143,7 @@ export async function noteDepartedEntrants(
   connection: PoolConnection,
   departures: readonly Departure[],
 ): Promise<void> {
-  const owned = settledLater.get(connection);
+  const owned = states.get(connection)?.settledLater;
   const noted = owned ? departures.filter((departure) => !owned.has(departure.matchId)) : departures;
   if (noted.length === 0) return;
   const held = await readHeldTimes(connection, [...new Set(noted.map((departure) => departure.matchId))]);
@@ -145,9 +158,8 @@ export async function noteDepartedEntrants(
  */
 export async function holdDepartures(connection: PoolConnection, matchIds: readonly number[]): Promise<HeldTimes> {
   const held = matchIds.length > 0 ? await readHeldTimes(connection, matchIds) : new Map<number, HeldTime>();
-  const owned = settledLater.get(connection) ?? new Set<number>();
-  for (const id of matchIds) owned.add(id);
-  settledLater.set(connection, owned);
+  const { settledLater } = stateOf(connection);
+  for (const id of matchIds) settledLater.add(id);
   return { matchIds, held };
 }
 
@@ -157,33 +169,29 @@ export async function holdDepartures(connection: PoolConnection, matchIds: reado
  * pose intermédiaire — l'appelant les effacera si l'affiche d'arrivée a changé.
  */
 export function withoutSettledLater(connection: PoolConnection, matchIds: readonly number[]): number[] {
-  const owned = settledLater.get(connection);
+  const owned = states.get(connection)?.settledLater;
   return owned ? matchIds.filter((id) => !owned.has(id)) : [...matchIds];
 }
 
 /** Note les sorties constatées à l'arrivée, sur les horaires relevés par {@link holdDepartures}. */
 export function settleDepartures(connection: PoolConnection, times: HeldTimes, departures: readonly Departure[]): void {
-  const owned = settledLater.get(connection);
-  if (owned) {
-    for (const id of times.matchIds) owned.delete(id);
-    if (owned.size === 0) settledLater.delete(connection);
-  }
+  const owned = states.get(connection)?.settledLater;
+  for (const id of times.matchIds) owned?.delete(id);
   enqueue(connection, times.held, departures);
 }
 
 /**
  * Horaires tenus encore valables des manches données, avec leur contexte. Une
- * manche déjà lue dans la transaction n'est pas relue ({@link heldRead}).
+ * manche déjà lue dans la transaction n'est pas relue (`TransactionState.heldRead`).
  */
 async function readHeldTimes(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, HeldTime>> {
-  const known = heldRead.get(connection) ?? new Map<number, HeldTime | null>();
+  const known = stateOf(connection).heldRead;
   const unread = matchIds.filter((id) => !known.has(id));
   if (unread.length > 0) {
     const fetched = await fetchHeldTimes(connection, unread);
     // Table absente : rien n'a jamais été reçu.
     if (fetched === null) return new Map();
     for (const id of unread) known.set(id, fetched.get(id) ?? null);
-    heldRead.set(connection, known);
   }
   const held = new Map<number, HeldTime>();
   for (const id of matchIds) {
@@ -230,32 +238,46 @@ async function fetchHeldTimes(connection: PoolConnection, matchIds: readonly num
  * l'horaire ({@link holdersOf}).
  */
 function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>, departures: readonly Departure[]): void {
-  const noticed = departures.filter((departure) => held.has(departure.matchId));
-  if (noticed.length === 0) return;
-  const queue = pending.get(connection) ?? [];
+  const byMatch = groupByHeldMatch(held, departures);
+  if (byMatch.size === 0) return;
+  const state = stateOf(connection);
+  const queue = state.pending;
   const queued = new Set(queue.map((entry) => `${entry.matchId}:${entry.teamId}`));
   let dropped = 0;
-  for (const departure of noticed) {
-    const key = `${departure.matchId}:${departure.teamId}`;
-    const time = held.get(departure.matchId) as HeldTime;
-    const holders = holdersOf(connection, noticed, departure.matchId);
-    if (queued.has(key) || !holders.has(departure.teamId)) continue;
-    if (queue.length >= MAX_PENDING_NOTICES) {
-      dropped += 1;
-      continue;
+  for (const [matchId, group] of byMatch) {
+    const time = held.get(matchId) as HeldTime;
+    const holders = holdersOf(state, matchId, group);
+    for (const departure of group) {
+      const key = `${matchId}:${departure.teamId}`;
+      if (queued.has(key) || !holders.has(departure.teamId)) continue;
+      if (queue.length >= MAX_PENDING_NOTICES) {
+        dropped += 1;
+        continue;
+      }
+      queued.add(key);
+      queue.push({
+        matchId,
+        teamId: departure.teamId,
+        opponentId: [...holders].find((id) => id !== departure.teamId) ?? null,
+        heldStartAt: time.heldStartAt,
+        match: time.match,
+      });
     }
-    queued.add(key);
-    queue.push({
-      matchId: departure.matchId,
-      teamId: departure.teamId,
-      opponentId: [...holders].find((id) => id !== departure.teamId) ?? null,
-      heldStartAt: time.heldStartAt,
-      match: time.match,
-    });
   }
-  if (queue.length > 0) pending.set(connection, queue);
   // Au-delà du plafond, ces joueurs ne seront pas prévenus : pm2 le dit.
   if (dropped > 0) console.warn(`[notify] ${dropped} avis de match retiré au-delà du plafond, non envoyés`);
+}
+
+/** Les sorties des manches dont un horaire est tenu, regroupées par manche (un seul passage). */
+function groupByHeldMatch(held: ReadonlyMap<number, HeldTime>, departures: readonly Departure[]): Map<number, Departure[]> {
+  const byMatch = new Map<number, Departure[]>();
+  for (const departure of departures) {
+    if (!held.has(departure.matchId)) continue;
+    const group = byMatch.get(departure.matchId);
+    if (group) group.push(departure);
+    else byMatch.set(departure.matchId, [departure]);
+  }
+  return byMatch;
 }
 
 /**
@@ -265,18 +287,15 @@ function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>
  * l'une l'autre). Fixées une fois pour la transaction : une engagée posée puis
  * retirée ensuite n'en fait pas partie.
  */
-function holdersOf(connection: PoolConnection, departures: readonly Departure[], matchId: number): ReadonlySet<number> {
-  const known = heldBy.get(connection) ?? new Map<number, ReadonlySet<number>>();
-  heldBy.set(connection, known);
-  const fixed = known.get(matchId);
+function holdersOf(state: TransactionState, matchId: number, group: readonly Departure[]): ReadonlySet<number> {
+  const fixed = state.heldBy.get(matchId);
   if (fixed) return fixed;
   const holders = new Set<number>();
-  for (const departure of departures) {
-    if (departure.matchId !== matchId) continue;
+  for (const departure of group) {
     holders.add(departure.teamId);
     if (departure.opponentId !== null) holders.add(departure.opponentId);
   }
-  known.set(matchId, holders);
+  state.heldBy.set(matchId, holders);
   return holders;
 }
 
@@ -361,10 +380,7 @@ export async function noteDeletedMatches(
 
 /** Jette les avis notés : le changement n'a pas abouti. */
 export function discardDepartedNotices(connection: PoolConnection): void {
-  pending.delete(connection);
-  settledLater.delete(connection);
-  heldRead.delete(connection);
-  heldBy.delete(connection);
+  states.delete(connection);
 }
 
 /**
@@ -372,11 +388,8 @@ export function discardDepartedNotices(connection: PoolConnection): void {
  * attendre** (comme `flushBotLogs`). Ne lève jamais.
  */
 export function flushDepartedNotices(connection: PoolConnection): void {
-  const notices = pending.get(connection) ?? [];
-  pending.delete(connection);
-  settledLater.delete(connection);
-  heldRead.delete(connection);
-  heldBy.delete(connection);
+  const notices = states.get(connection)?.pending ?? [];
+  states.delete(connection);
   if (notices.length === 0) return;
   void announceEntrantsWithdrawn(notices).catch((error: unknown) => {
     if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", error);
