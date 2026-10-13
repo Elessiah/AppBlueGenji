@@ -150,8 +150,12 @@ async function resetReminderMarks(
   const result: ToldSchedule =
     told.length > 0 ? { alreadyAnnounced: true, toldStartAt: toIso(told[0].start_at) } : NOTHING_TOLD;
   // Rendue à l'horaire que les joueurs tiennent : rien à réannoncer, et le
-  // rappel déjà parti pour lui ne doit pas repartir — les marques restent.
+  // rappel déjà parti pour lui ne doit pas repartir — les marques restent. Une
+  // date déjà passée (correction d'archive, saisie de travers) n'est annoncée à
+  // personne : elle laisse aussi les marques en place, que le balayage — qui ne
+  // lit que les dates à venir — ignore, et que la date suivante retrouve.
   if (result.toldStartAt !== null && result.toldStartAt === startAt) return result;
+  if (startAt !== null && new Date(startAt).getTime() <= Date.now()) return result;
   if (startAt !== null && bothEntrants) {
     await connection.execute(
       `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
