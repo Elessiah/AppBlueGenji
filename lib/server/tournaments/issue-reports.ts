@@ -36,11 +36,12 @@ import {
 import type { LogEntrant } from "@/lib/shared/log-privacy";
 import { tournamentPageUrl } from "./app-url";
 import { resolveUserEntrantTeamId } from "./registration";
-import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
+import { isSwissRound, swissPhaseSql } from "./swiss-round-sql";
 import { loadTournamentRow } from "./repository";
 
 type EntrantRow = RowDataPacket & {
   tournament_name: string;
+  tournament_format: string;
   participant_type: string | null;
   entrant_name: string;
 };
@@ -84,12 +85,12 @@ async function loadReportedMatch(
   matchId: number,
   entrantTeamId: number,
   participantType: ParticipantType,
+  swissTournament: boolean,
 ): Promise<ReportedMatch> {
   const [matchRows] = await db.execute<MatchRow[]>(
-    `SELECT m.team1_id, m.team2_id, m.bracket, m.round_number, ${swissRoundSql("m", "tr")},
+    `SELECT m.team1_id, m.team2_id, m.bracket, m.round_number, ${swissPhaseSql("m")} AS swiss_round,
               t1.name AS team1_name, t2.name AS team2_name
          FROM bg_matches m
-         JOIN bg_tournaments tr ON tr.id = m.tournament_id
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
          LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
         WHERE m.id = ? AND m.tournament_id = ?
@@ -105,14 +106,16 @@ async function loadReportedMatch(
   if (Number(row.team1_id) !== entrantTeamId && Number(row.team2_id) !== entrantTeamId) {
     throw new Error("NOT_MATCH_PARTICIPANT");
   }
+  // Tournoi suisse (format déjà lu par l'appelant), ou phase suisse d'un multi.
+  const swiss = swissTournament || isSwissRound(row);
   return {
-    round: matchRoundLabel(String(row.bracket), Number(row.round_number), isSwissRound(row)),
+    round: matchRoundLabel(String(row.bracket), Number(row.round_number), swiss),
     team1: row.team1_name ? { name: row.team1_name, participantType } : null,
     team2: row.team2_name ? { name: row.team2_name, participantType } : null,
     id: matchId,
     bracket: String(row.bracket),
     roundNumber: Number(row.round_number),
-    swiss: isSwissRound(row),
+    swiss,
   };
 }
 
@@ -149,7 +152,7 @@ export async function reportTournamentIssue(
   if (entrantTeamId === null) throw new Error("NOT_REGISTERED");
 
   const [rows] = await db.execute<EntrantRow[]>(
-    `SELECT t.name AS tournament_name, t.participant_type, e.name AS entrant_name
+    `SELECT t.name AS tournament_name, t.format AS tournament_format, t.participant_type, e.name AS entrant_name
        FROM bg_tournaments t
        JOIN bg_tournament_registrations r
          ON r.tournament_id = t.id AND r.team_id = ?
@@ -165,7 +168,14 @@ export async function reportTournamentIssue(
   const match =
     matchId === null
       ? null
-      : await loadReportedMatch(db, tournamentId, matchId, entrantTeamId, participantType);
+      : await loadReportedMatch(
+          db,
+          tournamentId,
+          matchId,
+          entrantTeamId,
+          participantType,
+          context.tournament_format === "SWISS",
+        );
 
   const alertMessage = buildIssueReportMessage({
     tournamentName: String(context.tournament_name),

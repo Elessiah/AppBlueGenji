@@ -56,6 +56,9 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { tournamentPageUrl } from "./app-url";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
+/** Un horaire tel que la base le rend (`dateStrings`) ou que le code le passe ; `null` : aucun. */
+type MaybeInstant = Date | string | null;
+
 /** Une manche à jouer, ses deux engagées connues. */
 type ScheduledMatch = {
   id: number;
@@ -81,7 +84,7 @@ type ScheduledMatchRow = RowDataPacket & ScheduledMatch;
  */
 export type MatchNotice = Omit<ScheduledMatch, "start_at" | "team1_id" | "team2_id" | "team1_name" | "team2_name"> & {
   status: string;
-  start_at: string | Date | null;
+  start_at: MaybeInstant;
   team1_id: number | null;
   team2_id: number | null;
   team1_name: string | null;
@@ -92,7 +95,7 @@ export type MatchNotice = Omit<ScheduledMatch, "start_at" | "team1_id" | "team2_
  * La manche, si elle reste à jouer (aucun score saisi) entre deux engagées
  * connues ; `startAt` : l'horaire qu'annonce le message (`null` : rien).
  */
-function playableMatch(row: MatchNotice, startAt: string | Date | null): ScheduledMatch | null {
+function playableMatch(row: MatchNotice, startAt: MaybeInstant): ScheduledMatch | null {
   const { team1_id, team2_id, team1_name, team2_name } = row;
   if (team1_id === null || team2_id === null || team1_name === null || team2_name === null) return null;
   if (startAt === null || row.status === "COMPLETED" || row.status === "AWAITING_CONFIRMATION") return null;
@@ -202,37 +205,66 @@ async function claimReminder(match: ScheduledMatch, offsetKey: string): Promise<
  */
 type ToldMark = { matchId: number; claimed: boolean; previous: Date | null; unchanged: boolean };
 
-type ToldStartRow = RowDataPacket & { start_at: Date | string | null };
+type ToldStateRow = RowDataPacket & {
+  match_start_at: MaybeInstant;
+  told_id: number | null;
+  start_at: MaybeInstant;
+};
+
+/** Même instant, `null` compris (une chaîne `dateStrings` ou une `Date`). */
+function sameInstant(a: MaybeInstant, b: MaybeInstant): boolean {
+  if (a === null || b === null) return a === b;
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+/** Rien à poser, rien à rendre : la marque reste telle quelle. */
+const UNTOUCHED = (matchId: number): ToldMark => ({ matchId, claimed: false, previous: null, unchanged: true });
 
 /**
  * Pose la marque avec l'horaire envoyé (`null` pour un avis de retrait : les
  * joueurs ne tiendront plus d'horaire). Une marque déjà là garde de quoi être
  * rendue. `null` : personne à prévenir.
+ *
+ * Relit au passage l'horaire **actuel** de la manche : un arbitre qui l'a
+ * déplacé (ou retiré, ou reposé) depuis la lecture de l'envoi a fait partir sa
+ * propre annonce — envoyer celle-ci dirait aux joueurs un horaire périmé.
+ *
+ * @param sentStart L'horaire que l'envoi annonce (`null` : un avis de retrait,
+ *                  la manche ne doit plus en avoir).
+ * @returns `"stale"` : l'horaire a changé, rien ne doit partir.
  */
 async function openToldMark(
   match: ScheduledMatch,
   recipientsByTeam: Map<number, NotificationRecipient[]>,
-  toldStart: Date | null,
-): Promise<ToldMark | null> {
+  sentStart: Date | null,
+): Promise<ToldMark | null | "stale"> {
   const hasRecipients = matchSides(match).some((side) => (recipientsByTeam.get(side.teamId) ?? []).length > 0);
   if (!hasRecipients) return null;
   const matchId = Number(match.id);
   const db = await getDatabase();
-  const [rows] = await db.execute<ToldStartRow[]>(
-    `SELECT start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
-    [matchId, MATCH_TOLD_KEY],
+  const [rows] = await db.execute<ToldStateRow[]>(
+    `SELECT m.start_at AS match_start_at, r.id AS told_id, r.start_at
+       FROM bg_matches m
+       LEFT JOIN bg_match_reminders r ON r.match_id = m.id AND r.offset_key = ?
+      WHERE m.id = ? LIMIT 1`,
+    [MATCH_TOLD_KEY, matchId],
   );
-  if (rows.length === 0) {
+  const state = rows[0];
+  if (!state || !sameInstant(state.match_start_at, sentStart)) return "stale";
+  if (state.told_id === null) {
     // Un avis de retrait suppose la marque : sans elle, rien à poser.
-    if (toldStart === null) return null;
-    return { matchId, claimed: await claimToldMark(matchId, toldStart), previous: null, unchanged: false };
+    if (sentStart === null) return null;
+    // Perdue au profit d'un envoi concurrent : celui-ci n'a rien écrit, il n'a
+    // rien à rendre — sans quoi il effacerait l'horaire que l'autre a remis.
+    if (!(await claimToldMark(matchId, sentStart))) return UNTOUCHED(matchId);
+    return { matchId, claimed: true, previous: null, unchanged: false };
   }
-  const previous = rows[0].start_at === null ? null : new Date(rows[0].start_at);
+  const previous = state.start_at === null ? null : new Date(state.start_at);
   // Le rappel 24 h d'un horaire déjà reçu : la marque tient déjà cet horaire,
   // rien à écrire — ni à rendre si rien n'aboutit.
-  const unchanged = (previous?.getTime() ?? null) === (toldStart?.getTime() ?? null);
-  if (!unchanged) await setToldTime(matchId, toldStart);
-  return { matchId, claimed: false, previous, unchanged };
+  if (sameInstant(previous, sentStart)) return UNTOUCHED(matchId);
+  await setToldTime(matchId, sentStart);
+  return { matchId, claimed: false, previous, unchanged: false };
 }
 
 /** Referme la marque après l'envoi : rien n'a abouti, elle reprend son état d'avant. */
@@ -432,6 +464,7 @@ async function dispatchPlannedSend(
   // si rien n'a abouti — même sur une erreur. Un avis de retrait la garde,
   // sans horaire.
   const told = await openToldMark(match, recipientsByTeam, clearedStartAt ? null : new Date(match.start_at));
+  if (told === "stale") return 0;
 
   // Un message par engagée, pas un pour tout le monde : chaque joueur lit
   // « ton équipe contre l'autre », dans le bon sens.
@@ -565,7 +598,14 @@ async function runSweep(now: Date): Promise<number> {
   // fraîchement appariée en réserve des dizaines.
   const planned: PlannedSend[] = [];
   await inBatches(matches, SWEEP_CONCURRENCY, async (match) => {
-    planned.push(...(await planMatchSends(match, now, sentByMatch.get(Number(match.id)) ?? new Set())));
+    // Une réservation en échec (attente de verrou, interblocage) ne retient pas
+    // les autres manches : celles déjà réservées doivent partir, sans quoi leur
+    // palier serait consommé sans message. Celle-ci réessaiera au passage suivant.
+    try {
+      planned.push(...(await planMatchSends(match, now, sentByMatch.get(Number(match.id)) ?? new Set())));
+    } catch (error) {
+      console.error("[match-reminders] réservation de rappel en échec", error);
+    }
   });
   if (planned.length === 0) return 0;
 

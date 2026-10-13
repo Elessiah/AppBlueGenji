@@ -15,9 +15,17 @@
  * @returns L'expression SQL, suivie de `AS swiss_round`.
  */
 export function swissRoundSql(match: string, tournament: string): string {
+  return `(${tournament}.format = 'SWISS' OR ${swissPhaseSql(match)}) AS swiss_round`;
+}
+
+/**
+ * La moitié « phase » de {@link swissRoundSql}, pour une requête dont
+ * l'appelant tient déjà le format du tournoi (sans `AS`).
+ */
+export function swissPhaseSql(match: string): string {
   return (
-    `(${tournament}.format = 'SWISS' OR (${match}.phase_id <> 0 AND EXISTS (` +
-    `SELECT 1 FROM bg_tournament_phases sp WHERE sp.id = ${match}.phase_id AND sp.format = 'SWISS'))) AS swiss_round`
+    `(${match}.phase_id <> 0 AND EXISTS (` +
+    `SELECT 1 FROM bg_tournament_phases sp WHERE sp.id = ${match}.phase_id AND sp.format = 'SWISS'))`
   );
 }
 

@@ -104,9 +104,8 @@ async function lockScheduleRow(
   matchId: number,
 ): Promise<{ row: MatchScheduleRow; refereeScheduling: boolean } | null> {
   // Table seule sous verrou (MariaDB : pas de `FOR UPDATE OF`), puis l'option
-  // du tournoi par une lecture ordinaire — même partage que `lockLaunchMatch`.
-  // Le verrou tient la ligne contre un « Prêt » concurrent, que la remise à
-  // zéro effacerait sinon après coup.
+  // du tournoi. Le verrou tient la ligne contre un « Prêt » concurrent, que la
+  // remise à zéro effacerait sinon après coup.
   const [rows] = await connection.execute<MatchScheduleRow[]>(
     `SELECT id, tournament_id, status, team1_id, team2_id, start_at, launched_at, launch_pairing,
             team1_score, team2_score
@@ -115,9 +114,13 @@ async function lockScheduleRow(
   );
   const row = rows[0];
   if (!row) return null;
+  // Lecture verrouillante d'une ligne déjà tenue (`lockTournamentRow`) : rien
+  // de plus à attendre, et aucune image figée de la base — la première lecture
+  // ordinaire de la transaction, celle de la marque `TOLD`
+  // (`resetReminderMarks`), voit ainsi l'état le plus récent.
   const [tournament] = await connection.execute<
     (RowDataPacket & { referee_scheduling: number | null })[]
-  >(`SELECT referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1`, [row.tournament_id]);
+  >(`SELECT referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`, [row.tournament_id]);
   return { row, refereeScheduling: Number(tournament[0]?.referee_scheduling ?? 0) === 1 };
 }
 

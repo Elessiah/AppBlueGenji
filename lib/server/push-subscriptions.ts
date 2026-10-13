@@ -151,7 +151,6 @@ type SubscriptionRow = RowDataPacket & {
 /** Envois simultanés au plus : un tournoi prévient des dizaines d'appareils. */
 const PUSH_CONCURRENCY = 8;
 
-
 export type PushOptions = {
   /** `high` pour ce qui n'attend pas (départ de match) : réveille un téléphone en veille. */
   urgency?: "normal" | "high";

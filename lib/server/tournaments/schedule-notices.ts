@@ -24,6 +24,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { toIso } from "@/lib/server/serialization";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
@@ -147,6 +148,20 @@ function sameEntrants(row: ScheduledMatchInfoRow, change: MatchScheduleChange): 
   return ids[0] === change.entrantIds[0] && ids[1] === change.entrantIds[1];
 }
 
+/**
+ * La manche relue porte encore l'horaire de ce changement. Sinon, un
+ * changement plus récent l'a remplacé, et c'est à lui d'avertir joueurs et
+ * arbitres : annoncer ici l'horaire relu doublerait son annonce.
+ */
+function stillCurrent(row: ScheduledMatchInfoRow, change: MatchScheduleChange): boolean {
+  return toIso(row.start_at) === change.startAt;
+}
+
+/** Les joueurs de la manche relue sont à prévenir par ce changement-ci. */
+function ownsPlayerNotice(row: ScheduledMatchInfoRow, change: MatchScheduleChange): boolean {
+  return sameEntrants(row, change) && stillCurrent(row, change);
+}
+
 /** La rencontre a eu lieu : jouée, ou score saisi en attente de confirmation. */
 function isPlayed(status: string): boolean {
   return status === "COMPLETED" || status === "AWAITING_CONFIRMATION";
@@ -249,7 +264,8 @@ async function logScheduleCleared(
   // Les arbitres avaient reçu « Match programmé » pour cet horaire encore
   // devant : l'avis de retrait le remplace sur leur appareil (même étiquette).
   const previous = new Date(change.previousStartAt).getTime();
-  if (isPlayed(row.status) || !Number.isFinite(previous) || previous <= Date.now() - RECENT_PREVIOUS_MS) return;
+  if (!stillCurrent(row, change) || isPlayed(row.status)) return;
+  if (!Number.isFinite(previous) || previous <= Date.now() - RECENT_PREVIOUS_MS) return;
   await notifyStaff({
     topic: "MATCH_SCHEDULED",
     excludeUserIds: change.actor ? [change.actor.id] : [],
@@ -278,7 +294,7 @@ async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchSc
   if (previousStartAt === null) return;
   const results = await Promise.allSettled([
     logScheduleCleared(row, { ...change, previousStartAt }),
-    isAnnounceableClearing(change) && sameEntrants(row, change)
+    isAnnounceableClearing(change) && ownsPlayerNotice(row, change)
       ? announceMatchScheduleCleared(row, heldStartAt(change) ?? previousStartAt)
       : Promise.resolve(0),
   ]);
@@ -318,10 +334,10 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   const announceable = isAnnounceableSchedule(change);
   const playersAlreadyHoldIt = change.alreadyAnnounced && change.toldStartAt === startAt;
   const results = await Promise.allSettled([
-    announceable && !playersAlreadyHoldIt && sameEntrants(row, change)
+    announceable && !playersAlreadyHoldIt && ownsPlayerNotice(row, change)
       ? announceMatchSchedule(row, playerAnnouncement(change))
       : Promise.resolve(0),
-    notifyReferees(row, { ...change, startAt }, announceable),
+    notifyReferees(row, { ...change, startAt }, announceable && stillCurrent(row, change)),
   ]);
   reportFailures(results, "[notify] horaire de match non annoncé");
 }
