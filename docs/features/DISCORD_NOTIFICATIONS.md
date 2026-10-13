@@ -592,6 +592,11 @@ annoncé), T05 (horaires parmi les gestes d'arbitrage tracés), T08 (messages
 remis), T12 ; `/rgpd` (section 08, sujets du staff compris ; ID Discord ; transferts) dans les
 deux langues. L'entrée ne promet pas d'annonce « aussitôt » : une manche aux
 engagées inconnues n'est annoncée qu'à l'approche du match (balayage, 48 h).
+Elle dit aussi qu'un retrait se tait hors planification par l'arbitrage
+(`clearedHeldStartAt`), et que le sujet push ne règle pas les messages privés
+(intérêt légitime : droit d'opposition). Si la manche ne peut être relue après
+l'enregistrement (base injoignable, manche supprimée), l'auteur du geste reste
+tracé dans pm2 (`auditUnreadSchedule`, sans ligne Discord).
 
 ## Configuration
 
