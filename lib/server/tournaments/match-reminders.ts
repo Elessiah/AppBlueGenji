@@ -12,19 +12,21 @@
  * fait basculer les états de tournoi. Un `setInterval` de processus serait
  * remis à zéro à chaque redéploiement et dupliqué à chaque worker.
  *
- * **Une date posée tardivement ne rattrape pas les paliers manqués.** Elle
- * donne une **annonce** unique portant la date (`buildMatchScheduleAnnouncement`),
- * puis les rappels qui restent devant. Le partage entre les deux régimes tient
- * à la marque d'observation `SEEN`, posée au premier passage : elle sépare
- * « le site découvre cette date » de « le temps a passé depuis ».
+ * **Une manche découverte par le balayage est annoncée.** `setMatchStartAt`
+ * annonce lui-même une date posée sur deux engagées connues (et pose la marque
+ * d'observation `SEEN`) ; le balayage ne découvre donc que les manches dont une
+ * engagée manquait alors, ou a changé. Il leur donne une **annonce** unique
+ * portant la date (`buildMatchScheduleAnnouncement`), consomme le palier déjà
+ * ouvert, et laisse courir celui qui reste devant.
  *
  * **Pourquoi la réservation précède l'envoi.** `bg_match_reminders` porte une
  * clé unique `(match_id, offset_key)` : la ligne est insérée d'abord, et seule
  * l'insertion qui gagne envoie. Deux requêtes concurrentes déclenchent le même
  * balayage — sans ce verrou, le joueur recevrait son rappel en double. Le prix
  * est symétrique et assumé : un bot injoignable au moment précis de l'envoi
- * consomme le palier. C'est le bon sens du risque — un rappel manqué se
- * rattrape au palier suivant, un rappel envoyé en boucle ne se rattrape pas.
+ * consomme le palier — et il n'en reste qu'un (24 h) : ce rappel-là est perdu.
+ * C'est le bon sens du risque — un rappel manqué ne s'excuse qu'une fois, un
+ * rappel envoyé en boucle ne se rattrape pas.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -179,10 +181,11 @@ type PlannedSend = {
  *
  * Deux régimes, séparés par la marque d'observation (`MATCH_SEEN_KEY`) :
  *
- * - **Première observation.** Le site découvre cette date. Si des paliers sont
- *   déjà ouverts — la date a été posée à cinq heures — ils sont consommés sans
- *   message et remplacés par une **annonce** unique qui porte la date. Sans
- *   cela, la manche ne recevrait qu'un rappel, sans l'annonce de son horaire.
+ * - **Première observation.** Le site découvre cette date (une engagée
+ *   manquait quand l'arbitre l'a posée, ou a changé depuis) : **annonce**
+ *   unique qui porte la date. Un palier déjà ouvert est consommé sans
+ *   message — sans cela, la manche ne recevrait qu'un rappel, sans l'annonce
+ *   de son horaire.
  * - **Ensuite.** Régime normal : le palier dont la fenêtre s'ouvre part avec sa
  *   formulation.
  *
@@ -201,9 +204,10 @@ async function planMatchSends(
     // suivant.
     if (!(await claimReminder(matchId, MATCH_SEEN_KEY))) return [];
 
+    // Première observation : l'horaire n'a pas été annoncé à ces engagées
+    // (`setMatchStartAt` pose la marque quand il annonce) — on l'annonce, quelle
+    // que soit l'échéance.
     const opened = openedMatchReminders(match.start_at, now);
-    if (opened.length === 0) return [];
-
     for (const offset of opened) await claimReminder(matchId, offset.key);
     const openedKeys = new Set(opened.map((offset) => offset.key));
     const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
@@ -403,9 +407,8 @@ async function runSweep(now: Date): Promise<number> {
   // un match.
   //
   // La borne haute vient du module partagé et vaut l'horizon **plus une marge** :
-  // une fenêtre de lecture égale à l'horizon ferait découvrir chaque manche à la
-  // seconde où le premier palier s'ouvre, donc toujours par le régime
-  // d'annonce, et ce palier ne partirait jamais.
+  // une manche découverte ici est annoncée une journée avant que son rappel ne
+  // s'ouvre, plutôt qu'à sa place.
   const [matches] = await db.query<ScheduledMatchRow[]>(
     `${SCHEDULED_MATCH_SELECT}
         AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)`,

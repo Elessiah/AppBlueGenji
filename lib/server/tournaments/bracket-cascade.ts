@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { statusFromTeams } from "./_internal";
 
 /**
@@ -167,6 +168,14 @@ async function vacateSlot(
      WHERE id = ?`,
     [statusFromTeams(team1 === null ? null : Number(team1), team2 === null ? null : Number(team2)), targetId],
   );
+  // Les marques de rappel (horaire reçu, observation, palier) appartenaient à
+  // l'ancienne affiche : la remplaçante n'a rien reçu, et doit recevoir
+  // l'annonce — même règle que `pushTeamToTarget`, qui ne la verrait plus.
+  if (leaving) {
+    await ignoreMissingTable(
+      connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [targetId]),
+    );
+  }
   return reopened;
 }
 

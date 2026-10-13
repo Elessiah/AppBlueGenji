@@ -119,25 +119,24 @@ export const MATCH_REMINDER_HORIZON_MS =
 /**
  * Fenêtre de **lecture** du balayage : l'horizon, plus une journée de marge.
  *
- * La marge n'est pas décorative, elle est ce qui rend le premier palier
- * atteignable. Le balayage ne voit une manche que si elle est dans sa fenêtre
- * de lecture ; si celle-ci valait exactement l'horizon, toute manche serait
- * découverte **au moment même** où le premier palier s'ouvre, donc
- * toujours par le régime d'annonce — et ce palier ne partirait jamais. Une
- * journée d'avance laisse le site observer la manche avant que quoi que ce soit
- * ne soit dû, et les paliers courent alors normalement.
+ * Une manche que le balayage découvre (une engagée manquait quand l'arbitre a
+ * posé la date) est annoncée à sa première observation. La marge fait partir
+ * cette annonce une journée **avant** l'ouverture du rappel, qui court ensuite
+ * normalement — sans elle, l'annonce arriverait au moment même où le rappel
+ * s'ouvre, et le remplacerait.
  */
 export const MATCH_REMINDER_LOOKAHEAD_MS = MATCH_REMINDER_HORIZON_MS + 24 * 60 * MINUTE_MS;
 
 /**
  * Clé de la ligne posée à la **première observation** d'une manche programmée.
  *
- * Elle ne correspond à aucun message : elle marque que le site a vu cette date,
- * et sépare donc « le match vient d'être programmé » de « le temps a passé
- * depuis ». Sans elle, un match programmé à cinq heures recevrait un simple
- * rappel au lieu de l'annonce qui porte la date — et c'est aussi le verrou de
- * l'annonce : seule la requête qui pose la marque annonce
- * (`setMatchStartAt` la pose lui-même quand il annonce).
+ * Elle ne correspond à aucun message : elle marque que l'annonce de cette date
+ * est **prise en charge** — par le balayage qui la pose (et annonce), ou par
+ * `setMatchStartAt`, qui la pose pour toute date posée sur deux engagées
+ * connues (annoncée aussitôt si elle est devant ; une correction d'archive
+ * dans le passé n'annonce rien). Sans elle, un match programmé à cinq heures
+ * recevrait un simple rappel au lieu de l'annonce qui porte la date ; c'est
+ * aussi le verrou de l'annonce : seule la requête qui pose la marque annonce.
  */
 export const MATCH_SEEN_KEY = "SEEN";
 

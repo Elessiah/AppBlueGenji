@@ -534,7 +534,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Start of their matches, score to confirm, tournament kick-off, match reminders",
       "Requests to join a team they manage, reports and moderation decisions concerning them, changes to the data policy",
-      "Refereeing alerts (including scheduled or rescheduled matches) and moderation alerts for the staff holding these roles",
+      "Referee alerts, scheduled matches and moderation alerts for the staff holding these roles",
     ],
     legalBasis: "Consent (activation on each device, withdrawable at any time, topic by topic)",
     dataSubjects: ["Registered players who turn on notifications on a device"],
