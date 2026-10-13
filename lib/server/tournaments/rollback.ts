@@ -262,6 +262,12 @@ async function detachMatchParticipants(
        WHERE id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
+    // Les marques de rappel appartenaient à l'affiche défaite : les engagées
+    // qui la rempliront n'ont reçu aucun horaire (même règle que
+    // `bracket-cascade.ts`). Table tolérée absente, comme dans `deleteMatches`.
+    await ignoreMissingTable(
+      connection.execute(`DELETE FROM bg_match_reminders WHERE match_id IN (${ids.map(() => "?").join(", ")})`, ids),
+    );
   }
 }
 

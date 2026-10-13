@@ -243,6 +243,7 @@ async function dispatchPlannedSend(
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
 ): Promise<number> {
   let dispatched = 0;
+  let delivered = false;
   const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
   const url = tournamentPageUrl(Number(match.tournament_id));
 
@@ -291,7 +292,7 @@ async function dispatchPlannedSend(
     }
 
     const offsetKey = offset ? offset.key : null;
-    await notifyUsers(recipients, {
+    const report = await notifyUsers(recipients, {
       topic: "MATCH_REMINDER",
       discord: { message, context: discordContext },
       push: (locale) =>
@@ -300,12 +301,14 @@ async function dispatchPlannedSend(
           : matchReminderPush(pushSide, offsetKey, locale, announcement),
     });
     dispatched += 1;
+    if ((report.discord?.sent ?? 0) > 0 || report.pushed > 0) delivered = true;
   }
   // Un horaire parti le dit en base : une date posée plus tard se lira
   // « reprogrammée », une date effacée « retirée » (`setMatchStartAt`) — ce que
-  // ni la marque d'observation ni celle d'un palier ne prouvent. Un avis de
+  // ni la marque d'observation ni celle d'un palier ne prouvent — à condition
+  // qu'un message privé ou un push ait réellement abouti. Un avis de
   // retrait n'en pose pas : la marque est déjà là, c'est elle qui l'a permis.
-  if (dispatched > 0 && !clearedStartAt) await claimReminder(Number(match.id), MATCH_TOLD_KEY);
+  if (delivered && !clearedStartAt) await claimReminder(Number(match.id), MATCH_TOLD_KEY);
   return dispatched;
 }
 

@@ -14,7 +14,7 @@
     },
     "MATCH_REMINDER": {
       "label": "Match times and reminders",
-      "description": "A match's time as soon as it is set, changed or removed, then a reminder 24 h before."
+      "description": "A match's time when it is set, changed or removed, then a reminder within the last 24 h."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Join requests",

@@ -151,6 +151,14 @@ export const MATCH_SEEN_KEY = "SEEN";
 export const MATCH_TOLD_KEY = "TOLD";
 
 /**
+ * Marques qui prouvent qu'un horaire a été reçu : `TOLD`, et les paliers
+ * retirés `P7D` / `PT1H` qu'une manche programmée avant l'arrivée de `TOLD`
+ * peut porter (ils n'étaient posés qu'avec un message). `P1D` n'en est pas : il
+ * est réservé avant l'envoi, et consommé sans message par une annonce.
+ */
+export const MATCH_TOLD_KEYS: readonly string[] = [MATCH_TOLD_KEY, "P7D", "PT1H"];
+
+/**
  * Paliers dont la fenêtre est **déjà ouverte** à `now`.
  *
  * Ce sont ceux qu'une date posée tardivement fait manquer d'un coup : une
