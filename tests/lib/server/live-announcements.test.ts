@@ -303,7 +303,27 @@ describe("runLiveAnnouncementSweep", () => {
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
     expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]).toBe("live-announce match-41");
     expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
-      "[live-announce] match 40 (tournoi 4) : réservation impossible, réessayée au passage suivant",
+      "[live-announce] match 40 (tournoi 4) : réservation impossible, réessayée au passage suivant (avertissement répété au plus une fois par heure)",
+    );
+  });
+
+  it("une panne de réservation qui dure ne remplit pas pm2 : une trace par match et par heure", async () => {
+    const { execute } = mockDb([AUTO_LIVE]);
+    execute.mockRejectedValue(new Error("DISK_FULL"));
+    await runLiveAnnouncementSweep(NOW);
+    await runLiveAnnouncementSweep(NOW);
+    await runLiveAnnouncementSweep(NOW);
+    expect(console.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("un match à l'antenne sans aucun lien laisse une trace pm2, une fois par heure", async () => {
+    mockDb([{ ...AUTO_LIVE, live_url: null, tournament_live_url: null }]);
+    await runLiveAnnouncementSweep(NOW);
+    await runLiveAnnouncementSweep(NOW);
+    expect(pushLiveAnnouncement).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain(
+      "match 40 (tournoi 4) à l'antenne sans lien de diffusion exploitable",
     );
   });
 
