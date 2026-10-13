@@ -172,18 +172,24 @@ l'arbitre peut rejouer plutôt qu'un horaire changé dont personne n'est préven
 Il lit d'abord `TOLD` (`alreadyAnnounced`) puis, si une date est
 posée :
 
-- les deux engagées connues, efface les lignes de la manche **sauf** `SEEN` et
-  `TOLD`, et pose `SEEN` dans le même geste. Un balayage qui passerait entre ce
-  ménage et l'annonce ne peut donc plus la prendre pour lui (et annoncer sans
+- les deux engagées connues, pose `SEEN` puis efface les lignes de la manche
+  **sauf** `SEEN` et `TOLD`, dans le même geste. Un balayage qui passerait entre
+  ce ménage et l'annonce ne peut donc plus la prendre pour lui (et annoncer sans
   l'ancienne date) : il ne peut prendre qu'un palier ouvert, dont le rappel
-  porte la nouvelle date — l'annonce se tait alors ;
+  porte la nouvelle date — l'annonce se tait alors. L'insertion **précède**
+  l'effacement : un `DELETE` sur une manche sans marque verrouille l'intervalle
+  d'index qui l'entoure, et deux arbitres qui programment au même instant deux
+  manches voisines s'interbloqueraient sur leurs insertions suivantes (la
+  transaction perdante rendrait l'horaire en refus) ;
 - une engagée manquante, efface tout sauf `TOLD` : le balayage annoncera la
   manche quand elle sera connue.
 
 Une date **effacée** garde toutes ses marques (inertes : le balayage ne lit que
 les manches datées). Puis `notifyMatchScheduleChange`
 (`lib/server/tournaments/schedule-notices.ts`) prévient **sans attendre le
-balayage** :
+balayage**, la manche lue **une fois** pour le journal, les arbitres et les
+joueurs (`announceMatchSchedule` / `announceMatchScheduleCleared` la reçoivent,
+`MatchNotice`, et ne la relisent pas) :
 
 - **Joueurs** des deux engagées (équipes ou entrées solo, push dans la langue de
   chacun, message privé Discord en français) : `announceMatchSchedule` consomme
@@ -240,6 +246,16 @@ journalisé. Une manche dont une engagée manque encore n'a pas d'annonce joueur
 insérée **avant** l'envoi, et seule l'insertion qui gagne envoie : deux requêtes
 concurrentes déclenchent le même balayage, et sans ce verrou le joueur recevrait
 son rappel en double.
+
+**Coût du balayage.** Sa fenêtre se lit par l'index `idx_bg_matches_start_at`
+(sans lui, chaque passage relisait toute l'histoire des matchs). Les envois
+partent quatre manches à la fois (`inBatches`, `SWEEP_CONCURRENCY`) : une ronde
+suisse appariée sur des horaires déjà posés donne autant d'annonces que de
+manches, et chacune attend le bot puis les appareils — les réservations, prises
+avant, interdisent le doublon quel que soit l'ordre. Le rappel 24 h d'un horaire
+déjà reçu lit la marque `TOLD` sans la réécrire (elle tient déjà cet horaire),
+et une cascade de correction de score efface les marques des affiches quittées
+en une instruction (`detachDownstreamOutcome`).
 
 Le prix est symétrique et assumé : un bot injoignable au moment précis de l'envoi
 consomme le palier. C'est le bon sens du risque — un rappel manqué se rattrape au
