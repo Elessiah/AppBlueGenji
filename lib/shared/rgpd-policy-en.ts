@@ -9,7 +9,7 @@
 
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
-import { DONNEES_PROFIL } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL, MATCH_TIME_DM_SCOPE } from "@/lib/shared/rgpd-policy";
 import type { DonneEntry, DroitEntry, LegalBase } from "@/lib/shared/rgpd-policy";
 
 /** The four legal bases (GDPR, art. 6.1), in English. */
@@ -31,6 +31,7 @@ const PROFIL_DUREE_EN: Record<string, string> = {
 const SCOPE_EN: Record<string, string> = {
   "présentation aux joueurs et au caster de ton match, à son lancement":
     "presentation to the players and caster of your match, at its launch",
+  [MATCH_TIME_DM_SCOPE]: "match time notices and reminders by direct message",
 };
 
 /** Data and purpose of each `DONNEES_PROFIL` row, same order. */
@@ -141,7 +142,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to object",
-    text: "You can object to the processing of your data based on legitimate interest (tournament history).",
+    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices and reminders by direct message).",
   },
   {
     title: "Right to data portability",

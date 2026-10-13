@@ -27,7 +27,7 @@ Base légaleConsentementExécution du contrat présentation aux joueurs et au ca
 ConservationDurée du compte
 DonnéePseudo Discord
 FinalitéAuthentification Discord, notifications bot. Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris
-Base légaleExécution du contrat
+Base légaleExécution du contratIntérêt légitime annonces d'horaire et rappels de match en message privé
 ConservationDurée du compte
 DonnéeCertification du pseudo Discord
 FinalitéOuvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change
@@ -35,7 +35,7 @@ Base légaleConsentementExécution du contrat présentation aux joueurs et au ca
 ConservationJusqu'au retrait ou au changement du tag, ou durée du compte
 DonnéeID Discord
 FinalitéMoyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires et rappels de match, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre
-Base légaleExécution du contrat
+Base légaleExécution du contratIntérêt légitime annonces d'horaire et rappels de match en message privé
 ConservationDurée du compte
 DonnéeIdentifiant Google
 FinalitéMoyen de connexion (bouton Google) — identifiant technique opaque. Aucune adresse e-mail n'est demandée ni conservée, et le nom de ton compte Google n'est pas repris. Retirable depuis Mon profil tant qu'il t'en reste un autre
@@ -103,7 +103,7 @@ Droit à la limitation
 Vous pouvez demander que vos données soient conservées sans être autrement utilisées le temps que nous vérifiions leur exactitude ou que nous examinions votre opposition, lorsque leur traitement est illicite et que vous préférez cette limitation à leur effacement, ou lorsque vous en avez besoin pour faire valoir un droit en justice alors que nous n'en aurions plus l'usage (art. 18).
 05
 Droit d'opposition
-Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois).
+Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire et rappels de match en message privé).
 06
 Droit à la portabilité
 Vous pouvez demander l'export de vos données dans un format lisible par machine (JSON).
