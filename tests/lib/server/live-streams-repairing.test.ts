@@ -125,3 +125,36 @@ describe("finalizeMatch — antenne du match aval", () => {
     expect(antennaResets(calls)).toHaveLength(0);
   });
 });
+
+describe("finalizeMatch — marques de rappel du match aval", () => {
+  const reminderResets = (calls: Call[]): Call[] =>
+    calls.filter(([sql]) => sql.includes("DELETE FROM bg_match_reminders"));
+
+  it("efface les marques quand le créneau change d'équipe : la nouvelle n'a reçu aucun horaire", async () => {
+    const { connection, calls } = connectionSpy({ team1_id: 7, team2_id: 8 });
+
+    await finalizeMatch(connection, 1, downstream, {
+      team1Score: 2,
+      team2Score: 1,
+      winnerTeamId: 9,
+      loserTeamId: 8,
+    });
+
+    const resets = reminderResets(calls);
+    expect(resets).toHaveLength(1);
+    expect(resets[0][1]).toEqual([20]);
+  });
+
+  it("garde les marques quand le créneau se remplit pour la première fois", async () => {
+    const { connection, calls } = connectionSpy({ team1_id: null, team2_id: null });
+
+    await finalizeMatch(connection, 1, downstream, {
+      team1Score: 2,
+      team2Score: 1,
+      winnerTeamId: 9,
+      loserTeamId: 8,
+    });
+
+    expect(reminderResets(calls)).toHaveLength(0);
+  });
+});

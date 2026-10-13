@@ -461,10 +461,10 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
 
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
     expect(calls).toHaveLength(2);
-    expect(calls[0][2]).toBe("match-scheduled");
+    expect(calls[0][2]).toBe("match-schedule-cleared");
     expect(calls[0][0]).toContain("**Horaire du match retiré**");
     expect(calls[0][0]).toContain("**Les Renards** contre **Team Nova**");
-    expect(calls[0][0]).toContain("L'horaire prévu jeudi 10 septembre à 20:00 (heure de Paris) est retiré");
+    expect(calls[0][0]).toContain("L'horaire du jeudi 10 septembre à 20:00 (heure de Paris) est retiré : un nouvel horaire te sera annoncé.");
     // Un avis de retrait ne pose aucune marque : `TOLD` est déjà là.
 
     const pushes = jest.mocked(pushToUsers).mock.calls;

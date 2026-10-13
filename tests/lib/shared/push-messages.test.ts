@@ -61,6 +61,9 @@ describe("matchReminderPush", () => {
   it("annonce un horaire changé, en français et en anglais", () => {
     const side = { ...SIDE, bracket: "UPPER", roundNumber: 1, startAt: "2026-09-10T18:00:00Z" };
     expect(matchReminderPush(side, null, "fr", { rescheduled: true }).title).toBe("Match reprogrammé");
+    expect(
+      matchReminderPush(side, null, "fr", { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" }).body,
+    ).toMatch(/^Nouveau coup d'envoi : jeudi 10 septembre à 20:00 \(heure de Paris\), au lieu du mardi 8 septembre à 20:00\. /);
     const en = matchReminderPush(side, null, "en", { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" });
     expect(en.title).toBe("Match rescheduled");
     // Le changement d'abord : c'est la fin d'un corps trop long qui se coupe.
@@ -99,7 +102,7 @@ describe("matchScheduleClearedPush", () => {
   it("dit l'horaire retiré, en français, et remplace l'annonce sur l'appareil", () => {
     expect(matchScheduleClearedPush(side)).toEqual({
       title: "Horaire du match retiré",
-      body: "L'horaire prévu jeudi 10 septembre à 20:00 (heure de Paris) est retiré : le nouvel horaire te sera annoncé. Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2.",
+      body: "L'horaire du jeudi 10 septembre à 20:00 (heure de Paris) est retiré : un nouvel horaire te sera annoncé. Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2.",
       url: "/tournois/7#match-31",
       tag: matchReminderPush(side, null).tag,
     });
@@ -109,7 +112,7 @@ describe("matchScheduleClearedPush", () => {
     const content = matchScheduleClearedPush(side, "en");
     expect(content.title).toBe("Match time removed");
     expect(content.body).toBe(
-      "The time planned for Thursday, September 10 at 20:00 (Paris time) has been removed: you'll be told the new one. Les Renards vs Team Nova · Coupe BlueGenji, Lower bracket · round 2.",
+      "The time set for Thursday, September 10 at 20:00 (Paris time) has been removed: a new time will be announced. Les Renards vs Team Nova · Coupe BlueGenji, Lower bracket · round 2.",
     );
     expect(content.url).toBe("/en/tournois/7#match-31");
   });

@@ -154,7 +154,7 @@ describe("buildMatchScheduleAnnouncement", () => {
     });
     expect(message).toContain("**Match reprogrammé**");
     expect(message).not.toContain("**Match programmé**");
-    expect(message).toContain("(heure de Paris), au lieu du mardi 8 septembre à 20:00");
+    expect(message).toContain("Nouveau coup d'envoi : jeudi 10 septembre à 20:00 (heure de Paris), au lieu du mardi 8 septembre à 20:00");
     // Date effacée puis reposée : « reprogrammé », sans ancienne date à citer.
     expect(buildMatchScheduleAnnouncement(context, [], { rescheduled: true })).not.toContain("au lieu du");
   });
@@ -187,8 +187,9 @@ describe("buildMatchScheduleClearedNotice", () => {
     expect(message.split("\n")[0]).toBe("**Horaire du match retiré**");
     expect(message).toContain("Coupe BlueGenji · Manche 2");
     expect(message).toContain("**Les Renards** contre **Team Nova**");
-    expect(message).toContain("L'horaire prévu ");
-    expect(message).toContain("(heure de Paris) est retiré : le nouvel horaire te sera annoncé.");
+    expect(message).toContain("L'horaire du ");
+    expect(message).toContain("un nouvel horaire te sera annoncé.");
+    expect(message).toContain("(heure de Paris) est retiré");
     expect(message).toContain("https://bluegenji.fr/tournois/7");
   });
 
