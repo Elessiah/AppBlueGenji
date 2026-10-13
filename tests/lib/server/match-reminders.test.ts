@@ -218,12 +218,12 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
 
     const updates = (execute.mock.calls as unknown as [string, unknown[]][])
-      .filter(([sql]) => sql.startsWith("UPDATE bg_match_reminders"))
+      .filter(([sql]) => sql.startsWith("UPDATE bg_match_reminders") || sql.includes("ON DUPLICATE KEY UPDATE"))
       .map(([, params]) => params);
     // Posé avant l'envoi — si la manche porte encore cet horaire et ces
-    // engagées —, puis rendu.
+    // engagées, la manche lue avant la marque —, puis rendu.
     expect(updates).toEqual([
-      [START, 31, "TOLD", START, 101, 102],
+      [31, "TOLD", START, 31, START, 101, 102, START],
       // Rendu à condition de porter encore l'horaire écrit par cet envoi : un
       // changement plus récent, remis entre-temps, garde le sien.
       [before, 31, "TOLD", START],
@@ -390,6 +390,36 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(error).toHaveBeenCalled();
   });
 
+  it("rend le palier réservé quand la marque d'horaire reçu ne peut être lue (verrou)", async () => {
+    const { execute } = await mockDb({});
+    const base = execute.getMockImplementation();
+    execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith("SELECT m.start_at AS match_start_at")) throw new Error("Lock wait timeout exceeded");
+      return base!(sql, params);
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("DELETE"));
+    expect(releases).toEqual([[expect.stringMatching(/offset_key IN \(\?\)$/), [31, "P1D"]]]);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it("rend toutes les réservations du passage quand ses destinataires ne peuvent être lus", async () => {
+    const { query, execute } = await mockDb({ sent: [] });
+    query.mockReset();
+    query
+      .mockResolvedValueOnce([[{ ...MATCH, seen_mark: 0, told_mark: 0 }]])
+      .mockRejectedValueOnce(new Error("Too many connections"));
+
+    await expect(dispatchDueMatchReminders(ONE_HOUR_BEFORE)).rejects.toThrow("Too many connections");
+
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("DELETE"));
+    // L'observation et le palier consommé : l'annonce repartira au passage suivant.
+    expect(releases.map(([, params]) => params)).toEqual([[31, "SEEN", "P1D"]]);
+  });
+
   it("réserve la marque d'horaire reçu avant l'envoi : une correction immédiate la lit déjà", async () => {
     const { execute } = await mockDb({});
     let toldBeforeSend = false;
@@ -416,11 +446,12 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const held = await mockDb({ told: new Date("2026-09-09T18:00:00Z") });
     await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
     const update = (held.execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) =>
-      sql.startsWith("UPDATE bg_match_reminders r"),
+      sql.includes("ON DUPLICATE KEY UPDATE"),
     );
-    expect(update?.[0]).toMatch(/JOIN bg_matches m ON m\.id = r\.match_id/);
-    expect(update?.[0]).toMatch(/m\.start_at <=> \? AND m\.team1_id = \? AND m\.team2_id = \?/);
-    expect(update?.[1]).toEqual([START, 31, "TOLD", START, 101, 102]);
+    // La manche est lue avant la marque : l'ordre de verrouillage du moteur.
+    expect(update?.[0]).toMatch(/^INSERT INTO bg_match_reminders \(match_id, offset_key, start_at\)\s+SELECT \?, \?, \? FROM bg_matches/);
+    expect(update?.[0]).toMatch(/WHERE id = \? AND start_at <=> \? AND team1_id = \? AND team2_id = \?\s+ON DUPLICATE KEY UPDATE start_at = \?/);
+    expect(update?.[1]).toEqual([31, "TOLD", START, 31, START, 101, 102, START]);
   });
 
   it("marque l'horaire reçu dès qu'un seul message privé a abouti", async () => {
@@ -794,9 +825,9 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
     const [sql] = query.mock.calls[0] as unknown as [string];
     expect(sql).not.toMatch(/FROM bg_matches/);
     // Les marques restent ; l'horaire tenu est oublié avant l'envoi (rien à citer ensuite).
-    const updates = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("UPDATE"));
+    const updates = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("UPDATE") || sql.includes("ON DUPLICATE KEY UPDATE"));
     expect(updates).toEqual([
-      [expect.stringMatching(/^UPDATE bg_match_reminders r\s+JOIN bg_matches m/), [null, 31, "TOLD", null, 101, 102]],
+      [expect.stringMatching(/ON DUPLICATE KEY UPDATE start_at = \?$/), [31, "TOLD", null, 31, null, 101, 102, null]],
     ]);
 
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;

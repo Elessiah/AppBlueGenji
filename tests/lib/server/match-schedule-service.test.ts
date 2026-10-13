@@ -153,6 +153,24 @@ describe("setMatchStartAt", () => {
     );
   });
 
+  it("rejoue l'écriture qu'un interblocage a annulée", async () => {
+    const { connection, writes } = world();
+    const base = connection.execute.getMockImplementation();
+    let aborted = false;
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (!aborted && sql.startsWith("UPDATE bg_matches")) {
+        aborted = true;
+        throw Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+      }
+      return base!(sql, params);
+    });
+
+    expect(await setMatchStartAt(42, FUTURE)).toBe("2099-08-29T18:30:00.000Z");
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(writes.filter((w) => w.sql.startsWith("UPDATE bg_matches"))).toHaveLength(1);
+  });
+
   it("accepte la valeur brute d'un champ datetime-local", async () => {
     world();
     const result = await setMatchStartAt(42, "2026-08-29T20:30");

@@ -13,6 +13,8 @@ import {
 } from "@/lib/server/tournaments/departed-notices";
 import { forgetMatchReminders } from "@/lib/server/tournaments/reminder-marks";
 import { pushTeamToTarget } from "@/lib/server/tournaments/scoring";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 /**
@@ -64,5 +66,13 @@ describe("flushBotLogs / discardBotLogs", () => {
     expect(flushDepartedNotices).toHaveBeenCalledWith(connection);
     discardBotLogs(connection);
     expect(discardDepartedNotices).toHaveBeenCalledWith(connection);
+  });
+});
+
+describe("une seule implémentation de la pose en aval", () => {
+  it("les exemptions passent par le même pushTeamToTarget que le report de score", () => {
+    const byes = readFileSync(join(process.cwd(), "lib/server/tournaments/byes.ts"), "utf8");
+    expect(byes).toContain('import { pushTeamToTarget } from "./target-slot";');
+    expect(byes).not.toMatch(/function pushTeamToTarget\(/);
   });
 });
