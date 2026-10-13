@@ -449,6 +449,17 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(messages).toContain("[match-reminders] envoi de rappel en échec");
   });
 
+  it("tient chacun pour atteignable si les abonnements ne peuvent être lus", async () => {
+    jest.mocked(usersReachableByPush).mockRejectedValue(new Error("Lock wait timeout exceeded"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await mockDb({});
+
+    // Les messages privés et les push partent comme avant le filtre.
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2], [3]]);
+    expect(error).toHaveBeenCalled();
+  });
+
   it("ne pose aucune marque d'horaire reçu pour des engagées que rien n'atteindrait", async () => {
     // Ni tag Discord exploitable… (les identités déclarées passent par le bot)
     const unreachable = RECIPIENTS.map((r) => ({ ...r, discord_id: null, discord_pseudo: null }));
