@@ -42,7 +42,7 @@ const ROUNDS: [string, number][] = [
   ["THIRD_PLACE", 1],
   ["UPPER", PLAYOFF_ROUND_OFFSET + 1],
 ];
-const OFFSETS: (MatchReminderOffsetKey | null)[] = ["P7D", "P1D", null];
+const OFFSETS: (MatchReminderOffsetKey | null)[] = ["P1D", null];
 const REFEREE_LINE = "**Conflit** de score · <@123> https://site.test/tournois/7#match-31";
 
 /** Les mêmes cas que la fixture, rédigés dans `locale`. */
@@ -97,9 +97,12 @@ describe("notifications push — français inchangé", () => {
   it("rend chaque cas à l'identique de la version d'avant le lot 9-3", () => {
     // Seule différence voulue (revue sécurité) : le lien d'une alerte d'arbitrage
     // n'est plus la première URL de la ligne Discord — le texte, lui, est inchangé.
-    // Le rappel « 1 h avant » (`PT1H`) a depuis été retiré : ses cas sortent de
-    // la comparaison, et le cas solo se lit au palier de 24 h.
-    const kept = Object.fromEntries(Object.entries(FR_BEFORE).filter(([name]) => !name.endsWith(".PT1H")));
+    // Les rappels « 1 h avant » (`PT1H`) et « une semaine » (`P7D`) ont depuis
+    // été retirés : leurs cas sortent de la comparaison, et le cas solo se lit
+    // au palier de 24 h.
+    const kept = Object.fromEntries(
+      Object.entries(FR_BEFORE).filter(([name]) => !name.endsWith(".PT1H") && !name.endsWith(".P7D")),
+    );
     const before = {
       ...kept,
       "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" },

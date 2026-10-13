@@ -6,9 +6,11 @@ import {
   MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
   MATCH_SEEN_KEY,
+  MATCH_TOLD_KEY,
   buildIssueReportMessage,
   buildMatchReminderMessage,
   buildMatchScheduleAnnouncement,
+  buildMatchScheduleClearedNotice,
   dueMatchReminders,
   formatMatchStart,
   matchRoundLabel,
@@ -26,28 +28,25 @@ function before(minutes: number): Date {
 
 describe("dueMatchReminders", () => {
   it("ne déclenche rien hors de toute fenêtre", () => {
-    expect(dueMatchReminders(START, before(8 * 24 * 60))).toEqual([]);
+    expect(dueMatchReminders(START, before(24 * 60 + 1))).toEqual([]);
+    expect(dueMatchReminders(START, before(7 * 24 * 60))).toEqual([]);
   });
 
-  it("déclenche le palier « une semaine » à son ouverture", () => {
-    expect(dueMatchReminders(START, before(7 * 24 * 60)).map((o) => o.key)).toEqual(["P7D"]);
-  });
-
-  it("déclenche le palier 24 h quand la semaine est passée", () => {
+  it("déclenche le palier 24 h à son ouverture", () => {
     expect(dueMatchReminders(START, before(24 * 60)).map((o) => o.key)).toEqual(["P1D"]);
     expect(dueMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
-  it("n'a plus de rappel « 1 h avant » : le palier 24 h court jusqu'au coup d'envoi", () => {
-    expect(MATCH_REMINDER_OFFSETS.map((o) => o.key)).toEqual(["P7D", "P1D"]);
+  it("n'a plus de rappel « une semaine » ni « 1 h avant » : le palier 24 h court jusqu'au coup d'envoi", () => {
+    expect(MATCH_REMINDER_OFFSETS.map((o) => o.key)).toEqual(["P1D"]);
     expect(MATCH_REMINDER_OFFSETS.some((o) => o.minutesBefore < 24 * 60)).toBe(false);
     expect(dueMatchReminders(START, before(60)).map((o) => o.key)).toEqual(["P1D"]);
     expect(dueMatchReminders(START, before(1)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
   it("ne renvoie rien dans la dernière heure une fois les 24 h envoyées", () => {
-    expect(dueMatchReminders(START, before(60), ["P7D", "P1D"])).toEqual([]);
-    expect(dueMatchReminders(START, before(30), ["P7D", "P1D"])).toEqual([]);
+    expect(dueMatchReminders(START, before(60), ["P1D"])).toEqual([]);
+    expect(dueMatchReminders(START, before(30), ["P1D"])).toEqual([]);
   });
 
   it("n'envoie qu'un seul rappel pour un match programmé à la dernière minute", () => {
@@ -64,10 +63,6 @@ describe("dueMatchReminders", () => {
     expect(dueMatchReminders(START, before(24 * 60), ["P1D"])).toEqual([]);
   });
 
-  it("ignore un palier envoyé qui ne concerne pas la fenêtre courante", () => {
-    expect(dueMatchReminders(START, before(30), ["P7D"]).map((o) => o.key)).toEqual(["P1D"]);
-  });
-
   it("accepte une date sous forme de chaîne", () => {
     expect(dueMatchReminders(START.toISOString(), before(60)).map((o) => o.key)).toEqual(["P1D"]);
   });
@@ -78,14 +73,14 @@ describe("dueMatchReminders", () => {
   });
 
   it("expose un horizon égal au plus grand palier", () => {
-    expect(MATCH_REMINDER_HORIZON_MS).toBe(7 * 24 * 60 * MINUTE);
+    expect(MATCH_REMINDER_HORIZON_MS).toBe(24 * 60 * MINUTE);
   });
 
   it("lit une journée plus loin que l'horizon, pour que le premier palier soit atteignable", () => {
     // Une fenêtre de lecture égale à l'horizon ferait découvrir chaque manche à
-    // la seconde où le palier « une semaine » s'ouvre : il ne partirait jamais.
+    // la seconde où le palier 24 h s'ouvre : il ne partirait jamais.
     expect(MATCH_REMINDER_LOOKAHEAD_MS).toBeGreaterThan(MATCH_REMINDER_HORIZON_MS);
-    expect(MATCH_REMINDER_LOOKAHEAD_MS).toBe(8 * 24 * 60 * MINUTE);
+    expect(MATCH_REMINDER_LOOKAHEAD_MS).toBe(2 * 24 * 60 * MINUTE);
   });
 
   it("garde les paliers ordonnés du plus lointain au plus proche", () => {
@@ -96,23 +91,16 @@ describe("dueMatchReminders", () => {
 
 describe("openedMatchReminders", () => {
   it("ne retient rien tant qu'aucune fenêtre n'est ouverte", () => {
-    expect(openedMatchReminders(START, before(8 * 24 * 60))).toEqual([]);
+    expect(openedMatchReminders(START, before(3 * 24 * 60))).toEqual([]);
   });
 
-  it("retient le palier « une semaine » dès son ouverture", () => {
-    expect(openedMatchReminders(START, before(7 * 24 * 60)).map((o) => o.key)).toEqual(["P7D"]);
+  it("retient le palier 24 h dès son ouverture", () => {
+    expect(openedMatchReminders(START, before(24 * 60)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
-  it("retient tout ce qui est dépassé pour une date posée à trois jours", () => {
-    expect(openedMatchReminders(START, before(3 * 24 * 60)).map((o) => o.key)).toEqual(["P7D"]);
-  });
-
-  it("retient la semaine et les 24 h pour une date posée à cinq heures", () => {
-    expect(openedMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P7D", "P1D"]);
-  });
-
-  it("retient les deux paliers pour une date posée à trente minutes", () => {
-    expect(openedMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["P7D", "P1D"]);
+  it("retient le palier 24 h pour une date posée à cinq heures ou trente minutes", () => {
+    expect(openedMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P1D"]);
+    expect(openedMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
   it("ne retient rien une fois le match commencé", () => {
@@ -127,8 +115,12 @@ describe("openedMatchReminders", () => {
     expect(openedMatchReminders("pas une date", before(60))).toEqual([]);
   });
 
-  it("expose une marque d'observation distincte des paliers", () => {
-    expect(MATCH_REMINDER_OFFSETS.map((o) => o.key as string)).not.toContain(MATCH_SEEN_KEY);
+  it("expose des marques d'observation et d'envoi distinctes des paliers, tenant en huit caractères", () => {
+    const keys = MATCH_REMINDER_OFFSETS.map((o) => o.key as string);
+    expect(keys).not.toContain(MATCH_SEEN_KEY);
+    expect(keys).not.toContain(MATCH_TOLD_KEY);
+    expect(MATCH_TOLD_KEY).not.toBe(MATCH_SEEN_KEY);
+    expect(MATCH_TOLD_KEY.length).toBeLessThanOrEqual(8);
   });
 });
 
@@ -143,12 +135,10 @@ describe("buildMatchScheduleAnnouncement", () => {
   };
 
   it("porte la date plutôt qu'un délai, et annonce le prochain rappel", () => {
-    const message = buildMatchScheduleAnnouncement(context, [MATCH_REMINDER_OFFSETS[1]]);
+    const message = buildMatchScheduleAnnouncement(context, [MATCH_REMINDER_OFFSETS[0]]);
     expect(message).toContain("**Match programmé**");
     expect(message).toContain("20:00");
-    // Le prochain rappel est le plus lointain des paliers restants, pas le plus proche.
-    expect(message).toContain("Prochain rappel : 24 heures");
-    expect(message).not.toContain("dans une semaine");
+    expect(message).toContain("Prochain rappel : 24 heures avant le coup d'envoi.");
   });
 
   it("ne promet aucun rappel quand il n'en reste plus", () => {
@@ -172,13 +162,43 @@ describe("buildMatchScheduleAnnouncement", () => {
   it("ne nomme aucun joueur en tournoi individuel", () => {
     const solo = { ...context, teamName: "Kiro", opponentName: "Nova", solo: true };
     for (const message of [
-      buildMatchScheduleAnnouncement(solo, [MATCH_REMINDER_OFFSETS[1]], { rescheduled: true }),
-      buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[1], solo),
+      buildMatchScheduleAnnouncement(solo, [MATCH_REMINDER_OFFSETS[0]], { rescheduled: true }),
+      buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[0], solo),
     ]) {
       expect(message).toContain("**Ton match**");
       expect(message).not.toMatch(/Kiro|Nova/);
       expect(message).toContain("Coupe BlueGenji");
     }
+  });
+});
+
+describe("buildMatchScheduleClearedNotice", () => {
+  const context = {
+    tournamentName: "Coupe BlueGenji",
+    tournamentUrl: "https://bluegenji.fr/tournois/7",
+    teamName: "Les Renards",
+    opponentName: "Team Nova",
+    roundLabel: "Manche 2",
+    startAt: START,
+  };
+
+  it("dit l'horaire retiré, la manche et les deux engagées", () => {
+    const message = buildMatchScheduleClearedNotice(context);
+    expect(message.split("\n")[0]).toBe("**Horaire du match retiré**");
+    expect(message).toContain("Coupe BlueGenji · Manche 2");
+    expect(message).toContain("**Les Renards** contre **Team Nova**");
+    expect(message).toContain("Le coup d'envoi prévu ");
+    expect(message).toContain("(heure de Paris) est retiré : le nouvel horaire te sera annoncé.");
+    expect(message).toContain("https://bluegenji.fr/tournois/7");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel, et neutralise un nom piégé", () => {
+    const solo = buildMatchScheduleClearedNotice({ ...context, teamName: "Kiro", opponentName: "Nova", solo: true });
+    expect(solo).toContain("**Ton match**");
+    expect(solo).not.toMatch(/Kiro|Nova/);
+    expect(buildMatchScheduleClearedNotice({ ...context, teamName: "@everyone", tournamentUrl: null })).not.toContain(
+      "**@everyone**",
+    );
   });
 });
 
@@ -193,7 +213,7 @@ describe("buildMatchReminderMessage", () => {
   };
 
   it("nomme le palier, les deux engagées et l'horaire", () => {
-    const message = buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[1], context);
+    const message = buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[0], context);
     expect(message).toContain("dans 24 heures");
     expect(message).toContain("Coupe BlueGenji · Manche 2");
     expect(message).toContain("**Les Renards** contre **Team Nova**");
@@ -206,7 +226,7 @@ describe("buildMatchReminderMessage", () => {
       tournamentUrl: null,
     });
     expect(message).not.toContain("http");
-    expect(message).toContain("dans une semaine");
+    expect(message).toContain("dans 24 heures");
   });
 });
 

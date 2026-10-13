@@ -60,7 +60,7 @@ function world(
       return [[{ referee_scheduling: options.refereeScheduling ? 1 : 0 }]];
     }
     if (sql.startsWith("SELECT 1 FROM bg_match_reminders")) {
-      expect(params).toEqual([42, "ANNOUNCE", "P7D", "P1D"]);
+      expect(params).toEqual([42, "TOLD"]);
       return [options.announced ? [{ seen: 1 }] : []];
     }
     if (sql.startsWith("DELETE FROM bg_match_reminders") && options.failReminders) {
@@ -121,13 +121,31 @@ describe("setMatchStartAt", () => {
     expect(writes.find((w) => w.sql.startsWith("UPDATE bg_matches"))?.params[0]).toBeNull();
   });
 
-  it("efface les rappels déjà envoyés quand la date change vraiment", async () => {
+  it("efface les paliers quand la date change vraiment, et pose la marque d'observation dans le même geste", async () => {
     const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }) });
 
     await setMatchStartAt(42, "2026-08-30T18:30:00Z");
 
+    // Les marques d'observation et d'horaire reçu survivent au ménage…
     const reminders = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
-    expect(reminders?.params).toEqual([42]);
+    expect(reminders?.sql).toContain("offset_key NOT IN (?, ?)");
+    expect(reminders?.params).toEqual([42, "SEEN", "TOLD"]);
+    // … et l'observation est posée aussitôt : un balayage concurrent ne peut
+    // plus prendre l'annonce pour lui.
+    const seen = writes.find((w) => w.sql.startsWith("INSERT IGNORE INTO bg_match_reminders"));
+    expect(seen?.params).toEqual([42, "SEEN"]);
+    expect(writes.indexOf(seen!)).toBeGreaterThan(writes.indexOf(reminders!));
+  });
+
+  it("laisse le balayage annoncer une manche dont une engagée manque encore", async () => {
+    const { writes } = world({ row: matchRow({ team2_id: null, start_at: new Date("2026-08-29T18:30:00Z") }) });
+
+    await setMatchStartAt(42, "2026-08-30T18:30:00Z");
+
+    const reminders = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
+    expect(reminders?.sql).toContain("offset_key <> ?");
+    expect(reminders?.params).toEqual([42, "TOLD"]);
+    expect(writes.some((w) => w.sql.startsWith("INSERT IGNORE"))).toBe(false);
   });
 
   it("laisse les rappels en place quand la date est réécrite à l'identique", async () => {
@@ -165,10 +183,17 @@ describe("setMatchStartAt", () => {
     });
   });
 
-  it("garde les marques d'une date effacée, pour dire « reprogrammé » quand elle revient", async () => {
-    const cleared = world({ row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }) });
+  it("garde les marques d'une date effacée, et dit si les joueurs l'avaient reçue", async () => {
+    const cleared = world({ row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }), announced: true });
     await setMatchStartAt(42, null);
     expect(cleared.writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"))).toBe(false);
+    expect(notifyMatchScheduleChange).toHaveBeenLastCalledWith({
+      matchId: 42,
+      startAt: null,
+      previousStartAt: "2099-08-28T18:30:00.000Z",
+      alreadyAnnounced: true,
+      actor: null,
+    });
 
     const reset = world({ announced: true });
     await setMatchStartAt(42, FUTURE);

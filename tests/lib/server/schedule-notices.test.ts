@@ -8,8 +8,9 @@ jest.mock("@/lib/server/tournaments/match-reminders");
 import { getDatabase } from "@/lib/server/database";
 import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
-import { announceMatchSchedule } from "@/lib/server/tournaments/match-reminders";
+import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
 import {
+  isAnnounceableClearing,
   isAnnounceableSchedule,
   notifyMatchScheduleChange,
   type MatchScheduleChange,
@@ -53,6 +54,7 @@ function logLine(): string {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(announceMatchSchedule).mockResolvedValue(2);
+  jest.mocked(announceMatchScheduleCleared).mockResolvedValue(2);
   jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 1 });
 });
 
@@ -159,12 +161,18 @@ describe("notifyMatchScheduleChange — rien à annoncer", () => {
     expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
-  it("se tait pour une date effacée ou déjà passée", async () => {
+  it("se tait pour une date posée déjà passée", async () => {
     mockMatch();
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START }));
     await notifyMatchScheduleChange(change({ startAt: "2020-01-01T00:00:00.000Z" }));
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     expect(notifyStaff).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("se tait pour un effacement sans date d'avant", async () => {
+    mockMatch();
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: null, alreadyAnnounced: true }));
+    expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
     expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
@@ -218,6 +226,76 @@ describe("notifyMatchScheduleChange — vie privée et cas limites", () => {
     await expect(notifyMatchScheduleChange(change())).resolves.toBeUndefined();
 
     expect(notifyStaff).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+});
+
+describe("isAnnounceableClearing", () => {
+  const now = new Date("2099-01-01T00:00:00Z");
+
+  it("retient un horaire reçu par les joueurs et encore devant", () => {
+    expect(isAnnounceableClearing(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toBe(
+      true,
+    );
+  });
+
+  it("écarte un horaire jamais reçu, déjà passé, absent, ou une date posée", () => {
+    const cleared = { startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true };
+    expect(isAnnounceableClearing(change({ ...cleared, alreadyAnnounced: false }), now)).toBe(false);
+    expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: "2020-01-01T00:00:00.000Z" }), now)).toBe(false);
+    expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: null }), now)).toBe(false);
+    expect(isAnnounceableClearing(change({ previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toBe(false);
+  });
+});
+
+describe("notifyMatchScheduleChange — horaire retiré", () => {
+  it("prévient les joueurs qui l'avaient reçu et journalise, sans pousser aux arbitres", async () => {
+    mockMatch();
+
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+
+    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(42, OLD_START);
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(notifyStaff).not.toHaveBeenCalled();
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
+    const line = logLine();
+    expect(line).toMatch(/^🗓️ Horaire retiré — « Coupe BlueGenji » \(#7\)/u);
+    expect(line).toContain("Les Renards vs Team Nova (#42), le coup d'envoi du ");
+    expect(line).toContain("(heure de Paris) est retiré, par le staff.");
+    expect(line).not.toContain(ACTOR.pseudo);
+  });
+
+  it("journalise sans prévenir les joueurs d'un horaire qu'ils n'avaient pas reçu", async () => {
+    mockMatch();
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: false }));
+    expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
+    expect(logLine()).toContain("Horaire retiré");
+  });
+
+  it("ne journalise rien sans auteur, mais prévient les joueurs", async () => {
+    mockMatch();
+    await notifyMatchScheduleChange(
+      change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, actor: null }),
+    );
+    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(42, OLD_START);
+    expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("ne nomme aucun joueur au journal en tournoi individuel", async () => {
+    mockMatch({ ...ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    expect(logLine()).toContain("un joueur vs un joueur");
+    expect(logLine()).not.toMatch(/Kiro|Nova/);
+  });
+
+  it("n'échoue jamais, même si l'avis aux joueurs échoue", async () => {
+    mockMatch();
+    jest.mocked(announceMatchScheduleCleared).mockRejectedValue(new Error("bot éteint"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(
+      notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true })),
+    ).resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
     error.mockRestore();
   });

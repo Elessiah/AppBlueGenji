@@ -6,6 +6,7 @@ jest.mock("@/lib/server/push-subscriptions");
 
 import {
   announceMatchSchedule,
+  announceMatchScheduleCleared,
   dispatchDueMatchReminders,
   resetMatchReminderThrottle,
 } from "@/lib/server/tournaments/match-reminders";
@@ -16,6 +17,7 @@ import { resolvePush } from "../../helpers/push";
 
 const START = new Date("2026-09-10T18:00:00Z");
 const ONE_HOUR_BEFORE = new Date("2026-09-10T17:00:00Z");
+const FIVE_HOURS_BEFORE = new Date("2026-09-10T13:00:00Z");
 const THREE_DAYS_BEFORE = new Date("2026-09-07T18:00:00Z");
 const TEN_DAYS_BEFORE = new Date("2026-08-31T18:00:00Z");
 
@@ -120,7 +122,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(recipientsB.map((r) => r.label)).toEqual(["Nova"]);
   });
 
-  it("réserve le palier avant d'envoyer", async () => {
+  it("réserve le palier avant d'envoyer, puis marque l'horaire comme reçu", async () => {
     const { execute } = await mockDb({});
 
     await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
@@ -128,6 +130,14 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_reminders/);
     expect(params).toEqual([31, "P1D"]);
+    expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
+  });
+
+  it("ne marque rien comme reçu quand aucune engagée n'a de destinataire", async () => {
+    const { execute } = await mockDb({ recipients: [] });
+
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(claimedKeys(execute)).toEqual(["P1D"]);
   });
 
   it("n'envoie rien quand une autre requête a déjà pris le palier", async () => {
@@ -147,7 +157,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   });
 
   it("n'envoie plus de rappel « 1 h avant » : la dernière heure est silencieuse", async () => {
-    // Les 24 h sont parties ; une ancienne ligne `PT1H` peut rester en base.
+    // Les 24 h sont parties ; d'anciennes lignes `P7D` / `PT1H` peuvent rester en base.
     const { execute } = await mockDb({
       sent: [
         ...SEEN,
@@ -162,12 +172,12 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
-  it("garde le rappel « une semaine » à son ouverture", async () => {
+  it("n'envoie plus de rappel « une semaine » : rien avant les 24 h", async () => {
     const { execute } = await mockDb({});
 
-    expect(await dispatchDueMatchReminders(new Date("2026-09-03T18:00:00Z"))).toBe(2);
-    expect(claimedKeys(execute)).toEqual(["P7D"]);
-    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).title).toBe("Match dans une semaine");
+    expect(await dispatchDueMatchReminders(new Date("2026-09-03T18:00:00Z"))).toBe(0);
+    expect(execute).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
   });
 
   it("ne fait rien quand aucune manche n'est dans l'horizon", async () => {
@@ -215,10 +225,10 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const [sql] = query.mock.calls[0] as unknown as [string];
     expect(sql).toMatch(/m\.start_at > NOW\(\)/);
     // Fenêtre de lecture = horizon + une journée de marge, pour que la manche
-    // soit observée avant que le palier « une semaine » ne s'ouvre.
+    // soit observée avant que le palier 24 h ne s'ouvre.
     expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
     const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
-    expect(params).toEqual([8 * 24 * 60 * 60]);
+    expect(params).toEqual([2 * 24 * 60 * 60]);
     expect(sql).toMatch(/m\.status <> 'COMPLETED'/);
     // Jointure interne sur les deux engagées : un bye n'est pas un match.
     expect(sql).toMatch(/JOIN bg_teams t1/);
@@ -236,12 +246,12 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 });
 
 describe("dispatchDueMatchReminders — date posée tardivement", () => {
-  it("annonce la date au lieu d'un « dans une semaine » mensonger", async () => {
-    // Manche découverte à J-3 : la fenêtre du palier « une semaine » est ouverte,
+  it("annonce la date au lieu d'un « dans 24 heures » mensonger", async () => {
+    // Manche découverte à cinq heures : la fenêtre du palier 24 h est ouverte,
     // mais ce qu'il annoncerait est faux.
     await mockDb({ sent: [] });
 
-    expect(await dispatchDueMatchReminders(THREE_DAYS_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
 
     const [, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0] as [
       string,
@@ -251,27 +261,27 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
     expect(context).toBe("match-scheduled");
     for (const message of sentMessages()) {
       expect(message).toContain("**Match programmé**");
-      expect(message).not.toContain("dans une semaine");
-      expect(message).toContain("Prochain rappel : 24 heures");
+      expect(message).not.toContain("dans 24 heures");
+      expect(message).not.toContain("Prochain rappel");
     }
   });
 
-  it("consomme les paliers dépassés en même temps qu'elle annonce", async () => {
+  it("consomme le palier dépassé en même temps qu'elle annonce", async () => {
     const { execute } = await mockDb({ sent: [] });
 
-    await dispatchDueMatchReminders(THREE_DAYS_BEFORE);
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
 
     // La marque d'observation d'abord — c'est elle qui fait verrou —, puis le
-    // seul palier déjà ouvert. Les deux autres restent devant.
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D", "ANNOUNCE"]);
+    // palier déjà ouvert, puis la marque d'un horaire reçu.
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "TOLD"]);
   });
 
-  it("consomme tous les paliers pour une date posée à moins d'une heure", async () => {
+  it("consomme le palier pour une date posée à moins d'une heure", async () => {
     const { execute } = await mockDb({ sent: [] });
 
     expect(await dispatchDueMatchReminders(new Date("2026-09-10T17:30:00Z"))).toBe(2);
 
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D", "P1D", "ANNOUNCE"]);
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "TOLD"]);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match programmé**");
       expect(message).not.toContain("Prochain rappel");
@@ -290,7 +300,7 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
   it("laisse la manche au passage suivant si une autre requête l'observe d'abord", async () => {
     const { execute } = await mockDb({ sent: [], claimed: false });
 
-    expect(await dispatchDueMatchReminders(THREE_DAYS_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
     expect(claimedKeys(execute)).toEqual(["SEEN"]);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
@@ -323,11 +333,12 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(sql).toMatch(/m\.id = \?/);
     expect(sql).not.toMatch(/DATE_ADD/);
     expect(params).toEqual([31]);
-    // La marque d'observation et celle de l'annonce partie : les deux rappels restent devant.
-    expect(claimedKeys(execute)).toEqual(["SEEN", "ANNOUNCE"]);
+    // La marque d'observation est posée par `setMatchStartAt` : seule celle de
+    // l'horaire reçu ici, le rappel 24 h reste devant.
+    expect(claimedKeys(execute)).toEqual(["TOLD"]);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match programmé**");
-      expect(message).toContain("Prochain rappel : une semaine");
+      expect(message).toContain("Prochain rappel : 24 heures");
     }
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("match-scheduled");
   });
@@ -336,10 +347,10 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     const { execute } = await mockAnnounceDb();
 
     expect(
-      await announceMatchSchedule(31, { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" }, THREE_DAYS_BEFORE),
+      await announceMatchSchedule(31, { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" }, FIVE_HOURS_BEFORE),
     ).toBe(2);
 
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D", "ANNOUNCE"]);
+    expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
     expect(sentMessages()).toHaveLength(2);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match reprogrammé**");
@@ -394,12 +405,92 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(pushToUsers).not.toHaveBeenCalled();
   });
 
-  it("se tait si un balayage concurrent a déjà posé la marque", async () => {
+  it("se tait si un balayage concurrent a déjà envoyé le rappel ouvert, qui porte la nouvelle date", async () => {
     const { execute } = await mockAnnounceDb({ claimed: false });
 
-    expect(await announceMatchSchedule(31, { rescheduled: true }, THREE_DAYS_BEFORE)).toBe(0);
-    expect(claimedKeys(execute)).toEqual(["SEEN"]);
+    expect(await announceMatchSchedule(31, { rescheduled: true }, FIVE_HOURS_BEFORE)).toBe(0);
+    expect(claimedKeys(execute)).toEqual(["P1D"]);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("ne réserve pas la marque d'observation : `setMatchStartAt` l'a posée", async () => {
+    const { execute } = await mockAnnounceDb();
+    await announceMatchSchedule(31, { rescheduled: false }, THREE_DAYS_BEFORE);
+    expect(claimedKeys(execute)).not.toContain("SEEN");
+  });
+});
+
+describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () => {
+  async function mockClearedDb(options: { matches?: unknown[]; recipients?: Recipient[] } = {}) {
+    const recipients = options.recipients ?? RECIPIENTS;
+    const query = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([options.matches ?? [{ ...MATCH, start_at: null }]])
+      .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+    const execute = jest.fn<() => Promise<unknown>>().mockResolvedValue([{ affectedRows: 1 }]);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
+    return { query, execute };
+  }
+
+  it("prévient les deux engagées, par Discord et par push, dans la langue de chacun", async () => {
+    const { query, execute } = await mockClearedDb();
+
+    expect(await announceMatchScheduleCleared(31, "2026-09-10T18:00:00.000Z")).toBe(2);
+
+    // La manche se lit sans horaire : il vient d'être effacé.
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).not.toMatch(/start_at IS NOT NULL/);
+    expect(sql).toMatch(/m\.status <> 'COMPLETED'/);
+    expect(params).toEqual([31]);
+    // Les marques restent : aucune écriture.
+    expect(execute).not.toHaveBeenCalled();
+
+    const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][2]).toBe("match-scheduled");
+    expect(calls[0][0]).toContain("**Horaire du match retiré**");
+    expect(calls[0][0]).toContain("**Les Renards** contre **Team Nova**");
+    expect(calls[0][0]).toContain("jeudi 10 septembre à 20:00 (heure de Paris) est retiré");
+
+    const pushes = jest.mocked(pushToUsers).mock.calls;
+    expect(pushes.map((call) => call[0])).toEqual([[1, 2], [3]]);
+    expect(pushes.map((call) => call[1])).toEqual(["MATCH_REMINDER", "MATCH_REMINDER"]);
+    expect(resolvePush(pushes[0][2]).title).toBe("Horaire du match retiré");
+    expect(resolvePush(pushes[1][2]).body).toContain("Team Nova contre Les Renards");
+    expect(resolvePush(pushes[0][2], "en").title).toBe("Match time removed");
+    expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel", async () => {
+    await mockClearedDb({
+      matches: [{ ...MATCH, start_at: null, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" }],
+      recipients: [
+        { team_id: 101, id: 1, pseudo: "Kiro", discord_id: "555000111", discord_pseudo: "kiro" },
+        { team_id: 102, id: 3, pseudo: "Nova", discord_id: "555000333", discord_pseudo: "nova" },
+      ],
+    });
+
+    expect(await announceMatchScheduleCleared(31, "2026-09-10T18:00:00.000Z")).toBe(2);
+
+    for (const [message] of jest.mocked(pushDiscordDirectMessages).mock.calls) {
+      expect(message).toContain("**Ton match**");
+      expect(message).not.toMatch(/Kiro|Nova/);
+    }
+    for (const [, , content] of jest.mocked(pushToUsers).mock.calls) {
+      for (const locale of ["fr", "en"] as const) {
+        const { title, body } = resolvePush(content, locale);
+        expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
+      }
+    }
+  });
+
+  it("ne fait rien pour une manche jouée ou sans ses deux engagées", async () => {
+    await mockClearedDb({ matches: [] });
+    expect(await announceMatchScheduleCleared(31, "2026-09-10T18:00:00.000Z")).toBe(0);
+    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 });
