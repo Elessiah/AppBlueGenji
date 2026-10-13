@@ -764,8 +764,10 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
   const teamIds = [
     ...new Set(departures.flatMap((departure) => [departure.teamId, departure.opponentId ?? departure.teamId])),
   ];
-  // Trois branches réunies, chacune sur son index (clé, tournoi + place) :
-  // un `OR` entre index différents pousserait à balayer la table.
+  // Trois branches réunies : la clé primaire, puis les rencontres des
+  // sortantes par place (index des clés étrangères `team1_id` / `team2_id` —
+  // une équipe joue peu de rencontres —, filtrées sur le tournoi). Un `OR`
+  // entre la clé et ces index pousserait à balayer la table.
   const columns = "id, tournament_id, phase_id, bracket, round_number, team1_id, team2_id, start_at";
   const inTournaments = `tournament_id IN (${sqlPlaceholders(tournamentIds.length)})`;
   const [currentRows] = await db.query<CurrentMatchRow[]>(
