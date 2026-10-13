@@ -1,6 +1,14 @@
-import { describe, expect, it } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("@/lib/server/tournaments/departed-notices");
+
 import type { PoolConnection } from "mysql2/promise";
 import { detachDownstreamOutcome } from "@/lib/server/tournaments/bracket-cascade";
+import { noteDepartedEntrant } from "@/lib/server/tournaments/departed-notices";
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 /**
  * Effets en cascade d'une correction dans un tableau à élimination : ce que
@@ -210,10 +218,18 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
 
   it("efface les marques de rappel de l'affiche quittée : la remplaçante recevra l'annonce", async () => {
     const { conn, forgotten } = board([row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 })]);
+    // L'horaire tenu par la sortante se lit avant l'effacement des marques.
+    let forgottenWhenNoted: number[] | null = null;
+    jest.mocked(noteDepartedEntrant).mockImplementation(async () => {
+      forgottenWhenNoted = [...forgotten];
+    });
 
     await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: null, loserTeamId: null });
 
     expect(forgotten).toEqual([2]);
+    // L'engagée 7 quitte la place 1 de la manche 2 : son avis est noté.
+    expect(noteDepartedEntrant).toHaveBeenCalledWith(conn, 2, 7, 1);
+    expect(forgottenWhenNoted).toEqual([]);
   });
 
   it("garde les marques quand le créneau garde son engagée", async () => {
@@ -222,6 +238,7 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: null });
 
     expect(forgotten).toEqual([]);
+    expect(noteDepartedEntrant).not.toHaveBeenCalled();
   });
 
   it("vide aussi le créneau de perdant d'une double élimination", async () => {
@@ -241,6 +258,10 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     expect(get(5).status).toBe("PENDING");
     // Les marques des deux affiches quittées partent en une seule instruction.
     expect(forgotten).toEqual([2, 5]);
+    expect(jest.mocked(noteDepartedEntrant).mock.calls.map(([, ...rest]) => rest)).toEqual([
+      [2, 7, 1],
+      [5, 8, 1],
+    ]);
     expect(forgetCalls()).toBe(1);
   });
 });

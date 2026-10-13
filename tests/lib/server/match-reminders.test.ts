@@ -6,6 +6,7 @@ jest.mock("@/lib/server/push-subscriptions");
 
 import {
   announceMatchSchedule,
+  announceEntrantWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
   resetMatchReminderThrottle,
@@ -851,5 +852,89 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
     }
     expect(pushToUsers).not.toHaveBeenCalled();
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+});
+
+describe("announceEntrantWithdrawn — engagée retirée par une correction de score", () => {
+  const WITHDRAWN_ROW = {
+    id: 31,
+    tournament_id: 7,
+    tournament_name: "Coupe BlueGenji",
+    participant_type: "TEAM",
+    bracket: "UPPER",
+    round_number: 2,
+    swiss_round: 0,
+    departed_name: "Les Renards",
+    opponent_name: "Team Nova",
+  };
+  const DEPARTED = { matchId: 31, teamId: 101, slot: 1 as const, heldStartAt: START };
+
+  async function mockWithdrawnDb(row: object | null = WITHDRAWN_ROW, recipients: Recipient[] = RECIPIENTS) {
+    const query = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([row ? [row] : []])
+      .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: jest.fn() }));
+    return query;
+  }
+
+  it("prévient les seuls joueurs de l'engagée retirée, par Discord et par push, dans la langue de chacun", async () => {
+    const query = await mockWithdrawnDb();
+
+    expect(await announceEntrantWithdrawn(DEPARTED)).toBe(1);
+
+    // L'ancien adversaire est l'occupant de l'autre place.
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain("LEFT JOIN bg_teams o ON o.id = m.team2_id");
+    expect(params).toEqual([101, 31]);
+    const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][2]).toBe("match-withdrawn");
+    expect(calls[0][0]).toContain("**Match retiré de ton programme**");
+    expect(calls[0][0]).toContain("**Les Renards** contre **Team Nova**");
+    expect(calls[0][0]).toContain("l'horaire du jeudi 10 septembre à 20:00 (heure de Paris) ne te concerne plus.");
+
+    const pushes = jest.mocked(pushToUsers).mock.calls;
+    expect(pushes.map((call) => call[0])).toEqual([[1, 2]]);
+    expect(pushes[0][1]).toBe("MATCH_REMINDER");
+    expect(resolvePush(pushes[0][2]).title).toBe("Match retiré de ton programme");
+    expect(resolvePush(pushes[0][2]).tag).toBe("rencontre-31-reminder");
+    expect(resolvePush(pushes[0][2], "en").title).toBe("Match removed from your schedule");
+    expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel, et lit l'autre place pour une sortante en place 2", async () => {
+    const query = await mockWithdrawnDb({ ...WITHDRAWN_ROW, participant_type: "SOLO", departed_name: "Kiro", opponent_name: "Nova" });
+
+    await announceEntrantWithdrawn({ ...DEPARTED, slot: 2 });
+
+    expect(String((query.mock.calls[0] as unknown as [string])[0])).toContain("LEFT JOIN bg_teams o ON o.id = m.team1_id");
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("**Ton match**");
+    expect(message).not.toMatch(/Kiro|Nova/);
+    for (const locale of ["fr", "en"] as const) {
+      const { title, body } = resolvePush(jest.mocked(pushToUsers).mock.calls[0][2], locale);
+      expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
+    }
+  });
+
+  it("dit « Ronde N » en ronde suisse, et « TBD » quand l'autre place est vide", async () => {
+    await mockWithdrawnDb({ ...WITHDRAWN_ROW, swiss_round: 1, opponent_name: null });
+    await announceEntrantWithdrawn(DEPARTED);
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("Coupe BlueGenji · Ronde 2");
+    expect(message).toContain("**Les Renards** contre **TBD**");
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2], "en").body).toContain("Round 2");
+  });
+
+  it("ne fait rien pour une manche disparue ou une engagée sans joueur à prévenir", async () => {
+    await mockWithdrawnDb(null);
+    expect(await announceEntrantWithdrawn(DEPARTED)).toBe(0);
+    await mockWithdrawnDb(WITHDRAWN_ROW, []);
+    expect(await announceEntrantWithdrawn(DEPARTED)).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
   });
 });

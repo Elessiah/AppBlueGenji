@@ -11,6 +11,7 @@ import {
   buildMatchReminderMessage,
   buildMatchScheduleAnnouncement,
   buildMatchScheduleClearedNotice,
+  buildMatchWithdrawnNotice,
   dueMatchReminders,
   formatMatchStart,
   matchRoundLabel,
@@ -169,6 +170,36 @@ describe("buildMatchScheduleAnnouncement", () => {
       expect(message).not.toMatch(/Kiro|Nova/);
       expect(message).toContain("Coupe BlueGenji");
     }
+  });
+});
+
+describe("buildMatchWithdrawnNotice", () => {
+  const context = {
+    tournamentName: "Coupe BlueGenji",
+    tournamentUrl: "https://bluegenji.fr/tournois/7",
+    teamName: "Les Renards",
+    opponentName: "Team Nova",
+    roundLabel: "Manche 2",
+    startAt: START,
+  };
+
+  it("dit à l'engagée retirée que l'horaire reçu ne la concerne plus", () => {
+    const message = buildMatchWithdrawnNotice(context);
+    expect(message.split("\n")[0]).toBe("**Match retiré de ton programme**");
+    expect(message).toContain("Coupe BlueGenji · Manche 2");
+    expect(message).toContain("**Les Renards** contre **Team Nova**");
+    expect(message).toContain("Après une correction de score, tu ne joues plus ce match : l'horaire du ");
+    expect(message).toContain("(heure de Paris) ne te concerne plus.");
+    expect(message).toContain("https://bluegenji.fr/tournois/7");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel, et neutralise un nom piégé", () => {
+    const solo = buildMatchWithdrawnNotice({ ...context, teamName: "Kiro", opponentName: "Nova", solo: true });
+    expect(solo).toContain("**Ton match**");
+    expect(solo).not.toMatch(/Kiro|Nova/);
+    expect(buildMatchWithdrawnNotice({ ...context, teamName: "@everyone", tournamentUrl: null })).not.toContain(
+      "@everyone",
+    );
   });
 });
 
