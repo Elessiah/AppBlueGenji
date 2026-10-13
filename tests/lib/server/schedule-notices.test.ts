@@ -249,10 +249,13 @@ describe("notifyMatchScheduleChange — arbitre engagé dans le match", () => {
 });
 
 describe("notifyMatchScheduleChange — match déjà joué", () => {
-  it("journalise une date posée sur un match joué, sans prévenir les arbitres", async () => {
-    mockMatch({ ...ROW, status: "COMPLETED" });
-    await notifyMatchScheduleChange(change());
-    expect(logLine()).toContain("Match programmé");
+  it("journalise une date posée sur un match joué ou au score saisi, sans prévenir les arbitres", async () => {
+    for (const status of ["COMPLETED", "AWAITING_CONFIRMATION"]) {
+      jest.mocked(publishStaffAction).mockClear();
+      mockMatch({ ...ROW, status });
+      await notifyMatchScheduleChange(change());
+      expect(logLine()).toContain("Match programmé");
+    }
     expect(notifyStaff).not.toHaveBeenCalled();
   });
 });

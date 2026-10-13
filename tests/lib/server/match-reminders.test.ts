@@ -264,7 +264,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
     const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     expect(params).toEqual([2 * 24 * 60 * 60]);
-    expect(sql).toMatch(/m\.status <> 'COMPLETED'/);
+    expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
     // Jointure interne sur les deux engagées : un bye n'est pas un match.
     expect(sql).toMatch(/JOIN bg_teams t1/);
     expect(sql).toMatch(/JOIN bg_teams t2/);
@@ -498,7 +498,7 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
     // La manche se lit sans horaire : il vient d'être effacé.
     const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).not.toMatch(/start_at IS NOT NULL/);
-    expect(sql).toMatch(/m\.status <> 'COMPLETED'/);
+    expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
     expect(params).toEqual([31]);
     // Les marques restent : aucune écriture.
     expect(execute).not.toHaveBeenCalled();
