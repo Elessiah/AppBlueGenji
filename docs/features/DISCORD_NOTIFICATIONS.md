@@ -120,7 +120,8 @@ ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 2026-10-13). Quand une correction sort une engagée d'une manche
 (`pushTeamToTarget` remplace l'occupant — seule implémentation, dans
 `lib/server/tournaments/target-slot.ts`, que les exemptions empruntent aussi ;
-deux instructions par pose, la place et le statut écrits ensemble —,
+deux instructions par pose, la place et le statut écrits ensemble, le statut
+calculé par la base sur la valeur actuelle de l'autre place —,
 `detachDownstreamOutcome` vide une place), ses joueurs apprennent que l'horaire reçu ne les concerne plus :
 « **Match retiré de ton programme** » / "Match removed from your schedule" —
 message privé Discord (français, « Ton match » en tournoi individuel, aucun
@@ -327,8 +328,10 @@ réservées (`PlannedSend.claimed` : observation, palier) — sans quoi le rappe
 ou l'annonce, serait consommé sans message et jamais retenté. Chaque marque
 réservée retient l'horaire pour lequel elle l'est (`bg_match_reminders.start_at`,
 recopié de la manche ; `setMatchStartAt` y date l'observation), et seul l'envoi
-de cet horaire la rend (`start_at <=> ?`) : un ancien envoi en échec n'efface
-pas les marques d'un changement plus récent. Une réservation vérifie aussi les
+de cet horaire la rend (`start_at <=> ?`, `releaseDatedMarks` dans
+`reminder-marks.ts`, seul chemin de rendu) : un ancien envoi en échec n'efface
+pas les marques d'un changement plus récent. Un passage du balayage en échec
+est écrit dans pm2. Une réservation vérifie aussi les
 engagées de la manche ; si `schedule-notices` ne peut relire la manche après
 le commit, il rend l'observation de la date, et le balayage l'annoncera (un
 redémarrage dans cet intervalle reste une limite connue : seul le rappel 24 h
