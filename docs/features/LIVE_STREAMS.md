@@ -146,19 +146,26 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
 - **Un message par diffusion, pas par match** : les matchs d'un même tournoi
   qu'un même balayage trouve à l'antenne sur le **même lien** (une ronde
   lancée d'un coup, repliée sur la chaîne officielle) partent en un seul
-  message — « 🔴 En direct : A contre B et C contre D — Tournoi » ; en tournoi
-  individuel, « 🔴 En direct : 2 matchs — Tournoi ». Chaque affiche garde sa
-  réservation. Deux matchs **à la suite** restent deux annonces.
+  message : « 🔴 En direct — Tournoi : » puis une affiche par ligne
+  (« • A contre B ») — un nom d'équipe peut contenir « et » ou une virgule,
+  jamais un saut de ligne ; passé 1 500 caractères
+  (`LIVE_ANNOUNCEMENT_MAX_LENGTH`), une dernière ligne compte le reste
+  (« • et 3 autres matchs ») plutôt que de laisser le bot couper un nom. En
+  tournoi individuel, « 🔴 En direct : 2 matchs — Tournoi ». Chaque affiche
+  garde sa réservation. Deux matchs **à la suite** restent deux annonces.
 - **Une annonce par match et par affiche** : `bg_live_announcements`
   (clé unique `(match_id, pairing)`) est réservée **avant** l'appel au bot.
   Un balayage concurrent, un rafraîchissement, une relecture du flux, un direct
   coupé puis relancé, un lancement annulé puis refait (horaire changé) ne
   repostent jamais. La réservation n'est **rendue** que si rien n'est parti —
   bot injoignable ou d'une version antérieure, salon fermé (`503`), panne
-  (`500`), délai dépassé — et le balayage suivant réessaie tant que le match
-  est à l'antenne ; un succès (même sans mention) ou un refus du corps
-  (`400`) la garde. Le bot répond **avant** d'écrire au canal de logs : un
-  canal lent ne fait pas croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
+  (`500`) — et le balayage suivant réessaie tant que le match a commencé
+  depuis moins de deux heures ; un succès (même sans mention) ou un refus du
+  corps (`400`) la garde. Un **délai dépassé** (15 s) la garde aussi : le bot a
+  pu publier quand même, et une annonce perdue vaut mieux qu'un second
+  `@everyone` à tout le serveur (`uncertain`, `console.error` dans pm2). Le bot
+  répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
+  croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
   du bot : un salon fermé ne doit pas suspendre les rappels de fond ; côté
   bot, chaque incident n'est signalé au canal de logs qu'une fois par heure.
   Elle part avec la ligne du match (suppression du
@@ -200,9 +207,12 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   mention n'a pas pu partir — identifiants seuls) ; l'annonce naît d'un
   balayage, pas d'un geste du staff, donc aucune ligne `staff-audit`. Un report
   est averti dans pm2 au plus une fois par heure et par cause, distincte :
-  « salon #live fermé au bot » (`503`) ou « bot injoignable ou d'une version
-  sans annonces ». Côté bot, un refus ou une permission manquante est signalé
-  dans le canal de logs, au plus une fois par heure par incident.
+  « salon #live fermé au bot » (`503`) ou « bot injoignable, en panne ou d'une
+  version sans annonces » ; passé deux heures, le match n'est plus réessayé.
+  Un refus du corps (`400`) ou un délai dépassé n'est tracé que dans pm2
+  (`console.error`). Côté bot, un salon fermé, une panne ou une permission
+  manquante est signalé dans le canal de logs, au plus une fois par heure par
+  incident.
 - **Production — permissions Discord** dans #live : « Voir le salon »,
   « Envoyer des messages », « Mentionner @everyone, @here et tous les rôles »
   et « Intégrer des liens ». Sans la mention, le message part sans notifier ;
