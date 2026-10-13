@@ -205,7 +205,8 @@ async function announce(group: AnnouncementGroup): Promise<number> {
   });
   const ids = matchIdsOf(group);
   const plural = group.rows.length > 1;
-  const label = `${plural ? `matchs ${ids}` : `match ${ids}`} (tournoi ${Number(first.tournament_id)})`;
+  const noun = plural ? "matchs" : "match";
+  const label = `${noun} ${ids} (tournoi ${Number(first.tournament_id)})`;
   const context = `live-announce match-${group.rows.map((row) => Number(row.id)).join(",")}`;
   const outcome = await pushLiveAnnouncement(message, group.url, context);
   if (outcome === "posted" || outcome === "posted-silent") {
