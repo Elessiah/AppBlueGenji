@@ -180,6 +180,18 @@ async function closeToldMark(told: ToldMark | null, delivered: boolean): Promise
   if (!told.claimed && delivered) await updateToldMark(told.matchId, told.startAt);
 }
 
+/**
+ * Un avis de retrait parti : les joueurs ne tiennent plus d'horaire. La marque
+ * reste (une date suivante se dira « reprogrammée »), sans horaire à citer.
+ */
+async function forgetToldTime(matchId: number): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(`UPDATE bg_match_reminders SET start_at = NULL WHERE match_id = ? AND offset_key = ?`, [
+    matchId,
+    MATCH_TOLD_KEY,
+  ]);
+}
+
 /** Réserve la marque d'horaire reçu, avec l'horaire envoyé. `false` : elle existait. */
 async function claimToldMark(matchId: number, startAt: Date): Promise<boolean> {
   const db = await getDatabase();
@@ -366,6 +378,7 @@ async function dispatchPlannedSend(
     if ((report.discord?.sent ?? 0) > 0 || report.pushed > 0) delivered = true;
   }
   await closeToldMark(told, delivered);
+  if (clearedStartAt && delivered) await forgetToldTime(Number(match.id));
   return dispatched;
 }
 

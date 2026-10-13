@@ -280,10 +280,16 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
     return;
   }
   if (startAt === change.previousStartAt) return;
-  // Une date déjà passée (correction d'archive) n'est que journalisée.
+  // Une date déjà passée (correction d'archive) n'est que journalisée. Une
+  // date rendue à l'horaire que les joueurs tiennent déjà (après une saisie de
+  // travers seulement journalisée) ne leur apprend rien : ils n'en reçoivent
+  // pas d'annonce.
   const announceable = isAnnounceableSchedule(change);
+  const playersAlreadyHoldIt = change.alreadyAnnounced && change.toldStartAt === startAt;
   const results = await Promise.allSettled([
-    announceable ? announceMatchSchedule(change.matchId, playerAnnouncement(change)) : Promise.resolve(0),
+    announceable && !playersAlreadyHoldIt
+      ? announceMatchSchedule(change.matchId, playerAnnouncement(change))
+      : Promise.resolve(0),
     notifyReferees({ ...change, startAt }, announceable),
   ]);
   for (const result of results) {
