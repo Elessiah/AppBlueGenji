@@ -147,6 +147,11 @@ async function resetReminderMarks(
     if (isMissingTableError(error)) return NOTHING_TOLD;
     throw error;
   }
+  const result: ToldSchedule =
+    told.length > 0 ? { alreadyAnnounced: true, toldStartAt: toIso(told[0].start_at) } : NOTHING_TOLD;
+  // Rendue à l'horaire que les joueurs tiennent : rien à réannoncer, et le
+  // rappel déjà parti pour lui ne doit pas repartir — les marques restent.
+  if (result.toldStartAt !== null && result.toldStartAt === startAt) return result;
   if (startAt !== null && bothEntrants) {
     await connection.execute(
       `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
@@ -162,7 +167,7 @@ async function resetReminderMarks(
       MATCH_TOLD_KEY,
     ]);
   }
-  return told.length > 0 ? { alreadyAnnounced: true, toldStartAt: toIso(told[0].start_at) } : NOTHING_TOLD;
+  return result;
 }
 
 type ToldRow = RowDataPacket & { start_at: Date | string | null };

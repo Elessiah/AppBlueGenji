@@ -152,41 +152,55 @@ async function claimReminder(matchId: number, offsetKey: string): Promise<boolea
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
-type ToldMark = { matchId: number; startAt: Date; claimed: boolean };
+/**
+ * La marque d'horaire reçu pendant un envoi : posée (ou mise à jour) **avant**
+ * l'envoi — un arbitre qui corrige sa saisie dans la seconde lit déjà le nouvel
+ * horaire —, puis rendue à son état d'avant si rien n'a abouti.
+ */
+type ToldMark = { matchId: number; claimed: boolean; previous: Date | null };
+
+type ToldStartRow = RowDataPacket & { start_at: Date | string | null };
 
 /**
- * Ouvre la marque d'horaire reçu avant l'envoi, avec l'horaire envoyé (`start_at`) :
- * c'est lui que les joueurs tiendront, et qu'une date suivante citera. `null` :
- * personne à prévenir.
+ * Pose la marque avec l'horaire envoyé (`null` pour un avis de retrait : les
+ * joueurs ne tiendront plus d'horaire). Une marque déjà là garde de quoi être
+ * rendue. `null` : personne à prévenir.
  */
 async function openToldMark(
   match: ScheduledMatchRow,
   recipientsByTeam: Map<number, NotificationRecipient[]>,
+  toldStart: Date | null,
 ): Promise<ToldMark | null> {
   const hasRecipients = matchSides(match).some((side) => (recipientsByTeam.get(side.teamId) ?? []).length > 0);
   if (!hasRecipients) return null;
   const matchId = Number(match.id);
-  const startAt = new Date(match.start_at);
-  return { matchId, startAt, claimed: await claimToldMark(matchId, startAt) };
-}
-
-/**
- * Referme la marque après l'envoi : réservée pour rien (rien n'a abouti), elle
- * est rendue ; déjà là (un horaire reçu avant), elle prend le nouveau s'il est parti.
- */
-async function closeToldMark(told: ToldMark | null, delivered: boolean): Promise<void> {
-  if (!told) return;
-  if (told.claimed && !delivered) await releaseReminder(told.matchId, MATCH_TOLD_KEY);
-  if (!told.claimed && delivered) await updateToldMark(told.matchId, told.startAt);
-}
-
-/**
- * Un avis de retrait parti : les joueurs ne tiennent plus d'horaire. La marque
- * reste (une date suivante se dira « reprogrammée »), sans horaire à citer.
- */
-async function forgetToldTime(matchId: number): Promise<void> {
   const db = await getDatabase();
-  await db.execute(`UPDATE bg_match_reminders SET start_at = NULL WHERE match_id = ? AND offset_key = ?`, [
+  const [rows] = await db.execute<ToldStartRow[]>(
+    `SELECT start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
+    [matchId, MATCH_TOLD_KEY],
+  );
+  if (rows.length === 0) {
+    // Un avis de retrait suppose la marque : sans elle, rien à poser.
+    if (toldStart === null) return null;
+    return { matchId, claimed: await claimToldMark(matchId, toldStart), previous: null };
+  }
+  const previous = rows[0].start_at === null ? null : new Date(rows[0].start_at);
+  await setToldTime(matchId, toldStart);
+  return { matchId, claimed: false, previous };
+}
+
+/** Referme la marque après l'envoi : rien n'a abouti, elle reprend son état d'avant. */
+async function closeToldMark(told: ToldMark | null, delivered: boolean): Promise<void> {
+  if (!told || delivered) return;
+  if (told.claimed) await releaseReminder(told.matchId, MATCH_TOLD_KEY);
+  else await setToldTime(told.matchId, told.previous);
+}
+
+/** L'horaire que les joueurs tiennent (`null` : aucun, après un retrait). */
+async function setToldTime(matchId: number, startAt: Date | null): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
+    startAt,
     matchId,
     MATCH_TOLD_KEY,
   ]);
@@ -200,16 +214,6 @@ async function claimToldMark(matchId: number, startAt: Date): Promise<boolean> {
     [matchId, MATCH_TOLD_KEY, startAt],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
-}
-
-/** Retient le dernier horaire reçu par les joueurs. */
-async function updateToldMark(matchId: number, startAt: Date): Promise<void> {
-  const db = await getDatabase();
-  await db.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
-    startAt,
-    matchId,
-    MATCH_TOLD_KEY,
-  ]);
 }
 
 /** Rend une marque réservée pour un envoi qui n'a rien donné. */
@@ -313,13 +317,13 @@ async function dispatchPlannedSend(
   const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
   const url = tournamentPageUrl(Number(match.tournament_id));
 
-  // Un horaire parti le dit en base : une date posée plus tard se lira
-  // « reprogrammée », une date effacée « retirée » (`setMatchStartAt`) — ce que
-  // ni la marque d'observation ni celle d'un palier ne prouvent. Posée **avant**
-  // l'envoi (un arbitre qui corrige sa saisie dans la seconde doit déjà la
-  // lire), retirée si rien n'a abouti. Un avis de retrait n'en pose pas : la
-  // marque est déjà là, c'est elle qui l'a permis.
-  const told = clearedStartAt ? null : await openToldMark(match, recipientsByTeam);
+  // Un horaire parti le dit en base, avec l'horaire envoyé : une date posée
+  // plus tard se lira « reprogrammée, au lieu du … », une date effacée
+  // « retirée » (`setMatchStartAt`) — ce que ni la marque d'observation ni
+  // celle d'un palier ne prouvent. Posée **avant** l'envoi (un arbitre qui
+  // corrige sa saisie dans la seconde la lit déjà), rendue à son état d'avant
+  // si rien n'a abouti. Un avis de retrait la garde, sans horaire.
+  const told = await openToldMark(match, recipientsByTeam, clearedStartAt ? null : new Date(match.start_at));
 
   // Un message par engagée, pas un pour tout le monde : chaque joueur lit
   // « ton équipe contre l'autre », dans le bon sens.
@@ -378,7 +382,6 @@ async function dispatchPlannedSend(
     if ((report.discord?.sent ?? 0) > 0 || report.pushed > 0) delivered = true;
   }
   await closeToldMark(told, delivered);
-  if (clearedStartAt && delivered) await forgetToldTime(Number(match.id));
   return dispatched;
 }
 
