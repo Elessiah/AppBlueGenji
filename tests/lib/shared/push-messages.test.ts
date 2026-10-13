@@ -102,7 +102,7 @@ describe("matchScheduleClearedPush", () => {
   it("dit l'horaire retiré, en français, et remplace l'annonce sur l'appareil", () => {
     expect(matchScheduleClearedPush(side)).toEqual({
       title: "Horaire du match retiré",
-      body: "L'horaire du jeudi 10 septembre à 20:00 (heure de Paris) est retiré : un nouvel horaire te sera annoncé. Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2.",
+      body: "L'horaire du jeudi 10 septembre à 20:00 (heure de Paris) est retiré : un nouvel horaire te sera annoncé. Les Renards contre Team Nova · Coupe BlueGenji, Tableau perdants · manche 2.",
       url: "/tournois/7#match-31",
       tag: matchReminderPush(side, null).tag,
     });
@@ -143,7 +143,7 @@ describe("matchScheduledStaffPush", () => {
     const content = matchScheduledStaffPush(input, FIRST);
     expect(content).toEqual({
       title: "Match programmé",
-      body: "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+      body: "Les Renards contre Team Nova · Coupe BlueGenji, Tableau perdants · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
       url: "/tournois/7#match-31",
       tag: "rencontre-31-schedule",
     });

@@ -261,7 +261,7 @@ describe("formatMatchStart", () => {
 describe("matchRoundLabel", () => {
   it("distingue les parties de plateau", () => {
     expect(matchRoundLabel("UPPER", 3)).toBe("Manche 3");
-    expect(matchRoundLabel("LOWER", 2)).toBe("Loser bracket · manche 2");
+    expect(matchRoundLabel("LOWER", 2)).toBe("Tableau perdants · manche 2");
     expect(matchRoundLabel("GRAND", 1)).toBe("Grande finale");
     expect(matchRoundLabel("THIRD_PLACE", 4)).toBe("Petite finale");
   });

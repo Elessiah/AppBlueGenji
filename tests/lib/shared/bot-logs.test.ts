@@ -150,7 +150,7 @@ describe("formatMatchScheduledLog", () => {
 
   it("annonce une première date : manche, équipes, heure de Paris, auteur anonyme", () => {
     expect(formatMatchScheduledLog(base)).toBe(
-      "🗓️ Match programmé — « Coupe BlueGenji » (#12) : Loser bracket · manche 2 — Les Renards vs Team Nova (#42), " +
+      "🗓️ Match programmé — « Coupe BlueGenji » (#12) : Tableau perdants · manche 2 — Les Renards vs Team Nova (#42), " +
         "coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris), par le staff.",
     );
   });
@@ -393,7 +393,7 @@ describe("formatMatchResultLog", () => {
     });
 
     expect(grand).toContain("Grande finale");
-    expect(lower).toContain("Loser bracket · manche 4");
+    expect(lower).toContain("Tableau perdants · manche 4");
   });
 });
 

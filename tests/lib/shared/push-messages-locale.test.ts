@@ -104,9 +104,12 @@ describe("notifications push — français inchangé", () => {
     const kept = Object.fromEntries(
       Object.entries(FR_BEFORE)
         .filter(([name]) => !name.endsWith(".PT1H") && !name.endsWith(".P7D"))
-        .map(([name, content]) =>
-          name.endsWith(".P1D") ? [name, { ...content, title: "Match dans moins de 24 heures" }] : [name, content],
-        ),
+        // Le tableau des perdants porte le nom que lui donne le site
+        // (« Tableau perdants »), plus l'anglicisme « Loser bracket ».
+        .map(([name, content]): [string, PushContent] => {
+          const renamed = { ...content, body: content.body.replace("Loser bracket", "Tableau perdants") };
+          return [name, name.endsWith(".P1D") ? { ...renamed, title: "Match dans moins de 24 heures" } : renamed];
+        }),
     );
     const before = {
       ...kept,
