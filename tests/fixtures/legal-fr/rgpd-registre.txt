@@ -5,7 +5,7 @@ Le registre décrit les traitements de données personnelles du site et du bot D
 Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
 Télécharger le registre (tableur CSV)← Politique de confidentialité
 RESPONSABLE
-ActeursMIS À JOUR LE 15/10/2026
+ActeursMIS À JOUR LE 16/10/2026
 Responsable du traitement
 Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
 Contact
@@ -550,6 +550,7 @@ Diffuser en direct les matchs des tournois et en garder la rediffusion
 Sous-finalités
 Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)
 Publier sur la fiche du match le lien de sa rediffusion YouTube
+Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (« un joueur » en tournoi individuel, jamais un pseudo), nom du tournoi et lien de la diffusion
 Base légale
 Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur
 Personnes concernées
@@ -564,12 +565,15 @@ Aucune
 Conservation
 Direct : aucune conservation par le site, qui ne garde que le lien de la chaîne
 Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée
+Annonce sur Discord : le site ne garde qu'une trace de l'envoi (le match et les équipes appariées), effacée avec le match ; le message reste dans le salon jusqu'à sa suppression par l'association
 Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée
 Destinataires
 Public des plateformes de diffusion et du site
 Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée
+Membres du serveur Discord de l'association, pour l'annonce publiée dans le salon #live
+Discord (hébergement du salon)
 Transferts hors UE
-Aucun
+États-Unis : Discord (annonce publiée dans le salon #live) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
 Sécurité
 Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
 Chiffrement des échanges (HTTPS)

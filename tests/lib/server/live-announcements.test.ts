@@ -9,6 +9,7 @@ jest.mock("@/lib/server/bot-integration", () => ({
 import { getDatabase } from "@/lib/server/database";
 import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integration";
 import {
+  LIVE_ANNOUNCE_MAX_AGE_MINUTES,
   dispatchLiveAnnouncements,
   liveAnnouncementsEnabled,
   resetLiveAnnouncementThrottle,
@@ -143,6 +144,21 @@ describe("runLiveAnnouncementSweep", () => {
     expect(sql).toContain("NOT EXISTS (SELECT 1 FROM bg_live_announcements");
     expect(sql).toContain("t.state = 'RUNNING'");
     expect(sql).toContain("m.live_trigger IS NOT NULL");
+  });
+
+  it("n'annonce qu'un passage à l'antenne de moins de deux heures, mesuré par l'horloge de la base", async () => {
+    const { query } = mockDb([]);
+    await runLiveAnnouncementSweep(NOW);
+    const sql = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(LIVE_ANNOUNCE_MAX_AGE_MINUTES).toBe(120);
+    // Chaque mode lit sa propre colonne de passage à l'antenne.
+    expect(sql).toContain("m.live_trigger = 'AUTO' AND m.launched_at > NOW() - INTERVAL 120 MINUTE");
+    expect(sql).toContain("m.live_trigger = 'START_TIME' AND (m.start_at > NOW() - INTERVAL 120 MINUTE");
+    expect(sql).toContain("m.live_trigger = 'MANUAL' AND m.live_started_at > NOW() - INTERVAL 120 MINUTE");
+    // `START_TIME` devenu jouable après son heure : son lancement, pour l'affiche courante, compte.
+    expect(sql).toContain(
+      "OR (m.launched_at > NOW() - INTERVAL 120 MINUTE AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id))",
+    );
   });
 
   it("rend la réservation quand rien n'est parti, pour réessayer au passage suivant", async () => {
