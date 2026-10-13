@@ -86,38 +86,55 @@ describe("forgetMatchReminders", () => {
 });
 
 describe("marque STAFF — horaire poussé aux arbitres", () => {
-  it("retient l'horaire, seulement s'il est encore celui de la manche", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-    await markStaffPushed(31, "2099-01-01T18:00:00.000Z");
-    const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
-    expect(sql).toMatch(/SELECT id, \?, start_at FROM bg_matches WHERE id = \? AND start_at = \?/);
-    expect(params).toEqual(["STAFF", 31, new Date("2099-01-01T18:00:00.000Z"), new Date("2099-01-01T18:00:00.000Z")]);
-  });
+  const T = "2099-01-01T18:00:00.000Z";
+  const OTHER = new Date("2099-01-02T18:00:00.000Z");
 
-  it("dit si la réservation a pris : rien quand la manche ne tient plus cet horaire, oui sur table absente", async () => {
-    const held = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: held }));
-    expect(await markStaffPushed(31, "2099-01-01T18:00:00.000Z")).toBe(true);
-
-    const moved = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]);
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: moved }));
-    expect(await markStaffPushed(31, "2099-01-01T18:00:00.000Z")).toBe(false);
-
-    const missing = jest
+  /** Lecture de la marque (`before`), puis réservation (`affectedRows`, `insertId`). */
+  function staffDb(before: object[], affectedRows = 1, insertId = 77) {
+    const execute = jest
       .fn<SqlQuery>()
-      .mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: missing }));
-    expect(await markStaffPushed(31, "2099-01-01T18:00:00.000Z")).toBe(true);
+      .mockResolvedValueOnce([before])
+      .mockResolvedValueOnce([{ affectedRows, insertId }])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    return execute;
+  }
+
+  it("réserve l'horaire, seulement s'il est encore celui de la manche", async () => {
+    const execute = staffDb([]);
+    expect(await markStaffPushed(31, T)).toEqual({ kind: "reserved", id: 77, startAt: T, previous: null });
+    const [sql, params] = execute.mock.calls[1] as unknown as [string, unknown[]];
+    expect(sql).toMatch(/SELECT id, \?, start_at FROM bg_matches WHERE id = \? AND start_at = \?/);
+    expect(params).toEqual(["STAFF", 31, new Date(T), new Date(T)]);
+
+    staffDb([], 0);
+    // La manche ne tient plus cet horaire : rien à pousser.
+    expect(await markStaffPushed(31, T)).toBeNull();
   });
 
-  it("rend la marque réservée de cet horaire seulement", async () => {
+  it("dit « déjà tenue » quand la marque prouve un envoi précédent du même horaire : elle ne se rendra pas", async () => {
+    staffDb([{ id: 5, start_at: new Date(T) }]);
+    expect(await markStaffPushed(31, T)).toEqual({ kind: "held" });
+    const execute = jest.fn<SqlQuery>();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await releaseStaffPush({ kind: "held" });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("rend la marque à ce qu'elle tenait, sur sa ligne et si elle tient encore l'horaire de cet envoi", async () => {
+    staffDb([{ id: 5, start_at: OTHER }]);
+    const reservation = await markStaffPushed(31, T);
+    expect(reservation).toEqual({ kind: "reserved", id: 5, startAt: T, previous: OTHER });
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-    await releaseStaffPush(31, "2099-01-01T18:00:00.000Z");
-    const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
-    expect(sql).toBe("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?");
-    expect(params).toEqual([31, "STAFF", new Date("2099-01-01T18:00:00.000Z")]);
+    await releaseStaffPush(reservation as NonNullable<typeof reservation>);
+    expect(execute.mock.calls[0]).toEqual([
+      "UPDATE bg_match_reminders SET start_at = ? WHERE id = ? AND start_at <=> ?",
+      [OTHER, 5, new Date(T)],
+    ]);
+
+    await releaseStaffPush({ kind: "reserved", id: 77, startAt: T, previous: null });
+    expect(execute.mock.calls[1]).toEqual(["DELETE FROM bg_match_reminders WHERE id = ? AND start_at <=> ?", [77, new Date(T)]]);
   });
 
   it("oublie l'horaire retiré, sauf si la manche l'a retrouvé pendant l'envoi (reposé par un autre arbitre)", async () => {
@@ -134,7 +151,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     const failing = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: failing }));
     // Marque illisible : on pousse quand même (sans marque, le retrait ne sera pas poussé).
-    await expect(markStaffPushed(31, "2099-01-01T18:00:00.000Z")).resolves.toBe(true);
+    await expect(markStaffPushed(31, "2099-01-01T18:00:00.000Z")).resolves.toEqual({ kind: "unmarked" });
     await expect(forgetStaffPush(31, "2099-01-01T18:00:00.000Z")).resolves.toBeUndefined();
     expect(error).toHaveBeenCalledTimes(2);
 

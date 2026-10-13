@@ -9,7 +9,7 @@ jest.mock("@/lib/server/tournaments/reminder-marks", () => ({
   ...jest.requireActual<typeof import("@/lib/server/tournaments/reminder-marks")>(
     "@/lib/server/tournaments/reminder-marks",
   ),
-  markStaffPushed: jest.fn(async () => true),
+  markStaffPushed: jest.fn(async () => ({ kind: "reserved" as const, id: 1, startAt: "", previous: null })),
   releaseStaffPush: jest.fn(),
   forgetStaffPush: jest.fn(),
 }));
@@ -460,12 +460,12 @@ describe("marque STAFF", () => {
 
     jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
     await notifyMatchScheduleChange(change());
-    expect(releaseStaffPush).toHaveBeenCalledWith(42, NEW_START);
+    expect(releaseStaffPush).toHaveBeenCalledWith(expect.objectContaining({ kind: "reserved" }));
   });
 
   it("ne pousse rien aux arbitres quand la réservation échoue : la manche ne tient plus cet horaire", async () => {
     mockMatch();
-    jest.mocked(markStaffPushed).mockResolvedValueOnce(false);
+    jest.mocked(markStaffPushed).mockResolvedValueOnce(null);
     await notifyMatchScheduleChange(change());
     expect(notifyStaff).not.toHaveBeenCalled();
     expect(releaseStaffPush).not.toHaveBeenCalled();
