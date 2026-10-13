@@ -163,7 +163,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   depuis moins de deux heures ; un succès (même sans mention) ou un refus du
   corps (`400`) la garde. Un **délai dépassé** (15 s) la garde aussi : le bot a
   pu publier quand même, et une annonce perdue vaut mieux qu'un second
-  `@everyone` à tout le serveur (`uncertain`, `console.error` dans pm2). Le bot
+  `@everyone` à tout le serveur (`uncertain`, `console.error` dans pm2) ; il
+  n'est pas compté comme une panne du bot. Le bot
   répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
   croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
   du bot : un salon fermé ne doit pas suspendre les rappels de fond ; côté
@@ -195,7 +196,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
 - **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
   Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `entrantLabel`
   (`discordInline` ; une entrée individuelle s'écrit « un joueur », jamais un
-  pseudo). Le bot préfixe `@everyone` et n'autorise que cette mention
+  pseudo — décidé aussi par `bg_teams.solo_user_id`, pas seulement par le type
+  du tournoi). Le bot préfixe `@everyone` et n'autorise que cette mention
   (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
@@ -203,8 +205,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   développement ne fait jamais écrire `@everyone` au serveur, même devant un
   bot local branché par erreur sur le vrai serveur.
 - **Traces** : pm2 `[live-announce] match N (tournoi T) annoncé dans #live`
-  (`matchs N, M … annoncés` pour un groupe ; « sans notifier » quand la
-  mention n'a pas pu partir — identifiants seuls) ; l'annonce naît d'un
+  (`matchs N, M (tournoi T) annoncés` pour un groupe ; « sans notifier » quand
+  la mention n'a pas pu partir — identifiants seuls, tournoi compris sur toutes
+  les lignes, échecs et reports aussi) ; l'annonce naît d'un
   balayage, pas d'un geste du staff, donc aucune ligne `staff-audit`. Un report
   est averti dans pm2 au plus une fois par heure et par cause, distincte :
   « salon #live fermé au bot » (`503`) ou « bot injoignable, en panne ou d'une
