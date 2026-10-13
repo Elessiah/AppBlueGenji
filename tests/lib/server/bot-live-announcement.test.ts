@@ -67,8 +67,27 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
-  it("rend « discord-held » sur un 503 dont la raison n'est pas le salon (mode lent, AutoMod, panne de Discord)", async () => {
-    for (const reason of ["slowmode-short", "slowmode", "automod", "send-rejected", "discord-unreachable", "discord-down"]) {
+  it("classe un 503 par sa raison : mode lent, refus de Discord, envoi incertain", async () => {
+    const cases: [string, string][] = [
+      ["slowmode-short", "slowed"],
+      ["slowmode", "slowed"],
+      ["automod", "discord-held"],
+      ["send-rejected", "discord-held"],
+      ["discord-unreachable", "discord-held"],
+      // Discord a lâché pendant l'envoi : le message a pu partir, pas de nouvel essai.
+      ["discord-down", "uncertain"],
+    ];
+    for (const [reason, outcome] of cases) {
+      jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason }, { status: 503 }));
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe(outcome);
+    }
+    expect(isBotCircuitOpen()).toBe(false);
+  });
+
+  it("rend « discord-held » sur un refus d'AutoMod, sans ouvrir le coupe-circuit", async () => {
+    for (const reason of ["automod"]) {
       jest
         .spyOn(global, "fetch")
         .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason }, { status: 503 }));
