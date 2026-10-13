@@ -687,6 +687,8 @@ describe("announceDeletedMatchesToStaff", () => {
     expect(push.body).toContain("Les Renards contre Team Nova");
     expect(push.body).toContain("Ronde 3");
     expect(push.tag).toBe("rencontre-31-schedule");
+    // La manche n'existe plus : la page du tournoi, sans ancre morte.
+    expect(push.url).toBe("/tournois/7");
     expect(resolvePush(staffCall().push, "en").title).toBe("Match time removed");
   });
 

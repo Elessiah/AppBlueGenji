@@ -357,6 +357,8 @@ describe("staff, purge et export", () => {
     expect(await subscribedStaffCandidates()).toEqual([{ userId: 3, isAdmin: true, rolesJson: null }]);
     expect(query.mock.calls[0][0]).toMatch(/EXISTS \(SELECT 1 FROM bg_push_subscriptions/);
     expect(query.mock.calls[0][0]).toMatch(/is_deleted = 0/);
+    // Un compte suspendu n'a plus aucun droit effectif : il ne reçoit rien du staff.
+    expect(query.mock.calls[0][0]).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_account_suspensions sus\s+WHERE sus\.user_id = u\.id AND sus\.lifted_at IS NULL/);
   });
 
   it("oublie les abonnements restés muets au-delà de la durée déclarée", async () => {
