@@ -41,7 +41,7 @@ ait un producteur côté serveur.
 | `MODERATION` | Avatar ou logo masqué, supprimé, rétabli | Oui |
 | `PRIVACY_CHANGE` | Changement du traitement des données | Oui |
 | `REFEREE_ALERT` | Conflit de score, score resté trop longtemps sans confirmation, problème signalé (`tournaments`) | Oui (rôle arbitre) |
-| `MATCH_SCHEDULED` (« Matchs planifiés ») | Un autre arbitre planifie un match, en change l'horaire ou le retire — l'auteur du geste n'est pas prévenu ; un retrait d'un horaire encore devant donne « Horaire du match retiré » ; étiquette distincte de l'annonce aux joueurs (un arbitre qui joue reçoit les deux) (`tournaments`) | Ligne au journal Discord (`publishStaffAction`), pas de message privé |
+| `MATCH_SCHEDULED` (« Matchs planifiés ») | Un autre arbitre planifie un match, ou en change ou en retire l'horaire — l'auteur du geste n'est pas prévenu ; un retrait d'un horaire encore devant donne « Horaire du match retiré » ; étiquette distincte de l'annonce aux joueurs (un arbitre qui joue reçoit les deux) (`tournaments`) | Ligne au journal Discord (`publishStaffAction`), pas de message privé |
 | `STAFF_REPORT` | Signalement ou contestation reçu (`moderation`) | Oui (direction) |
 
 Un compte **sans** moyen Discord est désormais un destinataire : il peut avoir

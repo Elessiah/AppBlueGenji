@@ -532,7 +532,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Push notifications",
     purpose: "Notifying a player on their devices, at their request, of what concerns them on the site",
     subPurposes: [
-      "Start of their matches, score to confirm, tournament kick-off, match reminders",
+      "Start of their matches, score to confirm, tournament kick-off, match times (set, changed or removed) and match reminders",
       "Requests to join a team they manage, reports and moderation decisions concerning them, changes to the data policy",
       "Referee alerts, scheduled matches and moderation alerts for the staff holding these roles",
     ],

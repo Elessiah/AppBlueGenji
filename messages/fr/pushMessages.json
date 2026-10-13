@@ -26,7 +26,7 @@
   },
   "round": {
     "playoff": "Play-offs · tour {round}",
-    "lower": "Loser bracket · manche {round}",
+    "lower": "Tableau perdants · manche {round}",
     "grand": "Grande finale",
     "thirdPlace": "Petite finale",
     "default": "Manche {round}"

@@ -327,7 +327,8 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
 }
 
 /**
- * Libellé lisible d'une manche : « Manche 3 », « Loser bracket · manche 2 ».
+ * Libellé lisible d'une manche : « Manche 3 », « Tableau perdants · manche 2 »
+ * (le nom du tableau sur le site, `tournament.json` → `bracketLabels.LOWER`).
  *
  * Partagé par les rappels et les signalements — les deux désignent la même
  * manche au même staff, et deux formulations différentes pour un seul match
@@ -347,7 +348,7 @@ export function matchRoundLabel(bracket: string, roundNumber: number): string {
   const round = `manche ${roundNumber}`;
   switch (bracket) {
     case "LOWER":
-      return `Loser bracket · ${round}`;
+      return `Tableau perdants · ${round}`;
     case "GRAND":
       return "Grande finale";
     case "THIRD_PLACE":
