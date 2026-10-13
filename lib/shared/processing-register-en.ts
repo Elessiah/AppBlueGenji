@@ -658,6 +658,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Streaming a match live on the association's channel or a caster's (YouTube, Twitch or Kick)",
       "Publishing the link to its YouTube replay on the match page",
+      "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (“a player” in a solo tournament, never a username), tournament name and stream link",
     ],
     legalBasis:
       "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws; right to object (art. 21) open to each player",
@@ -671,13 +672,16 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     retention: [
       "Live: nothing kept by the site, which only keeps the link to the channel",
       "Replay link: kept with the match, like its results (T03); the video stays on the platform until it is deleted by the channel that published it",
+      "Discord announcement: the site only keeps a record of the sending (the match and the paired teams), deleted with the match; the message stays in the channel until the association deletes it",
       `Right to object: on request (“${REPORT_FORM_NAME_EN}” form, “GDPR” category), the player appears under a neutral name in subsequent streams, the replay link is removed from the site, and a video published by the association's channel is hidden or deleted`,
     ],
     recipients: [
       "Public of the streaming platforms and of the site",
       "Streaming platforms (YouTube, Twitch, Kick), controllers of their own processing, including of their viewers' data; the site only links to the channels and embeds no player, it sends them no data",
+      "Members of the association's Discord server, for the announcement posted in the #live channel",
+      "Discord (hosting of the channel)",
     ],
-    transfers: ["None"],
+    transfers: [`United States: Discord (announcement posted in the #live channel) — ${transferBasisEn(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY_EN,
       "Stream links limited to a list of platforms, no embedded player; no contact data displayed on screen by the site",

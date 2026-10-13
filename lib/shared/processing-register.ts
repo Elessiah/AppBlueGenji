@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-15";
+export const REGISTER_UPDATED_AT = "2026-10-16";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -837,6 +837,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)",
       "Publier sur la fiche du match le lien de sa rediffusion YouTube",
+      "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (« un joueur » en tournoi individuel, jamais un pseudo), nom du tournoi et lien de la diffusion",
     ],
     legalBasis:
       "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",
@@ -850,16 +851,20 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     retention: [
       "Direct : aucune conservation par le site, qui ne garde que le lien de la chaîne",
       "Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée",
+      "Annonce sur Discord : le site ne garde qu'une trace de l'envoi (le match et les équipes appariées), effacée avec le match ; le message reste dans le salon jusqu'à sa suppression par l'association",
       "Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée",
     ],
     recipients: [
       "Public des plateformes de diffusion et du site",
       "Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée",
+      "Membres du serveur Discord de l'association, pour l'annonce publiée dans le salon #live",
+      "Discord (hébergement du salon)",
     ],
     // Le site ne transmet rien aux plateformes : la diffusion est publiée par la
     // chaîne qui la produit, chaque plateforme traitant ses spectateurs en
-    // responsable de son propre traitement.
-    transfers: ["Aucun"],
+    // responsable de son propre traitement. Seule l'annonce du match dans le
+    // salon #live passe par Discord.
+    transfers: [`États-Unis : Discord (annonce publiée dans le salon #live) — ${transferBasis(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY,
       "Liens de diffusion limités à une liste de plateformes, aucun lecteur intégré ; aucune donnée de contact affichée à l'écran par le site",

@@ -363,6 +363,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
   },
+  "2026-10-annonce-des-matchs-diffuses": {
+    title: "Streamed matches announced on Discord",
+    summary:
+      "When a streamed match starts, the bot announces it to the whole Discord server of the association, with the names of both teams.",
+    details: [
+      "The announcement is posted in the #live channel of the association's Discord server, with an @everyone mention: the names of both teams, the tournament's name and the stream link.",
+      "It carries no player username: in a solo tournament, each entrant is written “a player”.",
+      "The site only keeps a record of the sending (the match and the paired teams), deleted with the match. The message stays in the channel, at Discord (United States), until the association deletes it.",
+    ],
+    linkLabels: ["Read the “Match streaming” paragraph", READ_RECIPIENTS],
+  },
 };
 
 /**

@@ -808,8 +808,8 @@ export function RgpdEn({
           <ul>
             <li>
               <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match times and
-              reminders, notifications) and the staff-only channels, which carry no player username; and logging in through
-              Discord, if you choose it.
+              reminders, notifications), the staff-only channels and the announcement of streamed matches in the #live
+              channel, which carry no player username; and logging in through Discord, if you choose it.
             </li>
             <li>
               <strong>Google and Blizzard</strong> (United States): only if you log in through one of them, which
@@ -866,7 +866,10 @@ export function RgpdEn({
             promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then
             removed from the site, and a video published by the association&apos;s channel is hidden or deleted.
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
-            of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).
+            of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
+            streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
+            server, with an @everyone mention: the names of both teams (“a player” in a solo tournament, never a
+            username), the tournament&apos;s name and the stream link.
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>
         </div>
