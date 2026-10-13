@@ -7,6 +7,7 @@ import { PUT } from "@/app/api/admin/matches/[matchId]/schedule/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
 import { authUser } from "../../../helpers/auth-user";
+import { MATCH_SCHEDULE_WRITE_RULE } from "@/lib/server/api-guard";
 
 const player = authUser({ id: 2, isAdmin: false, roles: [] });
 const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
@@ -129,13 +130,15 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
     const looping = authUser({ id: 991, isAdmin: true, roles: ["ADMIN"] });
     jest.mocked(getCurrentUser).mockResolvedValue(looping);
     jest.mocked(setMatchStartAt).mockResolvedValue("2026-08-29T18:30:00.000Z");
-    for (let call = 0; call < 60; call += 1) {
+    // Un plateau entier (126 manches en double élimination à 64) passe d'une traite.
+    expect(MATCH_SCHEDULE_WRITE_RULE.limit).toBeGreaterThanOrEqual(2 * 126);
+    for (let call = 0; call < MATCH_SCHEDULE_WRITE_RULE.limit; call += 1) {
       expect((await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"))).status).toBe(200);
     }
     const res = await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"));
     expect(res.status).toBe(429);
     expect(JSON.stringify(await res.json())).toContain("TOO_MANY_REQUESTS");
-    expect(setMatchStartAt).toHaveBeenCalledTimes(60);
+    expect(setMatchStartAt).toHaveBeenCalledTimes(MATCH_SCHEDULE_WRITE_RULE.limit);
   });
 
   it("remonte 404 sur un match introuvable", async () => {
