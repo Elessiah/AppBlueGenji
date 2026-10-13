@@ -122,6 +122,55 @@ Une seule boucle de sondage alimente les deux : `useLandingLive`, appelé par le
 `Hero` (`components/cyber/landing/`). Deux sondages séparés les feraient diverger
 le temps d'un tick — une carte annonçant un direct au-dessus d'un bouton absent.
 
+## Annonce sur Discord (#live, `@everyone`)
+
+Au **début** d'un match diffusé, le bot poste dans le salon #live du serveur
+BlueGenji esport (`LIVE_ANNOUNCE_CHANNEL_ID` côté bot,
+`src/notifications/liveAnnouncement.ts`) un message qui mentionne `@everyone`,
+nomme les deux engagés et le tournoi, et donne le lien de la diffusion —
+demande de l'association : deux matchs à la suite font donc deux annonces.
+
+- **Début du match = passage à l'antenne**, tel que `isMatchLive` le dérive :
+  lancement en `AUTO`, heure dite en `START_TIME`, clic « Lancer le direct » en
+  `MANUAL`. Le lancement compte pour l'**affiche courante** seulement
+  (`currentLaunchState`).
+- **Un balayage** (`lib/server/tournaments/live-announcements.ts`), pas un
+  crochet par écriture : cinq écritures posent `launched_at`, et `START_TIME`
+  passe à l'antenne sans écriture. Mêmes déclencheurs que les notifications de
+  départ (`PUSH_NOTIFICATIONS.md`) : chaque évènement de tournoi publié,
+  l'entretien de l'instantané qui ouvre un lancement, la lecture de la liste
+  des tournois. Étranglé à dix secondes, avec relève ; jamais attendu.
+- **Une annonce par match et par affiche** : `bg_live_announcements`
+  (clé unique `(match_id, pairing)`) est réservée **avant** l'appel au bot.
+  Un balayage concurrent, un rafraîchissement, une relecture du flux, un direct
+  coupé puis relancé, un lancement annulé puis refait (horaire changé) ne
+  repostent jamais. La réservation n'est **rendue** que si rien n'est parti —
+  bot injoignable ou d'une version antérieure, salon fermé (`503`) — et le
+  balayage suivant réessaie tant que le match est à l'antenne ; un refus du
+  corps (`400`) la garde. Elle part avec la ligne du match (suppression du
+  tournoi, retour en arrière, plateau régénéré) : un match recréé puis relancé
+  est annoncé de nouveau. Une affiche changée par un ré-appariement est une
+  autre rencontre, donc une autre annonce.
+- **Lien** : la diffusion du match, à défaut la chaîne officielle du tournoi —
+  celle que le site désigne au spectateur d'un match sans lien propre. Chacun
+  repasse par `normalizeStreamUrl`, et le bot revalide la liste blanche. Sans
+  lien exploitable, pas d'annonce.
+- **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
+  Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `entrantLabel`
+  (`discordInline` ; une entrée individuelle s'écrit « un joueur », jamais un
+  pseudo). Le bot préfixe `@everyone` et n'autorise que cette mention
+  (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message.
+- **Production seulement** (`NODE_ENV=production`) : une base de
+  développement ne fait jamais écrire `@everyone` au serveur, même devant un
+  bot local branché par erreur sur le vrai serveur.
+- **Traces** : pm2 `[live-announce] match N (tournoi T) annoncé dans #live`
+  (identifiants seuls) ; l'annonce naît d'un balayage, pas d'un geste du staff,
+  donc aucune ligne `staff-audit`. Côté bot, un refus ou une permission
+  « Mentionner everyone » manquante est signalé dans le canal de logs.
+- **Production — permissions Discord** : le bot doit pouvoir voir le salon,
+  y écrire et y mentionner `@everyone`. Sans la dernière, le message part sans
+  notifier ; sans les deux premières, rien ne part et le site réessaie.
+
 ## Information des joueurs (RGPD)
 
 La retransmission est un traitement (registre, **T16**) : intérêt légitime de
