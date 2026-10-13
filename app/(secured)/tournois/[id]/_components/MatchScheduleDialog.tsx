@@ -67,8 +67,20 @@ function pendingPreview(text: TournamentDialogsText, state: MatchStartEntryState
 }
 
 /** Aide sous les champs : ce que la date va produire. */
-function startAtHint(text: TournamentDialogsText, refereeScheduling: boolean): string {
-  return text.t(refereeScheduling ? "schedule.hintPlanning" : "schedule.hint");
+function startAtHint(text: TournamentDialogsText, refereeScheduling: boolean, entrantsKnown: boolean): string {
+  const base = text.t(refereeScheduling ? "schedule.hintPlanning" : "schedule.hint");
+  return `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
+}
+
+/**
+ * Qui l'horaire prévient (`lib/server/tournaments/schedule-notices.ts`) : les
+ * joueurs des deux engagées, tout de suite — un retrait seulement en tournoi
+ * planifié par l'arbitrage. Une place encore vide : l'annonce attend le
+ * balayage des rappels, une fois les deux engagées connues.
+ */
+function scheduleNotice(text: TournamentDialogsText, refereeScheduling: boolean, entrantsKnown: boolean): string {
+  if (!entrantsKnown) return text.t("schedule.noticeTbd");
+  return text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice");
 }
 
 /** Confirmation après enregistrement. */
@@ -453,7 +465,7 @@ export function MatchScheduleDialog({
             id={HINT_ID}
             style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}
           >
-            {startAtHint(text, refereeScheduling)}
+            {startAtHint(text, refereeScheduling, match.team1Id !== null && match.team2Id !== null)}
           </p>
 
           {clearsLiveTrigger && (
