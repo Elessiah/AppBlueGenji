@@ -17,7 +17,7 @@ jest.mock("@/lib/server/tournaments/reminder-marks", () => ({
 import { getDatabase } from "@/lib/server/database";
 import { forgetStaffPush, markStaffPushed, releaseStaffPush } from "@/lib/server/tournaments/reminder-marks";
 import { notifyStaff } from "@/lib/server/notify";
-import { publishStaffAction } from "@/lib/server/staff-audit";
+import { auditStaffAction, postStaffLog } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
 import {
   heldStartAt,
@@ -80,7 +80,7 @@ function staffCall() {
 }
 
 function logLine(): string {
-  return jest.mocked(publishStaffAction).mock.calls[0][0];
+  return jest.mocked(postStaffLog).mock.calls[0][0];
 }
 
 beforeEach(() => {
@@ -133,7 +133,8 @@ describe("notifyMatchScheduleChange — première date", () => {
 
     await notifyMatchScheduleChange(change());
 
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
+    expect(postStaffLog).toHaveBeenCalledWith(expect.any(String));
+    expect(auditStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toContain("🗓️ Match programmé — « Coupe BlueGenji » (#7)");
     expect(line).toContain("Tableau perdants · manche 2 — Les Renards vs Team Nova (#42)");
@@ -211,7 +212,7 @@ describe("notifyMatchScheduleChange — rien à annoncer", () => {
     await notifyMatchScheduleChange(change({ previousStartAt: NEW_START }));
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     expect(notifyStaff).not.toHaveBeenCalled();
-    expect(publishStaffAction).not.toHaveBeenCalled();
+    expect(postStaffLog).not.toHaveBeenCalled();
   });
 
   it("ne fait que journaliser une date posée déjà passée (correction d'archive)", async () => {
@@ -226,16 +227,14 @@ describe("notifyMatchScheduleChange — rien à annoncer", () => {
     mockMatch();
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: null, alreadyAnnounced: true }));
     expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
-    expect(publishStaffAction).not.toHaveBeenCalled();
+    expect(postStaffLog).not.toHaveBeenCalled();
   });
 
   it("ne prévient pas les arbitres d'une manche disparue", async () => {
     mockMatch(null);
-    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     await notifyMatchScheduleChange(change());
     expect(notifyStaff).not.toHaveBeenCalled();
-    expect(publishStaffAction).not.toHaveBeenCalled();
-    info.mockRestore();
+    expect(postStaffLog).not.toHaveBeenCalled();
   });
 });
 
@@ -269,7 +268,7 @@ describe("notifyMatchScheduleChange — vie privée et cas limites", () => {
   it("ne journalise rien sans auteur, mais prévient tous les arbitres", async () => {
     mockMatch();
     await notifyMatchScheduleChange(change({ actor: null }));
-    expect(publishStaffAction).not.toHaveBeenCalled();
+    expect(postStaffLog).not.toHaveBeenCalled();
     expect(staffCall().excludeUserIds).toEqual([]);
   });
 
@@ -297,7 +296,7 @@ describe("notifyMatchScheduleChange — arbitre engagé dans le match", () => {
 describe("notifyMatchScheduleChange — match déjà joué", () => {
   it("journalise une date posée sur un match joué ou au score saisi, sans prévenir les arbitres", async () => {
     for (const status of ["COMPLETED", "AWAITING_CONFIRMATION"]) {
-      jest.mocked(publishStaffAction).mockClear();
+      jest.mocked(postStaffLog).mockClear();
       mockMatch({ ...ROW, status });
       await notifyMatchScheduleChange(change());
       expect(logLine()).toContain("Match programmé");
@@ -506,7 +505,7 @@ describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining(ROW), expect.anything());
-    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(postStaffLog).toHaveBeenCalledTimes(1);
     expect(notifyStaff).toHaveBeenCalledTimes(1);
   });
 
@@ -562,7 +561,7 @@ describe("notifyMatchScheduleChange — engagées changées après l'écriture",
     await notifyMatchScheduleChange(change({ entrantIds: [101, null] }));
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     // Journal et arbitres suivent : ils ne dépendent pas des marques.
-    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(postStaffLog).toHaveBeenCalledTimes(1);
     expect(notifyStaff).toHaveBeenCalledTimes(1);
   });
 
@@ -612,7 +611,8 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
     expect(push.body).toMatch(/^L'horaire du .+ \(heure de Paris\) est retiré\. Les Renards contre Team Nova · Coupe BlueGenji, Tableau perdants · manche 2\.$/);
     expect(push.tag).toBe("rencontre-42-schedule");
     expect(resolvePush(staffCall().push, "en").title).toBe("Match time removed");
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
+    expect(postStaffLog).toHaveBeenCalledWith(expect.any(String));
+    expect(auditStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toMatch(/^🗓️ Horaire retiré — « Coupe BlueGenji » \(#7\)/u);
     expect(line).toContain("Les Renards vs Team Nova (#42), l'horaire du ");
@@ -633,7 +633,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
       change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START, actor: null }),
     );
     expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), OLD_START);
-    expect(publishStaffAction).not.toHaveBeenCalled();
+    expect(postStaffLog).not.toHaveBeenCalled();
   });
 
   it("ne nomme aucun joueur au journal en tournoi individuel", async () => {
@@ -715,46 +715,46 @@ describe("announceDeletedMatchesToStaff", () => {
   });
 });
 
-describe("notifyMatchScheduleChange — trace du geste sans manche relue", () => {
-  function auditLines(info: jest.SpiedFunction<typeof console.info>): string[] {
-    return info.mock.calls.map((call) => String(call[0])).filter((line) => line.startsWith("[staff-audit]"));
+describe("notifyMatchScheduleChange — trace pm2 du geste, dès le commit", () => {
+  function auditText(): string {
+    return jest.mocked(auditStaffAction).mock.calls[0][0];
   }
 
-  it("nomme l'auteur dans pm2 quand la manche a disparu, sans ligne Discord", async () => {
-    mockMatch(null);
-    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
-
-    await notifyMatchScheduleChange(change({ previousStartAt: OLD_START }));
-
-    const [line] = auditLines(info);
-    expect(line).toContain(`#42 posé au ${NEW_START} (était ${OLD_START})`);
-    expect(line).toContain(`auteur : ${ACTOR.pseudo} (#${ACTOR.id})`);
-    expect(publishStaffAction).not.toHaveBeenCalled();
-    info.mockRestore();
+  it("nomme l'auteur avant toute lecture : un arrêt du serveur après le commit garde la trace", () => {
+    const execute = mockMatch();
+    // Pas d'`await` : la trace part dans le même tour que l'appel.
+    void notifyMatchScheduleChange(change({ previousStartAt: OLD_START }));
+    expect(auditStaffAction).toHaveBeenCalledTimes(1);
+    expect(auditText()).toBe(`🗓️ Horaire du match #42 posé au ${NEW_START} (était ${OLD_START})`);
+    expect(jest.mocked(auditStaffAction).mock.calls[0][1]).toEqual(ACTOR);
+    expect(execute).not.toHaveBeenCalled();
   });
 
-  it("nomme l'auteur d'un retrait quand la relecture échoue", async () => {
+  it("trace un retrait même quand la relecture échoue, sans ligne Discord", async () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(
       notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START })),
     ).resolves.toBeUndefined();
 
-    const [line] = auditLines(info);
-    expect(line).toContain(`#42 retiré (était ${OLD_START})`);
-    expect(line).toContain(`auteur : ${ACTOR.pseudo} (#${ACTOR.id})`);
-    info.mockRestore();
+    expect(auditText()).toBe(`🗓️ Horaire du match #42 retiré (était ${OLD_START})`);
+    expect(postStaffLog).not.toHaveBeenCalled();
     error.mockRestore();
   });
 
-  it("ne trace rien sans auteur", async () => {
+  it("trace une manche disparue entre-temps, et une première date sans date d'avant", async () => {
     mockMatch(null);
-    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    await notifyMatchScheduleChange(change());
+    expect(auditText()).toBe(`🗓️ Horaire du match #42 posé au ${NEW_START} (était vide)`);
+    expect(postStaffLog).not.toHaveBeenCalled();
+  });
+
+  it("ne trace rien sans auteur, ni pour une date inchangée", async () => {
+    mockMatch();
     await notifyMatchScheduleChange(change({ actor: null }));
-    expect(auditLines(info)).toEqual([]);
-    info.mockRestore();
+    await notifyMatchScheduleChange(change({ previousStartAt: NEW_START }));
+    expect(auditStaffAction).not.toHaveBeenCalled();
   });
 });
