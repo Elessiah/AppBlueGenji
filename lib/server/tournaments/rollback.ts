@@ -637,23 +637,28 @@ async function reopenTournament(connection: PoolConnection, tournamentId: number
   await resetRegistrationRanks(connection, tournamentId);
 }
 
-/** Applique le plan : le stade est vidé, ce qui le suivait est traité. */
+/**
+ * Applique le plan : le stade est vidé, ce qui le suivait est traité.
+ *
+ * @returns Les affiches des rencontres détachées **avant** le geste, à comparer
+ *          une fois la réconciliation passée (`forgetChangedPosters`).
+ */
 async function applyRollback(
   connection: PoolConnection,
   tournamentId: number,
   format: TournamentFormat,
   plan: RollbackPlan,
   phases: readonly RollbackPhase[],
-): Promise<void> {
+): Promise<Map<number, string>> {
   // Les détachés sont vidés de leur résultat au même titre que le stade défait :
   // ils n'ont pas été joués, mais le moteur a pu en *résoudre* certains (byes).
   await clearMatchResults(connection, [...plan.clearedMatchIds, ...plan.detachedMatchIds]);
 
+  const posters =
+    plan.detachedMatchIds.length > 0 ? await loadPosters(connection, plan.detachedMatchIds) : new Map<number, string>();
   if (plan.detachedMatchIds.length > 0) {
-    const posters = await loadPosters(connection, plan.detachedMatchIds);
     await detachMatchParticipants(connection, plan.detachedMatchIds);
     await repopulateDetachedMatches(connection, tournamentId, plan.detachedMatchIds);
-    await forgetChangedPosters(connection, posters, plan.detachedMatchIds);
   }
   if (plan.deletedMatchIds.length > 0) {
     await deleteMatches(connection, plan.deletedMatchIds);
@@ -662,6 +667,7 @@ async function applyRollback(
   await rewindRoundCursor(connection, tournamentId, format, plan, phases);
   await rewindEndurancePlayoffs(connection, tournamentId, format);
   await reopenPhases(connection, tournamentId, plan, phases);
+  return posters;
 }
 
 /**
@@ -767,8 +773,11 @@ export async function rollbackCurrentRound(
     // « terminé » se contenterait d'y réécrire un palmarès.
     if (finished) await reopenTournament(connection, tournamentId);
 
-    await applyRollback(connection, tournamentId, tournament.format, plan, phases);
+    const posters = await applyRollback(connection, tournamentId, tournament.format, plan, phases);
     await reconcileAfterRollback(connection, tournamentId);
+    // Comparées **après** la réconciliation : un bye reposé rend sa place à
+    // l'engagée qui l'occupait, et l'affiche n'a alors pas changé.
+    await forgetChangedPosters(connection, posters, plan.detachedMatchIds);
 
     await connection.commit();
 

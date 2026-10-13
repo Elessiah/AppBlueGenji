@@ -112,10 +112,9 @@ async function lockScheduleRow(
  * (`./match-reminders`), **dans la transaction** qui écrit la date : un
  * balayage ne voit jamais la nouvelle date avec les marques de l'ancienne.
  *
- * - Les marques qui prouvent qu'un horaire a été **reçu** sont lues d'abord :
- *   `TOLD`, et pour une manche programmée avant son arrivée les paliers
- *   retirés `P7D` / `PT1H`, qui n'ont jamais été réservés sans message. La
- *   nouvelle date se dira alors « reprogrammée », une date effacée « retirée ».
+ * - La marque qui prouve qu'un horaire a été **reçu** (`TOLD`, preuves
+ *   héritées recopiées au démarrage) est lue d'abord : la nouvelle date se
+ *   dira alors « reprogrammée », une date effacée « retirée ».
  * - Une date posée sur deux engagées connues : les paliers de l'ancienne date
  *   partent, `TOLD` reste, et la marque d'observation est gardée ou posée —
  *   l'annonce (`announceMatchSchedule`) est la nôtre, aucun balayage ne la
@@ -148,14 +147,6 @@ async function resetReminderMarks(
   } catch (error) {
     if (isMissingTableError(error)) return false;
     throw error;
-  }
-  // Une preuve héritée (`P7D` / `PT1H`) devient `TOLD` avant que le ménage ne
-  // l'emporte : elle doit survivre aux changements de date comme la marque.
-  if (told.length > 0) {
-    await connection.execute(`INSERT IGNORE INTO bg_match_reminders (match_id, offset_key) VALUES (?, ?)`, [
-      matchId,
-      MATCH_TOLD_KEY,
-    ]);
   }
   if (startAt !== null && bothEntrants) {
     await connection.execute(

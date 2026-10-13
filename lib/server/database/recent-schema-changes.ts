@@ -203,17 +203,25 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // existant garde le français jusqu'à sa prochaine connexion.
     `ALTER TABLE bg_users ADD COLUMN locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr' AFTER terms_accepted_at`,
     // PR #441 — marque `TOLD` (un horaire reçu, `lib/shared/discord-notifications.ts`).
-    // Données seulement, bornées aux lignes écrites par l'ancien code des
-    // rappels (avant la date ci-dessous, postérieure au déploiement) : rejouées
-    // à chaque démarrage, elles ne font rien une seconde fois.
+    // Données seulement, rejouées à chaque démarrage sans effet une seconde fois.
     // 1. Un palier posé par l'ancien code l'était toujours avec un message :
-    //    il prouve un horaire reçu.
+    //    il prouve un horaire reçu. `P7D` et `PT1H` n'existent plus — le nouveau
+    //    code ne les écrit jamais —, toujours sûrs ; `P1D`, que le nouveau code
+    //    réserve avant l'envoi, seulement tant qu'aucune marque `TOLD` n'existe
+    //    (donc au premier démarrage, avant tout envoi du nouveau code).
     `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
        SELECT DISTINCT match_id, 'TOLD' FROM bg_match_reminders
-        WHERE offset_key IN ('P7D', 'P1D', 'PT1H') AND sent_at < '2026-10-31'`,
+        WHERE offset_key IN ('P7D', 'PT1H')`,
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
+       SELECT DISTINCT r.match_id, 'TOLD' FROM bg_match_reminders r
+        WHERE r.offset_key = 'P1D'
+          AND NOT EXISTS (SELECT 1 FROM bg_match_reminders t WHERE t.offset_key = 'TOLD')`,
     // 2. Une marque d'observation seule, posée en silence par l'ancien balayage
     //    (sept à huit jours avant, dans l'attente du palier « une semaine »
     //    retiré) : sans elle, la manche sera annoncée par le nouveau balayage.
+    //    Bornée par la date (un `DELETE` ne peut relire sa table) : jusque-là,
+    //    une marque seule du nouveau code (annonce partie vers personne) est
+    //    effacée au redémarrage, et l'annonce simplement retentée.
     `DELETE r FROM bg_match_reminders r
        JOIN bg_matches m ON m.id = r.match_id
        LEFT JOIN bg_match_reminders o ON o.match_id = r.match_id AND o.offset_key <> 'SEEN'
