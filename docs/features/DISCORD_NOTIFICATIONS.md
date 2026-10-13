@@ -195,7 +195,12 @@ joueurs (`announceMatchSchedule` / `announceMatchScheduleCleared` la reçoivent,
 `MatchNotice`, et ne la relisent pas). Les joueurs ne sont prévenus que si la
 manche relue a encore les engagées de l'écriture (`entrantIds`, sous verrou) :
 une place remplie ou une engagée remplacée entre-temps n'a pas les marques que
-l'écriture a posées, et son annonce revient au balayage :
+l'écriture a posées, et son annonce revient au balayage. Ni joueurs ni
+arbitres ne sont prévenus si la manche relue porte déjà un autre horaire (une
+correction plus récente, qui fait ses propres annonces) ; la ligne de journal
+reste. Dans la transaction, l'option du tournoi se lit sous le verrou déjà
+tenu : la lecture de `TOLD` est la première lecture ordinaire, et voit l'état
+le plus récent :
 
 - **Joueurs** des deux engagées (équipes ou entrées solo, push dans la langue de
   chacun, message privé Discord en français) : `announceMatchSchedule` consomme
@@ -265,7 +270,18 @@ marque `TOLD` reprend son état sauf si une engagée a été atteinte. Une
 réservation ne vaut que **pour l'horaire lu** (`INSERT … SELECT … WHERE
 start_at = ?`) : un arbitre qui déplace la manche entre la lecture du balayage
 et son envoi la fait échouer, et l'annonce du nouvel horaire garde son
-palier. Le rappel 24 h d'un horaire
+palier. Juste avant l'envoi, la pose de `TOLD` relit l'horaire actuel de la
+manche : déplacé depuis, rien ne part (l'annonce de l'arbitre s'en charge).
+Une réservation qui échoue (attente de verrou, interblocage) est journalisée
+et réessayée au passage suivant, sans retenir les autres manches. Une marque
+`TOLD` prise par un envoi concurrent n'est ni réécrite ni rendue par le
+perdant.
+
+Accepté, non changé : un message par engagée (chacune lit « ton équipe contre
+l'autre »), donc une lecture des abonnements push par message ; et la
+réservation `INSERT … SELECT` prend un verrou partagé sur la manche — face à
+une correction de score sur une manche voisine, l'interblocage éventuel
+désigne la réservation (aucune ligne écrite), réessayée au passage suivant. Le rappel 24 h d'un horaire
 déjà reçu lit la marque `TOLD` sans la réécrire (elle tient déjà cet horaire),
 et une cascade de correction de score efface les marques des affiches quittées
 en une instruction (`detachDownstreamOutcome`).
