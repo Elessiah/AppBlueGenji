@@ -284,7 +284,7 @@ async function announce(group: AnnouncementGroup): Promise<number> {
   } else if (outcome === "discord-held") {
     warnOnce(
       `discord-held ${context}`,
-      `[live-announce] ${label} : Discord a refusé l'annonce (AutoMod ou autre refus) ou n'a pas répondu au bot — cause au canal de logs du bot, ${retry}`,
+      `[live-announce] ${label} : Discord a refusé l'annonce (AutoMod ou autre refus) ou n'a pas répondu au bot — cause au canal de logs du bot, ou dans ses journaux si Discord était en panne, ${retry}`,
     );
   } else {
     warnOnce(

@@ -626,18 +626,22 @@ const CHANNEL_CLOSED_REASONS = new Set(["missing", "no-view", "no-send", "send-d
 const SLOWED_REASONS = new Set(["slowmode", "slowmode-short"]);
 
 /**
- * Classe un `503` du bot par sa raison (`reason`). Un bot qui ne la donne pas
- * (version antérieure) est lu comme un salon fermé, comme avant.
+ * Classe un `503` du bot par sa raison (`reason`). Un `503` d'annonce sans
+ * raison (bot d'une version antérieure) est lu comme un salon fermé, comme
+ * avant ; un autre `503` (configuration du bot) comme un bot indisponible.
  */
 async function classifyUnavailable(
   response: Response,
-): Promise<"channel-closed" | "slowed" | "discord-held" | "uncertain"> {
-  let reason: unknown;
+): Promise<"channel-closed" | "slowed" | "discord-held" | "uncertain" | "unavailable"> {
+  let body: { error?: unknown; reason?: unknown } | null = null;
   try {
-    reason = ((await response.json()) as { reason?: unknown } | null)?.reason;
+    body = (await response.json()) as { error?: unknown; reason?: unknown } | null;
   } catch {
-    // Corps illisible : lu comme un salon fermé.
+    // Corps illisible : rien ne dit que le salon est en cause.
   }
+  // Un autre `503` du bot (jeton interne absent…) ne parle pas de #live.
+  if (body?.error !== "LIVE_CHANNEL_UNAVAILABLE") return "unavailable";
+  const reason = body.reason;
   if (typeof reason !== "string" || CHANNEL_CLOSED_REASONS.has(reason)) return "channel-closed";
   if (SLOWED_REASONS.has(reason)) return "slowed";
   // Discord a lâché pendant l'envoi : le message a pu partir.
