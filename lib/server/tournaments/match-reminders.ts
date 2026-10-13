@@ -282,9 +282,10 @@ async function openToldMark(
     // Un avis de retrait suppose la marque : effacée depuis (affiche changée,
     // retour en arrière), personne ne tient plus cet horaire — rien ne part.
     if (sentStart === null) return "stale";
-    // Rien d'écrit : un envoi concurrent du même horaire a pris la marque (il
-    // le remet lui-même), ou la manche a changé depuis la lecture — dans les
-    // deux cas, rien ne part d'ici, et rien n'est à rendre.
+    // Rien d'écrit : la manche a changé depuis la lecture (ou la marque vient
+    // d'être posée par un autre envoi) — rien ne part d'ici, et rien n'est à
+    // rendre. Deux envois d'un même horaire ne coexistent pas : les
+    // réservations (observation, palier) en laissent passer un seul.
     if (!(await claimToldMark(match, sentStart))) return "stale";
     return { matchId, claimed: true, previous: null, unchanged: false, sent: sentStart };
   }
@@ -325,6 +326,9 @@ async function setToldTime(match: ScheduledMatch, startAt: Date | null): Promise
   const matchId = Number(match.id);
   // Écrite seulement si la manche porte encore cet horaire et ces engagées : la
   // condition est dans l'écriture même, pas dans une lecture qui la précède.
+  // (Elle ne départage pas deux envois du même horaire — `FOUND_ROWS` compte
+  // une ligne réécrite à l'identique — : ce sont les réservations qui
+  // n'en laissent passer qu'un.)
   // La manche est lue **avant** la marque (`INSERT … SELECT`), dans l'ordre de
   // verrouillage du moteur — un `UPDATE … JOIN` pouvait tenir la marque en
   // attendant la manche, et s'interbloquer avec `setMatchStartAt`.

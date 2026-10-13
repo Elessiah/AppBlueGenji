@@ -192,11 +192,18 @@ async function resetReminderMarks(
     // rendu (ou héritées, sans horaire) restent. L'observation, elle, est
     // redatée : un échec tardif de l'avis intermédiaire ne doit pas la rendre
     // (`releaseDatedMarks` ne rend que les marques de son horaire).
-    await connection.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
-      new Date(startAt),
-      matchId,
-      MATCH_SEEN_KEY,
-    ]);
+    // Absente (un passage par un match joué l'a retirée), elle est reposée pour
+    // un match à jouer : sans elle, le balayage réannoncerait un horaire que
+    // les joueurs tiennent déjà. Insertion avant l'effacement, comme plus bas.
+    await connection.execute(
+      announceable
+        ? `INSERT INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE start_at = ?`
+        : `UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`,
+      announceable
+        ? [matchId, MATCH_SEEN_KEY, new Date(startAt), new Date(startAt)]
+        : [new Date(startAt), matchId, MATCH_SEEN_KEY],
+    );
     await connection.execute(
       `DELETE FROM bg_match_reminders
         WHERE match_id = ? AND offset_key NOT IN (?, ?) AND start_at IS NOT NULL AND start_at <> ?`,
