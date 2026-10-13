@@ -11,6 +11,7 @@ import {
 } from "@/lib/shared/rgpd-policy";
 import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 
 describe("clés de rendu de /rgpd", () => {
   // La page s'en sert comme `key` React : un doublon ferait confondre deux lignes.
@@ -299,6 +300,16 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(
       "match time notices and reminders by direct message",
     );
+  });
+
+  it("le registre du bot (T08) déclare ce que le site lui transmet, comme sa politique", () => {
+    const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
+    expect(t08?.dataCategories.join(" ")).toMatch(
+      /Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji[^,]*et le texte du message/,
+    );
+    const t08En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T08");
+    expect(t08En?.dataCategories.join(" ")).toMatch(/Site messages: the recipient's Discord ID or username, their BlueGenji username/);
+    expect(t08En?.dataCategories).toHaveLength(t08?.dataCategories.length ?? -1);
   });
 
   it("la portée est traduite en anglais", () => {
