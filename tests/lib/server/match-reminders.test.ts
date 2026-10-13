@@ -190,8 +190,10 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_reminders/);
     // Réservé pour l'horaire lu : un horaire déplacé entre-temps fait échouer
     // la réservation, et l'annonce du nouveau garde son palier.
-    expect(sql).toMatch(/FROM bg_matches WHERE id = \? AND start_at = \?/);
-    expect(params).toEqual([31, "P1D", 31, START]);
+    // et les engagées aussi : une affiche changée a vu ses marques effacées. La
+    // ligne retient l'horaire pour lequel elle est prise.
+    expect(sql).toMatch(/SELECT \?, \?, start_at FROM bg_matches\s+WHERE id = \? AND start_at = \? AND team1_id = \? AND team2_id = \?/);
+    expect(params).toEqual([31, "P1D", 31, START, 101, 102]);
     expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
   });
 
@@ -341,8 +343,8 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
-    const told = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) =>
-      sql.includes("(match_id, offset_key, start_at)"),
+    const told = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql, params]) =>
+      sql.includes("(match_id, offset_key, start_at)") && params[1] === "TOLD",
     );
     expect(told?.[0]).toMatch(/SELECT \?, \?, \? FROM bg_matches\s+WHERE id = \? AND start_at = \? AND team1_id = \? AND team2_id = \?/);
     expect(told?.[1]).toEqual([31, "TOLD", START, 31, START, 101, 102]);
@@ -402,7 +404,8 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
 
     const releases = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("DELETE"));
-    expect(releases).toEqual([[expect.stringMatching(/offset_key IN \(\?\)$/), [31, "P1D"]]]);
+    // Rendu seulement s'il porte encore l'horaire de cet envoi.
+    expect(releases).toEqual([[expect.stringMatching(/offset_key IN \(\?\) AND start_at <=> \?$/), [31, "P1D", START]]]);
     expect(error).toHaveBeenCalled();
   });
 
@@ -417,7 +420,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     const releases = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("DELETE"));
     // L'observation et le palier consommé : l'annonce repartira au passage suivant.
-    expect(releases.map(([, params]) => params)).toEqual([[31, "SEEN", "P1D"]]);
+    expect(releases.map(([, params]) => params)).toEqual([[31, "SEEN", "P1D", START]]);
   });
 
   it("réserve la marque d'horaire reçu avant l'envoi : une correction immédiate la lit déjà", async () => {
@@ -436,8 +439,8 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // Marque absente : posée avec l'horaire envoyé.
     const fresh = await mockDb({});
     await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
-    const reserve = (fresh.execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) =>
-      sql.startsWith("INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)"),
+    const reserve = (fresh.execute.mock.calls as unknown as [string, unknown[]][]).find(([sql, params]) =>
+      sql.startsWith("INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)") && params[1] === "TOLD",
     );
     expect(reserve?.[1]).toEqual([31, "TOLD", START, 31, START, 101, 102]);
 
@@ -793,6 +796,24 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(claimedKeys(execute)).toEqual(["P1D"]);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("rend l'observation de `setMatchStartAt` quand un palier ne peut être réservé", async () => {
+    const { execute } = await mockAnnounceDb();
+    const base = execute.getMockImplementation();
+    execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith("INSERT IGNORE") && params?.[1] === "P1D") throw new Error("Lock wait timeout exceeded");
+      return base!(sql, params);
+    });
+
+    await expect(announceMatchSchedule(notice(), { rescheduled: false }, FIVE_HOURS_BEFORE)).rejects.toThrow(
+      "Lock wait timeout",
+    );
+
+    const release = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) => sql.startsWith("DELETE"));
+    // Le balayage, qui ne lit que les manches sans observation, l'annoncera.
+    expect(release?.[1]).toEqual([31, "SEEN", START]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
   it("ne réserve pas la marque d'observation : `setMatchStartAt` l'a posée", async () => {

@@ -43,7 +43,7 @@ describe("tournaments-service: match state machine", () => {
     };
 
     const routingUpdates = (calls: Call[]) =>
-      calls.filter((c) => /SET team[12]_id = \? WHERE id = \?/.test(c.sql));
+      calls.filter((c) => /SET team[12]_id = \?, status = \? WHERE id = \?/.test(c.sql));
 
     const baseMatch = {
       id: 5,
@@ -59,9 +59,10 @@ describe("tournaments-service: match state machine", () => {
     it("écrit le gagnant dans team1_id quand le slot suivant est 1", async () => {
       const { connection, calls } = makeConnection();
       await finalizeMatch(connection, 1, baseMatch, baseResult);
+      // La place et le statut en une écriture (l'autre place, vide, laisse PENDING).
       expect(calls).toContainEqual({
-        sql: "UPDATE bg_matches SET team1_id = ? WHERE id = ?",
-        params: [7, 10],
+        sql: "UPDATE bg_matches SET team1_id = ?, status = ? WHERE id = ?",
+        params: [7, "PENDING", 10],
       });
     });
 
@@ -69,8 +70,8 @@ describe("tournaments-service: match state machine", () => {
       const { connection, calls } = makeConnection();
       await finalizeMatch(connection, 1, { ...baseMatch, next_winner_slot: 2 }, baseResult);
       expect(calls).toContainEqual({
-        sql: "UPDATE bg_matches SET team2_id = ? WHERE id = ?",
-        params: [7, 10],
+        sql: "UPDATE bg_matches SET team2_id = ?, status = ? WHERE id = ?",
+        params: [7, "PENDING", 10],
       });
     });
 
@@ -82,8 +83,8 @@ describe("tournaments-service: match state machine", () => {
         { ...baseMatch, next_loser_match_id: 20, next_loser_slot: 2 },
         baseResult,
       );
-      expect(calls).toContainEqual({ sql: "UPDATE bg_matches SET team1_id = ? WHERE id = ?", params: [7, 10] });
-      expect(calls).toContainEqual({ sql: "UPDATE bg_matches SET team2_id = ? WHERE id = ?", params: [8, 20] });
+      expect(calls).toContainEqual({ sql: "UPDATE bg_matches SET team1_id = ?, status = ? WHERE id = ?", params: [7, "PENDING", 10] });
+      expect(calls).toContainEqual({ sql: "UPDATE bg_matches SET team2_id = ?, status = ? WHERE id = ?", params: [8, "PENDING", 20] });
     });
 
     it("n'avance personne quand il n'y a pas de match suivant (finale simple élim)", async () => {
@@ -101,8 +102,8 @@ describe("tournaments-service: match state machine", () => {
       const { connection, calls } = makeConnection({ 10: { team1_id: 99, team2_id: 7 } });
       await finalizeMatch(connection, 1, { ...baseMatch, next_winner_slot: 2 }, baseResult);
       expect(calls).toContainEqual({
-        sql: "UPDATE bg_matches SET status = ? WHERE id = ?",
-        params: ["READY", 10],
+        sql: "UPDATE bg_matches SET team2_id = ?, status = ? WHERE id = ?",
+        params: [7, "READY", 10],
       });
     });
 
@@ -114,10 +115,10 @@ describe("tournaments-service: match state machine", () => {
 
       const { connection, calls } = makeConnection();
       await finalizeMatch(connection, 1, baseMatch, baseResult);
-      const winnerPlacement = calls.find((c) => /SET team[12]_id = \? WHERE id = \?/.test(c.sql));
+      const winnerPlacement = calls.find((c) => /SET team[12]_id = \?, status = \? WHERE id = \?/.test(c.sql));
 
       expect(redirectTarget).toBe(10);
-      expect(winnerPlacement?.params).toEqual([7, redirectTarget]); // gagnant 7 → match 10
+      expect(winnerPlacement?.params).toEqual([7, "PENDING", redirectTarget]); // gagnant 7 → match 10
     });
   });
 

@@ -205,8 +205,11 @@ describe("setMatchStartAt", () => {
     // ne peut plus prendre l'annonce pour lui. Posée **avant** le ménage : une
     // insertion après un `DELETE` qui a verrouillé l'intervalle d'index
     // interbloquerait deux programmations de manches voisines.
-    const seen = writes.find((w) => w.sql.startsWith("INSERT IGNORE INTO bg_match_reminders"));
-    expect(seen?.params).toEqual([42, "SEEN"]);
+    // L'observation porte l'horaire qu'elle couvre (un ancien envoi en échec ne
+    // rend que les marques du sien).
+    const seen = writes.find((w) => w.sql.startsWith("INSERT INTO bg_match_reminders"));
+    expect(seen?.sql).toContain("ON DUPLICATE KEY UPDATE start_at = ?");
+    expect(seen?.params).toEqual([42, "SEEN", new Date("2099-08-30T18:30:00Z"), new Date("2099-08-30T18:30:00Z")]);
     expect(writes.indexOf(seen!)).toBeLessThan(writes.indexOf(reminders!));
   });
 

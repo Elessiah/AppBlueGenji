@@ -63,7 +63,8 @@ describe("finalizeMatch — antenne du match aval", () => {
 
     const resets = antennaResets(calls);
     expect(resets).toHaveLength(1);
-    expect(resets[0][1]).toEqual([20]);
+    // Dans l'écriture même de la place : l'équipe 9, le statut, le match 20.
+    expect(resets[0][1]).toEqual([9, "READY", 20]);
   });
 
   it("laisse la diffusion programmée intacte quand le créneau était vide", async () => {

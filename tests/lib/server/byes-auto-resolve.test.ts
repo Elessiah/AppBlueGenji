@@ -94,12 +94,17 @@ function fakeBracket(matches: FakeMatch[]) {
       target.status = "COMPLETED";
       return [{ affectedRows: 1 }];
     }
-    if (q.startsWith("UPDATE bg_matches SET team1_id = ?")) {
-      byId(values[1]).team1_id = values[0] as number;
+    // La pose en aval écrit la place et le statut ensemble (`target-slot.ts`).
+    if (q.startsWith("UPDATE bg_matches SET team1_id = ?, status = ?")) {
+      const target = byId(values[2]);
+      target.team1_id = values[0] as number;
+      target.status = values[1] as FakeMatch["status"];
       return [{ affectedRows: 1 }];
     }
-    if (q.startsWith("UPDATE bg_matches SET team2_id = ?")) {
-      byId(values[1]).team2_id = values[0] as number;
+    if (q.startsWith("UPDATE bg_matches SET team2_id = ?, status = ?")) {
+      const target = byId(values[2]);
+      target.team2_id = values[0] as number;
+      target.status = values[1] as FakeMatch["status"];
       return [{ affectedRows: 1 }];
     }
     if (q.startsWith("SELECT team1_id, team2_id")) {
