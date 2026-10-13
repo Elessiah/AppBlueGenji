@@ -601,6 +601,13 @@ Sur `/rgpd`, l'identifiant et le pseudo Discord portent, à côté du contrat,
 l'intérêt légitime pour ces messages (`MATCH_TIME_DM_SCOPE`), que le droit
 d'opposition nomme ; la politique du bot dit que le site lui transmet aussi le
 pseudo BlueGenji du destinataire (`label`, bilan d'envoi).
+Destinataires déclarés tels qu'ils sont : tous les membres actifs des équipes
+(coachs, managers, propriétaires compris — registre T04, personnes concernées).
+L'entrée ne fige pas la base légale des messages privés (elle dit seulement que
+le sujet push ne les règle pas) : `/rgpd` la porte et peut changer. **Limite
+connue** : aucun réglage ne permet d'honorer une opposition à ces messages
+privés (intérêt légitime) sans intervention technique — décision requise :
+un réglage par compte, ou leur requalification en exécution du service.
 
 ## Configuration
 
