@@ -132,7 +132,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Displaying a public profile (username, avatar, in-game usernames according to visibility settings)",
       "Putting players in touch (adding each other in game, team recruitment)",
       "Exporting one's data and deleting one's account from “My profile”",
-      "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a Google, Discord or Blizzard login from a browser too old to tell, does not change it), or the one chosen in “My profile”",
+      "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser too old to tell, does not change it), or the one chosen in “My profile”",
     ],
     legalBasis:
       "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible",
