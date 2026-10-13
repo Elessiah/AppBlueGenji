@@ -51,22 +51,38 @@ function importsOf(file: string): string[] {
   return found;
 }
 
-/** Le chemin d'un fichier client jusqu'au module, ou `null` s'il ne l'atteint pas. */
-function pathToTarget(entry: string, seen: Set<string>): string[] | null {
-  const queue: string[][] = [[entry]];
-  while (queue.length > 0) {
-    const chain = queue.shift() as string[];
-    const file = chain.at(-1) as string;
-    if (file === TARGET) return chain;
-    if (seen.has(file)) continue;
-    seen.add(file);
-    for (const next of importsOf(file)) queue.push([...chain, next]);
+/**
+ * Les fichiers qui atteignent le module, chacun avec le suivant sur son chemin :
+ * parcours **à rebours** depuis la cible sur le graphe complet — exact, cycles
+ * d'imports compris, et chaque entrée client qui fuit est nommée.
+ */
+function filesReachingTarget(files: readonly string[]): Map<string, string> {
+  const importers = new Map<string, string[]>();
+  for (const file of files) {
+    for (const next of importsOf(file)) importers.set(next, [...(importers.get(next) ?? []), file]);
   }
-  return null;
+  const nextHop = new Map<string, string>();
+  const queue = [TARGET];
+  while (queue.length > 0) {
+    const file = queue.shift() as string;
+    for (const importer of importers.get(file) ?? []) {
+      if (importer === TARGET || nextHop.has(importer)) continue;
+      nextHop.set(importer, file);
+      queue.push(importer);
+    }
+  }
+  return nextHop;
+}
+
+function chainFrom(entry: string, nextHop: ReadonlyMap<string, string>): string {
+  const chain = [entry];
+  while (chain.at(-1) !== TARGET) chain.push(nextHop.get(chain.at(-1) as string) as string);
+  return chain.map((file) => relative(ROOT, file)).join(" → ");
 }
 
 describe("push-messages reste côté serveur", () => {
-  const clientEntries = SOURCE_DIRS.flatMap((dir) => sourceFiles(join(ROOT, dir))).filter((file) =>
+  const files = SOURCE_DIRS.flatMap((dir) => sourceFiles(join(ROOT, dir)));
+  const clientEntries = files.filter((file) =>
     /^\s*["']use client["']/m.test(readFileSync(file, "utf8").slice(0, 400)),
   );
 
@@ -75,13 +91,8 @@ describe("push-messages reste côté serveur", () => {
   });
 
   it("aucun module client n'atteint lib/shared/push-messages.ts", () => {
-    // Un seul ensemble « vu » : un fichier parcouru sans atteindre la cible
-    // ne l'atteindra pas davantage depuis une autre entrée.
-    const seen = new Set<string>();
-    const offenders = clientEntries
-      .map((entry) => pathToTarget(entry, seen))
-      .filter((chain): chain is string[] => chain !== null)
-      .map((chain) => chain.map((file) => relative(ROOT, file)).join(" → "));
+    const nextHop = filesReachingTarget(files);
+    const offenders = clientEntries.filter((entry) => nextHop.has(entry)).map((entry) => chainFrom(entry, nextHop));
     expect(offenders).toEqual([]);
   });
 
@@ -89,8 +100,11 @@ describe("push-messages reste côté serveur", () => {
     expect(importsOf(join(ROOT, "lib", "server", "tournaments", "player-pushes.ts"))).toContain(TARGET);
   });
 
-  it("le détecteur suit un détour par un module partagé", () => {
-    const seen = new Set<string>();
-    expect(pathToTarget(join(ROOT, "lib", "server", "tournaments", "player-pushes.ts"), seen)?.at(-1)).toBe(TARGET);
+  it("le détecteur suit un détour par un autre module", () => {
+    // `match-schedule.ts` ne l'importe pas : il l'atteint par `player-pushes.ts`.
+    const nextHop = filesReachingTarget(files);
+    const entry = join(ROOT, "lib", "server", "tournaments", "match-schedule.ts");
+    expect(importsOf(entry)).not.toContain(TARGET);
+    expect(chainFrom(entry, nextHop).split(" → ").length).toBeGreaterThan(2);
   });
 });
