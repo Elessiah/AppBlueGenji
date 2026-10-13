@@ -127,10 +127,13 @@ le retire — jamais une date intermédiaire seulement journalisée (date passé
 saisie de travers). Une marque héritée de l'ancien code n'en a pas (`NULL`) :
 on retombe alors sur la date d'avant. L'horaire tenu vaut tant qu'il est devant
 ou passé depuis moins de 12 h (un match en retard qu'on décale ou dont on
-retire l'horaire). Un avis de retrait parti l'oublie (`start_at` remis à
-`NULL`) : la date suivante se dit « reprogrammée », sans rien citer. Une date
-rendue à l'horaire que les joueurs tiennent déjà (après une saisie de travers
-seulement journalisée) ne leur est pas réannoncée.
+retire l'horaire). L'horaire est posé dans la marque **avant** l'envoi (un
+arbitre qui corrige sa saisie dans la seconde le lit déjà) et rendu à son
+état d'avant si rien n'a abouti ; un avis de retrait le remet à `NULL` : la
+date suivante se dit « reprogrammée », sans rien citer. Une date rendue à
+l'horaire que les joueurs tiennent déjà (après une saisie de travers seulement
+journalisée) ne leur est pas réannoncée, et garde ses marques (le rappel déjà
+parti ne repart pas).
 
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
 rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
