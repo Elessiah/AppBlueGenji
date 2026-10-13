@@ -361,7 +361,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The site keeps, with the match, the time that was announced, to tell you “instead of …” if it changes; it does not keep the text of the messages.",
       "If you are on the tournament staff and turned on push notifications, you are also told when another member schedules a match, or changes or removes its time, and when a tournament update deletes a scheduled match (topic “Scheduled matches”, which you can turn off in “My profile”). Each time set, changed or removed by the referees is recorded in the staff activity log: unnamed on Discord, with its author's username and account ID in the server logs.",
     ],
-    linkLabels: ["Read the “Push notifications” section"],
+    linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
   },
 };
 

@@ -679,7 +679,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Le site garde, avec le match, l'horaire qui a été annoncé, pour te dire « au lieu du … » s'il change ; il ne garde pas le texte des messages.",
       "Si tu fais partie du staff des tournois et que tu as activé les notifications push, tu es aussi prévenu quand un autre membre planifie un match, ou en change ou en retire l'horaire, et quand une mise à jour du tournoi supprime un match planifié (sujet « Matchs planifiés », que tu peux couper dans « Mon profil »). Chaque horaire posé, changé ou retiré par l'arbitrage est consigné au journal d'activité du staff : sans nom sur Discord, avec le pseudo et l'identifiant de compte de son auteur dans les journaux du serveur.",
     ],
-    links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
+    links: [
+      { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" },
+      { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
+    ],
   },
 ];
 
