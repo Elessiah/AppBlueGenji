@@ -22,4 +22,8 @@ describe("chunkIds", () => {
     expect(chunkIds([1, 2, 3], 2)).toEqual([[1, 2], [3]]);
     expect(chunkIds([])).toEqual([]);
   });
+
+  it("refuse une taille nulle, négative ou fractionnaire plutôt que de boucler sans fin", () => {
+    for (const size of [0, -1, 1.5, Number.NaN]) expect(() => chunkIds([1], size)).toThrow(RangeError);
+  });
 });
