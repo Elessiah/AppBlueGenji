@@ -181,17 +181,24 @@ export function RecruitmentAdEditor({
         <FieldErrorText fieldId="recruitment-contact-url" message={errors.message("contactUrl")} />
       </div>
 
-      <label className={styles.modalField}>
-        <span className={styles.modalLabel}>Contact Discord (optionnel)</span>
+      <div className={styles.modalField}>
+        <label className={styles.modalLabel} htmlFor="recruitment-contact-discord">
+          Contact Discord (optionnel)
+        </label>
         <input
+          id="recruitment-contact-discord"
           className={styles.modalInput}
           value={form.contactDiscord}
           maxLength={RECRUITMENT_DISCORD_MAX}
           placeholder="pseudo#0000 ou lien d'invitation"
+          {...errors.aria("contactDiscord", "recruitment-contact-discord-hint")}
           onChange={(e) => onChange("contactDiscord", e.target.value)}
         />
-        <span className={styles.modalHint}>Pseudo (copiable) ou lien d'invitation Discord.</span>
-      </label>
+        <span id="recruitment-contact-discord-hint" className={styles.modalHint}>
+          Pseudo (copiable) ou lien d&apos;invitation Discord.
+        </span>
+        <FieldErrorText fieldId="recruitment-contact-discord" message={errors.message("contactDiscord")} />
+      </div>
       {!editing && prefilledDiscord && (
         <p className={styles.modalHint}>
           Discord pré-rempli depuis ton profil — modifie ou efface librement.

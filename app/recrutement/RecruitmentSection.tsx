@@ -88,6 +88,7 @@ const RECRUITMENT_FIELD_IDS: Readonly<Record<RecruitmentField, string>> = {
   body: "recruitment-body",
   bodyEn: "recruitment-body-en",
   contactUrl: "recruitment-contact-url",
+  contactDiscord: "recruitment-contact-discord",
 };
 
 /** Refus du réordonnancement, traduit quand il a un sens pour le lecteur. */

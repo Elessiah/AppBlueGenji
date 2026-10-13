@@ -2,7 +2,7 @@
 
 import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 import { useToast } from "@/components/ui/toast";
-import type { RecruitmentAd } from "@/lib/shared/recruitment";
+import { recruitmentDiscordHref, type RecruitmentAd } from "@/lib/shared/recruitment";
 import { CopyGlyph, DiscordGlyph, OpenGlyph } from "./glyphs";
 import styles from "./ContactTags.module.css";
 
@@ -10,17 +10,6 @@ interface ContactTagsProps {
   ad: RecruitmentAd;
 }
 
-// Un contact Discord fourni sous forme d'URL (invitation, lien profil) devient un
-// lien ; sinon c'est un pseudo à copier.
-function isUrl(value: string): boolean {
-  return /^(https?:\/\/|discord\.gg\/)/i.test(value.trim());
-}
-
-// Normalise une URL Discord/lien pour l'attribut href (préfixe le schéma si absent).
-function toHref(value: string): string {
-  const v = value.trim();
-  return v.startsWith("http") ? v : `https://${v}`;
-}
 
 /**
  * Tags de contact d'une annonce (pseudo Discord copiable ou lien d'invitation,
@@ -47,15 +36,18 @@ export function ContactTags({ ad }: Readonly<ContactTagsProps>) {
   }
 
   const primary = ad.contactPreferred === "DISCORD" ? styles.contactTagPrimary : "";
+  // Un contact Discord fourni sous forme de lien chez Discord (invitation, profil)
+  // devient un lien ; sinon c'est un texte à copier (`recruitmentDiscordHref`).
+  const discordHref = recruitmentDiscordHref(ad.contactDiscord);
 
   return (
     // `group` : sans rôle, le nom « Contacts » serait interdit (`aria-prohibited-attr`).
     <fieldset className={`native-group ${styles.contactTags}`} aria-label={t("contact.label")}>
       {ad.contactDiscord &&
-        (isUrl(ad.contactDiscord) ? (
+        (discordHref ? (
           <a
             className={`${styles.contactTag} ${primary}`}
-            href={toHref(ad.contactDiscord)}
+            href={discordHref}
             target="_blank"
             rel="noopener noreferrer"
           >
