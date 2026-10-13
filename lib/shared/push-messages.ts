@@ -139,7 +139,24 @@ function pushMatchStart(startAt: string | Date, locale: Locale): string {
   ).format(date);
 }
 
-type ScheduledMatchSide = MatchSide & { bracket: string; roundNumber: number; swiss?: boolean; startAt: string | Date };
+type ScheduledMatchSide = MatchSide & {
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  startAt: string | Date;
+  /**
+   * Rencontre vers laquelle mène le lien, quand ce n'est pas `matchId` (qui
+   * reste l'étiquette) : la nouvelle rencontre d'une ronde réappariée, ou
+   * `null` — la page du tournoi — pour une rencontre supprimée.
+   */
+  linkMatchId?: number | null;
+};
+
+/** Lien d'un avis : la rencontre qui existe, ou la page du tournoi. */
+function sideHref(side: ScheduledMatchSide, locale: Locale): string {
+  const linked = side.linkMatchId === undefined ? side.matchId : side.linkMatchId;
+  return localeHref(tournamentMatchHref(side.tournamentId, linked), locale);
+}
 
 export type { ScheduleAnnouncement } from "./discord-notifications";
 
@@ -212,13 +229,13 @@ export function matchScheduleClearedPush(side: ScheduledMatchSide, locale: Local
       round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
       previous: pushMatchStart(side.startAt, locale),
     }),
-    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
+    url: sideHref(side, locale),
     tag: `${matchTag(side.matchId)}-reminder`,
   };
 }
 
 /**
- * Engagée retirée d'une manche par une correction de score : `side.startAt`
+ * Engagée retirée d'une manche par un changement du tournoi : `side.startAt`
  * porte l'horaire qu'elle avait reçu et qui ne la concerne plus. Même
  * étiquette que l'annonce, qu'il remplace sur l'appareil.
  */
@@ -232,7 +249,7 @@ export function matchWithdrawnPush(side: ScheduledMatchSide, locale: Locale = DE
       round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
       previous: pushMatchStart(side.startAt, locale),
     }),
-    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
+    url: sideHref(side, locale),
     tag: `${matchTag(side.matchId)}-reminder`,
   };
 }

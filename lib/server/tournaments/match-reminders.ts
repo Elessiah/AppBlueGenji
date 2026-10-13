@@ -57,6 +57,7 @@ import {
 import { inBatches } from "@/lib/shared/in-batches";
 import { PLAYED_MATCH_STATUSES, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { tournamentPageUrl } from "./app-url";
+import { onPoster, toPoster, type PosterRow } from "./match-poster";
 import { releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -684,6 +685,8 @@ export async function announceMatchScheduleCleared(notice: MatchNotice, previous
 export type WithdrawnMatch = {
   tournamentId: number;
   tournamentName: string;
+  /** Phase de la manche (`0` hors multi-phases). */
+  phaseId: number;
   /** Tournoi individuel : aucun nom dans l'avis (« Ton match »). */
   solo: boolean;
   bracket: string;
@@ -692,7 +695,7 @@ export type WithdrawnMatch = {
 };
 
 /**
- * Une engagée retirée d'une manche par un changement des résultats, avec
+ * Une engagée retirée d'une manche par un changement du tournoi, avec
  * l'horaire qu'elle avait reçu et l'adversaire de cet horaire
  * (`./departed-notices`).
  */
@@ -705,21 +708,45 @@ export type DepartedEntrant = {
   match: WithdrawnMatch;
 };
 
-type PosterRow = RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null };
+type CurrentMatchRow = PosterRow & {
+  tournament_id: number;
+  phase_id: number;
+  bracket: string;
+  round_number: number;
+  start_at: Date | string | null;
+};
 
 type TeamNameRow = RowDataPacket & { id: number; name: string };
 
+/** Ce que l'avis dira à une engagée sortie, une fois l'état d'arrivée relu. */
+type WithdrawnOutcome =
+  /** Revenue sur la manche (seconde correction) : rien à dire. */
+  | { kind: "back" }
+  /**
+   * Reposée contre le même adversaire dans la même manche (ronde réappariée,
+   * plateau refait), sur une rencontre sans horaire : seul l'horaire est
+   * retiré. `linkMatchId` : la nouvelle rencontre.
+   */
+  | { kind: "cleared"; linkMatchId: number }
+  /** Reposée de même, mais la nouvelle rencontre a déjà un horaire : son annonce suivra. */
+  | { kind: "rescheduled" }
+  /** Elle ne joue plus ce match. `linkMatchId` : `null` si la manche a disparu. */
+  | { kind: "withdrawn"; linkMatchId: number | null };
+
 /**
- * Prévient les joueurs des engagées **retirées** de leur manche par un
- * changement des résultats que l'horaire qu'ils avaient reçu ne les concerne
- * plus : message privé Discord (français, « Ton match » en tournoi individuel)
- * et push dans la langue de chacun, même étiquette que l'annonce qu'il
- * remplace. Après le commit du changement, au meilleur effort.
+ * Prévient les joueurs des engagées **retirées** d'une manche dont ils
+ * tenaient l'horaire, une fois le changement commité : message privé Discord
+ * (français, « Ton match » en tournoi individuel) et push dans la langue de
+ * chacun, même étiquette que l'annonce qu'il remplace. Au meilleur effort.
  *
- * Trois lectures pour tous les avis (places actuelles, noms des sortantes et
- * de leurs adversaires, destinataires), puis les envois, quelques-uns à la
- * fois. Une engagée revenue sur sa manche entre-temps (seconde correction)
- * n'est pas prévenue ; une manche supprimée n'a plus personne dessus.
+ * L'état d'arrivée décide du message ({@link withdrawnOutcome}) : une engagée
+ * reposée contre le même adversaire dans la même manche lit « Horaire du match
+ * retiré » (un nouvel horaire lui sera annoncé) ; les autres lisent « Match
+ * retiré de ton programme ».
+ *
+ * Trois lectures pour tous les avis (manches d'avant et d'arrivée, noms des
+ * sortantes et de leurs adversaires, destinataires), puis les envois,
+ * quelques-uns à la fois.
  *
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
@@ -727,39 +754,42 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
   if (departures.length === 0) return 0;
   const db = await getDatabase();
   const matchIds = [...new Set(departures.map((departure) => departure.matchId))];
+  const tournamentIds = [...new Set(departures.map((departure) => departure.match.tournamentId))];
+  const departedIds = [...new Set(departures.map((departure) => departure.teamId))];
   const teamIds = [
-    ...new Set(
-      departures.flatMap((departure) =>
-        departure.opponentId === null ? [departure.teamId] : [departure.teamId, departure.opponentId],
-      ),
-    ),
+    ...new Set(departures.flatMap((departure) => [departure.teamId, departure.opponentId ?? departure.teamId])),
   ];
-  const [posterRows] = await db.query<PosterRow[]>(
-    `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${matchIds.map(() => "?").join(", ")})`,
-    matchIds,
+  const [currentRows] = await db.query<CurrentMatchRow[]>(
+    `SELECT id, tournament_id, phase_id, bracket, round_number, team1_id, team2_id, start_at
+       FROM bg_matches
+      WHERE id IN (${placeholders(matchIds)})
+         OR (tournament_id IN (${placeholders(tournamentIds)})
+             AND (team1_id IN (${placeholders(departedIds)}) OR team2_id IN (${placeholders(departedIds)})))`,
+    [...matchIds, ...tournamentIds, ...departedIds, ...departedIds],
   );
   const [nameRows] = await db.query<TeamNameRow[]>(
-    `SELECT id, name FROM bg_teams WHERE id IN (${teamIds.map(() => "?").join(", ")})`,
+    `SELECT id, name FROM bg_teams WHERE id IN (${placeholders(teamIds)})`,
     teamIds,
   );
-  const posters = new Map(posterRows.map((row) => [Number(row.id), row]));
   const names = new Map(nameRows.map((row) => [Number(row.id), String(row.name)]));
-  const sends = departures.filter((departure) => {
-    const poster = posters.get(departure.matchId);
-    // Revenue sur la manche (seconde correction) : rien à lui retirer.
-    return names.has(departure.teamId) && !(poster && onPoster(poster, departure.teamId));
-  });
+  const sends = departures
+    .filter((departure) => names.has(departure.teamId))
+    .map((departure) => ({ departure, outcome: withdrawnOutcome(departure, currentRows) }))
+    .filter(
+      (send): send is { departure: DepartedEntrant; outcome: Extract<WithdrawnOutcome, { linkMatchId: number | null }> } =>
+        send.outcome.kind === "cleared" || send.outcome.kind === "withdrawn",
+    );
   if (sends.length === 0) return 0;
 
-  const recipientsByTeam = await loadRecipientsByTeam([...new Set(sends.map((send) => send.teamId))]);
+  const recipientsByTeam = await loadRecipientsByTeam([...new Set(sends.map(({ departure }) => departure.teamId))]);
   let dispatched = 0;
-  await inBatches(sends, SWEEP_CONCURRENCY, async (departure) => {
+  await inBatches(sends, SWEEP_CONCURRENCY, async ({ departure, outcome }) => {
     const recipients = recipientsByTeam.get(departure.teamId) ?? [];
     if (recipients.length === 0) return;
     const opponentName = (departure.opponentId === null ? undefined : names.get(departure.opponentId)) ?? "TBD";
     // Un avis en échec ne retient pas les autres.
     try {
-      await sendWithdrawnNotice(departure, String(names.get(departure.teamId)), opponentName, recipients);
+      await sendWithdrawnNotice(departure, outcome, String(names.get(departure.teamId)), opponentName, recipients);
       dispatched += 1;
     } catch (error) {
       console.error("[notify] avis de match retiré non envoyé", error);
@@ -768,14 +798,45 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
   return dispatched;
 }
 
-/** L'engagée occupe l'une des deux places de la manche. */
-function onPoster(row: PosterRow, teamId: number): boolean {
-  return Number(row.team1_id) === teamId || Number(row.team2_id) === teamId;
+function placeholders(values: readonly unknown[]): string {
+  return values.map(() => "?").join(", ");
 }
 
-/** L'avis d'une engagée retirée, à ses joueurs. */
+/**
+ * Ce que l'état d'arrivée dit d'une sortie : revenue sur sa manche, reposée
+ * contre le même adversaire dans la même manche (même tournoi, phase, partie
+ * de plateau et numéro de manche — une ronde réappariée ou un plateau refait
+ * crée de nouvelles rencontres), ou retirée.
+ */
+function withdrawnOutcome(departure: DepartedEntrant, current: readonly CurrentMatchRow[]): WithdrawnOutcome {
+  const original = current.find((row) => Number(row.id) === departure.matchId);
+  if (original && onPoster(toPoster(original), departure.teamId)) return { kind: "back" };
+  const { match, opponentId, teamId } = departure;
+  const repaired =
+    opponentId === null
+      ? undefined
+      : current.find((row) => {
+          const poster = toPoster(row);
+          return (
+            Number(row.id) !== departure.matchId &&
+            Number(row.tournament_id) === match.tournamentId &&
+            Number(row.phase_id ?? 0) === match.phaseId &&
+            String(row.bracket) === match.bracket &&
+            Number(row.round_number) === match.roundNumber &&
+            onPoster(poster, teamId) &&
+            onPoster(poster, opponentId)
+          );
+        });
+  if (repaired) {
+    return repaired.start_at === null ? { kind: "cleared", linkMatchId: Number(repaired.id) } : { kind: "rescheduled" };
+  }
+  return { kind: "withdrawn", linkMatchId: original ? departure.matchId : null };
+}
+
+/** L'avis d'une engagée sortie, à ses joueurs. */
 async function sendWithdrawnNotice(
   departure: DepartedEntrant,
+  outcome: { kind: "cleared" | "withdrawn"; linkMatchId: number | null },
   teamName: string,
   opponentName: string,
   recipients: NotificationRecipient[],
@@ -790,10 +851,14 @@ async function sendWithdrawnNotice(
     startAt: departure.heldStartAt,
     solo: match.solo,
   };
+  // L'étiquette reste celle de l'ancienne rencontre (l'avis remplace son
+  // annonce sur l'appareil) ; le lien mène à la rencontre qui existe, ou à la
+  // page du tournoi.
   const pushSide = {
     tournamentId: match.tournamentId,
     tournamentName: match.tournamentName,
     matchId: departure.matchId,
+    linkMatchId: outcome.linkMatchId,
     teamName,
     opponentName,
     bracket: match.bracket,
@@ -802,10 +867,13 @@ async function sendWithdrawnNotice(
     startAt: departure.heldStartAt,
     solo: match.solo,
   };
+  const cleared = outcome.kind === "cleared";
   await notifyUsers(recipients, {
     topic: "MATCH_REMINDER",
-    discord: { message: buildMatchWithdrawnNotice(context), context: "match-withdrawn" },
-    push: (locale) => matchWithdrawnPush(pushSide, locale),
+    discord: cleared
+      ? { message: buildMatchScheduleClearedNotice(context), context: "match-schedule-cleared" }
+      : { message: buildMatchWithdrawnNotice(context), context: "match-withdrawn" },
+    push: (locale) => (cleared ? matchScheduleClearedPush(pushSide, locale) : matchWithdrawnPush(pushSide, locale)),
   });
 }
 

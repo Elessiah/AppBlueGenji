@@ -48,7 +48,14 @@ import { ALL_MAP_SOURCES, clearMapSets } from "./match-maps";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { forgetMatchReminders } from "./reminder-marks";
-import { departuresBetween, noteDeletedMatches, noteDepartedEntrants, type Poster } from "./departed-notices";
+import {
+  departuresBetween,
+  holdDepartures,
+  noteDeletedMatches,
+  settleDepartures,
+  type HeldTimes,
+} from "./departed-notices";
+import { toPoster, type Poster, type PosterRow } from "./match-poster";
 import { pushTeamToTarget } from "./target-slot";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import {
@@ -268,8 +275,6 @@ async function detachMatchParticipants(
   }
 }
 
-type PosterRow = RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null };
-
 /** Affiches (engagées des deux créneaux) des rencontres données. */
 async function loadPosters(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, Poster>> {
   const posters = new Map<number, Poster>();
@@ -278,12 +283,7 @@ async function loadPosters(connection: PoolConnection, matchIds: readonly number
       `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
-    for (const row of rows) {
-      posters.set(Number(row.id), {
-        team1Id: row.team1_id === null ? null : Number(row.team1_id),
-        team2Id: row.team2_id === null ? null : Number(row.team2_id),
-      });
-    }
+    for (const row of rows) posters.set(Number(row.id), toPoster(row));
   }
   return posters;
 }
@@ -312,23 +312,28 @@ function posterKey(poster: Poster | undefined): string {
  *
  * Les engagées qui ont **quitté** une affiche changée apprennent, après le
  * commit, que l'horaire qu'elles en avaient reçu ne les concerne plus
- * (`./departed-notices`) — lu avant l'effacement des marques.
+ * (`./departed-notices`) : horaire relevé **avant** le détachement
+ * (`holdDepartures`), comparaison faite sur l'état d'arrivée — une pose
+ * intermédiaire de la réconciliation ne prévient personne.
  */
 async function forgetChangedPosters(
   connection: PoolConnection,
-  before: Map<number, Poster>,
+  detached: DetachedPosters,
   matchIds: readonly number[],
 ): Promise<void> {
   const after = await loadPosters(connection, matchIds);
-  const changed = matchIds.filter((id) => posterKey(before.get(id)) !== posterKey(after.get(id)));
-  if (changed.length === 0) return;
-  const changedBefore = new Map(changed.flatMap((id) => {
-    const poster = before.get(id);
-    return poster ? [[id, poster] as const] : [];
-  }));
-  await noteDepartedEntrants(connection, departuresBetween(changedBefore, after));
+  const changed = matchIds.filter((id) => posterKey(detached.posters.get(id)) !== posterKey(after.get(id)));
+  const changedBefore = new Map<number, Poster>();
+  for (const id of changed) {
+    const poster = detached.posters.get(id);
+    if (poster) changedBefore.set(id, poster);
+  }
+  settleDepartures(connection, detached.held, departuresBetween(changedBefore, after));
   await forgetMatchReminders(connection, changed);
 }
+
+/** Les rencontres détachées avant le geste : leurs affiches, et l'horaire que leurs joueurs tiennent. */
+type DetachedPosters = { posters: Map<number, Poster>; held: HeldTimes };
 
 /**
  * Re-remplit les créneaux détachés depuis les résultats qui subsistent.
@@ -656,8 +661,9 @@ async function reopenTournament(connection: PoolConnection, tournamentId: number
 /**
  * Applique le plan : le stade est vidé, ce qui le suivait est traité.
  *
- * @returns Les affiches des rencontres détachées **avant** le geste, à comparer
- *          une fois la réconciliation passée (`forgetChangedPosters`).
+ * @returns Les affiches des rencontres détachées **avant** le geste, et
+ *          l'horaire que leurs joueurs tiennent, à comparer une fois la
+ *          réconciliation passée (`forgetChangedPosters`).
  */
 async function applyRollback(
   connection: PoolConnection,
@@ -665,13 +671,14 @@ async function applyRollback(
   format: TournamentFormat,
   plan: RollbackPlan,
   phases: readonly RollbackPhase[],
-): Promise<Map<number, Poster>> {
+): Promise<DetachedPosters> {
   // Les détachés sont vidés de leur résultat au même titre que le stade défait :
   // ils n'ont pas été joués, mais le moteur a pu en *résoudre* certains (byes).
   await clearMatchResults(connection, [...plan.clearedMatchIds, ...plan.detachedMatchIds]);
 
   const posters =
     plan.detachedMatchIds.length > 0 ? await loadPosters(connection, plan.detachedMatchIds) : new Map<number, Poster>();
+  const held = await holdDepartures(connection, plan.detachedMatchIds);
   if (plan.detachedMatchIds.length > 0) {
     await detachMatchParticipants(connection, plan.detachedMatchIds);
     await repopulateDetachedMatches(connection, tournamentId, plan.detachedMatchIds);
@@ -683,7 +690,7 @@ async function applyRollback(
   await rewindRoundCursor(connection, tournamentId, format, plan, phases);
   await rewindEndurancePlayoffs(connection, tournamentId, format);
   await reopenPhases(connection, tournamentId, plan, phases);
-  return posters;
+  return { posters, held };
 }
 
 /**
@@ -789,11 +796,11 @@ export async function rollbackCurrentRound(
     // « terminé » se contenterait d'y réécrire un palmarès.
     if (finished) await reopenTournament(connection, tournamentId);
 
-    const posters = await applyRollback(connection, tournamentId, tournament.format, plan, phases);
+    const detached = await applyRollback(connection, tournamentId, tournament.format, plan, phases);
     await reconcileAfterRollback(connection, tournamentId);
     // Comparées **après** la réconciliation : un bye reposé rend sa place à
     // l'engagée qui l'occupait, et l'affiche n'a alors pas changé.
-    await forgetChangedPosters(connection, posters, plan.detachedMatchIds);
+    await forgetChangedPosters(connection, detached, plan.detachedMatchIds);
 
     await connection.commit();
 
