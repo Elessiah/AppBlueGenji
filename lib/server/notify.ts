@@ -99,18 +99,25 @@ export type StaffNotification = {
    */
   discord?: () => Promise<DiscordDeliveryReport | null>;
   pushOptions?: PushOptions;
+  /**
+   * Comptes à ne pas prévenir — l'auteur du geste, qui n'a rien à apprendre
+   * de ce qu'il vient de faire.
+   */
+  excludeUserIds?: readonly number[];
 };
 
 /**
  * Prévient un métier : l'envoi Discord de l'appelant, et le push aux comptes
- * qui détiennent la permission du sujet.
+ * qui détiennent la permission du sujet (hors `excludeUserIds`).
  */
 export async function notifyStaff(notification: StaffNotification): Promise<NotificationReport> {
   const audience = PUSH_TOPICS[notification.topic].audience;
+  const excluded = new Set(notification.excludeUserIds ?? []);
   const staffPush = async (): Promise<number> => {
     if (audience === null) return 0;
     const candidates = await subscribedStaffCandidates();
     const userIds = candidates
+      .filter((candidate) => !excluded.has(candidate.userId))
       .filter((candidate) =>
         can({ isAdmin: candidate.isAdmin, roles: sanitizePlatformRoles(candidate.rolesJson) }, audience),
       )

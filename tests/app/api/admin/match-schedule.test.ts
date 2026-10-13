@@ -7,6 +7,7 @@ import { PUT } from "@/app/api/admin/matches/[matchId]/schedule/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
 import { authUser } from "../../../helpers/auth-user";
+import { MATCH_SCHEDULE_WRITE_RULE } from "@/lib/server/api-guard";
 
 const player = authUser({ id: 2, isAdmin: false, roles: [] });
 const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
@@ -66,7 +67,7 @@ describe("PUT /api/admin/matches/[matchId]/schedule — permissions", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ startAt: "2026-08-29T18:30:00.000Z" });
-    expect(setMatchStartAt).toHaveBeenCalledWith(42, "2026-08-29T18:30:00Z");
+    expect(setMatchStartAt).toHaveBeenCalledWith(42, "2026-08-29T18:30:00Z", { id: arbitre.id, pseudo: arbitre.pseudo });
   });
 
   it("accepte un admin", async () => {
@@ -74,7 +75,7 @@ describe("PUT /api/admin/matches/[matchId]/schedule — permissions", () => {
     jest.mocked(setMatchStartAt).mockResolvedValue(null);
 
     expect((await PUT(req({ startAt: null }), params("42"))).status).toBe(200);
-    expect(setMatchStartAt).toHaveBeenCalledWith(42, null);
+    expect(setMatchStartAt).toHaveBeenCalledWith(42, null, { id: admin.id, pseudo: admin.pseudo });
   });
 });
 
@@ -99,14 +100,45 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
     expect(setMatchStartAt).not.toHaveBeenCalled();
   });
 
-  it("traite un corps vide comme un effacement", async () => {
-    jest.mocked(setMatchStartAt).mockResolvedValue(null);
-    const res = await PUT(
+  it("refuse un corps vide, illisible ou sans startAt : effacer un horaire prévient les joueurs", async () => {
+    const bodies = [
       new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT" }),
-      params("42"),
-    );
-    expect(res.status).toBe(200);
-    expect(setMatchStartAt).toHaveBeenCalledWith(42, null);
+      new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT", body: "{\"startAt\": \"2026" }),
+      req({}),
+      req({ start: null }),
+    ];
+    for (const request of bodies) {
+      const res = await PUT(request, params("42"));
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(await res.json())).toContain("INVALID_MATCH_START_AT");
+    }
+    expect(setMatchStartAt).not.toHaveBeenCalled();
+  });
+
+  it("efface l'horaire sur un null explicite, ou une chaîne vide", async () => {
+    jest.mocked(setMatchStartAt).mockResolvedValue(null);
+    for (const startAt of [null, ""]) {
+      const res = await PUT(req({ startAt }), params("42"));
+      expect(res.status).toBe(200);
+    }
+    expect(setMatchStartAt).toHaveBeenNthCalledWith(1, 42, null, { id: admin.id, pseudo: admin.pseudo });
+    expect(setMatchStartAt).toHaveBeenNthCalledWith(2, 42, "", { id: admin.id, pseudo: admin.pseudo });
+  });
+
+  it("plafonne les gestes d'un arbitre : chacun écrit à tous les joueurs du match", async () => {
+    // Un autre compte : le seau de l'arbitre des autres tests reste intact.
+    const looping = authUser({ id: 991, isAdmin: true, roles: ["ADMIN"] });
+    jest.mocked(getCurrentUser).mockResolvedValue(looping);
+    jest.mocked(setMatchStartAt).mockResolvedValue("2026-08-29T18:30:00.000Z");
+    // Un plateau entier (126 manches en double élimination à 64) passe d'une traite.
+    expect(MATCH_SCHEDULE_WRITE_RULE.limit).toBeGreaterThanOrEqual(2 * 126);
+    for (let call = 0; call < MATCH_SCHEDULE_WRITE_RULE.limit; call += 1) {
+      expect((await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"))).status).toBe(200);
+    }
+    const res = await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"));
+    expect(res.status).toBe(429);
+    expect(JSON.stringify(await res.json())).toContain("TOO_MANY_REQUESTS");
+    expect(setMatchStartAt).toHaveBeenCalledTimes(MATCH_SCHEDULE_WRITE_RULE.limit);
   });
 
   it("remonte 404 sur un match introuvable", async () => {
@@ -123,9 +155,18 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
     expect(res.status).toBe(400);
   });
 
-  it("remonte 500 sur une panne inattendue", async () => {
-    jest.mocked(setMatchStartAt).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
+  it("remonte 500 sur une panne inattendue, avec un code et jamais le texte de l'erreur", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(setMatchStartAt)
+      .mockRejectedValue(new Error("Deadlock found when trying to get lock; try restarting transaction"));
     const res = await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"));
     expect(res.status).toBe(500);
+    const body = JSON.stringify(await res.json());
+    expect(body).toContain("MATCH_SCHEDULE_UPDATE_FAILED");
+    expect(body).not.toContain("Deadlock");
+    // Le texte reste dans pm2.
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 });

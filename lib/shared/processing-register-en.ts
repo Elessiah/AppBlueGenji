@@ -247,12 +247,12 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
-      "Sending match reminders by Discord direct message (one week, 24 h and 1 h before)",
-      "Alerting the referee role (score conflict, expired postponement, report on a player)",
+      "Sending by Discord direct message the announcement of a match's time (set, changed or removed) and a match reminder within the 24 h before kickoff",
+      "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match reminders and refereeing alerts",
-    dataSubjects: ["Players taking part in a tournament", "Referees", "Casters registered on a match"],
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, match reminders and referee alerts",
+    dataSubjects: ["Players taking part in a tournament", "Other members of the teams taking part (coaches, managers, owners)", "Referees", "Casters registered on a match"],
     dataCategories: [
       "Discord username and identifier",
       "BattleTag",
@@ -263,7 +263,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     sensitiveData: "None",
     retention: [
       "Certified username: until it is changed or the account is deleted",
-      "Records of reminders and alerts sent (match and step, without content): kept with the match, so with no time limit",
+      "Records of reminders and alerts sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
       "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played",
     ],
     recipients: [
@@ -284,7 +284,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose: "Keeping the staff informed of notable events on the platform",
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
-      "Traceability of refereeing actions (penalties, removal of participants, rollbacks), for moderation",
+      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed), for moderation",
     ],
     legalBasis: "Legitimate interest (administration and oversight of refereeing)",
     dataSubjects: ["Staff"],
@@ -366,7 +366,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exclusion of a user from the relay by moderation — valid for the whole network of partner servers (community moderation), hence the list of exclusions open to the administrators of each server",
       "Activity statistics (/stats command, which shows each person only their own activity; the bot's dashboard)",
       "Confirming memberships of the association and scheduled reminders on its servers",
-      "Delivering messages written by the site: codes, reminders, moderation notices (report naming the person, logo hidden, removed or deleted), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one",
+      "Delivering messages written by the site: codes, match times and reminders, moderation notices (report naming the person, logo hidden, removed or deleted), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one",
     ],
     legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing",
     dataSubjects: [
@@ -381,6 +381,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exclusions: identifiers of the excluded user and the moderator, date; identifiers and reason posted in the staff's private log channel, reason copied by direct message to the bot's owner, usernames and reason displayed by /ban-list",
       "Configuration: identifiers of servers, channels and roles, invitation, identifier of the administrator who set it",
       "Memberships and scheduled reminders: identifier of the member or role targeted and of the author, message, date of the next sending (for a membership: its expiry date, hence membership status), frequency; membership certificate delivered by direct message without being kept",
+      "Site messages: the recipient's Discord ID or username, their BlueGenji username (returned in the delivery report sent back to the site) and the message text, sent by the site and delivered without being stored by the bot",
       "Technical log (staff's private channel, server logs): name of the servers that add or remove the bot, errors that may quote an identifier; the bot no longer writes a username there of its own accord, messages prior to this rule excepted (the free-text reason for an exclusion or an error delivering a direct message may quote one)",
     ],
     sensitiveData: "None",
@@ -532,9 +533,9 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Push notifications",
     purpose: "Notifying a player on their devices, at their request, of what concerns them on the site",
     subPurposes: [
-      "Start of their matches, score to confirm, tournament kick-off, match reminders",
+      "Start of their matches, score to confirm, tournament kickoff, match times (set, changed or removed) and match reminders",
       "Requests to join a team they manage, reports and moderation decisions concerning them, changes to the data policy",
-      "Refereeing and moderation alerts for the staff holding these roles",
+      "Referee alerts, scheduled matches and moderation alerts for the staff holding these roles",
     ],
     legalBasis: "Consent (activation on each device, withdrawable at any time, topic by topic)",
     dataSubjects: ["Registered players who turn on notifications on a device"],

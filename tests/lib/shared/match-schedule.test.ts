@@ -2,12 +2,26 @@ import { describe, expect, it } from "@jest/globals";
 import {
   formatMatchStartAt,
   formatMatchStartAtFull,
+  isMatchOver,
+  isPlayedMatchStatus,
   isValidMatchStartAt,
   matchStartAtTime,
   MATCH_START_AT_MAX_YEAR,
   MATCH_START_AT_MIN_YEAR,
   normalizeMatchStartAt,
 } from "@/lib/shared/match-schedule";
+
+describe("isPlayedMatchStatus", () => {
+  it("tient pour jouée une rencontre close ou au score saisi", () => {
+    expect(isPlayedMatchStatus("COMPLETED")).toBe(true);
+    expect(isPlayedMatchStatus("AWAITING_CONFIRMATION")).toBe(true);
+  });
+
+  it("laisse à jouer une rencontre en attente ou prête", () => {
+    expect(isPlayedMatchStatus("PENDING")).toBe(false);
+    expect(isPlayedMatchStatus("READY")).toBe(false);
+  });
+});
 
 describe("normalizeMatchStartAt", () => {
   it("normalise un ISO en UTC", () => {
@@ -135,5 +149,15 @@ describe("formatMatchStartAtFull", () => {
 
   it("rend null sans date", () => {
     expect(formatMatchStartAtFull(null)).toBeNull();
+  });
+});
+
+describe("isMatchOver", () => {
+  it("tient pour finie une rencontre jouée, ou toute rencontre d'un tournoi clos", () => {
+    expect(isMatchOver("COMPLETED", false)).toBe(true);
+    expect(isMatchOver("AWAITING_CONFIRMATION", false)).toBe(true);
+    expect(isMatchOver("READY", true)).toBe(true);
+    expect(isMatchOver("READY", false)).toBe(false);
+    expect(isMatchOver("PENDING", false)).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 
 /**
@@ -52,5 +53,57 @@ describe("MatchScheduleDialog — heure", () => {
     expect(SOURCE).toContain('{t("schedule.wrongYear")}');
     expect(frDialogs.schedule.preview).toBe("Date retenue :");
     expect(frDialogs.schedule.wrongYear).toBe("Mauvaise année ?");
+  });
+});
+
+describe("MatchScheduleDialog — qui l'horaire prévient", () => {
+  it("dit aux arbitres que l'horaire est annoncé, et quand", () => {
+    expect(SOURCE).toMatch(
+      /startAtHint\(\s*text,\s*refereeScheduling,\s*match\.team1Id !== null && match\.team2Id !== null,\s*(\/\/[^\n]*\s*)?isMatchOver\(match\.status, tournamentFinished\),\s*\)/,
+    );
+    // Un match joué n'annonce rien : l'aide s'en tient à la date.
+    expect(SOURCE).toContain("return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;");
+    expect(SOURCE).toMatch(/if \(!entrantsKnown\) return text\.t\("schedule\.noticeTbd"\);/);
+    expect(SOURCE).toContain('text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice")');
+  });
+
+  it("ne promet un avis de retrait qu'en tournoi planifié par l'arbitrage, et l'attente d'une place vide", () => {
+    expect(frDialogs.schedule.noticePlanning).toContain("posé ou changé, ou un horaire retiré");
+    expect(frDialogs.schedule.notice).toContain("posé ou changé");
+    expect(frDialogs.schedule.notice).not.toContain("retiré");
+    expect(frDialogs.schedule.noticeTbd).toContain("dans les 48 h qui précèdent le coup d'envoi");
+    // « Engagées » n'a pas de sens en tournoi individuel.
+    for (const notice of [frDialogs.schedule.notice, frDialogs.schedule.noticePlanning, frDialogs.schedule.noticeTbd]) {
+      expect(notice).not.toContain("engagées");
+    }
+    expect(enDialogs.schedule.noticePlanning).toContain("set or changed, or a time removed");
+    expect(enDialogs.schedule.notice).not.toContain("removed");
+    expect(enDialogs.schedule.noticeTbd).toContain("within the 48 h before kickoff");
+    expect(enDialogs.schedule.notice).toContain("announced to the match's players");
+  });
+});
+
+describe("MatchScheduleDialog — aide inchangée", () => {
+  it("garde l'aide d'avant : l'avis de qui sera prévenu vit dans ses propres clés, sans doublon", () => {
+    for (const dialogs of [frDialogs, enDialogs]) {
+      for (const hint of [dialogs.schedule.hint, dialogs.schedule.hintPlanning]) {
+        expect(hint).not.toContain(dialogs.schedule.notice);
+        expect(hint).not.toMatch(/annoncé aux joueurs|announced to the players/);
+      }
+    }
+  });
+});
+
+describe("MatchScheduleDialog — confirmation d'un retrait", () => {
+  it("confirme un retrait sans reprendre le titre de l'avis aux joueurs, qui ne part pas toujours", () => {
+    expect(frDialogs.schedule.cleared).toBe("Date de début effacée.");
+    expect(enDialogs.schedule.cleared).toBe("Start date cleared.");
+  });
+
+  it("ne parle pas de retrait quand il n'y avait aucun horaire", () => {
+    expect(SOURCE).toContain('if (!touched) return text.t(hadTime ? "schedule.cleared" : "schedule.noTime");');
+    expect(SOURCE).toContain("savedMessage(text, entry.kind === \"ready\", planning, match.startAt !== null)");
+    expect(frDialogs.schedule.noTime).toBe("Aucune date de début posée.");
+    expect(enDialogs.schedule.noTime).toBe("No start date set.");
   });
 });

@@ -42,7 +42,7 @@ const ROUNDS: [string, number][] = [
   ["THIRD_PLACE", 1],
   ["UPPER", PLAYOFF_ROUND_OFFSET + 1],
 ];
-const OFFSETS: (MatchReminderOffsetKey | null)[] = ["P7D", "P1D", "PT1H", null];
+const OFFSETS: (MatchReminderOffsetKey | null)[] = ["P1D", null];
 const REFEREE_LINE = "**Conflit** de score · <@123> https://site.test/tournois/7#match-31";
 
 /** Les mêmes cas que la fixture, rédigés dans `locale`. */
@@ -60,7 +60,7 @@ function allCases(locale: Locale): Record<string, PushContent> {
       );
     }
   }
-  out["reminder.solo"] = matchReminderPush({ ...SOLO, bracket: "UPPER", roundNumber: 1, startAt: START }, "PT1H", locale);
+  out["reminder.solo"] = matchReminderPush({ ...SOLO, bracket: "UPPER", roundNumber: 1, startAt: START }, "P1D", locale);
   out["scoreToConfirm.team"] = scoreToConfirmPush(SIDE, locale);
   out["scoreToConfirm.solo"] = scoreToConfirmPush(SOLO, locale);
   out["tournamentStart"] = tournamentStartPush({ tournamentId: 7, tournamentName: "Coupe" }, locale);
@@ -97,7 +97,25 @@ describe("notifications push — français inchangé", () => {
   it("rend chaque cas à l'identique de la version d'avant le lot 9-3", () => {
     // Seule différence voulue (revue sécurité) : le lien d'une alerte d'arbitrage
     // n'est plus la première URL de la ligne Discord — le texte, lui, est inchangé.
-    const before = { ...FR_BEFORE, "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" } };
+    // Les rappels « 1 h avant » (`PT1H`) et « une semaine » (`P7D`) ont depuis
+    // été retirés : leurs cas sortent de la comparaison. Le rappel restant ne
+    // promet plus un délai exact (le balayage peut l'envoyer tard dans sa
+    // fenêtre) : « Match dans moins de 24 heures », cas solo compris.
+    const kept = Object.fromEntries(
+      Object.entries(FR_BEFORE)
+        .filter(([name]) => !name.endsWith(".PT1H") && !name.endsWith(".P7D"))
+        // Le tableau des perdants porte le nom que lui donne le site
+        // (« Tableau perdants »), plus l'anglicisme « Loser bracket ».
+        .map(([name, content]): [string, PushContent] => {
+          const renamed = { ...content, body: content.body.replace("Loser bracket", "Tableau perdants") };
+          return [name, name.endsWith(".P1D") ? { ...renamed, title: "Match dans moins de 24 heures" } : renamed];
+        }),
+    );
+    const before = {
+      ...kept,
+      "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" },
+      "reminder.solo": { ...FR_BEFORE["reminder.solo"], title: "Match dans moins de 24 heures" },
+    };
     expect(allCases("fr")).toEqual(before);
   });
 
@@ -152,11 +170,11 @@ describe("notifications push — anglais", () => {
       body: "Les Renards vs Team Nova · Coupe BlueGenji. Mark yourself ready.",
       url: "/en/tournois/7#match-31",
     });
-    expect(en["reminder.LOWER.2.P1D"].title).toBe("Match in 24 hours");
+    expect(en["reminder.LOWER.2.P1D"].title).toBe("Match in less than 24 hours");
     expect(en["reminder.LOWER.2.P1D"].body).toContain("Lower bracket · round 2");
     expect(en["reminder.LOWER.2.P1D"].body).toContain("(Paris time)");
     expect(en["reminder.UPPER.1.null"].title).toBe("Match scheduled");
-    expect(en[`reminder.UPPER.${PLAYOFF_ROUND_OFFSET + 1}.PT1H`].body).toContain("Playoffs · round 2");
+    expect(en[`reminder.UPPER.${PLAYOFF_ROUND_OFFSET + 1}.P1D`].body).toContain("Playoffs · round 2");
     expect(en["privacyChange.1"].body).toBe("A. The details are waiting for you on your next visit.");
     expect(en["privacyChange.2"].body).toContain("(and 1 other)");
     expect(en["privacyChange.3"].body).toContain("(and 2 others)");
@@ -175,7 +193,7 @@ describe("notifications push — anglais", () => {
 
   it("donne l'heure de coup d'envoi en anglais, heure de Paris, sur 24 heures", () => {
     // 18:00 UTC le 10 septembre 2026 = 20:00 à Paris (heure d'été).
-    expect(en["reminder.UPPER.1.PT1H"].body).toContain("Thursday, September 10 at 20:00");
+    expect(en["reminder.UPPER.1.P1D"].body).toContain("Thursday, September 10 at 20:00");
   });
 
   it("ne reprend pas en anglais le texte Discord, resté français (D6)", () => {
@@ -208,6 +226,13 @@ describe("notifications push — anglais", () => {
     const fr31 = refereeAlertPush(REFEREE_LINE, "score_conflict-31", "fr", "score_conflict", match);
     expect(fr31.body).toBe(refereeAlertPush(REFEREE_LINE, "score_conflict-31", "fr", "score_conflict").body);
     expect(fr31.url).toBe("/tournois/7#match-31");
+  });
+
+  it("nomme une ronde suisse « Ronde N » / \"Round N\", comme la vue suisse du site", () => {
+    expect(pushRoundLabel("UPPER", 4, "fr", true)).toBe("Ronde 4");
+    expect(pushRoundLabel("UPPER", 4, "fr", true)).toBe(matchRoundLabel("UPPER", 4, true));
+    expect(pushRoundLabel("UPPER", 4, "en", true)).toBe("Round 4");
+    expect(pushRoundLabel("UPPER", 4, "fr")).toBe("Manche 4");
   });
 
   it("écrit « Playoffs » comme le reste du site anglais", () => {

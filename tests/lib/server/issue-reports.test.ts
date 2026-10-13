@@ -113,6 +113,33 @@ describe("reportTournamentIssue", () => {
     expect(message).toContain("Match : Manche 2 — Les Renards vs Team Nova (#31)");
   });
 
+  it("dit « Ronde N » pour une manche de phase suisse", async () => {
+    const execute = await mockDb([ENTRANT, [{ ...MATCH[0], swiss_round: 1 }]]);
+
+    await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
+
+    const matchSql = String(execute.mock.calls[1]?.[0]);
+    expect(matchSql).toContain("AS swiss_round");
+    // Le format du tournoi est déjà lu : la manche ne rejoint pas le tournoi.
+    expect(matchSql).not.toContain("bg_tournaments");
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).toContain("Match : Ronde 2 — Les Renards vs Team Nova (#31)");
+  });
+
+  it("dit « Ronde N » dans un tournoi suisse, en anglais \"Round N\"", async () => {
+    jest.mocked(subscribedStaffCandidates).mockResolvedValue([{ userId: 5, isAdmin: false, rolesJson: '["ARBITRE"]' }]);
+    jest.mocked(pushToUsers).mockResolvedValue(1);
+    await mockDb([[{ ...ENTRANT[0], tournament_format: "SWISS" }], [{ ...MATCH[0], swiss_round: 0 }]]);
+
+    await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
+
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).toContain("Match : Ronde 2 — Les Renards vs Team Nova (#31)");
+    const [, , content] = jest.mocked(pushToUsers).mock.calls[0];
+    expect(resolvePush(content, "en").body).toContain("Round 2");
+    expect(resolvePush(content).body).toContain("Ronde 2");
+  });
+
   it("refuse un message hors bornes avant toute lecture", async () => {
     const execute = await mockDb([ENTRANT]);
 

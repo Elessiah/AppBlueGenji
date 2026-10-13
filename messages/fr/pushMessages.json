@@ -10,19 +10,29 @@
   "matchReminder": {
     "title": "Match dans {offset}",
     "titleScheduled": "Match programmé",
+    "titleRescheduled": "Match reprogrammé",
+    "titleCleared": "Horaire du match retiré",
     "body": "{pairing} · {tournament}, {round}. Coup d'envoi {start} (heure de Paris).",
+    "bodyRescheduled": "Nouveau coup d'envoi : {start} (heure de Paris), au lieu du {previous}. {pairing} · {tournament}, {round}.",
+    "bodyCleared": "L'horaire du {previous} (heure de Paris) est retiré : un nouvel horaire te sera annoncé. {pairing} · {tournament}, {round}.",
+    "titleWithdrawn": "Match retiré de ton programme",
+    "bodyWithdrawn": "Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du {previous} (heure de Paris) ne te concerne plus. {pairing} · {tournament}, {round}.",
     "offset": {
-      "P7D": "une semaine",
-      "P1D": "24 heures",
-      "PT1H": "1 heure"
+      "P1D": "moins de 24 heures"
     }
+  },
+  "matchScheduled": {
+    "pairingSolo": "Un match",
+    "tbd": "TBD",
+    "bodyCleared": "L'horaire du {previous} (heure de Paris) est retiré. {pairing} · {tournament}, {round}."
   },
   "round": {
     "playoff": "Play-offs · tour {round}",
-    "lower": "Loser bracket · manche {round}",
+    "lower": "Tableau perdants · manche {round}",
     "grand": "Grande finale",
     "thirdPlace": "Petite finale",
-    "default": "Manche {round}"
+    "default": "Manche {round}",
+    "swiss": "Ronde {round}"
   },
   "scoreToConfirm": {
     "title": "Score à confirmer",

@@ -921,8 +921,9 @@ function RgpdFr({
         <div className={styles.prose}>
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
-            score à confirmer, du coup d&apos;envoi d&apos;un tournoi, des rappels de match et de ce
-            qui concerne votre compte ou votre équipe. <strong>Rien ne part sans votre geste</strong> :
+            score à confirmer, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
+            changé ou retiré) et de son rappel, et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            alertes de son rôle (alertes d&apos;arbitrage, matchs planifiés, signalements reçus). <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
           </p>
@@ -982,7 +983,7 @@ function RgpdFr({
           <ul>
             <li>
               <strong>Discord</strong> (États-Unis) : les messages privés du bot (code de
-              connexion, rappels de match, notifications) et les salons réservés au staff, qui ne
+              connexion, horaires et rappels de match, notifications) et les salons réservés au staff, qui ne
               portent aucun pseudo de joueur ; et la connexion par Discord, si vous la choisissez.
             </li>
             <li>

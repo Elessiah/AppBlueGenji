@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
  */
 
 jest.mock("@/lib/server/tournaments/repository");
+// Avis aux engagées des manches supprimées : couverts par departed-notices.test.ts.
+jest.mock("@/lib/server/tournaments/departed-notices");
 
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";

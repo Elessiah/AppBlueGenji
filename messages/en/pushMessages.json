@@ -10,19 +10,29 @@
   "matchReminder": {
     "title": "Match in {offset}",
     "titleScheduled": "Match scheduled",
+    "titleRescheduled": "Match rescheduled",
+    "titleCleared": "Match time removed",
     "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
+    "bodyRescheduled": "New kickoff: {start} (Paris time), instead of {previous}. {pairing} · {tournament}, {round}.",
+    "bodyCleared": "The time set for {previous} (Paris time) has been removed: a new time will be announced. {pairing} · {tournament}, {round}.",
+    "titleWithdrawn": "Match removed from your schedule",
+    "bodyWithdrawn": "The tournament has been updated and you no longer play this match: the time set for {previous} (Paris time) no longer applies to you. {pairing} · {tournament}, {round}.",
     "offset": {
-      "P7D": "a week",
-      "P1D": "24 hours",
-      "PT1H": "1 hour"
+      "P1D": "less than 24 hours"
     }
+  },
+  "matchScheduled": {
+    "pairingSolo": "A match",
+    "tbd": "TBD",
+    "bodyCleared": "The time set for {previous} (Paris time) has been removed. {pairing} · {tournament}, {round}."
   },
   "round": {
     "playoff": "Playoffs · round {round}",
     "lower": "Lower bracket · round {round}",
     "grand": "Grand final",
     "thirdPlace": "Third-place match",
-    "default": "Round {round}"
+    "default": "Round {round}",
+    "swiss": "Round {round}"
   },
   "scoreToConfirm": {
     "title": "Score to confirm",

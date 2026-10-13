@@ -37,6 +37,7 @@ import type {
   TournamentState,
 } from "@/lib/shared/types";
 import { cachedStats } from "@/lib/server/stats-cache";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /**
  * Bloc statistique complet d'une entité : l'agrégat affiché en tête de fiche et
@@ -141,15 +142,6 @@ type Membership = {
   leftAt: number | null;
 };
 
-/**
- * Liste de placeholders `?,?,?` pour un `IN (...)`. `db.execute` ne développe
- * pas les tableaux : les identifiants restent passés en paramètres liés, jamais
- * interpolés dans le SQL.
- */
-function placeholders(count: number): string {
-  return Array.from({ length: count }, () => "?").join(", ");
-}
-
 function timestamp(value: Date | string | null | undefined): number | null {
   if (value === null || value === undefined) return null;
   const parsed = value instanceof Date ? value.getTime() : Date.parse(value);
@@ -180,7 +172,7 @@ async function loadMatchRows(
   teamIds: number[] | null,
 ): Promise<MatchStatRow[]> {
   if (teamIds !== null && teamIds.length === 0) return [];
-  const list = teamIds === null ? "" : placeholders(teamIds.length);
+  const list = teamIds === null ? "" : sqlPlaceholders(teamIds.length);
   const [rows] = await db.execute<MatchStatRow[]>(
     `SELECT
       m.id,
@@ -234,7 +226,7 @@ async function loadRegistrationRows(
       t.finished_at
      FROM bg_tournament_registrations r
      JOIN bg_tournaments t ON t.id = r.tournament_id${teamIds === null ? "" : `
-     WHERE r.team_id IN (${placeholders(teamIds.length)})`}
+     WHERE r.team_id IN (${sqlPlaceholders(teamIds.length)})`}
      ORDER BY played_at DESC`,
     teamIds ?? [],
   );
@@ -491,7 +483,7 @@ async function loadMembershipsForUsers(
   db: Awaited<ReturnType<typeof getDatabase>>,
   userIds: number[] | null,
 ): Promise<Map<number, Membership[]>> {
-  const list = userIds === null ? "" : placeholders(userIds.length);
+  const list = userIds === null ? "" : sqlPlaceholders(userIds.length);
   const memberFilter = userIds === null ? "" : `
      WHERE user_id IN (${list})`;
   const soloFilter = userIds === null ? "IS NOT NULL" : `IN (${list})`;

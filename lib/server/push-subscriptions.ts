@@ -27,8 +27,11 @@ import {
 } from "@/lib/shared/push-notifications";
 import { type Locale } from "@/lib/shared/locales";
 import { cached } from "@/lib/shared/intl-cache";
+import { inBatches } from "@/lib/shared/in-batches";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 
 export function endpointHash(endpoint: string): string {
   return crypto.createHash("sha256").update(endpoint).digest("hex");
@@ -150,18 +153,49 @@ type SubscriptionRow = RowDataPacket & {
 /** Envois simultanés au plus : un tournoi prévient des dizaines d'appareils. */
 const PUSH_CONCURRENCY = 8;
 
-async function inBatches<T>(items: readonly T[], size: number, run: (item: T) => Promise<void>): Promise<void> {
-  for (let start = 0; start < items.length; start += size) {
-    await Promise.all(items.slice(start, start + size).map(run));
-  }
-}
-
 export type PushOptions = {
   /** `high` pour ce qui n'attend pas (départ de match) : réveille un téléphone en veille. */
   urgency?: "normal" | "high";
   /** Au-delà, un appareil éteint ne reçoit plus le message — il serait périmé. */
   ttlSeconds?: number;
 };
+
+/**
+ * Les appareils qu'un push de ce sujet atteint : abonnés, compte non supprimé,
+ * sujet non coupé. **Une seule écriture de la règle**, pour la distribution
+ * (`pushToUsers`) comme pour la question « ce joueur serait-il atteint ? »
+ * (`usersReachableByPush`). Paramètres : les comptes, puis le sujet.
+ */
+function reachableSubscriptionsSql(accounts: number): string {
+  return `FROM bg_push_subscriptions s
+       JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
+       WHERE s.user_id IN (${sqlPlaceholders(accounts)})
+         AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
+                         WHERE o.user_id = s.user_id AND o.topic = ?)`;
+}
+
+/**
+ * Comptes qu'un push de ce sujet atteindrait : au moins un appareil abonné, le
+ * sujet non coupé, compte non supprimé — la règle de `pushToUsers`, en une
+ * lecture pour toute une liste. Sans configuration push, ou sans la table
+ * (création avalée au démarrage) : personne.
+ */
+export async function usersReachableByPush(
+  userIds: readonly number[],
+  topic: PushTopic,
+  config: WebPushConfig | null = webPushConfig(),
+): Promise<Set<number>> {
+  const ids = [...new Set(userIds.filter((id) => Number.isInteger(id) && id > 0))];
+  if (!config || ids.length === 0) return new Set();
+  const db = await getDatabase();
+  const rows = await rowsOrEmptyIfMissingTable(
+    db.query<(RowDataPacket & { user_id: number })[]>(
+      `SELECT DISTINCT s.user_id ${reachableSubscriptionsSql(ids.length)}`,
+      [...ids, topic],
+    ),
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
+}
 
 /**
  * Remet un message à tous les appareils des comptes donnés, sauf ceux qui ont
@@ -181,14 +215,8 @@ export async function pushToUsers(
   if (!config || ids.length === 0) return 0;
   try {
     const db = await getDatabase();
-    const placeholders = ids.map(() => "?").join(", ");
     const [rows] = await db.query<SubscriptionRow[]>(
-      `SELECT s.id, s.endpoint, s.p256dh, s.auth, u.locale
-       FROM bg_push_subscriptions s
-       JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
-       WHERE s.user_id IN (${placeholders})
-         AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
-                         WHERE o.user_id = s.user_id AND o.topic = ?)`,
+      `SELECT s.id, s.endpoint, s.p256dh, s.auth, u.locale ${reachableSubscriptionsSql(ids.length)}`,
       [...ids, topic],
     );
     if (rows.length === 0) return 0;
@@ -207,33 +235,52 @@ export async function pushToUsers(
     }));
     const sent: number[] = [];
     const gone: number[] = [];
-    await inBatches(deliveries, PUSH_CONCURRENCY, async ({ row, payload }) => {
-      const outcome = await sendWebPush(
-        config,
-        { endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth },
-        payload,
-        options,
-      );
-      if (outcome === "SENT") sent.push(Number(row.id));
-      else if (outcome === "GONE") gone.push(Number(row.id));
-    });
-
-    // Le service a dit l'abonnement mort : l'appareil a désactivé les
-    // notifications ou désinstallé le navigateur. Le garder serait lui écrire
-    // à jamais — et garder une donnée qui ne sert plus.
-    if (gone.length > 0) {
-      await db.query(`DELETE FROM bg_push_subscriptions WHERE id IN (${gone.map(() => "?").join(", ")})`, gone);
+    try {
+      await inBatches(deliveries, PUSH_CONCURRENCY, async ({ row, payload }) => {
+        const outcome = await sendWebPush(
+          config,
+          { endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth },
+          payload,
+          options,
+        );
+        if (outcome === "SENT") sent.push(Number(row.id));
+        else if (outcome === "GONE") gone.push(Number(row.id));
+      });
+    } catch (error) {
+      // Un envoi en échec n'efface pas ceux qui ont abouti : le compte rendu
+      // (marques « reçu » des appelants) se fonde sur eux.
+      console.error("[push] envoi interrompu", error);
     }
-    if (sent.length > 0) {
-      await db.query(
-        `UPDATE bg_push_subscriptions SET last_success_at = NOW() WHERE id IN (${sent.map(() => "?").join(", ")})`,
-        sent,
-      );
-    }
+    await recordDeliveries(sent, gone);
+    // Ce qui a **atteint** un appareil, même si la tenue des abonnements a
+    // échoué ensuite : un appelant qui lirait 0 croirait n'avoir prévenu personne.
     return sent.length;
   } catch (error) {
     if (!isMissingTableError(error)) console.error("[push] distribution impossible", error);
     return 0;
+  }
+}
+
+/**
+ * Tenue des abonnements après une distribution, au meilleur effort. Le service
+ * a dit l'abonnement mort : l'appareil a désactivé les notifications ou
+ * désinstallé le navigateur — le garder serait lui écrire à jamais, et garder
+ * une donnée qui ne sert plus. Les autres datent leur dernier succès.
+ */
+async function recordDeliveries(sent: readonly number[], gone: readonly number[]): Promise<void> {
+  try {
+    const db = await getDatabase();
+    if (gone.length > 0) {
+      await db.query(`DELETE FROM bg_push_subscriptions WHERE id IN (${sqlPlaceholders(gone.length)})`, [...gone]);
+    }
+    if (sent.length > 0) {
+      await db.query(
+        `UPDATE bg_push_subscriptions SET last_success_at = NOW() WHERE id IN (${sqlPlaceholders(sent.length)})`,
+        [...sent],
+      );
+    }
+  } catch (error) {
+    if (!isMissingTableError(error)) console.error("[push] tenue des abonnements impossible", error);
   }
 }
 
@@ -254,7 +301,9 @@ export async function subscribedStaffCandidates(): Promise<
       `SELECT u.id, u.is_admin, u.platform_roles_json FROM bg_users u
        WHERE u.is_deleted = 0
          AND (u.is_admin = 1 OR u.platform_roles_json IS NOT NULL)
-         AND EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)`,
+         AND EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)
+         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
+                          WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
     );
     return rows.map((row) => ({
       userId: Number(row.id),

@@ -751,7 +751,9 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm, of a
-            tournament&apos;s kickoff, of match reminders and of what concerns your account or your team.{" "}
+            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, and of what
+            concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, scheduled
+            matches, incoming reports).{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>
@@ -805,8 +807,8 @@ export function RgpdEn({
           </p>
           <ul>
             <li>
-              <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match reminders,
-              notifications) and the staff-only channels, which carry no player username; and logging in through
+              <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match times and
+              reminders, notifications) and the staff-only channels, which carry no player username; and logging in through
               Discord, if you choose it.
             </li>
             <li>

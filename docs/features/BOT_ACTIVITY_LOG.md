@@ -34,7 +34,12 @@ Le libellé de manche vient de `matchRoundLabel`, partagé avec les rappels, les
 signalements et les alertes arbitre. L'arbre final de BlueGenji Survie numérote
 ses tours à partir de `PLAYOFF_ROUND_OFFSET` (1000) : ils s'annoncent donc
 « Play-offs · tour N », compté depuis 1, et non « Manche 1000 » juste après la
-« Manche 5 » de la qualification.
+« Manche 5 » de la qualification. Une manche de ronde suisse (tournoi `SWISS`
+ou phase suisse d'un `MULTI`) se lit « Ronde N » (anglais "Round N" dans les
+push), le mot de la vue suisse du site : chaque requête qui alimente un libellé
+lit la colonne `swiss_round` (`swissRoundSql`, format du tournoi puis de la
+phase par sa clé primaire, sans jointure ajoutée ; `swissPhaseSql` quand
+l'appelant tient déjà le format, comme le signalement).
 
 Le **retrait d'un engagé** et l'**abandon** sont deux lignes et non une, parce
 que ce sont deux faits : l'abandon laisse l'engagé au classement avec un forfait

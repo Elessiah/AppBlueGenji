@@ -4,11 +4,12 @@
  */
 
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import type { PlayoffRoundPlan } from "@/lib/shared/bg-survie/playoffs";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { createMatch } from "../repository";
 import { clearMapSets } from "../match-maps";
+import { forgetMatchReminders } from "../reminder-marks";
+import { departuresBetween, noteDeletedMatches, noteDepartedEntrants, type Poster } from "../departed-notices";
 
 /** Une rencontre d'arbre final telle qu'elle est posée en base. */
 type PlayoffMatchRow = {
@@ -120,6 +121,7 @@ export async function writePlayoffRound(
   let reusable = existing;
   if (!sameShape) {
     if (existing.length > 0) {
+      await noteDeletedMatches(conn, "tournament_id = ? AND round_number = ?", [tournamentId, round]);
       await conn.execute(`DELETE FROM bg_matches WHERE tournament_id = ? AND round_number = ?`, [
         tournamentId,
         round,
@@ -144,7 +146,7 @@ export async function writePlayoffRound(
     ["FINAL"],
   );
 
-  await clearRewrittenReminders(conn, rewrittenPlayoffMatchIds(reusable, plan));
+  await clearRewrittenReminders(conn, reusable, plan);
 }
 
 /**
@@ -194,30 +196,41 @@ async function writePlayoffPairing(
  * correction n'a pas touchée.
  */
 function rewrittenPlayoffMatchIds(reusable: PlayoffMatchRow[], plan: PlayoffRoundPlan): number[] {
+  // Paire non ordonnée : les mêmes engagées reposées dans l'autre sens jouent
+  // le même match, à l'horaire qu'elles tiennent.
+  const key = (a: number | null, b: number | null) =>
+    [a, b].map((id) => (id === null ? "" : String(id))).sort((x, y) => x.localeCompare(y)).join(":");
   return reusable
     .filter(
       (match, index) =>
         index < plan.length &&
-        (match.teamAId !== plan[index].pairing.teamAId ||
-          match.teamBId !== plan[index].pairing.teamBId),
+        key(match.teamAId, match.teamBId) !== key(plan[index].pairing.teamAId, plan[index].pairing.teamBId),
     )
     .map((match) => match.id);
 }
 
 /**
- * Efface les rappels des rencontres réécrites.
+ * Efface les rappels des rencontres réécrites ; les engagées qui en sont
+ * sorties apprennent, après le commit, que l'horaire qu'elles en avaient reçu
+ * ne les concerne plus (`../departed-notices`) — lu avant l'effacement.
  *
- * Sous `ignoreMissingTable` : la création de la table est avalée par un
- * `catch` dans `database/schema/standings.ts`, et une base à qui elle manque n'a aucun rappel
- * à effacer — ce n'est pas une raison de laisser l'arbre sur un tour périmé.
+ * Une table absente est tolérée (`forgetMatchReminders`, `noteDepartedEntrants`) :
+ * ce n'est pas une raison de laisser l'arbre sur un tour périmé.
  */
-async function clearRewrittenReminders(conn: PoolConnection, rewritten: number[]): Promise<void> {
-  if (rewritten.length > 0) {
-    await ignoreMissingTable(
-      conn.execute(
-        `DELETE FROM bg_match_reminders WHERE match_id IN (${rewritten.map(() => "?").join(", ")})`,
-        rewritten,
-      ),
-    );
-  }
+async function clearRewrittenReminders(
+  conn: PoolConnection,
+  reusable: PlayoffMatchRow[],
+  plan: PlayoffRoundPlan,
+): Promise<void> {
+  const rewritten = new Set(rewrittenPlayoffMatchIds(reusable, plan));
+  if (rewritten.size === 0) return;
+  const before = new Map<number, Poster>();
+  const after = new Map<number, Poster>();
+  reusable.forEach((match, index) => {
+    if (!rewritten.has(match.id)) return;
+    before.set(match.id, { team1Id: match.teamAId, team2Id: match.teamBId });
+    after.set(match.id, { team1Id: plan[index].pairing.teamAId, team2Id: plan[index].pairing.teamBId });
+  });
+  await noteDepartedEntrants(conn, departuresBetween(before, after));
+  await forgetMatchReminders(conn, [...rewritten]);
 }

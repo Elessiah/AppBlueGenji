@@ -25,6 +25,7 @@ import {
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
+import { noteDeletedMatches } from "./departed-notices";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
 interface TournamentSwissRow extends RowDataPacket {
@@ -494,6 +495,13 @@ async function ensureRound(
   if (samePlan(existing, desired)) return false;
   if (await roundHasScoreInput(conn, tournamentId, round, phaseId)) return false;
 
+  // Leurs engagées tenaient peut-être un horaire : l'avis se note avant la
+  // suppression (`departed-notices.ts`).
+  await noteDeletedMatches(conn, "tournament_id = ? AND phase_id = ? AND round_number = ?", [
+    tournamentId,
+    phaseId,
+    round,
+  ]);
   await conn.execute(
     `DELETE FROM bg_matches WHERE tournament_id = ? AND phase_id = ? AND round_number = ?`,
     [tournamentId, phaseId, round],

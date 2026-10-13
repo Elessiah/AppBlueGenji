@@ -231,6 +231,69 @@ export function formatForfeitCancelledLog(context: {
   return `${lead("🔙", "Abandon annulé", context.tournament)} : ${entrantLabel(context.entrant)} revient en lice, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
+/** « A vs B » d'une ligne d'horaire, une place encore vide se lisant « TBD ». */
+function scheduledPairLabel(team1: LogEntrant | null, team2: LogEntrant | null): string {
+  return `${team1 ? entrantLabel(team1) : "TBD"} vs ${team2 ? entrantLabel(team2) : "TBD"}`;
+}
+
+/**
+ * Match programmé ou reprogrammé par l'arbitrage
+ * (`lib/server/tournaments/match-schedule.ts`).
+ *
+ * Les engagées passent par `entrantLabel` (« un joueur » en tournoi
+ * individuel), une place encore vide se lit « TBD ». L'auteur y est « le
+ * staff », nommé dans pm2 (`publishStaffAction`). Une reprogrammation rappelle
+ * l'ancien horaire : l'arbitre qui lit le canal sait ce qui a bougé.
+ */
+export function formatMatchScheduledLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  startAt: string | Date;
+  previousStartAt: string | Date | null;
+  /** Date effacée puis reposée : « reprogrammé » sans ancienne date à citer. */
+  rescheduled?: boolean;
+}): string {
+  const pair = scheduledPairLabel(context.team1, context.team2);
+  const rescheduled = context.rescheduled ?? context.previousStartAt !== null;
+  const kind = rescheduled ? "Match reprogrammé" : "Match programmé";
+  const previous =
+    context.previousStartAt === null ? "" : `, au lieu du ${formatMatchStart(context.previousStartAt)}`;
+  return (
+    `${lead("🗓️", kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${pair} (#${context.matchId}), coup d'envoi ${formatMatchStart(context.startAt)} ` +
+    `(heure de Paris)${previous}, par ${ANONYMOUS_STAFF_LABEL}.`
+  );
+}
+
+/**
+ * Horaire d'un match retiré par l'arbitrage (`setMatchStartAt` avec une date
+ * vide). Mêmes règles que {@link formatMatchScheduledLog} : engagées par
+ * `entrantLabel`, « TBD » pour une place vide, auteur « le staff ».
+ */
+export function formatMatchScheduleClearedLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  previousStartAt: string | Date;
+}): string {
+  return (
+    `${lead("🗓️", "Horaire retiré", context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), l'horaire du ` +
+    `${formatMatchStart(context.previousStartAt)} (heure de Paris) est retiré, par ${ANONYMOUS_STAFF_LABEL}.`
+  );
+}
+
 /**
  * Retrait d'une inscription par le staff, avant le coup d'envoi
  * (`lib/shared/entrant-removal.ts`).
@@ -267,6 +330,8 @@ export function formatMatchResultLog(context: {
   tournament: BotLogTournament;
   bracket: string;
   roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
   team1: LogEntrant;
   team2: LogEntrant;
   /** `null` sur un forfait arbitré : le moteur n'y écrit aucun score. */
@@ -280,7 +345,7 @@ export function formatMatchResultLog(context: {
    */
   doubleForfeit?: boolean;
 }): string {
-  const round = matchRoundLabel(context.bracket, context.roundNumber);
+  const round = matchRoundLabel(context.bracket, context.roundNumber, context.swiss);
   // Un forfait prononcé par un arbitre laisse les deux scores à `null` : la
   // rencontre n'a pas été jouée. Écrire « 0–0 » raconterait un match nul.
   const team1 = entrantLabel(context.team1);

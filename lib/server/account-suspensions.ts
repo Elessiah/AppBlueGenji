@@ -39,15 +39,10 @@ import {
 import { suspensionPush } from "@/lib/shared/push-messages";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import type { StaffActor } from "@/lib/shared/log-privacy";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 
-/**
- * Une suspension qui court, écrite une fois pour toutes les lectures —
- * pendant SQL de `isSuspensionActive`. `alias` est celui de
- * `bg_account_suspensions` dans la requête appelante.
- */
-export function activeSuspensionSql(alias: string): string {
-  return `${alias}.lifted_at IS NULL AND ${alias}.starts_at <= NOW() AND (${alias}.ends_at IS NULL OR ${alias}.ends_at > NOW())`;
-}
+/** Une suspension qui court (`./suspension-sql`, sans dépendance). */
+export { activeSuspensionSql };
 
 /** Levée par `createSession` : le compte est suspendu, `notice` dit la décision. */
 export class AccountSuspendedError extends Error {

@@ -1,5 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { statusFromTeams } from "./_internal";
+import { noteDepartedEntrants, withoutSettledLater, type Departure } from "./departed-notices";
+import { forgetMatchReminders } from "./reminder-marks";
 
 /**
  * **Effets en cascade** d'une correction de résultat dans un tableau à
@@ -97,6 +99,7 @@ async function reopenEngineResolved(
   target: CascadeRow,
   targetId: number,
   depth: number,
+  departed: Departure[],
 ): Promise<number> {
   if (!isEngineResolved(target)) {
     // Une rencontre disputée derrière : le verrou aurait dû refuser. On
@@ -105,7 +108,7 @@ async function reopenEngineResolved(
   }
   // Ce que l'exemption avait fait monter redescend, en entier : la cible sera
   // tranchée de nouveau, et rien ne dit encore par qui.
-  const reopened = 1 + (await undoPropagation(connection, target, null, null, depth + 1, true));
+  const reopened = 1 + (await undoPropagation(connection, target, null, null, depth + 1, true, departed));
   await connection.execute(
     `UPDATE bg_matches
        SET team1_score = NULL, team2_score = NULL,
@@ -115,6 +118,42 @@ async function reopenEngineResolved(
     [targetId],
   );
   return reopened;
+}
+
+/**
+ * Une engagée **quitte** l'affiche : les marques de rappel (horaire reçu,
+ * observation, palier) appartenaient à l'ancienne, la remplaçante n'a rien
+ * reçu et doit recevoir l'annonce — même règle que `pushTeamToTarget`, qui ne
+ * la verrait plus (`./reminder-marks.ts`). Notée ici, effacée en une seule
+ * instruction à la fin de la cascade (`detachDownstreamOutcome`), après que
+ * l'horaire tenu par la sortante a été lu pour son avis (`./departed-notices`).
+ */
+function recordDeparture(
+  departed: Departure[],
+  target: CascadeRow,
+  targetId: number,
+  slot: number,
+  teamId: number | null,
+  leaving: boolean,
+): void {
+  if (!leaving || teamId === null) return;
+  // L'adversaire de l'horaire reçu : l'autre place, lue avant d'être vidée.
+  const opponent = slot === 1 ? target.team2_id : target.team1_id;
+  departed.push({ matchId: targetId, teamId, opponentId: opponent === null ? null : Number(opponent) });
+}
+
+/**
+ * Les manches quittées : l'horaire que les sortantes tenaient se lit d'abord —
+ * leurs joueurs apprendront, après le commit, qu'il ne les concerne plus
+ * (`./departed-notices`) —, puis les marques partent en une instruction.
+ */
+async function forgetDepartures(connection: PoolConnection, departed: Departure[]): Promise<void> {
+  await noteDepartedEntrants(connection, departed);
+  // Sauf les manches qu'un retour en arrière réglera lui-même (`./rollback.ts`).
+  await forgetMatchReminders(
+    connection,
+    withoutSettledLater(connection, [...new Set(departed.map((departure) => departure.matchId))]),
+  );
 }
 
 /**
@@ -140,6 +179,7 @@ async function vacateSlot(
   keepTeamId: number | null,
   depth: number,
   force: boolean,
+  departed: Departure[],
 ): Promise<number> {
   if (depth > MAX_DEPTH) return 0;
   const target = await loadRow(connection, targetId);
@@ -151,7 +191,7 @@ async function vacateSlot(
 
   if (currentId === keepTeamId && !(force && closed)) return 0;
 
-  const reopened = closed ? await reopenEngineResolved(connection, target, targetId, depth) : 0;
+  const reopened = closed ? await reopenEngineResolved(connection, target, targetId, depth, departed) : 0;
 
   const team1 = slot === 1 ? null : target.team1_id;
   const team2 = slot === 2 ? null : target.team2_id;
@@ -167,6 +207,7 @@ async function vacateSlot(
      WHERE id = ?`,
     [statusFromTeams(team1 === null ? null : Number(team1), team2 === null ? null : Number(team2)), targetId],
   );
+  recordDeparture(departed, target, targetId, slot, currentId, leaving);
   return reopened;
 }
 
@@ -182,6 +223,7 @@ async function undoPropagation(
   nextLoserTeamId: number | null,
   depth: number,
   force: boolean,
+  departed: Departure[],
 ): Promise<number> {
   const links: [number | null, number | null, number | null][] = [
     [match.next_winner_match_id, match.next_winner_slot, nextWinnerTeamId],
@@ -191,7 +233,7 @@ async function undoPropagation(
   let reopened = 0;
   for (const [targetId, slot, keep] of links) {
     if (targetId === null || slot === null) continue;
-    reopened += await vacateSlot(connection, Number(targetId), Number(slot), keep, depth, force);
+    reopened += await vacateSlot(connection, Number(targetId), Number(slot), keep, depth, force, departed);
   }
   return reopened;
 }
@@ -214,5 +256,8 @@ export async function detachDownstreamOutcome(
   match: CascadeLinks,
   next: { winnerTeamId: number | null; loserTeamId: number | null },
 ): Promise<number> {
-  return undoPropagation(connection, match, next.winnerTeamId, next.loserTeamId, 0, false);
+  const departed: Departure[] = [];
+  const reopened = await undoPropagation(connection, match, next.winnerTeamId, next.loserTeamId, 0, false, departed);
+  if (departed.length > 0) await forgetDepartures(connection, departed);
+  return reopened;
 }

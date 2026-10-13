@@ -27,7 +27,12 @@ import enPush from "@/messages/en/pushMessages.json";
 import frPush from "@/messages/fr/pushMessages.json";
 import enReports from "@/messages/en/reports.json";
 import frReports from "@/messages/fr/reports.json";
-import { formatMatchStart } from "./discord-notifications";
+import {
+  FIRST_SCHEDULE,
+  formatMatchStart,
+  type MatchReminderOffsetKey,
+  type ScheduleAnnouncement,
+} from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
@@ -86,13 +91,18 @@ export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", loc
 }
 
 /** Palier d'un rappel (`MATCH_REMINDER_OFFSETS`), par sa clé. */
-export type MatchReminderOffsetKey = "P7D" | "P1D" | "PT1H";
+export type { MatchReminderOffsetKey } from "./discord-notifications";
 
 /**
  * Libellé d'une manche (`matchRoundLabel`, français du journal Discord) dans
  * la langue du texte ; le français égale `matchRoundLabel` (testé).
  */
-export function pushRoundLabel(bracket: string, roundNumber: number, locale: Locale = DEFAULT_LOCALE): string {
+export function pushRoundLabel(
+  bracket: string,
+  roundNumber: number,
+  locale: Locale = DEFAULT_LOCALE,
+  swiss = false,
+): string {
   const text = TEXT[locale];
   if (isEndurancePlayoffRound(roundNumber) && bracket !== "THIRD_PLACE") {
     return text.t("round.playoff", { round: roundNumber - PLAYOFF_ROUND_OFFSET + 1 });
@@ -105,7 +115,7 @@ export function pushRoundLabel(bracket: string, roundNumber: number, locale: Loc
     case "THIRD_PLACE":
       return text.t("round.thirdPlace");
     default:
-      return text.t("round.default", { round: roundNumber });
+      return text.t(swiss ? "round.swiss" : "round.default", { round: roundNumber });
   }
 }
 
@@ -129,23 +139,200 @@ function pushMatchStart(startAt: string | Date, locale: Locale): string {
   ).format(date);
 }
 
-/** Rappel d'un match programmé (`offset` : son palier), ou annonce de son horaire (`null`). */
+type ScheduledMatchSide = MatchSide & {
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  startAt: string | Date;
+  /**
+   * Rencontre vers laquelle mène le lien, quand ce n'est pas `matchId` (qui
+   * reste l'étiquette) : la nouvelle rencontre d'une ronde réappariée, ou
+   * `null` — la page du tournoi — pour une rencontre supprimée.
+   */
+  linkMatchId?: number | null;
+};
+
+/** Lien d'un avis : la rencontre qui existe, ou la page du tournoi. */
+function sideHref(side: ScheduledMatchSide, locale: Locale): string {
+  const linked = side.linkMatchId === undefined ? side.matchId : side.linkMatchId;
+  return localeHref(tournamentMatchHref(side.tournamentId, linked), locale);
+}
+
+export type { ScheduleAnnouncement } from "./discord-notifications";
+
+
+function announcementTitle(offset: MatchReminderOffsetKey | null, rescheduled: boolean, text: PushText): string {
+  if (offset) return text.t("matchReminder.title", { offset: text.t(`matchReminder.offset.${offset}`) });
+  return rescheduled ? text.t("matchReminder.titleRescheduled") : text.t("matchReminder.titleScheduled");
+}
+
+/** Corps « qui · où · quand », avec l'ancienne date sur une reprogrammation. */
+function scheduleBody(
+  values: { pairing: string; tournament: string; round: string; startAt: string | Date },
+  announcement: ScheduleAnnouncement,
+  locale: Locale,
+): string {
+  const text = TEXT[locale];
+  const base = {
+    pairing: values.pairing,
+    tournament: values.tournament,
+    round: values.round,
+    start: pushMatchStart(values.startAt, locale),
+  };
+  const previous = announcement.rescheduled ? announcement.previousStartAt : null;
+  return previous
+    ? text.t("matchReminder.bodyRescheduled", { ...base, previous: pushMatchStart(previous, locale) })
+    : text.t("matchReminder.body", base);
+}
+
+/**
+ * Rappel d'un match programmé (`offset` : son palier), ou annonce de son
+ * horaire (`null`) — « reprogrammé », avec l'ancienne date, quand elle en
+ * remplace une autre.
+ */
 export function matchReminderPush(
-  side: MatchSide & { bracket: string; roundNumber: number; startAt: string | Date },
+  side: ScheduledMatchSide,
   offset: MatchReminderOffsetKey | null,
+  locale: Locale = DEFAULT_LOCALE,
+  announcement: ScheduleAnnouncement = FIRST_SCHEDULE,
+): PushContent {
+  const text = TEXT[locale];
+  const change = offset ? FIRST_SCHEDULE : announcement;
+  return {
+    title: announcementTitle(offset, change.rescheduled, text),
+    body: scheduleBody(
+      {
+        pairing: pairing(side, text),
+        tournament: side.tournamentName,
+        round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
+        startAt: side.startAt,
+      },
+      change,
+      locale,
+    ),
+    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
+    tag: `${matchTag(side.matchId)}-reminder`,
+  };
+}
+
+/**
+ * Horaire retiré par l'arbitrage : `side.startAt` porte l'horaire qui ne vaut
+ * plus. Même étiquette que l'annonce, qu'il remplace sur l'appareil.
+ */
+export function matchScheduleClearedPush(side: ScheduledMatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("matchReminder.titleCleared"),
+    body: text.t("matchReminder.bodyCleared", {
+      pairing: pairing(side, text),
+      tournament: side.tournamentName,
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
+      previous: pushMatchStart(side.startAt, locale),
+    }),
+    url: sideHref(side, locale),
+    tag: `${matchTag(side.matchId)}-reminder`,
+  };
+}
+
+/**
+ * Engagée retirée d'une manche par un changement du tournoi : `side.startAt`
+ * porte l'horaire qu'elle avait reçu et qui ne la concerne plus. Même
+ * étiquette que l'annonce, qu'il remplace sur l'appareil.
+ */
+export function matchWithdrawnPush(side: ScheduledMatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("matchReminder.titleWithdrawn"),
+    body: text.t("matchReminder.bodyWithdrawn", {
+      pairing: pairing(side, text),
+      tournament: side.tournamentName,
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
+      previous: pushMatchStart(side.startAt, locale),
+    }),
+    url: sideHref(side, locale),
+    tag: `${matchTag(side.matchId)}-reminder`,
+  };
+}
+
+/**
+ * Match programmé ou reprogrammé, pour l'arbitrage (`MATCH_SCHEDULED`) — mêmes
+ * titre et corps que l'annonce aux joueurs.
+ *
+ * Les deux engagées sont nommées quand ce sont des équipes ; en tournoi
+ * individuel, leurs noms sont des pseudos et la notification dit « Un match »
+ * (même règle que pour les joueurs). Une place encore vide se lit « TBD »,
+ * comme sur le plateau et au journal.
+ */
+type StaffScheduleInput = {
+  tournamentId: number;
+  tournamentName: string;
+  matchId: number;
+  team1Name: string | null;
+  team2Name: string | null;
+  solo: boolean;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  startAt: string | Date;
+  /** Rencontre du lien quand ce n'est pas `matchId` : `null` — la page du tournoi — pour une rencontre supprimée. */
+  linkMatchId?: number | null;
+};
+
+/** « A contre B » pour l'arbitrage : « Un match » en solo, « TBD » pour une place vide. */
+function staffPairing(input: StaffScheduleInput, text: PushText): string {
+  const tbd = text.t("matchScheduled.tbd");
+  return input.solo
+    ? text.t("matchScheduled.pairingSolo")
+    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+}
+
+export function matchScheduledStaffPush(
+  input: StaffScheduleInput,
+  announcement: ScheduleAnnouncement,
   locale: Locale = DEFAULT_LOCALE,
 ): PushContent {
   const text = TEXT[locale];
+  const pairingText = staffPairing(input, text);
   return {
-    title: offset ? text.t("matchReminder.title", { offset: text.t(`matchReminder.offset.${offset}`) }) : text.t("matchReminder.titleScheduled"),
-    body: text.t("matchReminder.body", {
-      pairing: pairing(side, text),
-      tournament: side.tournamentName,
-      round: pushRoundLabel(side.bracket, side.roundNumber, locale),
-      start: pushMatchStart(side.startAt, locale),
+    title: announcementTitle(null, announcement.rescheduled, text),
+    body: scheduleBody(
+      {
+        pairing: pairingText,
+        tournament: input.tournamentName,
+        round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+        startAt: input.startAt,
+      },
+      announcement,
+      locale,
+    ),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    // Étiquette distincte de l'annonce aux joueurs : un arbitre engagé dans le
+    // match garde les deux, plutôt que de voir sa version joueur (« Ton
+    // match ») remplacée par la version arbitre (« Un match »).
+    tag: `${matchTag(input.matchId)}-schedule`,
+  };
+}
+
+/**
+ * Horaire retiré, pour l'arbitrage (`MATCH_SCHEDULED`) : `input.startAt` porte
+ * l'horaire qui ne vaut plus. Même étiquette que l'avis « programmé » qu'il
+ * remplace sur l'appareil.
+ */
+export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("matchReminder.titleCleared"),
+    body: text.t("matchScheduled.bodyCleared", {
+      previous: pushMatchStart(input.startAt, locale),
+      pairing: staffPairing(input, text),
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
-    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
-    tag: `${matchTag(side.matchId)}-reminder`,
+    url: localeHref(
+      tournamentMatchHref(input.tournamentId, input.linkMatchId === undefined ? input.matchId : input.linkMatchId),
+      locale,
+    ),
+    tag: `${matchTag(input.matchId)}-schedule`,
   };
 }
 
@@ -280,6 +467,8 @@ export type RefereeAlertMatch = {
   matchId: number;
   bracket: string;
   roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`swissRoundSql`). */
+  swiss?: boolean;
 };
 
 /**
@@ -310,7 +499,7 @@ export function refereeAlertPush(
   else if (match) {
     body = text.t(`refereeAlert.${kind}Match`, {
       tournament: match.tournamentName,
-      round: pushRoundLabel(match.bracket, match.roundNumber, locale),
+      round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
     });
   } else body = text.t(`refereeAlert.${kind}`);
   return {
@@ -326,7 +515,7 @@ export function refereeAlertPush(
 
 /** Problème signalé par un engagé pendant un match (`issue-reports.ts`). */
 export function issueReportPush(
-  input: { tournamentId: number; tournamentName: string; match: { id: number; bracket: string; roundNumber: number } | null },
+  input: { tournamentId: number; tournamentName: string; match: { id: number; bracket: string; roundNumber: number; swiss?: boolean } | null },
   locale: Locale = DEFAULT_LOCALE,
 ): PushContent {
   const text = TEXT[locale];
@@ -335,7 +524,7 @@ export function issueReportPush(
     body: input.match
       ? text.t("issueReport.bodyRound", {
           tournament: input.tournamentName,
-          round: pushRoundLabel(input.match.bracket, input.match.roundNumber, locale),
+          round: pushRoundLabel(input.match.bracket, input.match.roundNumber, locale, input.match.swiss),
         })
       : text.t("issueReport.body", { tournament: input.tournamentName }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.match?.id ?? null), locale),

@@ -1,6 +1,22 @@
-import { describe, expect, it } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
+// Seule la lecture des horaires tenus est simulée ; `withoutSettledLater` reste réel.
+jest.mock("@/lib/server/tournaments/departed-notices", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/departed-notices")>(
+    "@/lib/server/tournaments/departed-notices",
+  ),
+  noteDepartedEntrants: jest.fn(),
+  flushDepartedNotices: jest.fn(),
+  discardDepartedNotices: jest.fn(),
+}));
+
 import type { PoolConnection } from "mysql2/promise";
 import { detachDownstreamOutcome } from "@/lib/server/tournaments/bracket-cascade";
+import { noteDepartedEntrants } from "@/lib/server/tournaments/departed-notices";
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 /**
  * Effets en cascade d'une correction dans un tableau à élimination : ce que
@@ -55,8 +71,16 @@ function row(overrides: Partial<Row> & { id: number }): Row {
   };
 }
 
-function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row } {
+function board(rows: Row[]): {
+  conn: PoolConnection;
+  get: (id: number) => Row;
+  forgotten: number[];
+  forgetCalls: () => number;
+} {
   const table = new Map(rows.map((r) => [r.id, { ...r }]));
+  /** Manches dont les marques de rappel ont été effacées. */
+  const forgotten: number[] = [];
+  let forgets = 0;
 
   const conn = {
     execute: async (sql: string, params: unknown[]) => {
@@ -65,6 +89,12 @@ function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row } 
       const target = table.get(id);
 
       if (q.startsWith("SELECT")) return [target ? [{ ...target }] : [], []];
+      if (q.startsWith("DELETE FROM bg_match_reminders")) {
+        forgets += 1;
+        // Les manches ; le dernier paramètre est la marque gardée (`STAFF`).
+        forgotten.push(...params.filter((param) => typeof param === "number").map(Number));
+        return [{ affectedRows: 1 }, []];
+      }
       if (!target) return [{ affectedRows: 0 }, []];
 
       if (q.includes("SET team1_score = NULL")) {
@@ -91,7 +121,7 @@ function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row } 
     },
   } as unknown as PoolConnection;
 
-  return { conn, get: (matchId) => table.get(matchId)! };
+  return { conn, get: (matchId) => table.get(matchId)!, forgotten, forgetCalls: () => forgets };
 }
 
 const links = (winnerTarget: number | null, slot: number | null = 1) => ({
@@ -195,8 +225,33 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     expect(get(2).live_started_at).toBeNull();
   });
 
+  it("efface les marques de rappel de l'affiche quittée : la remplaçante recevra l'annonce", async () => {
+    const { conn, forgotten } = board([row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 })]);
+    // L'horaire tenu par la sortante se lit avant l'effacement des marques.
+    let forgottenWhenNoted: number[] | null = null;
+    jest.mocked(noteDepartedEntrants).mockImplementation(async () => {
+      forgottenWhenNoted = [...forgotten];
+    });
+
+    await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: null, loserTeamId: null });
+
+    expect(forgotten).toEqual([2]);
+    // L'engagée 7 quitte la place 1 de la manche 2 : son avis est noté.
+    expect(noteDepartedEntrants).toHaveBeenCalledWith(conn, [{ matchId: 2, teamId: 7, opponentId: 10 }]);
+    expect(forgottenWhenNoted).toEqual([]);
+  });
+
+  it("garde les marques quand le créneau garde son engagée", async () => {
+    const { conn, forgotten } = board([row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 })]);
+
+    await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: null });
+
+    expect(forgotten).toEqual([]);
+    expect(noteDepartedEntrants).not.toHaveBeenCalled();
+  });
+
   it("vide aussi le créneau de perdant d'une double élimination", async () => {
-    const { conn, get } = board([
+    const { conn, get, forgotten, forgetCalls } = board([
       row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 }),
       row({ id: 5, status: "READY", team1_id: 8, team2_id: 11 }),
     ]);
@@ -210,6 +265,15 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     expect(get(2).team1_id).toBeNull();
     expect(get(5).team1_id).toBeNull();
     expect(get(5).status).toBe("PENDING");
+    // Les marques des deux affiches quittées partent en une seule instruction.
+    expect(forgotten).toEqual([2, 5]);
+    // Une seule lecture pour les deux sortantes.
+    expect(noteDepartedEntrants).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(noteDepartedEntrants).mock.calls[0][1]).toEqual([
+      { matchId: 2, teamId: 7, opponentId: 10 },
+      { matchId: 5, teamId: 8, opponentId: 11 },
+    ]);
+    expect(forgetCalls()).toBe(1);
   });
 });
 

@@ -16,6 +16,7 @@ import { loadForfeits, loadPenalties, loadQualificationOutcomes } from "./replay
 import { roundHasScoreInput, roundIsComplete, roundPairingsAreStale } from "./round-progress";
 import { loadEnduranceStandings, persistStandings } from "./standings-store";
 import { configOf, loadTournament, matchFormatOf } from "./tournament-row";
+import { noteDeletedMatches } from "../departed-notices";
 
 /**
  * Rejoue la phase qualificative, persiste le classement, puis :
@@ -101,6 +102,10 @@ export async function reconcileEndurance(
   let effectiveRound = currentRound;
   if (currentRound > 0 && !(await roundHasScoreInput(conn, tournamentId, currentRound))) {
     if (await roundPairingsAreStale(conn, tournamentId, currentRound, replayed)) {
+      await noteDeletedMatches(conn, "tournament_id = ? AND phase_id = 0 AND round_number = ?", [
+        tournamentId,
+        currentRound,
+      ]);
       await conn.execute(
         `DELETE FROM bg_matches WHERE tournament_id = ? AND phase_id = 0 AND round_number = ?`,
         [tournamentId, currentRound],

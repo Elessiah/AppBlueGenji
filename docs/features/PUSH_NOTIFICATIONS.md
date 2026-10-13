@@ -22,6 +22,9 @@ aujourd'hui et demain. D'où trois pièces, et une seule règle pour la suite.
 **La règle pour demain** : une notification nouvelle est une entrée de
 `PUSH_TOPICS`, un rédacteur dans `lib/shared/push-messages.ts`, et un appel à
 `notifyUsers` / `notifyStaff`. Son réglage paraît de lui-même sur `/profil`.
+`notifyStaff` écarte les comptes **suspendus** (`subscribedStaffCandidates`,
+même règle SQL que la session : `lib/server/suspension-sql.ts`) : un arbitre
+suspendu n'a plus de droit effectif, il ne reçoit plus rien du staff.
 Un balayage (`tests/lib/server/notification-channels.test.ts`) refuse tout
 `pushDiscordDirectMessages` hors de `notify.ts`, et tout `pushRefereeAlert` /
 `pushLeadershipAlert` hors d'un `notifyStaff` : une notification qui passerait à
@@ -35,12 +38,13 @@ ait un producteur côté serveur.
 | `MATCH_START` | Match entré en lancement (« déclare-toi prêt »), ou lancé sans être passé par là (lancement forcé) | Non |
 | `SCORE_TO_CONFIRM` | L'adversaire a saisi un score | Non |
 | `TOURNAMENT_START` | Coup d'envoi d'un tournoi où l'on est engagé | Non |
-| `MATCH_REMINDER` | Rappels J-7 / J-1 / H-1 et annonce d'horaire | Oui |
+| `MATCH_REMINDER` (« Horaires et rappels de match ») | Annonce de l'horaire posé, changé ou retiré par l'arbitrage (« Match programmé / reprogrammé », avec l'ancienne date ; « Horaire du match retiré »), « Match retiré de ton programme » quand une mise à jour du tournoi (correction de score, retour en arrière, ronde réappariée, plateau refait avant le départ, finales BG Survie réécrites) sort l'engagée de la manche, puis rappel J-1 (les rappels J-7 et H-1 sont retirés) | Oui |
 | `TEAM_JOIN_REQUEST` | Demande d'adhésion (gestion de l'équipe) | Oui |
 | `CONTENT_REPORT` | Signalement qui vise le compte ou son équipe | Oui |
 | `MODERATION` | Avatar ou logo masqué, supprimé, rétabli | Oui |
 | `PRIVACY_CHANGE` | Changement du traitement des données | Oui |
-| `REFEREE_ALERT` | Conflit de score, report non tranché, problème signalé (`tournaments`) | Oui (rôle arbitre) |
+| `REFEREE_ALERT` | Conflit de score, score resté trop longtemps sans confirmation, problème signalé (`tournaments`) | Oui (rôle arbitre) |
+| `MATCH_SCHEDULED` (« Matchs planifiés ») | Un autre arbitre planifie un match, ou en change ou en retire l'horaire — l'auteur du geste n'est pas prévenu ; un retrait d'un horaire encore devant donne « Horaire du match retiré » ; une manche planifiée supprimée par le moteur (ronde réappariée, retour en arrière) donne aussi « Horaire du match retiré », à **tout** le staff (personne n'est exclu : c'est le moteur qui l'a retirée) ; étiquette distincte de l'annonce aux joueurs (un arbitre qui joue reçoit les deux) (`tournaments`) | Ligne au journal Discord (`publishStaffAction`) pour un geste d'arbitre, aucune pour une suppression par le moteur ; pas de message privé |
 | `STAFF_REPORT` | Signalement ou contestation reçu (`moderation`) | Oui (direction) |
 
 Un compte **sans** moyen Discord est désormais un destinataire : il peut avoir

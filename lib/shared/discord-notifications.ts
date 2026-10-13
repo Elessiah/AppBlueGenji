@@ -5,11 +5,14 @@
  * des appels reste app → bot (comme l'auth, les logs et la fréquentation), le
  * bot n'appelant jamais le site en retour.
  *
- * 1. **Rappels de match** — une semaine, 24 h puis 1 h avant le coup d'envoi
- *    d'une manche programmée (`bg_matches.start_at`), en message privé à chaque
- *    joueur des deux engagées. Une date posée tardivement — à trois jours, à
- *    cinq heures — donne d'abord une **annonce** unique portant la date, puis
- *    les paliers qui restent devant.
+ * 1. **Rappels de match** — 24 h avant le coup d'envoi d'une manche programmée
+ *    (`bg_matches.start_at`), en message privé à chaque joueur des deux
+ *    engagées. Poser ou changer la date donne d'abord une **annonce** unique
+ *    qui la porte (« Match programmé » / « Match reprogrammé »), puis le rappel
+ *    s'il reste devant ; la retirer prévient aussi (« Horaire du match
+ *    retiré »). Les rappels « une semaine » et « 1 heure avant » ont été
+ *    retirés (demande de l'association, 2026-10 : trop de notifications) — le
+ *    départ du match (`MATCH_START`) tient lieu du dernier.
  * 2. **Signalement d'un problème** — un inscrit alerte le staff depuis la page
  *    du tournoi ou depuis un match ; le bot le relaie au canal de logs et au
  *    rôle arbitre.
@@ -22,15 +25,28 @@ import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/round
 import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { discordInline, discordQuote } from "./discord-text";
 
-/** Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`). */
-export type MatchReminderOffsetKey = "P7D" | "P1D" | "PT1H";
+/**
+ * Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`).
+ *
+ * `P7D` (une semaine avant) et `PT1H` (une heure avant) n'existent plus : les
+ * lignes déjà posées sous ces clés restent en base, inertes — le balayage ne
+ * lit que les clés de {@link MATCH_REMINDER_OFFSETS}.
+ */
+export type MatchReminderOffsetKey = "P1D";
 
 /** Palier de rappel : combien de temps avant le match, et comment le dire. */
 export interface MatchReminderOffset {
   key: MatchReminderOffsetKey;
   minutesBefore: number;
-  /** Formulation employée dans le message (« dans 24 heures »). */
+  /** Délai tel que l'annonce le promet (« Prochain rappel : 24 heures avant »). */
   label: string;
+  /**
+   * Délai tel que le rappel le dit (« dans moins de 24 heures »). Le balayage
+   * n'est entraîné que par le trafic : le rappel peut partir n'importe quand
+   * dans sa fenêtre, jusqu'à quelques minutes du coup d'envoi — il ne promet
+   * donc pas un délai exact, l'horaire du message le donne.
+   */
+  dueLabel: string;
 }
 
 /**
@@ -41,9 +57,7 @@ export interface MatchReminderOffset {
  * sépare du suivant.
  */
 export const MATCH_REMINDER_OFFSETS: readonly MatchReminderOffset[] = [
-  { key: "P7D", minutesBefore: 7 * 24 * 60, label: "une semaine" },
-  { key: "P1D", minutesBefore: 24 * 60, label: "24 heures" },
-  { key: "PT1H", minutesBefore: 60, label: "1 heure" },
+  { key: "P1D", minutesBefore: 24 * 60, label: "24 heures", dueLabel: "moins de 24 heures" },
 ];
 
 const MINUTE_MS = 60_000;
@@ -53,10 +67,9 @@ const MINUTE_MS = 60_000;
  *
  * Chaque palier ne vaut que dans **sa propre fenêtre** : `[début − palier,
  * début − palier suivant)`, le dernier s'arrêtant au coup d'envoi. Sans ce
- * découpage, une manche programmée pour dans trente minutes déclencherait d'un
- * coup les trois rappels — « dans une semaine », « dans 24 heures » et « dans
- * 1 heure » — pour le même match, dans la même seconde. Ici, elle ne déclenche
- * que le rappel d'une heure, le seul qui soit vrai.
+ * découpage, plusieurs paliers s'ouvriraient d'un coup pour une manche
+ * programmée tard, dans la même seconde. Il n'en reste qu'un (24 heures), mais
+ * la règle tient pour tout palier qu'on rajouterait.
  *
  * Rien ne part une fois le match commencé : un rappel en retard n'est plus un
  * rappel, et un match reprogrammé vers le passé (correction d'archive) ne doit
@@ -106,33 +119,56 @@ export const MATCH_REMINDER_HORIZON_MS =
 /**
  * Fenêtre de **lecture** du balayage : l'horizon, plus une journée de marge.
  *
- * La marge n'est pas décorative, elle est ce qui rend le premier palier
- * atteignable. Le balayage ne voit une manche que si elle est dans sa fenêtre
- * de lecture ; si celle-ci valait exactement l'horizon, toute manche serait
- * découverte **au moment même** où le palier « une semaine » s'ouvre, donc
- * toujours par le régime d'annonce — et ce palier ne partirait jamais. Une
- * journée d'avance laisse le site observer la manche avant que quoi que ce soit
- * ne soit dû, et les trois paliers courent alors normalement.
+ * Une manche que le balayage découvre (une engagée manquait quand l'arbitre a
+ * posé la date) est annoncée à sa première observation. La marge fait partir
+ * cette annonce une journée **avant** l'ouverture du rappel, qui court ensuite
+ * normalement — sans elle, l'annonce arriverait au moment même où le rappel
+ * s'ouvre, et le remplacerait.
  */
 export const MATCH_REMINDER_LOOKAHEAD_MS = MATCH_REMINDER_HORIZON_MS + 24 * 60 * MINUTE_MS;
 
 /**
  * Clé de la ligne posée à la **première observation** d'une manche programmée.
  *
- * Elle ne correspond à aucun message : elle marque que le site a vu cette date,
- * et sépare donc « le match vient d'être programmé » de « le temps a passé
- * depuis ». Sans elle, un match programmé à trois jours recevrait le rappel
- * « dans une semaine », puisqu'à J-3 la fenêtre de ce palier est bel et bien
- * ouverte.
+ * Elle ne correspond à aucun message : elle marque que l'annonce de cette date
+ * est **prise en charge** — par le balayage qui la pose (et annonce), ou par
+ * `setMatchStartAt`, qui la pose pour toute date posée sur deux engagées
+ * connues (annoncée aussitôt si elle est devant ; une correction d'archive
+ * dans le passé n'annonce rien). Sans elle, un match programmé à cinq heures
+ * recevrait un simple rappel au lieu de l'annonce qui porte la date ; c'est
+ * aussi le verrou de l'annonce : seule la requête qui pose la marque annonce.
  */
 export const MATCH_SEEN_KEY = "SEEN";
+
+/**
+ * Marque posée quand un message d'horaire (annonce ou rappel) est **réellement
+ * parti** vers au moins une engagée. Ni la marque d'observation (posée aussi
+ * en silence) ni celle d'un palier (réservée avant l'envoi, consommée sans
+ * message par une annonce) ne le prouvent. C'est elle qui fait dire
+ * « reprogrammé » à une nouvelle date et « retiré » à une date effacée.
+ * Survit aux changements de date ; tient dans `offset_key` (`VARCHAR(8)`).
+ * Seule source : les preuves héritées de l'ancien code des rappels (`P7D`,
+ * `PT1H`) y sont recopiées au démarrage (`RECENT_SCHEMA_CHANGES`).
+ */
+export const MATCH_TOLD_KEY = "TOLD";
+
+/**
+ * Marque de l'horaire **poussé aux arbitres** (`MATCH_SCHEDULED`) : posée
+ * quand l'avis « Match programmé » a atteint au moins un appareil, avec
+ * l'horaire poussé. Seul un horaire qu'elle tient se retire chez eux (« Horaire
+ * du match retiré ») : une date seulement journalisée (passée, match joué,
+ * tournoi clos) n'a rien à remplacer. Indépendante de l'affiche : une
+ * correction de score n'efface pas ce que les arbitres ont reçu.
+ */
+export const MATCH_STAFF_KEY = "STAFF";
+
 
 /**
  * Paliers dont la fenêtre est **déjà ouverte** à `now`.
  *
  * Ce sont ceux qu'une date posée tardivement fait manquer d'un coup : une
- * manche annoncée cinq heures avant le coup d'envoi laisse derrière elle les
- * paliers « une semaine » et « 24 heures ». Ils sont consommés sans message —
+ * manche annoncée cinq heures avant le coup d'envoi laisse derrière elle le
+ * palier « 24 heures ». Il est consommé sans message —
  * l'annonce les remplace tous par une seule ligne, qui porte la date — et seuls
  * les paliers encore devant continuent de courir.
  *
@@ -194,6 +230,31 @@ export interface MatchReminderContext {
   opponentName: string;
   roundLabel: string;
   startAt: string | Date;
+  /**
+   * Tournoi individuel : les deux noms sont des pseudos, que le message
+   * privé ne porte pas (aucun pseudo de joueur sur Discord) — il dit « Ton
+   * match », comme le push.
+   */
+  solo?: boolean;
+}
+
+/**
+ * Ce qu'une annonce d'horaire dit du changement : « reprogrammé » quand la date
+ * en remplace une que les joueurs connaissaient, et l'ancienne date quand elle
+ * est connue (une date effacée puis reposée n'en a plus).
+ */
+export type ScheduleAnnouncement = {
+  rescheduled: boolean;
+  previousStartAt?: string | Date | null;
+};
+
+/** Première annonce d'un horaire : rien à remplacer. */
+export const FIRST_SCHEDULE: ScheduleAnnouncement = { rescheduled: false };
+
+/** Ligne « qui contre qui » d'un message privé de match. */
+function pairingLine(context: MatchReminderContext): string {
+  if (context.solo) return "**Ton match**";
+  return `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`;
 }
 
 /**
@@ -211,9 +272,9 @@ export function buildMatchReminderMessage(
   context: MatchReminderContext,
 ): string {
   const lines = [
-    `**Rappel de match — dans ${offset.label}**`,
+    `**Rappel de match — dans ${offset.dueLabel}**`,
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`,
+    pairingLine(context),
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
@@ -221,7 +282,9 @@ export function buildMatchReminderMessage(
 }
 
 /**
- * Rédige l'annonce d'une manche programmée tardivement.
+ * Rédige l'annonce de l'horaire d'une manche : date posée ou changée par
+ * l'arbitrage (`rescheduled` quand elle en remplace une), ou découverte
+ * tardivement par le balayage.
  *
  * Un seul message, qui porte la date, là où les paliers manqués en auraient
  * envoyé deux ou trois d'affilée — et de travers : « ton match est dans une
@@ -231,17 +294,23 @@ export function buildMatchReminderMessage(
  *
  * @param context Ce qu'il y a à dire du match.
  * @param remaining Paliers encore à venir, pour annoncer la suite.
+ * @param announcement Date qui en remplace une autre (« Match reprogrammé »),
+ *                     et l'ancienne quand elle est connue.
  * @returns Le message privé à envoyer, en français.
  */
 export function buildMatchScheduleAnnouncement(
   context: MatchReminderContext,
   remaining: readonly MatchReminderOffset[] = [],
+  announcement: ScheduleAnnouncement = FIRST_SCHEDULE,
 ): string {
+  const previous = announcement.rescheduled ? announcement.previousStartAt : null;
   const lines = [
-    "**Match programmé**",
+    announcement.rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`,
-    `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
+    pairingLine(context),
+    previous
+      ? `Nouveau coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris), au lieu du ${formatMatchStart(previous)}`
+      : `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
   if (remaining.length > 0) {
     // Le prochain rappel est le palier restant le plus **lointain** : la liste
@@ -253,7 +322,46 @@ export function buildMatchScheduleAnnouncement(
 }
 
 /**
- * Libellé lisible d'une manche : « Manche 3 », « Loser bracket · manche 2 ».
+ * Rédige l'avis d'un horaire **retiré** par l'arbitrage : `context.startAt`
+ * porte l'horaire qui ne vaut plus. Mêmes lignes que l'annonce, pour que le
+ * joueur rapproche les deux messages.
+ *
+ * @returns Le message privé à envoyer, en français.
+ */
+export function buildMatchScheduleClearedNotice(context: MatchReminderContext): string {
+  const lines = [
+    "**Horaire du match retiré**",
+    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
+    pairingLine(context),
+    `L'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) est retiré : un nouvel horaire te sera annoncé.`,
+  ];
+  if (context.tournamentUrl) lines.push(context.tournamentUrl);
+  return lines.join("\n");
+}
+
+/**
+ * Rédige l'avis à une engagée **retirée** d'une manche par un changement du
+ * tournoi (correction, retour en arrière, ronde réappariée) : l'horaire qu'elle avait reçu (`context.startAt`) ne la concerne plus.
+ * Mêmes lignes que l'annonce, pour que le joueur rapproche les deux messages.
+ *
+ * @returns Le message privé à envoyer, en français.
+ */
+export function buildMatchWithdrawnNotice(context: MatchReminderContext): string {
+  const lines = [
+    "**Match retiré de ton programme**",
+    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
+    pairingLine(context),
+    `Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) ne te concerne plus.`,
+  ];
+  if (context.tournamentUrl) lines.push(context.tournamentUrl);
+  return lines.join("\n");
+}
+
+/**
+ * Libellé lisible d'une manche : « Manche 3 », « Tableau perdants · manche 2 »
+ * (le nom du tableau sur le site, `tournament.json` → `bracketLabels.LOWER`),
+ * « Ronde 2 » en ronde suisse — le mot du site (`tournamentViews.json` →
+ * `swiss.roundNoun`), tournoi `SWISS` ou phase suisse d'un `MULTI`.
  *
  * Partagé par les rappels et les signalements — les deux désignent la même
  * manche au même staff, et deux formulations différentes pour un seul match
@@ -261,9 +369,10 @@ export function buildMatchScheduleAnnouncement(
  *
  * @param bracket Partie de plateau (`UPPER`, `LOWER`, `GRAND`, `THIRD_PLACE`).
  * @param roundNumber Numéro de manche.
+ * @param swiss La manche est une ronde suisse (`swissRoundSql`).
  * @returns Le libellé en français.
  */
-export function matchRoundLabel(bracket: string, roundNumber: number): string {
+export function matchRoundLabel(bracket: string, roundNumber: number, swiss = false): string {
   // L'arbre final de BlueGenji Survie numérote ses tours à partir de
   // `PLAYOFF_ROUND_OFFSET` : affiché tel quel, le journal passait de
   // « Manche 5 » à « Manche 1000 ». Même libellé que le retour en arrière.
@@ -273,13 +382,13 @@ export function matchRoundLabel(bracket: string, roundNumber: number): string {
   const round = `manche ${roundNumber}`;
   switch (bracket) {
     case "LOWER":
-      return `Loser bracket · ${round}`;
+      return `Tableau perdants · ${round}`;
     case "GRAND":
       return "Grande finale";
     case "THIRD_PLACE":
       return "Petite finale";
     default:
-      return `Manche ${roundNumber}`;
+      return swiss ? `Ronde ${roundNumber}` : `Manche ${roundNumber}`;
   }
 }
 

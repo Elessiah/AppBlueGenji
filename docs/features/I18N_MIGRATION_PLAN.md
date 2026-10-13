@@ -584,14 +584,14 @@ La référence est désormais `I18N.md` ; cette table en garde l'historique.
 | En direct / le live | Live | Seulement une vraie diffusion (`pill-live`). |
 | À jour / Reconnexion… / Hors ligne | Up to date / Reconnecting… / Offline | Témoin de flux. |
 | Simple / Double élimination | Single / Double elimination | |
-| Ronde suisse | Swiss | |
+| Ronde suisse | Swiss | Une manche de ronde suisse se lit « Ronde N » / "Round N", notifications comprises. |
 | Survie par coupes | Survival (cuts) | |
 | BlueGenji Survie | BlueGenji's Survival | Nom de mode traduit (D7). |
 | Multi-phases | Multi-stage | |
 | Manche | Round | Unité d'un arbre / d'une ronde. |
 | Map / carte | Map | Une manche d'un match (score par map). |
 | BO5 / FT3 | Bo5 / FT3 (First to 3) | Notation gardée telle quelle. |
-| Haut / bas de tableau, Grande finale | Upper / Lower bracket, Grand final | |
+| Tableau principal / Tableau perdants (notifications : « Tableau perdants · manche N »), Grande finale | Upper / Lower bracket, Grand final | Nom du site (`tournament.json` → `bracketLabels`) ; « bas de tableau » et « Loser bracket » ne s'emploient plus. |
 | Forfait, double forfait | Forfeit, double forfeit | |
 | Arbitre | Referee | |
 | Signalement | Report | |

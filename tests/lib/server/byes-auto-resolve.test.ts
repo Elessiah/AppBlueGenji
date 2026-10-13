@@ -46,6 +46,21 @@ function hasPendingFeeder(matches: FakeMatch[], target: FakeMatch, slot: number 
 }
 
 /**
+ * La pose en aval écrit la place et le statut ensemble (`target-slot.ts`) : le
+ * statut suit l'autre place, comme la base le calcule. `false` : autre requête.
+ */
+function placeInSlot(q: string, values: unknown[], byId: (id: unknown) => FakeMatch): boolean {
+  const placed = /^UPDATE bg_matches SET team([12])_id = \?, status = IF\(team[12]_id IS NULL/.exec(q);
+  if (!placed) return false;
+  const target = byId(values[1]);
+  if (placed[1] === "1") target.team1_id = values[0] as number;
+  else target.team2_id = values[0] as number;
+  const other = placed[1] === "1" ? target.team2_id : target.team1_id;
+  target.status = other === null ? "PENDING" : "READY";
+  return true;
+}
+
+/**
  * Plateau en mémoire qui répond aux requêtes de `byes.ts` comme la base le
  * ferait — y compris la clause `NOT EXISTS` des candidats, évaluée sur l'état
  * **au moment de la lecture**.
@@ -94,14 +109,7 @@ function fakeBracket(matches: FakeMatch[]) {
       target.status = "COMPLETED";
       return [{ affectedRows: 1 }];
     }
-    if (q.startsWith("UPDATE bg_matches SET team1_id = ?")) {
-      byId(values[1]).team1_id = values[0] as number;
-      return [{ affectedRows: 1 }];
-    }
-    if (q.startsWith("UPDATE bg_matches SET team2_id = ?")) {
-      byId(values[1]).team2_id = values[0] as number;
-      return [{ affectedRows: 1 }];
-    }
+    if (placeInSlot(q, values, byId)) return [{ affectedRows: 1 }];
     if (q.startsWith("SELECT team1_id, team2_id")) {
       const target = byId(values[0]);
       return [[{ team1_id: target.team1_id, team2_id: target.team2_id }]];

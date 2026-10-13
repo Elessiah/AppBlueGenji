@@ -14,6 +14,7 @@ import {
 } from "@/lib/shared/survival";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
+import { noteDeletedMatches } from "./departed-notices";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
@@ -519,6 +520,13 @@ async function ensureNextRound(
   if (samePairings(existing, desired)) return false;
   if (await roundHasScoreInput(conn, tournamentId, nextRound, phaseId)) return false;
 
+  // Leurs engagées tenaient peut-être un horaire : l'avis se note avant la
+  // suppression (`departed-notices.ts`).
+  await noteDeletedMatches(conn, "tournament_id = ? AND phase_id = ? AND round_number = ?", [
+    tournamentId,
+    phaseId,
+    nextRound,
+  ]);
   await conn.execute(
     `DELETE FROM bg_matches WHERE tournament_id = ? AND phase_id = ? AND round_number = ?`,
     [tournamentId, phaseId, nextRound],

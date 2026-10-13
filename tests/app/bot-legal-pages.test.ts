@@ -319,6 +319,15 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(en).toContain("https://www.cnil.fr/fr/plaintes");
   });
 
+  it("says the site sends the recipient's BlueGenji username with each direct message (legal review #441)", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain(
+      "un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire et le message à remettre",
+    );
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain(
+      "a Discord ID or username, the recipient's BlueGenji username and the message to deliver",
+    );
+  });
+
   it("informs rather than binds: the policy is never 'accepted' by use", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).not.toMatch(/vous acceptez/i);
     expect(flatOf(PRIVACY_POLICY, "en")).not.toMatch(/you agree/i);

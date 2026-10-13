@@ -13,8 +13,8 @@
       "description": "A tournament your team is registered for has just started."
     },
     "MATCH_REMINDER": {
-      "label": "Match reminders",
-      "description": "One week, 24 h and then 1 h before a scheduled match, and the announcement of its time."
+      "label": "Match times and reminders",
+      "description": "A match's time when it is set, changed or removed, then a reminder within the 24 h before kickoff."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Join requests",
@@ -34,7 +34,11 @@
     },
     "REFEREE_ALERT": {
       "label": "Referee alerts",
-      "description": "A score conflict, an unresolved reschedule or a reported problem is waiting for a referee."
+      "description": "A score conflict, a score left unconfirmed for too long or a reported problem is waiting for a referee."
+    },
+    "MATCH_SCHEDULED": {
+      "label": "Scheduled matches",
+      "description": "Another referee schedules a match, or changes or removes its time — or a tournament update deletes a scheduled match."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",

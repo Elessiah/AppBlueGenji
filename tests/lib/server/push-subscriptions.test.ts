@@ -19,6 +19,7 @@ import {
   saveDisabledTopics,
   saveSubscription,
   subscribedStaffCandidates,
+  usersReachableByPush,
 } from "@/lib/server/push-subscriptions";
 import { sendWebPush, type WebPushConfig } from "@/lib/server/web-push";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -91,6 +92,37 @@ describe("pushToUsers", () => {
     expect(query.mock.calls[1]).toEqual([`DELETE FROM bg_push_subscriptions WHERE id IN (?)`, [11]]);
     expect(query.mock.calls[2][0]).toMatch(/SET last_success_at = NOW\(\) WHERE id IN \(\?\)/);
     expect(query.mock.calls[2][1]).toEqual([10]);
+  });
+
+  it("compte les appareils atteints même si la tenue des abonnements échoue ensuite", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
+      .mockRejectedValue(new Error("deadlock"));
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockResolvedValueOnce("GONE");
+
+    const count = await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG);
+
+    // Un appelant qui lirait 0 croirait n'avoir prévenu personne (marques « reçu »).
+    expect(count).toBe(1);
+    expect(error).toHaveBeenCalledWith("[push] tenue des abonnements impossible", expect.any(Error));
+    error.mockRestore();
+  });
+
+  it("compte les envois aboutis même si un autre envoi lève", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockRejectedValueOnce(new Error("réseau"));
+
+    expect(await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(1);
+    expect(error).toHaveBeenCalledWith("[push] envoi interrompu", expect.any(Error));
+    error.mockRestore();
   });
 
   it("rédige chaque appareil dans la langue de son titulaire, une fois par langue", async () => {
@@ -168,6 +200,33 @@ describe("pushToUsers", () => {
     expect(await pushToUsers([1], "MATCH_START", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(0);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe("usersReachableByPush", () => {
+  it("rend les comptes qu'un push de ce sujet atteindrait, en une lecture", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ user_id: 1 }, { user_id: 3 }]]);
+    pool({ query });
+
+    const reachable = await usersReachableByPush([1, 2, 3, 3], "MATCH_REMINDER", CONFIG);
+
+    expect([...reachable]).toEqual([1, 3]);
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain("u.is_deleted = 0");
+    expect(sql).toContain("o.topic = ?");
+    expect(params).toEqual([1, 2, 3, "MATCH_REMINDER"]);
+  });
+
+  it("ne lit rien sans configuration push ni compte, et tient une table absente pour vide", async () => {
+    const query = jest.fn<SqlQuery>();
+    pool({ query });
+    expect((await usersReachableByPush([1], "MATCH_REMINDER", null)).size).toBe(0);
+    expect((await usersReachableByPush([], "MATCH_REMINDER", CONFIG)).size).toBe(0);
+    expect(query).not.toHaveBeenCalled();
+
+    query.mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
+    expect((await usersReachableByPush([1], "MATCH_REMINDER", CONFIG)).size).toBe(0);
   });
 });
 
@@ -298,6 +357,8 @@ describe("staff, purge et export", () => {
     expect(await subscribedStaffCandidates()).toEqual([{ userId: 3, isAdmin: true, rolesJson: null }]);
     expect(query.mock.calls[0][0]).toMatch(/EXISTS \(SELECT 1 FROM bg_push_subscriptions/);
     expect(query.mock.calls[0][0]).toMatch(/is_deleted = 0/);
+    // Un compte suspendu n'a plus aucun droit effectif : il ne reçoit rien du staff.
+    expect(query.mock.calls[0][0]).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_account_suspensions sus\s+WHERE sus\.user_id = u\.id AND sus\.lifted_at IS NULL/);
   });
 
   it("oublie les abonnements restés muets au-delà de la durée déclarée", async () => {

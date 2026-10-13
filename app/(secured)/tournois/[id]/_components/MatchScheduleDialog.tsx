@@ -26,6 +26,7 @@ import {
   type MatchStartEntryField,
   type MatchStartEntryState,
 } from "@/lib/shared/match-start-entry";
+import { isMatchOver } from "@/lib/shared/match-schedule";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
@@ -67,13 +68,36 @@ function pendingPreview(text: TournamentDialogsText, state: MatchStartEntryState
 }
 
 /** Aide sous les champs : ce que la date va produire. */
-function startAtHint(text: TournamentDialogsText, refereeScheduling: boolean): string {
-  return text.t(refereeScheduling ? "schedule.hintPlanning" : "schedule.hint");
+function startAtHint(
+  text: TournamentDialogsText,
+  refereeScheduling: boolean,
+  entrantsKnown: boolean,
+  played: boolean,
+): string {
+  const base = text.t(refereeScheduling ? "schedule.hintPlanning" : "schedule.hint");
+  // Un match joué (ou au score saisi) n'annonce rien : la date n'est qu'une
+  // correction d'archive.
+  return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
 }
 
-/** Confirmation après enregistrement. */
-function savedMessage(text: TournamentDialogsText, touched: boolean, planning: boolean): string {
-  if (!touched) return text.t("schedule.cleared");
+/**
+ * Qui l'horaire prévient (`lib/server/tournaments/schedule-notices.ts`) : les
+ * joueurs des deux engagées, tout de suite — un retrait seulement en tournoi
+ * planifié par l'arbitrage. Une place encore vide : l'annonce attend le
+ * balayage des rappels, une fois les deux engagées connues.
+ */
+function scheduleNotice(text: TournamentDialogsText, refereeScheduling: boolean, entrantsKnown: boolean): string {
+  if (!entrantsKnown) return text.t("schedule.noticeTbd");
+  return text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice");
+}
+
+/**
+ * Confirmation après enregistrement — neutre : elle ne reprend pas le titre
+ * de l'avis aux joueurs (« Horaire du match retiré »), qui ne part pas
+ * toujours. Vider une date qui n'existait pas ne retire rien.
+ */
+function savedMessage(text: TournamentDialogsText, touched: boolean, planning: boolean, hadTime: boolean): string {
+  if (!touched) return text.t(hadTime ? "schedule.cleared" : "schedule.noTime");
   return text.t(planning ? "schedule.planned" : "schedule.saved");
 }
 
@@ -258,7 +282,7 @@ export function MatchScheduleDialog({
         const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
         throw new CodedError(code, mapError(code));
       }
-      showSuccess(savedMessage(text, entry.kind === "ready", planning));
+      showSuccess(savedMessage(text, entry.kind === "ready", planning, match.startAt !== null));
       onSaved();
       onClose();
     } catch (error) {
@@ -453,7 +477,13 @@ export function MatchScheduleDialog({
             id={HINT_ID}
             style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}
           >
-            {startAtHint(text, refereeScheduling)}
+            {startAtHint(
+              text,
+              refereeScheduling,
+              match.team1Id !== null && match.team2Id !== null,
+              // Tournoi clos : ses manches comptent pour jouées, rien n'est annoncé.
+              isMatchOver(match.status, tournamentFinished),
+            )}
           </p>
 
           {clearsLiveTrigger && (

@@ -15,6 +15,14 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/phases-repository");
 jest.mock("@/lib/server/tournaments/byes");
+// Avis aux engagées retirées : couverts par departed-notices.test.ts.
+jest.mock("@/lib/server/tournaments/departed-notices", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/departed-notices")>(
+    "@/lib/server/tournaments/departed-notices",
+  ),
+  noteDepartedEntrants: jest.fn(),
+  noteDeletedMatches: jest.fn(),
+}));
 
 import { createBracketIfMissing } from "@/lib/server/tournaments/bracket-generator";
 import { createSingleEliminationBracket } from "@/lib/server/tournaments/bracket-single";

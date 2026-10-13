@@ -446,7 +446,8 @@ describe("reconcileEndurance — réparation de l'arbre final", () => {
     const cleanup = conn.execute.mock.calls.find(([sql]) =>
       String(sql).includes("DELETE FROM bg_match_reminders"),
     );
-    expect(cleanup?.[1]).toEqual([601]);
+    // La marque de l'horaire poussé aux arbitres reste (`STAFF`).
+    expect(cleanup?.[1]).toEqual([601, "STAFF"]);
   });
 
   it("réécrit le tour même quand la table des rappels manque", async () => {

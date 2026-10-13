@@ -7,6 +7,7 @@ import {
   formatForfeitCancelledLog,
   formatForfeitLog,
   formatMatchResultLog,
+  formatMatchScheduledLog,
   formatPlayerSignupLog,
   formatRegistrationLog,
   formatRoundRolledBackLog,
@@ -81,6 +82,16 @@ const TOURNAMENT_LINES = () => [
     entrant: { name: "Les Renards", participantType: "TEAM" },
     points: 3,
   }),
+  formatMatchScheduledLog({
+    tournament: TOURNAMENT,
+    matchId: 42,
+    bracket: "UPPER",
+    roundNumber: 2,
+    team1: { name: "Les Renards", participantType: "TEAM" },
+    team2: { name: "Team Nova", participantType: "TEAM" },
+    startAt: "2026-09-10T18:00:00.000Z",
+    previousStartAt: "2026-09-09T18:00:00.000Z",
+  }),
 ];
 
 /**
@@ -122,6 +133,48 @@ describe("règles de rédaction communes", () => {
     const emojis = ALL_LINES().map((line) => line.split(" ")[0]);
 
     expect(new Set(emojis).size).toBe(emojis.length);
+  });
+});
+
+describe("formatMatchScheduledLog", () => {
+  const base = {
+    tournament: TOURNAMENT,
+    matchId: 42,
+    bracket: "LOWER",
+    roundNumber: 2,
+    team1: { name: "Les Renards", participantType: "TEAM" as const },
+    team2: { name: "Team Nova", participantType: "TEAM" as const },
+    startAt: "2026-09-10T18:00:00.000Z",
+    previousStartAt: null,
+  };
+
+  it("annonce une première date : manche, équipes, heure de Paris, auteur anonyme", () => {
+    expect(formatMatchScheduledLog(base)).toBe(
+      "🗓️ Match programmé — « Coupe BlueGenji » (#12) : Tableau perdants · manche 2 — Les Renards vs Team Nova (#42), " +
+        "coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris), par le staff.",
+    );
+  });
+
+  it("rappelle l'ancien horaire d'une reprogrammation", () => {
+    const line = formatMatchScheduledLog({ ...base, previousStartAt: "2026-09-09T16:30:00.000Z" });
+    expect(line).toMatch(/^🗓️ Match reprogrammé — /u);
+    expect(line).toContain("(heure de Paris), au lieu du mercredi 9 septembre à 18:30, par le staff.");
+  });
+
+  it("dit « reprogrammé » pour une date effacée puis reposée, sans ancienne date", () => {
+    const line = formatMatchScheduledLog({ ...base, previousStartAt: null, rescheduled: true });
+    expect(line).toMatch(/^🗓️ Match reprogrammé — /u);
+    expect(line).not.toContain("au lieu du");
+  });
+
+  it("ne nomme aucun joueur d'un tournoi individuel, et écrit TBD pour une place vide", () => {
+    const line = formatMatchScheduledLog({
+      ...base,
+      team1: { name: "Kiro", participantType: "SOLO" },
+      team2: null,
+    });
+    expect(line).toContain(`${ANONYMOUS_PLAYER_LABEL} vs TBD`);
+    expect(line).not.toContain("Kiro");
   });
 });
 
@@ -340,7 +393,7 @@ describe("formatMatchResultLog", () => {
     });
 
     expect(grand).toContain("Grande finale");
-    expect(lower).toContain("Loser bracket · manche 4");
+    expect(lower).toContain("Tableau perdants · manche 4");
   });
 });
 

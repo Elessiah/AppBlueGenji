@@ -201,7 +201,19 @@ describe("resolveBotLogs", () => {
       matchId: 31,
       bracket: "UPPER",
       roundNumber: 2,
+      swiss: false,
     });
+  });
+
+  it("nomme « Ronde N » la manche d'une ronde suisse, au journal comme dans l'alerte", async () => {
+    const execute = mockDb([[{ ...MATCH_ROW, swiss_round: 1, team1_score: null, team2_score: null, participant_type: "TEAM" }]]);
+
+    const [entry] = await resolveBotLogs([{ kind: "score_conflict", matchId: 31 }]);
+
+    expect(entry.message).toContain("Ronde 2");
+    expect(entry.message).not.toContain("Manche 2");
+    expect(entry.refereeMatch).toMatchObject({ swiss: true });
+    expect(String(execute.mock.calls[0][0])).toContain("AS swiss_round");
   });
 
   it("une ligne de journal n'emporte aucune manche", async () => {

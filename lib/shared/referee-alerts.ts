@@ -135,6 +135,8 @@ export interface RefereeAlertContext {
   matchId: number;
   bracket: string;
   roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
   /** Les engagées : un joueur ne part jamais sur Discord par son pseudo (`entrantLabel`). */
   team1: LogEntrant;
   team2: LogEntrant;
@@ -153,7 +155,7 @@ export interface RefereeAlertContext {
  * @param context La rencontre concernée.
  */
 function alertLine(emoji: string, reason: string, context: RefereeAlertContext): string {
-  const round = matchRoundLabel(context.bracket, context.roundNumber);
+  const round = matchRoundLabel(context.bracket, context.roundNumber, context.swiss);
   const line =
     `${emoji} Arbitrage requis — « ${discordInline(context.tournament.name)} » (#${context.tournament.id})` +
     ` · ${round} : ${entrantLabel(context.team1)} vs ${entrantLabel(context.team2)} (match #${context.matchId})` +

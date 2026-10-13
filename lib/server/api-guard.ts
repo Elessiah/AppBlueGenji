@@ -87,6 +87,21 @@ export const MATCH_LAUNCH_READ_RULE: RateLimitRule = {
   windowMs: 60_000,
 };
 
+/**
+ * Horaires de match posés, changés ou retirés par un arbitre : chaque geste
+ * écrit aux joueurs des deux engagées (message privé Discord, push) et pousse
+ * aux arbitres. Trois cents gestes en cinq minutes (un par seconde) laissent
+ * planifier d'une traite un plateau entier — 126 manches en double
+ * élimination à 64 —, réenregistrements compris ; au-delà, c'est un client qui
+ * boucle ou une session volée, et le bot risquerait les limites anti-spam de
+ * Discord.
+ */
+export const MATCH_SCHEDULE_WRITE_RULE: RateLimitRule = {
+  name: "match-schedule-write",
+  limit: 300,
+  windowMs: 5 * 60_000,
+};
+
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
 export const TOURNAMENT_READ_RULE: RateLimitRule = {
   name: "tournament-read",

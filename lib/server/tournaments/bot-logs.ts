@@ -41,6 +41,7 @@ import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot
 import { notifyStaff } from "@/lib/server/notify";
 import { refereeAlertPush, type RefereeAlertKind, type RefereeAlertMatch } from "@/lib/shared/push-messages";
 import { notifyTournamentStart } from "./player-pushes";
+import { discardDepartedNotices, flushDepartedNotices } from "./departed-notices";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
@@ -66,6 +67,8 @@ import {
   type RefereeAlertContext,
 } from "@/lib/shared/referee-alerts";
 import { tournamentPageUrl } from "./app-url";
+import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -270,6 +273,8 @@ export function markMatchResolved(connection: PoolConnection, matchId: number): 
 /** Jette les lignes réservées : la transaction n'a pas abouti. */
 export function discardBotLogs(connection: PoolConnection): void {
   pending.delete(connection);
+  // Les avis aux engagées retirées suivent la même transaction.
+  discardDepartedNotices(connection);
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.delete(connection);
@@ -285,6 +290,8 @@ export function discardBotLogs(connection: PoolConnection): void {
  * À appeler juste après le commit ; `discardBotLogs` couvre le chemin d'échec.
  */
 export function flushBotLogs(connection: PoolConnection): void {
+  // Les avis aux engagées retirées par une correction partent avec le journal.
+  flushDepartedNotices(connection);
   const queue = pending.get(connection) ?? [];
   pending.delete(connection);
   const settled = resolvedMatches.get(connection) ?? new Set<number>();
@@ -553,13 +560,8 @@ async function clearRefereeAlertsOnPool(matchIds: ReadonlySet<number>): Promise<
   if (matchIds.size === 0) return;
   try {
     const db = await getDatabase();
-    const ids = [...matchIds];
-    for (let from = 0; from < ids.length; from += CLEAR_ALERTS_CHUNK) {
-      const chunk = ids.slice(from, from + CLEAR_ALERTS_CHUNK);
-      await db.execute(
-        `DELETE FROM bg_referee_alerts WHERE match_id IN (${chunk.map(() => "?").join(", ")})`,
-        chunk,
-      );
+    for (const chunk of chunkIds([...matchIds], CLEAR_ALERTS_CHUNK)) {
+      await db.execute(`DELETE FROM bg_referee_alerts WHERE match_id IN (${sqlPlaceholders(chunk.length)})`, chunk);
     }
   } catch {
     // Meilleur effort.
@@ -767,6 +769,7 @@ type MatchLogRow = RowDataPacket & {
   id: number;
   bracket: string;
   round_number: number;
+  swiss_round: number;
   team1_score: number | null;
   team2_score: number | null;
   forfeit_team_id: number | null;
@@ -786,6 +789,7 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         m.id,
         m.bracket,
         m.round_number,
+        ${swissRoundSql("m", "tr")},
         m.team1_score,
         m.team2_score,
         m.forfeit_team_id,
@@ -824,6 +828,7 @@ async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertCon
     matchId: Number(match.id),
     bracket: String(match.bracket),
     roundNumber: Number(match.round_number),
+    swiss: isSwissRound(match),
     team1: { name: match.team1_name, participantType },
     team2: { name: match.team2_name, participantType },
   };
@@ -906,6 +911,7 @@ async function resolveMatchFinishedLog(
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },
     bracket: String(match.bracket),
     roundNumber: Number(match.round_number),
+    swiss: isSwissRound(match),
     team1: { name: match.team1_name, participantType: toParticipantType(match.participant_type) },
     team2: { name: match.team2_name, participantType: toParticipantType(match.participant_type) },
     team1Score: match.team1_score === null ? null : Number(match.team1_score),
@@ -923,6 +929,7 @@ function refereeMatchOf(context: RefereeAlertContext): RefereeAlertMatch {
     matchId: context.matchId,
     bracket: context.bracket,
     roundNumber: context.roundNumber,
+    swiss: context.swiss,
   };
 }
 
