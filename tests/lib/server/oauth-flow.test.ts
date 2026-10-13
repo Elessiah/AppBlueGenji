@@ -80,7 +80,7 @@ describe("startOAuth", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: false,
-      localeFromPage: true,
+      localeFromPage: false,
     });
   });
 
@@ -344,14 +344,32 @@ describe("completeOAuth — connexion", () => {
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/en/tournois", localeFromPage: false }));
   });
 
-  it("scelle la langue d'un départ cliqué sur une page du site, ou d'un navigateur sans l'en-tête", async () => {
-    await startOAuth(
-      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": "same-origin" } }),
-      "GOOGLE",
-    );
+  it.each<[string, Record<string, string>]>([
+    ["cliqué sur une page du site", { "sec-fetch-site": "same-origin" }],
+    ["d'un navigateur ancien, venu d'une page du site", { referer: "http://localhost:3000/en/connexion" }],
+  ])("scelle la langue d'un départ %s", async (_label, headers) => {
+    await startOAuth(new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers }), "GOOGLE");
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: true }));
-    await startOAuth(request("http://localhost:3000/api/auth/x/start"), "GOOGLE");
-    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: true }));
+  });
+
+  it.each<[string, Record<string, string>]>([
+    ["sans aucun en-tête de provenance", {}],
+    ["d'un navigateur ancien, venu d'un autre site", { referer: "https://evil.test/page" }],
+  ])("ne scelle pas la langue d'un départ %s", async (_label, headers) => {
+    await startOAuth(new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers }), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: false }));
+  });
+
+  it.each<[string, Record<string, string>, boolean]>([
+    ["un autre site", { "sec-fetch-site": "cross-site" }, false],
+    ["un sous-domaine", { "sec-fetch-site": "same-site" }, false],
+    ["un favori ou une adresse tapée", { "sec-fetch-site": "none" }, false],
+    ["un Referer d'un autre site", { referer: "https://evil.test/" }, false],
+    ["une page du site", { "sec-fetch-site": "same-origin" }, true],
+    ["un navigateur sans en-têtes (doute)", {}, true],
+  ])("conditions cochées (`terms=1`) depuis %s : retenues = %s", async (_label, headers, expected) => {
+    await startOAuth(new NextRequest("http://localhost:3000/api/auth/x/start?terms=1", { headers }), "DISCORD");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: expected }));
   });
 
   it("une connexion partie d'ailleurs que d'une page du site ouvre la session sans toucher à la langue du compte", async () => {

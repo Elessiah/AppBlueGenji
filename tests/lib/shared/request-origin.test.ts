@@ -7,6 +7,7 @@ import {
   apiWriteNeedsProvenance,
   isJsonContentType,
   isWriteMethod,
+  navigationProvenance,
   requestOriginRefusal,
 
   type RequestOriginSignals,
@@ -161,5 +162,36 @@ describe("apiWriteNeedsProvenance", () => {
   it("ne regarde que /api/", () => {
     expect(apiWriteNeedsProvenance("/tournois", "POST")).toBe(false);
     expect(apiWriteNeedsProvenance("/apiculture", "POST")).toBe(false);
+  });
+});
+
+describe("navigationProvenance — départ d'une navigation (lot 9-3)", () => {
+  const HOSTS = ["bluegenji.test", "localhost:3000"];
+  const of = (secFetchSite: string | null, referer: string | null = null) =>
+    navigationProvenance({ secFetchSite, referer, siteHosts: HOSTS });
+
+  it("tient `Sec-Fetch-Site: same-origin` pour un clic sur une page du site, et lui seul", () => {
+    expect(of("same-origin")).toBe("site");
+    expect(of(" Same-Origin ")).toBe("site");
+    for (const value of ["cross-site", "same-site", "none", "bizarre"]) expect(of(value)).toBe("elsewhere");
+  });
+
+  it("l'en-tête fait foi devant un Referer contraire", () => {
+    expect(of("cross-site", "https://bluegenji.test/connexion")).toBe("elsewhere");
+    expect(of("same-origin", "https://evil.test/")).toBe("site");
+  });
+
+  it("sans l'en-tête, lit l'hôte du Referer", () => {
+    expect(of(null, "https://bluegenji.test/en/connexion")).toBe("site");
+    expect(of(null, "http://LOCALHOST:3000/connexion")).toBe("site");
+    expect(of(null, "https://bluegenji.test.evil.test/")).toBe("elsewhere");
+    expect(of(null, "https://evil.test/?u=https://bluegenji.test")).toBe("elsewhere");
+    expect(of(null, "javascript:alert(1)")).toBe("elsewhere");
+    expect(of(null, "pas une adresse")).toBe("elsewhere");
+  });
+
+  it("sans aucun des deux en-têtes, ne tranche pas", () => {
+    expect(of(null)).toBe("unknown");
+    expect(of("", " ")).toBe("unknown");
   });
 });

@@ -792,7 +792,9 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
   it("dit ce qui est gardé, comment c'est posé, combien de temps, et ce que la suppression emporte", () => {
     expect(text()).toMatch(/français ou anglais/);
     expect(text()).toMatch(/notifications push/);
-    expect(text()).toMatch(/dernière connexion/);
+    expect(text()).toMatch(/connecté la dernière fois/);
+    // Une connexion lancée hors du site ne pose pas la langue (revue sécurité) : le texte le dit.
+    expect(text()).toMatch(/lancée d'ailleurs, par un lien ou un favori, ne la change pas/);
     expect(text()).toMatch(/Mon profil/);
     expect(text()).toMatch(/prochaine connexion faite dans l'autre langue/);
     expect(text()).toMatch(/le temps du compte/);
