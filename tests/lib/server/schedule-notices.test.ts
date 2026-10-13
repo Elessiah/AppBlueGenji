@@ -6,7 +6,7 @@ jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/tournaments/match-reminders");
 
 import { getDatabase } from "@/lib/server/database";
-import { loadEntrantPlayerIds, notifyStaff } from "@/lib/server/notify";
+import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
 import {
@@ -32,8 +32,6 @@ const ROW = {
   team1_name: "Les Renards",
   team2_name: "Team Nova",
   status: "READY",
-  team1_id: 101,
-  team2_id: 102,
 };
 
 function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChange {
@@ -67,7 +65,6 @@ beforeEach(() => {
   jest.mocked(announceMatchSchedule).mockResolvedValue(2);
   jest.mocked(announceMatchScheduleCleared).mockResolvedValue(2);
   jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 1 });
-  jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[101, [1, 2]], [102, [3]]]));
 });
 
 describe("isAnnounceableSchedule", () => {
@@ -94,7 +91,7 @@ describe("notifyMatchScheduleChange — première date", () => {
     expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: false, previousStartAt: null });
     expect(notifyStaff).toHaveBeenCalledTimes(1);
     expect(staffCall().topic).toBe("MATCH_SCHEDULED");
-    expect(staffCall().excludeUserIds).toEqual([9, 1, 2, 3]);
+    expect(staffCall().excludeUserIds).toEqual([9]);
     // Pas de message privé au rôle arbitre : une ligne de journal suffit.
     expect(staffCall().discord).toBeUndefined();
 
@@ -227,7 +224,7 @@ describe("notifyMatchScheduleChange — vie privée et cas limites", () => {
     mockMatch();
     await notifyMatchScheduleChange(change({ actor: null }));
     expect(publishStaffAction).not.toHaveBeenCalled();
-    expect(staffCall().excludeUserIds).toEqual([1, 2, 3]);
+    expect(staffCall().excludeUserIds).toEqual([]);
   });
 
   it("prévient les arbitres même si l'annonce aux joueurs échoue, sans jamais lever", async () => {
@@ -244,34 +241,10 @@ describe("notifyMatchScheduleChange — vie privée et cas limites", () => {
 });
 
 describe("notifyMatchScheduleChange — arbitre engagé dans le match", () => {
-  it("laisse hors du push arbitre l'auteur et les joueurs du match, qui ont déjà l'annonce", async () => {
+  it("ne laisse hors du push arbitre que l'auteur : un arbitre qui joue garde les deux versions", async () => {
     mockMatch();
     await notifyMatchScheduleChange(change());
-    expect(loadEntrantPlayerIds).toHaveBeenCalledWith([101, 102]);
-    expect(staffCall().excludeUserIds).toEqual([ACTOR.id, 1, 2, 3]);
-  });
-
-  it("garde la version arbitre pour les joueurs du match quand aucune annonce ne leur est partie", async () => {
-    // Place encore vide : l'annonce aux joueurs ne part pas, l'arbitre qui joue
-    // ce match n'apprendrait l'horaire de nulle part.
-    mockMatch({ ...ROW, team2_name: null, team2_id: null });
-    jest.mocked(announceMatchSchedule).mockResolvedValue(0);
-
-    await notifyMatchScheduleChange(change());
-
-    expect(loadEntrantPlayerIds).not.toHaveBeenCalled();
     expect(staffCall().excludeUserIds).toEqual([ACTOR.id]);
-  });
-
-  it("garde la version arbitre quand l'annonce aux joueurs a échoué", async () => {
-    mockMatch();
-    jest.mocked(announceMatchSchedule).mockRejectedValue(new Error("bot éteint"));
-    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
-
-    await notifyMatchScheduleChange(change());
-
-    expect(staffCall().excludeUserIds).toEqual([ACTOR.id]);
-    error.mockRestore();
   });
 });
 

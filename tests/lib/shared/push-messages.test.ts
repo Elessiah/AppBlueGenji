@@ -145,10 +145,10 @@ describe("matchScheduledStaffPush", () => {
       title: "Match programmé",
       body: "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
       url: "/tournois/7#match-31",
-      tag: "rencontre-31-reminder",
+      tag: "rencontre-31-schedule",
     });
-    // Un arbitre engagé dans le match ne garde qu'une notification : même étiquette.
-    expect(content.tag).toBe(matchReminderPush({ ...SIDE, ...input }, null).tag);
+    // Étiquette distincte : un arbitre qui joue ce match garde sa version joueur.
+    expect(content.tag).not.toBe(matchReminderPush({ ...SIDE, ...input }, null).tag);
   });
 
   it("dit « reprogrammé » quand la date en remplace une autre", () => {
