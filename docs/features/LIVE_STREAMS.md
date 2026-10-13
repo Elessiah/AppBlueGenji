@@ -190,7 +190,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   (FR et EN), politique du bot (`bot-legal-content.ts`) et entrée
   `2026-10-annonce-des-matchs-diffuses` de `PRIVACY_CHANGES`.
 - **Lien** : la diffusion du match, à défaut la chaîne officielle du tournoi —
-  celle que le site désigne au spectateur d'un match sans lien propre. Chacun
+  celle que le site désigne au spectateur d'un match sans lien propre (badge
+  sans lien, bouton « Regarder le live » de l'accueil) ; un caster
+  indépendant renseigne donc son lien, sans quoi l'annonce renvoie à la
+  chaîne officielle comme le reste du site. Chacun
   repasse par `normalizeStreamUrl`, et le bot revalide la liste blanche. Sans
   lien exploitable, pas d'annonce.
 - **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
@@ -216,7 +219,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   Un refus du corps (`400`) ou un délai dépassé n'est tracé que dans pm2
   (`console.error`). Côté bot, un salon fermé, une panne ou une permission
   manquante est signalé dans le canal de logs, au plus une fois par heure par
-  incident.
+  incident. Deux pannes de la base sont tracées sans essai suivant possible
+  ou promis : une réservation refusée (`réservation impossible`, réessayée au
+  passage suivant) et une réservation qui n'a pas pu être rendue
+  (`réservation non rendue`, l'annonce est perdue — à reposter à la main).
 - **Production — permissions Discord** dans #live : « Voir le salon »,
   « Envoyer des messages », « Mentionner @everyone, @here et tous les rôles »
   et « Intégrer des liens ». Sans la mention, le message part sans notifier ;
@@ -230,7 +236,9 @@ l'association, droit d'opposition. Elle ne montre que le **pseudo**, le **nom
 d'équipe** et les **résultats et performances en jeu** — ni webcam ni chat
 vocal des joueurs. Le site ne fait que **lier** les chaînes, sans lecteur
 intégré : il ne transmet rien aux plateformes, qui traitent leurs spectateurs en
-responsables de leur propre traitement (T16 : transferts « Aucun »).
+responsables de leur propre traitement. Seule l'annonce d'un match dans le
+salon #live passe par Discord (T16 : transfert vers les États-Unis, Discord,
+§ Annonce sur Discord).
 
 Le joueur en est informé là où il s'engage, sans case à cocher — ce n'est pas
 un consentement : sous le bouton d'inscription de la fiche du tournoi
