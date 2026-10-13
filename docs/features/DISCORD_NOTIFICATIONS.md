@@ -144,8 +144,9 @@ même étiquette que l'annonce qu'il remplace. Chemins couverts :
   périmé reconstruit — et rencontres d'arbre final réécrites sur place.
 
 Avant chaque `DELETE FROM bg_matches` du moteur, `noteDeletedMatches` (même
-filtre, constant) lit les manches visées **sous verrou** (une seule table) puis
-leurs marques `TOLD` sous verrou : une marque posée par un envoi concurrent
+filtre, constant) lit les manches visées **sous verrou** (une seule table, leurs
+seules places) puis leurs marques `TOLD` sous verrou, par paquets de 500 ; le
+contexte n'est lu que pour les manches dont un horaire est tenu : une marque posée par un envoi concurrent
 après l'image de la transaction n'échappe pas, et un envoi qui n'a pas encore
 posé la sienne attend la suppression puis ne trouve plus la manche ; un test
 balaie les sources pour qu'aucune suppression n'y échappe
@@ -164,7 +165,12 @@ jamais l'occupant actuel de l'autre place. Une engagée n'est notée qu'une
 fois par manche et par transaction, et une manche n'est lue qu'une fois par
 transaction : une seconde sortie sur la même manche (deux remplacements, ou une
 exemption puis une correction) retrouve l'horaire lu par la première, alors
-que ses marques ont été effacées entre-temps (le moteur n'écrit jamais `TOLD`). L'avis part après le commit avec le
+que ses marques ont été effacées entre-temps (le moteur n'écrit jamais `TOLD`).
+Seules les **détentrices** de l'horaire sont prévenues : l'affiche d'avant la
+première sortie notée sur la manche (chaque sortante et l'adversaire qu'elle
+avait), fixée pour la transaction ; l'adversaire nommé est l'autre
+détentrice. Une engagée posée puis retirée dans la même transaction n'avait
+rien reçu et n'est pas prévenue. L'avis part après le commit avec le
 journal (`flushBotLogs`) et se jette avec lui si le changement échoue
 (`discardBotLogs`) — même contrat de cycle de vie ; plafond de 512 avis par
 transaction (une ronde suisse entière réappariée en compte deux par manche ;
@@ -183,7 +189,10 @@ plateau refait recrée ses rencontres) n'a perdu que son horaire et lit
 nouvelle rencontre tient le même horaire, ni dans un tournoi sans horaires
 d'arbitrage (`referee_scheduling`) dont la nouvelle rencontre n'en a pas : le
 lancement préviendra, comme après un retrait ; les autres lisent « Match
-retiré de ton programme ». Une rencontre d'arbre final de BlueGenji Survie
+retiré de ton programme ». Accepté : la nouvelle rencontre n'a aucune marque,
+le balayage l'annonce donc comme un « Match programmé » 48 h avant (au même
+horaire, un doublon plutôt qu'un silence ; à un autre, « Horaire du match
+retiré » puis l'annonce du nouveau). Une rencontre d'arbre final de BlueGenji Survie
 réécrite avec les mêmes engagées dans l'autre sens n'est pas « changée » (paire
 non ordonnée, comme au retour en arrière). L'étiquette reste celle de l'ancienne
 rencontre (l'avis remplace son annonce sur l'appareil) ; le lien du push mène à
