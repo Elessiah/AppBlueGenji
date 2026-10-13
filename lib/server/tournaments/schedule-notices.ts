@@ -73,10 +73,13 @@ export type MatchScheduleChange = {
  * seulement s'ils avaient reçu un horaire — une date posée quand une place était
  * encore vide, jamais annoncée, ne se cite pas.
  */
-export function playerAnnouncement(change: MatchScheduleChange): ScheduleAnnouncement {
-  return change.alreadyAnnounced
-    ? { rescheduled: true, previousStartAt: change.previousStartAt }
-    : { rescheduled: false, previousStartAt: null };
+export function playerAnnouncement(change: MatchScheduleChange, now: Date = new Date()): ScheduleAnnouncement {
+  if (!change.alreadyAnnounced) return { rescheduled: false, previousStartAt: null };
+  // Une date d'avant déjà passée n'a été que journalisée (correction
+  // d'archive, saisie de travers) : les joueurs ne l'ont jamais reçue, on ne
+  // la leur cite pas.
+  const previous = change.previousStartAt === null ? Number.NaN : new Date(change.previousStartAt).getTime();
+  return { rescheduled: true, previousStartAt: previous > now.getTime() ? change.previousStartAt : null };
 }
 
 /**
