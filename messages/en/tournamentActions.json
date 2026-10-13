@@ -65,7 +65,7 @@
   },
   "register": {
     "streamNotice": {
-      "TEAM": "This tournament's matches may be streamed live and recorded, showing your username, your team's name and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name.",
+      "TEAM": "This tournament's matches may be streamed live and recorded, showing your username, your team's name and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name. When a streamed match starts, your team's name is also announced on the association's Discord.",
       "SOLO": "This tournament's matches may be streamed live and recorded, showing your username and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name."
     },
     "streamNoticeLink": "Learn more",
