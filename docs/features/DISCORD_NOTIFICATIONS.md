@@ -330,16 +330,20 @@ réservée retient l'horaire pour lequel elle l'est (`bg_match_reminders.start_a
 recopié de la manche ; `setMatchStartAt` y date l'observation), et seul l'envoi
 de cet horaire la rend (`start_at <=> ?`, `releaseDatedMarks` dans
 `reminder-marks.ts`, seul chemin de rendu) : un ancien envoi en échec n'efface
-pas les marques d'un changement plus récent. Un passage du balayage en échec
-est écrit dans pm2. Une réservation vérifie aussi les
+pas les marques d'un changement plus récent ; un rendu en échec est écrit dans
+pm2, comme un passage du balayage en échec (hors table absente). Une réservation vérifie aussi les
 engagées de la manche ; si `schedule-notices` ne peut relire la manche après
 le commit, il rend l'observation de la date, et le balayage l'annoncera (un
 redémarrage dans cet intervalle reste une limite connue : seul le rappel 24 h
 partirait) ; l'annonce d'un
 arbitre rend aussi l'observation posée par `setMatchStartAt`, et le balayage
-annoncera la manche. `setMatchStartAt` est rejoué sur interblocage
+annoncera la manche. `setMatchStartAt` est rejoué sur interblocage, ou sur le
+refus de l'isolation par instantané de MariaDB (`ER_CHECKREAD`, 1020)
 (`retryOnDeadlock`, `lib/server/tournaments/deadlock-retry.ts`, partagé avec le
-report de score).
+report de score). Une date posée sur un match au score saisi ne pose pas
+d'observation (tout part sauf `TOLD`) : si la rencontre revient à jouer, le
+balayage l'annoncera. La place remplacée par `pushTeamToTarget` se lit sous
+verrou (`FOR UPDATE`).
 
 Accepté, non changé : un message par engagée (chacune lit « ton équipe contre
 l'autre »), donc une lecture des abonnements push par message ; et la
