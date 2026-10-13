@@ -72,6 +72,10 @@ describe("MatchScheduleDialog — qui l'horaire prévient", () => {
     expect(frDialogs.schedule.notice).toContain("posé ou changé");
     expect(frDialogs.schedule.notice).not.toContain("retiré");
     expect(frDialogs.schedule.noticeTbd).toContain("dans les 48 h qui précèdent le coup d'envoi");
+    // « Engagées » n'a pas de sens en tournoi individuel.
+    for (const notice of [frDialogs.schedule.notice, frDialogs.schedule.noticePlanning, frDialogs.schedule.noticeTbd]) {
+      expect(notice).not.toContain("engagées");
+    }
     expect(enDialogs.schedule.noticePlanning).toContain("set, changed or removed");
     expect(enDialogs.schedule.notice).not.toContain("removed");
     expect(enDialogs.schedule.noticeTbd).toContain("within the 48 h before kickoff");
@@ -90,9 +94,9 @@ describe("MatchScheduleDialog — aide inchangée", () => {
 });
 
 describe("MatchScheduleDialog — confirmation d'un retrait", () => {
-  it("nomme le retrait comme la notification qu'il déclenche", () => {
-    expect(frDialogs.schedule.cleared).toBe("Horaire du match retiré.");
-    expect(enDialogs.schedule.cleared).toBe("Match time removed.");
+  it("confirme un retrait sans reprendre le titre de l'avis aux joueurs, qui ne part pas toujours", () => {
+    expect(frDialogs.schedule.cleared).toBe("Horaire effacé.");
+    expect(enDialogs.schedule.cleared).toBe("Time cleared.");
   });
 
   it("ne parle pas de retrait quand il n'y avait aucun horaire", () => {
