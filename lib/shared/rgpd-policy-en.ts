@@ -75,6 +75,10 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
     "Avatar",
     "Display on the profile and the brackets. Uploaded by you, or copied to our servers from Google or Discord at login — since September 30, 2026, the copied photo stays hidden until you tick “Avatar” in My profile (a photo copied before that date remains displayed: untick “Avatar” to hide it)",
   ],
+  [
+    "Account language",
+    "French or English: the language of push notifications. That of the site page you last logged in from, or the one you choose in My profile; reset to French if the account is anonymized",
+  ],
 ];
 
 /**

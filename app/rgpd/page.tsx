@@ -545,8 +545,9 @@ function RgpdFr({
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
               anti-CSRF), le nom du fournisseur, la page où vous ramener, l&apos;objet de la
               connexion (se connecter ou rattacher un compte), si vous avez accepté les conditions
-              d&apos;utilisation et si la connexion a été lancée depuis une page du site (seule
-              celle-ci règle la langue du compte). Aucun identifiant de personne.
+              d&apos;utilisation et si la connexion a été lancée depuis une page du site (sans
+              quoi ni la langue du compte ni l&apos;acceptation des conditions ne sont retenues).
+              Aucun identifiant de personne.
             </li>
             <li>
               <strong>bg_suspension_notice</strong> — déposé uniquement <strong>si une connexion

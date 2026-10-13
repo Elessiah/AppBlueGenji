@@ -421,8 +421,8 @@ export function RgpdEn({
               or Blizzard, and deleted on return. It lasts ten minutes at most and only contains a single-use random
               token (anti-CSRF protection), the provider&apos;s name, the page to bring you back to, the purpose of
               the login (logging in or linking an account), whether you accepted the terms of use and whether the
-              login was started from a page of the site (only then does it set the account language). No personal
-              identifier.
+              login was started from a page of the site (otherwise neither the account language nor the acceptance of
+              the terms is recorded). No personal identifier.
             </li>
             <li>
               <strong>bg_suspension_notice</strong> — set only <strong>if a login is refused because your account
