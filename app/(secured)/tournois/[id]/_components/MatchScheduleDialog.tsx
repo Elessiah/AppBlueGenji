@@ -91,9 +91,9 @@ function scheduleNotice(text: TournamentDialogsText, refereeScheduling: boolean,
 }
 
 /**
- * Confirmation après enregistrement. Vider une date qui n'existait pas ne
- * retire rien : la confirmation ne doit pas reprendre le titre de l'avis
- * « Horaire du match retiré », qui, lui, n'est pas parti.
+ * Confirmation après enregistrement — neutre : elle ne reprend pas le titre
+ * de l'avis aux joueurs (« Horaire du match retiré »), qui ne part pas
+ * toujours. Vider une date qui n'existait pas ne retire rien.
  */
 function savedMessage(text: TournamentDialogsText, touched: boolean, planning: boolean, hadTime: boolean): string {
   if (!touched) return text.t(hadTime ? "schedule.cleared" : "schedule.noTime");
