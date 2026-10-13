@@ -597,6 +597,10 @@ Elle dit aussi qu'un retrait se tait hors planification par l'arbitrage
 (intérêt légitime : droit d'opposition). Si la manche ne peut être relue après
 l'enregistrement (base injoignable, manche supprimée), l'auteur du geste reste
 tracé dans pm2 (`auditUnreadSchedule`, sans ligne Discord).
+Sur `/rgpd`, l'identifiant et le pseudo Discord portent, à côté du contrat,
+l'intérêt légitime pour ces messages (`MATCH_TIME_DM_SCOPE`), que le droit
+d'opposition nomme ; la politique du bot dit que le site lui transmet aussi le
+pseudo BlueGenji du destinataire (`label`, bilan d'envoi).
 
 ## Configuration
 
