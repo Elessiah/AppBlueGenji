@@ -262,7 +262,9 @@ function RgpdFr({
             ou Blizzard du fournisseur choisi — et d&apos;un pseudo site, attribué d&apos;office à
             la création. Il garde aussi une langue, français ou anglais (le français par défaut),
             posée à la connexion ou choisie dans Mon profil, qui sert à vous écrire vos
-            notifications : elle n&apos;est pas facultative, mais vous la changez quand vous voulez. Sans moyen de connexion, aucun compte ne peut être créé : les pages
+            notifications push (les messages Discord restent en français) : elle n&apos;est pas
+            facultative, mais vous la changez dans Mon profil (jusqu&apos;à votre prochaine connexion
+            faite dans l&apos;autre langue). Sans moyen de connexion, aucun compte ne peut être créé : les pages
             publiques restent lisibles, mais on ne peut ni rejoindre une équipe ni
             s&apos;inscrire à un tournoi. Le fournisseur transmet en outre ce que le tableau
             décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le

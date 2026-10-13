@@ -205,8 +205,9 @@ export function RgpdEn({
             <strong>Mandatory and optional data.</strong> To exist, an account only needs a means of logging in
             — the Google, Discord or Blizzard identifier of the chosen provider — and a site username, assigned
             automatically at creation. It also keeps a language, French or English (French by default), set at
-            login or chosen in My profile, used to write your notifications to you: it is not optional, but you
-            can change it whenever you like. Without a means of logging in, no account can be created: public pages
+            login or chosen in My profile, used to write your push notifications to you (Discord messages stay in
+            French): it is not optional, but you can change it in My profile (until you next log in from a page
+            in the other language). Without a means of logging in, no account can be created: public pages
             remain readable, but you can neither join a team nor register for a tournament. The provider also
             sends what the table describes for it, which comes with the login: the Discord username from
             Discord, the BattleTag from Blizzard (kept up to date at each login as long as the Battle.net
