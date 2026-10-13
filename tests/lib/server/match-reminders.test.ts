@@ -58,7 +58,7 @@ const RECIPIENTS: Recipient[] = [
 const SEEN = [{ match_id: 31, offset_key: "SEEN" }];
 
 /**
- * Câble la base : `query` sert les quatre lectures (matchs, clés déjà posées,
+ * Câble la base : `query` sert les trois lectures (matchs avec leurs marques,
  * joueurs des engagées, comptes), `execute` les réservations.
  */
 async function mockDb(options: {
@@ -69,12 +69,23 @@ async function mockDb(options: {
   toldClaimed?: boolean;
   told?: Date | null;
   current?: Date | null;
+  poster?: [number | null, number | null];
 }) {
   const recipients = options.recipients ?? RECIPIENTS;
+  // Les marques posées arrivent avec chaque manche (colonnes de la requête du balayage).
+  const sent = (options.sent ?? SEEN) as { match_id: number; offset_key: string }[];
+  const has = (matchId: number, key: string) => (sent.some((r) => r.match_id === matchId && r.offset_key === key) ? 1 : 0);
+  // Une manche dont le dernier palier (`P1D`) est pris n'est pas lue (`NOT EXISTS`).
+  const matches = ((options.matches ?? [MATCH]) as { id: number }[])
+    .filter((match) => has(match.id, "P1D") === 0)
+    .map((match) => ({
+    ...match,
+    seen_mark: has(match.id, "SEEN"),
+    told_mark: has(match.id, "TOLD"),
+  }));
   const query = jest
     .fn<() => Promise<unknown>>()
-    .mockResolvedValueOnce([options.matches ?? [MATCH]])
-    .mockResolvedValueOnce([options.sent ?? SEEN])
+    .mockResolvedValueOnce([matches])
     .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
     .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
   const execute = executeDouble(options);
@@ -95,11 +106,23 @@ function executeDouble(options: {
   toldClaimed?: boolean;
   told?: Date | null;
   current?: Date | null;
+  /** Engagées actuelles de la manche (par défaut celles de l'envoi). */
+  poster?: [number | null, number | null];
 }) {
   return jest.fn(async (sql: string, params?: unknown[]) => {
     if (sql.startsWith("SELECT m.start_at AS match_start_at")) {
       const told = options.told === undefined ? { told_id: null, start_at: null } : { told_id: 1, start_at: options.told };
-      return [[{ match_start_at: options.current === undefined ? START : options.current, ...told }]];
+      const [team1, team2] = options.poster ?? [101, 102];
+      return [
+        [
+          {
+            match_start_at: options.current === undefined ? START : options.current,
+            match_team1_id: team1,
+            match_team2_id: team2,
+            ...told,
+          },
+        ],
+      ];
     }
     if (sql.startsWith("INSERT IGNORE") && params?.[1] === "TOLD" && options.toldClaimed === false) {
       return [{ affectedRows: 0 }];
@@ -300,6 +323,15 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(claimedKeys(execute)).toEqual(["P1D"]);
   });
 
+  it("n'envoie rien quand une engagée a été remplacée depuis la lecture du balayage", async () => {
+    const { execute } = await mockDb({ poster: [101, 999] });
+
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(claimedKeys(execute)).toEqual(["P1D"]);
+  });
+
   it("ne rend rien d'une marque d'horaire reçu prise par un envoi concurrent", async () => {
     jest.mocked(pushToUsers).mockResolvedValue(0);
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
@@ -485,7 +517,11 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // soit observée avant que le palier 24 h ne s'ouvre.
     expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
     const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
-    expect(params).toEqual([2 * 24 * 60 * 60, "P1D"]);
+    // Marques lues dans la requête ; au-delà de 24 h, seule une manche jamais
+    // observée est lue (`SEEN` absent).
+    expect(params).toEqual(["SEEN", "TOLD", 2 * 24 * 60 * 60, 24 * 60 * 60, "SEEN", "P1D"]);
+    expect(sql).toMatch(/OR NOT EXISTS \(SELECT 1 FROM bg_match_reminders seen\s+WHERE seen\.match_id = m\.id AND seen\.offset_key = \?\)/);
+    expect(sql).toMatch(/EXISTS \(SELECT 1 FROM bg_match_reminders sm WHERE sm\.match_id = m\.id AND sm\.offset_key = \?\) AS seen_mark/);
     // Une manche dont le rappel 24 h est déjà pris n'est plus relue.
     expect(sql).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_match_reminders done\s+WHERE done\.match_id = m\.id AND done\.offset_key = \?\)/);
     expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
@@ -791,6 +827,17 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
         expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
       }
     }
+  });
+
+  it("ne prévient de rien quand la marque d'horaire reçu a disparu entre-temps", async () => {
+    const { query } = await mockClearedDb();
+    const { getDatabase } = await import("@/lib/server/database");
+    const execute = executeDouble({ current: null });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
+
+    expect(await announceMatchScheduleCleared(notice({ start_at: null }), "2026-09-10T18:00:00.000Z")).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
   });
 
   it("ne fait rien pour une manche jouée ou sans ses deux engagées", async () => {
