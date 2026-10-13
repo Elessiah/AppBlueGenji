@@ -155,7 +155,11 @@ pas couverte (le tournoi disparaît). Une manche supprimée dont l'horaire avait
 été poussé aux arbitres (marque `STAFF` encore valable, lue sous verrou avec
 les places) leur vaut aussi « Horaire du match retiré » après le commit
 (`announceDeletedMatchesToStaff`, personne exclu : c'est le moteur qui l'a
-retirée) — la marque part avec la manche.
+retirée ; quatre à la fois ; noms illisibles → « TBD » plutôt que rien) — la
+marque part avec la manche. Mêmes conditions qu'un retrait par l'arbitre : la
+manche n'est pas jouée et tient encore l'horaire poussé (un horaire déjà
+retiré, dont la marque a survécu faute d'appareil atteint, ne se retire pas
+deux fois).
 
 L'horaire est celui que tient la marque `TOLD`, lu dans la transaction
 **avant** l'effacement des marques ou la suppression, par une seule lecture
