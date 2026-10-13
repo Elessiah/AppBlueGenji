@@ -7,7 +7,7 @@
  * ses marques appartenaient à l'ancienne affiche. Les nouvelles engagées n'ont
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
-import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
@@ -46,38 +46,74 @@ export async function releaseDatedMarks(
 }
 
 /**
+ * Réservation de la marque des arbitres pour un envoi : ce qu'elle tenait
+ * avant (à rendre si l'envoi n'atteint personne), ou `held` — elle tenait
+ * déjà cet horaire, preuve d'un envoi précédent qui ne se rend pas.
+ */
+export type StaffReservation =
+  | { kind: "held" }
+  | { kind: "reserved"; id: number; startAt: string; previous: Date | string | null }
+  /** Marque illisible : l'envoi part, rien à rendre. */
+  | { kind: "unmarked" };
+
+type StaffRow = RowDataPacket & { id: number; start_at: Date | string | null };
+
+/**
  * Retient l'horaire poussé aux arbitres ({@link MATCH_STAFF_KEY}) — **avant**
  * l'envoi, pour qu'un retrait qui suivrait de près le trouve, et seulement
  * s'il est encore celui de la manche (un changement plus récent l'emporte).
- * Rendue par {@link releaseStaffPush} si l'envoi n'atteint personne. Au
- * meilleur effort : sans elle, son retrait ne leur sera simplement pas poussé.
+ * Rendue par {@link releaseStaffPush} si l'envoi n'atteint personne — à ce
+ * qu'elle tenait avant, jamais quand elle tenait déjà cet horaire (la preuve
+ * d'un envoi précédent qui, lui, a atteint les arbitres).
+ *
+ * @returns `null` : la manche ne tient plus cet horaire (changé ou retiré
+ *          depuis) — rien à pousser, le geste plus récent a ses propres avis.
  */
-export async function markStaffPushed(matchId: number, startAt: string): Promise<boolean> {
+export async function markStaffPushed(matchId: number, startAt: string): Promise<StaffReservation | null> {
+  const time = new Date(startAt);
   try {
     const db = await getDatabase();
+    const [rows] = await db.execute<StaffRow[]>(
+      `SELECT id, start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
+      [matchId, MATCH_STAFF_KEY],
+    );
+    const before = rows[0];
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)
        SELECT id, ?, start_at FROM bg_matches WHERE id = ? AND start_at = ?
        ON DUPLICATE KEY UPDATE start_at = ?`,
-      [MATCH_STAFF_KEY, matchId, new Date(startAt), new Date(startAt)],
+      [MATCH_STAFF_KEY, matchId, time, time],
     );
-    // Aucune ligne : la manche ne tient plus cet horaire (changé ou retiré
-    // depuis) — rien à pousser, le geste plus récent a ses propres avis.
-    return result.affectedRows > 0;
+    if (result.affectedRows === 0) return null;
+    if (before && before.start_at !== null && new Date(before.start_at).getTime() === time.getTime()) {
+      return { kind: "held" };
+    }
+    return { kind: "reserved", id: before ? Number(before.id) : Number(result.insertId), startAt, previous: before?.start_at ?? null };
   } catch (error) {
     // Table absente ou marque illisible : on pousse quand même (sans marque,
     // le retrait ne sera simplement pas poussé).
     if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non retenu", error);
-    return true;
+    return { kind: "unmarked" };
   }
 }
 
-/** Rend la marque réservée par {@link markStaffPushed} : l'envoi n'a atteint aucun appareil. */
-export async function releaseStaffPush(matchId: number, startAt: string): Promise<void> {
-  await deleteStaffMark(
-    `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`,
-    [matchId, MATCH_STAFF_KEY, new Date(startAt)],
-  );
+/**
+ * Rend la marque réservée par {@link markStaffPushed} : l'envoi n'a atteint
+ * aucun appareil. Elle retrouve ce qu'elle tenait (ou disparaît), sur sa
+ * ligne et seulement si elle tient encore l'horaire de cet envoi.
+ */
+export async function releaseStaffPush(reservation: StaffReservation): Promise<void> {
+  if (reservation.kind !== "reserved") return;
+  const { id, startAt, previous } = reservation;
+  if (previous === null) {
+    await writeStaffMark(`DELETE FROM bg_match_reminders WHERE id = ? AND start_at <=> ?`, [id, new Date(startAt)]);
+  } else {
+    await writeStaffMark(`UPDATE bg_match_reminders SET start_at = ? WHERE id = ? AND start_at <=> ?`, [
+      new Date(previous),
+      id,
+      new Date(startAt),
+    ]);
+  }
 }
 
 /**
@@ -86,7 +122,7 @@ export async function releaseStaffPush(matchId: number, startAt: string): Promis
  * l'envoi : sa marque vaut pour la nouvelle annonce). Au meilleur effort.
  */
 export async function forgetStaffPush(matchId: number, startAt: string): Promise<void> {
-  await deleteStaffMark(
+  await writeStaffMark(
     `DELETE FROM bg_match_reminders
       WHERE match_id = ? AND offset_key = ? AND start_at <=> ?
         AND NOT EXISTS (SELECT 1 FROM bg_matches m WHERE m.id = ? AND m.start_at <=> ?)`,
@@ -94,7 +130,7 @@ export async function forgetStaffPush(matchId: number, startAt: string): Promise
   );
 }
 
-async function deleteStaffMark(sql: string, params: (number | string | Date)[]): Promise<void> {
+async function writeStaffMark(sql: string, params: (number | string | Date)[]): Promise<void> {
   try {
     const db = await getDatabase();
     await db.execute(sql, params);

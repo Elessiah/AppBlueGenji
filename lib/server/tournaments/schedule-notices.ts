@@ -221,7 +221,8 @@ async function notifyReferees(
 
   // Réservée avant l'envoi : un retrait qui suivrait de près doit la trouver.
   // Refusée, la manche ne tient plus cet horaire : rien à pousser.
-  if (!(await markStaffPushed(change.matchId, change.startAt))) return 0;
+  const reservation = await markStaffPushed(change.matchId, change.startAt);
+  if (reservation === null) return 0;
   // L'auteur ne se prévient pas lui-même. Un arbitre qui joue ce match reçoit
   // les deux versions (étiquettes distinctes) : un doublon plutôt qu'une
   // annonce qui en remplace une autre, ou aucune.
@@ -247,7 +248,7 @@ async function notifyReferees(
       ),
   });
   // Aucun appareil atteint : rien à retirer chez eux plus tard.
-  if (pushed === 0) await releaseStaffPush(change.matchId, change.startAt);
+  if (pushed === 0) await releaseStaffPush(reservation);
   return pushed;
 }
 
