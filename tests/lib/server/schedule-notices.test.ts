@@ -77,7 +77,7 @@ describe("notifyMatchScheduleChange — première date", () => {
 
     await notifyMatchScheduleChange(change());
 
-    expect(announceMatchSchedule).toHaveBeenCalledWith(42, false);
+    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: false, previousStartAt: null });
     expect(notifyStaff).toHaveBeenCalledTimes(1);
     expect(staffCall().topic).toBe("MATCH_SCHEDULED");
     expect(staffCall().excludeUserIds).toEqual([9]);
@@ -116,11 +116,25 @@ describe("notifyMatchScheduleChange — date changée", () => {
 
     await notifyMatchScheduleChange(change({ previousStartAt: OLD_START }));
 
-    expect(announceMatchSchedule).toHaveBeenCalledWith(42, true);
+    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: true, previousStartAt: OLD_START });
     expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
+    expect(resolvePush(staffCall().push).body).toContain(", au lieu du ");
     expect(resolvePush(staffCall().push, "en").title).toBe("Match rescheduled");
+    expect(resolvePush(staffCall().push, "en").body).toContain(", instead of ");
     expect(logLine()).toContain("🗓️ Match reprogrammé");
     expect(logLine()).toContain("au lieu du");
+  });
+
+  it("dit « reprogrammé » pour une date effacée puis reposée, sans ancienne date à citer", async () => {
+    mockMatch();
+
+    await notifyMatchScheduleChange(change({ alreadyAnnounced: true }));
+
+    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: true, previousStartAt: null });
+    expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
+    expect(resolvePush(staffCall().push).body).not.toContain("au lieu du");
+    expect(logLine()).toContain("🗓️ Match reprogrammé");
+    expect(logLine()).not.toContain("au lieu du");
   });
 });
 
@@ -174,7 +188,7 @@ describe("notifyMatchScheduleChange — vie privée et cas limites", () => {
     mockMatch({ ...ROW, team2_name: null });
     await notifyMatchScheduleChange(change());
     expect(logLine()).toContain("Les Renards vs TBD");
-    expect(resolvePush(staffCall().push).body).toContain("Les Renards contre À déterminer");
+    expect(resolvePush(staffCall().push).body).toContain("Les Renards contre TBD");
   });
 
   it("ne journalise rien sans auteur, mais prévient tous les arbitres", async () => {

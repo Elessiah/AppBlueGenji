@@ -158,15 +158,21 @@ describe("buildMatchScheduleAnnouncement", () => {
   });
 
   it("dit « reprogrammé » quand la date en remplace une autre", () => {
-    const message = buildMatchScheduleAnnouncement(context, [], true);
+    const message = buildMatchScheduleAnnouncement(context, [], {
+      rescheduled: true,
+      previousStartAt: "2026-09-08T18:00:00Z",
+    });
     expect(message).toContain("**Match reprogrammé**");
     expect(message).not.toContain("**Match programmé**");
+    expect(message).toContain("Au lieu du mardi 8 septembre à 20:00");
+    // Date effacée puis reposée : « reprogrammé », sans ancienne date à citer.
+    expect(buildMatchScheduleAnnouncement(context, [], { rescheduled: true })).not.toContain("Au lieu du");
   });
 
   it("ne nomme aucun joueur en tournoi individuel", () => {
     const solo = { ...context, teamName: "Kiro", opponentName: "Nova", solo: true };
     for (const message of [
-      buildMatchScheduleAnnouncement(solo, [MATCH_REMINDER_OFFSETS[1]], true),
+      buildMatchScheduleAnnouncement(solo, [MATCH_REMINDER_OFFSETS[1]], { rescheduled: true }),
       buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[1], solo),
     ]) {
       expect(message).toContain("**Ton match**");

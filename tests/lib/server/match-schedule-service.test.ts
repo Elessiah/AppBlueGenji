@@ -43,7 +43,9 @@ function matchRow(overrides: Partial<Row> = {}): Row {
  * Base simulée : la ligne du match (sous verrou), l'option du tournoi, puis les
  * écritures. Les requêtes sont reconnues à leur texte, pas à leur rang.
  */
-function world(options: { row?: Row | null; refereeScheduling?: boolean; failReminders?: boolean } = {}) {
+function world(
+  options: { row?: Row | null; refereeScheduling?: boolean; failReminders?: boolean; announced?: boolean } = {},
+) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   const row = options.row === undefined ? matchRow() : options.row;
@@ -56,6 +58,10 @@ function world(options: { row?: Row | null; refereeScheduling?: boolean; failRem
     }
     if (sql.startsWith("SELECT referee_scheduling FROM bg_tournaments")) {
       return [[{ referee_scheduling: options.refereeScheduling ? 1 : 0 }]];
+    }
+    if (sql.startsWith("SELECT 1 FROM bg_match_reminders")) {
+      expect(params).toEqual([42, "SEEN"]);
+      return [options.announced ? [{ seen: 1 }] : []];
     }
     if (sql.startsWith("DELETE FROM bg_match_reminders") && options.failReminders) {
       throw new Error("base injoignable");
@@ -140,6 +146,7 @@ describe("setMatchStartAt", () => {
       matchId: 42,
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: null,
+      alreadyAnnounced: false,
       actor,
     });
   });
@@ -153,6 +160,24 @@ describe("setMatchStartAt", () => {
       matchId: 42,
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: "2099-08-28T18:30:00.000Z",
+      alreadyAnnounced: false,
+      actor: null,
+    });
+  });
+
+  it("garde les marques d'une date effacée, pour dire « reprogrammé » quand elle revient", async () => {
+    const cleared = world({ row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }) });
+    await setMatchStartAt(42, null);
+    expect(cleared.writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"))).toBe(false);
+
+    const reset = world({ announced: true });
+    await setMatchStartAt(42, FUTURE);
+    expect(reset.writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"))).toBe(true);
+    expect(notifyMatchScheduleChange).toHaveBeenLastCalledWith({
+      matchId: 42,
+      startAt: "2099-08-29T18:30:00.000Z",
+      previousStartAt: null,
+      alreadyAnnounced: true,
       actor: null,
     });
   });

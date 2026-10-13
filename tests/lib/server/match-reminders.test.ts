@@ -316,7 +316,7 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
   it("annonce tout de suite une date posée au-delà de la fenêtre du balayage", async () => {
     const { query, execute } = await mockAnnounceDb();
 
-    expect(await announceMatchSchedule(31, false, TEN_DAYS_BEFORE)).toBe(2);
+    expect(await announceMatchSchedule(31, { rescheduled: false }, TEN_DAYS_BEFORE)).toBe(2);
 
     // La manche est lue par son numéro, sans borne de fenêtre.
     const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
@@ -335,18 +335,25 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
   it("dit « reprogrammé » aux deux engagées, par Discord et par push, dans la langue de chacun", async () => {
     const { execute } = await mockAnnounceDb();
 
-    expect(await announceMatchSchedule(31, true, THREE_DAYS_BEFORE)).toBe(2);
+    expect(
+      await announceMatchSchedule(31, { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" }, THREE_DAYS_BEFORE),
+    ).toBe(2);
 
     expect(claimedKeys(execute)).toEqual(["SEEN", "P7D"]);
     expect(sentMessages()).toHaveLength(2);
-    for (const message of sentMessages()) expect(message).toContain("**Match reprogrammé**");
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match reprogrammé**");
+      expect(message).toContain("Au lieu du mardi 8 septembre à 20:00");
+    }
     const pushes = jest.mocked(pushToUsers).mock.calls;
     expect(pushes.map((call) => call[0])).toEqual([[1, 2], [3]]);
     expect(pushes.map((call) => call[1])).toEqual(["MATCH_REMINDER", "MATCH_REMINDER"]);
     expect(resolvePush(pushes[0][2]).title).toBe("Match reprogrammé");
     expect(resolvePush(pushes[0][2]).body).toContain("Les Renards contre Team Nova");
     expect(resolvePush(pushes[1][2]).body).toContain("Team Nova contre Les Renards");
+    expect(resolvePush(pushes[0][2]).body).toContain("au lieu du mardi 8 septembre à 20:00");
     expect(resolvePush(pushes[0][2], "en").title).toBe("Match rescheduled");
+    expect(resolvePush(pushes[0][2], "en").body).toContain("instead of Tuesday, September 8 at 20:00");
     expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
   });
 
@@ -359,7 +366,7 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
       ],
     });
 
-    expect(await announceMatchSchedule(31, false, THREE_DAYS_BEFORE)).toBe(2);
+    expect(await announceMatchSchedule(31, { rescheduled: false }, THREE_DAYS_BEFORE)).toBe(2);
 
     // Le message privé Discord ne porte pas plus de pseudo que le push.
     const directMessages = jest.mocked(pushDiscordDirectMessages).mock.calls.map((call) => call[0]);
@@ -382,7 +389,7 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
   it("ne fait rien pour une manche passée, jouée ou sans ses deux engagées", async () => {
     const { execute } = await mockAnnounceDb({ matches: [] });
 
-    expect(await announceMatchSchedule(31, false, THREE_DAYS_BEFORE)).toBe(0);
+    expect(await announceMatchSchedule(31, { rescheduled: false }, THREE_DAYS_BEFORE)).toBe(0);
     expect(execute).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
   });
@@ -390,7 +397,7 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
   it("se tait si un balayage concurrent a déjà posé la marque", async () => {
     const { execute } = await mockAnnounceDb({ claimed: false });
 
-    expect(await announceMatchSchedule(31, true, THREE_DAYS_BEFORE)).toBe(0);
+    expect(await announceMatchSchedule(31, { rescheduled: true }, THREE_DAYS_BEFORE)).toBe(0);
     expect(claimedKeys(execute)).toEqual(["SEEN"]);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();

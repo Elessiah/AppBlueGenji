@@ -158,7 +158,13 @@ describe("formatMatchScheduledLog", () => {
   it("rappelle l'ancien horaire d'une reprogrammation", () => {
     const line = formatMatchScheduledLog({ ...base, previousStartAt: "2026-09-09T16:30:00.000Z" });
     expect(line).toMatch(/^🗓️ Match reprogrammé — /u);
-    expect(line).toContain("(au lieu du mercredi 9 septembre à 18:30)");
+    expect(line).toContain("(heure de Paris), au lieu du mercredi 9 septembre à 18:30, par le staff.");
+  });
+
+  it("dit « reprogrammé » pour une date effacée puis reposée, sans ancienne date", () => {
+    const line = formatMatchScheduledLog({ ...base, previousStartAt: null, rescheduled: true });
+    expect(line).toMatch(/^🗓️ Match reprogrammé — /u);
+    expect(line).not.toContain("au lieu du");
   });
 
   it("ne nomme aucun joueur d'un tournoi individuel, et écrit TBD pour une place vide", () => {
