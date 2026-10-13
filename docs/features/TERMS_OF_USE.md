@@ -20,10 +20,11 @@ cookie d'état OAuth (comme l'intention, jamais relu dans l'URL du rappel)
 **seulement** si le départ est prouvé cliqué sur une page du site
 (`startedOnSitePage` : `Sec-Fetch-Site: same-origin`, `Sec-Fetch-Mode: navigate`,
 `Sec-Fetch-Dest: document`) — sinon ni `SIGNUP` ni `LOGIN` n'est enregistré —,
-`termsAccepted` dans le corps du code Discord. Un lien saisi par le staff (annonce
-de recrutement, site d'un partenaire) ne peut pas viser une route d'API
-(`leadsToApi`), sans quoi il ferait de ce départ une acceptation que personne n'a
-donnée. **Un compte
+`termsAccepted` dans le corps du code Discord. Un lien saisi sur le site et
+rendu cliquable (annonce de recrutement, site d'un partenaire, page d'origine
+d'un signalement) ne peut pas viser une route d'API (`leadsToApi`, à
+l'enregistrement et à l'affichage), sans quoi il ferait de ce départ une
+acceptation que personne n'a donnée. **Un compte
 neuf sans acceptation est refusé** (`TERMS_REQUIRED`) ; un compte existant se
 connecte toujours.
 
