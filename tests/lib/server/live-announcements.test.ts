@@ -200,14 +200,22 @@ describe("runLiveAnnouncementSweep", () => {
     expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("salon #live fermé au bot");
   });
 
-  it("Discord a refusé l'annonce : rend la réservation, sans accuser les permissions du bot", async () => {
+  it("Discord n'a pas répondu en lisant le salon : rend la réservation, sans accuser les permissions du bot", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-held");
     const { execute } = mockDb([AUTO_LIVE]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
     const warning = String(jest.mocked(console.warn).mock.calls[0][0]);
-    expect(warning).toContain("Discord a refusé l'annonce");
+    expect(warning).toContain("Discord n'a pas répondu au bot");
     expect(warning).not.toContain("permission");
+  });
+
+  it("Discord a refusé le message (AutoMod) : garde la réservation, pas d'essai à chaque balayage", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-refused");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([]);
+    expect(String(jest.mocked(console.error).mock.calls[0][0])).toContain("le même message serait refusé de nouveau");
   });
 
   it("mode lent : rend la réservation et le dit tel quel", async () => {
@@ -247,7 +255,8 @@ describe("runLiveAnnouncementSweep", () => {
     expect(releasesOf(execute)).toEqual([]);
     const line = String(jest.mocked(console.error).mock.calls[0][0]);
     expect(line).toContain("son envoi peut encore aboutir");
-    expect(line).toContain("attendre plusieurs minutes avant de vérifier #live");
+    // Aucune consigne de la poster à la main : l'envoi du bot peut encore partir.
+    expect(line).not.toContain("à la main");
   });
 
   it("Discord lâché pendant l'envoi : garde la réservation, #live fait foi", async () => {
@@ -256,7 +265,7 @@ describe("runLiveAnnouncementSweep", () => {
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(releasesOf(execute)).toEqual([]);
     expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
-      "[live-announce] match 40 (tournoi 4) : publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live et ne la poster à la main que si elle n'y est pas",
+      "[live-announce] match 40 (tournoi 4) : publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live",
     );
   });
 

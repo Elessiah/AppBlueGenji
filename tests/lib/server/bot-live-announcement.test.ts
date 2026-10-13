@@ -71,8 +71,8 @@ describe("pushLiveAnnouncement", () => {
     const cases: [string, string][] = [
       ["slowmode-short", "slowed"],
       ["slowmode", "slowed"],
-      ["automod", "discord-held"],
-      ["send-rejected", "discord-held"],
+      ["automod", "discord-refused"],
+      ["send-rejected", "discord-refused"],
       ["discord-unreachable", "discord-held"],
       // Discord a lâché pendant l'envoi : le message a pu partir, pas de nouvel essai.
       ["discord-down", "uncertain"],
@@ -86,8 +86,8 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
-  it("rend « discord-held » sur un refus d'AutoMod, sans ouvrir le coupe-circuit", async () => {
-    for (const reason of ["automod"]) {
+  it("rend « discord-held » sur une panne de Discord en lisant le salon, sans ouvrir le coupe-circuit", async () => {
+    for (const reason of ["discord-unreachable"]) {
       jest
         .spyOn(global, "fetch")
         .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason }, { status: 503 }));
