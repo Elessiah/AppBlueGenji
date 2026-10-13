@@ -36,7 +36,13 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
 import { announceMatchSchedule, announceMatchScheduleCleared, type MatchNotice } from "./match-reminders";
 import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
-import { forgetStaffPush, HELD_TIME_GRACE_MS, markStaffPushed, releaseDatedMarks } from "./reminder-marks";
+import {
+  forgetStaffPush,
+  HELD_TIME_GRACE_MS,
+  markStaffPushed,
+  releaseDatedMarks,
+  releaseStaffPush,
+} from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 type ScheduledMatchInfoRow = RowDataPacket & MatchNotice;
@@ -213,6 +219,8 @@ async function notifyReferees(
   // tracée au journal mais annoncée à personne (les joueurs non plus).
   if (!push || isPlayedMatchStatus(row.status)) return 0;
 
+  // Réservée avant l'envoi : un retrait qui suivrait de près doit la trouver.
+  await markStaffPushed(change.matchId, change.startAt);
   // L'auteur ne se prévient pas lui-même. Un arbitre qui joue ce match reçoit
   // les deux versions (étiquettes distinctes) : un doublon plutôt qu'une
   // annonce qui en remplace une autre, ou aucune.
@@ -237,8 +245,8 @@ async function notifyReferees(
         locale,
       ),
   });
-  // Retenu pour son retrait éventuel : seul un horaire reçu se retire chez eux.
-  if (pushed > 0) await markStaffPushed(change.matchId, change.startAt);
+  // Aucun appareil atteint : rien à retirer chez eux plus tard.
+  if (pushed === 0) await releaseStaffPush(change.matchId, change.startAt);
   return pushed;
 }
 

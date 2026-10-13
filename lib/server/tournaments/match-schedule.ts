@@ -199,15 +199,16 @@ async function resetReminderMarks(
   if (poster.bothEntrants && !poster.played) {
     await upsertSeenMark(connection, matchId, startAt);
     await connection.execute(
-      `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
-      [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY],
+      `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?, ?)`,
+      [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY, MATCH_STAFF_KEY],
     );
   } else {
     // Une engagée manque, ou la rencontre est jouée (score saisi) : pas
     // d'observation — le balayage annoncera la manche quand elle sera à jouer.
-    await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key <> ?`, [
+    await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`, [
       matchId,
       MATCH_TOLD_KEY,
+      MATCH_STAFF_KEY,
     ]);
   }
   return result;
@@ -260,8 +261,8 @@ async function restoreHeldMarks(
   }
   await connection.execute(
     `DELETE FROM bg_match_reminders
-      WHERE match_id = ? AND offset_key NOT IN (?, ?) AND start_at IS NOT NULL AND start_at <> ?`,
-    [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY, new Date(startAt)],
+      WHERE match_id = ? AND offset_key NOT IN (?, ?, ?) AND start_at IS NOT NULL AND start_at <> ?`,
+    [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY, MATCH_STAFF_KEY, new Date(startAt)],
   );
 }
 

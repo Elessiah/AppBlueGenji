@@ -46,10 +46,11 @@ export async function releaseDatedMarks(
 }
 
 /**
- * Retient l'horaire poussé aux arbitres ({@link MATCH_STAFF_KEY}) — seulement
+ * Retient l'horaire poussé aux arbitres ({@link MATCH_STAFF_KEY}) — **avant**
+ * l'envoi, pour qu'un retrait qui suivrait de près le trouve, et seulement
  * s'il est encore celui de la manche (un changement plus récent l'emporte).
- * Au meilleur effort : sans elle, son retrait ne leur sera simplement pas
- * poussé.
+ * Rendue par {@link releaseStaffPush} si l'envoi n'atteint personne. Au
+ * meilleur effort : sans elle, son retrait ne leur sera simplement pas poussé.
  */
 export async function markStaffPushed(matchId: number, startAt: string): Promise<void> {
   try {
@@ -65,15 +66,32 @@ export async function markStaffPushed(matchId: number, startAt: string): Promise
   }
 }
 
-/** Oublie l'horaire poussé aux arbitres, une fois son retrait poussé. Au meilleur effort. */
+/** Rend la marque réservée par {@link markStaffPushed} : l'envoi n'a atteint aucun appareil. */
+export async function releaseStaffPush(matchId: number, startAt: string): Promise<void> {
+  await deleteStaffMark(
+    `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`,
+    [matchId, MATCH_STAFF_KEY, new Date(startAt)],
+  );
+}
+
+/**
+ * Oublie l'horaire poussé aux arbitres, une fois son retrait poussé — sauf si
+ * la manche l'a retrouvé entre-temps (reposé par un autre arbitre pendant
+ * l'envoi : sa marque vaut pour la nouvelle annonce). Au meilleur effort.
+ */
 export async function forgetStaffPush(matchId: number, startAt: string): Promise<void> {
+  await deleteStaffMark(
+    `DELETE FROM bg_match_reminders
+      WHERE match_id = ? AND offset_key = ? AND start_at <=> ?
+        AND NOT EXISTS (SELECT 1 FROM bg_matches m WHERE m.id = ? AND m.start_at <=> ?)`,
+    [matchId, MATCH_STAFF_KEY, new Date(startAt), matchId, new Date(startAt)],
+  );
+}
+
+async function deleteStaffMark(sql: string, params: (number | string | Date)[]): Promise<void> {
   try {
     const db = await getDatabase();
-    await db.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`, [
-      matchId,
-      MATCH_STAFF_KEY,
-      new Date(startAt),
-    ]);
+    await db.execute(sql, params);
   } catch (error) {
     if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non oublié", error);
   }
