@@ -133,9 +133,10 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   // réduites, préfixes enchaînés ôtés) : `/en//api/…` ou `/fr/en/api/…`
   // mèneraient sinon à `/api/…` par un ou deux renvois, chacun depuis le site
   // (revue sécurité du lot 9-3).
-  const redirectPath = `/${path.replace(/^[/\\]+/, "")}`;
-  if (isApiPath(path) || leadsToApi(redirectPath)) return new NextResponse(null, { status: 404 });
+  if (isApiPath(path)) return new NextResponse(null, { status: 404 });
   if (prefixed === "en" && isMigratedRoute(path)) return null;
+  const redirectPath = `/${path.replace(/^[/\\]+/, "")}`;
+  if (leadsToApi(redirectPath)) return new NextResponse(null, { status: 404 });
   // Adresse absolue sur la racine **publique** (`APP_URL`) : l'adaptateur de
   // Next lit tout `Location` par `new URL` sans base (une adresse relative le
   // fait échouer) et récrit sur l'origine de la requête celui qui la partage —

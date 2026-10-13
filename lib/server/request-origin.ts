@@ -76,5 +76,9 @@ export function rejectCrossSiteRequest(
 
 /** La navigation vient-elle d'un clic sur une page du site (voir `isSitePageNavigation`) ? */
 export function startedOnSitePage(req: Request): boolean {
-  return isSitePageNavigation(req.headers.get("sec-fetch-site"));
+  return isSitePageNavigation({
+    secFetchSite: req.headers.get("sec-fetch-site"),
+    secFetchMode: req.headers.get("sec-fetch-mode"),
+    secFetchDest: req.headers.get("sec-fetch-dest"),
+  });
 }

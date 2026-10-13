@@ -99,6 +99,9 @@ function sitePath(value) {
   // Caractère de contrôle : le navigateur le retire avant de résoudre, et
   // `/\t/autre.site` deviendrait une adresse d'un autre site.
   if (/[\u0000-\u001f\u007f]/.test(value)) return "/";
+  // Barre ou contre-barre encodée : décodée après la résolution des `..`, elle
+  // en ferait apparaître de nouveaux (`/x/..%2fapi`).
+  if (/%2f|%5c/i.test(value.split(/[?#]/)[0])) return "/";
   // Résolu, le lien doit rester sur le site, et ne jamais mener à une route
   // d'API (règle de `leadsToApi` côté serveur ; tout préfixe de deux lettres,
   // même enchaîné, compte pour une langue) : ouverte d'ici, elle partirait du site comme un

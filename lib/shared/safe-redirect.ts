@@ -78,11 +78,15 @@ export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDI
  * Le chemin d'une destination **tel que le navigateur le résoudra** (`.`/`..`
  * retirés, encodage défait, barres répétées réduites), en minuscules, sans barre finale ni préfixes de
  * langue (`/en/connexion` est la même page que `/connexion`, lot 6) — ou
- * `null` si l'encodage est illisible. Seule lecture de « où mène vraiment ce
+ * `null` si l'encodage est illisible ou porte une barre encodée. Seule lecture de « où mène vraiment ce
  * chemin » : refus des routes d'API ({@link safeRedirectPath}) et de la page de
  * connexion ({@link signedInLoginRedirect}).
  */
 function resolvedSitePath(href: string): string | null {
+  // Barre ou contre-barre encodée : décodée **après** la résolution des `..`,
+  // elle en ferait apparaître de nouveaux (`/x/..%2fapi`). Aucun chemin du
+  // site n'en porte.
+  if (/%2f|%5c/i.test(pathPart(href))) return null;
   let path: string;
   try {
     path = decodeURIComponent(new URL(href, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
@@ -92,7 +96,12 @@ function resolvedSitePath(href: string): string | null {
   // Barres répétées ramenées à une : `/en//api/…` mène à `/api/…` (le
   // middleware retire les barres de tête après le préfixe de langue). Les
   // préfixes sont ôtés **tous** : `/fr/en/api/…` y mène aussi, par deux renvois.
-  let rest = trimTrailingSlashes(path.toLowerCase().replaceAll(/\/{2,}/g, "/")) || "/";
+  return withoutLocalePrefixes(trimTrailingSlashes(path.toLowerCase().replaceAll(/\/{2,}/g, "/")) || "/");
+}
+
+/** Le chemin sans **aucun** de ses préfixes de langue (`/fr/en/regles` → `/regles`). */
+function withoutLocalePrefixes(path: string): string {
+  let rest = path;
   for (let split = splitLocalePrefix(rest); split.prefixed !== null; split = splitLocalePrefix(rest)) rest = split.path;
   return rest;
 }
@@ -150,7 +159,7 @@ export function sealedReturnPath(value: unknown, locale: Locale): string {
   const safe = safeRedirectPath(value);
   const path = pathPart(safe);
   const suffix = safe.slice(path.length);
-  const bare = splitLocalePrefix(path).path;
+  const bare = withoutLocalePrefixes(path);
   if (locale === DEFAULT_LOCALE) return `${bare}${suffix}`;
   return `/${locale}${bare === "/" ? "" : bare}${suffix}`;
 }
