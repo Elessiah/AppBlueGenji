@@ -147,7 +147,8 @@ describe("reconcileDeletedAccounts", () => {
     expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0 });
     const update = writesFor(queries, 5123).find((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"))!;
     expect(ANONYMOUS_PSEUDOS).toContain(update.params[0]);
-    expect(update.params[1]).toBe(5123);
+    // [pseudo, DEFAULT_LOCALE (langue remise au défaut, lot 9-3), id]
+    expect(update.params[2]).toBe(5123);
     expect(writesFor(queries, 5123).some((q) => q.sql.startsWith("DELETE FROM bg_users"))).toBe(false);
   });
 
