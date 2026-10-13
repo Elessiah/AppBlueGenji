@@ -286,9 +286,9 @@ describe("noteDeletedMatches", () => {
     const unheld = connectionHolding({}, { doomed: [{ id: 31, team1_id: 101, team2_id: 102 }] });
     await noteDepartedEntrants(unheld.connection, []);
     await noteDeletedMatches(unheld.connection, "tournament_id = ?", [7]);
-    // Les places, puis les marques des joueurs ; ni contexte (aucun horaire tenu),
-    // ni marque des arbitres (la manche n'a pas d'horaire).
-    expect(unheld.mock.execute).toHaveBeenCalledTimes(2);
+    // Les places, les marques des joueurs et celle des arbitres ; pas de
+    // contexte : aucun horaire tenu.
+    expect(unheld.mock.execute).toHaveBeenCalledTimes(3);
 
     // Table des marques absente : rien n'a jamais été reçu.
     const missing = connectionMock();
@@ -441,7 +441,7 @@ describe("manche supprimée dont l'horaire avait été poussé aux arbitres", ()
     ]);
   });
 
-  it("ne pousse rien pour une manche jouée, ni pour un horaire déjà retiré ou remplacé", async () => {
+  it("ne pousse rien pour une manche jouée", async () => {
     const played = connectionHolding(
       {},
       { doomed: [{ id: 31, team1_id: 101, team2_id: 102, status: "COMPLETED" }], staff: { 31: AHEAD } },
@@ -449,18 +449,18 @@ describe("manche supprimée dont l'horaire avait été poussé aux arbitres", ()
     await noteDeletedMatches(played.connection, "id IN (?)", [31]);
     flushDepartedNotices(played.connection);
 
-    // La marque survit à un retrait jamais poussé : la manche n'a plus d'horaire.
-    const cleared = connectionHolding({}, { doomed: [{ id: 31, team1_id: 101, team2_id: 102, start_at: null }], staff: { 31: AHEAD } });
-    await noteDeletedMatches(cleared.connection, "id IN (?)", [31]);
-    flushDepartedNotices(cleared.connection);
+    expect(announceDeletedMatchesToStaff).not.toHaveBeenCalled();
+  });
 
+  it("retire l'horaire que montrent leurs appareils, même si la manche en a changé sans les atteindre", async () => {
+    // Le changement vers T+1 h n'a atteint personne : la marque est revenue à T.
     const moved = connectionHolding(
       {},
       { doomed: [{ id: 31, team1_id: 101, team2_id: 102, start_at: new Date(AHEAD.getTime() + 3_600_000) }], staff: { 31: AHEAD } },
     );
     await noteDeletedMatches(moved.connection, "id IN (?)", [31]);
     flushDepartedNotices(moved.connection);
-    expect(announceDeletedMatchesToStaff).not.toHaveBeenCalled();
+    expect(jest.mocked(announceDeletedMatchesToStaff).mock.calls[0][0][0].startAt).toBe(AHEAD);
   });
 
   it("ne pousse rien pour un horaire trop ancien, ni si la transaction échoue", async () => {

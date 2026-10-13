@@ -24,7 +24,7 @@ import {
   announceDeletedMatchesToStaff,
   clearedHeldStartAt,
   isAnnounceableSchedule,
-  refereesWerePushed,
+  staffTimeToRemove,
   notifyMatchScheduleChange,
   playerAnnouncement,
   type MatchScheduleChange,
@@ -427,24 +427,25 @@ describe("clearedHeldStartAt", () => {
   });
 });
 
-describe("refereesWerePushed", () => {
+describe("staffTimeToRemove", () => {
   const now = new Date("2099-01-01T00:00:00Z");
   const late = "2098-12-31T20:00:00.000Z";
 
-  it("tient pour poussé l'horaire que tient la marque STAFF, devant ou passé de peu", () => {
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: OLD_START }), now)).toBe(true);
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, staffStartAt: late }), now)).toBe(true);
+  it("rend l'horaire que tient la marque STAFF, devant ou passé de peu", () => {
+    expect(staffTimeToRemove(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: OLD_START }), now)).toBe(OLD_START);
+    expect(staffTimeToRemove(change({ startAt: null, previousStartAt: late, staffStartAt: late }), now)).toBe(late);
   });
 
-  it("ne tient pas pour poussé un horaire seulement journalisé (match joué, tournoi clos, date passée), un autre, ni un trop ancien", () => {
-    // Pas de marque : la date n'a été que journalisée — même encore devant.
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: null }), now)).toBe(false);
-    // La marque tient un autre horaire.
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: late }), now)).toBe(false);
+  it("rend l'horaire des appareils même quand le dernier changement n'a atteint personne", () => {
+    // Marque rendue à l'horaire d'avant : c'est lui qu'il faut retirer.
+    expect(staffTimeToRemove(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: late }), now)).toBe(late);
+  });
+
+  it("ne rend rien sans marque (date seulement journalisée, ou retrait déjà poussé), ni pour un horaire trop ancien", () => {
+    expect(staffTimeToRemove(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: null }), now)).toBeNull();
     const old = "2098-12-30T00:00:00.000Z";
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: old, staffStartAt: old }), now)).toBe(false);
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: null, staffStartAt: OLD_START }), now)).toBe(false);
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: "pas une date", staffStartAt: OLD_START }), now)).toBe(false);
+    expect(staffTimeToRemove(change({ startAt: null, previousStartAt: old, staffStartAt: old }), now)).toBeNull();
+    expect(staffTimeToRemove(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: "pas une date" }), now)).toBeNull();
   });
 });
 
