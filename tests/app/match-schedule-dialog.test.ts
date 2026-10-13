@@ -68,7 +68,7 @@ describe("MatchScheduleDialog — qui l'horaire prévient", () => {
   });
 
   it("ne promet un avis de retrait qu'en tournoi planifié par l'arbitrage, et l'attente d'une place vide", () => {
-    expect(frDialogs.schedule.noticePlanning).toContain("posé, changé ou retiré");
+    expect(frDialogs.schedule.noticePlanning).toContain("posé ou changé, ou un horaire retiré");
     expect(frDialogs.schedule.notice).toContain("posé ou changé");
     expect(frDialogs.schedule.notice).not.toContain("retiré");
     expect(frDialogs.schedule.noticeTbd).toContain("dans les 48 h qui précèdent le coup d'envoi");
@@ -76,7 +76,7 @@ describe("MatchScheduleDialog — qui l'horaire prévient", () => {
     for (const notice of [frDialogs.schedule.notice, frDialogs.schedule.noticePlanning, frDialogs.schedule.noticeTbd]) {
       expect(notice).not.toContain("engagées");
     }
-    expect(enDialogs.schedule.noticePlanning).toContain("set, changed or removed");
+    expect(enDialogs.schedule.noticePlanning).toContain("set or changed, or a time removed");
     expect(enDialogs.schedule.notice).not.toContain("removed");
     expect(enDialogs.schedule.noticeTbd).toContain("within the 48 h before kickoff");
     expect(enDialogs.schedule.notice).toContain("announced to the match's players");

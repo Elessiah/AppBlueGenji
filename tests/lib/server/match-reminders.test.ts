@@ -517,8 +517,11 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
     expect(sql).not.toMatch(/start_at IS NOT NULL/);
     expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
     expect(params).toEqual([31]);
-    // Les marques restent : aucune écriture.
-    expect(execute).not.toHaveBeenCalled();
+    // Les marques restent ; l'avis parti, l'horaire tenu est oublié (rien à citer ensuite).
+    expect(execute).toHaveBeenCalledTimes(1);
+    const [forgetSql, forgetParams] = execute.mock.calls[0] as unknown as [string, unknown[]];
+    expect(forgetSql).toMatch(/^UPDATE bg_match_reminders SET start_at = NULL WHERE match_id = \? AND offset_key = \?/);
+    expect(forgetParams).toEqual([31, "TOLD"]);
 
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
     expect(calls).toHaveLength(2);

@@ -324,6 +324,19 @@ describe("playerAnnouncement", () => {
   });
 });
 
+describe("notifyMatchScheduleChange — horaire rendu à celui que les joueurs tiennent", () => {
+  it("ne réannonce rien aux joueurs, mais journalise et prévient les arbitres", async () => {
+    mockMatch();
+    // 20 h reçu ; mois saisi de travers (passé, journalisé) ; rendu à 20 h.
+    await notifyMatchScheduleChange(
+      change({ previousStartAt: "2020-09-10T18:00:00.000Z", alreadyAnnounced: true, toldStartAt: NEW_START }),
+    );
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(logLine()).toContain("Match reprogrammé");
+    expect(notifyStaff).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("isAnnounceableClearing", () => {
   const now = new Date("2099-01-01T00:00:00Z");
 
