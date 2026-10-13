@@ -160,6 +160,17 @@ describe("setMatchStartAt", () => {
     );
   });
 
+  it("garde toutes les marques quand la date revient à l'horaire que les joueurs tiennent", async () => {
+    const { writes } = world({
+      row: matchRow({ start_at: new Date("2020-09-29T18:30:00Z") }),
+      announced: true,
+      toldStartAt: new Date(FUTURE),
+    });
+    await setMatchStartAt(42, FUTURE);
+    // Ni ménage ni marque reposée : le rappel déjà parti pour cet horaire ne repart pas.
+    expect(writes.some((w) => w.sql.includes("bg_match_reminders"))).toBe(false);
+  });
+
   it("garde la marque `TOLD` au ménage d'une date changée", async () => {
     const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), announced: true });
 
