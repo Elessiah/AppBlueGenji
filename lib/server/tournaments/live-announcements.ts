@@ -150,15 +150,23 @@ async function claimAnnouncement(matchId: number, pairing: string): Promise<bool
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
-/** Rend les réservations d'un groupe, en une requête : rien n'est parti, le prochain balayage réessaiera. */
-async function releaseAnnouncements(rows: readonly LiveCandidateRow[]): Promise<void> {
+/**
+ * Rend les réservations d'un groupe, en une requête : rien n'est parti, le
+ * prochain balayage réessaiera.
+ *
+ * @param label Les matchs et leur tournoi, pour la trace d'un échec.
+ * @returns `false` si la base a refusé : l'annonce ne sera pas réessayée.
+ */
+async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: string): Promise<boolean> {
   try {
     const db = await getDatabase();
     const placeholders = rows.map(() => "(?, ?)").join(", ");
     const params = rows.flatMap((row) => [Number(row.id), String(row.pairing)]);
     await db.execute(`DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (${placeholders})`, params);
+    return true;
   } catch (error) {
-    console.error("[live-announce] réservation non rendue", error);
+    console.error(`[live-announce] ${label} : réservation non rendue, annonce non réessayée`, error);
+    return false;
   }
 }
 
@@ -232,8 +240,10 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     console.error(`[live-announce] ${label} : bot sans réponse à temps, annonce peut-être publiée, non réessayée`);
     return 0;
   }
-  await releaseAnnouncements(group.rows);
-  const retry = "annonce reportée, réessayée tant que le match a commencé depuis moins de deux heures";
+  if (!(await releaseAnnouncements(group.rows, label))) return 0;
+  const retry = plural
+    ? "annonces reportées, réessayées tant que les matchs ont commencé depuis moins de deux heures"
+    : "annonce reportée, réessayée tant que le match a commencé depuis moins de deux heures";
   if (outcome === "channel-closed") {
     warnOnce(
       `channel-closed ${context}`,
