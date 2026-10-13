@@ -71,6 +71,7 @@ import { publishUpdatedEvent } from "./notifications";
 import { loadPhases } from "./phases-repository";
 import { resetRegistrationRanks } from "./repository";
 import { syncTournamentState } from "./state";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /** Réglages du geste. */
 export type RollbackOptions = {
@@ -234,7 +235,7 @@ async function clearMatchResults(
              WHEN team1_id IS NOT NULL AND team2_id IS NOT NULL THEN 'READY'
              ELSE 'PENDING'
            END
-       WHERE id IN (${ids.map(() => "?").join(", ")})`,
+       WHERE id IN (${sqlPlaceholders(ids.length)})`,
       ids,
     );
     // Le résultat défait emporte son détail map par map, retenu comme proposé.
@@ -269,7 +270,7 @@ async function detachMatchParticipants(
            team2_id = NULL,
            status = 'PENDING',
            live_started_at = NULL
-       WHERE id IN (${ids.map(() => "?").join(", ")})`,
+       WHERE id IN (${sqlPlaceholders(ids.length)})`,
       ids,
     );
   }
@@ -280,7 +281,7 @@ async function loadPosters(connection: PoolConnection, matchIds: readonly number
   const posters = new Map<number, Poster>();
   for (const ids of chunk(matchIds)) {
     const [rows] = await connection.execute<PosterRow[]>(
-      `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${ids.map(() => "?").join(", ")})`,
+      `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${sqlPlaceholders(ids.length)})`,
       ids,
     );
     for (const row of rows) posters.set(Number(row.id), toPoster(row));
@@ -364,7 +365,7 @@ async function repopulateDetachedMatches(
   matchIds: readonly number[],
 ): Promise<void> {
   for (const ids of chunk(matchIds)) {
-    const placeholders = ids.map(() => "?").join(", ");
+    const placeholders = sqlPlaceholders(ids.length);
     const [feeders] = await connection.execute<
       (RowDataPacket & {
         winner_team_id: number | null;
@@ -434,7 +435,7 @@ async function deleteMatches(
   matchIds: readonly number[],
 ): Promise<void> {
   for (const ids of chunk(matchIds)) {
-    const placeholders = ids.map(() => "?").join(", ");
+    const placeholders = sqlPlaceholders(ids.length);
     // Sous `ignoreMissingTable` comme dans `./deletion.ts` : la création de ces
     // trois tables est avalée par un `catch` dans `database/schema/`, et une base à
     // qui l'une manque rendrait sinon tout retour en arrière impossible — pour
@@ -597,7 +598,7 @@ async function reopenPhases(
   const later = phases.filter((phase) => phase.position > target.position);
   if (later.length > 0) {
     const ids = later.map((phase) => phase.id);
-    const placeholders = ids.map(() => "?").join(", ");
+    const placeholders = sqlPlaceholders(ids.length);
 
     await connection.execute(
       `DELETE FROM bg_tournament_phase_teams WHERE phase_id IN (${placeholders})`,

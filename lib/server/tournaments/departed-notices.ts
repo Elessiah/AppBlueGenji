@@ -10,13 +10,18 @@
  * marques de la manche ne soient effacées (`forgetMatchReminders`) ou la manche
  * supprimée, par une lecture verrouillante — l'état le plus récent, que
  * l'effacement verrouille de toute façon. Ce que l'avis dit de la manche
- * (tournoi, phase, manche, adversaire) est relevé au même moment : une manche
- * supprimée n'est plus lisible après le commit. L'avis part après le commit,
- * comme les lignes du journal (`flushBotLogs`), et se jette avec elles si la
- * transaction échoue (`discardBotLogs`) : même contrat de cycle de vie que la
- * file du journal. Ce qu'il dit se décide après le commit
- * (`announceEntrantsWithdrawn`) : une engagée reposée contre le même
- * adversaire dans la même manche n'a perdu que son horaire.
+ * (tournoi, phase, manche) est relevé au même moment : une manche supprimée
+ * n'est plus lisible après le commit. L'avis part après le commit, comme les
+ * lignes du journal (`flushBotLogs`), et se jette avec elles si la transaction
+ * échoue (`discardBotLogs`) : même contrat de cycle de vie que la file du
+ * journal. Ce qu'il dit se décide après le commit (`announceEntrantsWithdrawn`)
+ * : une engagée reposée contre le même adversaire dans la même manche n'a
+ * perdu que son horaire.
+ *
+ * Seules les engagées de **l'affiche qui a reçu l'horaire** sont prévenues
+ * (les « détentrices », relevées à la première sortie notée sur la manche),
+ * avec pour adversaire l'autre détentrice : une engagée posée puis retirée
+ * dans la même transaction n'avait rien reçu.
  *
  * Rien ne part si les joueurs n'avaient reçu aucun horaire (pas de marque
  * `TOLD`, ou plus d'horaire après un retrait remis), ni pour un horaire passé
@@ -39,6 +44,9 @@ export type { Poster } from "./match-poster";
  * transaction hors norme.
  */
 const MAX_PENDING_NOTICES = 512;
+
+/** Manches lues par requête : la liste `IN (…)` reste bornée. */
+const READ_CHUNK = 500;
 
 /** Avis en attente, par connexion. */
 const pending = new WeakMap<PoolConnection, DepartedEntrant[]>();
@@ -72,16 +80,18 @@ type ContextRow = RowDataPacket & {
   swiss_round: number;
 };
 
-/** Horaire tenu d'une manche, et ce que l'avis en dira. */
-type HeldTime = { heldStartAt: Date | string; match: WithdrawnMatch };
+/**
+ * Horaire tenu d'une manche, ce que l'avis en dira, et les engagées qui l'ont
+ * reçu — fixées à la première sortie notée (`holders`).
+ */
+type HeldTime = { heldStartAt: Date | string; match: WithdrawnMatch; holders?: ReadonlySet<number> };
 
 /** Horaires tenus relevés par {@link holdDepartures}. */
 export type HeldTimes = { matchIds: readonly number[]; held: ReadonlyMap<number, HeldTime> };
 
 /**
- * Une engagée qui quitte une manche, et l'adversaire qu'elle y avait — celui
- * de l'horaire reçu, relevé avant le changement (`null` : place vide, ou
- * inconnu).
+ * Une engagée qui quitte une manche, et l'adversaire qu'elle y avait, relevé
+ * avant le changement (`null` : place vide, ou inconnu).
  */
 export type Departure = { matchId: number; teamId: number; opponentId: number | null };
 
@@ -183,16 +193,23 @@ async function readHeldTimes(connection: PoolConnection, matchIds: readonly numb
   return held;
 }
 
-/** Lecture verrouillante des marques `TOLD`, puis du contexte des seules manches à prévenir. `null` : table absente. */
+/**
+ * Lecture verrouillante des marques `TOLD` (par paquets), puis du contexte des
+ * seules manches à prévenir. `null` : table absente.
+ */
 async function fetchHeldTimes(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, HeldTime> | null> {
-  let rows: HeldRow[];
+  const rows: HeldRow[] = [];
   try {
-    [rows] = await connection.execute<HeldRow[]>(
-      `SELECT match_id, start_at FROM bg_match_reminders
-        WHERE match_id IN (${sqlPlaceholders(matchIds.length)}) AND offset_key = ?
-        FOR UPDATE`,
-      [...matchIds, MATCH_TOLD_KEY],
-    );
+    for (let from = 0; from < matchIds.length; from += READ_CHUNK) {
+      const ids = matchIds.slice(from, from + READ_CHUNK);
+      const [chunkRows] = await connection.execute<HeldRow[]>(
+        `SELECT match_id, start_at FROM bg_match_reminders
+          WHERE match_id IN (${sqlPlaceholders(ids.length)}) AND offset_key = ?
+          FOR UPDATE`,
+        [...ids, MATCH_TOLD_KEY],
+      );
+      rows.push(...chunkRows);
+    }
   } catch (error) {
     if (isMissingTableError(error)) return null;
     throw error;
@@ -208,7 +225,11 @@ async function fetchHeldTimes(connection: PoolConnection, matchIds: readonly num
   return held;
 }
 
-/** Met en file les avis des sorties dont la manche a un horaire tenu, sans doublon. */
+/**
+ * Met en file les avis des sorties dont la manche a un horaire tenu : une
+ * fois par engagée et par manche, et seulement pour les détentrices de
+ * l'horaire ({@link holdersOf}).
+ */
 function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>, departures: readonly Departure[]): void {
   const noticed = departures.filter((departure) => held.has(departure.matchId));
   if (noticed.length === 0) return;
@@ -217,8 +238,9 @@ function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>
   let dropped = 0;
   for (const departure of noticed) {
     const key = `${departure.matchId}:${departure.teamId}`;
-    const time = held.get(departure.matchId);
-    if (queued.has(key) || !time) continue;
+    const time = held.get(departure.matchId) as HeldTime;
+    const holders = holdersOf(time, noticed, departure.matchId);
+    if (queued.has(key) || !holders.has(departure.teamId)) continue;
     if (queue.length >= MAX_PENDING_NOTICES) {
       dropped += 1;
       continue;
@@ -227,7 +249,7 @@ function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>
     queue.push({
       matchId: departure.matchId,
       teamId: departure.teamId,
-      opponentId: departure.opponentId ?? fellowDeparture(noticed, departure),
+      opponentId: [...holders].find((id) => id !== departure.teamId) ?? null,
       heldStartAt: time.heldStartAt,
       match: time.match,
     });
@@ -235,6 +257,25 @@ function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>
   if (queue.length > 0) pending.set(connection, queue);
   // Au-delà du plafond, ces joueurs ne seront pas prévenus : pm2 le dit.
   if (dropped > 0) console.warn(`[notify] ${dropped} avis de match retiré au-delà du plafond, non envoyés`);
+}
+
+/**
+ * Les engagées qui ont reçu l'horaire d'une manche : l'affiche d'avant la
+ * **première** sortie notée sur elle dans la transaction — chaque sortante et
+ * l'adversaire qu'elle avait (deux sortantes de la même manche se donnent
+ * l'une l'autre). Fixées une fois pour la transaction : une engagée posée puis
+ * retirée ensuite n'en fait pas partie.
+ */
+function holdersOf(time: HeldTime, departures: readonly Departure[], matchId: number): ReadonlySet<number> {
+  if (time.holders) return time.holders;
+  const holders = new Set<number>();
+  for (const departure of departures) {
+    if (departure.matchId !== matchId) continue;
+    holders.add(departure.teamId);
+    if (departure.opponentId !== null) holders.add(departure.opponentId);
+  }
+  time.holders = holders;
+  return holders;
 }
 
 /** Horaires tenus encore valables (à venir, ou passés depuis moins de 12 h), par manche. */
@@ -245,18 +286,6 @@ function stillValidTimes(rows: readonly HeldRow[]): Map<number, Date | string> {
     if (row.start_at !== null && new Date(row.start_at).getTime() > since) held.set(Number(row.match_id), row.start_at);
   }
   return held;
-}
-
-/**
- * Les deux engagées d'une manche sortent l'une après l'autre (cascade) : la
- * seconde voit déjà vide la place de la première. Son adversaire est alors la
- * première sortante.
- */
-function fellowDeparture(departures: readonly Departure[], departure: Departure): number | null {
-  const fellow = departures.find(
-    (other) => other.matchId === departure.matchId && other.teamId !== departure.teamId,
-  );
-  return fellow?.teamId ?? null;
 }
 
 /** Ce que l'avis dit des manches (tournoi, phase, manche), lu avant leur éventuelle suppression. */
@@ -296,10 +325,13 @@ async function loadWithdrawnMatches(
  * filtre (un test balaie les sources pour qu'aucune suppression du moteur n'y
  * échappe).
  *
- * Les manches visées se lisent **sous verrou** : une marque `TOLD` posée par un
- * envoi concurrent après l'image de la transaction serait sinon manquée — et
- * un envoi qui n'a pas encore posé la sienne attend la suppression, puis ne
- * trouve plus la manche (réservation conditionnée, rien n'est envoyé).
+ * Les manches visées se lisent **sous verrou** (une seule table, leurs seules
+ * places — le `DELETE` qui suit les verrouille de toute façon), puis leurs
+ * marques `TOLD` sous verrou : une marque posée par un envoi concurrent après
+ * l'image de la transaction n'échappe pas, et un envoi qui n'a pas encore posé
+ * la sienne attend la suppression, puis ne trouve plus la manche (réservation
+ * conditionnée, rien n'est envoyé). Le contexte n'est lu que pour les manches
+ * dont un horaire est tenu.
  *
  * @param filterSql Filtre **constant** sur `bg_matches` (colonnes sans
  *        préfixe, valeurs en `?`) — jamais une valeur saisie.
@@ -310,18 +342,15 @@ export async function noteDeletedMatches(
   filterSql: string,
   params: readonly (string | number)[],
 ): Promise<void> {
-  let rows: PosterRow[];
-  try {
-    [rows] = await connection.execute<PosterRow[]>(
-      `SELECT id, team1_id, team2_id FROM bg_matches WHERE ${filterSql} FOR UPDATE`,
-      [...params],
-    );
-  } catch (error) {
-    if (isMissingTableError(error)) return;
-    throw error;
-  }
+  const [rows] = await connection.execute<PosterRow[]>(
+    `SELECT id, team1_id, team2_id FROM bg_matches WHERE ${filterSql} FOR UPDATE`,
+    [...params],
+  );
   if (rows.length === 0) return;
-  const before = new Map<number, Poster>(rows.map((row) => [Number(row.id), toPoster(row)]));
+  const held = await readHeldTimes(connection, rows.map((row) => Number(row.id)));
+  if (held.size === 0) return;
+  const before = new Map<number, Poster>();
+  for (const row of rows) if (held.has(Number(row.id))) before.set(Number(row.id), toPoster(row));
   await noteDepartedEntrants(connection, departuresBetween(before, new Map()));
 }
 

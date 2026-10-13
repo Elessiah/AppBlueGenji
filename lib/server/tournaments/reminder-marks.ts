@@ -10,6 +10,7 @@
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 const CHUNK = 500;
 
@@ -36,7 +37,7 @@ export async function releaseDatedMarks(
     const db = await getDatabase();
     await db.execute(
       `DELETE FROM bg_match_reminders
-        WHERE match_id = ? AND offset_key IN (${keys.map(() => "?").join(", ")}) AND start_at <=> ?`,
+        WHERE match_id = ? AND offset_key IN (${sqlPlaceholders(keys.length)}) AND start_at <=> ?`,
       [matchId, ...keys, new Date(startAt)],
     );
   } catch (error) {
@@ -56,7 +57,7 @@ export async function forgetMatchReminders(connection: PoolConnection, matchIds:
   for (let start = 0; start < matchIds.length; start += CHUNK) {
     const ids = matchIds.slice(start, start + CHUNK);
     await ignoreMissingTable(
-      connection.execute(`DELETE FROM bg_match_reminders WHERE match_id IN (${ids.map(() => "?").join(", ")})`, ids),
+      connection.execute(`DELETE FROM bg_match_reminders WHERE match_id IN (${sqlPlaceholders(ids.length)})`, ids),
     );
   }
 }

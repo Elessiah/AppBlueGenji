@@ -30,6 +30,7 @@ import { cached } from "@/lib/shared/intl-cache";
 import { inBatches } from "@/lib/shared/in-batches";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 export function endpointHash(endpoint: string): string {
   return crypto.createHash("sha256").update(endpoint).digest("hex");
@@ -167,7 +168,7 @@ export type PushOptions = {
 function reachableSubscriptionsSql(accounts: number): string {
   return `FROM bg_push_subscriptions s
        JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
-       WHERE s.user_id IN (${Array.from({ length: accounts }, () => "?").join(", ")})
+       WHERE s.user_id IN (${sqlPlaceholders(accounts)})
          AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
                          WHERE o.user_id = s.user_id AND o.topic = ?)`;
 }
@@ -248,11 +249,11 @@ export async function pushToUsers(
     // notifications ou désinstallé le navigateur. Le garder serait lui écrire
     // à jamais — et garder une donnée qui ne sert plus.
     if (gone.length > 0) {
-      await db.query(`DELETE FROM bg_push_subscriptions WHERE id IN (${gone.map(() => "?").join(", ")})`, gone);
+      await db.query(`DELETE FROM bg_push_subscriptions WHERE id IN (${sqlPlaceholders(gone.length)})`, gone);
     }
     if (sent.length > 0) {
       await db.query(
-        `UPDATE bg_push_subscriptions SET last_success_at = NOW() WHERE id IN (${sent.map(() => "?").join(", ")})`,
+        `UPDATE bg_push_subscriptions SET last_success_at = NOW() WHERE id IN (${sqlPlaceholders(sent.length)})`,
         sent,
       );
     }
