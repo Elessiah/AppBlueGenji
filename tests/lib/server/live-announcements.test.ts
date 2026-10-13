@@ -193,6 +193,14 @@ describe("runLiveAnnouncementSweep", () => {
     expect(warnings[1]).toContain("salon #live fermé");
   });
 
+  it("délai dépassé : garde la réservation, pas de second @everyone si le bot a publié", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("uncertain");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([]);
+    expect(String(jest.mocked(console.error).mock.calls[0][0])).toContain("peut-être publiée, non réessayée");
+  });
+
   it("publié sans pouvoir mentionner @everyone : gardé, et la trace pm2 le dit", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted-silent");
     const { execute } = mockDb([AUTO_LIVE]);
@@ -216,7 +224,7 @@ describe("runLiveAnnouncementSweep", () => {
     ]);
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
     expect(pushLiveAnnouncement).toHaveBeenCalledWith(
-      "🔴 En direct : Renards contre Nova et Orques contre Lynx — Coupe d'hiver",
+      "🔴 En direct — Coupe d'hiver :\n• Renards contre Nova\n• Orques contre Lynx",
       "https://twitch.tv/bluegenji",
       "live-announce match-40,41",
     );

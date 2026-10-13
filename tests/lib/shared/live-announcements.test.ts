@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  LIVE_ANNOUNCEMENT_MAX_LENGTH,
   formatLiveAnnouncement,
   formatLiveAnnouncementGroup,
   liveAnnouncementUrl,
@@ -45,13 +46,33 @@ describe("formatLiveAnnouncementGroup", () => {
     { team1Name: "Givre", team2Name: "Ombre" },
   ];
 
-  it("énumère les affiches d'une même diffusion en une ligne", () => {
-    expect(
-      formatLiveAnnouncementGroup({ tournamentName: "Coupe d'hiver", participantType: "TEAM", pairings: pairings.slice(0, 2) }),
-    ).toBe("🔴 En direct : Renards contre Nova et Orques contre Lynx — Coupe d'hiver");
+  it("énumère les affiches d'une même diffusion, une par ligne, le tournoi en tête", () => {
     expect(formatLiveAnnouncementGroup({ tournamentName: "Coupe d'hiver", participantType: "TEAM", pairings })).toBe(
-      "🔴 En direct : Renards contre Nova, Orques contre Lynx et Givre contre Ombre — Coupe d'hiver",
+      "🔴 En direct — Coupe d'hiver :\n• Renards contre Nova\n• Orques contre Lynx\n• Givre contre Ombre",
     );
+  });
+
+  it("reste lisible quand un nom d'équipe contient « et », une virgule ou un saut de ligne", () => {
+    const text = formatLiveAnnouncementGroup({
+      tournamentName: "Coupe",
+      participantType: "TEAM",
+      pairings: [
+        { team1Name: "Ordre et Chaos", team2Name: "Lumière" },
+        { team1Name: "Nord,\nSud", team2Name: "Est" },
+      ],
+    });
+    expect(text.split("\n")).toEqual(["🔴 En direct — Coupe :", "• Ordre et Chaos contre Lumière", "• Nord, Sud contre Est"]);
+  });
+
+  it("une longue ronde compte le reste au lieu d'être coupée par le bot", () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ team1Name: `${"A".repeat(58)}${i}`, team2Name: `${"B".repeat(58)}${i}` }));
+    const text = formatLiveAnnouncementGroup({ tournamentName: "T".repeat(120), participantType: "TEAM", pairings: many });
+    expect(text.length).toBeLessThanOrEqual(LIVE_ANNOUNCEMENT_MAX_LENGTH);
+    expect(text.startsWith(`🔴 En direct — ${"T".repeat(120)} :`)).toBe(true);
+    const lines = text.split("\n");
+    const shown = lines.length - 2;
+    expect(lines[lines.length - 1]).toBe(`• et ${40 - shown} autres matchs`);
+    expect(lines.slice(1, -1).every((line) => /^• A+\d+ contre B+\d+$/.test(line))).toBe(true);
   });
 
   it("compte les matchs d'un tournoi individuel au lieu d'aligner des « un joueur »", () => {

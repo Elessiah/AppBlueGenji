@@ -77,6 +77,14 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
+  it("rend « uncertain » sur un délai dépassé : le bot a pu publier", async () => {
+    jest.spyOn(global, "fetch").mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("uncertain");
+    // Remet le compteur de pannes à zéro pour le cas suivant.
+    jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ posted: true, mentionEveryone: true }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("posted");
+  });
+
   it("rend « unavailable » sur un bot injoignable, puis court-circuite", async () => {
     const fetchMock = jest
       .spyOn(global, "fetch")
