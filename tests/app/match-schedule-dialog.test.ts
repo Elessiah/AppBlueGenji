@@ -73,3 +73,14 @@ describe("MatchScheduleDialog — qui l'horaire prévient", () => {
     expect(enDialogs.schedule.noticeTbd).toContain("within the 48 h before kickoff");
   });
 });
+
+describe("MatchScheduleDialog — aide inchangée", () => {
+  it("garde l'aide d'avant : l'avis de qui sera prévenu vit dans ses propres clés, sans doublon", () => {
+    for (const dialogs of [frDialogs, enDialogs]) {
+      for (const hint of [dialogs.schedule.hint, dialogs.schedule.hintPlanning]) {
+        expect(hint).not.toContain(dialogs.schedule.notice);
+        expect(hint).not.toMatch(/annoncé aux joueurs|announced to the players/);
+      }
+    }
+  });
+});
