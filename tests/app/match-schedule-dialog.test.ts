@@ -79,6 +79,7 @@ describe("MatchScheduleDialog — qui l'horaire prévient", () => {
     expect(enDialogs.schedule.noticePlanning).toContain("set, changed or removed");
     expect(enDialogs.schedule.notice).not.toContain("removed");
     expect(enDialogs.schedule.noticeTbd).toContain("within the 48 h before kickoff");
+    expect(enDialogs.schedule.notice).toContain("announced to the match's players");
   });
 });
 

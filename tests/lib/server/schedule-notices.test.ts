@@ -290,7 +290,15 @@ describe("playerAnnouncement", () => {
     });
   });
 
-  it("ne cite pas une date d'avant déjà passée, que les joueurs n'ont jamais reçue", () => {
+  it("cite encore une date passée de peu : un match en retard qu'on décale", () => {
+    const lateStart = "2098-12-31T20:00:00.000Z"; // quatre heures avant `now`
+    expect(playerAnnouncement(change({ previousStartAt: lateStart, alreadyAnnounced: true }), now)).toEqual({
+      rescheduled: true,
+      previousStartAt: lateStart,
+    });
+  });
+
+  it("ne cite pas une date d'avant passée depuis longtemps, que les joueurs n'ont jamais reçue", () => {
     expect(
       playerAnnouncement(change({ previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true }), now),
     ).toEqual({ rescheduled: true, previousStartAt: null });
