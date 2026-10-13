@@ -29,7 +29,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { announceEntrantsWithdrawn, type DepartedEntrant, type WithdrawnMatch } from "./match-reminders";
 import { toPoster, type Poster, type PosterRow } from "./match-poster";
@@ -44,9 +44,6 @@ export type { Poster } from "./match-poster";
  * transaction hors norme.
  */
 const MAX_PENDING_NOTICES = 512;
-
-/** Manches lues par requête : la liste `IN (…)` reste bornée. */
-const READ_CHUNK = 500;
 
 /** Avis en attente, par connexion. */
 const pending = new WeakMap<PoolConnection, DepartedEntrant[]>();
@@ -66,6 +63,12 @@ const settledLater = new WeakMap<PoolConnection, Set<number>>();
  */
 const heldRead = new WeakMap<PoolConnection, Map<number, HeldTime | null>>();
 
+/**
+ * Les engagées qui ont reçu l'horaire de chaque manche, fixées à la première
+ * sortie notée sur elle dans la transaction ({@link holdersOf}).
+ */
+const heldBy = new WeakMap<PoolConnection, Map<number, ReadonlySet<number>>>();
+
 type HeldRow = RowDataPacket & { match_id: number; start_at: Date | string | null };
 
 type ContextRow = RowDataPacket & {
@@ -80,11 +83,8 @@ type ContextRow = RowDataPacket & {
   swiss_round: number;
 };
 
-/**
- * Horaire tenu d'une manche, ce que l'avis en dira, et les engagées qui l'ont
- * reçu — fixées à la première sortie notée (`holders`).
- */
-type HeldTime = { heldStartAt: Date | string; match: WithdrawnMatch; holders?: ReadonlySet<number> };
+/** Horaire tenu d'une manche, et ce que l'avis en dira. */
+type HeldTime = { heldStartAt: Date | string; match: WithdrawnMatch };
 
 /** Horaires tenus relevés par {@link holdDepartures}. */
 export type HeldTimes = { matchIds: readonly number[]; held: ReadonlyMap<number, HeldTime> };
@@ -200,8 +200,7 @@ async function readHeldTimes(connection: PoolConnection, matchIds: readonly numb
 async function fetchHeldTimes(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, HeldTime> | null> {
   const rows: HeldRow[] = [];
   try {
-    for (let from = 0; from < matchIds.length; from += READ_CHUNK) {
-      const ids = matchIds.slice(from, from + READ_CHUNK);
+    for (const ids of chunkIds(matchIds)) {
       const [chunkRows] = await connection.execute<HeldRow[]>(
         `SELECT match_id, start_at FROM bg_match_reminders
           WHERE match_id IN (${sqlPlaceholders(ids.length)}) AND offset_key = ?
@@ -239,7 +238,7 @@ function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>
   for (const departure of noticed) {
     const key = `${departure.matchId}:${departure.teamId}`;
     const time = held.get(departure.matchId) as HeldTime;
-    const holders = holdersOf(time, noticed, departure.matchId);
+    const holders = holdersOf(connection, noticed, departure.matchId);
     if (queued.has(key) || !holders.has(departure.teamId)) continue;
     if (queue.length >= MAX_PENDING_NOTICES) {
       dropped += 1;
@@ -266,15 +265,18 @@ function enqueue(connection: PoolConnection, held: ReadonlyMap<number, HeldTime>
  * l'une l'autre). Fixées une fois pour la transaction : une engagée posée puis
  * retirée ensuite n'en fait pas partie.
  */
-function holdersOf(time: HeldTime, departures: readonly Departure[], matchId: number): ReadonlySet<number> {
-  if (time.holders) return time.holders;
+function holdersOf(connection: PoolConnection, departures: readonly Departure[], matchId: number): ReadonlySet<number> {
+  const known = heldBy.get(connection) ?? new Map<number, ReadonlySet<number>>();
+  heldBy.set(connection, known);
+  const fixed = known.get(matchId);
+  if (fixed) return fixed;
   const holders = new Set<number>();
   for (const departure of departures) {
     if (departure.matchId !== matchId) continue;
     holders.add(departure.teamId);
     if (departure.opponentId !== null) holders.add(departure.opponentId);
   }
-  time.holders = holders;
+  known.set(matchId, holders);
   return holders;
 }
 
@@ -293,15 +295,19 @@ async function loadWithdrawnMatches(
   connection: PoolConnection,
   matchIds: readonly number[],
 ): Promise<Map<number, WithdrawnMatch>> {
-  const [rows] = await connection.execute<ContextRow[]>(
-    `SELECT m.id, m.tournament_id, m.phase_id, m.bracket, m.round_number,
-            t.name AS tournament_name, t.participant_type, t.referee_scheduling,
-            ${swissRoundSql("m", "t")}
-       FROM bg_matches m
-       JOIN bg_tournaments t ON t.id = m.tournament_id
-      WHERE m.id IN (${sqlPlaceholders(matchIds.length)})`,
-    [...matchIds],
-  );
+  const rows: ContextRow[] = [];
+  for (const ids of chunkIds(matchIds)) {
+    const [chunkRows] = await connection.execute<ContextRow[]>(
+      `SELECT m.id, m.tournament_id, m.phase_id, m.bracket, m.round_number,
+              t.name AS tournament_name, t.participant_type, t.referee_scheduling,
+              ${swissRoundSql("m", "t")}
+         FROM bg_matches m
+         JOIN bg_tournaments t ON t.id = m.tournament_id
+        WHERE m.id IN (${sqlPlaceholders(ids.length)})`,
+      ids,
+    );
+    rows.push(...chunkRows);
+  }
   return new Map(
     rows.map((row) => [
       Number(row.id),
@@ -347,10 +353,9 @@ export async function noteDeletedMatches(
     [...params],
   );
   if (rows.length === 0) return;
-  const held = await readHeldTimes(connection, rows.map((row) => Number(row.id)));
-  if (held.size === 0) return;
-  const before = new Map<number, Poster>();
-  for (const row of rows) if (held.has(Number(row.id))) before.set(Number(row.id), toPoster(row));
+  const before = new Map<number, Poster>(rows.map((row) => [Number(row.id), toPoster(row)]));
+  // Une seule règle : `noteDepartedEntrants` écarte les manches qu'un retour
+  // en arrière règle lui-même, lit les horaires tenus et ne garde que ceux-là.
   await noteDepartedEntrants(connection, departuresBetween(before, new Map()));
 }
 
@@ -359,6 +364,7 @@ export function discardDepartedNotices(connection: PoolConnection): void {
   pending.delete(connection);
   settledLater.delete(connection);
   heldRead.delete(connection);
+  heldBy.delete(connection);
 }
 
 /**
@@ -370,6 +376,7 @@ export function flushDepartedNotices(connection: PoolConnection): void {
   pending.delete(connection);
   settledLater.delete(connection);
   heldRead.delete(connection);
+  heldBy.delete(connection);
   if (notices.length === 0) return;
   void announceEntrantsWithdrawn(notices).catch((error: unknown) => {
     if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", error);

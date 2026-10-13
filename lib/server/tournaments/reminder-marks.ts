@@ -10,9 +10,7 @@
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
-import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
-
-const CHUNK = 500;
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /**
  * Un horaire reçu vaut encore tant qu'il est devant, ou passé depuis moins de
@@ -54,8 +52,7 @@ export async function releaseDatedMarks(
  * marque à effacer — ce n'est pas une raison de faire échouer le geste.
  */
 export async function forgetMatchReminders(connection: PoolConnection, matchIds: readonly number[]): Promise<void> {
-  for (let start = 0; start < matchIds.length; start += CHUNK) {
-    const ids = matchIds.slice(start, start + CHUNK);
+  for (const ids of chunkIds(matchIds)) {
     await ignoreMissingTable(
       connection.execute(`DELETE FROM bg_match_reminders WHERE match_id IN (${sqlPlaceholders(ids.length)})`, ids),
     );

@@ -71,7 +71,7 @@ import { publishUpdatedEvent } from "./notifications";
 import { loadPhases } from "./phases-repository";
 import { resetRegistrationRanks } from "./repository";
 import { syncTournamentState } from "./state";
-import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /** Réglages du geste. */
 export type RollbackOptions = {
@@ -192,11 +192,7 @@ async function loadRollbackMatches(
 const ID_CHUNK = 200;
 
 function chunk(ids: readonly number[]): number[][] {
-  const chunks: number[][] = [];
-  for (let from = 0; from < ids.length; from += ID_CHUNK) {
-    chunks.push(ids.slice(from, from + ID_CHUNK));
-  }
-  return chunks;
+  return chunkIds(ids, ID_CHUNK);
 }
 
 /**
