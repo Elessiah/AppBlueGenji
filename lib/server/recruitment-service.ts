@@ -14,6 +14,7 @@ import {
   selectRecruitmentSpotlight,
   sortRecruitmentAds,
   validateRecruitmentAdInput,
+  isSafeRecruitmentContactUrl,
 } from "@/lib/shared/recruitment";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 
@@ -53,7 +54,9 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
     domain: row.domain,
     roles: row.roles,
     body: row.body,
-    contactUrl: row.contact_url,
+    // Un lien enregistré avant la règle et qu'elle refuse n'est plus servi
+    // (`isSafeRecruitmentContactUrl`) : l'annonce perd son bouton « Postuler ».
+    contactUrl: row.contact_url !== null && isSafeRecruitmentContactUrl(row.contact_url) ? row.contact_url : null,
     contactDiscord: row.contact_discord,
     contactDiscordId: row.contact_discord_id,
     contactPreferred: row.contact_preferred ?? "AUTO",

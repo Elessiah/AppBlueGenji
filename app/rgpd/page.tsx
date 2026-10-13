@@ -944,7 +944,7 @@ function RgpdFr({
               langue de la page du site d&apos;où vous vous êtes connecté la dernière fois (une connexion
               lancée d&apos;ailleurs, par un lien ou un favori, ne la change pas, ni une connexion par le bouton
               Google, Discord ou Blizzard depuis un navigateur qui ne l&apos;indique pas (trop ancien, ou qui retire cette indication) ; le français par défaut,
-              y compris pour un compte créé ainsi ou qui ne s&apos;est pas reconnecté depuis l&apos;arrivée de ce réglage), ou celle que vous choisissez dans{" "}
+              notamment pour un compte qui ne s&apos;est pas reconnecté depuis l&apos;arrivée de ce réglage), ou celle que vous choisissez dans{" "}
               <Link href="/profil#notifications">Mon profil</Link>, jusqu&apos;à votre prochaine connexion
               faite dans l&apos;autre langue. Ce point ne dépend pas de votre accord : le site garde ce seul
               choix avec tout compte, abonné ou non, le temps du compte, pour vous écrire dans votre langue

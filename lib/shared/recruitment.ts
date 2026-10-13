@@ -1,5 +1,6 @@
 import { type CountdownOverride, isCountdownHeld } from "./pausable-countdown";
 import { DEFAULT_LOCALE, type Locale } from "./locales";
+import { leadsToApi } from "./safe-redirect";
 import { checkEnglish, englishCodes, englishErrorMessage, optionalStaffText, staffText } from "./staff-translation";
 
 /**
@@ -449,6 +450,28 @@ export type RecruitmentValidationResult =
   | { ok: false; error: string };
 
 /**
+ * Lien « Postuler » acceptable : une adresse absolue `https:` qui ne mène à
+ * aucune route d'API, ou un `mailto:`. Un lien relatif, un autre schéma
+ * (`javascript:`, `http:`…) ou une route d'API sont refusés : un clic sur
+ * `/api/auth/<p>/start?terms=1&lang=en` partirait d'une page du site
+ * (`Sec-Fetch-Site: same-origin`) et enregistrerait une acceptation des
+ * conditions et une langue du compte que personne n'a données. Le chemin est
+ * jugé quel que soit l'hôte (l'adresse du site n'est pas connue ici) : un
+ * ticket ou un formulaire n'a pas à viser une route `/api`.
+ */
+export function isSafeRecruitmentContactUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "mailto:") return true;
+  if (url.protocol !== "https:") return false;
+  return !leadsToApi(url.pathname);
+}
+
+/**
  * Valide et normalise une annonce de recrutement. Le titre est requis ; le pôle
  * défaut « AUTRE » ; le statut défaut « OPTIONAL » (facultative). Référent / missions /
  * corps / lien / Discord sont optionnels et ramenés à `null` si vides.
@@ -489,6 +512,9 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
   const bodyEn = checkEnglish(input.bodyEn, body !== null, RECRUITMENT_BODY_MAX, englishCodes("BODY"));
   if (!bodyEn.ok) return bodyEn;
   const contactUrl = normalizeOptional(input.contactUrl, RECRUITMENT_URL_MAX);
+  if (contactUrl !== null && !isSafeRecruitmentContactUrl(contactUrl)) {
+    return { ok: false, error: "CONTACT_URL_INVALID" };
+  }
   const contactDiscord = normalizeOptional(input.contactDiscord, RECRUITMENT_DISCORD_MAX);
 
   // ID Discord dérivé : on l'ignore silencieusement s'il n'a pas la forme d'un
@@ -889,12 +915,14 @@ export const RECRUITMENT_FIELD_ERRORS = {
   ROLES_EN_TOO_LONG: "rolesEn",
   BODY_EN_REQUIRED: "bodyEn",
   BODY_EN_TOO_LONG: "bodyEn",
+  CONTACT_URL_INVALID: "contactUrl",
 } as const;
-export type RecruitmentField = "title" | "titleEn" | "roles" | "rolesEn" | "body" | "bodyEn";
+export type RecruitmentField = "title" | "titleEn" | "roles" | "rolesEn" | "body" | "bodyEn" | "contactUrl";
 
 const RECRUITMENT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   TITLE_REQUIRED: "Le titre est requis.",
   TITLE_TOO_LONG: `Titre trop long (${RECRUITMENT_TITLE_MAX} caractères maximum).`,
+  CONTACT_URL_INVALID: "Le lien de candidature doit être une adresse https:// (hors route d'API du site) ou mailto:.",
 };
 
 /** Phrase d'un refus ; un code inconnu garde sa forme d'origine (« Échec : CODE »). */
