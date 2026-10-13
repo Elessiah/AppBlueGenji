@@ -670,13 +670,13 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     publishedAt: "2026-10-15",
     title: "Horaires de match annoncés, changés ou retirés",
     summary:
-      "Quand l'arbitrage pose, change ou retire l'horaire d'un de tes matchs, tu en es prévenu aussitôt ; un seul rappel reste, dans les 24 h qui précèdent le coup d'envoi.",
+      "Quand l'arbitrage pose, change ou retire l'horaire d'un de tes matchs, tu en es prévenu ; un seul rappel reste, dans les 24 h qui précèdent le coup d'envoi.",
     details: [
-      "L'annonce part aux joueurs des deux camps du match, en message privé Discord et en notification push si tu les as activées (sujet « Horaires et rappels de match »). Tu es aussi prévenu quand une mise à jour du tournoi te retire, toi ou ton équipe, d'un match dont tu avais reçu l'horaire.",
+      "L'annonce part aux joueurs des deux camps du match — dès que l'horaire est posé si les deux camps sont connus, sinon à l'approche du match (dans les 48 h qui précèdent) —, en message privé Discord et en notification push si tu les as activées (sujet « Horaires et rappels de match »). Tu es aussi prévenu quand une mise à jour du tournoi te retire, toi ou ton équipe, d'un match dont tu avais reçu l'horaire.",
       "Les rappels une semaine et une heure avant le match disparaissent.",
       "Ces messages ne portent aucun pseudo de joueur : des noms d'équipe, ou « Ton match » en tournoi individuel.",
       "Le site garde, avec le match, l'horaire qui a été annoncé, pour te dire « au lieu du … » s'il change ; il ne garde pas le texte des messages.",
-      "Si tu fais partie du staff des tournois et que tu as activé les notifications push, tu es aussi prévenu quand un autre membre planifie un match, ou en change ou en retire l'horaire (sujet « Matchs planifiés », que tu peux couper dans « Mon profil »). Chaque horaire posé, changé ou retiré est consigné au journal d'activité du staff : sans nom sur Discord, avec le pseudo de son auteur dans les journaux du serveur.",
+      "Si tu fais partie du staff des tournois et que tu as activé les notifications push, tu es aussi prévenu quand un autre membre planifie un match, ou en change ou en retire l'horaire, et quand une mise à jour du tournoi supprime un match planifié (sujet « Matchs planifiés », que tu peux couper dans « Mon profil »). Chaque horaire posé, changé ou retiré par l'arbitrage est consigné au journal d'activité du staff : sans nom sur Discord, avec le pseudo et l'identifiant de compte de son auteur dans les journaux du serveur.",
     ],
     links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
   },

@@ -38,7 +38,7 @@
     },
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",
-      "description": "Another referee schedules a match, or changes or removes its time."
+      "description": "Another referee schedules a match, or changes or removes its time — or a tournament update deletes a scheduled match."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",

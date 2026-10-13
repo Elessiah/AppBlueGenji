@@ -87,7 +87,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_SCHEDULED: {
     label: "Matchs planifiés",
-    description: "Un autre arbitre planifie un match, ou en change ou en retire l'horaire.",
+    description: "Un autre arbitre planifie un match, ou en change ou en retire l'horaire — ou une mise à jour du tournoi supprime un match planifié.",
     audience: "tournaments",
   },
   STAFF_REPORT: {
