@@ -127,7 +127,11 @@ export function isAnnounceableSchedule(change: MatchScheduleChange, now: Date = 
 async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<ScheduledMatchInfoRow[]>(
-    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status, m.start_at, m.team1_id, m.team2_id,
+    // Un tournoi clos ne se joue plus : ses manches comptent pour jouées
+    // (journal seul, ni annonce ni push), comme une manche au score saisi.
+    `SELECT m.id, m.tournament_id, m.bracket, m.round_number,
+            IF(t.state = 'FINISHED', 'COMPLETED', m.status) AS status,
+            m.start_at, m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
@@ -261,11 +265,10 @@ async function logScheduleCleared(
       change.actor,
     );
   }
-  // Les arbitres avaient reçu « Match programmé » pour cet horaire encore
-  // devant : l'avis de retrait le remplace sur leur appareil (même étiquette).
-  const previous = new Date(change.previousStartAt).getTime();
+  // Les arbitres avaient reçu « Match programmé » pour cet horaire : l'avis de
+  // retrait le remplace sur leur appareil (même étiquette).
   if (!stillCurrent(row, change) || isPlayedMatchStatus(row.status)) return;
-  if (!Number.isFinite(previous) || previous <= now.getTime() - HELD_TIME_GRACE_MS) return;
+  if (!refereesWerePushed(change, now)) return;
   await notifyStaff({
     topic: "MATCH_SCHEDULED",
     excludeUserIds: change.actor ? [change.actor.id] : [],
@@ -286,6 +289,22 @@ async function logScheduleCleared(
         locale,
       ),
   });
+}
+
+/**
+ * Les arbitres ont-ils reçu l'horaire retiré ? Il ne leur est poussé que posé
+ * **devant** : encore devant, il l'a été ; passé de peu (match en retard), il
+ * l'a été s'il est celui que les joueurs ont reçu — annoncé, donc devant à
+ * l'annonce. Une date passée saisie pour l'archive n'a été que journalisée :
+ * son retrait ne se pousse pas.
+ */
+export function refereesWerePushed(change: MatchScheduleChange, now: Date = new Date()): boolean {
+  if (change.previousStartAt === null) return false;
+  const previous = new Date(change.previousStartAt).getTime();
+  if (!Number.isFinite(previous)) return false;
+  if (previous > now.getTime()) return true;
+  if (previous <= now.getTime() - HELD_TIME_GRACE_MS || change.toldStartAt === null) return false;
+  return new Date(change.toldStartAt).getTime() === previous;
 }
 
 /** Horaire effacé : journal, avis aux arbitres, et aux joueurs qui l'avaient reçu. */

@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, MATCH_SCHEDULE_WRITE_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
 import { can } from "@/lib/shared/permissions";
@@ -12,7 +13,9 @@ function parseMatchId(raw: string): number | null {
 /**
  * Fixe (ou efface) la date de début d'un match.
  * Corps : `{ startAt: string | null }` — ISO ou valeur d'un champ
- * `datetime-local` ; `null` (ou chaîne vide) efface l'horaire.
+ * `datetime-local` ; `null` (ou chaîne vide) efface l'horaire. Un corps
+ * illisible ou sans `startAt` est refusé : effacer un horaire prévient tous
+ * les joueurs, ce ne peut être qu'un geste explicite.
  *
  * Réservé à la permission `tournaments` : arbitre et admin programment le
  * plateau. Un caster, qui porte `live` sans `tournaments`, configure la
@@ -27,8 +30,12 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { startAt?: unknown };
-  const raw = body.startAt ?? null;
+  const throttled = enforceRateLimit(MATCH_SCHEDULE_WRITE_RULE, user.id);
+  if (throttled) return throttled;
+
+  const body = (await readJsonBody(req).catch(() => null)) as { startAt?: unknown } | null;
+  if (body === null || typeof body !== "object" || !("startAt" in body)) return fail("INVALID_MATCH_START_AT", 400);
+  const raw = body.startAt;
   if (raw !== null && typeof raw !== "string") return fail("INVALID_MATCH_START_AT", 400);
 
   try {

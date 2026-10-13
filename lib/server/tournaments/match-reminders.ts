@@ -602,6 +602,7 @@ const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_num
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
       WHERE m.status NOT IN (${PLAYED_MATCH_STATUSES.map((status) => `'${status}'`).join(", ")})
+        AND t.state <> 'FINISHED'
         AND m.start_at IS NOT NULL
         AND m.start_at > NOW()`;
 
