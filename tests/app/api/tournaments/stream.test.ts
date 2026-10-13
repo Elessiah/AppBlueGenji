@@ -10,6 +10,9 @@ import type { TournamentSnapshot, TournamentViewerContext } from "@/lib/shared/t
  */
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
+jest.mock("@/lib/server/tournaments/live-announcements", () => ({
+  dispatchLiveAnnouncements: jest.fn(async () => 0),
+}));
 
 import { GET } from "@/app/api/tournaments/[id]/stream/route";
 import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
@@ -36,6 +39,7 @@ import {
 import type { PlatformRole } from "@/lib/shared/permissions";
 import { authUser } from "../../../helpers/auth-user";
 import * as snapshotModule from "@/lib/server/tournaments/snapshot";
+import { dispatchLiveAnnouncements } from "@/lib/server/tournaments/live-announcements";
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -520,6 +524,41 @@ describe("GET /api/tournaments/[id]/stream — contre-pression", () => {
     jest.advanceTimersByTime(STREAM_STALL_TIMEOUT_MS * 3);
     expect(tournamentAudience(5)).toBe(1);
     await reader.cancel();
+  });
+});
+
+describe("GET /api/tournaments/[id]/stream — annonce des lives au battement", () => {
+  beforeEach(() => {
+    jest
+      .spyOn(snapshotModule, "getTournamentSnapshotFrame")
+      .mockRejectedValue(new Error("hors ligne"));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** Ouvre un flux, avance d'un battement et laisse l'import dynamique se résoudre. */
+  async function oneHeartbeat(): Promise<void> {
+    jest.useFakeTimers();
+    const response = await GET(new Request("http://t/"), params("5"));
+    const reader = response.body!.getReader();
+    await reader.read();
+    jest.advanceTimersByTime(25_000);
+    jest.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await reader.cancel();
+  }
+
+  it("relance le balayage des annonces en production : un match `START_TIME` part à l'heure", async () => {
+    jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
+    await oneHeartbeat();
+    expect(dispatchLiveAnnouncements).toHaveBeenCalled();
+  });
+
+  it("ne le charge même pas hors production", async () => {
+    await oneHeartbeat();
+    expect(dispatchLiveAnnouncements).not.toHaveBeenCalled();
   });
 });
 

@@ -39,6 +39,18 @@ describe("pushLiveAnnouncement", () => {
     });
   });
 
+  it("rend « posted-silent » quand le bot a publié sans pouvoir mentionner @everyone", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(Response.json({ posted: true, mentionEveryone: false, embedLinks: true }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("posted-silent");
+  });
+
+  it("rend « posted » sur un bilan illisible : la publication a eu lieu", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("ok", { status: 200 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("posted");
+  });
+
   it("rend « rejected » sur un 400, sans compter une panne", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ error: "INVALID_LIVE_ANNOUNCEMENT" }, { status: 400 }));
     for (let i = 0; i < 4; i++) {
@@ -55,12 +67,12 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
-  it("rend « unavailable » sur un salon fermé (503) sans ouvrir le coupe-circuit des autres appels", async () => {
+  it("rend « channel-closed » sur un salon fermé (503) sans ouvrir le coupe-circuit des autres appels", async () => {
     jest
       .spyOn(global, "fetch")
       .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE" }, { status: 503 }));
     for (let i = 0; i < 4; i++) {
-      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("channel-closed");
     }
     expect(isBotCircuitOpen()).toBe(false);
   });

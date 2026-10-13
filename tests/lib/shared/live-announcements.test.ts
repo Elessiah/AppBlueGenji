@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
-import { formatLiveAnnouncement, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
+import {
+  formatLiveAnnouncement,
+  formatLiveAnnouncementGroup,
+  liveAnnouncementUrl,
+} from "@/lib/shared/live-announcements";
 
 describe("formatLiveAnnouncement", () => {
   it("nomme les deux équipes et le tournoi", () => {
@@ -31,6 +35,35 @@ describe("formatLiveAnnouncement", () => {
     });
     expect(text).toBe("🔴 En direct : un joueur contre un joueur — Solo Cup");
     expect(text).not.toMatch(/Pseudo/);
+  });
+});
+
+describe("formatLiveAnnouncementGroup", () => {
+  const pairings = [
+    { team1Name: "Renards", team2Name: "Nova" },
+    { team1Name: "Orques", team2Name: "Lynx" },
+    { team1Name: "Givre", team2Name: "Ombre" },
+  ];
+
+  it("énumère les affiches d'une même diffusion en une ligne", () => {
+    expect(
+      formatLiveAnnouncementGroup({ tournamentName: "Coupe d'hiver", participantType: "TEAM", pairings: pairings.slice(0, 2) }),
+    ).toBe("🔴 En direct : Renards contre Nova et Orques contre Lynx — Coupe d'hiver");
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Coupe d'hiver", participantType: "TEAM", pairings })).toBe(
+      "🔴 En direct : Renards contre Nova, Orques contre Lynx et Givre contre Ombre — Coupe d'hiver",
+    );
+  });
+
+  it("compte les matchs d'un tournoi individuel au lieu d'aligner des « un joueur »", () => {
+    const text = formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", participantType: "SOLO", pairings });
+    expect(text).toBe("🔴 En direct : 3 matchs — Solo Cup");
+    expect(text).not.toMatch(/Renards|Nova/);
+  });
+
+  it("une seule affiche : le texte d'un match", () => {
+    expect(
+      formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", participantType: "SOLO", pairings: pairings.slice(0, 1) }),
+    ).toBe("🔴 En direct : un joueur contre un joueur — Solo Cup");
   });
 });
 

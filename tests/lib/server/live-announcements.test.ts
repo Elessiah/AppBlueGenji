@@ -168,6 +168,84 @@ describe("runLiveAnnouncementSweep", () => {
     expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
   });
 
+  it("salon #live fermé : rend la réservation et dit au staff la vraie cause, une fois par heure", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([
+      [40, "1:2"],
+      [40, "1:2"],
+    ]);
+    // Le balayage réessaie toutes les dix secondes : pm2 n'est pas inondé.
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("salon #live fermé au bot");
+  });
+
+  it("bot injoignable ou antérieur : un avertissement distinct de celui du salon fermé", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("unavailable").mockResolvedValueOnce("channel-closed");
+    mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    await runLiveAnnouncementSweep(NOW);
+    const warnings = jest.mocked(console.warn).mock.calls.map(([text]) => String(text));
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("bot injoignable");
+    expect(warnings[1]).toContain("salon #live fermé");
+  });
+
+  it("publié sans pouvoir mentionner @everyone : gardé, et la trace pm2 le dit", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted-silent");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    expect(releasesOf(execute)).toEqual([]);
+    expect(console.info).toHaveBeenCalledWith(
+      "[live-announce] match 40 (tournoi 4) annoncé dans #live sans notifier (permission de mentionner @everyone absente)",
+    );
+  });
+
+  it("un seul @everyone pour les matchs d'un tournoi à l'antenne ensemble sur le même lien", async () => {
+    const { execute } = mockDb([
+      { ...AUTO_LIVE, live_url: null },
+      { ...AUTO_LIVE, id: 41, live_url: null, pairing: "3:4", launch_pairing: "3:4", team1_name: "Orques", team2_name: "Lynx" },
+    ]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(2);
+    // Chaque affiche garde sa réservation, un seul message part.
+    expect(claimsOf(execute)).toEqual([
+      [40, "1:2"],
+      [41, "3:4"],
+    ]);
+    expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
+    expect(pushLiveAnnouncement).toHaveBeenCalledWith(
+      "🔴 En direct : Renards contre Nova et Orques contre Lynx — Coupe d'hiver",
+      "https://twitch.tv/bluegenji",
+      "live-announce match-40,41",
+    );
+    expect(console.info).toHaveBeenCalledWith("[live-announce] matchs 40, 41 (tournoi 4) annoncés dans #live");
+  });
+
+  it("des liens différents, ou des tournois différents, font des messages différents", async () => {
+    mockDb([
+      AUTO_LIVE,
+      { ...AUTO_LIVE, id: 41, live_url: "https://kick.com/autre", pairing: "3:4", launch_pairing: "3:4" },
+      { ...AUTO_LIVE, id: 42, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" },
+    ]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(3);
+    expect(pushLiveAnnouncement).toHaveBeenCalledTimes(3);
+  });
+
+  it("un groupe resté sans réponse rend toutes ses réservations", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("unavailable");
+    const { execute } = mockDb([
+      AUTO_LIVE,
+      { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" },
+    ]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([
+      [40, "1:2"],
+      [41, "3:4"],
+    ]);
+  });
+
   it("garde la réservation d'une annonce refusée par le bot : la renvoyer ne changerait rien", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("rejected");
     const { execute } = mockDb([AUTO_LIVE]);
