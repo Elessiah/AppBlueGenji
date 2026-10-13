@@ -220,7 +220,8 @@ async function notifyReferees(
   if (!push || isPlayedMatchStatus(row.status)) return 0;
 
   // Réservée avant l'envoi : un retrait qui suivrait de près doit la trouver.
-  await markStaffPushed(change.matchId, change.startAt);
+  // Refusée, la manche ne tient plus cet horaire : rien à pousser.
+  if (!(await markStaffPushed(change.matchId, change.startAt))) return 0;
   // L'auteur ne se prévient pas lui-même. Un arbitre qui joue ce match reçoit
   // les deux versions (étiquettes distinctes) : un doublon plutôt qu'une
   // annonce qui en remplace une autre, ou aucune.

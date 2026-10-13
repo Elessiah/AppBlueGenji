@@ -7,7 +7,7 @@
  * ses marques appartenaient à l'ancienne affiche. Les nouvelles engagées n'ont
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
@@ -52,17 +52,23 @@ export async function releaseDatedMarks(
  * Rendue par {@link releaseStaffPush} si l'envoi n'atteint personne. Au
  * meilleur effort : sans elle, son retrait ne leur sera simplement pas poussé.
  */
-export async function markStaffPushed(matchId: number, startAt: string): Promise<void> {
+export async function markStaffPushed(matchId: number, startAt: string): Promise<boolean> {
   try {
     const db = await getDatabase();
-    await db.execute(
+    const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)
        SELECT id, ?, start_at FROM bg_matches WHERE id = ? AND start_at = ?
        ON DUPLICATE KEY UPDATE start_at = ?`,
       [MATCH_STAFF_KEY, matchId, new Date(startAt), new Date(startAt)],
     );
+    // Aucune ligne : la manche ne tient plus cet horaire (changé ou retiré
+    // depuis) — rien à pousser, le geste plus récent a ses propres avis.
+    return result.affectedRows > 0;
   } catch (error) {
+    // Table absente ou marque illisible : on pousse quand même (sans marque,
+    // le retrait ne sera simplement pas poussé).
     if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non retenu", error);
+    return true;
   }
 }
 

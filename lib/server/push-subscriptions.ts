@@ -234,33 +234,52 @@ export async function pushToUsers(
     }));
     const sent: number[] = [];
     const gone: number[] = [];
-    await inBatches(deliveries, PUSH_CONCURRENCY, async ({ row, payload }) => {
-      const outcome = await sendWebPush(
-        config,
-        { endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth },
-        payload,
-        options,
-      );
-      if (outcome === "SENT") sent.push(Number(row.id));
-      else if (outcome === "GONE") gone.push(Number(row.id));
-    });
-
-    // Le service a dit l'abonnement mort : l'appareil a désactivé les
-    // notifications ou désinstallé le navigateur. Le garder serait lui écrire
-    // à jamais — et garder une donnée qui ne sert plus.
-    if (gone.length > 0) {
-      await db.query(`DELETE FROM bg_push_subscriptions WHERE id IN (${sqlPlaceholders(gone.length)})`, gone);
+    try {
+      await inBatches(deliveries, PUSH_CONCURRENCY, async ({ row, payload }) => {
+        const outcome = await sendWebPush(
+          config,
+          { endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth },
+          payload,
+          options,
+        );
+        if (outcome === "SENT") sent.push(Number(row.id));
+        else if (outcome === "GONE") gone.push(Number(row.id));
+      });
+    } catch (error) {
+      // Un envoi en échec n'efface pas ceux qui ont abouti : le compte rendu
+      // (marques « reçu » des appelants) se fonde sur eux.
+      console.error("[push] envoi interrompu", error);
     }
-    if (sent.length > 0) {
-      await db.query(
-        `UPDATE bg_push_subscriptions SET last_success_at = NOW() WHERE id IN (${sqlPlaceholders(sent.length)})`,
-        sent,
-      );
-    }
+    await recordDeliveries(sent, gone);
+    // Ce qui a **atteint** un appareil, même si la tenue des abonnements a
+    // échoué ensuite : un appelant qui lirait 0 croirait n'avoir prévenu personne.
     return sent.length;
   } catch (error) {
     if (!isMissingTableError(error)) console.error("[push] distribution impossible", error);
     return 0;
+  }
+}
+
+/**
+ * Tenue des abonnements après une distribution, au meilleur effort. Le service
+ * a dit l'abonnement mort : l'appareil a désactivé les notifications ou
+ * désinstallé le navigateur — le garder serait lui écrire à jamais, et garder
+ * une donnée qui ne sert plus. Les autres datent leur dernier succès.
+ */
+async function recordDeliveries(sent: readonly number[], gone: readonly number[]): Promise<void> {
+  try {
+    const db = await getDatabase();
+    if (gone.length > 0) {
+      await db.query(`DELETE FROM bg_push_subscriptions WHERE id IN (${sqlPlaceholders(gone.length)})`, [...gone]);
+    }
+    if (sent.length > 0) {
+      await db.query(
+        `UPDATE bg_push_subscriptions SET last_success_at = NOW() WHERE id IN (${sqlPlaceholders(sent.length)})`,
+        [...sent],
+      );
+    }
+  } catch (error) {
+    if (!isMissingTableError(error)) console.error("[push] tenue des abonnements impossible", error);
   }
 }
 
