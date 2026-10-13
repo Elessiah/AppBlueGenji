@@ -420,7 +420,8 @@ export function RgpdEn({
               <strong>bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
               or Blizzard, and deleted on return. It lasts ten minutes at most and only contains a single-use random
               token (anti-CSRF protection), the provider&apos;s name, the page to bring you back to, the purpose of
-              the login (logging in or linking an account) and whether you accepted the terms of use. No personal
+              the login (logging in or linking an account), whether you accepted the terms of use and whether the
+              login was started from a page of the site (only then does it set the account language). No personal
               identifier.
             </li>
             <li>
