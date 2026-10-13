@@ -157,9 +157,8 @@ les places) leur vaut aussi « Horaire du match retiré » après le commit
 (`announceDeletedMatchesToStaff`, personne exclu : c'est le moteur qui l'a
 retirée ; quatre à la fois ; noms illisibles → « TBD » plutôt que rien) — la
 marque part avec la manche. Mêmes conditions qu'un retrait par l'arbitre : la
-manche n'est pas jouée et tient encore l'horaire poussé (un horaire déjà
-retiré, dont la marque a survécu faute d'appareil atteint, ne se retire pas
-deux fois).
+manche n'est pas jouée et la marque tient un horaire valable — celui que
+montrent leurs appareils (un retrait déjà poussé l'a oubliée).
 
 L'horaire est celui que tient la marque `TOLD`, lu dans la transaction
 **avant** l'effacement des marques ou la suppression, par une seule lecture
@@ -458,7 +457,9 @@ retour à l'horaire tenu, affiche changée, reprise des marques héritées, qui 
 la compte pas comme preuve d'un horaire reçu par les joueurs), et s'oublie une
 fois le retrait poussé (`forgetStaffPush`) — sauf si la manche a retrouvé cet
 horaire pendant l'envoi (reposé par un autre arbitre).
-`refereesWerePushed` exige qu'elle tienne l'horaire retiré, encore valable
+`staffTimeToRemove` rend l'horaire qu'elle tient — celui que montrent leurs
+appareils, même si un changement plus récent n'a atteint personne — s'il vaut
+encore, et le retrait cite cet horaire-là ; encore valable
 (devant, ou passé de moins de 12 h) : une date seulement journalisée — passée,
 posée sur un match joué ou dans un tournoi clos, même rouvert ensuite — n'a
 rien à remplacer. `forgetMatchReminders` la garde : une affiche changée ne
