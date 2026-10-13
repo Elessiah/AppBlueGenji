@@ -770,8 +770,8 @@ export function RgpdEn({
             </li>
             <li>
               <strong>In which language</strong>: your account&apos;s, French or English — the language of the site
-              page you last logged in from (a login started elsewhere, from a link or a bookmark, does not change it, nor does a login through the Google, Discord or Blizzard button from a browser too old to tell;
-              French for an account that has not logged in again since this setting arrived), or the
+              page you last logged in from (a login started elsewhere, from a link or a bookmark, does not change it, nor does a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information);
+              French by default, including for an account created that way or that has not logged in again since this setting arrived), or the
               one you choose in <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>,
               until you next log in from a page in the other language. This point does not depend on your agreement: the
               site keeps this single choice with every account, subscribed or not, for the lifetime of the account, to

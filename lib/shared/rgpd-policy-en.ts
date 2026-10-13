@@ -77,7 +77,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Account language",
-    "French or English: the language of push notifications. That of the site page you last logged in from, or the one you choose in My profile; reset to French if the account is anonymized",
+    "French or English: the language of push notifications. That of the site page your last login started from (except as detailed in the Push notifications section), or the one you choose in My profile; French by default, reset to French if the account is anonymized",
   ],
 ];
 
