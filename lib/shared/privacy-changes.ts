@@ -654,7 +654,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Ton compte retient désormais une langue, français ou anglais : les notifications push te parviennent dans cette langue.",
     details: [
-      "La langue du compte est celle de la page lors de ta dernière connexion ; tu peux la changer dans « Mon profil », section Notifications — ce choix vaut jusqu'à ta prochaine connexion faite dans l'autre langue.",
+      "La langue du compte est celle de la page lors de ta dernière connexion (le français pour un compte qui ne s'est pas reconnecté depuis ce changement) ; tu peux la changer dans « Mon profil », section Notifications — ce choix vaut jusqu'à ta prochaine connexion faite dans l'autre langue.",
       "Le site ne garde que ce choix (français ou anglais), le temps du compte. Il figure dans l'export de tes données et revient au français si le compte est anonymisé.",
       "Les messages Discord, eux, restent en français.",
     ],
