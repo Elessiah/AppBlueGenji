@@ -330,6 +330,22 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")?.[1]).toEqual([3]);
   });
 
+  it("tient pour la même affiche les mêmes engagées reposées dans l'autre sens", async () => {
+    const { execute } = setup({
+      format: "SINGLE",
+      matches: [
+        playedRow({ id: 1, round_number: 1, next_winner_match_id: 3 }),
+        playedRow({ id: 2, round_number: 1, next_winner_match_id: 3 }),
+        row({ id: 3, round_number: 2, team1_id: 10, team2_id: 20 }),
+      ],
+      postersAfter: [{ id: 3, team1_id: 20, team2_id: 10 }],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")).toBeUndefined();
+  });
+
   it("garde les marques d'une rencontre rendue aux mêmes engagées : pas de seconde annonce", async () => {
     const { execute } = setup({
       format: "SINGLE",

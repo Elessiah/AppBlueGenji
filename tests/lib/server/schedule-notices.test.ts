@@ -170,12 +170,12 @@ describe("notifyMatchScheduleChange — rien à annoncer", () => {
     expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
-  it("se tait pour une date posée déjà passée", async () => {
+  it("ne fait que journaliser une date posée déjà passée (correction d'archive)", async () => {
     mockMatch();
     await notifyMatchScheduleChange(change({ startAt: "2020-01-01T00:00:00.000Z" }));
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     expect(notifyStaff).not.toHaveBeenCalled();
-    expect(publishStaffAction).not.toHaveBeenCalled();
+    expect(logLine()).toContain("🗓️ Match programmé");
   });
 
   it("se tait pour un effacement sans date d'avant", async () => {
