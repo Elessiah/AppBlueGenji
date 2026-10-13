@@ -116,29 +116,54 @@ connue : l'engagée restée en place perd aussi sa marque `TOLD` (les marques
 sont par manche, pas par engagée) — un changement ou un retrait d'horaire
 ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 
-**Engagée retirée par une correction de score** (décision utilisateur,
-2026-10-13). Quand une correction sort une engagée d'une manche
-(`pushTeamToTarget` remplace l'occupant — seule implémentation, dans
-`lib/server/tournaments/target-slot.ts`, que les exemptions empruntent aussi ;
-deux instructions par pose, la place et le statut écrits ensemble, le statut
-calculé par la base sur la valeur actuelle de l'autre place —,
-`detachDownstreamOutcome` vide une place), ses joueurs apprennent que l'horaire reçu ne les concerne plus :
-« **Match retiré de ton programme** » / "Match removed from your schedule" —
-message privé Discord (français, « Ton match » en tournoi individuel, aucun
-pseudo) et push `MATCH_REMINDER` dans la langue de chacun, même étiquette que
-l'annonce qu'il remplace. L'horaire est celui que tient la marque `TOLD`, lu
-dans la transaction **avant** l'effacement des marques, par une seule lecture
-verrouillante pour toutes les sortantes (`noteDepartedEntrants`,
-`lib/server/tournaments/departed-notices.ts`) ; l'avis part après le commit avec
-le journal (`flushBotLogs`) et se jette avec lui si la correction échoue
-(`discardBotLogs`) — même contrat de cycle de vie, même plafond (32) par
-transaction (le dépassement est écrit dans pm2). Une engagée revenue sur la
-manche entre-temps (seconde correction) n'est pas prévenue. Rien ne part sans horaire reçu (pas
-de `TOLD`, ou plus d'horaire après un retrait remis), ni pour un horaire passé
-depuis plus de 12 h. Trois lectures pour tous les avis
-(`announceEntrantsWithdrawn` : manches, noms des sortantes, destinataires ;
-l'ancien adversaire est l'occupant de l'autre place), puis les envois, quatre à
-la fois.
+**Engagée retirée de sa manche par un changement des résultats** (décision
+utilisateur, 2026-10-13, étendue par la revue de sécurité). Quand une engagée
+quitte une manche dont ses joueurs tenaient l'horaire, ils apprennent qu'il ne
+les concerne plus : « **Match retiré de ton programme** » / "Match removed from
+your schedule" (« Après une correction des résultats… » / "After a change to
+the results…") — message privé Discord (français, « Ton match » en tournoi
+individuel, aucun pseudo) et push `MATCH_REMINDER` dans la langue de chacun,
+même étiquette que l'annonce qu'il remplace. Chemins couverts :
+
+- correction de score : `pushTeamToTarget` remplace l'occupant (seule
+  implémentation, dans `lib/server/tournaments/target-slot.ts`, que les
+  exemptions empruntent aussi ; deux instructions par pose, la place et le
+  statut écrits ensemble, le statut calculé par la base sur la valeur actuelle
+  de l'autre place), `detachDownstreamOutcome` vide une place ;
+- retour en arrière (`rollback.ts`) : affiche détachée qui a changé une fois
+  re-remplie, manches supprimées ;
+- manches **supprimées** par le moteur — ronde suisse ou de Survie
+  réappariée, manche de BlueGenji Survie défaite, arbre final refait, plateau
+  périmé reconstruit — et rencontres d'arbre final réécrites sur place.
+
+Avant chaque `DELETE FROM bg_matches` du moteur, `noteDeletedMatches` (même
+filtre, constant) relève les manches dont un horaire a été reçu ; un test
+balaie les sources pour qu'aucune suppression n'y échappe
+(`departed-notices-wiring.test.ts`). La suppression d'un tournoi entier n'est
+pas couverte (le tournoi disparaît).
+
+L'horaire est celui que tient la marque `TOLD`, lu dans la transaction
+**avant** l'effacement des marques ou la suppression, par une seule lecture
+verrouillante sans jointure pour toutes les sortantes (`noteDepartedEntrants`,
+`lib/server/tournaments/departed-notices.ts`) ; ce que l'avis dit de la manche
+(tournoi, manche, ronde suisse, tournoi individuel) est relevé au même moment
+— une manche supprimée n'est plus lisible après le commit —, et l'adversaire
+est celui **de l'horaire reçu**, relevé avant le changement (si les deux
+engagées sortent l'une après l'autre, chacune a l'autre pour adversaire),
+jamais l'occupant actuel de l'autre place. L'avis part après le commit avec le
+journal (`flushBotLogs`) et se jette avec lui si le changement échoue
+(`discardBotLogs`) — même contrat de cycle de vie ; plafond de 512 avis par
+transaction (une ronde suisse entière réappariée en compte deux par manche ;
+le dépassement est écrit dans pm2). Une engagée revenue sur la manche
+entre-temps (seconde correction) n'est pas prévenue. Rien ne part sans horaire
+reçu (pas de `TOLD`, ou plus d'horaire après un retrait remis), ni pour un
+horaire passé depuis plus de 12 h. Limite connue (marques par manche) : `TOLD`
+est posée dès qu'une des deux engagées a été atteinte, et l'avis part alors aux
+deux — une engagée qu'aucun message n'avait atteinte peut recevoir le retrait
+d'un horaire qu'elle n'a pas reçu (un message de trop, jamais à un tiers).
+Trois lectures pour tous les avis (`announceEntrantsWithdrawn` : places
+actuelles, noms des sortantes et de leurs adversaires, destinataires), puis les
+envois, quatre à la fois.
 
 ### La marque `TOLD` : un horaire reçu
 
@@ -375,7 +400,8 @@ palier suivant, un rappel envoyé en boucle ne se rattrape pas.
 
 La table suit la manche (`ON DELETE CASCADE`) : un plateau régénéré —
 réappariement d'une ronde suisse, correction de score en survie — efface ses
-matchs, donc ses rappels.
+matchs, donc ses rappels ; les engagées qui en tenaient l'horaire sont
+prévenues (`noteDeletedMatches`, ci-dessus).
 
 ### Qui reçoit
 
