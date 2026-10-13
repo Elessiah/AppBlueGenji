@@ -125,7 +125,7 @@ le temps d'un tick — une carte annonçant un direct au-dessus d'un bouton abse
 ## Annonce sur Discord (#live, `@everyone`)
 
 Au **début** d'un match diffusé, le bot poste dans le salon #live du serveur
-BlueGenji esport (`LIVE_ANNOUNCE_CHANNEL_ID` côté bot,
+BlueGenji esport (constante `LIVE_ANNOUNCE_CHANNEL_ID` côté bot,
 `src/notifications/liveAnnouncement.ts`) un message qui mentionne `@everyone`,
 nomme les deux engagés et le tournoi, et donne le lien de la diffusion —
 demande de l'association : deux matchs à la suite font donc deux annonces.
@@ -139,15 +139,26 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   passe à l'antenne sans écriture. Mêmes déclencheurs que les notifications de
   départ (`PUSH_NOTIFICATIONS.md`) : chaque évènement de tournoi publié,
   l'entretien de l'instantané qui ouvre un lancement, la lecture de la liste
-  des tournois. Étranglé à dix secondes, avec relève ; jamais attendu.
+  des tournois — et, pour qu'un `START_TIME` parte **à l'heure**, le
+  battement (25 s) de chaque flux SSE de tournoi ouvert, en production
+  seulement. Étranglé à dix secondes pour tout le processus, avec relève ;
+  jamais attendu.
+- **Un message par diffusion, pas par match** : les matchs d'un même tournoi
+  qu'un même balayage trouve à l'antenne sur le **même lien** (une ronde
+  lancée d'un coup, repliée sur la chaîne officielle) partent en un seul
+  message — « 🔴 En direct : A contre B et C contre D — Tournoi » ; en tournoi
+  individuel, « 🔴 En direct : 2 matchs — Tournoi ». Chaque affiche garde sa
+  réservation. Deux matchs **à la suite** restent deux annonces.
 - **Une annonce par match et par affiche** : `bg_live_announcements`
   (clé unique `(match_id, pairing)`) est réservée **avant** l'appel au bot.
   Un balayage concurrent, un rafraîchissement, une relecture du flux, un direct
   coupé puis relancé, un lancement annulé puis refait (horaire changé) ne
   repostent jamais. La réservation n'est **rendue** que si rien n'est parti —
-  bot injoignable ou d'une version antérieure, salon fermé (`503`) — et le
-  balayage suivant réessaie tant que le match est à l'antenne ; un refus du
-  corps (`400`) la garde. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
+  bot injoignable ou d'une version antérieure, salon fermé (`503`), panne
+  (`500`), délai dépassé — et le balayage suivant réessaie tant que le match
+  est à l'antenne ; un succès (même sans mention) ou un refus du corps
+  (`400`) la garde. Le bot répond **avant** d'écrire au canal de logs : un
+  canal lent ne fait pas croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
   du bot : un salon fermé ne doit pas suspendre les rappels de fond ; côté
   bot, chaque incident n'est signalé au canal de logs qu'une fois par heure.
   Elle part avec la ligne du match (suppression du
@@ -178,17 +189,25 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `entrantLabel`
   (`discordInline` ; une entrée individuelle s'écrit « un joueur », jamais un
   pseudo). Le bot préfixe `@everyone` et n'autorise que cette mention
-  (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message.
+  (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
+  permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
+  qui ne notifie personne aurait l'air d'une panne).
 - **Production seulement** (`NODE_ENV=production`) : une base de
   développement ne fait jamais écrire `@everyone` au serveur, même devant un
   bot local branché par erreur sur le vrai serveur.
 - **Traces** : pm2 `[live-announce] match N (tournoi T) annoncé dans #live`
-  (identifiants seuls) ; l'annonce naît d'un balayage, pas d'un geste du staff,
-  donc aucune ligne `staff-audit`. Côté bot, un refus ou une permission
-  « Mentionner everyone » manquante est signalé dans le canal de logs.
-- **Production — permissions Discord** : le bot doit pouvoir voir le salon,
-  y écrire et y mentionner `@everyone`. Sans la dernière, le message part sans
-  notifier ; sans les deux premières, rien ne part et le site réessaie.
+  (`matchs N, M … annoncés` pour un groupe ; « sans notifier » quand la
+  mention n'a pas pu partir — identifiants seuls) ; l'annonce naît d'un
+  balayage, pas d'un geste du staff, donc aucune ligne `staff-audit`. Un report
+  est averti dans pm2 au plus une fois par heure et par cause, distincte :
+  « salon #live fermé au bot » (`503`) ou « bot injoignable ou d'une version
+  sans annonces ». Côté bot, un refus ou une permission manquante est signalé
+  dans le canal de logs, au plus une fois par heure par incident.
+- **Production — permissions Discord** dans #live : « Voir le salon »,
+  « Envoyer des messages », « Mentionner @everyone, @here et tous les rôles »
+  et « Intégrer des liens ». Sans la mention, le message part sans notifier ;
+  sans l'intégration, sans aperçu de la chaîne ; sans les deux premières, rien
+  ne part et le site réessaie.
 
 ## Information des joueurs (RGPD)
 
