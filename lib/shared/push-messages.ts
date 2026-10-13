@@ -250,10 +250,10 @@ export function matchScheduledStaffPush(
       locale,
     ),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
-    // Même étiquette que l'annonce aux joueurs : un arbitre engagé dans le
-    // match ne reçoit pas deux fois la même nouvelle — la seconde remplace la
-    // première sur l'appareil.
-    tag: `${matchTag(input.matchId)}-reminder`,
+    // Étiquette distincte de l'annonce aux joueurs : un arbitre engagé dans le
+    // match garde les deux, plutôt que de voir sa version joueur (« Ton
+    // match ») remplacée par la version arbitre (« Un match »).
+    tag: `${matchTag(input.matchId)}-schedule`,
   };
 }
 

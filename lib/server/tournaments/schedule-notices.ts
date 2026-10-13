@@ -24,7 +24,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { loadEntrantPlayerIds, notifyStaff } from "@/lib/server/notify";
+import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/shared/bot-logs";
 import type { ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
@@ -36,8 +36,6 @@ import { announceMatchSchedule, announceMatchScheduleCleared } from "./match-rem
 type ScheduledMatchInfoRow = RowDataPacket & {
   id: number;
   status: string;
-  team1_id: number | null;
-  team2_id: number | null;
   tournament_id: number;
   tournament_name: string;
   participant_type: string;
@@ -101,7 +99,7 @@ export function isAnnounceableSchedule(change: MatchScheduleChange, now: Date = 
 async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<ScheduledMatchInfoRow[]>(
-    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status, m.team1_id, m.team2_id,
+    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status,
             t.name AS tournament_name, t.participant_type,
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
@@ -125,11 +123,7 @@ function logEntrants(row: ScheduledMatchInfoRow): { team1: LogEntrant | null; te
  * Écrit la ligne du journal et, pour une date à annoncer (`push`), prévient les
  * arbitres.
  */
-async function notifyReferees(
-  change: MatchScheduleChange & { startAt: string },
-  push: boolean,
-  playersAnnounced: boolean,
-): Promise<number> {
+async function notifyReferees(change: MatchScheduleChange & { startAt: string }, push: boolean): Promise<number> {
   const row = await loadMatchInfo(change.matchId);
   if (!row) return 0;
   const participantType = toParticipantType(row.participant_type);
@@ -153,16 +147,12 @@ async function notifyReferees(
   // tracée au journal mais annoncée à personne (les joueurs non plus).
   if (!push || row.status === "COMPLETED") return 0;
 
-  // L'auteur ne se prévient pas lui-même, et un arbitre qui joue ce match
-  // a reçu l'annonce des joueurs (même étiquette) : la version arbitre
-  // (« Un match » en solo) ne doit pas la remplacer sur son appareil. Sans
-  // annonce aux joueurs (une place encore vide, par exemple), il garde la
-  // version arbitre — sinon il n'apprendrait rien.
-  const teamIds = [row.team1_id, row.team2_id].filter((id): id is number => id !== null).map(Number);
-  const players = playersAnnounced ? [...(await loadEntrantPlayerIds(teamIds)).values()].flat() : [];
+  // L'auteur ne se prévient pas lui-même. Un arbitre qui joue ce match reçoit
+  // les deux versions (étiquettes distinctes) : un doublon plutôt qu'une
+  // annonce qui en remplace une autre, ou aucune.
   const { pushed } = await notifyStaff({
     topic: "MATCH_SCHEDULED",
-    excludeUserIds: [...(change.actor ? [change.actor.id] : []), ...players],
+    excludeUserIds: change.actor ? [change.actor.id] : [],
     push: (locale) =>
       matchScheduledStaffPush(
         {
@@ -241,14 +231,11 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   if (startAt === change.previousStartAt) return;
   // Une date déjà passée (correction d'archive) n'est que journalisée.
   const announceable = isAnnounceableSchedule(change);
-  // Les joueurs d'abord : les arbitres qui jouent ce match ne sont tenus à
-  // l'écart du push arbitre que si l'annonce est bien partie vers eux.
-  const [players] = await Promise.allSettled([
+  const results = await Promise.allSettled([
     announceable ? announceMatchSchedule(change.matchId, playerAnnouncement(change)) : Promise.resolve(0),
+    notifyReferees({ ...change, startAt }, announceable),
   ]);
-  const playersAnnounced = players.status === "fulfilled" && players.value > 0;
-  const [referees] = await Promise.allSettled([notifyReferees({ ...change, startAt }, announceable, playersAnnounced)]);
-  for (const result of [players, referees]) {
+  for (const result of results) {
     if (result.status === "rejected" && !isMissingTableError(result.reason)) {
       console.error("[notify] horaire de match non annoncé", result.reason);
     }
