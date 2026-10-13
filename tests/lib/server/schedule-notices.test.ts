@@ -231,9 +231,11 @@ describe("notifyMatchScheduleChange — rien à annoncer", () => {
 
   it("ne prévient pas les arbitres d'une manche disparue", async () => {
     mockMatch(null);
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     await notifyMatchScheduleChange(change());
     expect(notifyStaff).not.toHaveBeenCalled();
     expect(publishStaffAction).not.toHaveBeenCalled();
+    info.mockRestore();
   });
 });
 
@@ -710,5 +712,49 @@ describe("announceDeletedMatchesToStaff", () => {
     expect(notifyStaff).toHaveBeenCalledTimes(2);
     expect(resolvePush(staffCall().push).title).toBe("Horaire du match retiré");
     error.mockRestore();
+  });
+});
+
+describe("notifyMatchScheduleChange — trace du geste sans manche relue", () => {
+  function auditLines(info: jest.SpiedFunction<typeof console.info>): string[] {
+    return info.mock.calls.map((call) => String(call[0])).filter((line) => line.startsWith("[staff-audit]"));
+  }
+
+  it("nomme l'auteur dans pm2 quand la manche a disparu, sans ligne Discord", async () => {
+    mockMatch(null);
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await notifyMatchScheduleChange(change({ previousStartAt: OLD_START }));
+
+    const [line] = auditLines(info);
+    expect(line).toContain(`#42 posé au ${NEW_START} (était ${OLD_START})`);
+    expect(line).toContain(`auteur : ${ACTOR.pseudo} (#${ACTOR.id})`);
+    expect(publishStaffAction).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
+
+  it("nomme l'auteur d'un retrait quand la relecture échoue", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(
+      notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START })),
+    ).resolves.toBeUndefined();
+
+    const [line] = auditLines(info);
+    expect(line).toContain(`#42 retiré (était ${OLD_START})`);
+    expect(line).toContain(`auteur : ${ACTOR.pseudo} (#${ACTOR.id})`);
+    info.mockRestore();
+    error.mockRestore();
+  });
+
+  it("ne trace rien sans auteur", async () => {
+    mockMatch(null);
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    await notifyMatchScheduleChange(change({ actor: null }));
+    expect(auditLines(info)).toEqual([]);
+    info.mockRestore();
   });
 });

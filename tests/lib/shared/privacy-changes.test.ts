@@ -848,6 +848,11 @@ describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés 
     // Sujet push fondé sur le consentement : l'entrée nomme le réglage qui le refuse.
     expect(text()).toMatch(/« Matchs planifiés », que tu peux couper dans « Mon profil »/);
     expect(text()).toMatch(/sans nom sur Discord, avec le pseudo et l'identifiant de compte de son auteur dans les journaux du serveur/);
+    // Sans planification par l'arbitrage, un retrait se tait (`clearedHeldStartAt`) : l'entrée le dit.
+    expect(text()).toMatch(/ne planifie pas les matchs, un horaire retiré n'est pas annoncé/);
+    // Le sujet push ne règle pas les messages privés, fondés sur l'intérêt légitime.
+    expect(text()).toMatch(/ne règle que les notifications push/);
+    expect(text()).toMatch(/intérêt légitime[^.]*tu peux t'y opposer \(droit d'opposition, voir « Vos droits » sur \/rgpd\)/);
     // Une manche supprimée par le moteur est poussée à tout le staff, auteur compris.
     expect(text()).toMatch(/quand une mise à jour du tournoi supprime un match planifié/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications"]);
