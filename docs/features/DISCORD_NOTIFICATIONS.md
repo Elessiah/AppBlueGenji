@@ -129,8 +129,8 @@ verrouillante pour toutes les sortantes (`noteDepartedEntrants`,
 `lib/server/tournaments/departed-notices.ts`) ; l'avis part après le commit avec
 le journal (`flushBotLogs`) et se jette avec lui si la correction échoue
 (`discardBotLogs`) — même contrat de cycle de vie, même plafond (32) par
-transaction. Une engagée revenue sur la manche entre-temps (seconde
-correction) n'est pas prévenue. Rien ne part sans horaire reçu (pas
+transaction (le dépassement est écrit dans pm2). Une engagée revenue sur la
+manche entre-temps (seconde correction) n'est pas prévenue. Rien ne part sans horaire reçu (pas
 de `TOLD`, ou plus d'horaire après un retrait remis), ni pour un horaire passé
 depuis plus de 12 h. Trois lectures pour tous les avis
 (`announceEntrantsWithdrawn` : manches, noms des sortantes, destinataires ;
@@ -295,7 +295,8 @@ perd ses millisecondes (la colonne `DATETIME` les arrondirait), pour que les
 comparaisons d'horaires de `schedule-notices` portent sur la valeur gardée ;
 l'option du tournoi se lit dans la lecture verrouillante qui le tient. Réservations
 et envois vont quatre manches à la fois (`inBatches` : une réserve de quatre
-exécutants, dont aucun n'attend le plus lent des autres ; `SWEEP_CONCURRENCY`), les
+exécutants, dont aucun n'attend le plus lent des autres, et qui traite tous les
+éléments avant de lever la première erreur ; `SWEEP_CONCURRENCY`), les
 deux engagées d'une manche ensemble : une ronde suisse appariée sur des
 horaires déjà posés donne autant d'annonces que de manches, et chacune attend
 le bot puis les appareils — les réservations, prises avant, interdisent le
@@ -311,9 +312,12 @@ part (l'annonce de l'arbitre, ou celle de la nouvelle affiche, s'en charge) ;
 un avis de retrait dont la marque `TOLD` a disparu entre-temps ne part pas non
 plus.
 Une réservation qui échoue (attente de verrou, interblocage) est journalisée
-et réessayée au passage suivant, sans retenir les autres manches. Une marque
-`TOLD` prise par un envoi concurrent n'est ni réécrite ni rendue par le
-perdant.
+et réessayée au passage suivant, sans retenir les autres manches. La pose de `TOLD` porte elle-même la condition (horaire et engagées de
+la manche, dans l'`INSERT … SELECT` ou l'`UPDATE … JOIN bg_matches`) : une
+correction ou un déplacement qui tombe entre la relecture et l'écriture fait
+échouer la pose, et rien ne part. Une marque prise par un envoi concurrent du
+même horaire fait taire le perdant (l'autre envoi la remet), qui n'a rien à
+rendre.
 
 Accepté, non changé : un message par engagée (chacune lit « ton équipe contre
 l'autre »), donc une lecture des abonnements push par message ; et la
