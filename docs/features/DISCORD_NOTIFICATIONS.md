@@ -440,7 +440,9 @@ la marque `STAFF` (`MATCH_STAFF_KEY`) retient l'horaire de « Match programmé �
 réservée **avant** l'envoi (`markStaffPushed`, conditionnée à l'horaire encore
 en place : un retrait qui suit de près la trouve ; refusée, la manche ne tient
 plus cet horaire et rien n'est poussé) et rendue si aucun appareil n'est
-atteint (`releaseStaffPush`) — `pushToUsers` compte les appareils atteints
+atteint (`releaseStaffPush`), sur sa ligne, à ce qu'elle tenait avant — jamais
+quand elle tenait déjà cet horaire (`held` : preuve d'un envoi précédent qui,
+lui, a atteint les arbitres) — `pushToUsers` compte les appareils atteints
 même si un autre envoi lève ou si la tenue des abonnements échoue ensuite ; elle se lit avec `TOLD` sous les verrous
 de l'écriture de la date, survit aux ménages de marques (changement de date,
 retour à l'horaire tenu, affiche changée, reprise des marques héritées, qui ne
