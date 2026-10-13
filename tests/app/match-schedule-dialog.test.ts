@@ -58,7 +58,11 @@ describe("MatchScheduleDialog — heure", () => {
 
 describe("MatchScheduleDialog — qui l'horaire prévient", () => {
   it("dit aux arbitres que l'horaire est annoncé, et quand", () => {
-    expect(SOURCE).toContain("startAtHint(text, refereeScheduling, match.team1Id !== null && match.team2Id !== null)");
+    expect(SOURCE).toMatch(
+      /startAtHint\(\s*text,\s*refereeScheduling,\s*match\.team1Id !== null && match\.team2Id !== null,\s*match\.status === "COMPLETED" \|\| match\.status === "AWAITING_CONFIRMATION",\s*\)/,
+    );
+    // Un match joué n'annonce rien : l'aide s'en tient à la date.
+    expect(SOURCE).toContain("return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;");
     expect(SOURCE).toMatch(/if \(!entrantsKnown\) return text\.t\("schedule\.noticeTbd"\);/);
     expect(SOURCE).toContain('text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice")');
   });
@@ -82,5 +86,12 @@ describe("MatchScheduleDialog — aide inchangée", () => {
         expect(hint).not.toMatch(/annoncé aux joueurs|announced to the players/);
       }
     }
+  });
+});
+
+describe("MatchScheduleDialog — confirmation d'un retrait", () => {
+  it("nomme le retrait comme la notification qu'il déclenche", () => {
+    expect(frDialogs.schedule.cleared).toBe("Horaire du match retiré.");
+    expect(enDialogs.schedule.cleared).toBe("Match time removed.");
   });
 });
