@@ -634,61 +634,103 @@ type WithdrawnMatchRow = RowDataPacket & {
   bracket: string;
   round_number: number;
   swiss_round: number;
-  departed_name: string | null;
-  opponent_name: string | null;
+  team1_id: number | null;
+  team2_id: number | null;
+  team1_name: string | null;
+  team2_name: string | null;
 };
 
+type TeamNameRow = RowDataPacket & { id: number; name: string };
+
 /**
- * Prévient les joueurs d'une engagée **retirée** d'une manche par une
+ * Prévient les joueurs des engagées **retirées** de leur manche par une
  * correction de score que l'horaire qu'ils avaient reçu ne les concerne plus :
  * message privé Discord (français, « Ton match » en tournoi individuel) et
  * push dans la langue de chacun, même étiquette que l'annonce qu'il remplace.
  * Après le commit de la correction, au meilleur effort.
  *
- * @returns Le nombre de messages déclenchés (0 ou 1).
+ * Trois lectures pour tous les avis (manches, noms des sortantes,
+ * destinataires), puis les envois, quelques-uns à la fois. Une engagée revenue
+ * sur sa manche entre-temps (seconde correction) n'est pas prévenue.
+ *
+ * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
-export async function announceEntrantWithdrawn(departed: DepartedEntrant): Promise<number> {
+export async function announceEntrantsWithdrawn(departures: readonly DepartedEntrant[]): Promise<number> {
+  if (departures.length === 0) return 0;
   const db = await getDatabase();
-  // L'ancien adversaire est l'occupant de l'autre place, s'il y est encore.
-  const opponentColumn = departed.slot === 1 ? "m.team2_id" : "m.team1_id";
-  const [rows] = await db.query<WithdrawnMatchRow[]>(
-    `SELECT m.id, m.tournament_id, m.bracket, m.round_number,
+  const matchIds = [...new Set(departures.map((departure) => departure.matchId))];
+  const teamIds = [...new Set(departures.map((departure) => departure.teamId))];
+  const [matchRows] = await db.query<WithdrawnMatchRow[]>(
+    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
-            d.name AS departed_name, o.name AS opponent_name
+            t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
-       LEFT JOIN bg_teams d ON d.id = ?
-       LEFT JOIN bg_teams o ON o.id = ${opponentColumn}
-      WHERE m.id = ? LIMIT 1`,
-    [departed.teamId, departed.matchId],
+       LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
+       LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+      WHERE m.id IN (${matchIds.map(() => "?").join(", ")})`,
+    matchIds,
   );
-  const row = rows[0];
-  if (!row || row.departed_name === null) return 0;
-  const recipients = (await loadRecipientsByTeam([departed.teamId])).get(departed.teamId) ?? [];
-  if (recipients.length === 0) return 0;
+  const [nameRows] = await db.query<TeamNameRow[]>(
+    `SELECT id, name FROM bg_teams WHERE id IN (${teamIds.map(() => "?").join(", ")})`,
+    teamIds,
+  );
+  const matches = new Map(matchRows.map((row) => [Number(row.id), row]));
+  const names = new Map(nameRows.map((row) => [Number(row.id), String(row.name)]));
+  const sends = departures.filter((departure) => {
+    const row = matches.get(departure.matchId);
+    // Revenue sur la manche (seconde correction) : rien à lui retirer.
+    return row !== undefined && names.has(departure.teamId) && !onPoster(row, departure.teamId);
+  });
+  if (sends.length === 0) return 0;
 
+  const recipientsByTeam = await loadRecipientsByTeam([...new Set(sends.map((send) => send.teamId))]);
+  let dispatched = 0;
+  await inBatches(sends, SWEEP_CONCURRENCY, async (departure) => {
+    const recipients = recipientsByTeam.get(departure.teamId) ?? [];
+    if (recipients.length === 0) return;
+    const row = matches.get(departure.matchId) as WithdrawnMatchRow;
+    await sendWithdrawnNotice(departure, row, String(names.get(departure.teamId)), recipients);
+    dispatched += 1;
+  });
+  return dispatched;
+}
+
+/** L'engagée occupe l'une des deux places de la manche. */
+function onPoster(row: WithdrawnMatchRow, teamId: number): boolean {
+  return Number(row.team1_id) === teamId || Number(row.team2_id) === teamId;
+}
+
+/** L'avis d'une engagée retirée, à ses joueurs. */
+async function sendWithdrawnNotice(
+  departure: DepartedEntrant,
+  row: WithdrawnMatchRow,
+  teamName: string,
+  recipients: NotificationRecipient[],
+): Promise<void> {
   const swiss = isSwissRound(row);
   const solo = row.participant_type === "SOLO";
-  const opponentName = row.opponent_name ?? "TBD";
+  // L'ancien adversaire est l'occupant de l'autre place, s'il y est encore.
+  const opponentName = (departure.slot === 1 ? row.team2_name : row.team1_name) ?? "TBD";
   const context = {
     tournamentName: String(row.tournament_name),
     tournamentUrl: tournamentPageUrl(Number(row.tournament_id)),
-    teamName: String(row.departed_name),
+    teamName,
     opponentName,
     roundLabel: matchRoundLabel(String(row.bracket), Number(row.round_number), swiss),
-    startAt: departed.heldStartAt,
+    startAt: departure.heldStartAt,
     solo,
   };
   const pushSide = {
     tournamentId: Number(row.tournament_id),
     tournamentName: context.tournamentName,
-    matchId: departed.matchId,
-    teamName: context.teamName,
+    matchId: departure.matchId,
+    teamName,
     opponentName,
     bracket: String(row.bracket),
     roundNumber: Number(row.round_number),
     swiss,
-    startAt: departed.heldStartAt,
+    startAt: departure.heldStartAt,
     solo,
   };
   await notifyUsers(recipients, {
@@ -696,7 +738,6 @@ export async function announceEntrantWithdrawn(departed: DepartedEntrant): Promi
     discord: { message: buildMatchWithdrawnNotice(context), context: "match-withdrawn" },
     push: (locale) => matchWithdrawnPush(pushSide, locale),
   });
-  return 1;
 }
 
 async function runSweep(now: Date): Promise<number> {

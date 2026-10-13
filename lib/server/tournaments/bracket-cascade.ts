@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { statusFromTeams } from "./_internal";
-import { noteDepartedEntrant } from "./departed-notices";
+import { noteDepartedEntrants, type Departure } from "./departed-notices";
 import { forgetMatchReminders } from "./reminder-marks";
 
 /**
@@ -144,12 +144,11 @@ function recordDeparture(
  * (`./departed-notices`) —, puis les marques partent en une instruction.
  */
 async function forgetDepartures(connection: PoolConnection, departed: Departure[]): Promise<void> {
-  for (const { matchId, teamId, slot } of departed) await noteDepartedEntrant(connection, matchId, teamId, slot);
+  await noteDepartedEntrants(connection, departed);
   await forgetMatchReminders(connection, [...new Set(departed.map((departure) => departure.matchId))]);
 }
 
-/** Une engagée sortie d'une manche, et la place qu'elle y occupait. */
-type Departure = { matchId: number; teamId: number; slot: 1 | 2 };
+
 
 /**
  * Vide un créneau d'aval et défait tout ce qui en était descendu.

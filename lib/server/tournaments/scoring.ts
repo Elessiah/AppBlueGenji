@@ -7,7 +7,7 @@ import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-laun
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
-import { noteDepartedEntrant } from "./departed-notices";
+import { noteDepartedEntrants } from "./departed-notices";
 import { forgetMatchReminders } from "./reminder-marks";
 import {
   dropQueuedRefereeAlerts,
@@ -80,7 +80,9 @@ export async function pushTeamToTarget(
     // arrière (`./reminder-marks.ts`). L'engagée remplacée apprend, après le
     // commit, que l'horaire qu'elle avait reçu ne la concerne plus
     // (`./departed-notices`) — lu avant l'effacement.
-    await noteDepartedEntrant(connection, targetMatchId, Number(previousTeamId), targetSlot === 1 ? 1 : 2);
+    await noteDepartedEntrants(connection, [
+      { matchId: targetMatchId, teamId: Number(previousTeamId), slot: targetSlot === 1 ? 1 : 2 },
+    ]);
     await forgetMatchReminders(connection, [targetMatchId]);
   }
 
