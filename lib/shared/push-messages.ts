@@ -291,9 +291,10 @@ export type RefereeAlertMatch = {
  * alertes de deux tournois ne se lisent pas pareil.
  *
  * Le lien mène à la manche (`match`) dans la langue du destinataire. Sans
- * manche, le français garde la première URL de la ligne, comme avant ; une
- * autre langue mène à la liste des tournois — une URL lue dans la ligne peut
- * venir d'un nom d'équipe, et préfixer son chemin mènerait n'importe où.
+ * manche, il mène à la liste des tournois, **dans toutes les langues** : il
+ * n'est jamais lu dans la ligne, dont une URL peut venir d'un nom de tournoi
+ * ou d'équipe — même ramenée à un chemin du site, elle mènerait où l'auteur
+ * du nom l'a voulu (`/connexion?redirect=…`, une route d'API…).
  */
 export function refereeAlertPush(
   message: string,
@@ -303,10 +304,7 @@ export function refereeAlertPush(
   match: RefereeAlertMatch | null = null,
 ): PushContent {
   const text = TEXT[locale];
-  let url: string;
-  if (match) url = localeHref(tournamentMatchHref(match.tournamentId, match.matchId), locale);
-  else if (locale === DEFAULT_LOCALE) url = /https?:\/\/\S+/.exec(message)?.[0] ?? "/tournois";
-  else url = localeHref("/tournois", locale);
+  const url = localeHref(match ? tournamentMatchHref(match.tournamentId, match.matchId) : "/tournois", locale);
   let body: string;
   if (locale === "fr") body = stripMarkdown(message);
   else if (match) {

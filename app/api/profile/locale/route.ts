@@ -18,7 +18,9 @@ export async function PUT(req: Request) {
   try {
     locale = ((await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES)) as { locale?: unknown }).locale;
   } catch {
-    return fail(INVALID_LOCALE, 400);
+    // Corps illisible, trop lourd ou non déclaré en JSON : un refus du
+    // transport, pas une langue invalide — il n'est rattaché à aucun champ.
+    return fail("INVALID_BODY", 400);
   }
   if (!isLocale(locale)) return fail(INVALID_LOCALE, 400);
 

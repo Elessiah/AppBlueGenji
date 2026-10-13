@@ -135,7 +135,7 @@ export async function getFullProfile(
   const canModerate = can(viewer, "moderation");
   const db = await getDatabase();
 
-  const [userRows] = await db.execute<(UserRow & { locale?: string | null })[]>(
+  const [userRows] = await db.execute<(UserRow & { locale: string })[]>(
     `SELECT
       id,
       pseudo,
