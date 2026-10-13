@@ -162,6 +162,18 @@ describe("buildMatchScheduleAnnouncement", () => {
     expect(message).toContain("**Match reprogrammé**");
     expect(message).not.toContain("**Match programmé**");
   });
+
+  it("ne nomme aucun joueur en tournoi individuel", () => {
+    const solo = { ...context, teamName: "Kiro", opponentName: "Nova", solo: true };
+    for (const message of [
+      buildMatchScheduleAnnouncement(solo, [MATCH_REMINDER_OFFSETS[1]], true),
+      buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[1], solo),
+    ]) {
+      expect(message).toContain("**Ton match**");
+      expect(message).not.toMatch(/Kiro|Nova/);
+      expect(message).toContain("Coupe BlueGenji");
+    }
+  });
 });
 
 describe("buildMatchReminderMessage", () => {

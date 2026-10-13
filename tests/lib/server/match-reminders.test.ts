@@ -350,16 +350,24 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
   });
 
-  it("prévient le joueur d'une entrée solo sans nommer personne dans le push", async () => {
+  it("prévient le joueur d'une entrée solo sans nommer personne, ni en push ni sur Discord", async () => {
     await mockAnnounceDb({
       matches: [{ ...MATCH, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" }],
       recipients: [
-        { team_id: 101, id: 1, pseudo: "Kiro", discord_id: null, discord_pseudo: null },
-        { team_id: 102, id: 3, pseudo: "Nova", discord_id: null, discord_pseudo: null },
+        { team_id: 101, id: 1, pseudo: "Kiro", discord_id: "555000111", discord_pseudo: "kiro" },
+        { team_id: 102, id: 3, pseudo: "Nova", discord_id: "555000333", discord_pseudo: "nova" },
       ],
     });
 
     expect(await announceMatchSchedule(31, false, THREE_DAYS_BEFORE)).toBe(2);
+
+    // Le message privé Discord ne porte pas plus de pseudo que le push.
+    const directMessages = jest.mocked(pushDiscordDirectMessages).mock.calls.map((call) => call[0]);
+    expect(directMessages).toHaveLength(2);
+    for (const message of directMessages) {
+      expect(message).toContain("**Ton match**");
+      expect(message).not.toMatch(/Kiro|Nova/);
+    }
 
     const pushes = jest.mocked(pushToUsers).mock.calls;
     expect(pushes.map((call) => call[0])).toEqual([[1], [3]]);
