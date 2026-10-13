@@ -95,14 +95,14 @@ describe("MatchScheduleDialog — aide inchangée", () => {
 
 describe("MatchScheduleDialog — confirmation d'un retrait", () => {
   it("confirme un retrait sans reprendre le titre de l'avis aux joueurs, qui ne part pas toujours", () => {
-    expect(frDialogs.schedule.cleared).toBe("Horaire effacé.");
-    expect(enDialogs.schedule.cleared).toBe("Time cleared.");
+    expect(frDialogs.schedule.cleared).toBe("Date de début effacée.");
+    expect(enDialogs.schedule.cleared).toBe("Start date cleared.");
   });
 
   it("ne parle pas de retrait quand il n'y avait aucun horaire", () => {
     expect(SOURCE).toContain('if (!touched) return text.t(hadTime ? "schedule.cleared" : "schedule.noTime");');
     expect(SOURCE).toContain("savedMessage(text, entry.kind === \"ready\", planning, match.startAt !== null)");
-    expect(frDialogs.schedule.noTime).toBe("Aucun horaire posé.");
-    expect(enDialogs.schedule.noTime).toBe("No time set.");
+    expect(frDialogs.schedule.noTime).toBe("Aucune date de début posée.");
+    expect(enDialogs.schedule.noTime).toBe("No start date set.");
   });
 });

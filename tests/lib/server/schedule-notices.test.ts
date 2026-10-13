@@ -13,6 +13,7 @@ import {
   isAnnounceableClearing,
   isAnnounceableSchedule,
   notifyMatchScheduleChange,
+  playerAnnouncement,
   type MatchScheduleChange,
 } from "@/lib/server/tournaments/schedule-notices";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
@@ -276,6 +277,30 @@ describe("notifyMatchScheduleChange — horaire retiré, arbitres", () => {
       const { title, body } = resolvePush(staffCall().push, locale);
       expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
     }
+  });
+});
+
+describe("playerAnnouncement", () => {
+  const now = new Date("2099-01-01T00:00:00Z");
+
+  it("cite l'ancienne date reçue, encore devant", () => {
+    expect(playerAnnouncement(change({ previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toEqual({
+      rescheduled: true,
+      previousStartAt: OLD_START,
+    });
+  });
+
+  it("ne cite pas une date d'avant déjà passée, que les joueurs n'ont jamais reçue", () => {
+    expect(
+      playerAnnouncement(change({ previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true }), now),
+    ).toEqual({ rescheduled: true, previousStartAt: null });
+  });
+
+  it("dit « programmé » quand rien n'avait été reçu", () => {
+    expect(playerAnnouncement(change({ previousStartAt: OLD_START, alreadyAnnounced: false }), now)).toEqual({
+      rescheduled: false,
+      previousStartAt: null,
+    });
   });
 });
 
