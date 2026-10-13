@@ -224,6 +224,8 @@ describe("service worker du site", () => {
       "/api/auth/google/start?terms=1",
       "/en/api/x",
       "/de/api/x",
+      "/en//api/auth/google/start",
+      "/fr/%2F/api/x",
       "/%61pi/auth/x",
       "/API",
       "/tournois/../api/x",
