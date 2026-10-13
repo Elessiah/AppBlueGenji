@@ -104,6 +104,7 @@ describe("safeRedirectPath — ce qui est refusé", () => {
     "/api/",
     "/API/auth/discord/start",
     "/en/api/auth/google/start",
+    "/fr/en/api/auth/google/start",
     "/tournois/../api/auth/google/start",
     "/./api/profile",
     "/%61pi/auth/google/start",
