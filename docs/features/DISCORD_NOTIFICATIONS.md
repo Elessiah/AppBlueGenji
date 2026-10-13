@@ -162,8 +162,10 @@ l'horaire que les joueurs tiennent déjà (après une saisie de travers seulemen
 journalisée) ne leur est pas réannoncée, et garde ses marques (le rappel déjà
 parti ne repart pas) — sauf un palier daté d'un **autre** horaire (pris pour
 une date intermédiaire dont l'annonce n'a atteint personne), qui ferait sauter
-au balayage le rappel 24 h de l'horaire rendu ; l'observation y est redatée,
-pour qu'un échec tardif de l'avis intermédiaire ne la rende pas ; une date déjà passée, annoncée
+au balayage le rappel 24 h de l'horaire rendu ; l'observation y est redatée
+(reposée si un passage par un match joué l'avait retirée, pour un match à
+jouer), pour qu'un échec tardif de l'avis intermédiaire ne la rende pas et que
+le balayage ne réannonce pas l'horaire tenu ; une date déjà passée, annoncée
 à personne, laisse elle aussi les marques en place.
 
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
@@ -324,9 +326,9 @@ la manche, dans un `INSERT … SELECT … FROM bg_matches` — la manche lue ava
 la marque, dans l'ordre de verrouillage du moteur ; `ON DUPLICATE KEY UPDATE`
 pour une marque déjà là) : une
 correction ou un déplacement qui tombe entre la relecture et l'écriture fait
-échouer la pose, et rien ne part. Une marque prise par un envoi concurrent du
-même horaire fait taire le perdant (l'autre envoi la remet), qui n'a rien à
-rendre. Un envoi qui échoue avant d'atteindre les joueurs (pose de `TOLD` en
+échouer la pose, et rien ne part. Deux envois d'un même horaire ne coexistent
+pas : ce sont les réservations (observation, palier) qui n'en laissent passer
+qu'un — la pose de `TOLD` ne les départage pas (`FOUND_ROWS`). Un envoi qui échoue avant d'atteindre les joueurs (pose de `TOLD` en
 attente de verrou, destinataires illisibles) **rend** les marques qu'il avait
 réservées (`PlannedSend.claimed` : observation, palier) — sans quoi le rappel,
 ou l'annonce, serait consommé sans message et jamais retenté. Chaque marque
