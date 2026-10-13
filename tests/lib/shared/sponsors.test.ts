@@ -212,3 +212,24 @@ describe("sponsorDescription", () => {
   });
 });
 
+
+describe("validateSponsorInput — site web (revue juridique #439)", () => {
+  it("accepte une adresse http(s) complète", () => {
+    for (const websiteUrl of ["https://www.logitechg.com", "http://exemple.fr/apis-et-outils"]) {
+      const result = validateSponsorInput({ name: "X", websiteUrl });
+      expect(result.ok).toBe(true);
+    }
+  });
+
+  it("refuse une route d'API, un autre schéma ou une adresse incomplète, rattaché au champ", () => {
+    for (const websiteUrl of [
+      "https://bluegenji.example/api/auth/google/start?terms=1&lang=en",
+      "https://bluegenji.example//api/auth/google/start",
+      "javascript:alert(1)",
+      "exemple.fr",
+    ]) {
+      expect(validateSponsorInput({ name: "X", websiteUrl })).toEqual({ ok: false, error: "INVALID_WEBSITE_URL" });
+    }
+    expect(SPONSOR_FIELD_ERRORS.INVALID_WEBSITE_URL).toBe("websiteUrl");
+  });
+});

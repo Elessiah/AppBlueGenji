@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_BODY_MAX,
@@ -24,6 +26,7 @@ import {
   recruitmentErrorMessage,
   validateRecruitmentAdInput,
   isSafeRecruitmentContactUrl,
+  recruitmentContactHref,
   RECRUITMENT_FIELD_ERRORS,
   type RecruitmentAd,
 } from "@/lib/shared/recruitment";
@@ -517,5 +520,24 @@ describe("lien de candidature (contactUrl) — revue juridique #439", () => {
     }
     expect(RECRUITMENT_FIELD_ERRORS.CONTACT_URL_INVALID).toBe("contactUrl");
     expect(recruitmentErrorMessage("CONTACT_URL_INVALID", "x")).toMatch(/https:\/\//);
+  });
+});
+
+describe("recruitmentContactHref — bouton « Postuler »", () => {
+  it("sert un lien accepté, jamais un lien enregistré avant la règle qu'elle refuse", () => {
+    expect(recruitmentContactHref("https://support.example/ticket/3")).toBe("https://support.example/ticket/3");
+    expect(recruitmentContactHref("/api/auth/google/start?terms=1")).toBeNull();
+    expect(recruitmentContactHref("javascript:alert(1)")).toBeNull();
+    expect(recruitmentContactHref(null)).toBeNull();
+    expect(recruitmentContactHref("")).toBeNull();
+  });
+
+  it("est le seul chemin d'un lien « Postuler » vers le DOM", () => {
+    const root = join(__dirname, "../../..");
+    for (const file of ["app/recrutement/AdDetailModal.tsx", "app/recrutement/RecruitmentSection.tsx", "components/recruitment-highlight.tsx"]) {
+      const source = readFileSync(join(root, file), "utf8");
+      expect(source).toContain("recruitmentContactHref(ad.contactUrl)");
+      expect(source).not.toMatch(/href=\{ad\.contactUrl\}/);
+    }
   });
 });

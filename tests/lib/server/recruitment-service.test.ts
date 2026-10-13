@@ -89,7 +89,7 @@ describe("recruitment-service", () => {
       expect(execute.mock.calls[0][0]).toContain("WHERE active = 1");
     });
 
-    it("ne sert plus un lien de candidature enregistré que la règle refuse (route d'API, autre schéma)", async () => {
+    it("rend le lien de candidature enregistré tel quel (le bouton passe par recruitmentContactHref)", async () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([
         [
           { ...HIGHLIGHT_ROW, id: 1, contact_url: "/api/auth/google/start?terms=1&lang=en" },
@@ -101,8 +101,8 @@ describe("recruitment-service", () => {
 
       const result = await listRecruitmentAds();
       expect(result.map((ad) => [ad.id, ad.contactUrl])).toEqual([
-        [1, null],
-        [2, null],
+        [1, "/api/auth/google/start?terms=1&lang=en"],
+        [2, "javascript:alert(1)"],
         [3, "https://support.example/ticket/3"],
       ]);
     });
