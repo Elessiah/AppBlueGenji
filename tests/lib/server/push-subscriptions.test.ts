@@ -21,6 +21,7 @@ import {
   subscribedStaffCandidates,
 } from "@/lib/server/push-subscriptions";
 import { sendWebPush, type WebPushConfig } from "@/lib/server/web-push";
+import * as pushNotifications from "@/lib/shared/push-notifications";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -143,6 +144,29 @@ describe("pushToUsers", () => {
     await pushToUsers([1], "MATCH_START", { title: "Ton match commence", body: "b", url: "/" }, {}, CONFIG);
 
     expect(JSON.parse(jest.mocked(sendWebPush).mock.calls[0][2])).toMatchObject({ title: "Ton match commence", lang: "fr" });
+  });
+
+  it("un contenu non traduit n'est rédigé qu'une fois, quelles que soient les langues des comptes", async () => {
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([
+        [
+          { id: 40, ...SUB, locale: "en" },
+          { id: 41, ...SUB, locale: "fr" },
+          { id: 42, ...SUB, locale: null },
+        ],
+      ])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+    const build = jest.spyOn(pushNotifications, "buildPushPayload");
+
+    expect(await pushToUsers([1, 2], "MATCH_START", { title: "Ton match commence", body: "b", url: "/" }, {}, CONFIG)).toBe(3);
+
+    expect(build).toHaveBeenCalledTimes(1);
+    build.mockRestore();
+    const payloads = new Set(jest.mocked(sendWebPush).mock.calls.map((call) => call[2]));
+    expect(payloads.size).toBe(1);
   });
 
   it("ne lève jamais : une panne rend zéro", async () => {

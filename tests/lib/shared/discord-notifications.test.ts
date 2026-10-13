@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import {
   ISSUE_REPORT_MAX_LENGTH,
   ISSUE_REPORT_MIN_LENGTH,
@@ -192,6 +192,26 @@ describe("formatMatchStart", () => {
   it("rend l'heure de Paris, pas celle du serveur", () => {
     // 18:00 UTC en septembre = 20:00 à Paris.
     expect(formatMatchStart(START)).toContain("20:00");
+  });
+
+  it("garde son formateur : un balayage de rappels n'en reconstruit pas un par engagé", () => {
+    formatMatchStart(START);
+    const spy = jest.spyOn(Intl, "DateTimeFormat");
+    const first = formatMatchStart(START);
+    const second = formatMatchStart("2026-12-24T19:30:00Z");
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+    // Même texte qu'un formateur neuf : le cache ne change rien à la date dite.
+    const fresh = new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Paris",
+    });
+    expect(first).toBe(fresh.format(new Date(START)));
+    expect(second).toBe(fresh.format(new Date("2026-12-24T19:30:00Z")));
   });
 });
 
