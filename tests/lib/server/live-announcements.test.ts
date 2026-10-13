@@ -206,24 +206,16 @@ describe("runLiveAnnouncementSweep", () => {
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
     const warning = String(jest.mocked(console.warn).mock.calls[0][0]);
-    expect(warning).toContain("Discord n'a pas répondu au bot");
+    expect(warning).toContain("ou n'a pas répondu au bot");
     expect(warning).not.toContain("permission");
   });
 
-  it("Discord a refusé le message (AutoMod) : garde la réservation, pas d'essai à chaque balayage", async () => {
+  it("AutoMod a bloqué le message : garde la réservation, pas d'essai à chaque balayage", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-refused");
     const { execute } = mockDb([AUTO_LIVE]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(releasesOf(execute)).toEqual([]);
-    expect(String(jest.mocked(console.error).mock.calls[0][0])).toContain("le même message serait refusé de nouveau");
-  });
-
-  it("mode lent : rend la réservation et le dit tel quel", async () => {
-    jest.mocked(pushLiveAnnouncement).mockResolvedValue("slowed");
-    const { execute } = mockDb([AUTO_LIVE]);
-    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
-    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
-    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("le mode lent de #live retient l'annonce");
+    expect(String(jest.mocked(console.error).mock.calls[0][0])).toContain("le même message serait bloqué de nouveau");
   });
 
   it("un autre match reporté pour la même cause laisse aussi sa trace", async () => {

@@ -67,12 +67,11 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
-  it("classe un 503 par sa raison : mode lent, refus de Discord, envoi incertain", async () => {
+  it("classe un 503 par sa raison : AutoMod, autre refus, envoi incertain", async () => {
     const cases: [string, string][] = [
-      ["slowmode-short", "slowed"],
-      ["slowmode", "slowed"],
       ["automod", "discord-refused"],
-      ["send-rejected", "discord-refused"],
+      // Refus lié à l'état du salon : il peut se régler, le site réessaie.
+      ["send-rejected", "discord-held"],
       ["discord-unreachable", "discord-held"],
       // Discord a lâché pendant l'envoi : le message a pu partir, pas de nouvel essai.
       ["discord-down", "uncertain"],
