@@ -420,7 +420,21 @@ annoncera la manche. `setMatchStartAt` est rejoué sur interblocage, ou sur le
 refus de l'isolation par instantané de MariaDB (`ER_CHECKREAD`, 1020)
 (`retryOnDeadlock`, `lib/server/tournaments/deadlock-retry.ts`, partagé avec le
 report de score) ; une panne qui persiste ne sort de la route qu'en code
-(`MATCH_SCHEDULE_UPDATE_FAILED`), son texte reste dans pm2. Une date posée sur un match au score saisi ne pose pas
+(`MATCH_SCHEDULE_UPDATE_FAILED`), son texte reste dans pm2. La route refuse un
+corps illisible ou sans `startAt` (400 `INVALID_MATCH_START_AT`) : seul un
+`null` (ou une chaîne vide) explicite efface l'horaire, puisque l'effacement
+prévient tous les joueurs ; et elle plafonne les gestes d'un arbitre
+(`MATCH_SCHEDULE_WRITE_RULE`, 60 en 5 minutes, 429 `TOO_MANY_REQUESTS`) —
+assez pour planifier une ronde entière, pas pour qu'un client qui boucle fasse
+écrire le bot en rafale.
+
+Un tournoi **clos** (`FINISHED`) ne se joue plus : ses manches restées
+ouvertes comptent pour jouées (`loadMatchInfo` les lit `COMPLETED`, le
+balayage les écarte) — une date corrigée pour l'archive n'est que
+journalisée. Le retrait d'un horaire n'est poussé aux arbitres que s'ils
+l'avaient reçu (`refereesWerePushed`) : encore devant, ou passé de peu et tenu
+par les joueurs (annoncé, donc devant à l'annonce) ; une date passée saisie
+pour l'archive n'a été que journalisée, son retrait aussi. Une date posée sur un match au score saisi ne pose pas
 d'observation (tout part sauf `TOLD`) : si la rencontre revient à jouer, le
 balayage l'annoncera. La place remplacée par `pushTeamToTarget` se lit sous
 verrou (`FOR UPDATE`).
