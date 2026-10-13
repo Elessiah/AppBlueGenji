@@ -248,7 +248,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
       "Sending by Discord direct message the announcement of a match's time (set or changed) and match reminders (one week and 24 h before)",
-      "Alerting the referee role (score conflict, expired postponement, report on a player)",
+      "Alerting the referee role (score conflict, expired score-report deadline, report on a player)",
     ],
     legalBasis:
       "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match reminders and refereeing alerts",

@@ -254,6 +254,7 @@ async function dispatchPlannedSend(
       opponentName: side.opponentName,
       roundLabel,
       startAt: match.start_at,
+      solo: match.participant_type === "SOLO",
     };
 
     const message = offset

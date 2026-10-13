@@ -201,6 +201,18 @@ export interface MatchReminderContext {
   opponentName: string;
   roundLabel: string;
   startAt: string | Date;
+  /**
+   * Tournoi individuel : les deux noms sont des pseudos, que le message
+   * privé ne porte pas (aucun pseudo de joueur sur Discord) — il dit « Ton
+   * match », comme le push.
+   */
+  solo?: boolean;
+}
+
+/** Ligne « qui contre qui » d'un message privé de match. */
+function pairingLine(context: MatchReminderContext): string {
+  if (context.solo) return "**Ton match**";
+  return `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`;
 }
 
 /**
@@ -220,7 +232,7 @@ export function buildMatchReminderMessage(
   const lines = [
     `**Rappel de match — dans ${offset.label}**`,
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`,
+    pairingLine(context),
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
@@ -251,7 +263,7 @@ export function buildMatchScheduleAnnouncement(
   const lines = [
     rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`,
+    pairingLine(context),
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
   if (remaining.length > 0) {
