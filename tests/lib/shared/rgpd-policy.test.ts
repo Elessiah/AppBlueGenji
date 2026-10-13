@@ -270,8 +270,10 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
 
   it("dit en FR et en EN que tout compte garde une langue, non facultative et modifiable", () => {
     expect(read("app/rgpd/page.tsx")).toMatch(/Il garde aussi une langue, français ou anglais \(le français par défaut\)/);
-    expect(read("app/rgpd/page.tsx")).toMatch(/elle n&apos;est pas facultative, mais vous la changez quand vous voulez/);
+    expect(read("app/rgpd/page.tsx")).toMatch(/vos\s+notifications push \(les messages Discord restent en français\)/);
+    expect(read("app/rgpd/page.tsx")).toMatch(/vous la changez dans Mon profil \(jusqu&apos;à votre prochaine connexion\s+faite dans l&apos;autre langue\)/);
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/It also keeps a language, French or English \(French by default\)/);
-    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/it is not optional, but you\s+can change it whenever you like/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/your push notifications to you \(Discord messages stay in\s+French\)/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
   });
 });
