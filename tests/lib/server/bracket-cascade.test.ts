@@ -55,8 +55,10 @@ function row(overrides: Partial<Row> & { id: number }): Row {
   };
 }
 
-function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row } {
+function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row; forgotten: number[] } {
   const table = new Map(rows.map((r) => [r.id, { ...r }]));
+  /** Manches dont les marques de rappel ont été effacées. */
+  const forgotten: number[] = [];
 
   const conn = {
     execute: async (sql: string, params: unknown[]) => {
@@ -65,6 +67,10 @@ function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row } 
       const target = table.get(id);
 
       if (q.startsWith("SELECT")) return [target ? [{ ...target }] : [], []];
+      if (q.startsWith("DELETE FROM bg_match_reminders")) {
+        forgotten.push(id);
+        return [{ affectedRows: 1 }, []];
+      }
       if (!target) return [{ affectedRows: 0 }, []];
 
       if (q.includes("SET team1_score = NULL")) {
@@ -91,7 +97,7 @@ function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row } 
     },
   } as unknown as PoolConnection;
 
-  return { conn, get: (matchId) => table.get(matchId)! };
+  return { conn, get: (matchId) => table.get(matchId)!, forgotten };
 }
 
 const links = (winnerTarget: number | null, slot: number | null = 1) => ({
@@ -193,6 +199,22 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
 
     expect(get(2)).toMatchObject({ team1_id: null, team2_id: 10, status: "PENDING" });
     expect(get(2).live_started_at).toBeNull();
+  });
+
+  it("efface les marques de rappel de l'affiche quittée : la remplaçante recevra l'annonce", async () => {
+    const { conn, forgotten } = board([row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 })]);
+
+    await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: null, loserTeamId: null });
+
+    expect(forgotten).toEqual([2]);
+  });
+
+  it("garde les marques quand le créneau garde son engagée", async () => {
+    const { conn, forgotten } = board([row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 })]);
+
+    await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: null });
+
+    expect(forgotten).toEqual([]);
   });
 
   it("vide aussi le créneau de perdant d'une double élimination", async () => {

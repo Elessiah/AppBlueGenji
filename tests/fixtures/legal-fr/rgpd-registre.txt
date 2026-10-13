@@ -431,7 +431,7 @@ Prévenir un joueur sur ses appareils, à sa demande, de ce qui le concerne sur 
 Sous-finalités
 Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, rappels de match
 Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données
-Alertes d'arbitrage (dont les matchs programmés ou reprogrammés) et de modération pour le staff qui détient ces rôles
+Alertes d'arbitrage, matchs planifiés et alertes de modération pour le staff qui détient ces rôles
 Base légale
 Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)
 Personnes concernées

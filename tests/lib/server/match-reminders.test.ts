@@ -299,13 +299,17 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
     }
   });
 
-  it("n'annonce rien pour une manche encore hors de tout palier", async () => {
+  it("annonce une manche découverte avant l'ouverture du rappel, qui reste devant", async () => {
+    // Une engagée manquait quand l'arbitre a posé la date : personne n'a été
+    // prévenu, la première observation annonce.
     const { execute } = await mockDb({ sent: [] });
 
-    expect(await dispatchDueMatchReminders(TEN_DAYS_BEFORE)).toBe(0);
-    // Seule la marque d'observation est posée : les paliers courent normalement.
-    expect(claimedKeys(execute)).toEqual(["SEEN"]);
-    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(await dispatchDueMatchReminders(THREE_DAYS_BEFORE)).toBe(2);
+    expect(claimedKeys(execute)).toEqual(["SEEN", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).toContain("Prochain rappel : 24 heures avant le coup d'envoi.");
+    }
   });
 
   it("laisse la manche au passage suivant si une autre requête l'observe d'abord", async () => {
