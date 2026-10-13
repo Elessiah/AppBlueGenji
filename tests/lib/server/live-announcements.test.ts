@@ -303,7 +303,7 @@ describe("runLiveAnnouncementSweep", () => {
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
     expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]).toBe("live-announce match-41");
     expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
-      "[live-announce] match 40 (tournoi 4) : réservation impossible, réessayée au passage suivant (avertissement répété au plus une fois par heure)",
+      "[live-announce] match 40 (tournoi 4) : réservation impossible, réessayée à chaque passage pendant les deux heures qui suivent le début du direct (avertissement répété au plus une fois par heure)",
     );
   });
 
@@ -325,6 +325,8 @@ describe("runLiveAnnouncementSweep", () => {
     expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain(
       "match 40 (tournoi 4) à l'antenne sans lien de diffusion exploitable",
     );
+    // Pas un abandon : un lien ajouté à temps fait partir l'annonce, la poster à la main ferait un doublon.
+    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("ne pas la poster à la main");
   });
 
   it("une très grande ronde garde une étiquette bornée, sans identifiant coupé", async () => {
