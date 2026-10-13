@@ -967,32 +967,33 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
   });
 });
 
-describe("announceEntrantsWithdrawn — engagées retirées par une correction de score", () => {
-  const MATCH_ROW = {
-    id: 31,
-    tournament_id: 7,
-    tournament_name: "Coupe BlueGenji",
-    participant_type: "TEAM",
+describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () => {
+  // Après la correction : Les Renards (101) sont sortis ; Orion (109) a pris leur place.
+  const POSTER = { id: 31, team1_id: 109, team2_id: 102 };
+  const MATCH = {
+    tournamentId: 7,
+    tournamentName: "Coupe BlueGenji",
+    solo: false,
     bracket: "UPPER",
-    round_number: 2,
-    swiss_round: 0,
-    // Après la correction : Les Renards (101) sont sortis de la place 1.
-    team1_id: 109,
-    team2_id: 102,
-    team1_name: "Orion",
-    team2_name: "Team Nova",
+    roundNumber: 2,
+    swiss: false,
   };
-  const DEPARTED = { matchId: 31, teamId: 101, slot: 1 as const, heldStartAt: START };
+  // L'adversaire de l'horaire reçu, relevé avant le changement : Team Nova (102).
+  const DEPARTED = { matchId: 31, teamId: 101, opponentId: 102, heldStartAt: START, match: MATCH };
+  const NAMES = [
+    { id: 101, name: "Les Renards" },
+    { id: 102, name: "Team Nova" },
+  ];
 
-  /** `query` : manches, noms des sortantes, joueurs des engagées, comptes. */
+  /** `query` : places actuelles, noms (sortantes et adversaires), joueurs des engagées, comptes. */
   async function mockWithdrawnDb(
-    rows: object[] = [MATCH_ROW],
-    names: object[] = [{ id: 101, name: "Les Renards" }],
+    posters: object[] = [POSTER],
+    names: object[] = NAMES,
     recipients: Recipient[] = RECIPIENTS,
   ) {
     const query = jest
       .fn<() => Promise<unknown>>()
-      .mockResolvedValueOnce([rows])
+      .mockResolvedValueOnce([posters])
       .mockResolvedValueOnce([names])
       .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
       .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
@@ -1008,14 +1009,16 @@ describe("announceEntrantsWithdrawn — engagées retirées par une correction d
 
     // Une lecture pour toutes les manches, une pour tous les noms.
     expect((query.mock.calls[0] as unknown as [string, unknown[]])[1]).toEqual([31]);
-    expect((query.mock.calls[1] as unknown as [string, unknown[]])[1]).toEqual([101]);
+    expect((query.mock.calls[1] as unknown as [string, unknown[]])[1]).toEqual([101, 102]);
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
     expect(calls).toHaveLength(1);
     expect(calls[0][2]).toBe("match-withdrawn");
     expect(calls[0][0]).toContain("**Match retiré de ton programme**");
-    // L'ancien adversaire : l'occupant de l'autre place.
+    // L'adversaire de l'horaire reçu, pas l'occupant actuel de l'autre place.
     expect(calls[0][0]).toContain("**Les Renards** contre **Team Nova**");
-    expect(calls[0][0]).toContain("l'horaire du jeudi 10 septembre à 20:00 (heure de Paris) ne te concerne plus.");
+    expect(calls[0][0]).toContain(
+      "Après une correction des résultats, tu ne joues plus ce match : l'horaire du jeudi 10 septembre à 20:00 (heure de Paris) ne te concerne plus.",
+    );
 
     const pushes = jest.mocked(pushToUsers).mock.calls;
     expect(pushes.map((call) => call[0])).toEqual([[1, 2]]);
@@ -1026,13 +1029,31 @@ describe("announceEntrantsWithdrawn — engagées retirées par une correction d
     expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
   });
 
-  it("ne nomme aucun joueur en tournoi individuel, et lit l'autre place pour une sortante en place 2", async () => {
+  it("nomme l'adversaire d'avant même quand il a lui aussi quitté la manche", async () => {
+    // Les deux places ont changé : C (109) et D (110) y sont désormais.
+    await mockWithdrawnDb([{ id: 31, team1_id: 109, team2_id: 110 }]);
+    await announceEntrantsWithdrawn([DEPARTED]);
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("**Les Renards** contre **Team Nova**");
+    expect(message).not.toMatch(/Orion/);
+  });
+
+  it("prévient l'engagée d'une manche supprimée depuis (ronde réappariée, retour en arrière)", async () => {
+    await mockWithdrawnDb([]);
+    expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(1);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]).toContain("Coupe BlueGenji · Manche 2");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel", async () => {
     await mockWithdrawnDb(
-      [{ ...MATCH_ROW, participant_type: "SOLO", team1_id: 103, team1_name: "Nova", team2_id: 109, team2_name: "Orion" }],
-      [{ id: 101, name: "Kiro" }],
+      [{ id: 31, team1_id: 103, team2_id: 109 }],
+      [
+        { id: 101, name: "Kiro" },
+        { id: 102, name: "Nova" },
+      ],
     );
 
-    await announceEntrantsWithdrawn([{ ...DEPARTED, slot: 2 }]);
+    await announceEntrantsWithdrawn([{ ...DEPARTED, match: { ...MATCH, solo: true } }]);
 
     const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(message).toContain("**Ton match**");
@@ -1043,9 +1064,10 @@ describe("announceEntrantsWithdrawn — engagées retirées par une correction d
     }
   });
 
-  it("dit « Ronde N » en ronde suisse, et « TBD » quand l'autre place est vide", async () => {
-    await mockWithdrawnDb([{ ...MATCH_ROW, swiss_round: 1, team2_id: null, team2_name: null }]);
-    await announceEntrantsWithdrawn([DEPARTED]);
+  it("dit « Ronde N » en ronde suisse, et « TBD » sans adversaire", async () => {
+    const query = await mockWithdrawnDb([POSTER], [{ id: 101, name: "Les Renards" }]);
+    await announceEntrantsWithdrawn([{ ...DEPARTED, opponentId: null, match: { ...MATCH, swiss: true } }]);
+    expect((query.mock.calls[1] as unknown as [string, unknown[]])[1]).toEqual([101]);
     const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(message).toContain("Coupe BlueGenji · Ronde 2");
     expect(message).toContain("**Les Renards** contre **TBD**");
@@ -1053,18 +1075,18 @@ describe("announceEntrantsWithdrawn — engagées retirées par une correction d
   });
 
   it("ne prévient pas une engagée revenue sur la manche (seconde correction)", async () => {
-    const query = await mockWithdrawnDb([{ ...MATCH_ROW, team1_id: 101, team1_name: "Les Renards" }]);
+    const query = await mockWithdrawnDb([{ ...POSTER, team1_id: 101 }]);
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
     // Ni destinataires lus, ni message.
     expect(query).toHaveBeenCalledTimes(2);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
-  it("ne fait rien sans avis, pour une manche disparue ou une engagée sans joueur à prévenir", async () => {
+  it("ne fait rien sans avis, pour une engagée disparue ou sans joueur à prévenir", async () => {
     expect(await announceEntrantsWithdrawn([])).toBe(0);
-    await mockWithdrawnDb([]);
+    await mockWithdrawnDb([POSTER], []);
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
-    await mockWithdrawnDb([MATCH_ROW], [{ id: 101, name: "Les Renards" }], []);
+    await mockWithdrawnDb([POSTER], NAMES, []);
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();

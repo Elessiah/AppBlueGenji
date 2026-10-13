@@ -132,7 +132,7 @@ describe("matchWithdrawnPush", () => {
   it("dit à l'engagée retirée que l'horaire ne la concerne plus, et remplace l'annonce", () => {
     expect(matchWithdrawnPush(side)).toEqual({
       title: "Match retiré de ton programme",
-      body: "Après une correction de score, tu ne joues plus ce match : l'horaire du jeudi 10 septembre à 20:00 (heure de Paris) ne te concerne plus. Les Renards contre Team Nova · Coupe BlueGenji, Ronde 3.",
+      body: "Après une correction des résultats, tu ne joues plus ce match : l'horaire du jeudi 10 septembre à 20:00 (heure de Paris) ne te concerne plus. Les Renards contre Team Nova · Coupe BlueGenji, Ronde 3.",
       url: "/tournois/7#match-31",
       tag: matchReminderPush(side, null).tag,
     });
@@ -142,7 +142,7 @@ describe("matchWithdrawnPush", () => {
     const content = matchWithdrawnPush(side, "en");
     expect(content.title).toBe("Match removed from your schedule");
     expect(content.body).toBe(
-      "After a score correction, you no longer play this match: the time set for Thursday, September 10 at 20:00 (Paris time) no longer applies to you. Les Renards vs Team Nova · Coupe BlueGenji, Round 3.",
+      "After a change to the results, you no longer play this match: the time set for Thursday, September 10 at 20:00 (Paris time) no longer applies to you. Les Renards vs Team Nova · Coupe BlueGenji, Round 3.",
     );
     expect(content.url).toBe("/en/tournois/7#match-31");
   });

@@ -13,8 +13,8 @@ import {
 } from "@/lib/server/tournaments/departed-notices";
 import { forgetMatchReminders } from "@/lib/server/tournaments/reminder-marks";
 import { pushTeamToTarget } from "@/lib/server/tournaments/target-slot";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 /**
@@ -48,7 +48,8 @@ describe("pushTeamToTarget — engagée remplacée", () => {
 
     await pushTeamToTarget(connection, 2, 1, 9);
 
-    expect(noteDepartedEntrants).toHaveBeenCalledWith(connection, [{ matchId: 2, teamId: 7, slot: 1 }]);
+    // L'adversaire de l'horaire reçu : l'autre place, lue avant le remplacement.
+    expect(noteDepartedEntrants).toHaveBeenCalledWith(connection, [{ matchId: 2, teamId: 7, opponentId: 10 }]);
     expect(order).toEqual(["note", "forget"]);
     // La place se lit sous verrou : le remplacement se décide sur l'état actuel.
     const [sql] = jest.mocked(connection.execute).mock.calls[0] as unknown as [string];
@@ -77,5 +78,58 @@ describe("une seule implémentation de la pose en aval", () => {
     const byes = readFileSync(join(process.cwd(), "lib/server/tournaments/byes.ts"), "utf8");
     expect(byes).toContain('import { pushTeamToTarget } from "./target-slot";');
     expect(byes).not.toMatch(/function pushTeamToTarget\(/);
+  });
+});
+
+describe("toute suppression de manches par le moteur note d'abord l'avis des engagées", () => {
+  /**
+   * Une manche supprimée (ronde réappariée, retour en arrière, arbre final
+   * refait, plateau périmé) emporte les marques de ses joueurs : sans
+   * `noteDeletedMatches` juste avant, une engagée qui tenait un horaire ne
+   * saurait jamais qu'il ne vaut plus.
+   */
+  const FILES = [
+    "lib/server/tournaments/swiss.ts",
+    "lib/server/tournaments/survival.ts",
+    "lib/server/tournaments/bg-survie/reconcile.ts",
+    "lib/server/tournaments/bg-survie/playoffs.ts",
+    "lib/server/tournaments/bg-survie/playoff-rounds.ts",
+    "lib/server/tournaments/rollback.ts",
+  ];
+
+  it.each(FILES)("%s", (file) => {
+    const source = readFileSync(join(process.cwd(), file), "utf8");
+    const deletes = [...source.matchAll(/DELETE FROM bg_matches WHERE/g)];
+    expect(deletes.length).toBeGreaterThan(0);
+    for (const match of deletes) {
+      const before = source.slice(Math.max(0, (match.index ?? 0) - 1200), match.index);
+      expect(before).toContain("noteDeletedMatches(");
+    }
+  });
+
+  it("le plateau périmé aussi (bracket-generator)", () => {
+    const source = readFileSync(join(process.cwd(), "lib/server/tournaments/bracket-generator.ts"), "utf8");
+    expect(source).toMatch(/noteDeletedMatches\(connection, "tournament_id = \? AND phase_id = \?"[^;]*;\s*await deletePhaseMatches/);
+    expect(source).toMatch(/noteDeletedMatches\(connection, "tournament_id = \?"[^;]*;\s*await deleteAllMatches/);
+  });
+
+  it("aucun autre module du moteur ne supprime de manches", () => {
+    const root = join(process.cwd(), "lib/server/tournaments");
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name);
+        return statSync(path).isDirectory() ? walk(path) : [path];
+      });
+    const deleting = walk(root)
+      .filter((path) => /DELETE FROM bg_matches WHERE/.test(readFileSync(path, "utf8")))
+      .map((path) => relative(process.cwd(), path).split(sep).join("/"))
+      .sort((a, b) => a.localeCompare(b));
+    // `deletion.ts` supprime le tournoi entier ; `repository.ts` porte les
+    // suppressions de plateau, appelées par `bracket-generator.ts`.
+    expect(deleting).toEqual(
+      [...FILES, "lib/server/tournaments/deletion.ts", "lib/server/tournaments/repository.ts"].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    );
   });
 });

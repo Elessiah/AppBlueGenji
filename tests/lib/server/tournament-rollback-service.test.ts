@@ -13,6 +13,14 @@ jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/target-slot");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/bot-logs");
+// Avis aux engagées retirées : couverts par departed-notices.test.ts.
+jest.mock("@/lib/server/tournaments/departed-notices", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/departed-notices")>(
+    "@/lib/server/tournaments/departed-notices",
+  ),
+  noteDepartedEntrants: jest.fn(),
+  noteDeletedMatches: jest.fn(),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
@@ -25,6 +33,7 @@ import { loadPhases } from "@/lib/server/tournaments/phases-repository";
 import { resetRegistrationRanks } from "@/lib/server/tournaments/repository";
 import { pushTeamToTarget } from "@/lib/server/tournaments/target-slot";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
+import { noteDeletedMatches, noteDepartedEntrants } from "@/lib/server/tournaments/departed-notices";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -350,6 +359,27 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(posterReads[1].order).toBeGreaterThan(jest.mocked(tryAutoResolveByes).mock.invocationCallOrder[0]);
   });
 
+  it("note l'avis des engagées sorties d'une affiche changée, avant d'en effacer les marques", async () => {
+    const { execute } = setup({
+      format: "SINGLE",
+      matches: [
+        playedRow({ id: 1, round_number: 1, next_winner_match_id: 3 }),
+        playedRow({ id: 2, round_number: 1, next_winner_match_id: 3 }),
+        row({ id: 3, round_number: 2, team1_id: 10, team2_id: 20 }),
+      ],
+      postersAfter: [{ id: 3, team1_id: 10, team2_id: null }],
+    });
+
+    await rollbackCurrentRound(7);
+
+    // 20 sort ; 10 reste sur l'affiche et n'est pas prévenue.
+    expect(noteDepartedEntrants).toHaveBeenCalledWith(expect.anything(), [{ matchId: 3, teamId: 20, opponentId: 10 }]);
+    const forget = execute.mock.calls.findIndex(([sql]) => String(sql).includes("DELETE FROM bg_match_reminders WHERE match_id IN"));
+    expect(execute.mock.invocationCallOrder[forget]).toBeGreaterThan(
+      jest.mocked(noteDepartedEntrants).mock.invocationCallOrder[0],
+    );
+  });
+
   it("tient pour la même affiche les mêmes engagées reposées dans l'autre sens", async () => {
     const { execute } = setup({
       format: "SINGLE",
@@ -416,6 +446,12 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statementWith(execute, "DELETE FROM bg_match_start_notices")?.[1]).toEqual([2, 3]);
     expect(statementWith(execute, "DELETE FROM bg_matches")?.[1]).toEqual([2, 3]);
     expect(statements(execute).some((sql) => sql.includes("SET team1_id = NULL"))).toBe(false);
+    // Les engagées qui tenaient un horaire sur ces manches sont notées avant la suppression.
+    expect(noteDeletedMatches).toHaveBeenCalledWith(expect.anything(), "id IN (?, ?)", [2, 3]);
+    const forget = execute.mock.calls.findIndex(([sql]) => String(sql).includes("DELETE FROM bg_match_reminders"));
+    expect(execute.mock.invocationCallOrder[forget]).toBeGreaterThan(
+      jest.mocked(noteDeletedMatches).mock.invocationCallOrder[0],
+    );
   });
 
   it.each([

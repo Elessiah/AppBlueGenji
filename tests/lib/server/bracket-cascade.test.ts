@@ -228,7 +228,7 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
 
     expect(forgotten).toEqual([2]);
     // L'engagée 7 quitte la place 1 de la manche 2 : son avis est noté.
-    expect(noteDepartedEntrants).toHaveBeenCalledWith(conn, [{ matchId: 2, teamId: 7, slot: 1 }]);
+    expect(noteDepartedEntrants).toHaveBeenCalledWith(conn, [{ matchId: 2, teamId: 7, opponentId: 10 }]);
     expect(forgottenWhenNoted).toEqual([]);
   });
 
@@ -261,8 +261,8 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     // Une seule lecture pour les deux sortantes.
     expect(noteDepartedEntrants).toHaveBeenCalledTimes(1);
     expect(jest.mocked(noteDepartedEntrants).mock.calls[0][1]).toEqual([
-      { matchId: 2, teamId: 7, slot: 1 },
-      { matchId: 5, teamId: 8, slot: 1 },
+      { matchId: 2, teamId: 7, opponentId: 10 },
+      { matchId: 5, teamId: 8, opponentId: 11 },
     ]);
     expect(forgetCalls()).toBe(1);
   });
