@@ -67,9 +67,16 @@ function pendingPreview(text: TournamentDialogsText, state: MatchStartEntryState
 }
 
 /** Aide sous les champs : ce que la date va produire. */
-function startAtHint(text: TournamentDialogsText, refereeScheduling: boolean, entrantsKnown: boolean): string {
+function startAtHint(
+  text: TournamentDialogsText,
+  refereeScheduling: boolean,
+  entrantsKnown: boolean,
+  played: boolean,
+): string {
   const base = text.t(refereeScheduling ? "schedule.hintPlanning" : "schedule.hint");
-  return `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
+  // Un match joué (ou au score saisi) n'annonce rien : la date n'est qu'une
+  // correction d'archive.
+  return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
 }
 
 /**
@@ -465,7 +472,12 @@ export function MatchScheduleDialog({
             id={HINT_ID}
             style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}
           >
-            {startAtHint(text, refereeScheduling, match.team1Id !== null && match.team2Id !== null)}
+            {startAtHint(
+              text,
+              refereeScheduling,
+              match.team1Id !== null && match.team2Id !== null,
+              match.status === "COMPLETED" || match.status === "AWAITING_CONFIRMATION",
+            )}
           </p>
 
           {clearsLiveTrigger && (

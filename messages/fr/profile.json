@@ -251,7 +251,7 @@
     "loading": "Chargement…",
     "notes": {
       "GOOGLE": "Connexion en un clic. Aucune adresse n'est enregistrée.",
-      "DISCORD": "Connexion, certification de ton tag, et horaires et rappels de match en message privé.",
+      "DISCORD": "Connexion, certification de ton tag, et annonce des horaires et rappels de match en message privé.",
       "BLIZZARD": "Connexion, et ton BattleTag tenu à jour par Blizzard."
     },
     "linked": "Rattaché",
