@@ -594,25 +594,24 @@ export async function pushLeadershipAlert(
  *   changerait rien, l'annonce est abandonnée ;
  * - `channel-closed` — le bot a répondu `503` : salon #live introuvable ou
  *   fermé au bot (permission), rien n'est parti ;
- * - `slowed` — le bot a répondu `503` : le mode lent de #live retient
- *   l'annonce (`reason` `slowmode`, `slowmode-short`), rien n'est parti ;
- * - `discord-refused` — le bot a répondu `503` : Discord a refusé le message
- *   (AutoMod, autre refus explicite). Le même message serait refusé de
- *   nouveau : l'appelant **garde** sa réservation, comme sur un `400` ;
- * - `discord-held` — le bot a répondu `503` : Discord n'a pas répondu en
+ * - `discord-refused` — le bot a répondu `503` : une règle AutoMod a bloqué
+ *   le message. Il serait bloqué de nouveau (et chaque essai alerterait la
+ *   modération) : l'appelant **garde** sa réservation, comme sur un `400` ;
+ * - `discord-held` — le bot a répondu `503` : Discord a refusé le message pour
+ *   une raison qui peut se régler (état du salon) ou n'a pas répondu en
  *   lisant le salon, rien n'est parti ;
  * - `uncertain` — le bot a répondu que Discord a lâché pendant l'envoi
  *   (`503`, `reason` `discord-down`) : l'annonce a pu partir, l'envoi est
  *   terminé ;
  * - `timed-out` — le bot n'a pas répondu à temps : son envoi peut **encore**
- *   être en cours (Discord lent, mode lent, limite de débit).
+ *   être en cours (Discord lent, limite de débit).
  *
  * Sur `uncertain` et `timed-out`, l'appelant **garde** sa réservation : une
  * annonce perdue vaut mieux qu'un second `@everyone` à tout le serveur ;
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
  *
- * Sur `channel-closed`, `slowed`, `discord-held` et `unavailable`, l'appelant
+ * Sur `channel-closed`, `discord-held` et `unavailable`, l'appelant
  * rend sa réservation et réessaiera.
  */
 export type LiveAnnouncementOutcome =
@@ -620,7 +619,6 @@ export type LiveAnnouncementOutcome =
   | "posted-silent"
   | "rejected"
   | "channel-closed"
-  | "slowed"
   | "discord-held"
   | "discord-refused"
   | "uncertain"
@@ -630,11 +628,8 @@ export type LiveAnnouncementOutcome =
 /** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
 const CHANNEL_CLOSED_REASONS = new Set(["missing", "no-view", "no-send", "send-denied"]);
 
-/** Raisons d'un `503` du bot qui disent que Discord a refusé le message lui-même. */
-const DISCORD_REFUSED_REASONS = new Set(["automod", "send-rejected"]);
-
-/** Raisons d'un `503` du bot qui disent que le mode lent de #live retient l'annonce. */
-const SLOWED_REASONS = new Set(["slowmode", "slowmode-short"]);
+/** Raisons d'un `503` du bot qui disent qu'AutoMod a bloqué le message lui-même. */
+const DISCORD_REFUSED_REASONS = new Set(["automod"]);
 
 /**
  * Classe un `503` du bot par sa raison (`reason`). Un `503` d'annonce sans
@@ -643,7 +638,7 @@ const SLOWED_REASONS = new Set(["slowmode", "slowmode-short"]);
  */
 async function classifyUnavailable(
   response: Response,
-): Promise<"channel-closed" | "slowed" | "discord-held" | "discord-refused" | "uncertain" | "unavailable"> {
+): Promise<"channel-closed" | "discord-held" | "discord-refused" | "uncertain" | "unavailable"> {
   let body: { error?: unknown; reason?: unknown } | null = null;
   try {
     body = (await response.json()) as { error?: unknown; reason?: unknown } | null;
@@ -654,11 +649,10 @@ async function classifyUnavailable(
   if (body?.error !== "LIVE_CHANNEL_UNAVAILABLE") return "unavailable";
   const reason = body.reason;
   if (typeof reason !== "string" || CHANNEL_CLOSED_REASONS.has(reason)) return "channel-closed";
-  if (SLOWED_REASONS.has(reason)) return "slowed";
   // Discord a lâché pendant l'envoi : le message a pu partir.
   if (reason === "discord-down") return "uncertain";
-  // Refus explicite : le renvoyer tel quel serait refusé de nouveau (et chaque
-  // essai bloqué par AutoMod alerterait la modération).
+  // Bloqué par AutoMod : le renvoyer tel quel serait bloqué de nouveau, et
+  // chaque essai alerterait la modération.
   if (DISCORD_REFUSED_REASONS.has(reason)) return "discord-refused";
   return "discord-held";
 }

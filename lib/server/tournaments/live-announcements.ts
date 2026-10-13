@@ -240,20 +240,19 @@ function groupParticipantType(rows: readonly LiveCandidateRow[]): ParticipantTyp
 const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
   rejected: "annonce refusée par le bot, abandonnée",
   "discord-refused":
-    "Discord a refusé l'annonce (AutoMod ou autre refus — cause au canal de logs du bot), abandonnée : le même message serait refusé de nouveau",
+    "une règle AutoMod du serveur a bloqué l'annonce (détail au canal de logs du bot), abandonnée : le même message serait bloqué de nouveau",
   // L'envoi est terminé : ce que montre #live fait foi.
   uncertain:
     "publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live",
   // L'envoi du bot peut encore aboutir : #live vide maintenant ne prouve rien.
   "timed-out":
-    "bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, mode lent — parfois des heures après un redémarrage du bot), annonce non réessayée",
+    "bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, limite de débit), annonce non réessayée",
 };
 
 /** Issues qui reportent l'annonce (réservation rendue), et leur cause dans pm2. */
 const POSTPONED_CAUSES: Partial<Record<LiveAnnouncementOutcome, string>> & { unavailable: string } = {
   "channel-closed": "salon #live fermé au bot (introuvable ou sans permission d'écrire)",
-  slowed: "le mode lent de #live retient l'annonce (le bot y a posté peu avant)",
-  "discord-held": "Discord n'a pas répondu au bot en lisant le salon (panne passagère)",
+  "discord-held": "Discord a refusé l'annonce (état du salon) ou n'a pas répondu au bot — cause au canal de logs ou dans les journaux du bot",
   unavailable: "bot injoignable, en panne ou d'une version sans annonces",
 };
 
