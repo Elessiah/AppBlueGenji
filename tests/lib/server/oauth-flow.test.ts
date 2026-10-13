@@ -85,7 +85,7 @@ describe("startOAuth", () => {
   });
 
   it("scelle l'acceptation des conditions d'utilisation, et seulement `terms=1`", async () => {
-    const fromPage = (url: string) => new NextRequest(url, { headers: { "sec-fetch-site": "same-origin" } });
+    const fromPage = (url: string) => new NextRequest(url, { headers: { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } });
     await startOAuth(fromPage("http://localhost:3000/api/auth/x/start?terms=1"), "GOOGLE");
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: true }));
 
@@ -339,7 +339,7 @@ describe("completeOAuth — connexion", () => {
     ["un favori ou une adresse tapée", "none"],
   ])("ne scelle pas la langue d'un départ venu par %s (lot 9-3)", async (_label, site) => {
     await startOAuth(
-      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": site } }),
+      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": site, "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } }),
       "DISCORD",
     );
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/en/tournois", localeFromPage: false }));
@@ -347,7 +347,7 @@ describe("completeOAuth — connexion", () => {
 
   it("scelle la langue d'un départ cliqué sur une page du site", async () => {
     await startOAuth(
-      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": "same-origin" } }),
+      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } }),
       "GOOGLE",
     );
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: true }));
@@ -366,7 +366,8 @@ describe("completeOAuth — connexion", () => {
     ["un sous-domaine", { "sec-fetch-site": "same-site" }, false],
     ["un favori ou une adresse tapée", { "sec-fetch-site": "none" }, false],
     ["un navigateur sans en-tête, Referer tu", {}, false],
-    ["une page du site", { "sec-fetch-site": "same-origin" }, true],
+    ["une image du site", { "sec-fetch-site": "same-origin", "sec-fetch-mode": "no-cors", "sec-fetch-dest": "image" }, false],
+    ["une page du site", { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" }, true],
   ])("conditions cochées (`terms=1`) depuis %s : retenues = %s", async (_label, headers, expected) => {
     await startOAuth(new NextRequest("http://localhost:3000/api/auth/x/start?terms=1", { headers }), "DISCORD");
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: expected }));

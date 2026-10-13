@@ -106,9 +106,16 @@ describe("middleware — adresses préfixées refusées ou renvoyées", () => {
     "/fr/en/api/auth/google/start",
     "/fr/en//api/auth/google/start",
     "/en/%61pi/x",
+    "/fr/x/..%2fapi/x",
   ])("répond 404 à une adresse qu'un renvoi mènerait sous /api/ (%s), sans renvoi", (path) => {
     const response = call(path);
     expect(response.status).toBe(404);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("sert une route anglaise traduite sans la juger comme un renvoi", () => {
+    const response = call("/en/regles");
+    expect(response.status).not.toBe(404);
     expect(response.headers.get("location")).toBeNull();
   });
 

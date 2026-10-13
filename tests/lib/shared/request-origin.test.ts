@@ -166,11 +166,20 @@ describe("apiWriteNeedsProvenance", () => {
 });
 
 describe("isSitePageNavigation — départ d'une navigation (lot 9-3)", () => {
-  it("ne tient pour un clic sur une page du site que `Sec-Fetch-Site: same-origin`", () => {
-    expect(isSitePageNavigation("same-origin")).toBe(true);
-    expect(isSitePageNavigation(" Same-Origin ")).toBe(true);
-    for (const value of ["cross-site", "same-site", "none", "bizarre", "", null]) {
-      expect(isSitePageNavigation(value)).toBe(false);
-    }
+  const nav = (secFetchSite: string | null, secFetchMode: string | null = "navigate", secFetchDest: string | null = "document") =>
+    isSitePageNavigation({ secFetchSite, secFetchMode, secFetchDest });
+
+  it("ne tient pour un clic sur une page du site qu'une navigation de document `same-origin`", () => {
+    expect(nav("same-origin")).toBe(true);
+    expect(nav(" Same-Origin ", "Navigate", "Document")).toBe(true);
+    for (const value of ["cross-site", "same-site", "none", "bizarre", "", null]) expect(nav(value)).toBe(false);
+  });
+
+  it("écarte une image, un fetch, un cadre ou un préchargement venus du site", () => {
+    expect(nav("same-origin", "no-cors", "image")).toBe(false);
+    expect(nav("same-origin", "cors", "empty")).toBe(false);
+    expect(nav("same-origin", "navigate", "iframe")).toBe(false);
+    expect(nav("same-origin", null, "document")).toBe(false);
+    expect(nav("same-origin", "navigate", null)).toBe(false);
   });
 });

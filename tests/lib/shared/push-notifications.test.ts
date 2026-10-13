@@ -93,6 +93,7 @@ describe("pushTargetPath", () => {
     "/en//api/auth/google/start?terms=1",
     "/fr///api/x",
     "/fr/en//api/auth/google/start?terms=1",
+    "/x/..%2fapi/auth/google/start",
     "/%61pi/auth/google/start",
     "/tournois/../api/x",
   ])("ne mène jamais à une route d'API, qui partirait du site comme un clic (%s)", (url) => {

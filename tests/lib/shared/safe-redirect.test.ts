@@ -105,6 +105,8 @@ describe("safeRedirectPath — ce qui est refusé", () => {
     "/API/auth/discord/start",
     "/en/api/auth/google/start",
     "/fr/en/api/auth/google/start",
+    "/x/..%2fapi/auth/google/start",
+    "/x/..%5Capi/x",
     "/tournois/../api/auth/google/start",
     "/./api/profile",
     "/%61pi/auth/google/start",
@@ -274,6 +276,9 @@ describe("sealedReturnPath / sealedReturnLocale — la langue scellée dans le c
   it("préfixe la destination, même d'une route pas encore traduite", () => {
     expect(sealedReturnPath("/tournois/12?onglet=1", "en")).toBe("/en/tournois/12?onglet=1");
     expect(sealedReturnPath("/en/regles", "en")).toBe("/en/regles");
+    // Préfixes enchaînés ôtés tous : la destination ne coûte aucun renvoi, et sa langue est celle du départ.
+    expect(sealedReturnPath("/fr/en/regles", "en")).toBe("/en/regles");
+    expect(sealedReturnPath("/en/fr/regles", "fr")).toBe("/regles");
     expect(sealedReturnPath("/", "en")).toBe("/en");
     expect(sealedReturnPath(undefined, "en")).toBe("/en/tournois");
   });

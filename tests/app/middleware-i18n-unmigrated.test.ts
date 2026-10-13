@@ -55,8 +55,11 @@ describe("middleware — route non traduite sous /en", () => {
   it.each(["/en//evil.example/x", "/en/%5Cevil.example", "/fr//evil.example"])(
     "ne sort jamais du site (%s)",
     (path) => {
-      const location = middleware(new NextRequest(`https://localhost:3000${path}`)).headers.get("location") ?? "";
-      expect(new URL(location).origin).toBe(PUBLIC);
+      const response = middleware(new NextRequest(`https://localhost:3000${path}`));
+      const location = response.headers.get("location");
+      // Une contre-barre encodée n'est plus renvoyée du tout (404, revue sécurité du lot 9-3).
+      if (location === null) expect(response.status).toBe(404);
+      else expect(new URL(location).origin).toBe(PUBLIC);
     },
   );
 
