@@ -103,7 +103,8 @@ découvre parte une journée avant l'ouverture du rappel, plutôt qu'à sa place
 
 Une engagée **remplacée** sur l'affiche (correction d'un score amont :
 `vacateSlot` dans `bracket-cascade.ts`, ou `pushTeamToTarget` dans
-`scoring.ts`) efface les marques de la manche, comme un retour en arrière : la
+`scoring.ts`) efface les marques de la manche, comme un retour en arrière
+(`detachMatchParticipants`, `rollback.ts`) : la
 remplaçante n'a reçu aucun horaire, le balayage lui annoncera la date. Limite
 connue : l'engagée restée en place perd aussi sa marque `TOLD` (les marques
 sont par manche, pas par engagée) — un changement ou un retrait d'horaire
@@ -111,8 +112,11 @@ ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 
 ### La marque `TOLD` : un horaire reçu
 
-`dispatchPlannedSend` pose `TOLD` dès qu'une annonce ou un rappel est **parti**
-vers au moins une engagée. Ni `SEEN` (le balayage la pose aussi en silence) ni
+`dispatchPlannedSend` pose `TOLD` dès qu'une annonce ou un rappel a **abouti**
+(un message privé remis ou un appareil atteint) pour au moins une engagée — un
+bot injoignable sans appareil abonné ne pose rien. Une manche programmée avant
+l'arrivée de `TOLD` est lue par ses paliers retirés `P7D` / `PT1H`, posés
+seulement avec un message (`MATCH_TOLD_KEYS`). Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
 annonce) ne le prouvent. `TOLD` survit aux changements de date : c'est elle qui
 fait dire « reprogrammé » à la date suivante — y compris quand c'est le
@@ -121,8 +125,13 @@ une date effacée.
 
 ### Programmer, reprogrammer ou retirer l'horaire d'une manche
 
-`setMatchStartAt`, **quand la date change réellement**, lit d'abord `TOLD`
-(`alreadyAnnounced`) puis, si une date est posée :
+`setMatchStartAt`, **quand la date change réellement**, remet les marques à
+jour **dans la transaction** qui écrit la date (`resetReminderMarks`) : un
+balayage ne voit jamais la nouvelle date avec les marques de l'ancienne. Une
+erreur (autre qu'une table absente) défait l'écriture de la date — un refus que
+l'arbitre peut rejouer plutôt qu'un horaire changé dont personne n'est prévenu.
+Il lit d'abord `MATCH_TOLD_KEYS` (`alreadyAnnounced`) puis, si une date est
+posée :
 
 - les deux engagées connues, efface les lignes de la manche **sauf** `SEEN` et
   `TOLD`, et pose `SEEN` dans le même geste. Un balayage qui passerait entre ce
