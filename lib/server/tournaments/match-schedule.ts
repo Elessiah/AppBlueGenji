@@ -27,6 +27,7 @@ import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import type { StaffActor } from "@/lib/shared/log-privacy";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { notifyMatchScheduleChange } from "./schedule-notices";
 
@@ -247,7 +248,9 @@ export async function setMatchStartAt(
   const startAt = blank ? null : toWholeSeconds(normalizeMatchStartAt(rawStartAt));
   if (!blank && startAt === null) throw new Error("INVALID_MATCH_START_AT");
 
-  const outcome = await withConnection(async (connection) => {
+  // Rejouée si InnoDB l'annule sur un interblocage (verrous d'intervalle des
+  // marques de rappel, face à une programmation voisine ou au balayage).
+  const outcome = await retryOnDeadlock(() => withConnection(async (connection) => {
     let written: {
       tournamentId: number;
       previousStartAt: string | null;
@@ -308,7 +311,7 @@ export async function setMatchStartAt(
     }
 
     return written;
-  });
+  }));
 
   publishMatchUpdatedEvent(outcome.tournamentId, { landingLive: true });
   // Joueurs, arbitres et journal apprennent l'horaire posé, changé ou retiré

@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   FinishedTournamentTotals,
@@ -170,7 +169,7 @@ import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore, type ProposalConfirmation } from "./scoring";
 import { loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
-import { isTransactionAborted } from "@/lib/server/mysql-errors";
+import { retryOnDeadlock } from "./deadlock-retry";
 import type { AdminResolveEntry, AdminScoreEntry } from "./admin";
 import {
   publishMatchUpdatedEvent,
@@ -1211,27 +1210,7 @@ async function readTournamentState(tournamentId: number): Promise<TournamentStat
   return rows[0]?.state ?? null;
 }
 
-const REPORT_DEADLOCK_ATTEMPTS = 3;
 
-/**
- * Rejoue une écriture de résultat annulée par un interblocage InnoDB : les
- * verrous d'intervalle de `bg_match_maps` (`./match-maps`) peuvent opposer deux
- * écritures sur des matchs voisins — report d'équipe ou geste d'arbitrage.
- * Toute autre erreur remonte telle quelle.
- */
-async function retryOnDeadlock(write: () => Promise<void>): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await write();
-      return;
-    } catch (error) {
-      if (!isTransactionAborted(error) || attempt >= REPORT_DEADLOCK_ATTEMPTS) throw error;
-      // Attente courte et aléatoire : deux transactions annulées ensemble ne
-      // repartent pas au même instant pour se heurter de nouveau.
-      await new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));
-    }
-  }
-}
 
 export async function reportMatchScorePublic(
   tournamentId: number,

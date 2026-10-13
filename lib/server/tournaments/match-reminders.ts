@@ -318,15 +318,17 @@ async function setToldTime(match: ScheduledMatch, startAt: Date | null): Promise
   const matchId = Number(match.id);
   // Écrite seulement si la manche porte encore cet horaire et ces engagées : la
   // condition est dans l'écriture même, pas dans une lecture qui la précède.
+  // La manche est lue **avant** la marque (`INSERT … SELECT`), dans l'ordre de
+  // verrouillage du moteur — un `UPDATE … JOIN` pouvait tenir la marque en
+  // attendant la manche, et s'interbloquer avec `setMatchStartAt`.
   const [result] = await db.execute(
-    `UPDATE bg_match_reminders r
-       JOIN bg_matches m ON m.id = r.match_id
-        SET r.start_at = ?
-      WHERE r.match_id = ? AND r.offset_key = ?
-        AND m.start_at <=> ? AND m.team1_id = ? AND m.team2_id = ?`,
-    [startAt, matchId, MATCH_TOLD_KEY, startAt, Number(match.team1_id), Number(match.team2_id)],
+    `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)
+       SELECT ?, ?, ? FROM bg_matches
+        WHERE id = ? AND start_at <=> ? AND team1_id = ? AND team2_id = ?
+     ON DUPLICATE KEY UPDATE start_at = ?`,
+    [matchId, MATCH_TOLD_KEY, startAt, matchId, startAt, Number(match.team1_id), Number(match.team2_id), startAt],
   );
-  return (result as { affectedRows?: number }).affectedRows === 1;
+  return ((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
 }
 
 /**
@@ -373,7 +375,26 @@ type PlannedSend = {
   announcement?: ScheduleAnnouncement;
   /** Horaire retiré par l'arbitrage (« Horaire du match retiré »). */
   clearedStartAt?: string;
+  /**
+   * Marques réservées pour cet envoi : rendues s'il échoue avant d'atteindre
+   * les joueurs (sans quoi le palier, ou l'annonce, serait consommé sans
+   * message et jamais retenté).
+   */
+  claimed?: string[];
 };
+
+/** Rend les marques d'un envoi qui n'a pu partir. Ne lève jamais. */
+async function releaseClaims(send: PlannedSend): Promise<void> {
+  const keys = send.claimed ?? [];
+  if (keys.length === 0) return;
+  const db = await getDatabase();
+  await db
+    .execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key IN (${keys.map(() => "?").join(", ")})`, [
+      Number(send.match.id),
+      ...keys,
+    ])
+    .catch(() => undefined);
+}
 
 /**
  * Décide ce qu'il y a à envoyer pour une manche, et **réserve** ce qu'elle
@@ -406,8 +427,11 @@ async function planMatchSends(
     // (`setMatchStartAt` pose la marque quand il annonce) — on l'annonce, quelle
     // que soit l'échéance.
     const opened = openedMatchReminders(match.start_at, now);
+    const claimed = [MATCH_SEEN_KEY];
     try {
-      for (const offset of opened) await claimReminder(match, offset.key);
+      for (const offset of opened) {
+        if (await claimReminder(match, offset.key)) claimed.push(offset.key);
+      }
     } catch (error) {
       // Rendue, l'observation laisse l'annonce au passage suivant ; gardée,
       // elle la ferait taire pour de bon (seul le rappel 24 h partirait).
@@ -419,7 +443,7 @@ async function planMatchSends(
     // Les joueurs avaient déjà reçu un horaire (manche programmée avant la
     // marque d'observation, par exemple) : la date découverte en remplace une.
     const announcement = { rescheduled: alreadySent.has(MATCH_TOLD_KEY) };
-    return [{ match, offset: null, remaining: [...remaining], announcement }];
+    return [{ match, offset: null, remaining: [...remaining], announcement, claimed }];
   }
 
   // `alreadySent` porte aussi la marque d'observation, qui n'est pas un palier :
@@ -432,7 +456,7 @@ async function planMatchSends(
   const planned: PlannedSend[] = [];
   for (const offset of due) {
     if (await claimReminder(match, offset.key)) {
-      planned.push({ match, offset, remaining: [] });
+      planned.push({ match, offset, remaining: [], claimed: [offset.key] });
     }
   }
   return planned;
@@ -522,7 +546,15 @@ async function dispatchPlannedSend(
   // corrige sa saisie dans la seconde la lit déjà), rendue à son état d'avant
   // si rien n'a abouti — même sur une erreur. Un avis de retrait la garde,
   // sans horaire.
-  const told = await openToldMark(match, recipientsByTeam, clearedStartAt ? null : new Date(match.start_at));
+  let told: Awaited<ReturnType<typeof openToldMark>>;
+  try {
+    told = await openToldMark(match, recipientsByTeam, clearedStartAt ? null : new Date(match.start_at));
+  } catch (error) {
+    // Attente de verrou, interblocage : rien n'est parti, les marques de cet
+    // envoi sont rendues — le passage suivant le retentera.
+    await releaseClaims(send);
+    throw error;
+  }
   if (told === "stale") return 0;
 
   // Un message par engagée, pas un pour tout le monde : chaque joueur lit
@@ -604,9 +636,17 @@ export async function announceMatchSchedule(
   }
   const openedKeys = new Set(opened.map((offset) => offset.key));
   const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
-
-  const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
-  return dispatchPlannedSend({ match, offset: null, remaining: [...remaining], announcement }, recipientsByTeam);
+  // En cas d'échec avant les joueurs, l'observation posée par `setMatchStartAt`
+  // est rendue avec les paliers : le balayage annoncera la manche.
+  const send: PlannedSend = {
+    match,
+    offset: null,
+    remaining: [...remaining],
+    announcement,
+    claimed: [MATCH_SEEN_KEY, ...openedKeys],
+  };
+  const recipientsByTeam = await recipientsOrRelease([send]);
+  return dispatchPlannedSend(send, recipientsByTeam);
 }
 
 /**
@@ -625,8 +665,9 @@ export async function announceMatchScheduleCleared(notice: MatchNotice, previous
   const match = playableMatch(notice, previousStartAt);
   if (!match) return 0;
 
-  const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
-  return dispatchPlannedSend({ match, offset: null, remaining: [], clearedStartAt: previousStartAt }, recipientsByTeam);
+  const send: PlannedSend = { match, offset: null, remaining: [], clearedStartAt: previousStartAt };
+  const recipientsByTeam = await recipientsOrRelease([send]);
+  return dispatchPlannedSend(send, recipientsByTeam);
 }
 
 /**
@@ -760,6 +801,21 @@ async function sendWithdrawnNotice(
   });
 }
 
+/**
+ * Destinataires des envois retenus, en une lecture. Si elle échoue, les marques
+ * réservées pour ces envois sont rendues — sans quoi tous seraient consommés
+ * sans message, et jamais retentés.
+ */
+async function recipientsOrRelease(sends: PlannedSend[]): Promise<Map<number, NotificationRecipient[]>> {
+  const teamIds = [...new Set(sends.flatMap(({ match }) => [Number(match.team1_id), Number(match.team2_id)]))];
+  try {
+    return await loadRecipientsByTeam(teamIds);
+  } catch (error) {
+    await Promise.all(sends.map(releaseClaims));
+    throw error;
+  }
+}
+
 async function runSweep(now: Date): Promise<number> {
   const db = await getDatabase();
 
@@ -809,10 +865,7 @@ async function runSweep(now: Date): Promise<number> {
   });
   if (planned.length === 0) return 0;
 
-  const teamIds = [
-    ...new Set(planned.flatMap(({ match }) => [Number(match.team1_id), Number(match.team2_id)])),
-  ];
-  const recipientsByTeam = await loadRecipientsByTeam(teamIds);
+  const recipientsByTeam = await recipientsOrRelease(planned);
 
   // Quelques manches à la fois : chaque envoi attend le bot puis les appareils,
   // et une ronde suisse appariée sur des horaires déjà posés en annonce d'un

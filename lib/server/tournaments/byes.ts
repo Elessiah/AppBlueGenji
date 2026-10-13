@@ -1,45 +1,6 @@
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection } from "mysql2/promise";
 import { MatchRow } from "./_internal";
-
-async function pushTeamToTarget(
-  connection: PoolConnection,
-  targetMatchId: number | null,
-  targetSlot: number | null,
-  teamId: number | null,
-): Promise<void> {
-  if (!targetMatchId || !targetSlot || !teamId) return;
-
-  if (targetSlot === 1) {
-    await connection.execute(`UPDATE bg_matches SET team1_id = ? WHERE id = ?`, [
-      teamId,
-      targetMatchId,
-    ]);
-  } else {
-    await connection.execute(`UPDATE bg_matches SET team2_id = ? WHERE id = ?`, [
-      teamId,
-      targetMatchId,
-    ]);
-  }
-
-  const [rows] = await connection.execute<
-    (RowDataPacket & { team1_id: number | null; team2_id: number | null })[]
-  >(
-    `SELECT team1_id, team2_id
-     FROM bg_matches
-     WHERE id = ?
-     LIMIT 1`,
-    [targetMatchId],
-  );
-
-  const row = rows[0];
-  const nextStatus =
-    row.team1_id !== null && row.team2_id !== null ? "READY" : "PENDING";
-
-  await connection.execute(`UPDATE bg_matches SET status = ? WHERE id = ?`, [
-    nextStatus,
-    targetMatchId,
-  ]);
-}
+import { pushTeamToTarget } from "./target-slot";
 
 async function finalizeMatch(
   connection: PoolConnection,

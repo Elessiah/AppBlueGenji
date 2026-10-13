@@ -296,10 +296,13 @@ async function logScheduleCleared(
 async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchScheduleChange): Promise<void> {
   const { previousStartAt } = change;
   if (previousStartAt === null) return;
+  // Calculé une fois : deux lectures de l'horloge pourraient diverger à la
+  // borne des 12 h.
+  const held = heldStartAt(change);
   const results = await Promise.allSettled([
     logScheduleCleared(row, { ...change, previousStartAt }),
-    isAnnounceableClearing(change) && ownsPlayerNotice(row, change)
-      ? announceMatchScheduleCleared(row, heldStartAt(change) ?? previousStartAt)
+    held !== null && isAnnounceableClearing(change) && ownsPlayerNotice(row, change)
+      ? announceMatchScheduleCleared(row, held)
       : Promise.resolve(0),
   ]);
   reportFailures(results, "[notify] horaire retiré non annoncé");
