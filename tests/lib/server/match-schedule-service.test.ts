@@ -133,9 +133,9 @@ describe("setMatchStartAt", () => {
   });
 
   it("efface les paliers quand la date change vraiment, et pose la marque d'observation dans le même geste", async () => {
-    const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }) });
+    const { writes } = world({ row: matchRow({ start_at: new Date("2099-08-29T18:30:00Z") }) });
 
-    await setMatchStartAt(42, "2026-08-30T18:30:00Z");
+    await setMatchStartAt(42, "2099-08-30T18:30:00Z");
 
     // Les marques d'observation et d'horaire reçu survivent au ménage…
     const reminders = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
@@ -160,6 +160,12 @@ describe("setMatchStartAt", () => {
     );
   });
 
+  it("laisse les marques en place pour une date déjà passée, annoncée à personne", async () => {
+    const { writes } = world({ row: matchRow({ start_at: new Date("2099-08-29T18:30:00Z") }), announced: true });
+    await setMatchStartAt(42, "2026-01-01T18:30:00Z");
+    expect(writes.some((w) => w.sql.includes("bg_match_reminders"))).toBe(false);
+  });
+
   it("garde toutes les marques quand la date revient à l'horaire que les joueurs tiennent", async () => {
     const { writes } = world({
       row: matchRow({ start_at: new Date("2020-09-29T18:30:00Z") }),
@@ -172,9 +178,9 @@ describe("setMatchStartAt", () => {
   });
 
   it("garde la marque `TOLD` au ménage d'une date changée", async () => {
-    const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), announced: true });
+    const { writes } = world({ row: matchRow({ start_at: new Date("2099-08-29T18:30:00Z") }), announced: true });
 
-    await setMatchStartAt(42, "2026-08-30T18:30:00Z");
+    await setMatchStartAt(42, "2099-08-30T18:30:00Z");
 
     const cleanup = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
     expect(cleanup?.params).toContain("TOLD");
@@ -182,9 +188,9 @@ describe("setMatchStartAt", () => {
   });
 
   it("laisse le balayage annoncer une manche dont une engagée manque encore", async () => {
-    const { writes } = world({ row: matchRow({ team2_id: null, start_at: new Date("2026-08-29T18:30:00Z") }) });
+    const { writes } = world({ row: matchRow({ team2_id: null, start_at: new Date("2099-08-29T18:30:00Z") }) });
 
-    await setMatchStartAt(42, "2026-08-30T18:30:00Z");
+    await setMatchStartAt(42, "2099-08-30T18:30:00Z");
 
     const reminders = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
     expect(reminders?.sql).toContain("offset_key <> ?");
@@ -276,8 +282,8 @@ describe("setMatchStartAt", () => {
   });
 
   it("défait la date quand le ménage des rappels échoue, plutôt qu'un horaire dont personne n'est prévenu", async () => {
-    const { connection } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), failReminders: true });
-    await expect(setMatchStartAt(42, "2026-08-30T18:30:00Z")).rejects.toThrow("base injoignable");
+    const { connection } = world({ row: matchRow({ start_at: new Date("2099-08-29T18:30:00Z") }), failReminders: true });
+    await expect(setMatchStartAt(42, "2099-08-30T18:30:00Z")).rejects.toThrow("base injoignable");
     expect(connection.commit).not.toHaveBeenCalled();
     expect(connection.rollback).toHaveBeenCalled();
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
