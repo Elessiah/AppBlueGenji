@@ -237,14 +237,23 @@ async function notifyReferees(
  * viendra).
  */
 export function isAnnounceableClearing(change: MatchScheduleChange, now: Date = new Date()): boolean {
-  if (change.startAt !== null || change.previousStartAt === null || !change.refereeScheduling) return false;
-  return heldStartAt(change, now) !== null;
+  return clearedHeldStartAt(change, now) !== null;
+}
+
+/**
+ * L'horaire retiré à annoncer aux joueurs, ou `null` s'il n'y a rien à leur
+ * dire — la règle de {@link isAnnounceableClearing}, qui rend aussi l'horaire.
+ */
+function clearedHeldStartAt(change: MatchScheduleChange, now: Date): string | null {
+  if (change.startAt !== null || change.previousStartAt === null || !change.refereeScheduling) return null;
+  return heldStartAt(change, now);
 }
 
 /** Ligne du journal pour un horaire retiré. */
 async function logScheduleCleared(
   row: ScheduledMatchInfoRow,
   change: MatchScheduleChange & { previousStartAt: string },
+  now: Date,
 ): Promise<void> {
   if (change.actor) {
     publishStaffAction(
@@ -264,7 +273,7 @@ async function logScheduleCleared(
   // devant : l'avis de retrait le remplace sur leur appareil (même étiquette).
   const previous = new Date(change.previousStartAt).getTime();
   if (!stillCurrent(row, change) || isPlayedMatchStatus(row.status)) return;
-  if (!Number.isFinite(previous) || previous <= Date.now() - HELD_TIME_GRACE_MS) return;
+  if (!Number.isFinite(previous) || previous <= now.getTime() - HELD_TIME_GRACE_MS) return;
   await notifyStaff({
     topic: "MATCH_SCHEDULED",
     excludeUserIds: change.actor ? [change.actor.id] : [],
@@ -291,15 +300,13 @@ async function logScheduleCleared(
 async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchScheduleChange): Promise<void> {
   const { previousStartAt } = change;
   if (previousStartAt === null) return;
-  // Un seul instant pour la règle et l'horaire cité : deux lectures de
+  // Un seul instant pour les joueurs et les arbitres : deux lectures de
   // l'horloge pourraient diverger à la borne des 12 h.
   const now = new Date();
-  const held = heldStartAt(change, now);
+  const held = clearedHeldStartAt(change, now);
   const results = await Promise.allSettled([
-    logScheduleCleared(row, { ...change, previousStartAt }),
-    held !== null && isAnnounceableClearing(change, now) && ownsPlayerNotice(row, change)
-      ? announceMatchScheduleCleared(row, held)
-      : Promise.resolve(0),
+    logScheduleCleared(row, { ...change, previousStartAt }, now),
+    held !== null && ownsPlayerNotice(row, change) ? announceMatchScheduleCleared(row, held) : Promise.resolve(0),
   ]);
   reportFailures(results, "[notify] horaire retiré non annoncé");
 }
