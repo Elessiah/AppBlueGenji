@@ -257,6 +257,25 @@ describe("notifyMatchScheduleChange — match déjà joué", () => {
   });
 });
 
+describe("notifyMatchScheduleChange — horaire retiré, arbitres", () => {
+  it("ne prévient pas les arbitres d'un horaire déjà passé ni d'un match joué", async () => {
+    mockMatch();
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true }));
+    mockMatch({ ...ROW, status: "COMPLETED" });
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    expect(notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it("ne nomme aucun joueur dans l'avis aux arbitres d'un tournoi individuel", async () => {
+    mockMatch({ ...ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START }));
+    for (const locale of ["fr", "en"] as const) {
+      const { title, body } = resolvePush(staffCall().push, locale);
+      expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
+    }
+  });
+});
+
 describe("isAnnounceableClearing", () => {
   const now = new Date("2099-01-01T00:00:00Z");
 
@@ -279,14 +298,20 @@ describe("isAnnounceableClearing", () => {
 });
 
 describe("notifyMatchScheduleChange — horaire retiré", () => {
-  it("prévient les joueurs qui l'avaient reçu et journalise, sans pousser aux arbitres", async () => {
+  it("prévient les joueurs qui l'avaient reçu, les arbitres sauf l'auteur, et journalise", async () => {
     mockMatch();
 
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
 
     expect(announceMatchScheduleCleared).toHaveBeenCalledWith(42, OLD_START);
     expect(announceMatchSchedule).not.toHaveBeenCalled();
-    expect(notifyStaff).not.toHaveBeenCalled();
+    expect(staffCall().topic).toBe("MATCH_SCHEDULED");
+    expect(staffCall().excludeUserIds).toEqual([ACTOR.id]);
+    const push = resolvePush(staffCall().push);
+    expect(push.title).toBe("Horaire du match retiré");
+    expect(push.body).toMatch(/^L'horaire du .+ \(heure de Paris\) est retiré\. Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2\.$/);
+    expect(push.tag).toBe("rencontre-42-schedule");
+    expect(resolvePush(staffCall().push, "en").title).toBe("Match time removed");
     expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toMatch(/^🗓️ Horaire retiré — « Coupe BlueGenji » \(#7\)/u);
