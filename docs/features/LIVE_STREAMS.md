@@ -157,11 +157,15 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   (clé unique `(match_id, pairing)`) est réservée **avant** l'appel au bot.
   Un balayage concurrent, un rafraîchissement, une relecture du flux, un direct
   coupé puis relancé, un lancement annulé puis refait (horaire changé) ne
-  repostent jamais. La réservation n'est **rendue** que si rien n'est parti —
-  bot injoignable ou d'une version antérieure, salon fermé (`503`), panne
-  (`500`) — et le balayage suivant réessaie tant que le match a commencé
-  depuis moins de deux heures ; un succès (même sans mention) ou un refus du
-  corps (`400`) la garde. Un **délai dépassé** (15 s) la garde aussi : le bot a
+  repostent jamais. La réservation n'est **rendue** que si rien n'est parti
+  pour une cause passagère — bot injoignable ou d'une version antérieure,
+  salon fermé ou mode lent (`503`), panne (`500`) — et le balayage suivant
+  réessaie tant que le match a commencé depuis moins de deux heures ; un
+  succès (même sans mention), un refus du corps (`400`) ou un refus de
+  Discord lui-même (`503` `automod` / `send-rejected` : le même message serait
+  refusé de nouveau, et chaque essai bloqué alerterait la modération) la
+  garde, comme un `503` `discord-down` (Discord lâché pendant l'envoi : il a
+  pu partir). Un **délai dépassé** (15 s) la garde aussi : le bot a
   pu publier quand même, et une annonce perdue vaut mieux qu'un second
   `@everyone` à tout le serveur (`timed-out`, `console.error` dans pm2, qui dit d'attendre quelques minutes avant de vérifier #live) ; il
   n'est pas compté comme une panne du bot. Le bot
@@ -215,17 +219,17 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   est averti dans pm2 au plus une fois par heure, par cause et par match (ou
   groupe), la cause distincte :
   « salon #live fermé au bot » (`503` de salon ou de permission), « le mode
-  lent de #live retient l'annonce », « Discord a refusé l'annonce … ou n'a pas
-  répondu au bot » (AutoMod, autre refus — la cause exacte est au canal de
-  logs du bot, ou ses journaux si Discord était en panne) ou « bot
-  injoignable, en panne ou d'une version sans annonces » ; passé deux heures,
-  le match n'est plus réessayé. Un `503` `discord-down` (Discord lâché pendant
-  l'envoi) est traité comme un délai dépassé : « publication non confirmée »,
-  réservation gardée, **aucun** nouvel essai — vérifier #live et ne la poster
-  à la main que si elle n'y est pas. Un `503` qui ne concerne pas l'annonce
-  (jeton interne du bot absent…) se lit « bot injoignable ».
-  Un refus du corps (`400`) ou un délai dépassé n'est tracé que dans pm2
-  (`console.error`). Côté bot, un salon fermé, une panne ou une permission
+  lent de #live retient l'annonce », « Discord n'a pas répondu au bot en
+  lisant le salon » ou « bot injoignable, en panne ou d'une version sans
+  annonces » ; passé deux heures, le match n'est plus réessayé. Un `503` qui
+  ne concerne pas l'annonce (jeton interne du bot absent…) se lit « bot
+  injoignable ». Les annonces abandonnées sont tracées en `console.error` :
+  refus du corps (`400`), refus de Discord (« Discord a refusé l'annonce …
+  abandonnée », cause au canal de logs du bot), « publication non
+  confirmée » (`503` `discord-down` — vérifier #live) et délai dépassé
+  (« son envoi peut encore aboutir » — parfois des heures après un
+  redémarrage du bot, sous un mode lent). Aucune de ces lignes ne demande de
+  poster l'annonce à la main : l'envoi du bot a pu partir, ou partir encore. Côté bot, un salon fermé, une panne ou une permission
   manquante est signalé dans le canal de logs, au plus une fois par heure par
   incident. Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est
