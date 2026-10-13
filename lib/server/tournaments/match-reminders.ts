@@ -42,6 +42,7 @@ import {
   MATCH_REMINDER_OFFSETS,
   MATCH_SEEN_KEY,
   MATCH_TOLD_KEY,
+  MATCH_TOLD_KEYS,
   buildMatchReminderMessage,
   buildMatchScheduleAnnouncement,
   buildMatchScheduleClearedNotice,
@@ -211,9 +212,9 @@ async function planMatchSends(
     for (const offset of opened) await claimReminder(matchId, offset.key);
     const openedKeys = new Set(opened.map((offset) => offset.key));
     const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
-    // Les joueurs avaient déjà reçu un horaire (date changée quand une place
-    // s'était vidée) : la date découverte ici en remplace une.
-    const announcement = { rescheduled: alreadySent.has(MATCH_TOLD_KEY) };
+    // Les joueurs avaient déjà reçu un horaire (manche programmée avant la
+    // marque d'observation, par exemple) : la date découverte en remplace une.
+    const announcement = { rescheduled: MATCH_TOLD_KEYS.some((key) => alreadySent.has(key)) };
     return [{ match, offset: null, remaining: [...remaining], announcement }];
   }
 

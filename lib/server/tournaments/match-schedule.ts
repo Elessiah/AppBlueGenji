@@ -149,6 +149,14 @@ async function resetReminderMarks(
     if (isMissingTableError(error)) return false;
     throw error;
   }
+  // Une preuve héritée (`P7D` / `PT1H`) devient `TOLD` avant que le ménage ne
+  // l'emporte : elle doit survivre aux changements de date comme la marque.
+  if (told.length > 0) {
+    await connection.execute(`INSERT IGNORE INTO bg_match_reminders (match_id, offset_key) VALUES (?, ?)`, [
+      matchId,
+      MATCH_TOLD_KEY,
+    ]);
+  }
   if (startAt !== null && bothEntrants) {
     await connection.execute(
       `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,

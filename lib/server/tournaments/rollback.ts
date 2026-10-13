@@ -262,9 +262,40 @@ async function detachMatchParticipants(
        WHERE id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
-    // Les marques de rappel appartenaient à l'affiche défaite : les engagées
-    // qui la rempliront n'ont reçu aucun horaire (même règle que
-    // `bracket-cascade.ts`). Table tolérée absente, comme dans `deleteMatches`.
+  }
+}
+
+type Poster = { id: number; team1_id: number | null; team2_id: number | null };
+
+/** Affiches (engagées des deux créneaux) des rencontres données. */
+async function loadPosters(connection: PoolConnection, matchIds: readonly number[]): Promise<Map<number, string>> {
+  const posters = new Map<number, string>();
+  for (const ids of chunk(matchIds)) {
+    const [rows] = await connection.execute<(RowDataPacket & Poster)[]>(
+      `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${ids.map(() => "?").join(", ")})`,
+      ids,
+    );
+    for (const row of rows) posters.set(Number(row.id), `${row.team1_id ?? ""}:${row.team2_id ?? ""}`);
+  }
+  return posters;
+}
+
+/**
+ * Efface les marques de rappel des rencontres détachées **dont l'affiche a
+ * changé** une fois re-remplies : leurs nouvelles engagées n'ont reçu aucun
+ * horaire et doivent recevoir l'annonce (même règle que `bracket-cascade.ts`).
+ * Une rencontre rendue aux mêmes engagées garde les siennes — sans quoi elle
+ * serait annoncée une seconde fois. Table tolérée absente, comme dans
+ * `deleteMatches`.
+ */
+async function forgetChangedPosters(
+  connection: PoolConnection,
+  before: Map<number, string>,
+  matchIds: readonly number[],
+): Promise<void> {
+  const after = await loadPosters(connection, matchIds);
+  const changed = matchIds.filter((id) => before.get(id) !== after.get(id));
+  for (const ids of chunk(changed)) {
     await ignoreMissingTable(
       connection.execute(`DELETE FROM bg_match_reminders WHERE match_id IN (${ids.map(() => "?").join(", ")})`, ids),
     );
@@ -611,8 +642,10 @@ async function applyRollback(
   await clearMatchResults(connection, [...plan.clearedMatchIds, ...plan.detachedMatchIds]);
 
   if (plan.detachedMatchIds.length > 0) {
+    const posters = await loadPosters(connection, plan.detachedMatchIds);
     await detachMatchParticipants(connection, plan.detachedMatchIds);
     await repopulateDetachedMatches(connection, tournamentId, plan.detachedMatchIds);
+    await forgetChangedPosters(connection, posters, plan.detachedMatchIds);
   }
   if (plan.deletedMatchIds.length > 0) {
     await deleteMatches(connection, plan.deletedMatchIds);

@@ -16,8 +16,10 @@
  * Une date **effacée** est journalisée et, si les joueurs avaient reçu
  * l'horaire et qu'il était encore devant, leur est annoncée (« Horaire du
  * match retiré ») ; pas de push aux arbitres. Rien ne part pour une date
- * inchangée, ni pour une date posée déjà passée (correction d'archive). Tout est au meilleur effort et après le commit : l'horaire est
- * enregistré, une panne de notification n'y change rien.
+ * inchangée, ni pour une date posée déjà passée (correction d'archive) ; une
+ * date posée sur un match déjà joué n'est que journalisée. Tout est au
+ * meilleur effort et après le commit : l'horaire est enregistré, une panne de
+ * notification n'y change rien.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -33,6 +35,7 @@ import { announceMatchSchedule, announceMatchScheduleCleared } from "./match-rem
 
 type ScheduledMatchInfoRow = RowDataPacket & {
   id: number;
+  status: string;
   tournament_id: number;
   tournament_name: string;
   participant_type: string;
@@ -96,7 +99,7 @@ export function isAnnounceableSchedule(change: MatchScheduleChange, now: Date = 
 async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<ScheduledMatchInfoRow[]>(
-    `SELECT m.id, m.tournament_id, m.bracket, m.round_number,
+    `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.status,
             t.name AS tournament_name, t.participant_type,
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
@@ -137,6 +140,9 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
     rescheduled: announcement.rescheduled,
   });
   if (change.actor) publishStaffAction(line, change.actor);
+  // Un match joué ne se rejouera pas : la date est une correction d'archive,
+  // tracée au journal mais annoncée à personne (les joueurs non plus).
+  if (row.status === "COMPLETED") return 0;
 
   const { pushed } = await notifyStaff({
     topic: "MATCH_SCHEDULED",
