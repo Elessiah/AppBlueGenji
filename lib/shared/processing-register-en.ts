@@ -381,6 +381,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exclusions: identifiers of the excluded user and the moderator, date; identifiers and reason posted in the staff's private log channel, reason copied by direct message to the bot's owner, usernames and reason displayed by /ban-list",
       "Configuration: identifiers of servers, channels and roles, invitation, identifier of the administrator who set it",
       "Memberships and scheduled reminders: identifier of the member or role targeted and of the author, message, date of the next sending (for a membership: its expiry date, hence membership status), frequency; membership certificate delivered by direct message without being kept",
+      "Site messages: the recipient's Discord ID or username, their BlueGenji username (returned in the delivery report sent back to the site) and the message text, sent by the site and delivered without being stored by the bot",
       "Technical log (staff's private channel, server logs): name of the servers that add or remove the bot, errors that may quote an identifier; the bot no longer writes a username there of its own accord, messages prior to this rule excepted (the free-text reason for an exclusion or an error delivering a direct message may quote one)",
     ],
     sensitiveData: "None",

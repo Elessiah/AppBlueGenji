@@ -278,6 +278,7 @@ Fil d'activité public de la page du bot : heure, type d'évènement (relais, sc
 Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list
 Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée
 Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée
+Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site) et le texte du message, transmis par le site et remis sans être enregistrés par le bot
 Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)
 Données sensibles
 Aucune
