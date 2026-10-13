@@ -286,6 +286,46 @@ describe("runLiveAnnouncementSweep", () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 
+  it("une réservation refusée par la base n'emporte pas les autres affiches du passage", async () => {
+    const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4", live_url: "https://kick.com/b" }]);
+    let first = true;
+    execute.mockImplementation(async (sql) => {
+      if (sql.startsWith("INSERT IGNORE")) {
+        if (first) {
+          first = false;
+          throw new Error("LOCK_WAIT_TIMEOUT");
+        }
+        return [{ affectedRows: 1 }];
+      }
+      return [{ affectedRows: 1 }];
+    });
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]).toBe("live-announce match-41");
+    expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
+      "[live-announce] match 40 (tournoi 4) : réservation impossible, réessayée au passage suivant",
+    );
+  });
+
+  it("une très grande ronde garde une étiquette bornée, sans identifiant coupé", async () => {
+    const rows = Array.from({ length: 60 }, (_, i) => ({
+      ...AUTO_LIVE,
+      id: 10_000 + i,
+      live_url: null,
+      pairing: `${i}:${i + 100}`,
+      launch_pairing: `${i}:${i + 100}`,
+    }));
+    mockDb(rows);
+    await runLiveAnnouncementSweep(NOW);
+    const context = String(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]);
+    expect(context.length).toBeLessThanOrEqual(200);
+    const match = /^live-announce match-([\d,]+),…\+(\d+)$/.exec(context);
+    expect(match).not.toBeNull();
+    const shown = match![1].split(",");
+    expect(shown.every((id, i) => id === String(10_000 + i))).toBe(true);
+    expect(shown.length + Number(match![2])).toBe(60);
+  });
+
   it("un groupe reporté s'accorde au pluriel", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
     mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" }]);
