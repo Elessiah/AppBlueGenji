@@ -31,6 +31,7 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 
 export function endpointHash(endpoint: string): string {
   return crypto.createHash("sha256").update(endpoint).digest("hex");
@@ -300,7 +301,9 @@ export async function subscribedStaffCandidates(): Promise<
       `SELECT u.id, u.is_admin, u.platform_roles_json FROM bg_users u
        WHERE u.is_deleted = 0
          AND (u.is_admin = 1 OR u.platform_roles_json IS NOT NULL)
-         AND EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)`,
+         AND EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)
+         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
+                          WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
     );
     return rows.map((row) => ({
       userId: Number(row.id),

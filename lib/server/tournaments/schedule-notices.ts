@@ -388,6 +388,8 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
               tournamentId: match.tournamentId,
               tournamentName: match.tournamentName,
               matchId: removal.matchId,
+              // La manche n'existe plus : le lien mène à la page du tournoi.
+              linkMatchId: null,
               team1Name: nameOf(removal.team1Id),
               team2Name: nameOf(removal.team2Id),
               solo: match.solo,

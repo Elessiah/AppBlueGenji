@@ -274,6 +274,8 @@ type StaffScheduleInput = {
   roundNumber: number;
   swiss?: boolean;
   startAt: string | Date;
+  /** Rencontre du lien quand ce n'est pas `matchId` : `null` — la page du tournoi — pour une rencontre supprimée. */
+  linkMatchId?: number | null;
 };
 
 /** « A contre B » pour l'arbitrage : « Un match » en solo, « TBD » pour une place vide. */
@@ -326,7 +328,10 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
       tournament: input.tournamentName,
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
-    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    url: localeHref(
+      tournamentMatchHref(input.tournamentId, input.linkMatchId === undefined ? input.matchId : input.linkMatchId),
+      locale,
+    ),
     tag: `${matchTag(input.matchId)}-schedule`,
   };
 }
