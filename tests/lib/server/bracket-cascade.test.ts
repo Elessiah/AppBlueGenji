@@ -4,7 +4,7 @@ jest.mock("@/lib/server/tournaments/departed-notices");
 
 import type { PoolConnection } from "mysql2/promise";
 import { detachDownstreamOutcome } from "@/lib/server/tournaments/bracket-cascade";
-import { noteDepartedEntrant } from "@/lib/server/tournaments/departed-notices";
+import { noteDepartedEntrants } from "@/lib/server/tournaments/departed-notices";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -220,7 +220,7 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     const { conn, forgotten } = board([row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 })]);
     // L'horaire tenu par la sortante se lit avant l'effacement des marques.
     let forgottenWhenNoted: number[] | null = null;
-    jest.mocked(noteDepartedEntrant).mockImplementation(async () => {
+    jest.mocked(noteDepartedEntrants).mockImplementation(async () => {
       forgottenWhenNoted = [...forgotten];
     });
 
@@ -228,7 +228,7 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
 
     expect(forgotten).toEqual([2]);
     // L'engagée 7 quitte la place 1 de la manche 2 : son avis est noté.
-    expect(noteDepartedEntrant).toHaveBeenCalledWith(conn, 2, 7, 1);
+    expect(noteDepartedEntrants).toHaveBeenCalledWith(conn, [{ matchId: 2, teamId: 7, slot: 1 }]);
     expect(forgottenWhenNoted).toEqual([]);
   });
 
@@ -238,7 +238,7 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     await detachDownstreamOutcome(conn, links(2, 1), { winnerTeamId: 7, loserTeamId: null });
 
     expect(forgotten).toEqual([]);
-    expect(noteDepartedEntrant).not.toHaveBeenCalled();
+    expect(noteDepartedEntrants).not.toHaveBeenCalled();
   });
 
   it("vide aussi le créneau de perdant d'une double élimination", async () => {
@@ -258,9 +258,11 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     expect(get(5).status).toBe("PENDING");
     // Les marques des deux affiches quittées partent en une seule instruction.
     expect(forgotten).toEqual([2, 5]);
-    expect(jest.mocked(noteDepartedEntrant).mock.calls.map(([, ...rest]) => rest)).toEqual([
-      [2, 7, 1],
-      [5, 8, 1],
+    // Une seule lecture pour les deux sortantes.
+    expect(noteDepartedEntrants).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(noteDepartedEntrants).mock.calls[0][1]).toEqual([
+      { matchId: 2, teamId: 7, slot: 1 },
+      { matchId: 5, teamId: 8, slot: 1 },
     ]);
     expect(forgetCalls()).toBe(1);
   });

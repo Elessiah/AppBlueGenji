@@ -1,4 +1,8 @@
 import { describe, expect, it, jest } from "@jest/globals";
+
+// Avis à l'engagée sortante : couverts par `departed-notices-wiring.test.ts`.
+jest.mock("@/lib/server/tournaments/departed-notices");
+
 import type { PoolConnection } from "mysql2/promise";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 

@@ -17,6 +17,26 @@ describe("inBatches", () => {
     expect(peak).toBe(2);
   });
 
+  it("un élément lent n'immobilise pas les autres places", async () => {
+    let release: () => void = () => undefined;
+    const slow = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const done: number[] = [];
+    const all = inBatches([1, 2, 3, 4], 2, async (item) => {
+      if (item === 1) await slow;
+      done.push(item);
+    });
+    for (let tick = 0; tick < 20 && done.length < 3; tick += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    // 1 attend encore ; 2, 3 et 4 sont passés par l'autre place.
+    expect(done).toEqual([2, 3, 4]);
+    release();
+    await all;
+    expect(done).toEqual([2, 3, 4, 1]);
+  });
+
   it("ne fait rien sur une liste vide", async () => {
     let calls = 0;
     await inBatches([], 4, async () => {
