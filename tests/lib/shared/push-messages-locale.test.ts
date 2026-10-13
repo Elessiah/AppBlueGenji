@@ -98,15 +98,20 @@ describe("notifications push — français inchangé", () => {
     // Seule différence voulue (revue sécurité) : le lien d'une alerte d'arbitrage
     // n'est plus la première URL de la ligne Discord — le texte, lui, est inchangé.
     // Les rappels « 1 h avant » (`PT1H`) et « une semaine » (`P7D`) ont depuis
-    // été retirés : leurs cas sortent de la comparaison, et le cas solo se lit
-    // au palier de 24 h.
+    // été retirés : leurs cas sortent de la comparaison. Le rappel restant ne
+    // promet plus un délai exact (le balayage peut l'envoyer tard dans sa
+    // fenêtre) : « Match dans moins de 24 heures », cas solo compris.
     const kept = Object.fromEntries(
-      Object.entries(FR_BEFORE).filter(([name]) => !name.endsWith(".PT1H") && !name.endsWith(".P7D")),
+      Object.entries(FR_BEFORE)
+        .filter(([name]) => !name.endsWith(".PT1H") && !name.endsWith(".P7D"))
+        .map(([name, content]) =>
+          name.endsWith(".P1D") ? [name, { ...content, title: "Match dans moins de 24 heures" }] : [name, content],
+        ),
     );
     const before = {
       ...kept,
       "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" },
-      "reminder.solo": { ...FR_BEFORE["reminder.solo"], title: "Match dans 24 heures" },
+      "reminder.solo": { ...FR_BEFORE["reminder.solo"], title: "Match dans moins de 24 heures" },
     };
     expect(allCases("fr")).toEqual(before);
   });
@@ -162,7 +167,7 @@ describe("notifications push — anglais", () => {
       body: "Les Renards vs Team Nova · Coupe BlueGenji. Mark yourself ready.",
       url: "/en/tournois/7#match-31",
     });
-    expect(en["reminder.LOWER.2.P1D"].title).toBe("Match in 24 hours");
+    expect(en["reminder.LOWER.2.P1D"].title).toBe("Match in less than 24 hours");
     expect(en["reminder.LOWER.2.P1D"].body).toContain("Lower bracket · round 2");
     expect(en["reminder.LOWER.2.P1D"].body).toContain("(Paris time)");
     expect(en["reminder.UPPER.1.null"].title).toBe("Match scheduled");

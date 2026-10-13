@@ -46,7 +46,7 @@ describe("matchReminderPush", () => {
       { ...SIDE, bracket: "UPPER", roundNumber: 2, startAt: "2026-09-10T18:00:00Z" },
       "P1D",
     );
-    expect(content.title).toBe("Match dans 24 heures");
+    expect(content.title).toBe("Match dans moins de 24 heures");
     expect(content.body).toContain("Manche 2");
     expect(content.body).toContain("20:00");
     expect(content.tag).not.toBe(matchStartPush(SIDE, "LOBBY").tag);
@@ -63,12 +63,33 @@ describe("matchReminderPush", () => {
     expect(matchReminderPush(side, null, "fr", { rescheduled: true }).title).toBe("Match reprogrammé");
     const en = matchReminderPush(side, null, "en", { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" });
     expect(en.title).toBe("Match rescheduled");
-    expect(en.body).toContain("Kickoff: Thursday, September 10 at 20:00 (Paris time), instead of Tuesday, September 8 at 20:00.");
+    // Le changement d'abord : c'est la fin d'un corps trop long qui se coupe.
+    expect(en.body).toMatch(/^New kickoff: Thursday, September 10 at 20:00 \(Paris time\), instead of Tuesday, September 8 at 20:00\. /);
     expect(en.url).toBe("/en/tournois/7#match-31");
     // Un palier garde son titre et son corps : le changement ne vaut que pour l'annonce.
     const reminder = matchReminderPush(side, "P1D", "fr", { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" });
-    expect(reminder.title).toBe("Match dans 24 heures");
+    expect(reminder.title).toBe("Match dans moins de 24 heures");
     expect(reminder.body).not.toContain("au lieu du");
+  });
+});
+
+describe("corps d'un changement d'horaire trop long", () => {
+  it("garde l'ancienne date et le retrait quand la fin du corps est coupée", () => {
+    const long = {
+      ...SIDE,
+      teamName: "Les Renards Argentés du Grand Nord",
+      opponentName: "Team Nova Interstellaire Unie",
+      tournamentName: "Coupe BlueGenji d'automne — édition des champions",
+      bracket: "LOWER",
+      roundNumber: 2,
+      startAt: "2026-09-10T18:00:00Z",
+    };
+    for (const locale of ["fr", "en"] as const) {
+      const moved = matchReminderPush(long, null, locale, { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" });
+      expect(moved.body.slice(0, 140)).toMatch(/au lieu du mardi 8 septembre|instead of Tuesday, September 8/);
+      const cleared = matchScheduleClearedPush(long, locale);
+      expect(cleared.body.slice(0, 140)).toMatch(/est retiré|has been removed/);
+    }
   });
 });
 
@@ -78,7 +99,7 @@ describe("matchScheduleClearedPush", () => {
   it("dit l'horaire retiré, en français, et remplace l'annonce sur l'appareil", () => {
     expect(matchScheduleClearedPush(side)).toEqual({
       title: "Horaire du match retiré",
-      body: "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Le coup d'envoi prévu jeudi 10 septembre à 20:00 (heure de Paris) est retiré : le nouvel horaire te sera annoncé.",
+      body: "L'horaire prévu jeudi 10 septembre à 20:00 (heure de Paris) est retiré : le nouvel horaire te sera annoncé. Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2.",
       url: "/tournois/7#match-31",
       tag: matchReminderPush(side, null).tag,
     });
@@ -88,7 +109,7 @@ describe("matchScheduleClearedPush", () => {
     const content = matchScheduleClearedPush(side, "en");
     expect(content.title).toBe("Match time removed");
     expect(content.body).toBe(
-      "Les Renards vs Team Nova · Coupe BlueGenji, Lower bracket · round 2. The kickoff planned for Thursday, September 10 at 20:00 (Paris time) has been removed: you'll be told the new time.",
+      "The time planned for Thursday, September 10 at 20:00 (Paris time) has been removed: you'll be told the new one. Les Renards vs Team Nova · Coupe BlueGenji, Lower bracket · round 2.",
     );
     expect(content.url).toBe("/en/tournois/7#match-31");
   });
@@ -135,7 +156,7 @@ describe("matchScheduledStaffPush", () => {
     const content = matchScheduledStaffPush(input, { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" }, "en");
     expect(content.title).toBe("Match rescheduled");
     expect(content.body).toBe(
-      "Les Renards vs Team Nova · Coupe BlueGenji, Lower bracket · round 2. Kickoff: Thursday, September 10 at 20:00 (Paris time), instead of Tuesday, September 8 at 20:00.",
+      "New kickoff: Thursday, September 10 at 20:00 (Paris time), instead of Tuesday, September 8 at 20:00. Les Renards vs Team Nova · Coupe BlueGenji, Lower bracket · round 2.",
     );
     expect(content.url).toBe("/en/tournois/7#match-31");
     expect(matchScheduledStaffPush(input, FIRST, "en").title).toBe("Match scheduled");

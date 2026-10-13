@@ -34,7 +34,15 @@ const ROW = {
 };
 
 function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChange {
-  return { matchId: 42, startAt: NEW_START, previousStartAt: null, alreadyAnnounced: false, actor: ACTOR, ...overrides };
+  return {
+    matchId: 42,
+    startAt: NEW_START,
+    previousStartAt: null,
+    alreadyAnnounced: false,
+    refereeScheduling: true,
+    actor: ACTOR,
+    ...overrides,
+  };
 }
 
 function mockMatch(row: object | null = ROW) {
@@ -245,6 +253,9 @@ describe("isAnnounceableClearing", () => {
     expect(isAnnounceableClearing(change({ ...cleared, alreadyAnnounced: false }), now)).toBe(false);
     expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: "2020-01-01T00:00:00.000Z" }), now)).toBe(false);
     expect(isAnnounceableClearing(change({ ...cleared, previousStartAt: null }), now)).toBe(false);
+    // Sans planification par l'arbitrage, un match sans horaire part en
+    // lancement : aucun « nouvel horaire » ne viendra.
+    expect(isAnnounceableClearing(change({ ...cleared, refereeScheduling: false }), now)).toBe(false);
     expect(isAnnounceableClearing(change({ previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toBe(false);
   });
 });
@@ -261,7 +272,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
     expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toMatch(/^🗓️ Horaire retiré — « Coupe BlueGenji » \(#7\)/u);
-    expect(line).toContain("Les Renards vs Team Nova (#42), le coup d'envoi du ");
+    expect(line).toContain("Les Renards vs Team Nova (#42), l'horaire du ");
     expect(line).toContain("(heure de Paris) est retiré, par le staff.");
     expect(line).not.toContain(ACTOR.pseudo);
   });

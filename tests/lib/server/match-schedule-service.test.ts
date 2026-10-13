@@ -165,6 +165,7 @@ describe("setMatchStartAt", () => {
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: null,
       alreadyAnnounced: false,
+      refereeScheduling: false,
       actor,
     });
   });
@@ -179,12 +180,17 @@ describe("setMatchStartAt", () => {
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: "2099-08-28T18:30:00.000Z",
       alreadyAnnounced: false,
+      refereeScheduling: false,
       actor: null,
     });
   });
 
   it("garde les marques d'une date effacée, et dit si les joueurs l'avaient reçue", async () => {
-    const cleared = world({ row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }), announced: true });
+    const cleared = world({
+      row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }),
+      announced: true,
+      refereeScheduling: true,
+    });
     await setMatchStartAt(42, null);
     expect(cleared.writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"))).toBe(false);
     expect(notifyMatchScheduleChange).toHaveBeenLastCalledWith({
@@ -192,6 +198,7 @@ describe("setMatchStartAt", () => {
       startAt: null,
       previousStartAt: "2099-08-28T18:30:00.000Z",
       alreadyAnnounced: true,
+      refereeScheduling: true,
       actor: null,
     });
 
@@ -203,6 +210,7 @@ describe("setMatchStartAt", () => {
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: null,
       alreadyAnnounced: true,
+      refereeScheduling: false,
       actor: null,
     });
   });

@@ -187,7 +187,7 @@ describe("buildMatchScheduleClearedNotice", () => {
     expect(message.split("\n")[0]).toBe("**Horaire du match retiré**");
     expect(message).toContain("Coupe BlueGenji · Manche 2");
     expect(message).toContain("**Les Renards** contre **Team Nova**");
-    expect(message).toContain("Le coup d'envoi prévu ");
+    expect(message).toContain("L'horaire prévu ");
     expect(message).toContain("(heure de Paris) est retiré : le nouvel horaire te sera annoncé.");
     expect(message).toContain("https://bluegenji.fr/tournois/7");
   });
@@ -214,7 +214,7 @@ describe("buildMatchReminderMessage", () => {
 
   it("nomme le palier, les deux engagées et l'horaire", () => {
     const message = buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[0], context);
-    expect(message).toContain("dans 24 heures");
+    expect(message).toContain("dans moins de 24 heures");
     expect(message).toContain("Coupe BlueGenji · Manche 2");
     expect(message).toContain("**Les Renards** contre **Team Nova**");
     expect(message).toContain("https://bluegenji.fr/tournois/7");
@@ -226,7 +226,7 @@ describe("buildMatchReminderMessage", () => {
       tournamentUrl: null,
     });
     expect(message).not.toContain("http");
-    expect(message).toContain("dans 24 heures");
+    expect(message).toContain("dans moins de 24 heures");
   });
 });
 

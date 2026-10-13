@@ -212,7 +212,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const [userIds, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
     expect(userIds).toEqual([1, 2]);
     expect(topic).toBe("MATCH_REMINDER");
-    expect(resolvePush(content).title).toBe("Match dans 24 heures");
+    expect(resolvePush(content).title).toBe("Match dans moins de 24 heures");
     expect(resolvePush(content).body).toContain("Les Renards contre Team Nova");
     expect(resolvePush(content).url).toBe("/tournois/7#match-31");
   });
@@ -285,6 +285,17 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
     for (const message of sentMessages()) {
       expect(message).toContain("**Match programmé**");
       expect(message).not.toContain("Prochain rappel");
+    }
+  });
+
+  it("dit « reprogrammé » quand les joueurs avaient reçu un autre horaire", async () => {
+    // Date changée quand une place s'était vidée : `SEEN` est parti, `TOLD` est resté.
+    await mockDb({ sent: [{ match_id: 31, offset_key: "TOLD" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match reprogrammé**");
+      expect(message).not.toContain("au lieu du");
     }
   });
 
@@ -453,7 +464,8 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
     expect(calls[0][2]).toBe("match-scheduled");
     expect(calls[0][0]).toContain("**Horaire du match retiré**");
     expect(calls[0][0]).toContain("**Les Renards** contre **Team Nova**");
-    expect(calls[0][0]).toContain("jeudi 10 septembre à 20:00 (heure de Paris) est retiré");
+    expect(calls[0][0]).toContain("L'horaire prévu jeudi 10 septembre à 20:00 (heure de Paris) est retiré");
+    // Un avis de retrait ne pose aucune marque : `TOLD` est déjà là.
 
     const pushes = jest.mocked(pushToUsers).mock.calls;
     expect(pushes.map((call) => call[0])).toEqual([[1, 2], [3]]);
