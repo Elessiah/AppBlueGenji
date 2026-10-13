@@ -1022,7 +1022,7 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     const [currentSql, currentParams] = query.mock.calls[0] as unknown as [string, unknown[]];
     // Trois branches réunies, chacune sur son index : la clé, puis le tournoi et chaque place.
     expect(currentSql.match(/UNION/g)).toHaveLength(2);
-    expect(currentSql).not.toMatch(/OR/);
+    expect(currentSql).not.toMatch(/\bOR\b/);
     expect(currentParams).toEqual([31, 7, 101, 7, 101]);
     expect((query.mock.calls[1] as unknown as [string, unknown[]])[1]).toEqual([101, 102]);
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
