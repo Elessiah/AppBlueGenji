@@ -698,4 +698,14 @@ describe("announceDeletedMatchesToStaff", () => {
       expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
     }
   });
+
+  it("pousse quand même le retrait si les noms sont illisibles : la marque est partie avec la manche", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+    await announceDeletedMatchesToStaff([removal, { ...removal, matchId: 32 }]);
+    expect(notifyStaff).toHaveBeenCalledTimes(2);
+    expect(resolvePush(staffCall().push).title).toBe("Horaire du match retiré");
+    error.mockRestore();
+  });
 });
