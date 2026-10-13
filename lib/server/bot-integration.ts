@@ -594,22 +594,27 @@ export async function pushLeadershipAlert(
  *   changerait rien, l'annonce est abandonnée ;
  * - `channel-closed` — le bot a répondu `503` : salon #live introuvable ou
  *   fermé au bot (permission), rien n'est parti ;
- * - `discord-held` — le bot a répondu `503` pour une autre raison qu'il
- *   nomme (`reason`) : mode lent, AutoMod, panne passagère de Discord ;
- * - `uncertain` — le bot n'a pas répondu à temps : il a pu publier quand même
- *   (Discord lent). L'appelant **garde** sa réservation : une annonce perdue
- *   vaut mieux qu'un second `@everyone` à tout le serveur ;
+ * - `slowed` — le bot a répondu `503` : le mode lent de #live retient
+ *   l'annonce (`reason` `slowmode`, `slowmode-short`), rien n'est parti ;
+ * - `discord-held` — le bot a répondu `503` : Discord a refusé l'annonce
+ *   (AutoMod, autre refus) ou n'a pas répondu en lisant le salon, rien n'est
+ *   parti ;
+ * - `uncertain` — le bot n'a pas répondu à temps, ou il a répondu que Discord
+ *   a lâché pendant l'envoi (`503`, `reason` `discord-down`) : l'annonce a pu
+ *   partir. L'appelant **garde** sa réservation : une annonce perdue vaut
+ *   mieux qu'un second `@everyone` à tout le serveur ;
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
  *
- * Sur `channel-closed`, `discord-held` et `unavailable`, l'appelant rend sa
- * réservation et réessaiera.
+ * Sur `channel-closed`, `slowed`, `discord-held` et `unavailable`, l'appelant
+ * rend sa réservation et réessaiera.
  */
 export type LiveAnnouncementOutcome =
   | "posted"
   | "posted-silent"
   | "rejected"
   | "channel-closed"
+  | "slowed"
   | "discord-held"
   | "uncertain"
   | "unavailable";
@@ -617,19 +622,27 @@ export type LiveAnnouncementOutcome =
 /** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
 const CHANNEL_CLOSED_REASONS = new Set(["missing", "no-view", "no-send", "send-denied"]);
 
+/** Raisons d'un `503` du bot qui disent que le mode lent de #live retient l'annonce. */
+const SLOWED_REASONS = new Set(["slowmode", "slowmode-short"]);
+
 /**
  * Classe un `503` du bot par sa raison (`reason`). Un bot qui ne la donne pas
  * (version antérieure) est lu comme un salon fermé, comme avant.
  */
-async function classifyUnavailable(response: Response): Promise<"channel-closed" | "discord-held"> {
+async function classifyUnavailable(
+  response: Response,
+): Promise<"channel-closed" | "slowed" | "discord-held" | "uncertain"> {
+  let reason: unknown;
   try {
-    const body = (await response.json()) as { reason?: unknown } | null;
-    const reason = body?.reason;
-    if (typeof reason === "string" && !CHANNEL_CLOSED_REASONS.has(reason)) return "discord-held";
+    reason = ((await response.json()) as { reason?: unknown } | null)?.reason;
   } catch {
     // Corps illisible : lu comme un salon fermé.
   }
-  return "channel-closed";
+  if (typeof reason !== "string" || CHANNEL_CLOSED_REASONS.has(reason)) return "channel-closed";
+  if (SLOWED_REASONS.has(reason)) return "slowed";
+  // Discord a lâché pendant l'envoi : le message a pu partir.
+  if (reason === "discord-down") return "uncertain";
+  return "discord-held";
 }
 
 /** Vrai si `fetch` a échoué parce que le délai d'attente est écoulé. */

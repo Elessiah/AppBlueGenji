@@ -259,9 +259,12 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     return 0;
   }
   if (outcome === "uncertain") {
-    // Le bot a pu publier après le délai : réessayer risquerait un second
-    // `@everyone` à tout le serveur. Les réservations sont gardées.
-    console.error(`[live-announce] ${label} : bot sans réponse à temps, annonce peut-être publiée, non réessayée`);
+    // Le bot a pu publier (délai dépassé, ou Discord lâché pendant l'envoi) :
+    // réessayer risquerait un second `@everyone` à tout le serveur. Les
+    // réservations sont gardées.
+    console.error(
+      `[live-announce] ${label} : publication non confirmée (bot sans réponse à temps ou Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live`,
+    );
     return 0;
   }
   if (!(await releaseAnnouncements(group.rows, label))) return 0;
@@ -273,10 +276,15 @@ async function announce(group: AnnouncementGroup): Promise<number> {
       `channel-closed ${context}`,
       `[live-announce] ${label} : salon #live fermé au bot (introuvable ou sans permission d'écrire), ${retry}`,
     );
+  } else if (outcome === "slowed") {
+    warnOnce(
+      `slowed ${context}`,
+      `[live-announce] ${label} : le mode lent de #live retient l'annonce (le bot y a posté peu avant), ${retry}`,
+    );
   } else if (outcome === "discord-held") {
     warnOnce(
       `discord-held ${context}`,
-      `[live-announce] ${label} : Discord a retenu l'annonce (mode lent, AutoMod ou panne passagère — cause au canal de logs du bot), ${retry}`,
+      `[live-announce] ${label} : Discord a refusé l'annonce (AutoMod ou autre refus) ou n'a pas répondu au bot — cause au canal de logs du bot, ${retry}`,
     );
   } else {
     warnOnce(
