@@ -164,7 +164,10 @@ nouveau balayage l'annoncera. À retirer de la liste une fois jouées partout.
 
 ### Programmer, reprogrammer ou retirer l'horaire d'une manche
 
-`setMatchStartAt`, **quand la date change réellement**, remet les marques à
+`setMatchStartAt` verrouille le **tournoi** puis la manche (l'ordre de toute
+écriture du moteur : une correction de score qui efface les marques d'une
+manche voisine puis met celle-ci à jour ne peut plus s'interbloquer avec une
+programmation) et, **quand la date change réellement**, remet les marques à
 jour **dans la transaction** qui écrit la date (`resetReminderMarks`) : un
 balayage ne voit jamais la nouvelle date avec les marques de l'ancienne. Une
 erreur (autre qu'une table absente) défait l'écriture de la date — un refus que
@@ -189,7 +192,10 @@ les manches datées). Puis `notifyMatchScheduleChange`
 (`lib/server/tournaments/schedule-notices.ts`) prévient **sans attendre le
 balayage**, la manche lue **une fois** pour le journal, les arbitres et les
 joueurs (`announceMatchSchedule` / `announceMatchScheduleCleared` la reçoivent,
-`MatchNotice`, et ne la relisent pas) :
+`MatchNotice`, et ne la relisent pas). Les joueurs ne sont prévenus que si la
+manche relue a encore les engagées de l'écriture (`entrantIds`, sous verrou) :
+une place remplie ou une engagée remplacée entre-temps n'a pas les marques que
+l'écriture a posées, et son annonce revient au balayage :
 
 - **Joueurs** des deux engagées (équipes ou entrées solo, push dans la langue de
   chacun, message privé Discord en français) : `announceMatchSchedule` consomme
@@ -248,11 +254,18 @@ concurrentes déclenchent le même balayage, et sans ce verrou le joueur recevra
 son rappel en double.
 
 **Coût du balayage.** Sa fenêtre se lit par l'index `idx_bg_matches_start_at`
-(sans lui, chaque passage relisait toute l'histoire des matchs). Les envois
-partent quatre manches à la fois (`inBatches`, `SWEEP_CONCURRENCY`) : une ronde
-suisse appariée sur des horaires déjà posés donne autant d'annonces que de
-manches, et chacune attend le bot puis les appareils — les réservations, prises
-avant, interdisent le doublon quel que soit l'ordre. Le rappel 24 h d'un horaire
+(sans lui, chaque passage relisait toute l'histoire des matchs). Réservations
+et envois vont quatre manches à la fois (`inBatches`, `SWEEP_CONCURRENCY`), les
+deux engagées d'une manche ensemble : une ronde suisse appariée sur des
+horaires déjà posés donne autant d'annonces que de manches, et chacune attend
+le bot puis les appareils — les réservations, prises avant, interdisent le
+doublon quel que soit l'ordre. Un envoi en échec ne retient pas les autres
+(leurs réservations sont prises : un passage interrompu les perdrait), et sa
+marque `TOLD` reprend son état sauf si une engagée a été atteinte. Une
+réservation ne vaut que **pour l'horaire lu** (`INSERT … SELECT … WHERE
+start_at = ?`) : un arbitre qui déplace la manche entre la lecture du balayage
+et son envoi la fait échouer, et l'annonce du nouvel horaire garde son
+palier. Le rappel 24 h d'un horaire
 déjà reçu lit la marque `TOLD` sans la réécrire (elle tient déjà cet horaire),
 et une cascade de correction de score efface les marques des affiches quittées
 en une instruction (`detachDownstreamOutcome`).
