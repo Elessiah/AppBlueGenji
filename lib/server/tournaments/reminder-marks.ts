@@ -8,7 +8,7 @@
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { MATCH_STAFF_KEY } from "@/lib/shared/discord-notifications";
@@ -66,35 +66,65 @@ type StaffRow = RowDataPacket & { id: number; start_at: Date | string | null };
  * qu'elle tenait avant, jamais quand elle tenait déjà cet horaire (la preuve
  * d'un envoi précédent qui, lui, a atteint les arbitres).
  *
+ * Lecture et réservation dans **une** transaction, sous verrous, dans l'ordre
+ * du moteur (la manche, puis sa marque) : une réservation ou un rendu
+ * concurrents attendent, et la réservation retient la ligne et la valeur
+ * qu'elle a réellement remplacées.
+ *
  * @returns `null` : la manche ne tient plus cet horaire (changé ou retiré
  *          depuis) — rien à pousser, le geste plus récent a ses propres avis.
  */
 export async function markStaffPushed(matchId: number, startAt: string): Promise<StaffReservation | null> {
-  const time = new Date(startAt);
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<StaffRow[]>(
-      `SELECT id, start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
-      [matchId, MATCH_STAFF_KEY],
-    );
-    const before = rows[0];
-    const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)
-       SELECT id, ?, start_at FROM bg_matches WHERE id = ? AND start_at = ?
-       ON DUPLICATE KEY UPDATE start_at = ?`,
-      [MATCH_STAFF_KEY, matchId, time, time],
-    );
-    if (result.affectedRows === 0) return null;
-    if (before && before.start_at !== null && new Date(before.start_at).getTime() === time.getTime()) {
-      return { kind: "held" };
-    }
-    return { kind: "reserved", id: before ? Number(before.id) : Number(result.insertId), startAt, previous: before?.start_at ?? null };
+    return await withConnection(async (connection) => {
+      await connection.beginTransaction();
+      try {
+        const reservation = await reserveStaffMark(connection, matchId, startAt);
+        await connection.commit();
+        return reservation;
+      } catch (error) {
+        await connection.rollback().catch(() => undefined);
+        throw error;
+      }
+    });
   } catch (error) {
     // Table absente ou marque illisible : on pousse quand même (sans marque,
     // le retrait ne sera simplement pas poussé).
     if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non retenu", error);
     return { kind: "unmarked" };
   }
+}
+
+async function reserveStaffMark(
+  connection: PoolConnection,
+  matchId: number,
+  startAt: string,
+): Promise<StaffReservation | null> {
+  const time = new Date(startAt);
+  // Une table par lecture verrouillante (MariaDB).
+  const [matches] = await connection.execute<(RowDataPacket & { start_at: Date | string | null })[]>(
+    `SELECT start_at FROM bg_matches WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+    [matchId],
+  );
+  const current = matches[0]?.start_at ?? null;
+  if (current === null || new Date(current).getTime() !== time.getTime()) return null;
+  const [rows] = await connection.execute<StaffRow[]>(
+    `SELECT id, start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1 FOR UPDATE`,
+    [matchId, MATCH_STAFF_KEY],
+  );
+  const before = rows[0];
+  if (before && before.start_at !== null && new Date(before.start_at).getTime() === time.getTime()) {
+    return { kind: "held" };
+  }
+  if (before) {
+    await connection.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE id = ?`, [time, before.id]);
+    return { kind: "reserved", id: Number(before.id), startAt, previous: before.start_at };
+  }
+  const [result] = await connection.execute<ResultSetHeader>(
+    `INSERT INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)`,
+    [matchId, MATCH_STAFF_KEY, time],
+  );
+  return { kind: "reserved", id: Number(result.insertId), startAt, previous: null };
 }
 
 /**
