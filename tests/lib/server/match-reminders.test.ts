@@ -608,6 +608,8 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     const [sql] = query.mock.calls[0] as unknown as [string];
     expect(sql).toMatch(/m\.start_at > NOW\(\)/);
+    // Un tournoi clos ne se joue plus : aucun rappel pour ses manches restées ouvertes.
+    expect(sql).toMatch(/AND t\.state <> 'FINISHED'/);
     // Fenêtre de lecture = horizon + une journée de marge, pour que la manche
     // soit observée avant que le palier 24 h ne s'ouvre.
     expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);

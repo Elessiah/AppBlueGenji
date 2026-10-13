@@ -13,6 +13,7 @@ import {
   heldStartAt,
   clearedHeldStartAt,
   isAnnounceableSchedule,
+  refereesWerePushed,
   notifyMatchScheduleChange,
   playerAnnouncement,
   type MatchScheduleChange,
@@ -411,6 +412,37 @@ describe("clearedHeldStartAt", () => {
     // lancement : aucun « nouvel horaire » ne viendra.
     expect(clearedHeldStartAt(change({ ...cleared, refereeScheduling: false }), now)).toBeNull();
     expect(clearedHeldStartAt(change({ previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }), now)).toBeNull();
+  });
+});
+
+describe("refereesWerePushed", () => {
+  const now = new Date("2099-01-01T00:00:00Z");
+  const late = "2098-12-31T20:00:00.000Z";
+
+  it("tient pour poussé un horaire encore devant", () => {
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START }), now)).toBe(true);
+  });
+
+  it("tient pour poussé un horaire passé de peu que les joueurs avaient reçu (annoncé, donc devant à l'annonce)", () => {
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, toldStartAt: late }), now)).toBe(true);
+  });
+
+  it("ne tient pas pour poussée une date passée seulement journalisée (archive), ni un horaire trop ancien", () => {
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, toldStartAt: null }), now)).toBe(false);
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, toldStartAt: OLD_START }), now)).toBe(false);
+    const old = "2098-12-30T00:00:00.000Z";
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: old, toldStartAt: old }), now)).toBe(false);
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: null }), now)).toBe(false);
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: "pas une date" }), now)).toBe(false);
+  });
+});
+
+describe("tournoi clos", () => {
+  it("lit ses manches comme jouées : journal seul, ni annonce ni push", async () => {
+    const execute = mockMatch();
+    await notifyMatchScheduleChange(change());
+    const [sql] = execute.mock.calls[0] as unknown as [string];
+    expect(sql).toMatch(/IF\(t\.state = 'FINISHED', 'COMPLETED', m\.status\) AS status/);
   });
 });
 

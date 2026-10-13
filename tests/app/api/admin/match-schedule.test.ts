@@ -99,14 +99,43 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
     expect(setMatchStartAt).not.toHaveBeenCalled();
   });
 
-  it("traite un corps vide comme un effacement", async () => {
-    jest.mocked(setMatchStartAt).mockResolvedValue(null);
-    const res = await PUT(
+  it("refuse un corps vide, illisible ou sans startAt : effacer un horaire prévient les joueurs", async () => {
+    const bodies = [
       new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT" }),
-      params("42"),
-    );
-    expect(res.status).toBe(200);
-    expect(setMatchStartAt).toHaveBeenCalledWith(42, null, { id: admin.id, pseudo: admin.pseudo });
+      new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT", body: "{\"startAt\": \"2026" }),
+      req({}),
+      req({ start: null }),
+    ];
+    for (const request of bodies) {
+      const res = await PUT(request, params("42"));
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(await res.json())).toContain("INVALID_MATCH_START_AT");
+    }
+    expect(setMatchStartAt).not.toHaveBeenCalled();
+  });
+
+  it("efface l'horaire sur un null explicite, ou une chaîne vide", async () => {
+    jest.mocked(setMatchStartAt).mockResolvedValue(null);
+    for (const startAt of [null, ""]) {
+      const res = await PUT(req({ startAt }), params("42"));
+      expect(res.status).toBe(200);
+    }
+    expect(setMatchStartAt).toHaveBeenNthCalledWith(1, 42, null, { id: admin.id, pseudo: admin.pseudo });
+    expect(setMatchStartAt).toHaveBeenNthCalledWith(2, 42, "", { id: admin.id, pseudo: admin.pseudo });
+  });
+
+  it("plafonne les gestes d'un arbitre : chacun écrit à tous les joueurs du match", async () => {
+    // Un autre compte : le seau de l'arbitre des autres tests reste intact.
+    const looping = authUser({ id: 991, isAdmin: true, roles: ["ADMIN"] });
+    jest.mocked(getCurrentUser).mockResolvedValue(looping);
+    jest.mocked(setMatchStartAt).mockResolvedValue("2026-08-29T18:30:00.000Z");
+    for (let call = 0; call < 60; call += 1) {
+      expect((await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"))).status).toBe(200);
+    }
+    const res = await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"));
+    expect(res.status).toBe(429);
+    expect(JSON.stringify(await res.json())).toContain("TOO_MANY_REQUESTS");
+    expect(setMatchStartAt).toHaveBeenCalledTimes(60);
   });
 
   it("remonte 404 sur un match introuvable", async () => {
