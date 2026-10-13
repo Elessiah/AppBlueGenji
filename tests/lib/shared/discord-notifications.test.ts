@@ -164,9 +164,9 @@ describe("buildMatchScheduleAnnouncement", () => {
     });
     expect(message).toContain("**Match reprogrammé**");
     expect(message).not.toContain("**Match programmé**");
-    expect(message).toContain("Au lieu du mardi 8 septembre à 20:00");
+    expect(message).toContain("(heure de Paris), au lieu du mardi 8 septembre à 20:00");
     // Date effacée puis reposée : « reprogrammé », sans ancienne date à citer.
-    expect(buildMatchScheduleAnnouncement(context, [], { rescheduled: true })).not.toContain("Au lieu du");
+    expect(buildMatchScheduleAnnouncement(context, [], { rescheduled: true })).not.toContain("au lieu du");
   });
 
   it("ne nomme aucun joueur en tournoi individuel", () => {

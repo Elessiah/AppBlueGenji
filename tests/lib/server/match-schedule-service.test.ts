@@ -60,7 +60,7 @@ function world(
       return [[{ referee_scheduling: options.refereeScheduling ? 1 : 0 }]];
     }
     if (sql.startsWith("SELECT 1 FROM bg_match_reminders")) {
-      expect(params).toEqual([42, "SEEN"]);
+      expect(params).toEqual([42, "ANNOUNCE", "P7D", "P1D"]);
       return [options.announced ? [{ seen: 1 }] : []];
     }
     if (sql.startsWith("DELETE FROM bg_match_reminders") && options.failReminders) {

@@ -263,7 +263,7 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
 
     // La marque d'observation d'abord — c'est elle qui fait verrou —, puis le
     // seul palier déjà ouvert. Les deux autres restent devant.
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D"]);
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D", "ANNOUNCE"]);
   });
 
   it("consomme tous les paliers pour une date posée à moins d'une heure", async () => {
@@ -271,7 +271,7 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
 
     expect(await dispatchDueMatchReminders(new Date("2026-09-10T17:30:00Z"))).toBe(2);
 
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D", "P1D"]);
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D", "P1D", "ANNOUNCE"]);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match programmé**");
       expect(message).not.toContain("Prochain rappel");
@@ -323,8 +323,8 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(sql).toMatch(/m\.id = \?/);
     expect(sql).not.toMatch(/DATE_ADD/);
     expect(params).toEqual([31]);
-    // Seule la marque d'observation : les deux rappels restent devant.
-    expect(claimedKeys(execute)).toEqual(["SEEN"]);
+    // La marque d'observation et celle de l'annonce partie : les deux rappels restent devant.
+    expect(claimedKeys(execute)).toEqual(["SEEN", "ANNOUNCE"]);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match programmé**");
       expect(message).toContain("Prochain rappel : une semaine");
@@ -339,11 +339,11 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
       await announceMatchSchedule(31, { rescheduled: true, previousStartAt: "2026-09-08T18:00:00Z" }, THREE_DAYS_BEFORE),
     ).toBe(2);
 
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D"]);
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P7D", "ANNOUNCE"]);
     expect(sentMessages()).toHaveLength(2);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match reprogrammé**");
-      expect(message).toContain("Au lieu du mardi 8 septembre à 20:00");
+      expect(message).toContain("(heure de Paris), au lieu du mardi 8 septembre à 20:00");
     }
     const pushes = jest.mocked(pushToUsers).mock.calls;
     expect(pushes.map((call) => call[0])).toEqual([[1, 2], [3]]);

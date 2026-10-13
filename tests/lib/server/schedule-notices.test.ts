@@ -33,7 +33,7 @@ const ROW = {
 };
 
 function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChange {
-  return { matchId: 42, startAt: NEW_START, previousStartAt: null, actor: ACTOR, ...overrides };
+  return { matchId: 42, startAt: NEW_START, previousStartAt: null, alreadyAnnounced: false, actor: ACTOR, ...overrides };
 }
 
 function mockMatch(row: object | null = ROW) {
@@ -114,7 +114,7 @@ describe("notifyMatchScheduleChange — date changée", () => {
   it("dit « reprogrammé » partout et rappelle l'ancien horaire au journal", async () => {
     mockMatch();
 
-    await notifyMatchScheduleChange(change({ previousStartAt: OLD_START }));
+    await notifyMatchScheduleChange(change({ previousStartAt: OLD_START, alreadyAnnounced: true }));
 
     expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: true, previousStartAt: OLD_START });
     expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
@@ -122,6 +122,18 @@ describe("notifyMatchScheduleChange — date changée", () => {
     expect(resolvePush(staffCall().push, "en").title).toBe("Match rescheduled");
     expect(resolvePush(staffCall().push, "en").body).toContain(", instead of ");
     expect(logLine()).toContain("🗓️ Match reprogrammé");
+    expect(logLine()).toContain("au lieu du");
+  });
+
+  it("ne cite pas aux joueurs une date qu'ils n'ont jamais reçue, mais la rappelle aux arbitres", async () => {
+    mockMatch();
+
+    // Date posée quand une place était encore vide : aucune annonce n'est partie.
+    await notifyMatchScheduleChange(change({ previousStartAt: OLD_START, alreadyAnnounced: false }));
+
+    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: false, previousStartAt: null });
+    expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
+    expect(resolvePush(staffCall().push).body).toContain(", au lieu du ");
     expect(logLine()).toContain("au lieu du");
   });
 
