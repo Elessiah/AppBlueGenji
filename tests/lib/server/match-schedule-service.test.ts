@@ -405,6 +405,17 @@ describe("setMatchStartAt", () => {
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
+  it("ne pose pas d'observation sur un match au score saisi : s'il revient à jouer, le balayage l'annoncera", async () => {
+    for (const status of ["AWAITING_CONFIRMATION", "COMPLETED"] as const) {
+      const { writes } = world({ row: matchRow({ status, start_at: new Date("2099-08-28T18:30:00Z") }) });
+      await setMatchStartAt(42, FUTURE);
+      expect(writes.some((w) => w.sql.startsWith("INSERT INTO bg_match_reminders"))).toBe(false);
+      const cleanup = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
+      expect(cleanup?.sql).toContain("offset_key <> ?");
+      expect(cleanup?.params).toEqual([42, "TOLD"]);
+    }
+  });
+
   it("programme un match déjà joué — la date ne verrouille rien", async () => {
     world({ row: matchRow({ status: "COMPLETED" }) });
     await expect(setMatchStartAt(42, "2020-06-01T12:00:00Z")).resolves.toBe(

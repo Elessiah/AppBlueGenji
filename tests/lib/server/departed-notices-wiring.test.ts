@@ -50,6 +50,9 @@ describe("pushTeamToTarget — engagée remplacée", () => {
 
     expect(noteDepartedEntrants).toHaveBeenCalledWith(connection, [{ matchId: 2, teamId: 7, slot: 1 }]);
     expect(order).toEqual(["note", "forget"]);
+    // La place se lit sous verrou : le remplacement se décide sur l'état actuel.
+    const [sql] = jest.mocked(connection.execute).mock.calls[0] as unknown as [string];
+    expect(sql).toMatch(/FOR UPDATE$/);
   });
 
   it("ne note rien quand la place était vide, ou garde la même engagée", async () => {

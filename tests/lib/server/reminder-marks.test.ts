@@ -1,6 +1,47 @@
-import { describe, expect, it } from "@jest/globals";
-import { forgetMatchReminders } from "@/lib/server/tournaments/reminder-marks";
-import { connectionMock, fakeConnection } from "../../helpers/sql-double";
+import { describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("@/lib/server/database");
+
+import { getDatabase } from "@/lib/server/database";
+import { forgetMatchReminders, releaseDatedMarks } from "@/lib/server/tournaments/reminder-marks";
+import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
+
+describe("releaseDatedMarks", () => {
+  it("ne rend que les marques prises pour cet horaire", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 2 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const start = new Date("2099-01-01T18:00:00Z");
+
+    await releaseDatedMarks(31, ["SEEN", "P1D"], start);
+
+    const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toMatch(/WHERE match_id = \? AND offset_key IN \(\?, \?\) AND start_at <=> \?$/);
+    expect(params).toEqual([31, "SEEN", "P1D", start]);
+  });
+
+  it("ne lit rien sans marque à rendre", async () => {
+    const execute = jest.fn<SqlQuery>();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await releaseDatedMarks(31, [], new Date());
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("ne lève jamais, mais dit l'échec dans pm2 (sauf table absente)", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const failing = jest.fn<SqlQuery>().mockRejectedValue(new Error("Lock wait timeout exceeded"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: failing }));
+    await expect(releaseDatedMarks(31, ["SEEN"], new Date())).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledTimes(1);
+
+    const missing = jest
+      .fn<SqlQuery>()
+      .mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: missing }));
+    await releaseDatedMarks(31, ["SEEN"], new Date());
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+});
 
 describe("forgetMatchReminders", () => {
   it("efface les marques des manches données, par lots", async () => {

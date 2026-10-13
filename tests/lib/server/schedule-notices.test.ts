@@ -459,6 +459,18 @@ describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
     expect(params).toEqual([42, "SEEN", new Date(NEW_START)]);
     error.mockRestore();
   });
+
+  it("ne rend pas l'observation d'une date rendue à l'horaire que les joueurs tiennent", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    // `setMatchStartAt` a gardé les marques telles quelles : rien à rendre.
+    await notifyMatchScheduleChange(change({ alreadyAnnounced: true, toldStartAt: NEW_START }));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
 });
 
 describe("notifyMatchScheduleChange — engagées changées après l'écriture", () => {
