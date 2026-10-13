@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments/match-reminders");
+jest.mock("@/lib/server/tournaments/schedule-notices");
 
 import {
   departuresBetween,
@@ -13,6 +14,7 @@ import {
   withoutSettledLater,
 } from "@/lib/server/tournaments/departed-notices";
 import { announceEntrantsWithdrawn } from "@/lib/server/tournaments/match-reminders";
+import { announceDeletedMatchesToStaff } from "@/lib/server/tournaments/schedule-notices";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 const AHEAD = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
@@ -52,16 +54,23 @@ const MATCH_31 = {
  */
 function connectionHolding(
   held: Record<number, Date | string | null>,
-  options: { doomed?: object[]; contexts?: Record<number, Record<string, unknown>> } = {},
+  options: {
+    doomed?: object[];
+    contexts?: Record<number, Record<string, unknown>>;
+    /** Horaires poussés aux arbitres (marque `STAFF`), par manche. */
+    staff?: Record<number, Date | string>;
+  } = {},
 ) {
   const mock = connectionMock();
   mock.execute.mockImplementation(async (sql: string, params?: unknown) => {
     if (sql.startsWith("SELECT match_id, start_at")) {
-      return [Object.entries(held).map(([matchId, startAt]) => ({ match_id: Number(matchId), start_at: startAt }))];
+      const values = params as unknown[];
+      const source = values[values.length - 1] === "STAFF" ? (options.staff ?? {}) : held;
+      return [Object.entries(source).map(([matchId, startAt]) => ({ match_id: Number(matchId), start_at: startAt }))];
     }
     if (sql.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) return [options.doomed ?? []];
     if (sql.startsWith("SELECT m.id, m.tournament_id")) {
-      const ids = (params as number[]).filter((id) => held[id] !== undefined);
+      const ids = (params as number[]).filter((id) => held[id] !== undefined || options.staff?.[id] !== undefined);
       return [ids.map((id) => contextRow(id, options.contexts?.[id]))];
     }
     return [[]];
@@ -76,6 +85,7 @@ function sqlOf(mock: ReturnType<typeof connectionMock>, index: number): [string,
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(announceEntrantsWithdrawn).mockResolvedValue(1);
+  jest.mocked(announceDeletedMatchesToStaff).mockResolvedValue(undefined);
 });
 
 describe("noteDepartedEntrants puis flushDepartedNotices", () => {
@@ -269,9 +279,10 @@ describe("noteDeletedMatches", () => {
     expect(mock.execute).toHaveBeenCalledTimes(1);
 
     const unheld = connectionHolding({}, { doomed: [{ id: 31, team1_id: 101, team2_id: 102 }] });
+    await noteDepartedEntrants(unheld.connection, []);
     await noteDeletedMatches(unheld.connection, "tournament_id = ?", [7]);
-    // Les marques, mais pas le contexte : aucun horaire tenu.
-    expect(unheld.mock.execute).toHaveBeenCalledTimes(2);
+    // Les marques des joueurs et des arbitres, mais pas le contexte : aucun horaire tenu.
+    expect(unheld.mock.execute).toHaveBeenCalledTimes(3);
 
     // Table des marques absente : rien n'a jamais été reçu.
     const missing = connectionMock();
@@ -385,8 +396,12 @@ describe("lecture des marques par paquets", () => {
     const doomed = Array.from({ length: 1200 }, (_, index) => ({ id: index + 1, team1_id: 10_000 + index, team2_id: null }));
     const { mock, connection } = connectionHolding({}, { doomed });
     await noteDeletedMatches(connection, "tournament_id = ?", [7]);
-    const reads = mock.execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT match_id"));
-    expect(reads.map(([, params]) => (params as unknown[]).length)).toEqual([501, 501, 201]);
+    for (const key of ["TOLD", "STAFF"]) {
+      const reads = mock.execute.mock.calls.filter(
+        ([sql, params]) => String(sql).startsWith("SELECT match_id") && (params as unknown[]).at(-1) === key,
+      );
+      expect(reads.map(([, params]) => (params as unknown[]).length)).toEqual([501, 501, 201]);
+    }
   });
 });
 
@@ -396,7 +411,37 @@ describe("noteDeletedMatches et retour en arrière", () => {
     await holdDepartures(connection, [31]);
     mock.execute.mockClear();
     await noteDeletedMatches(connection, "id IN (?)", [31]);
-    // La lecture des places, rien de plus.
-    expect(mock.execute).toHaveBeenCalledTimes(1);
+    // Les places et la marque des arbitres ; pas celle des joueurs, déjà relevée.
+    expect(mock.execute.mock.calls.some(([, params]) => (params as unknown[]).at(-1) === "TOLD")).toBe(false);
+  });
+});
+
+describe("manche supprimée dont l'horaire avait été poussé aux arbitres", () => {
+  it("leur pousse le retrait après le commit, avec la manche relevée avant la suppression", async () => {
+    const { connection } = connectionHolding(
+      {},
+      { doomed: [{ id: 31, team1_id: 101, team2_id: 102 }], staff: { 31: AHEAD } },
+    );
+    await noteDeletedMatches(connection, "tournament_id = ? AND round_number = ?", [7, 3]);
+    expect(announceDeletedMatchesToStaff).not.toHaveBeenCalled();
+    flushDepartedNotices(connection);
+    expect(announceDeletedMatchesToStaff).toHaveBeenCalledWith([
+      { matchId: 31, startAt: AHEAD, match: MATCH_31, team1Id: 101, team2Id: 102 },
+    ]);
+  });
+
+  it("ne pousse rien pour un horaire trop ancien, ni si la transaction échoue", async () => {
+    const old = connectionHolding(
+      {},
+      { doomed: [{ id: 31, team1_id: 101, team2_id: 102 }], staff: { 31: new Date(Date.now() - 13 * 60 * 60 * 1000) } },
+    );
+    await noteDeletedMatches(old.connection, "tournament_id = ?", [7]);
+    flushDepartedNotices(old.connection);
+
+    const failed = connectionHolding({}, { doomed: [{ id: 31, team1_id: 101, team2_id: 102 }], staff: { 31: AHEAD } });
+    await noteDeletedMatches(failed.connection, "tournament_id = ?", [7]);
+    discardDepartedNotices(failed.connection);
+    flushDepartedNotices(failed.connection);
+    expect(announceDeletedMatchesToStaff).not.toHaveBeenCalled();
   });
 });

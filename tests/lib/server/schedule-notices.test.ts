@@ -21,6 +21,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
 import {
   heldStartAt,
+  announceDeletedMatchesToStaff,
   clearedHeldStartAt,
   isAnnounceableSchedule,
   refereesWerePushed,
@@ -648,5 +649,53 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
     ).resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+});
+
+describe("announceDeletedMatchesToStaff", () => {
+  const removal = {
+    matchId: 31,
+    startAt: OLD_START,
+    match: {
+      tournamentId: 7,
+      tournamentName: "Coupe BlueGenji",
+      phaseId: 0,
+      solo: false,
+      refereeScheduling: true,
+      bracket: "UPPER",
+      roundNumber: 3,
+      swiss: true,
+    },
+    team1Id: 101,
+    team2Id: 102,
+  };
+
+  it("pousse « Horaire du match retiré » aux arbitres, personne exclu, sous l'étiquette de l'annonce", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { id: 101, name: "Les Renards" },
+        { id: 102, name: "Team Nova" },
+      ],
+    ]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+    await announceDeletedMatchesToStaff([removal]);
+    expect(staffCall().topic).toBe("MATCH_SCHEDULED");
+    expect(staffCall().excludeUserIds).toEqual([]);
+    const push = resolvePush(staffCall().push);
+    expect(push.title).toBe("Horaire du match retiré");
+    expect(push.body).toContain("Les Renards contre Team Nova");
+    expect(push.body).toContain("Ronde 3");
+    expect(push.tag).toBe("rencontre-31-schedule");
+    expect(resolvePush(staffCall().push, "en").title).toBe("Match time removed");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 101, name: "Kiro" }, { id: 102, name: "Nova" }]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+    await announceDeletedMatchesToStaff([{ ...removal, match: { ...removal.match, solo: true } }]);
+    for (const locale of ["fr", "en"] as const) {
+      const { title, body } = resolvePush(staffCall().push, locale);
+      expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
+    }
   });
 });
