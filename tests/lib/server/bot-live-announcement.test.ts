@@ -96,6 +96,18 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
+  it("un autre 503 du bot (configuration) n'accuse pas le salon #live", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(Response.json({ error: "INTERNAL_API_TOKEN_NOT_CONFIGURED" }, { status: 503 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("panne", { status: 503 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
+    // Un bot antérieur, sans raison : salon fermé, comme avant.
+    jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE" }, { status: 503 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("channel-closed");
+  });
+
   it("rend « channel-closed » pour une raison de salon ou de permission", async () => {
     for (const reason of ["missing", "no-view", "no-send", "send-denied"]) {
       jest
