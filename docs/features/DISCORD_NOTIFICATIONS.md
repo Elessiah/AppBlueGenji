@@ -87,7 +87,7 @@ remplacé par une **annonce unique** portant la date
 | à J-10 ou J-3 | annonce tout de suite (« Match programmé » + « Coup d'envoi : … »), puis P1D |
 | changée | « Match reprogrammé » + « Nouveau coup d'envoi : …, au lieu du … », s'il avait reçu l'ancienne |
 | à H-5 | annonce, et rien après |
-| retirée | « Horaire du match retiré », s'il l'avait reçue, qu'elle était encore devant et que le tournoi est planifié par l'arbitrage |
+| retirée | « Horaire du match retiré », s'il l'avait reçue, qu'elle était encore devant (ou passée depuis moins de 12 h) et que le tournoi est planifié par l'arbitrage |
 | posée quand une place était vide | rien tant qu'elle l'est ; annonce par le balayage dès que les deux engagées sont connues, au plus tard 48 h avant (une journée avant le rappel) |
 
 Le partage entre les deux régimes tient à la **marque d'observation** `SEEN` :
@@ -127,7 +127,10 @@ le retire — jamais une date intermédiaire seulement journalisée (date passé
 saisie de travers). Une marque héritée de l'ancien code n'en a pas (`NULL`) :
 on retombe alors sur la date d'avant. L'horaire tenu vaut tant qu'il est devant
 ou passé depuis moins de 12 h (un match en retard qu'on décale ou dont on
-retire l'horaire).
+retire l'horaire). Un avis de retrait parti l'oublie (`start_at` remis à
+`NULL`) : la date suivante se dit « reprogrammée », sans rien citer. Une date
+rendue à l'horaire que les joueurs tiennent déjà (après une saisie de travers
+seulement journalisée) ne leur est pas réannoncée.
 
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
 rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
@@ -205,7 +208,7 @@ balayage** :
 - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la permission
   `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`),
 
-  pour une date posée ou changée ; pour un retrait d'un horaire encore devant, « Horaire du match retiré » (corps arbitre sans « te sera annoncé », même étiquette `-schedule`, qui remplace leur avis « programmé »). « Reprogrammé » dès
+  pour une date posée ou changée ; pour un retrait d'un horaire encore devant (ou passé depuis moins de 12 h), « Horaire du match retiré » (corps arbitre sans « te sera annoncé », même étiquette `-schedule`, qui remplace leur avis « programmé »). « Reprogrammé » dès
   qu'une date précédait (ils la voyaient sur le plateau). Étiquette
   distincte de l'annonce aux joueurs (`rencontre-<id>-schedule`) : un arbitre
   qui joue ce match reçoit les deux versions — un doublon plutôt que sa
