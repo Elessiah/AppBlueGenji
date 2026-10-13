@@ -7,7 +7,10 @@ import {
   DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
+  MATCH_TIME_DM_SCOPE,
 } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 
 describe("clés de rendu de /rgpd", () => {
   // La page s'en sert comme `key` React : un doublon ferait confondre deux lignes.
@@ -275,5 +278,31 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/It also keeps a language, French or English \(French by default\)/);
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/your push notifications to you \(Discord messages stay in\s+French\)/);
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
+  });
+});
+
+describe("messages privés d'horaire et de rappel de match — base légale (revue juridique #441)", () => {
+  it("l'identifiant et le pseudo Discord portent l'intérêt légitime pour ces messages, comme le registre T04", () => {
+    for (const donnee of ["Pseudo Discord", "ID Discord"]) {
+      const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
+      expect(entry?.base).toBe("Exécution du contrat");
+      expect(entry?.extraBases).toEqual([{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }]);
+    }
+    const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04");
+    expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, les rappels de match/);
+  });
+
+  it("le droit d'opposition les nomme, en français et en anglais", () => {
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toContain(MATCH_TIME_DM_SCOPE);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(
+      "match time notices and reminders by direct message",
+    );
+  });
+
+  it("la portée est traduite en anglais", () => {
+    const entry = DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID");
+    expect(entry?.extraBases).toEqual([
+      { base: "Intérêt légitime", scope: "match time notices and reminders by direct message" },
+    ]);
   });
 });
