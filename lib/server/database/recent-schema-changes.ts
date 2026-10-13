@@ -206,7 +206,7 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // lui que cite « au lieu du … » et que retire « Horaire du match retiré ».
     `ALTER TABLE bg_match_reminders ADD COLUMN start_at DATETIME NULL AFTER sent_at`,
     // PR #441 — le balayage des rappels lit les manches par leur horaire (dans
-    // les 8 jours) à chaque lecture de `/tournois`, une fois par minute au plus :
+    // les 48 heures) à chaque lecture de `/tournois`, une fois par minute au plus :
     // sans index, toute l'histoire des matchs était relue à chaque passage.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_start_at (start_at)`,
     // PR #441 — marque `TOLD` (un horaire reçu, `lib/shared/discord-notifications.ts`).
@@ -215,10 +215,14 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     //    il prouve un horaire reçu. `P7D` et `PT1H` n'existent plus — le nouveau
     //    code ne les écrit jamais. `P1D` n'est pas lu : le nouveau code le
     //    réserve avant l'envoi, et l'ancien ne le posait jamais sans `P7D`
-    //    (consommé avec lui, ou envoyé avant lui).
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
-       SELECT DISTINCT match_id, 'TOLD' FROM bg_match_reminders
-        WHERE offset_key IN ('P7D', 'PT1H')`,
+    //    (consommé avec lui, ou envoyé avant lui). L'horaire reçu est celui de
+    //    la manche : l'ancien code effaçait ses paliers à chaque changement de
+    //    date. Une marque sans horaire ne signifie ainsi qu'une chose — un
+    //    retrait remis aux joueurs, qui ne tiennent plus d'horaire.
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
+       SELECT DISTINCT r.match_id, 'TOLD', m.start_at FROM bg_match_reminders r
+         JOIN bg_matches m ON m.id = r.match_id
+        WHERE r.offset_key IN ('P7D', 'PT1H')`,
     // 2. Une marque d'observation seule, posée en silence par l'ancien balayage
     //    (sept à huit jours avant, dans l'attente du palier « une semaine »
     //    retiré) : sans elle, la manche sera annoncée par le nouveau balayage.

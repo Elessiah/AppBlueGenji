@@ -5,8 +5,9 @@
  *
  * - **Joueurs** des deux engagées : message privé Discord et push
  *   `MATCH_REMINDER` (« Match programmé » / « Match reprogrammé »), par
- *   `announceMatchSchedule` — qui réserve la marque d'observation et évite le
- *   doublon avec le balayage des rappels.
+ *   `announceMatchSchedule`. La marque d'observation, qui évite le doublon
+ *   avec le balayage des rappels, est posée par `setMatchStartAt` dans la
+ *   transaction de la date.
  * - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la
  *   permission `tournaments`, **sauf l'auteur** du geste.
  * - **Journal** : une ligne au canal de logs, auteur anonymisé (« le staff »)
@@ -50,8 +51,9 @@ export type MatchScheduleChange = {
    */
   alreadyAnnounced: boolean;
   /**
-   * L'horaire que les joueurs ont reçu en dernier (`null` : inconnu — marque
-   * héritée de l'ancien code des rappels ; on retombe alors sur la date d'avant).
+   * L'horaire que les joueurs ont reçu en dernier (`null` : aucun — un retrait
+   * leur a été remis depuis ; les marques héritées de l'ancien code portent
+   * l'horaire de la manche, recopié au démarrage).
    */
   toldStartAt: string | null;
   /**
@@ -76,13 +78,14 @@ export type MatchScheduleChange = {
 const RECENT_PREVIOUS_MS = 12 * 60 * 60 * 1000;
 
 /**
- * L'horaire que les joueurs tiennent : le dernier reçu (`toldStartAt`), sinon la
- * date d'avant — et seulement s'il vaut encore, devant ou passé de peu (un
- * match en retard). Un horaire passé depuis longtemps ne se cite ni ne se retire.
+ * L'horaire que les joueurs tiennent : le dernier reçu (`toldStartAt`) — et
+ * seulement s'il vaut encore, devant ou passé de peu (un match en retard). Un
+ * horaire passé depuis longtemps ne se cite ni ne se retire ; après un retrait
+ * remis (`null`), ils n'en tiennent aucun : rien à citer, rien à retirer.
  */
 export function heldStartAt(change: MatchScheduleChange, now: Date = new Date()): string | null {
   if (!change.alreadyAnnounced) return null;
-  const held = change.toldStartAt ?? change.previousStartAt;
+  const held = change.toldStartAt;
   if (held === null || held === change.startAt) return null;
   const time = new Date(held).getTime();
   return time > now.getTime() - RECENT_PREVIOUS_MS ? held : null;

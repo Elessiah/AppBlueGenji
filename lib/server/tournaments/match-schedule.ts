@@ -28,7 +28,6 @@ import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import { publishMatchUpdatedEvent } from "./notifications";
-import { lockTournamentRow } from "./registration";
 import { notifyMatchScheduleChange } from "./schedule-notices";
 
 type MatchScheduleRow = RowDataPacket & {
@@ -87,6 +86,17 @@ function scheduleUpdateSql(leaving: boolean, scoreNoted: boolean): string {
 }
 
 /**
+ * La colonne `DATETIME` (sans fractions) **arrondit** les millisecondes : on les
+ * retire avant l'écriture, pour que l'horaire rendu, annoncé et comparé ensuite
+ * (`schedule-notices`) soit exactement celui que la base garde.
+ */
+function toWholeSeconds(iso: string | null): string | null {
+  if (iso === null) return null;
+  const time = Date.parse(iso);
+  return new Date(time - (time % 1000 + 1000) % 1000).toISOString();
+}
+
+/**
  * Le tournoi d'une manche, lu **hors transaction** : il ne change jamais, et
  * une lecture ordinaire dans la transaction, avant ses verrous, y figerait un
  * état périmé (`REPEATABLE READ`).
@@ -99,29 +109,31 @@ async function matchTournamentId(connection: PoolConnection, matchId: number): P
   return rows[0] ? Number(rows[0].tournament_id) : null;
 }
 
-async function lockScheduleRow(
-  connection: PoolConnection,
-  matchId: number,
-): Promise<{ row: MatchScheduleRow; refereeScheduling: boolean } | null> {
-  // Table seule sous verrou (MariaDB : pas de `FOR UPDATE OF`), puis l'option
-  // du tournoi. Le verrou tient la ligne contre un « Prêt » concurrent, que la
-  // remise à zéro effacerait sinon après coup.
+/**
+ * Verrouille le tournoi (comme `lockTournamentRow`) et en lit, dans la même
+ * lecture verrouillante, l'option de planification par l'arbitrage. Aucune
+ * lecture ordinaire avant les verrous : la première de la transaction, celle
+ * de la marque `TOLD` (`resetReminderMarks`), voit l'état le plus récent.
+ */
+async function lockScheduleTournament(connection: PoolConnection, tournamentId: number): Promise<boolean> {
+  const [rows] = await connection.execute<(RowDataPacket & { referee_scheduling: number | null })[]>(
+    `SELECT referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
+    [tournamentId],
+  );
+  return Number(rows[0]?.referee_scheduling ?? 0) === 1;
+}
+
+async function lockScheduleRow(connection: PoolConnection, matchId: number): Promise<MatchScheduleRow | null> {
+  // Table seule sous verrou (MariaDB : pas de `FOR UPDATE OF`). Le verrou tient
+  // la ligne contre un « Prêt » concurrent, que la remise à zéro effacerait
+  // sinon après coup.
   const [rows] = await connection.execute<MatchScheduleRow[]>(
     `SELECT id, tournament_id, status, team1_id, team2_id, start_at, launched_at, launch_pairing,
             team1_score, team2_score
      FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
     [matchId],
   );
-  const row = rows[0];
-  if (!row) return null;
-  // Lecture verrouillante d'une ligne déjà tenue (`lockTournamentRow`) : rien
-  // de plus à attendre, et aucune image figée de la base — la première lecture
-  // ordinaire de la transaction, celle de la marque `TOLD`
-  // (`resetReminderMarks`), voit ainsi l'état le plus récent.
-  const [tournament] = await connection.execute<
-    (RowDataPacket & { referee_scheduling: number | null })[]
-  >(`SELECT referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`, [row.tournament_id]);
-  return { row, refereeScheduling: Number(tournament[0]?.referee_scheduling ?? 0) === 1 };
+  return rows[0] ?? null;
 }
 
 /**
@@ -232,7 +244,7 @@ export async function setMatchStartAt(
 ): Promise<string | null> {
   const blank =
     rawStartAt === null || (typeof rawStartAt === "string" && rawStartAt.trim() === "");
-  const startAt = blank ? null : normalizeMatchStartAt(rawStartAt);
+  const startAt = blank ? null : toWholeSeconds(normalizeMatchStartAt(rawStartAt));
   if (!blank && startAt === null) throw new Error("INVALID_MATCH_START_AT");
 
   const outcome = await withConnection(async (connection) => {
@@ -253,10 +265,9 @@ export async function setMatchStartAt(
       // les marques de rappel d'une manche voisine (verrou d'intervalle) puis
       // met à jour celle-ci, et cette programmation qui tient la manche puis
       // pose sa marque, s'attendraient l'une l'autre — un interblocage.
-      await lockTournamentRow(connection, tournamentId);
-      const locked = await lockScheduleRow(connection, matchId);
-      if (!locked) throw new Error("MATCH_NOT_FOUND");
-      const { row, refereeScheduling } = locked;
+      const refereeScheduling = await lockScheduleTournament(connection, tournamentId);
+      const row = await lockScheduleRow(connection, matchId);
+      if (!row) throw new Error("MATCH_NOT_FOUND");
 
       // `DATETIME` n'a pas de fuseau : on écrit une `Date`, que le pilote
       // convertit dans le fuseau de la connexion — exactement comme les autres

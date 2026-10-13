@@ -117,6 +117,9 @@ type SentReminderRow = RowDataPacket & {
  */
 const SWEEP_THROTTLE_MS = 60_000;
 
+/** Le palier le plus proche du coup d'envoi : pris, le cycle de rappels est fini. */
+const LAST_REMINDER_KEY = [...MATCH_REMINDER_OFFSETS].sort((a, b) => a.minutesBefore - b.minutesBefore)[0].key;
+
 /** Manches envoyées en même temps par un balayage. */
 const SWEEP_CONCURRENCY = 4;
 
@@ -203,7 +206,14 @@ async function claimReminder(match: ScheduledMatch, offsetKey: string): Promise<
  * l'envoi — un arbitre qui corrige sa saisie dans la seconde lit déjà le nouvel
  * horaire —, puis rendue à son état d'avant si rien n'a abouti.
  */
-type ToldMark = { matchId: number; claimed: boolean; previous: Date | null; unchanged: boolean };
+type ToldMark = {
+  matchId: number;
+  claimed: boolean;
+  previous: Date | null;
+  unchanged: boolean;
+  /** L'horaire que cet envoi a écrit : la marque n'est rendue que si elle le porte encore. */
+  sent: Date | null;
+};
 
 type ToldStateRow = RowDataPacket & {
   match_start_at: MaybeInstant;
@@ -218,7 +228,13 @@ function sameInstant(a: MaybeInstant, b: MaybeInstant): boolean {
 }
 
 /** Rien à poser, rien à rendre : la marque reste telle quelle. */
-const UNTOUCHED = (matchId: number): ToldMark => ({ matchId, claimed: false, previous: null, unchanged: true });
+const UNTOUCHED = (matchId: number): ToldMark => ({
+  matchId,
+  claimed: false,
+  previous: null,
+  unchanged: true,
+  sent: null,
+});
 
 /**
  * Pose la marque avec l'horaire envoyé (`null` pour un avis de retrait : les
@@ -257,21 +273,37 @@ async function openToldMark(
     // Perdue au profit d'un envoi concurrent : celui-ci n'a rien écrit, il n'a
     // rien à rendre — sans quoi il effacerait l'horaire que l'autre a remis.
     if (!(await claimToldMark(matchId, sentStart))) return UNTOUCHED(matchId);
-    return { matchId, claimed: true, previous: null, unchanged: false };
+    return { matchId, claimed: true, previous: null, unchanged: false, sent: sentStart };
   }
   const previous = state.start_at === null ? null : new Date(state.start_at);
   // Le rappel 24 h d'un horaire déjà reçu : la marque tient déjà cet horaire,
   // rien à écrire — ni à rendre si rien n'aboutit.
   if (sameInstant(previous, sentStart)) return UNTOUCHED(matchId);
   await setToldTime(matchId, sentStart);
-  return { matchId, claimed: false, previous, unchanged: false };
+  return { matchId, claimed: false, previous, unchanged: false, sent: sentStart };
 }
 
-/** Referme la marque après l'envoi : rien n'a abouti, elle reprend son état d'avant. */
+/**
+ * Referme la marque après l'envoi : rien n'a abouti, elle reprend son état
+ * d'avant — **seulement si elle porte encore l'horaire de cet envoi**. Un
+ * changement plus récent, entre-temps remis aux joueurs, y a écrit le sien :
+ * le rendre l'effacerait (et le retrait suivant se tairait, ou citerait un
+ * horaire faux).
+ */
 async function closeToldMark(told: ToldMark | null, delivered: boolean): Promise<void> {
   if (!told || delivered || told.unchanged) return;
-  if (told.claimed) await releaseReminder(told.matchId, MATCH_TOLD_KEY);
-  else await setToldTime(told.matchId, told.previous);
+  const db = await getDatabase();
+  if (told.claimed) {
+    await db.execute(
+      `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`,
+      [told.matchId, MATCH_TOLD_KEY, told.sent],
+    );
+  } else {
+    await db.execute(
+      `UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`,
+      [told.previous, told.matchId, MATCH_TOLD_KEY, told.sent],
+    );
+  }
 }
 
 /** L'horaire que les joueurs tiennent (`null` : aucun, après un retrait). */
@@ -354,7 +386,14 @@ async function planMatchSends(
     // (`setMatchStartAt` pose la marque quand il annonce) — on l'annonce, quelle
     // que soit l'échéance.
     const opened = openedMatchReminders(match.start_at, now);
-    for (const offset of opened) await claimReminder(match, offset.key);
+    try {
+      for (const offset of opened) await claimReminder(match, offset.key);
+    } catch (error) {
+      // Rendue, l'observation laisse l'annonce au passage suivant ; gardée,
+      // elle la ferait taire pour de bon (seul le rappel 24 h partirait).
+      await releaseReminder(Number(match.id), MATCH_SEEN_KEY).catch(() => undefined);
+      throw error;
+    }
     const openedKeys = new Set(opened.map((offset) => offset.key));
     const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
     // Les joueurs avaient déjà reçu un horaire (manche programmée avant la
@@ -583,10 +622,14 @@ async function runSweep(now: Date): Promise<number> {
   // La borne haute vient du module partagé et vaut l'horizon **plus une marge** :
   // une manche découverte ici est annoncée une journée avant que son rappel ne
   // s'ouvre, plutôt qu'à sa place.
+  // Une manche dont le dernier palier est déjà pris n'a plus rien à recevoir
+  // de ce cycle : elle n'est plus relue à chaque passage (clé unique).
   const [matches] = await db.query<ScheduledMatchRow[]>(
     `${SCHEDULED_MATCH_SELECT}
-        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)`,
-    [Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000)],
+        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
+        AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
+                         WHERE done.match_id = m.id AND done.offset_key = ?)`,
+    [Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000), LAST_REMINDER_KEY],
   );
   if (matches.length === 0) return 0;
 
