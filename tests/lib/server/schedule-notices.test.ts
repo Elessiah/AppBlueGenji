@@ -10,11 +10,12 @@ jest.mock("@/lib/server/tournaments/reminder-marks", () => ({
     "@/lib/server/tournaments/reminder-marks",
   ),
   markStaffPushed: jest.fn(),
+  releaseStaffPush: jest.fn(),
   forgetStaffPush: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { forgetStaffPush, markStaffPushed } from "@/lib/server/tournaments/reminder-marks";
+import { forgetStaffPush, markStaffPushed, releaseStaffPush } from "@/lib/server/tournaments/reminder-marks";
 import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
@@ -447,15 +448,19 @@ describe("refereesWerePushed", () => {
 });
 
 describe("marque STAFF", () => {
-  it("retient l'horaire poussé aux arbitres, seulement s'il a atteint un appareil", async () => {
+  it("réserve l'horaire avant l'envoi aux arbitres, et le rend si aucun appareil n'est atteint", async () => {
     mockMatch();
     await notifyMatchScheduleChange(change());
     expect(markStaffPushed).toHaveBeenCalledWith(42, NEW_START);
+    // Réservée avant l'envoi : un retrait qui suivrait de près la trouve.
+    expect(jest.mocked(markStaffPushed).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(notifyStaff).mock.invocationCallOrder[0],
+    );
+    expect(releaseStaffPush).not.toHaveBeenCalled();
 
-    jest.mocked(markStaffPushed).mockClear();
     jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
     await notifyMatchScheduleChange(change());
-    expect(markStaffPushed).not.toHaveBeenCalled();
+    expect(releaseStaffPush).toHaveBeenCalledWith(42, NEW_START);
   });
 
   it("oublie l'horaire une fois son retrait poussé, et ne pousse pas le retrait d'un horaire jamais poussé", async () => {

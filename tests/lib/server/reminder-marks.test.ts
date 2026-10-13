@@ -8,6 +8,7 @@ import {
   forgetStaffPush,
   markStaffPushed,
   releaseDatedMarks,
+  releaseStaffPush,
 } from "@/lib/server/tournaments/reminder-marks";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -94,13 +95,22 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     expect(params).toEqual(["STAFF", 31, new Date("2099-01-01T18:00:00.000Z"), new Date("2099-01-01T18:00:00.000Z")]);
   });
 
-  it("oublie seulement la marque de cet horaire", async () => {
+  it("rend la marque réservée de cet horaire seulement", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await releaseStaffPush(31, "2099-01-01T18:00:00.000Z");
+    const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toBe("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?");
+    expect(params).toEqual([31, "STAFF", new Date("2099-01-01T18:00:00.000Z")]);
+  });
+
+  it("oublie l'horaire retiré, sauf si la manche l'a retrouvé pendant l'envoi (reposé par un autre arbitre)", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     await forgetStaffPush(31, "2099-01-01T18:00:00.000Z");
     const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
-    expect(sql).toBe("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?");
-    expect(params).toEqual([31, "STAFF", new Date("2099-01-01T18:00:00.000Z")]);
+    expect(sql).toMatch(/AND NOT EXISTS \(SELECT 1 FROM bg_matches m WHERE m\.id = \? AND m\.start_at <=> \?\)$/);
+    expect(params).toEqual([31, "STAFF", new Date("2099-01-01T18:00:00.000Z"), 31, new Date("2099-01-01T18:00:00.000Z")]);
   });
 
   it("n'échoue jamais : l'erreur va dans pm2, une table absente se tait", async () => {

@@ -210,8 +210,9 @@ describe("setMatchStartAt", () => {
 
     // Les marques d'observation et d'horaire reçu survivent au ménage…
     const reminders = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
-    expect(reminders?.sql).toContain("offset_key NOT IN (?, ?)");
-    expect(reminders?.params).toEqual([42, "SEEN", "TOLD"]);
+    // … comme celle de l'horaire poussé aux arbitres (`STAFF`), qui n'est pas aux joueurs.
+    expect(reminders?.sql).toContain("offset_key NOT IN (?, ?, ?)");
+    expect(reminders?.params).toEqual([42, "SEEN", "TOLD", "STAFF"]);
     // … et l'observation est posée dans le même geste : un balayage concurrent
     // ne peut plus prendre l'annonce pour lui. Posée **avant** le ménage : une
     // insertion après un `DELETE` qui a verrouillé l'intervalle d'index
@@ -263,7 +264,7 @@ describe("setMatchStartAt", () => {
     expect(marks[0].params).toEqual([42, "SEEN", new Date(FUTURE), new Date(FUTURE)]);
     expect(marks[1].sql).toMatch(/^DELETE FROM bg_match_reminders/);
     expect(marks[1].sql).toContain("start_at IS NOT NULL AND start_at <> ?");
-    expect(marks[1].params).toEqual([42, "SEEN", "TOLD", new Date(FUTURE)]);
+    expect(marks[1].params).toEqual([42, "SEEN", "TOLD", "STAFF", new Date(FUTURE)]);
   });
 
   it("garde la marque `TOLD` au ménage d'une date changée", async () => {
@@ -282,8 +283,8 @@ describe("setMatchStartAt", () => {
     await setMatchStartAt(42, "2099-08-30T18:30:00Z");
 
     const reminders = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
-    expect(reminders?.sql).toContain("offset_key <> ?");
-    expect(reminders?.params).toEqual([42, "TOLD"]);
+    expect(reminders?.sql).toContain("offset_key NOT IN (?, ?)");
+    expect(reminders?.params).toEqual([42, "TOLD", "STAFF"]);
     expect(writes.some((w) => w.sql.startsWith("INSERT IGNORE"))).toBe(false);
   });
 
@@ -453,8 +454,8 @@ describe("setMatchStartAt", () => {
       await setMatchStartAt(42, FUTURE);
       expect(writes.some((w) => w.sql.startsWith("INSERT INTO bg_match_reminders"))).toBe(false);
       const cleanup = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
-      expect(cleanup?.sql).toContain("offset_key <> ?");
-      expect(cleanup?.params).toEqual([42, "TOLD"]);
+      expect(cleanup?.sql).toContain("offset_key NOT IN (?, ?)");
+      expect(cleanup?.params).toEqual([42, "TOLD", "STAFF"]);
     }
   });
 
@@ -544,6 +545,6 @@ describe("setMatchStartAt", () => {
     const { writes } = world({ finished: true });
     await setMatchStartAt(42, FUTURE);
     expect(writes.some((w) => w.sql.startsWith("INSERT INTO bg_match_reminders"))).toBe(false);
-    expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key <> ?"))).toBe(true);
+    expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)"))).toBe(true);
   });
 });
