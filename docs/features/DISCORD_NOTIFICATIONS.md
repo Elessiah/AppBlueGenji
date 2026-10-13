@@ -63,6 +63,11 @@ suivant)`, le dernier s'arrêtant au coup d'envoi. La règle tient pour tout
 palier qu'on rajouterait : sans ce découpage, plusieurs rappels partiraient
 d'un coup pour une manche programmée tard, dans la même seconde.
 
+Le rappel dit « dans **moins de** 24 heures » (`dueLabel`) et non « dans
+24 heures » : le balayage n'est entraîné que par le trafic, il peut partir
+n'importe quand dans sa fenêtre, jusqu'à quelques minutes du coup d'envoi — le
+message donne l'horaire exact.
+
 Les anciens paliers `P7D` (une semaine) et `PT1H` (une heure avant) ont été
 retirés : leurs lignes déjà posées dans `bg_match_reminders` restent inertes,
 le balayage ne lisant que les clés des paliers déclarés.
@@ -81,7 +86,7 @@ remplacé par une **annonce unique** portant la date
 | --- | --- |
 | à J-10 ou J-3 | annonce tout de suite (« Match programmé, le … »), puis P1D |
 | à H-5 | annonce, et rien après |
-| retirée | « Horaire du match retiré », s'il l'avait reçue et qu'elle était encore devant |
+| retirée | « Horaire du match retiré », s'il l'avait reçue, qu'elle était encore devant et que le tournoi est planifié par l'arbitrage |
 
 Le partage entre les deux régimes tient à la **marque d'observation** `SEEN`,
 posée au premier passage du balayage sur cette manche (ou par `setMatchStartAt`,
@@ -102,7 +107,9 @@ partirait jamais.
 vers au moins une engagée. Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
 annonce) ne le prouvent. `TOLD` survit aux changements de date : c'est elle qui
-fait dire « reprogrammé » à la date suivante et « retiré » à une date effacée.
+fait dire « reprogrammé » à la date suivante — y compris quand c'est le
+balayage qui l'annonce, la place s'étant vidée entre-temps — et « retiré » à
+une date effacée.
 
 ### Programmer, reprogrammer ou retirer l'horaire d'une manche
 
@@ -130,8 +137,14 @@ balayage** :
   effacement). Une date posée quand une place était vide n'a jamais été
   annoncée : sa remplaçante se dit « programmé », sans ancienne date. Une date
   **retirée** (`announceMatchScheduleCleared`) donne « Horaire du match
-  retiré » — seulement si les joueurs l'avaient reçue et qu'elle était encore
-  devant — avec la même étiquette push que l'annonce, qu'il remplace. En
+  retiré » — seulement si les joueurs l'avaient reçue, qu'elle était encore
+  devant et que le tournoi est **planifié par l'arbitrage** (sans l'option, un
+  match sans horaire part en lancement : aucun nouvel horaire ne viendra, et le
+  départ du match prévient les joueurs) — avec la même étiquette push que
+  l'annonce, qu'il remplace. Les corps push d'une reprogrammation et d'un
+  retrait commencent par le changement (« Nouveau coup d'envoi …, au lieu du
+  … » / « L'horaire prévu … est retiré … ») : c'est la fin d'un corps trop long
+  que `PUSH_BODY_MAX` coupe. En
   tournoi individuel, le message privé (annonce, rappel, retrait) dit « **Ton
   match** » au lieu de « A contre B » : les deux noms sont des pseudos, et
   aucun pseudo de joueur ne passe par Discord — même règle que le push.
@@ -146,7 +159,7 @@ balayage** :
 - **Journal Discord** : une ligne `formatMatchScheduledLog` (« 🗓️ Match
   programmé / reprogrammé — « Tournoi » (#id) : Manche 2 — A vs B (#42), coup
   d'envoi …, au lieu du …, par le staff ») ou `formatMatchScheduleClearedLog`
-  (« 🗓️ Horaire retiré — … le coup d'envoi du … (heure de Paris) est retiré,
+  (« 🗓️ Horaire retiré — … l'horaire du … (heure de Paris) est retiré,
   par le staff »). Auteur anonyme sur Discord, nommé dans pm2
   (`publishStaffAction`) ; engagées par `entrantLabel` (« un joueur » en
   tournoi individuel). Pas de message privé au rôle arbitre : ce n'est pas une
