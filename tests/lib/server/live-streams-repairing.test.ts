@@ -155,7 +155,7 @@ describe("finalizeMatch — marques de rappel du match aval", () => {
 
     const resets = reminderResets(calls);
     expect(resets).toHaveLength(1);
-    expect(resets[0][1]).toEqual([20]);
+    expect(resets[0][1]).toEqual([20, "STAFF"]);
   });
 
   it("garde les marques quand le créneau se remplit pour la première fois", async () => {

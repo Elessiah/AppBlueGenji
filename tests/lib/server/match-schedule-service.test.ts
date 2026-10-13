@@ -43,18 +43,18 @@ function matchRow(overrides: Partial<Row> = {}): Row {
 function lockReply(
   sql: string,
   params: unknown,
-  { row, refereeScheduling }: { row: Row | null; refereeScheduling: boolean },
+  { row, refereeScheduling, finished }: { row: Row | null; refereeScheduling: boolean; finished?: boolean },
   order: string[],
 ): [unknown[]] | null {
   if (sql.startsWith("SELECT tournament_id FROM bg_matches")) {
     order.push("tournament_id");
     return [row ? [{ tournament_id: row.tournament_id }] : []];
   }
-  if (sql.startsWith("SELECT referee_scheduling FROM bg_tournaments")) {
+  if (sql.startsWith("SELECT referee_scheduling, state FROM bg_tournaments")) {
     order.push("lock_tournament");
     expect(sql).toContain("FOR UPDATE");
     expect(params).toEqual([7]);
-    return [[{ referee_scheduling: refereeScheduling ? 1 : 0 }]];
+    return [[{ referee_scheduling: refereeScheduling ? 1 : 0, state: finished ? "FINISHED" : "RUNNING" }]];
   }
   if (sql.startsWith("SELECT id, tournament_id, status")) {
     order.push("lock_match");
@@ -76,6 +76,10 @@ function world(
     missingReminders?: boolean;
     announced?: boolean;
     toldStartAt?: Date | null;
+    /** Horaire poussé aux arbitres (marque `STAFF`). */
+    staffStartAt?: Date | null;
+    /** Tournoi clos. */
+    finished?: boolean;
   } = {},
 ) {
   const connection = connectionMock();
@@ -86,15 +90,22 @@ function world(
   const order: string[] = [];
   connection.execute.mockImplementation(async (raw: string, params?: unknown) => {
     const sql = raw.replace(/\s+/g, " ").trim();
-    const locked = lockReply(sql, params, { row, refereeScheduling: options.refereeScheduling === true }, order);
+    const locked = lockReply(
+      sql,
+      params,
+      { row, refereeScheduling: options.refereeScheduling === true, finished: options.finished === true },
+      order,
+    );
     if (locked) return locked;
     if (options.missingReminders && sql.includes("bg_match_reminders")) {
       throw Object.assign(new Error("Table 'bg_match_reminders' doesn't exist"), { code: "ER_NO_SUCH_TABLE", errno: 1146 });
     }
-    if (sql.startsWith("SELECT start_at FROM bg_match_reminders")) {
-      expect(params).toEqual([42, "TOLD"]);
-      expect(sql).toMatch(/^SELECT start_at FROM bg_match_reminders/);
-      return [options.announced ? [{ start_at: options.toldStartAt ?? null }] : []];
+    if (sql.startsWith("SELECT offset_key, start_at FROM bg_match_reminders")) {
+      expect(params).toEqual([42, "TOLD", "STAFF"]);
+      const marks: object[] = [];
+      if (options.announced) marks.push({ offset_key: "TOLD", start_at: options.toldStartAt ?? null });
+      if (options.staffStartAt !== undefined) marks.push({ offset_key: "STAFF", start_at: options.staffStartAt });
+      return [marks];
     }
     if (sql.startsWith("DELETE FROM bg_match_reminders") && options.failReminders) {
       throw new Error("base injoignable");
@@ -294,6 +305,7 @@ describe("setMatchStartAt", () => {
       previousStartAt: null,
       alreadyAnnounced: false,
       toldStartAt: null,
+      staffStartAt: null,
       refereeScheduling: false,
       entrantIds: [1, 2],
       actor,
@@ -311,6 +323,7 @@ describe("setMatchStartAt", () => {
       previousStartAt: "2099-08-28T18:30:00.000Z",
       alreadyAnnounced: false,
       toldStartAt: null,
+      staffStartAt: null,
       refereeScheduling: false,
       entrantIds: [1, 2],
       actor: null,
@@ -331,6 +344,7 @@ describe("setMatchStartAt", () => {
       previousStartAt: "2099-08-28T18:30:00.000Z",
       alreadyAnnounced: true,
       toldStartAt: null,
+      staffStartAt: null,
       refereeScheduling: true,
       entrantIds: [1, 2],
       actor: null,
@@ -345,6 +359,7 @@ describe("setMatchStartAt", () => {
       previousStartAt: null,
       alreadyAnnounced: true,
       toldStartAt: null,
+      staffStartAt: null,
       refereeScheduling: false,
       entrantIds: [1, 2],
       actor: null,
@@ -517,5 +532,18 @@ describe("setMatchStartAt", () => {
       await setMatchStartAt(42, FUTURE);
       expect(resets(writes)).toBe(false);
     });
+  });
+
+  it("lit l'horaire poussé aux arbitres avec celui des joueurs, sous les verrous de l'écriture", async () => {
+    world({ row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }), staffStartAt: new Date("2099-08-28T18:30:00Z") });
+    await setMatchStartAt(42, null);
+    expect(jest.mocked(notifyMatchScheduleChange).mock.calls[0][0].staffStartAt).toBe("2099-08-28T18:30:00.000Z");
+  });
+
+  it("traite une manche d'un tournoi clos comme jouée : aucune observation posée, rien à rendre ensuite", async () => {
+    const { writes } = world({ finished: true });
+    await setMatchStartAt(42, FUTURE);
+    expect(writes.some((w) => w.sql.startsWith("INSERT INTO bg_match_reminders"))).toBe(false);
+    expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key <> ?"))).toBe(true);
   });
 });

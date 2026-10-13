@@ -4,8 +4,17 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/notify");
 jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/tournaments/match-reminders");
+// Seules les écritures de la marque `STAFF` sont simulées.
+jest.mock("@/lib/server/tournaments/reminder-marks", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/reminder-marks")>(
+    "@/lib/server/tournaments/reminder-marks",
+  ),
+  markStaffPushed: jest.fn(),
+  forgetStaffPush: jest.fn(),
+}));
 
 import { getDatabase } from "@/lib/server/database";
+import { forgetStaffPush, markStaffPushed } from "@/lib/server/tournaments/reminder-marks";
 import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
@@ -50,6 +59,7 @@ function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChan
     previousStartAt: null,
     alreadyAnnounced: false,
     toldStartAt: null,
+    staffStartAt: null,
     refereeScheduling: true,
     entrantIds: [101, 102],
     actor: ACTOR,
@@ -303,7 +313,7 @@ describe("notifyMatchScheduleChange — horaire retiré, arbitres", () => {
 
   it("ne nomme aucun joueur dans l'avis aux arbitres d'un tournoi individuel", async () => {
     mockMatch({ ...CLEARED_ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START }));
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: OLD_START }));
     for (const locale of ["fr", "en"] as const) {
       const { title, body } = resolvePush(staffCall().push, locale);
       expect(`${title} ${body}`).not.toMatch(/Kiro|Nova/);
@@ -419,21 +429,46 @@ describe("refereesWerePushed", () => {
   const now = new Date("2099-01-01T00:00:00Z");
   const late = "2098-12-31T20:00:00.000Z";
 
-  it("tient pour poussé un horaire encore devant", () => {
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START }), now)).toBe(true);
+  it("tient pour poussé l'horaire que tient la marque STAFF, devant ou passé de peu", () => {
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: OLD_START }), now)).toBe(true);
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, staffStartAt: late }), now)).toBe(true);
   });
 
-  it("tient pour poussé un horaire passé de peu que les joueurs avaient reçu (annoncé, donc devant à l'annonce)", () => {
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, toldStartAt: late }), now)).toBe(true);
-  });
-
-  it("ne tient pas pour poussée une date passée seulement journalisée (archive), ni un horaire trop ancien", () => {
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, toldStartAt: null }), now)).toBe(false);
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: late, toldStartAt: OLD_START }), now)).toBe(false);
+  it("ne tient pas pour poussé un horaire seulement journalisé (match joué, tournoi clos, date passée), un autre, ni un trop ancien", () => {
+    // Pas de marque : la date n'a été que journalisée — même encore devant.
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: null }), now)).toBe(false);
+    // La marque tient un autre horaire.
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: late }), now)).toBe(false);
     const old = "2098-12-30T00:00:00.000Z";
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: old, toldStartAt: old }), now)).toBe(false);
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: null }), now)).toBe(false);
-    expect(refereesWerePushed(change({ startAt: null, previousStartAt: "pas une date" }), now)).toBe(false);
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: old, staffStartAt: old }), now)).toBe(false);
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: null, staffStartAt: OLD_START }), now)).toBe(false);
+    expect(refereesWerePushed(change({ startAt: null, previousStartAt: "pas une date", staffStartAt: OLD_START }), now)).toBe(false);
+  });
+});
+
+describe("marque STAFF", () => {
+  it("retient l'horaire poussé aux arbitres, seulement s'il a atteint un appareil", async () => {
+    mockMatch();
+    await notifyMatchScheduleChange(change());
+    expect(markStaffPushed).toHaveBeenCalledWith(42, NEW_START);
+
+    jest.mocked(markStaffPushed).mockClear();
+    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
+    await notifyMatchScheduleChange(change());
+    expect(markStaffPushed).not.toHaveBeenCalled();
+  });
+
+  it("oublie l'horaire une fois son retrait poussé, et ne pousse pas le retrait d'un horaire jamais poussé", async () => {
+    mockMatch(CLEARED_ROW);
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: OLD_START }));
+    expect(forgetStaffPush).toHaveBeenCalledWith(42, OLD_START);
+
+    jest.mocked(notifyStaff).mockClear();
+    jest.mocked(forgetStaffPush).mockClear();
+    mockMatch(CLEARED_ROW);
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, staffStartAt: null }));
+    expect(notifyStaff).not.toHaveBeenCalled();
+    expect(forgetStaffPush).not.toHaveBeenCalled();
   });
 });
 
@@ -547,7 +582,9 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
   it("prévient les joueurs qui l'avaient reçu, les arbitres sauf l'auteur, et journalise", async () => {
     mockMatch(CLEARED_ROW);
 
-    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START }));
+    await notifyMatchScheduleChange(
+      change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START, staffStartAt: OLD_START }),
+    );
 
     expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), OLD_START);
     expect(announceMatchSchedule).not.toHaveBeenCalled();

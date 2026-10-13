@@ -91,7 +91,8 @@ function board(rows: Row[]): {
       if (q.startsWith("SELECT")) return [target ? [{ ...target }] : [], []];
       if (q.startsWith("DELETE FROM bg_match_reminders")) {
         forgets += 1;
-        forgotten.push(...params.map(Number));
+        // Les manches ; le dernier paramètre est la marque gardée (`STAFF`).
+        forgotten.push(...params.filter((param) => typeof param === "number").map(Number));
         return [{ affectedRows: 1 }, []];
       }
       if (!target) return [{ affectedRows: 0 }, []];

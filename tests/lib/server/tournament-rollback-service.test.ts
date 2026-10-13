@@ -339,7 +339,8 @@ describe("rollbackCurrentRound — écritures", () => {
 
     await rollbackCurrentRound(7);
 
-    expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")?.[1]).toEqual([3]);
+    // L'horaire poussé aux arbitres (`STAFF`) reste : l'affiche change, pas l'horaire.
+    expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")?.[1]).toEqual([3, "STAFF"]);
   });
 
   it("compare les affiches après la réconciliation : un bye reposé rend sa place", async () => {
@@ -452,7 +453,7 @@ describe("rollbackCurrentRound — écritures", () => {
 
     await rollbackCurrentRound(7);
 
-    expect(statementWith(execute, "DELETE FROM bg_match_reminders")?.[1]).toEqual([2, 3]);
+    expect(statementWith(execute, "DELETE FROM bg_match_reminders")?.[1]).toEqual([2, 3, "STAFF"]);
     expect(statementWith(execute, "DELETE FROM bg_referee_alerts")?.[1]).toEqual([2, 3]);
     expect(statementWith(execute, "DELETE FROM bg_match_start_notices")?.[1]).toEqual([2, 3]);
     expect(statementWith(execute, "DELETE FROM bg_matches")?.[1]).toEqual([2, 3]);
