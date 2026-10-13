@@ -1,4 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
@@ -6,6 +8,7 @@ jest.mock("@/lib/server/solo-entries-service");
 import { getDatabase } from "@/lib/server/database";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { anonymizeAccount } from "@/lib/server/users/account-erasure";
+import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import { getFullProfile } from "@/lib/server/users/full-profile";
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -69,6 +72,20 @@ describe("langue du compte — anonymisation", () => {
       .map(([sql]) => String(sql).replace(/\s+/g, " "))
       .find((sql) => /^ ?UPDATE bg_users SET/.test(sql) && sql.includes("is_deleted = 1"));
     expect(users).toBeDefined();
-    expect(users).toMatch(/locale = 'fr'/);
+    expect(users).toMatch(/locale = \?/);
+    const call = execute.mock.calls.find(([sql]) => String(sql).includes("is_deleted = 1"));
+    expect(call?.[1]).toEqual([expect.any(String), DEFAULT_LOCALE, 42]);
+  });
+});
+
+describe("langue du compte — défaut de la colonne", () => {
+  // L'anonymisation et accountLocaleFromRow écrivent DEFAULT_LOCALE : la
+  // colonne (base neuve et base existante) doit avoir le même défaut.
+  it("vaut DEFAULT_LOCALE dans le CREATE TABLE et dans l'ALTER", () => {
+    const root = path.resolve(__dirname, "../../..");
+    for (const file of ["lib/server/database/schema/accounts.ts", "lib/server/database/recent-schema-changes.ts"]) {
+      const source = readFileSync(path.join(root, file), "utf8");
+      expect(source).toContain(`locale ENUM('fr', 'en') NOT NULL DEFAULT '${DEFAULT_LOCALE}'`);
+    }
   });
 });

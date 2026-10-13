@@ -62,7 +62,8 @@ describe("DONNEES_PROFIL", () => {
     expect(locale?.extraBases).toBeUndefined();
     expect(locale?.finalite).toMatch(/notifications push/);
     expect(locale?.finalite).toMatch(/Mon profil/);
-    expect(locale?.finalite).toMatch(/remise au français si le compte est anonymisé/);
+    expect(locale?.finalite).toMatch(/sauf les exceptions détaillées à la section Notifications push/);
+    expect(locale?.finalite).toMatch(/français par défaut, remis au français si le compte est anonymisé/);
   });
 
   it("déclare la majorité, facultative et affichée seulement sur choix du joueur", () => {
