@@ -87,19 +87,27 @@ remplacé par une **annonce unique** portant la date
 | à J-10 ou J-3 | annonce tout de suite (« Match programmé, le … »), puis P1D |
 | à H-5 | annonce, et rien après |
 | retirée | « Horaire du match retiré », s'il l'avait reçue, qu'elle était encore devant et que le tournoi est planifié par l'arbitrage |
+| posée quand une place était vide | rien tant qu'elle l'est ; annonce par le balayage dès que les deux engagées sont connues, au plus tard 48 h avant (une journée avant le rappel) |
 
-Le partage entre les deux régimes tient à la **marque d'observation** `SEEN`,
-posée au premier passage du balayage sur cette manche (ou par `setMatchStartAt`,
-voir plus bas) : elle sépare « le site découvre cette date » de « le temps a
-passé depuis ». Sans elle, un match programmé à cinq heures ne recevrait qu'un
-rappel, sans l'annonce qui porte sa date ; elle fait aussi verrou : seule la
-requête qui la pose annonce.
+Le partage entre les deux régimes tient à la **marque d'observation** `SEEN` :
+elle dit que l'annonce de cette date est **prise en charge**. `setMatchStartAt`
+la pose pour toute date posée sur deux engagées connues (et annonce aussitôt) ;
+le balayage ne découvre donc que les manches dont une engagée manquait alors,
+ou a changé depuis, et les **annonce** à leur première observation, quelle que
+soit l'échéance. La marque fait aussi verrou : seule la requête qui la pose
+annonce.
 
-C'est aussi ce qui impose la marge de `MATCH_REMINDER_LOOKAHEAD_MS` : le balayage
-lit **une journée plus loin** que le plus grand palier (48 h). Une fenêtre de
-lecture égale à l'horizon ferait découvrir chaque manche à la seconde exacte où
-le palier s'ouvre — donc toujours par le régime d'annonce, et ce palier ne
-partirait jamais.
+D'où la marge de `MATCH_REMINDER_LOOKAHEAD_MS` : le balayage lit **une journée
+plus loin** que le palier (48 h), pour que l'annonce d'une manche qu'il
+découvre parte une journée avant l'ouverture du rappel, plutôt qu'à sa place.
+
+Une engagée **remplacée** sur l'affiche (correction d'un score amont :
+`vacateSlot` dans `bracket-cascade.ts`, ou `pushTeamToTarget` dans
+`scoring.ts`) efface les marques de la manche, comme un retour en arrière : la
+remplaçante n'a reçu aucun horaire, le balayage lui annoncera la date. Limite
+connue : l'engagée restée en place perd aussi sa marque `TOLD` (les marques
+sont par manche, pas par engagée) — un changement ou un retrait d'horaire
+ultérieur lui sera dit « programmé » plutôt que « reprogrammé », ou tu.
 
 ### La marque `TOLD` : un horaire reçu
 
