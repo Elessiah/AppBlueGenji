@@ -482,7 +482,7 @@ const DISCORD_LINK_HOSTS: ReadonlySet<string> = new Set([
 
 /**
  * Le contact Discord d'une annonce saisi comme un lien (`https://…`,
- * `discord.gg/…`) : son `href` s'il mène chez Discord, sinon `null` — un
+ * invitation `discord.gg`) : son `href` s'il mène chez Discord, sinon `null` — un
  * pseudo à copier n'est pas un lien, et un lien vers un autre hôte (le site
  * lui-même, `/api/auth/<p>/start?terms=1` compris) ne le devient jamais.
  */
