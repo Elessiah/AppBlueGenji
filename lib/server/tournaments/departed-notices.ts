@@ -54,13 +54,16 @@ export async function noteDepartedEntrants(connection: PoolConnection, departure
   }
   const held = new Map(rows.map((row) => [Number(row.match_id), row.start_at]));
   const queue = pending.get(connection) ?? [];
+  let dropped = 0;
   for (const departure of departures) {
     const startAt = held.get(departure.matchId) ?? null;
     if (startAt === null || new Date(startAt).getTime() <= Date.now() - HELD_TIME_GRACE_MS) continue;
-    if (queue.length >= MAX_PENDING_NOTICES) break;
-    queue.push({ ...departure, heldStartAt: startAt });
+    if (queue.length >= MAX_PENDING_NOTICES) dropped += 1;
+    else queue.push({ ...departure, heldStartAt: startAt });
   }
   if (queue.length > 0) pending.set(connection, queue);
+  // Au-delà du plafond, ces joueurs ne seront pas prévenus : pm2 le dit.
+  if (dropped > 0) console.warn(`[notify] ${dropped} avis de match retiré au-delà du plafond, non envoyés`);
 }
 
 /** Jette les avis notés : la correction n'a pas abouti. */

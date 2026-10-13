@@ -275,16 +275,17 @@ async function openToldMark(
     // Un avis de retrait suppose la marque : effacée depuis (affiche changée,
     // retour en arrière), personne ne tient plus cet horaire — rien ne part.
     if (sentStart === null) return "stale";
-    // Perdue au profit d'un envoi concurrent : celui-ci n'a rien écrit, il n'a
-    // rien à rendre — sans quoi il effacerait l'horaire que l'autre a remis.
-    if (!(await claimToldMark(matchId, sentStart))) return UNTOUCHED(matchId);
+    // Rien d'écrit : un envoi concurrent du même horaire a pris la marque (il
+    // le remet lui-même), ou la manche a changé depuis la lecture — dans les
+    // deux cas, rien ne part d'ici, et rien n'est à rendre.
+    if (!(await claimToldMark(match, sentStart))) return "stale";
     return { matchId, claimed: true, previous: null, unchanged: false, sent: sentStart };
   }
   const previous = state.start_at === null ? null : new Date(state.start_at);
   // Le rappel 24 h d'un horaire déjà reçu : la marque tient déjà cet horaire,
   // rien à écrire — ni à rendre si rien n'aboutit.
   if (sameInstant(previous, sentStart)) return UNTOUCHED(matchId);
-  await setToldTime(matchId, sentStart);
+  if (!(await setToldTime(match, sentStart))) return "stale";
   return { matchId, claimed: false, previous, unchanged: false, sent: sentStart };
 }
 
@@ -312,21 +313,35 @@ async function closeToldMark(told: ToldMark | null, delivered: boolean): Promise
 }
 
 /** L'horaire que les joueurs tiennent (`null` : aucun, après un retrait). */
-async function setToldTime(matchId: number, startAt: Date | null): Promise<void> {
+async function setToldTime(match: ScheduledMatch, startAt: Date | null): Promise<boolean> {
   const db = await getDatabase();
-  await db.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
-    startAt,
-    matchId,
-    MATCH_TOLD_KEY,
-  ]);
+  const matchId = Number(match.id);
+  // Écrite seulement si la manche porte encore cet horaire et ces engagées : la
+  // condition est dans l'écriture même, pas dans une lecture qui la précède.
+  const [result] = await db.execute(
+    `UPDATE bg_match_reminders r
+       JOIN bg_matches m ON m.id = r.match_id
+        SET r.start_at = ?
+      WHERE r.match_id = ? AND r.offset_key = ?
+        AND m.start_at <=> ? AND m.team1_id = ? AND m.team2_id = ?`,
+    [startAt, matchId, MATCH_TOLD_KEY, startAt, Number(match.team1_id), Number(match.team2_id)],
+  );
+  return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
-/** Réserve la marque d'horaire reçu, avec l'horaire envoyé. `false` : elle existait. */
-async function claimToldMark(matchId: number, startAt: Date): Promise<boolean> {
+/**
+ * Réserve la marque d'horaire reçu, avec l'horaire envoyé — si la manche porte
+ * encore cet horaire et ces engagées (condition dans l'écriture même, comme
+ * `claimReminder`). `false` : elle existait, ou la manche a changé.
+ */
+async function claimToldMark(match: ScheduledMatch, startAt: Date): Promise<boolean> {
   const db = await getDatabase();
+  const matchId = Number(match.id);
   const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)`,
-    [matchId, MATCH_TOLD_KEY, startAt],
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
+       SELECT ?, ?, ? FROM bg_matches
+        WHERE id = ? AND start_at = ? AND team1_id = ? AND team2_id = ?`,
+    [matchId, MATCH_TOLD_KEY, startAt, matchId, startAt, Number(match.team1_id), Number(match.team2_id)],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
@@ -690,8 +705,13 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
     const recipients = recipientsByTeam.get(departure.teamId) ?? [];
     if (recipients.length === 0) return;
     const row = matches.get(departure.matchId) as WithdrawnMatchRow;
-    await sendWithdrawnNotice(departure, row, String(names.get(departure.teamId)), recipients);
-    dispatched += 1;
+    // Un avis en échec ne retient pas les autres.
+    try {
+      await sendWithdrawnNotice(departure, row, String(names.get(departure.teamId)), recipients);
+      dispatched += 1;
+    } catch (error) {
+      console.error("[notify] avis de match retiré non envoyé", error);
+    }
   });
   return dispatched;
 }
@@ -759,18 +779,15 @@ async function runSweep(now: Date): Promise<number> {
   const [matches] = await db.query<SweepMatchRow[]>(
     `${SWEEP_MATCH_SELECT}
         AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
-        AND (m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
-             OR NOT EXISTS (SELECT 1 FROM bg_match_reminders seen
-                             WHERE seen.match_id = m.id AND seen.offset_key = ?))
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
-                         WHERE done.match_id = m.id AND done.offset_key = ?)`,
+                         WHERE done.match_id = m.id AND done.offset_key = ?)
+     HAVING m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND) OR seen_mark = 0`,
     [
       MATCH_SEEN_KEY,
       MATCH_TOLD_KEY,
       Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000),
-      FIRST_REMINDER_LEAD_SECONDS,
-      MATCH_SEEN_KEY,
       LAST_REMINDER_KEY,
+      FIRST_REMINDER_LEAD_SECONDS,
     ],
   );
   if (matches.length === 0) return 0;
