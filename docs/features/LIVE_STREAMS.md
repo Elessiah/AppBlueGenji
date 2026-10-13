@@ -209,7 +209,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   la mention n'a pas pu partir — identifiants seuls, tournoi compris sur toutes
   les lignes, échecs et reports aussi) ; l'annonce naît d'un
   balayage, pas d'un geste du staff, donc aucune ligne `staff-audit`. Un report
-  est averti dans pm2 au plus une fois par heure et par cause, distincte :
+  est averti dans pm2 au plus une fois par heure, par cause et par match (ou
+  groupe), la cause distincte :
   « salon #live fermé au bot » (`503`) ou « bot injoignable, en panne ou d'une
   version sans annonces » ; passé deux heures, le match n'est plus réessayé.
   Un refus du corps (`400`) ou un délai dépassé n'est tracé que dans pm2
