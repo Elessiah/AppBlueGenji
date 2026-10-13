@@ -299,7 +299,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
     if (!url) {
       warnOnce(
         `no-link ${Number(row.id)}`,
-        `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) à l'antenne sans lien de diffusion exploitable (ni le match ni le tournoi) : pas d'annonce`,
+        `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) à l'antenne sans lien de diffusion exploitable (ni le match ni le tournoi) : pas d'annonce pour l'instant — un lien ajouté dans les deux heures qui suivent le début du direct la fera partir, ne pas la poster à la main`,
       );
       continue;
     }
@@ -313,7 +313,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
       // emporter les affiches déjà réservées de ce passage : elles partent.
       warnOnce(
         `claim ${Number(row.id)}`,
-        `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) : réservation impossible, réessayée au passage suivant`,
+        `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) : réservation impossible, réessayée à chaque passage pendant les deux heures qui suivent le début du direct`,
         error,
       );
       continue;
