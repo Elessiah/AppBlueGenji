@@ -105,8 +105,9 @@ découvre parte une journée avant l'ouverture du rappel, plutôt qu'à sa place
 Une engagée **remplacée** sur l'affiche (correction d'un score amont :
 `vacateSlot` dans `bracket-cascade.ts`, ou `pushTeamToTarget` dans
 `scoring.ts`) efface les marques de la manche, comme un retour en arrière
-(`forgetChangedPosters`, `rollback.ts`, qui épargne une rencontre rendue aux
-mêmes engagées, dans un sens ou dans l'autre ; une rencontre laissée
+(`forgetChangedPosters`, `rollback.ts`, comparé après la réconciliation —
+byes reposés compris —, qui épargne une rencontre rendue aux mêmes engagées,
+dans un sens ou dans l'autre ; une rencontre laissée
 incomplète perd les siennes, et sera annoncée de nouveau si le même résultat
 est ressaisi — un doublon plutôt que des engagées jamais prévenues) : la
 remplaçante n'a reçu aucun horaire, le balayage lui annoncera la date. Limite
@@ -121,22 +122,23 @@ concerne plus (le plateau le montre).
 `dispatchPlannedSend` pose `TOLD` dès qu'une annonce ou un rappel a **abouti**
 (un message privé remis ou un appareil atteint) pour au moins une engagée — un
 bot injoignable sans appareil abonné ne pose rien. Une manche programmée avant
-l'arrivée de `TOLD` est lue par ses paliers retirés `P7D` / `PT1H`, posés
-seulement avec un message (`MATCH_TOLD_KEYS`). Ni `SEEN` (le balayage la pose aussi en silence) ni
+l'arrivée de `TOLD` a ses preuves héritées recopiées en `TOLD` au démarrage
+(voir « Passage à `TOLD` ») : `TOLD` est la seule source (`MATCH_TOLD_KEYS`). Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
 annonce) ne le prouvent. `TOLD` survit aux changements de date : c'est elle qui
 fait dire « reprogrammé » à la date suivante et « retiré » à une date effacée.
-Une preuve héritée (`P7D` / `PT1H`) est recopiée en `TOLD` au premier
-changement de date, avant que le ménage ne l'emporte. Une date posée sur un
+Une date posée sur un
 match **déjà joué**, ou déjà passée, n'est que journalisée (ni joueurs, ni
 arbitres).
 
 **Passage à `TOLD` (déploiement de la PR #441).** Deux reprises de données,
-au démarrage (`RECENT_SCHEMA_CHANGES`), bornées aux lignes écrites avant le
-2026-10-31 : tout palier hérité (`P7D`, `P1D`, `PT1H` — l'ancien code ne les
-posait qu'avec un message) est recopié en `TOLD`, et une marque `SEEN` posée
-seule, en silence, par l'ancien balayage (sept à huit jours avant, dans
-l'attente du palier « une semaine ») est effacée pour une manche à venir — le
+au démarrage (`RECENT_SCHEMA_CHANGES`), sans effet une seconde fois : tout
+palier hérité est recopié en `TOLD` (l'ancien code ne les posait qu'avec un
+message) — `P7D` / `PT1H` toujours, le nouveau code ne les écrivant jamais,
+`P1D` seulement tant qu'aucune marque `TOLD` n'existe (le nouveau code le
+réserve avant l'envoi) ; et une marque `SEEN` posée seule, en silence, par
+l'ancien balayage (sept à huit jours avant, dans l'attente du palier « une
+semaine ») est effacée pour une manche à venir, jusqu'au 2026-10-31 — le
 nouveau balayage l'annoncera. À retirer de la liste une fois jouées partout.
 
 ### Programmer, reprogrammer ou retirer l'horaire d'une manche
