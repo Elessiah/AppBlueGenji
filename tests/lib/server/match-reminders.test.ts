@@ -13,7 +13,7 @@ import {
   type MatchNotice,
 } from "@/lib/server/tournaments/match-reminders";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
-import { pushToUsers } from "@/lib/server/push-subscriptions";
+import { pushToUsers, usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { fakePool } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
@@ -151,6 +151,8 @@ beforeEach(() => {
   resetMatchReminderThrottle();
   // Un appareil atteint par push : l'horaire est reçu (marque `TOLD`).
   jest.mocked(pushToUsers).mockResolvedValue(1);
+  // Tout joueur a un appareil abonné aux rappels, sauf mention contraire.
+  jest.mocked(usersReachableByPush).mockImplementation(async (ids) => new Set(ids));
   jest.mocked(pushDiscordDirectMessages).mockResolvedValue({
     sent: 0,
     unresolved: [],
@@ -445,6 +447,20 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(messages).toContain("[match-reminders] marque d'horaire reçu non rendue");
     // L'échec de l'envoi remonte toujours jusqu'au balayage.
     expect(messages).toContain("[match-reminders] envoi de rappel en échec");
+  });
+
+  it("ne pose aucune marque d'horaire reçu pour des engagées que rien n'atteindrait", async () => {
+    // Ni tag Discord exploitable… (les identités déclarées passent par le bot)
+    const unreachable = RECIPIENTS.map((r) => ({ ...r, discord_id: null, discord_pseudo: null }));
+    // … ni appareil abonné aux rappels.
+    jest.mocked(usersReachableByPush).mockResolvedValue(new Set());
+    const { execute } = await mockDb({ recipients: unreachable });
+
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual(["P1D"]);
+    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
   it("réserve la marque d'horaire reçu avant l'envoi : une correction immédiate la lit déjà", async () => {
