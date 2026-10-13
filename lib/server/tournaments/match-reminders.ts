@@ -152,10 +152,17 @@ async function loadRecipientsByTeam(
   // un appareil abonné aux rappels. Une engagée sans aucun ne pose pas la
   // marque d'horaire reçu (qui ferait dire « reprogrammé » à des joueurs qui
   // n'ont rien reçu), et ne coûte ni écriture ni lecture d'abonnements.
-  const pushable = await usersReachableByPush(
-    recipients.filter((recipient) => recipient.discord === null).map((recipient) => recipient.userId),
-    "MATCH_REMINDER",
-  );
+  const withoutDiscord = recipients.filter((recipient) => recipient.discord === null).map((r) => r.userId);
+  let pushable: Set<number>;
+  try {
+    pushable = await usersReachableByPush(withoutDiscord, "MATCH_REMINDER");
+  } catch (error) {
+    // Lecture en échec : chacun est tenu pour atteignable, comme avant ce
+    // filtre — perdre le message privé d'un joueur pour une lecture
+    // d'abonnements serait pire qu'une marque posée de trop.
+    console.error("[match-reminders] abonnements push illisibles", error);
+    pushable = new Set(withoutDiscord);
+  }
   const reachable = recipients.filter((recipient) => recipient.discord !== null || pushable.has(recipient.userId));
   const byUser = new Map(reachable.map((recipient) => [recipient.userId, recipient]));
   const byTeam = new Map<number, NotificationRecipient[]>();

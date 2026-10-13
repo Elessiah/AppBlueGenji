@@ -159,6 +159,20 @@ export type PushOptions = {
 };
 
 /**
+ * Les appareils qu'un push de ce sujet atteint : abonnés, compte non supprimé,
+ * sujet non coupé. **Une seule écriture de la règle**, pour la distribution
+ * (`pushToUsers`) comme pour la question « ce joueur serait-il atteint ? »
+ * (`usersReachableByPush`). Paramètres : les comptes, puis le sujet.
+ */
+function reachableSubscriptionsSql(accounts: number): string {
+  return `FROM bg_push_subscriptions s
+       JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
+       WHERE s.user_id IN (${Array.from({ length: accounts }, () => "?").join(", ")})
+         AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
+                         WHERE o.user_id = s.user_id AND o.topic = ?)`;
+}
+
+/**
  * Comptes qu'un push de ce sujet atteindrait : au moins un appareil abonné, le
  * sujet non coupé, compte non supprimé — la règle de `pushToUsers`, en une
  * lecture pour toute une liste. Sans configuration push, ou sans la table
@@ -174,12 +188,7 @@ export async function usersReachableByPush(
   const db = await getDatabase();
   const rows = await rowsOrEmptyIfMissingTable(
     db.query<(RowDataPacket & { user_id: number })[]>(
-      `SELECT DISTINCT s.user_id
-         FROM bg_push_subscriptions s
-         JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
-        WHERE s.user_id IN (${ids.map(() => "?").join(", ")})
-          AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
-                          WHERE o.user_id = s.user_id AND o.topic = ?)`,
+      `SELECT DISTINCT s.user_id ${reachableSubscriptionsSql(ids.length)}`,
       [...ids, topic],
     ),
   );
@@ -204,14 +213,8 @@ export async function pushToUsers(
   if (!config || ids.length === 0) return 0;
   try {
     const db = await getDatabase();
-    const placeholders = ids.map(() => "?").join(", ");
     const [rows] = await db.query<SubscriptionRow[]>(
-      `SELECT s.id, s.endpoint, s.p256dh, s.auth, u.locale
-       FROM bg_push_subscriptions s
-       JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
-       WHERE s.user_id IN (${placeholders})
-         AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
-                         WHERE o.user_id = s.user_id AND o.topic = ?)`,
+      `SELECT s.id, s.endpoint, s.p256dh, s.auth, u.locale ${reachableSubscriptionsSql(ids.length)}`,
       [...ids, topic],
     );
     if (rows.length === 0) return 0;
