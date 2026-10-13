@@ -117,8 +117,16 @@ function setup(options: {
   remainingPlayoffMatches?: number;
   /** Rencontres encore tranchées qui alimentent un créneau détaché. */
   feeders?: Array<Record<string, number | null>>;
+  /** Affiches des rencontres détachées une fois re-remplies (défaut : inchangées). */
+  postersAfter?: Array<{ id: number; team1_id: number | null; team2_id: number | null }>;
 }) {
+  let posterReads = 0;
   const execute = jest.fn(async (sql: string) => {
+    if (/SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN/.test(sql)) {
+      posterReads += 1;
+      if (posterReads > 1 && options.postersAfter) return [options.postersAfter];
+      return [options.matches.map((m) => ({ id: m.id, team1_id: m.team1_id ?? null, team2_id: m.team2_id ?? null }))];
+    }
     if (/SELECT id, name, format FROM bg_tournaments/.test(sql)) {
       return [
         options.missing
@@ -306,19 +314,35 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statements(execute).some((sql) => sql.startsWith("DELETE FROM bg_matches"))).toBe(false);
   });
 
-  it("efface les marques de rappel des rencontres détachées : leurs futures engagées n'ont reçu aucun horaire", async () => {
+  it("efface les marques de rappel d'une rencontre détachée dont l'affiche change", async () => {
     const { execute } = setup({
       format: "SINGLE",
       matches: [
         playedRow({ id: 1, round_number: 1, next_winner_match_id: 3 }),
         playedRow({ id: 2, round_number: 1, next_winner_match_id: 3 }),
-        row({ id: 3, round_number: 2 }),
+        row({ id: 3, round_number: 2, team1_id: 10, team2_id: 20 }),
       ],
+      postersAfter: [{ id: 3, team1_id: null, team2_id: null }],
     });
 
     await rollbackCurrentRound(7);
 
     expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")?.[1]).toEqual([3]);
+  });
+
+  it("garde les marques d'une rencontre rendue aux mêmes engagées : pas de seconde annonce", async () => {
+    const { execute } = setup({
+      format: "SINGLE",
+      matches: [
+        playedRow({ id: 1, round_number: 1, next_winner_match_id: 3 }),
+        playedRow({ id: 2, round_number: 1, next_winner_match_id: 3 }),
+        row({ id: 3, round_number: 2, team1_id: 10, team2_id: 20 }),
+      ],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")).toBeUndefined();
   });
 
   it("efface aussi le résultat des rencontres détachées", async () => {

@@ -31,6 +31,7 @@ const ROW = {
   round_number: 2,
   team1_name: "Les Renards",
   team2_name: "Team Nova",
+  status: "READY",
 };
 
 function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChange {
@@ -236,6 +237,15 @@ describe("notifyMatchScheduleChange — vie privée et cas limites", () => {
     expect(notifyStaff).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+});
+
+describe("notifyMatchScheduleChange — match déjà joué", () => {
+  it("journalise une date posée sur un match joué, sans prévenir les arbitres", async () => {
+    mockMatch({ ...ROW, status: "COMPLETED" });
+    await notifyMatchScheduleChange(change());
+    expect(logLine()).toContain("Match programmé");
+    expect(notifyStaff).not.toHaveBeenCalled();
   });
 });
 

@@ -146,6 +146,17 @@ describe("setMatchStartAt", () => {
     expect(writes.indexOf(seen!)).toBeGreaterThan(writes.indexOf(reminders!));
   });
 
+  it("recopie une preuve héritée en `TOLD` avant que le ménage ne l'emporte", async () => {
+    const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), announced: true });
+
+    await setMatchStartAt(42, "2026-08-30T18:30:00Z");
+
+    const told = writes.find((w) => w.sql.startsWith("INSERT IGNORE") && w.params[1] === "TOLD");
+    const cleanup = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
+    expect(told?.params).toEqual([42, "TOLD"]);
+    expect(writes.indexOf(told!)).toBeLessThan(writes.indexOf(cleanup!));
+  });
+
   it("laisse le balayage annoncer une manche dont une engagée manque encore", async () => {
     const { writes } = world({ row: matchRow({ team2_id: null, start_at: new Date("2026-08-29T18:30:00Z") }) });
 

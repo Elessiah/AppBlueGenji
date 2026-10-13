@@ -308,13 +308,17 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
   });
 
   it("dit « reprogrammé » quand les joueurs avaient reçu un autre horaire", async () => {
-    // Date changée quand une place s'était vidée : `SEEN` est parti, `TOLD` est resté.
-    await mockDb({ sent: [{ match_id: 31, offset_key: "TOLD" }] });
+    // `SEEN` absente mais `TOLD` présente, ou une preuve héritée (`P7D`).
+    for (const key of ["TOLD", "P7D"]) {
+      jest.mocked(pushDiscordDirectMessages).mockClear();
+      resetMatchReminderThrottle();
+      await mockDb({ sent: [{ match_id: 31, offset_key: key }] });
 
-    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
-    for (const message of sentMessages()) {
-      expect(message).toContain("**Match reprogrammé**");
-      expect(message).not.toContain("au lieu du");
+      expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+      for (const message of sentMessages()) {
+        expect(message).toContain("**Match reprogrammé**");
+        expect(message).not.toContain("au lieu du");
+      }
     }
   });
 
