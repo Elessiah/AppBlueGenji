@@ -30,10 +30,11 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
+import { MATCH_STAFF_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { announceEntrantsWithdrawn, type DepartedEntrant, type WithdrawnMatch } from "./match-reminders";
 import { toPoster, type Poster, type PosterRow } from "./match-poster";
 import { HELD_TIME_GRACE_MS } from "./reminder-marks";
+import { announceDeletedMatchesToStaff } from "./schedule-notices";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 export type { Poster } from "./match-poster";
@@ -69,6 +70,20 @@ type TransactionState = {
   heldRead: Map<number, HeldTime | null>;
   /** Les engagées qui ont reçu l'horaire de chaque manche ({@link holdersOf}). */
   heldBy: Map<number, ReadonlySet<number>>;
+  /** Horaires poussés aux arbitres des manches supprimées : leur retrait leur sera poussé. */
+  staffRemovals: DeletedStaffTime[];
+};
+
+/**
+ * Une manche supprimée dont l'horaire avait été poussé aux arbitres (marque
+ * `STAFF`) : « Horaire du match retiré » le remplacera sur leurs appareils.
+ */
+export type DeletedStaffTime = {
+  matchId: number;
+  startAt: Date | string;
+  match: WithdrawnMatch;
+  team1Id: number | null;
+  team2Id: number | null;
 };
 
 const states = new WeakMap<PoolConnection, TransactionState>();
@@ -76,7 +91,7 @@ const states = new WeakMap<PoolConnection, TransactionState>();
 function stateOf(connection: PoolConnection): TransactionState {
   let state = states.get(connection);
   if (!state) {
-    state = { pending: [], settledLater: new Set(), heldRead: new Map(), heldBy: new Map() };
+    state = { pending: [], settledLater: new Set(), heldRead: new Map(), heldBy: new Map(), staffRemovals: [] };
     states.set(connection, state);
   }
   return state;
@@ -376,6 +391,40 @@ export async function noteDeletedMatches(
   // Une seule règle : `noteDepartedEntrants` écarte les manches qu'un retour
   // en arrière règle lui-même, lit les horaires tenus et ne garde que ceux-là.
   await noteDepartedEntrants(connection, departuresBetween(before, new Map()));
+  await noteStaffRemovals(connection, rows);
+}
+
+/**
+ * Les arbitres avaient reçu « Match programmé » pour une manche supprimée
+ * (marque `STAFF`, encore valable) : son retrait leur sera poussé après le
+ * commit — la marque part avec la manche.
+ */
+async function noteStaffRemovals(connection: PoolConnection, rows: readonly PosterRow[]): Promise<void> {
+  const staffRows: HeldRow[] = [];
+  try {
+    for (const ids of chunkIds(rows.map((row) => Number(row.id)))) {
+      const [chunkRows] = await connection.execute<HeldRow[]>(
+        `SELECT match_id, start_at FROM bg_match_reminders
+          WHERE match_id IN (${sqlPlaceholders(ids.length)}) AND offset_key = ?
+          FOR UPDATE`,
+        [...ids, MATCH_STAFF_KEY],
+      );
+      staffRows.push(...chunkRows);
+    }
+  } catch (error) {
+    if (isMissingTableError(error)) return;
+    throw error;
+  }
+  const times = stillValidTimes(staffRows);
+  if (times.size === 0) return;
+  const matches = await loadWithdrawnMatches(connection, [...times.keys()]);
+  const posters = new Map(rows.map((row) => [Number(row.id), toPoster(row)]));
+  const { staffRemovals } = stateOf(connection);
+  for (const [matchId, startAt] of times) {
+    const match = matches.get(matchId);
+    const poster = posters.get(matchId);
+    if (match && poster) staffRemovals.push({ matchId, startAt, match, ...poster });
+  }
 }
 
 /** Jette les avis notés : le changement n'a pas abouti. */
@@ -388,8 +437,15 @@ export function discardDepartedNotices(connection: PoolConnection): void {
  * attendre** (comme `flushBotLogs`). Ne lève jamais.
  */
 export function flushDepartedNotices(connection: PoolConnection): void {
-  const notices = states.get(connection)?.pending ?? [];
+  const state = states.get(connection);
   states.delete(connection);
+  const notices = state?.pending ?? [];
+  const removals = state?.staffRemovals ?? [];
+  if (removals.length > 0) {
+    void announceDeletedMatchesToStaff(removals).catch((error: unknown) => {
+      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", error);
+    });
+  }
   if (notices.length === 0) return;
   void announceEntrantsWithdrawn(notices).catch((error: unknown) => {
     if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", error);

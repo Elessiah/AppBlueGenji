@@ -25,6 +25,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { toIso } from "@/lib/server/serialization";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
@@ -34,6 +35,7 @@ import { MATCH_SEEN_KEY, type ScheduleAnnouncement } from "@/lib/shared/discord-
 import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
+import type { DeletedStaffTime } from "./departed-notices";
 import { announceMatchSchedule, announceMatchScheduleCleared, type MatchNotice } from "./match-reminders";
 import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import {
@@ -337,6 +339,57 @@ async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchSc
     held !== null && ownsPlayerNotice(row, change) ? announceMatchScheduleCleared(row, held) : Promise.resolve(0),
   ]);
   reportFailures(results, "[notify] horaire retiré non annoncé");
+}
+
+/**
+ * Manches supprimées par le moteur (ronde réappariée, retour en arrière,
+ * plateau refait) dont l'horaire avait été poussé aux arbitres : « Horaire du
+ * match retiré » remplace « Match programmé » sur leurs appareils (même
+ * étiquette). Personne n'est exclu — c'est le moteur, pas un arbitre, qui a
+ * retiré la manche. Une lecture des noms pour toutes ; un échec n'arrête pas
+ * les autres.
+ */
+export async function announceDeletedMatchesToStaff(removals: readonly DeletedStaffTime[]): Promise<void> {
+  const teamIds = [
+    ...new Set(removals.flatMap((removal) => [removal.team1Id, removal.team2Id]).filter((id): id is number => id !== null)),
+  ];
+  const names = new Map<number, string>();
+  if (teamIds.length > 0) {
+    const db = await getDatabase();
+    const [rows] = await db.query<(RowDataPacket & { id: number; name: string })[]>(
+      `SELECT id, name FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
+      teamIds,
+    );
+    for (const row of rows) names.set(Number(row.id), String(row.name));
+  }
+  const nameOf = (id: number | null) => (id === null ? null : (names.get(id) ?? null));
+  for (const removal of removals) {
+    const { match } = removal;
+    try {
+      await notifyStaff({
+        topic: "MATCH_SCHEDULED",
+        excludeUserIds: [],
+        push: (locale) =>
+          matchScheduleClearedStaffPush(
+            {
+              tournamentId: match.tournamentId,
+              tournamentName: match.tournamentName,
+              matchId: removal.matchId,
+              team1Name: nameOf(removal.team1Id),
+              team2Name: nameOf(removal.team2Id),
+              solo: match.solo,
+              bracket: match.bracket,
+              roundNumber: match.roundNumber,
+              swiss: match.swiss,
+              startAt: toIso(removal.startAt) ?? String(removal.startAt),
+            },
+            locale,
+          ),
+      });
+    } catch (error) {
+      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", error);
+    }
+  }
 }
 
 /** Un avis manqué se dit dans pm2 ; une table absente (base en création) se tait. */

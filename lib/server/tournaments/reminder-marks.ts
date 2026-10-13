@@ -12,6 +12,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { MATCH_STAFF_KEY } from "@/lib/shared/discord-notifications";
+import { retryOnDeadlock } from "./deadlock-retry";
 
 /**
  * Un horaire reçu vaut encore tant qu'il est devant, ou passé depuis moins de
@@ -76,17 +77,21 @@ type StaffRow = RowDataPacket & { id: number; start_at: Date | string | null };
  */
 export async function markStaffPushed(matchId: number, startAt: string): Promise<StaffReservation | null> {
   try {
-    return await withConnection(async (connection) => {
-      await connection.beginTransaction();
-      try {
-        const reservation = await reserveStaffMark(connection, matchId, startAt);
-        await connection.commit();
-        return reservation;
-      } catch (error) {
-        await connection.rollback().catch(() => undefined);
-        throw error;
-      }
-    });
+    // Rejouée sur interblocage : deux réservations dont les marques absentes
+    // partagent un intervalle d'index s'attendent l'une l'autre.
+    return await retryOnDeadlock(() =>
+      withConnection(async (connection) => {
+        await connection.beginTransaction();
+        try {
+          const reservation = await reserveStaffMark(connection, matchId, startAt);
+          await connection.commit();
+          return reservation;
+        } catch (error) {
+          await connection.rollback().catch(() => undefined);
+          throw error;
+        }
+      }),
+    );
   } catch (error) {
     // Table absente ou marque illisible : on pousse quand même (sans marque,
     // le retrait ne sera simplement pas poussé).
