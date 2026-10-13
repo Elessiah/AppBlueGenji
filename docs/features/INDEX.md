@@ -165,7 +165,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `BOT_INTEGRATION.md` — Appels app → bot, flux d'activité anonymisé.
 - `BOT_PAGE.md` — Pages `/bot` et `/bot/docs`.
 - `BOT_FEATURES_NEEDED.md` — Fonctionnalités à développer côté bot.
-- `DISCORD_NOTIFICATIONS.md` — Rappels de match et signalement d'un problème.
+- `DISCORD_NOTIFICATIONS.md` — Rappels de match (J-7, J-1), annonce d'un horaire posé ou changé (joueurs, arbitres, journal) et signalement d'un problème.
 - `BOT_ACTIVITY_LOG.md` — Journal d'activité : une ligne par fait accompli.
 - `REFEREE_ALERTS.md` — Alertes au rôle arbitre.
 - `PUSH_NOTIFICATIONS.md` — Notifications push, registre `PUSH_TOPICS`, `notifyUsers` / `notifyStaff`.
