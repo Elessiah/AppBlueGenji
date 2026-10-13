@@ -243,10 +243,14 @@ describe("setMatchStartAt", () => {
     // (pris pour une date intermédiaire dont l'annonce n'a atteint personne),
     // sans quoi le rappel 24 h de l'horaire rendu sauterait pour de bon.
     const marks = writes.filter((w) => w.sql.includes("bg_match_reminders"));
-    expect(marks).toHaveLength(1);
-    expect(marks[0].sql).toMatch(/^DELETE FROM bg_match_reminders/);
-    expect(marks[0].sql).toContain("start_at IS NOT NULL AND start_at <> ?");
-    expect(marks[0].params).toEqual([42, "SEEN", "TOLD", new Date(FUTURE)]);
+    expect(marks).toHaveLength(2);
+    // L'observation est redatée à l'horaire rendu : un échec tardif de l'avis
+    // intermédiaire ne la rend pas.
+    expect(marks[0].sql).toMatch(/^UPDATE bg_match_reminders SET start_at = \? WHERE match_id = \? AND offset_key = \?/);
+    expect(marks[0].params).toEqual([new Date(FUTURE), 42, "SEEN"]);
+    expect(marks[1].sql).toMatch(/^DELETE FROM bg_match_reminders/);
+    expect(marks[1].sql).toContain("start_at IS NOT NULL AND start_at <> ?");
+    expect(marks[1].params).toEqual([42, "SEEN", "TOLD", new Date(FUTURE)]);
   });
 
   it("garde la marque `TOLD` au ménage d'une date changée", async () => {

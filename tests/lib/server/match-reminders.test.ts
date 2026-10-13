@@ -425,6 +425,27 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(releases.map(([, params]) => params)).toEqual([[31, "SEEN", "P1D", START]]);
   });
 
+  it("dit dans pm2 une marque d'horaire reçu qui n'a pu être rendue, sans masquer l'échec de l'envoi", async () => {
+    jest.mocked(pushToUsers).mockResolvedValue(0);
+    jest.mocked(pushDiscordDirectMessages).mockRejectedValue(new Error("bot en panne"));
+    const { execute } = await mockDb({});
+    const base = execute.getMockImplementation();
+    execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?")) {
+        throw new Error("Lost connection");
+      }
+      return base!(sql, params);
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+
+    const messages = error.mock.calls.map((call) => String(call[0]));
+    expect(messages).toContain("[match-reminders] marque d'horaire reçu non rendue");
+    // L'échec de l'envoi remonte toujours jusqu'au balayage.
+    expect(messages).toContain("[match-reminders] envoi de rappel en échec");
+  });
+
   it("réserve la marque d'horaire reçu avant l'envoi : une correction immédiate la lit déjà", async () => {
     const { execute } = await mockDb({});
     let toldBeforeSend = false;
