@@ -55,10 +55,16 @@ function row(overrides: Partial<Row> & { id: number }): Row {
   };
 }
 
-function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row; forgotten: number[] } {
+function board(rows: Row[]): {
+  conn: PoolConnection;
+  get: (id: number) => Row;
+  forgotten: number[];
+  forgetCalls: () => number;
+} {
   const table = new Map(rows.map((r) => [r.id, { ...r }]));
   /** Manches dont les marques de rappel ont été effacées. */
   const forgotten: number[] = [];
+  let forgets = 0;
 
   const conn = {
     execute: async (sql: string, params: unknown[]) => {
@@ -68,7 +74,8 @@ function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row; f
 
       if (q.startsWith("SELECT")) return [target ? [{ ...target }] : [], []];
       if (q.startsWith("DELETE FROM bg_match_reminders")) {
-        forgotten.push(id);
+        forgets += 1;
+        forgotten.push(...params.map(Number));
         return [{ affectedRows: 1 }, []];
       }
       if (!target) return [{ affectedRows: 0 }, []];
@@ -97,7 +104,7 @@ function board(rows: Row[]): { conn: PoolConnection; get: (id: number) => Row; f
     },
   } as unknown as PoolConnection;
 
-  return { conn, get: (matchId) => table.get(matchId)!, forgotten };
+  return { conn, get: (matchId) => table.get(matchId)!, forgotten, forgetCalls: () => forgets };
 }
 
 const links = (winnerTarget: number | null, slot: number | null = 1) => ({
@@ -218,7 +225,7 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
   });
 
   it("vide aussi le créneau de perdant d'une double élimination", async () => {
-    const { conn, get } = board([
+    const { conn, get, forgotten, forgetCalls } = board([
       row({ id: 2, status: "READY", team1_id: 7, team2_id: 10 }),
       row({ id: 5, status: "READY", team1_id: 8, team2_id: 11 }),
     ]);
@@ -232,6 +239,9 @@ describe("detachDownstreamOutcome — résultat corrigé en double forfait", () 
     expect(get(2).team1_id).toBeNull();
     expect(get(5).team1_id).toBeNull();
     expect(get(5).status).toBe("PENDING");
+    // Les marques des deux affiches quittées partent en une seule instruction.
+    expect(forgotten).toEqual([2, 5]);
+    expect(forgetCalls()).toBe(1);
   });
 });
 

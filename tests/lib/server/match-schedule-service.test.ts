@@ -141,11 +141,13 @@ describe("setMatchStartAt", () => {
     const reminders = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
     expect(reminders?.sql).toContain("offset_key NOT IN (?, ?)");
     expect(reminders?.params).toEqual([42, "SEEN", "TOLD"]);
-    // … et l'observation est posée aussitôt : un balayage concurrent ne peut
-    // plus prendre l'annonce pour lui.
+    // … et l'observation est posée dans le même geste : un balayage concurrent
+    // ne peut plus prendre l'annonce pour lui. Posée **avant** le ménage : une
+    // insertion après un `DELETE` qui a verrouillé l'intervalle d'index
+    // interbloquerait deux programmations de manches voisines.
     const seen = writes.find((w) => w.sql.startsWith("INSERT IGNORE INTO bg_match_reminders"));
     expect(seen?.params).toEqual([42, "SEEN"]);
-    expect(writes.indexOf(seen!)).toBeGreaterThan(writes.indexOf(reminders!));
+    expect(writes.indexOf(seen!)).toBeLessThan(writes.indexOf(reminders!));
   });
 
   it("rend l'horaire que les joueurs ont reçu en dernier", async () => {

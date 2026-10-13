@@ -90,7 +90,7 @@ describe("notifyMatchScheduleChange — première date", () => {
 
     await notifyMatchScheduleChange(change());
 
-    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: false, previousStartAt: null });
+    expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), { rescheduled: false, previousStartAt: null });
     expect(notifyStaff).toHaveBeenCalledTimes(1);
     expect(staffCall().topic).toBe("MATCH_SCHEDULED");
     expect(staffCall().excludeUserIds).toEqual([9]);
@@ -150,7 +150,7 @@ describe("notifyMatchScheduleChange — date changée", () => {
 
     await notifyMatchScheduleChange(change({ previousStartAt: OLD_START, alreadyAnnounced: true }));
 
-    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: true, previousStartAt: OLD_START });
+    expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), { rescheduled: true, previousStartAt: OLD_START });
     expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
     expect(resolvePush(staffCall().push).body).toContain(", au lieu du ");
     expect(resolvePush(staffCall().push, "en").title).toBe("Match rescheduled");
@@ -165,7 +165,7 @@ describe("notifyMatchScheduleChange — date changée", () => {
     // Date posée quand une place était encore vide : aucune annonce n'est partie.
     await notifyMatchScheduleChange(change({ previousStartAt: OLD_START, alreadyAnnounced: false }));
 
-    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: false, previousStartAt: null });
+    expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), { rescheduled: false, previousStartAt: null });
     expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
     expect(resolvePush(staffCall().push).body).toContain(", au lieu du ");
     expect(logLine()).toContain("au lieu du");
@@ -176,7 +176,7 @@ describe("notifyMatchScheduleChange — date changée", () => {
 
     await notifyMatchScheduleChange(change({ alreadyAnnounced: true }));
 
-    expect(announceMatchSchedule).toHaveBeenCalledWith(42, { rescheduled: true, previousStartAt: null });
+    expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), { rescheduled: true, previousStartAt: null });
     expect(resolvePush(staffCall().push).title).toBe("Match reprogrammé");
     expect(resolvePush(staffCall().push).body).not.toContain("au lieu du");
     expect(logLine()).toContain("🗓️ Match reprogrammé");
@@ -388,13 +388,54 @@ describe("isAnnounceableClearing", () => {
   });
 });
 
+describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
+  it("lit la manche une fois pour le journal, les arbitres et les joueurs", async () => {
+    const execute = mockMatch();
+
+    await notifyMatchScheduleChange(change());
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining(ROW), expect.anything());
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(notifyStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it("lit la manche une fois pour un horaire retiré", async () => {
+    const execute = mockMatch();
+
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining(ROW), OLD_START);
+  });
+
+  it("ne lit rien pour une date réécrite à l'identique", async () => {
+    const execute = mockMatch();
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: null }));
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("n'échoue jamais quand la manche ne peut être lue, et n'annonce rien", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(notifyMatchScheduleChange(change())).resolves.toBeUndefined();
+
+    expect(error).toHaveBeenCalled();
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(notifyStaff).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+});
+
 describe("notifyMatchScheduleChange — horaire retiré", () => {
   it("prévient les joueurs qui l'avaient reçu, les arbitres sauf l'auteur, et journalise", async () => {
     mockMatch();
 
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
 
-    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(42, OLD_START);
+    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), OLD_START);
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     expect(staffCall().topic).toBe("MATCH_SCHEDULED");
     expect(staffCall().excludeUserIds).toEqual([ACTOR.id]);
@@ -423,7 +464,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
     await notifyMatchScheduleChange(
       change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, actor: null }),
     );
-    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(42, OLD_START);
+    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), OLD_START);
     expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
