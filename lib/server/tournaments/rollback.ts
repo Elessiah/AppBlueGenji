@@ -48,6 +48,7 @@ import { ALL_MAP_SOURCES, clearMapSets } from "./match-maps";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { forgetMatchReminders } from "./reminder-marks";
+import { pushTeamToTarget } from "./target-slot";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import {
   planRoundRollback,
@@ -336,8 +337,6 @@ async function repopulateDetachedMatches(
   tournamentId: number,
   matchIds: readonly number[],
 ): Promise<void> {
-  const { pushTeamToTarget } = await import("./scoring");
-
   for (const ids of chunk(matchIds)) {
     const placeholders = ids.map(() => "?").join(", ");
     const [feeders] = await connection.execute<

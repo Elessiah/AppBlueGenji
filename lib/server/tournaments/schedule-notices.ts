@@ -35,6 +35,7 @@ import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
 import { announceMatchSchedule, announceMatchScheduleCleared, type MatchNotice } from "./match-reminders";
+import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { HELD_TIME_GRACE_MS, releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -75,8 +76,6 @@ export type MatchScheduleChange = {
   actor: StaffActor | null;
 };
 
-/** Un horaire passé depuis moins longtemps vaut encore (match en retard). */
-const RECENT_PREVIOUS_MS = HELD_TIME_GRACE_MS;
 
 /**
  * L'horaire que les joueurs tiennent : le dernier reçu (`toldStartAt`) — et
@@ -89,7 +88,7 @@ export function heldStartAt(change: MatchScheduleChange, now: Date = new Date())
   const held = change.toldStartAt;
   if (held === null || held === change.startAt) return null;
   const time = new Date(held).getTime();
-  return time > now.getTime() - RECENT_PREVIOUS_MS ? held : null;
+  return time > now.getTime() - HELD_TIME_GRACE_MS ? held : null;
 }
 
 /**
@@ -166,10 +165,6 @@ function ownsPlayerNotice(row: ScheduledMatchInfoRow, change: MatchScheduleChang
   return sameEntrants(row, change) && stillCurrent(row, change);
 }
 
-/** La rencontre a eu lieu : jouée, ou score saisi en attente de confirmation. */
-function isPlayed(status: string): boolean {
-  return status === "COMPLETED" || status === "AWAITING_CONFIRMATION";
-}
 
 /** Les deux engagées d'une manche pour le journal (`null` : place encore vide). */
 function logEntrants(row: ScheduledMatchInfoRow): { team1: LogEntrant | null; team2: LogEntrant | null } {
@@ -207,7 +202,7 @@ async function notifyReferees(
   if (change.actor) publishStaffAction(line, change.actor);
   // Un match joué ne se rejouera pas : la date est une correction d'archive,
   // tracée au journal mais annoncée à personne (les joueurs non plus).
-  if (!push || isPlayed(row.status)) return 0;
+  if (!push || isPlayedMatchStatus(row.status)) return 0;
 
   // L'auteur ne se prévient pas lui-même. Un arbitre qui joue ce match reçoit
   // les deux versions (étiquettes distinctes) : un doublon plutôt qu'une
@@ -268,8 +263,8 @@ async function logScheduleCleared(
   // Les arbitres avaient reçu « Match programmé » pour cet horaire encore
   // devant : l'avis de retrait le remplace sur leur appareil (même étiquette).
   const previous = new Date(change.previousStartAt).getTime();
-  if (!stillCurrent(row, change) || isPlayed(row.status)) return;
-  if (!Number.isFinite(previous) || previous <= Date.now() - RECENT_PREVIOUS_MS) return;
+  if (!stillCurrent(row, change) || isPlayedMatchStatus(row.status)) return;
+  if (!Number.isFinite(previous) || previous <= Date.now() - HELD_TIME_GRACE_MS) return;
   await notifyStaff({
     topic: "MATCH_SCHEDULED",
     excludeUserIds: change.actor ? [change.actor.id] : [],
@@ -301,7 +296,9 @@ async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchSc
   const held = heldStartAt(change);
   const results = await Promise.allSettled([
     logScheduleCleared(row, { ...change, previousStartAt }),
-    held !== null && isAnnounceableClearing(change) && ownsPlayerNotice(row, change)
+    // `held` non nul : un horaire reçu et encore valable (`isAnnounceableClearing`
+    // sans relire l'horloge une seconde fois).
+    held !== null && change.refereeScheduling && ownsPlayerNotice(row, change)
       ? announceMatchScheduleCleared(row, held)
       : Promise.resolve(0),
   ]);

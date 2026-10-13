@@ -54,6 +54,7 @@ import {
   type ScheduleAnnouncement,
 } from "@/lib/shared/discord-notifications";
 import { inBatches } from "@/lib/shared/in-batches";
+import { PLAYED_MATCH_STATUSES, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { tournamentPageUrl } from "./app-url";
 import { releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
@@ -100,7 +101,7 @@ export type MatchNotice = Omit<ScheduledMatch, "start_at" | "team1_id" | "team2_
 function playableMatch(row: MatchNotice, startAt: MaybeInstant): ScheduledMatch | null {
   const { team1_id, team2_id, team1_name, team2_name } = row;
   if (team1_id === null || team2_id === null || team1_name === null || team2_name === null) return null;
-  if (startAt === null || row.status === "COMPLETED" || row.status === "AWAITING_CONFIRMATION") return null;
+  if (startAt === null || isPlayedMatchStatus(row.status)) return null;
   return { ...row, team1_id, team2_id, team1_name, team2_name, start_at: startAt };
 }
 
@@ -586,7 +587,7 @@ const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_num
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')
+      WHERE m.status NOT IN (${PLAYED_MATCH_STATUSES.map((status) => `'${status}'`).join(", ")})
         AND m.start_at IS NOT NULL
         AND m.start_at > NOW()`;
 

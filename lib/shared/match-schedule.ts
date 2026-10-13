@@ -66,6 +66,18 @@ export function normalizeMatchStartAt(input: unknown): string | null {
   return date.toISOString();
 }
 
+/**
+ * Statuts d'une rencontre qui **a eu lieu** : jouée, ou score saisi en attente
+ * de confirmation. Un horaire n'y est annoncé à personne (ni observation, ni
+ * annonce, ni balayage) — une seule définition pour les trois.
+ */
+export const PLAYED_MATCH_STATUSES = ["COMPLETED", "AWAITING_CONFIRMATION"] as const;
+
+/** La rencontre a eu lieu (voir {@link PLAYED_MATCH_STATUSES}). */
+export function isPlayedMatchStatus(status: string): boolean {
+  return (PLAYED_MATCH_STATUSES as readonly string[]).includes(status);
+}
+
 /** Vrai si `input` est une date de début exploitable. */
 export function isValidMatchStartAt(input: unknown): boolean {
   return normalizeMatchStartAt(input) !== null;

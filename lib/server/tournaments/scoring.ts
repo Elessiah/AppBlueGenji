@@ -26,8 +26,6 @@ import {
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
-export { pushTeamToTarget } from "./target-slot";
-
 
 export async function finalizeMatch(
   connection: PoolConnection,

@@ -23,7 +23,7 @@ import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
 import { MATCH_SEEN_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
+import { isPlayedMatchStatus, normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import type { StaffActor } from "@/lib/shared/log-privacy";
@@ -217,11 +217,6 @@ async function resetReminderMarks(
 
 type ToldRow = RowDataPacket & { start_at: Date | string | null };
 
-/** La rencontre a eu lieu : jouée, ou score saisi en attente de confirmation. */
-function isPlayedStatus(status: string): boolean {
-  return status === "COMPLETED" || status === "AWAITING_CONFIRMATION";
-}
-
 /** Identifiant d'une place de la manche (`null` : vide). */
 function nullableId(value: number | string | null): number | null {
   return value === null ? null : Number(value);
@@ -312,7 +307,7 @@ export async function setMatchStartAt(
               // Un match joué (score saisi) n'est annoncé à personne : pas
               // d'observation posée pour lui — s'il revient à jouer, le
               // balayage l'annoncera.
-              row.team1_id !== null && row.team2_id !== null && !isPlayedStatus(row.status),
+              row.team1_id !== null && row.team2_id !== null && !isPlayedMatchStatus(row.status),
             );
       await connection.commit();
       written = {
