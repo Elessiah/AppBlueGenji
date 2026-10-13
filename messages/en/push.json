@@ -13,8 +13,8 @@
       "description": "A tournament your team is registered for has just started."
     },
     "MATCH_REMINDER": {
-      "label": "Match reminders",
-      "description": "A match's time as soon as it is set or changed, then reminders one week and 24 h before."
+      "label": "Match times and reminders",
+      "description": "A match's time as soon as it is set, changed or removed, then a reminder 24 h before."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Join requests",
@@ -38,7 +38,7 @@
     },
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",
-      "description": "Another member of the refereeing staff schedules or reschedules a match."
+      "description": "Another referee schedules a match or changes its time."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",

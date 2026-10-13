@@ -34,14 +34,15 @@ import {
   notifyUsers,
   type NotificationRecipient,
 } from "@/lib/server/notify";
-import { matchReminderPush } from "@/lib/shared/push-messages";
+import { matchReminderPush, matchScheduleClearedPush } from "@/lib/shared/push-messages";
 import {
   MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
-  MATCH_ANNOUNCED_KEY,
   MATCH_SEEN_KEY,
+  MATCH_TOLD_KEY,
   buildMatchReminderMessage,
   buildMatchScheduleAnnouncement,
+  buildMatchScheduleClearedNotice,
   dueMatchReminders,
   matchRoundLabel,
   openedMatchReminders,
@@ -149,6 +150,14 @@ async function claimReminder(matchId: number, offsetKey: string): Promise<boolea
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
+/** Les deux engagées d'une manche, chacune face à l'autre. */
+function matchSides(match: ScheduledMatchRow): { teamId: number; teamName: string; opponentName: string }[] {
+  return [
+    { teamId: Number(match.team1_id), teamName: String(match.team1_name), opponentName: String(match.team2_name) },
+    { teamId: Number(match.team2_id), teamName: String(match.team2_name), opponentName: String(match.team1_name) },
+  ];
+}
+
 /**
  * Un envoi retenu : soit un palier de rappel, soit l'annonce d'une manche
  * programmée tardivement (`offset === null`).
@@ -230,22 +239,9 @@ async function dispatchPlannedSend(
   const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
   const url = tournamentPageUrl(Number(match.tournament_id));
 
-  const sides: { teamId: number; teamName: string; opponentName: string }[] = [
-    {
-      teamId: Number(match.team1_id),
-      teamName: String(match.team1_name),
-      opponentName: String(match.team2_name),
-    },
-    {
-      teamId: Number(match.team2_id),
-      teamName: String(match.team2_name),
-      opponentName: String(match.team1_name),
-    },
-  ];
-
   // Un message par engagée, pas un pour tout le monde : chaque joueur lit
   // « ton équipe contre l'autre », dans le bon sens.
-  for (const side of sides) {
+  for (const side of matchSides(match)) {
     const recipients = recipientsByTeam.get(side.teamId) ?? [];
     if (recipients.length === 0) continue;
 
@@ -286,18 +282,15 @@ async function dispatchPlannedSend(
     });
     dispatched += 1;
   }
-  // Une annonce partie le dit en base : une date posée plus tard se lira
-  // « reprogrammée » (`setMatchStartAt`), ce que la marque d'observation,
-  // posée aussi en silence, ne peut pas prouver.
-  if (offset === null && dispatched > 0) await claimReminder(Number(match.id), MATCH_ANNOUNCED_KEY);
+  // Un horaire parti le dit en base : une date posée plus tard se lira
+  // « reprogrammée », une date effacée « retirée » (`setMatchStartAt`) — ce que
+  // ni la marque d'observation ni celle d'un palier ne prouvent.
+  if (dispatched > 0) await claimReminder(Number(match.id), MATCH_TOLD_KEY);
   return dispatched;
 }
 
-/**
- * Manches à venir, non jouées, aux deux engagées connues — le balayage y ajoute
- * sa fenêtre de lecture, l'annonce d'un horaire le numéro de la manche.
- */
-const SCHEDULED_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
+/** Manches non jouées aux deux engagées connues. */
+const MATCH_WITH_ENTRANTS_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type,
             t1.name AS team1_name, t2.name AS team2_name
@@ -305,9 +298,15 @@ const SCHEDULED_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.start_at IS NOT NULL
-        AND m.start_at > NOW()
-        AND m.status <> 'COMPLETED'`;
+      WHERE m.status <> 'COMPLETED'`;
+
+/**
+ * Manches à venir, non jouées, aux deux engagées connues — le balayage y ajoute
+ * sa fenêtre de lecture, l'annonce d'un horaire le numéro de la manche.
+ */
+const SCHEDULED_MATCH_SELECT = `${MATCH_WITH_ENTRANTS_SELECT}
+        AND m.start_at IS NOT NULL
+        AND m.start_at > NOW()`;
 
 /**
  * Annonce aux joueurs des deux engagées l'horaire qu'un arbitre vient de poser
@@ -315,15 +314,16 @@ const SCHEDULED_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round
  *
  * Le balayage seul laissait deux trous : il ne passe qu'à la lecture de la
  * liste des tournois, et une date posée au-delà de sa fenêtre de lecture (plus
- * de huit jours) n'était annoncée par rien — le joueur l'apprenait au rappel
- * « une semaine ». Ici l'annonce part tout de suite, quelle que soit
- * l'échéance.
+ * de sa fenêtre de lecture) n'était annoncée par rien avant son rappel. Ici
+ * l'annonce part tout de suite, quelle que soit l'échéance.
  *
- * L'appelant a déjà effacé les rappels de l'ancienne date : la marque
- * d'observation se réserve donc à neuf, et c'est elle qui interdit le doublon
- * avec un balayage concurrent — celui qui la pose annonce, l'autre se tait. Les
- * paliers déjà ouverts sont consommés comme au premier passage du balayage ;
- * ceux qui restent devant suivent leur cours.
+ * L'appelant (`setMatchStartAt`) a effacé les paliers de l'ancienne date et
+ * posé lui-même la marque d'observation, **dans le même geste** : un balayage
+ * concurrent ne peut donc pas prendre l'annonce pour lui (régime d'annonce
+ * fermé), seulement un palier. Les paliers déjà ouverts sont consommés comme au
+ * premier passage du balayage ; si l'un d'eux est déjà pris, c'est qu'un
+ * balayage vient d'envoyer son rappel — qui porte la nouvelle date — et
+ * l'annonce se tait. Les paliers encore devant suivent leur cours.
  *
  * Meilleur effort : rien n'est annoncé pour une manche passée, jouée, ou dont
  * une engagée manque encore (le balayage l'annoncera quand elle sera connue).
@@ -343,15 +343,75 @@ export async function announceMatchSchedule(
   ]);
   const match = matches[0];
   if (!match) return 0;
-  if (!(await claimReminder(matchId, MATCH_SEEN_KEY))) return 0;
 
   const opened = openedMatchReminders(match.start_at, now);
-  for (const offset of opened) await claimReminder(matchId, offset.key);
+  for (const offset of opened) {
+    if (!(await claimReminder(matchId, offset.key))) return 0;
+  }
   const openedKeys = new Set(opened.map((offset) => offset.key));
   const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
 
   const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
   return dispatchPlannedSend({ match, offset: null, remaining: [...remaining], announcement }, recipientsByTeam);
+}
+
+/**
+ * Prévient les joueurs des deux engagées qu'un arbitre a **retiré** l'horaire
+ * qu'ils avaient reçu (`setMatchStartAt`, l'appelant vérifie la marque
+ * {@link MATCH_TOLD_KEY}) : message privé Discord et push, même étiquette que
+ * l'annonce qu'il remplace. Les marques restent : la date reposée ensuite se
+ * lira « reprogrammée ».
+ *
+ * @param previousStartAt L'horaire retiré.
+ * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
+ */
+export async function announceMatchScheduleCleared(matchId: number, previousStartAt: string): Promise<number> {
+  const db = await getDatabase();
+  const [matches] = await db.query<ScheduledMatchRow[]>(`${MATCH_WITH_ENTRANTS_SELECT} AND m.id = ? LIMIT 1`, [
+    matchId,
+  ]);
+  const match = matches[0];
+  if (!match) return 0;
+
+  const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
+  const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
+  const url = tournamentPageUrl(Number(match.tournament_id));
+  const solo = match.participant_type === "SOLO";
+  let dispatched = 0;
+  for (const side of matchSides(match)) {
+    const recipients = recipientsByTeam.get(side.teamId) ?? [];
+    if (recipients.length === 0) continue;
+    const context = {
+      tournamentName: String(match.tournament_name),
+      tournamentUrl: url,
+      teamName: side.teamName,
+      opponentName: side.opponentName,
+      roundLabel,
+      startAt: previousStartAt,
+      solo,
+    };
+    await notifyUsers(recipients, {
+      topic: "MATCH_REMINDER",
+      discord: { message: buildMatchScheduleClearedNotice(context), context: "match-scheduled" },
+      push: (locale) =>
+        matchScheduleClearedPush(
+          {
+            tournamentId: Number(match.tournament_id),
+            tournamentName: context.tournamentName,
+            matchId: Number(match.id),
+            teamName: side.teamName,
+            opponentName: side.opponentName,
+            bracket: String(match.bracket),
+            roundNumber: Number(match.round_number),
+            startAt: previousStartAt,
+            solo,
+          },
+          locale,
+        ),
+    });
+    dispatched += 1;
+  }
+  return dispatched;
 }
 
 async function runSweep(now: Date): Promise<number> {
@@ -365,7 +425,7 @@ async function runSweep(now: Date): Promise<number> {
   //
   // La borne haute vient du module partagé et vaut l'horizon **plus une marge** :
   // une fenêtre de lecture égale à l'horizon ferait découvrir chaque manche à la
-  // seconde où le palier « une semaine » s'ouvre, donc toujours par le régime
+  // seconde où le premier palier s'ouvre, donc toujours par le régime
   // d'annonce, et ce palier ne partirait jamais.
   const [matches] = await db.query<ScheduledMatchRow[]>(
     `${SCHEDULED_MATCH_SELECT}

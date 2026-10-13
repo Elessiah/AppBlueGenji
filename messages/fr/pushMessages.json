@@ -11,10 +11,11 @@
     "title": "Match dans {offset}",
     "titleScheduled": "Match programmé",
     "titleRescheduled": "Match reprogrammé",
+    "titleCleared": "Horaire du match retiré",
     "body": "{pairing} · {tournament}, {round}. Coup d'envoi {start} (heure de Paris).",
     "bodyRescheduled": "{pairing} · {tournament}, {round}. Coup d'envoi {start} (heure de Paris), au lieu du {previous}.",
+    "bodyCleared": "{pairing} · {tournament}, {round}. Le coup d'envoi prévu {previous} (heure de Paris) est retiré : le nouvel horaire te sera annoncé.",
     "offset": {
-      "P7D": "une semaine",
       "P1D": "24 heures"
     }
   },

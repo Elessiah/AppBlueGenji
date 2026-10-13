@@ -266,6 +266,29 @@ export function formatMatchScheduledLog(context: {
 }
 
 /**
+ * Horaire d'un match retiré par l'arbitrage (`setMatchStartAt` avec une date
+ * vide). Mêmes règles que {@link formatMatchScheduledLog} : engagées par
+ * `entrantLabel`, « TBD » pour une place vide, auteur « le staff ».
+ */
+export function formatMatchScheduleClearedLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  previousStartAt: string | Date;
+}): string {
+  const team1 = context.team1 ? entrantLabel(context.team1) : "TBD";
+  const team2 = context.team2 ? entrantLabel(context.team2) : "TBD";
+  return (
+    `${lead("🗓️", "Horaire retiré", context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber)} — ` +
+    `${team1} vs ${team2} (#${context.matchId}), le coup d'envoi du ${formatMatchStart(context.previousStartAt)} ` +
+    `(heure de Paris) est retiré, par ${ANONYMOUS_STAFF_LABEL}.`
+  );
+}
+
+/**
  * Retrait d'une inscription par le staff, avant le coup d'envoi
  * (`lib/shared/entrant-removal.ts`).
  *

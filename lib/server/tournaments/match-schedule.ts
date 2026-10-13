@@ -21,7 +21,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
-import { MATCH_TOLD_KEYS } from "@/lib/shared/discord-notifications";
+import { MATCH_SEEN_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
@@ -135,7 +135,7 @@ export async function setMatchStartAt(
   if (!blank && startAt === null) throw new Error("INVALID_MATCH_START_AT");
 
   const outcome = await withConnection(async (connection) => {
-    let written: { tournamentId: number; previousStartAt: string | null };
+    let written: { tournamentId: number; previousStartAt: string | null; bothEntrants: boolean };
     await connection.beginTransaction();
     try {
       const locked = await lockScheduleRow(connection, matchId);
@@ -163,7 +163,11 @@ export async function setMatchStartAt(
         await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [matchId]);
       }
       await connection.commit();
-      written = { tournamentId: Number(row.tournament_id), previousStartAt: toIso(row.start_at) };
+      written = {
+        tournamentId: Number(row.tournament_id),
+        previousStartAt: toIso(row.start_at),
+        bothEntrants: row.team1_id !== null && row.team2_id !== null,
+      };
     } catch (error) {
       await connection.rollback().catch(() => undefined);
       throw error;
@@ -176,23 +180,40 @@ export async function setMatchStartAt(
     // produire. Après le commit, sur la même connexion, et au meilleur effort :
     // une manche reprogrammée ne doit pas échouer parce que le ménage a échoué.
     //
-    // Avant l'effacement, les marques disent si les joueurs avaient **reçu** un
-    // horaire (annonce ou rappel, `MATCH_TOLD_KEYS` — pas la marque
-    // d'observation, posée aussi en silence) : la nouvelle date se lit alors
-    // « Match reprogrammé ». Une date **effacée** garde ses marques (inertes :
-    // le balayage ne lit que les manches datées), pour que la date reposée
-    // ensuite le dise encore.
+    // - La marque `TOLD` (un horaire est réellement parti vers les joueurs) est
+    //   lue d'abord et **gardée** : elle fait dire « reprogrammé » à la nouvelle
+    //   date, « retiré » à une date effacée.
+    // - Les deux engagées connues, la marque d'observation est gardée ou posée
+    //   **dans le même geste** que l'effacement : un balayage qui passerait
+    //   entre ce ménage et l'annonce (`announceMatchSchedule`) ne peut plus la
+    //   prendre pour lui et annoncer à sa place, sans l'ancienne date. Une
+    //   engagée manquante : la marque part avec le reste, et le balayage
+    //   annoncera la manche quand elle sera connue.
+    // - Une date **effacée** garde toutes ses marques (inertes : le balayage ne
+    //   lit que les manches datées).
     let alreadyAnnounced = false;
-    if (startAt !== null && written.previousStartAt !== startAt) {
+    if (written.previousStartAt !== startAt) {
       try {
-        const [seen] = await connection.execute<RowDataPacket[]>(
-          `SELECT 1 FROM bg_match_reminders
-            WHERE match_id = ? AND offset_key IN (${MATCH_TOLD_KEYS.map(() => "?").join(", ")})
-            LIMIT 1`,
-          [matchId, ...MATCH_TOLD_KEYS],
+        const [told] = await connection.execute<RowDataPacket[]>(
+          `SELECT 1 FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
+          [matchId, MATCH_TOLD_KEY],
         );
-        alreadyAnnounced = seen.length > 0;
-        await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [matchId]);
+        alreadyAnnounced = told.length > 0;
+        if (startAt !== null && written.bothEntrants) {
+          await connection.execute(
+            `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
+            [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY],
+          );
+          await connection.execute(
+            `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key) VALUES (?, ?)`,
+            [matchId, MATCH_SEEN_KEY],
+          );
+        } else if (startAt !== null) {
+          await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key <> ?`, [
+            matchId,
+            MATCH_TOLD_KEY,
+          ]);
+        }
       } catch {
         // Meilleur effort : au pire, le cycle des rappels garde son ancien état.
       }
@@ -201,9 +222,9 @@ export async function setMatchStartAt(
   });
 
   publishMatchUpdatedEvent(outcome.tournamentId, { landingLive: true });
-  // Joueurs, arbitres et journal apprennent l'horaire posé ou changé
+  // Joueurs, arbitres et journal apprennent l'horaire posé, changé ou retiré
   // (`./schedule-notices`) — sans retenir la réponse, et seulement après le
-  // ménage des rappels, dont l'annonce réserve la marque à neuf.
+  // ménage des rappels.
   void notifyMatchScheduleChange({
     matchId,
     startAt,

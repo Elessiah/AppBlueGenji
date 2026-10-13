@@ -13,8 +13,10 @@
  *   et nommé dans pm2 (`publishStaffAction`). Aucun pseudo de joueur : les
  *   engagées passent par `entrantLabel`.
  *
- * Rien ne part pour une date effacée, inchangée, ou déjà passée (correction
- * d'archive). Tout est au meilleur effort et après le commit : l'horaire est
+ * Une date **effacée** est journalisée et, si les joueurs avaient reçu
+ * l'horaire et qu'il était encore devant, leur est annoncée (« Horaire du
+ * match retiré ») ; pas de push aux arbitres. Rien ne part pour une date
+ * inchangée, ni pour une date posée déjà passée (correction d'archive). Tout est au meilleur effort et après le commit : l'horaire est
  * enregistré, une panne de notification n'y change rien.
  */
 import type { RowDataPacket } from "mysql2/promise";
@@ -22,12 +24,12 @@ import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
-import { formatMatchScheduledLog } from "@/lib/shared/bot-logs";
+import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/shared/bot-logs";
 import type { ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
 import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduledStaffPush } from "@/lib/shared/push-messages";
-import { announceMatchSchedule } from "./match-reminders";
+import { announceMatchSchedule, announceMatchScheduleCleared } from "./match-reminders";
 
 type ScheduledMatchInfoRow = RowDataPacket & {
   id: number;
@@ -145,13 +147,60 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
   return pushed;
 }
 
+/** L'horaire effacé mérite-t-il d'être annoncé aux joueurs ? Reçu, et encore devant. */
+export function isAnnounceableClearing(change: MatchScheduleChange, now: Date = new Date()): boolean {
+  if (change.startAt !== null || change.previousStartAt === null || !change.alreadyAnnounced) return false;
+  const previous = new Date(change.previousStartAt).getTime();
+  return Number.isFinite(previous) && previous > now.getTime();
+}
+
+/** Ligne du journal pour un horaire retiré. */
+async function logScheduleCleared(change: MatchScheduleChange & { previousStartAt: string }): Promise<void> {
+  if (!change.actor) return;
+  const row = await loadMatchInfo(change.matchId);
+  if (!row) return;
+  const participantType = toParticipantType(row.participant_type);
+  const entrant = (name: string | null): LogEntrant | null => (name === null ? null : { name, participantType });
+  publishStaffAction(
+    formatMatchScheduleClearedLog({
+      tournament: { id: Number(row.tournament_id), name: String(row.tournament_name) },
+      matchId: change.matchId,
+      bracket: String(row.bracket),
+      roundNumber: Number(row.round_number),
+      team1: entrant(row.team1_name),
+      team2: entrant(row.team2_name),
+      previousStartAt: change.previousStartAt,
+    }),
+    change.actor,
+  );
+}
+
+/** Horaire effacé : journal, et avis aux joueurs qui l'avaient reçu. */
+async function notifyScheduleCleared(change: MatchScheduleChange): Promise<void> {
+  const { previousStartAt } = change;
+  if (previousStartAt === null) return;
+  const results = await Promise.allSettled([
+    logScheduleCleared({ ...change, previousStartAt }),
+    isAnnounceableClearing(change) ? announceMatchScheduleCleared(change.matchId, previousStartAt) : Promise.resolve(0),
+  ]);
+  for (const result of results) {
+    if (result.status === "rejected" && !isMissingTableError(result.reason)) {
+      console.error("[notify] horaire retiré non annoncé", result.reason);
+    }
+  }
+}
+
 /**
  * Annonce un horaire posé ou changé, aux joueurs et aux arbitres. Jamais une
  * exception : l'appelant a déjà rendu sa réponse.
  */
 export async function notifyMatchScheduleChange(change: MatchScheduleChange): Promise<void> {
   const { startAt } = change;
-  if (startAt === null || !isAnnounceableSchedule(change)) return;
+  if (startAt === null) {
+    await notifyScheduleCleared(change);
+    return;
+  }
+  if (!isAnnounceableSchedule(change)) return;
   const results = await Promise.allSettled([
     announceMatchSchedule(change.matchId, playerAnnouncement(change)),
     notifyReferees({ ...change, startAt }),

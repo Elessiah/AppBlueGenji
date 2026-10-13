@@ -86,7 +86,7 @@ export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", loc
 }
 
 /** Palier d'un rappel (`MATCH_REMINDER_OFFSETS`), par sa clé. */
-export type MatchReminderOffsetKey = "P7D" | "P1D";
+export type MatchReminderOffsetKey = "P1D";
 
 /**
  * Libellé d'une manche (`matchRoundLabel`, français du journal Discord) dans
@@ -184,6 +184,25 @@ export function matchReminderPush(
       change,
       locale,
     ),
+    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
+    tag: `${matchTag(side.matchId)}-reminder`,
+  };
+}
+
+/**
+ * Horaire retiré par l'arbitrage : `side.startAt` porte l'horaire qui ne vaut
+ * plus. Même étiquette que l'annonce, qu'il remplace sur l'appareil.
+ */
+export function matchScheduleClearedPush(side: ScheduledMatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("matchReminder.titleCleared"),
+    body: text.t("matchReminder.bodyCleared", {
+      pairing: pairing(side, text),
+      tournament: side.tournamentName,
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale),
+      previous: pushMatchStart(side.startAt, locale),
+    }),
     url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-reminder`,
   };

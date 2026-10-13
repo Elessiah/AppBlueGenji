@@ -13,8 +13,8 @@
       "description": "Un tournoi où ton équipe est inscrite vient de commencer."
     },
     "MATCH_REMINDER": {
-      "label": "Rappels de match",
-      "description": "L'horaire d'un match dès qu'il est posé ou changé, puis des rappels une semaine et 24 h avant."
+      "label": "Horaires et rappels de match",
+      "description": "L'horaire d'un match dès qu'il est posé, changé ou retiré, puis un rappel 24 h avant."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Demandes d'adhésion",
@@ -37,8 +37,8 @@
       "description": "Un conflit de score, un score resté trop longtemps sans confirmation ou un problème signalé attend un arbitre."
     },
     "MATCH_SCHEDULED": {
-      "label": "Matchs programmés",
-      "description": "Un autre membre de l'arbitrage programme ou reprogramme un match."
+      "label": "Matchs planifiés",
+      "description": "Un autre arbitre planifie un match ou en change l'horaire."
     },
     "STAFF_REPORT": {
       "label": "Signalements reçus",
