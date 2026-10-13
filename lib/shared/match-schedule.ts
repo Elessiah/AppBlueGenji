@@ -78,6 +78,16 @@ export function isPlayedMatchStatus(status: string): boolean {
   return (PLAYED_MATCH_STATUSES as readonly string[]).includes(status);
 }
 
+/**
+ * La rencontre ne se jouera pas (plus) : jouée, ou d'un tournoi clos — un
+ * horaire n'y est annoncé à personne. Règle unique de l'écriture de la date
+ * (`setMatchStartAt`), des avis (`schedule-notices`, qui lit `COMPLETED` pour
+ * un tournoi clos), du balayage et du dialogue de l'arbitre.
+ */
+export function isMatchOver(status: string, tournamentFinished: boolean): boolean {
+  return tournamentFinished || isPlayedMatchStatus(status);
+}
+
 /** Vrai si `input` est une date de début exploitable. */
 export function isValidMatchStartAt(input: unknown): boolean {
   return normalizeMatchStartAt(input) !== null;

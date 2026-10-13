@@ -21,9 +21,9 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
-import { MATCH_SEEN_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
+import { MATCH_SEEN_KEY, MATCH_STAFF_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { isPlayedMatchStatus, normalizeMatchStartAt } from "@/lib/shared/match-schedule";
+import { isMatchOver, normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import type { StaffActor } from "@/lib/shared/log-privacy";
@@ -116,12 +116,14 @@ async function matchTournamentId(connection: PoolConnection, matchId: number): P
  * lecture ordinaire avant les verrous : la première de la transaction, celle
  * de la marque `TOLD` (`resetReminderMarks`), voit l'état le plus récent.
  */
-async function lockScheduleTournament(connection: PoolConnection, tournamentId: number): Promise<boolean> {
-  const [rows] = await connection.execute<(RowDataPacket & { referee_scheduling: number | null })[]>(
-    `SELECT referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
-    [tournamentId],
-  );
-  return Number(rows[0]?.referee_scheduling ?? 0) === 1;
+async function lockScheduleTournament(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<{ refereeScheduling: boolean; finished: boolean }> {
+  const [rows] = await connection.execute<
+    (RowDataPacket & { referee_scheduling: number | null; state: string | null })[]
+  >(`SELECT referee_scheduling, state FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`, [tournamentId]);
+  return { refereeScheduling: Number(rows[0]?.referee_scheduling ?? 0) === 1, finished: rows[0]?.state === "FINISHED" };
 }
 
 async function lockScheduleRow(connection: PoolConnection, matchId: number): Promise<MatchScheduleRow | null> {
@@ -167,18 +169,23 @@ async function resetReminderMarks(
   startAt: string | null,
   poster: { bothEntrants: boolean; played: boolean },
 ): Promise<ToldSchedule> {
-  let told: ToldRow[];
+  let marks: MarkRow[];
   try {
-    [told] = await connection.execute<ToldRow[]>(
-      `SELECT start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
-      [matchId, MATCH_TOLD_KEY],
+    [marks] = await connection.execute<MarkRow[]>(
+      `SELECT offset_key, start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key IN (?, ?)`,
+      [matchId, MATCH_TOLD_KEY, MATCH_STAFF_KEY],
     );
   } catch (error) {
     if (isMissingTableError(error)) return NOTHING_TOLD;
     throw error;
   }
-  const result: ToldSchedule =
-    told.length > 0 ? { alreadyAnnounced: true, toldStartAt: toIso(told[0].start_at) } : NOTHING_TOLD;
+  const told = marks.find((mark) => mark.offset_key === MATCH_TOLD_KEY);
+  const staff = marks.find((mark) => mark.offset_key === MATCH_STAFF_KEY);
+  const result: ToldSchedule = {
+    alreadyAnnounced: told !== undefined,
+    toldStartAt: told ? toIso(told.start_at) : null,
+    staffStartAt: staff ? toIso(staff.start_at) : null,
+  };
   // Rendue à l'horaire que les joueurs tiennent : rien à réannoncer, et le
   // rappel déjà parti pour lui ne doit pas repartir — les marques restent. Une
   // date déjà passée (correction d'archive, saisie de travers) n'est annoncée à
@@ -258,14 +265,18 @@ async function restoreHeldMarks(
   );
 }
 
-type ToldRow = RowDataPacket & { start_at: Date | string | null };
+type MarkRow = RowDataPacket & { offset_key: string; start_at: Date | string | null };
 
 /** Identifiant d'une place de la manche (`null` : vide). */
 function nullableId(value: number | string | null): number | null {
   return value === null ? null : Number(value);
 }
-type ToldSchedule = { alreadyAnnounced: boolean; toldStartAt: string | null };
-const NOTHING_TOLD: ToldSchedule = { alreadyAnnounced: false, toldStartAt: null };
+/**
+ * Ce que les joueurs ont reçu (`TOLD`) et ce qui a été poussé aux arbitres
+ * (`STAFF`), lus sous les verrous de l'écriture de la date.
+ */
+type ToldSchedule = { alreadyAnnounced: boolean; toldStartAt: string | null; staffStartAt: string | null };
+const NOTHING_TOLD: ToldSchedule = { alreadyAnnounced: false, toldStartAt: null, staffStartAt: null };
 
 /**
  * Fixe (ou efface) la date de début d'un match.
@@ -303,6 +314,7 @@ export async function setMatchStartAt(
       previousStartAt: string | null;
       alreadyAnnounced: boolean;
       toldStartAt: string | null;
+      staffStartAt: string | null;
       refereeScheduling: boolean;
       entrantIds: [number | null, number | null];
     };
@@ -315,7 +327,7 @@ export async function setMatchStartAt(
       // les marques de rappel d'une manche voisine (verrou d'intervalle) puis
       // met à jour celle-ci, et cette programmation qui tient la manche puis
       // pose sa marque, s'attendraient l'une l'autre — un interblocage.
-      const refereeScheduling = await lockScheduleTournament(connection, tournamentId);
+      const { refereeScheduling, finished } = await lockScheduleTournament(connection, tournamentId);
       const row = await lockScheduleRow(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
 
@@ -345,7 +357,7 @@ export async function setMatchStartAt(
           ? NOTHING_TOLD
           : await resetReminderMarks(connection, matchId, startAt, {
               bothEntrants: row.team1_id !== null && row.team2_id !== null,
-              played: isPlayedMatchStatus(row.status),
+              played: isMatchOver(row.status, finished),
             });
       await connection.commit();
       written = {
@@ -373,6 +385,7 @@ export async function setMatchStartAt(
     previousStartAt: outcome.previousStartAt,
     alreadyAnnounced: outcome.alreadyAnnounced,
     toldStartAt: outcome.toldStartAt,
+    staffStartAt: outcome.staffStartAt,
     refereeScheduling: outcome.refereeScheduling,
     entrantIds: outcome.entrantIds,
     actor,

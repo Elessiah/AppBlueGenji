@@ -26,7 +26,7 @@ import {
   type MatchStartEntryField,
   type MatchStartEntryState,
 } from "@/lib/shared/match-start-entry";
-import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
+import { isMatchOver } from "@/lib/shared/match-schedule";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
@@ -481,7 +481,8 @@ export function MatchScheduleDialog({
               text,
               refereeScheduling,
               match.team1Id !== null && match.team2Id !== null,
-              isPlayedMatchStatus(match.status),
+              // Tournoi clos : ses manches comptent pour jouées, rien n'est annoncé.
+              isMatchOver(match.status, tournamentFinished),
             )}
           </p>
 

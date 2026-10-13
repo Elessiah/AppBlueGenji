@@ -152,6 +152,16 @@ export const MATCH_SEEN_KEY = "SEEN";
  */
 export const MATCH_TOLD_KEY = "TOLD";
 
+/**
+ * Marque de l'horaire **poussé aux arbitres** (`MATCH_SCHEDULED`) : posée
+ * quand l'avis « Match programmé » a atteint au moins un appareil, avec
+ * l'horaire poussé. Seul un horaire qu'elle tient se retire chez eux (« Horaire
+ * du match retiré ») : une date seulement journalisée (passée, match joué,
+ * tournoi clos) n'a rien à remplacer. Indépendante de l'affiche : une
+ * correction de score n'efface pas ce que les arbitres ont reçu.
+ */
+export const MATCH_STAFF_KEY = "STAFF";
+
 
 /**
  * Paliers dont la fenêtre est **déjà ouverte** à `now`.
