@@ -159,7 +159,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   coupé puis relancé, un lancement annulé puis refait (horaire changé) ne
   repostent jamais. La réservation n'est **rendue** que si rien n'est parti
   pour une cause passagère — bot injoignable ou d'une version antérieure,
-  salon fermé ou mode lent (`503`), panne (`500`) — et le balayage suivant
+  salon fermé, mode lent ou Discord sans réponse en lisant le salon (`503`
+  `discord-unreachable`), panne (`500`) — et le balayage suivant
   réessaie tant que le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un refus de
   Discord lui-même (`503` `automod` / `send-rejected` : le même message serait
@@ -167,12 +168,16 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   garde, comme un `503` `discord-down` (Discord lâché pendant l'envoi : il a
   pu partir). Un **délai dépassé** (15 s) la garde aussi : le bot a
   pu publier quand même, et une annonce perdue vaut mieux qu'un second
-  `@everyone` à tout le serveur (`timed-out`, `console.error` dans pm2, qui dit d'attendre quelques minutes avant de vérifier #live) ; il
+  `@everyone` à tout le serveur (`timed-out`, `console.error` dans pm2 :
+  « son envoi peut encore aboutir », sans consigne d'action) ; il
   n'est pas compté comme une panne du bot. Le bot
   répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
   croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
-  du bot : un salon fermé ne doit pas suspendre les rappels de fond ; côté
-  bot, chaque incident n'est signalé au canal de logs qu'une fois par heure.
+  du bot : un salon fermé ne doit pas suspendre les rappels de fond. Côté
+  bot, une cause que le site réessaie n'est signalée au canal de logs qu'une
+  fois par heure ; une annonce qu'il ne réessaie pas (refus de Discord,
+  envoi incertain, requête déjà coupée par le site) l'est chacune ; une
+  attente de mode lent d'une minute au plus ne l'est pas.
   Elle part avec la ligne du match (suppression du
   tournoi, retour en arrière, plateau régénéré) : un match recréé puis relancé
   est annoncé de nouveau. Une affiche changée par un ré-appariement est une
@@ -229,9 +234,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   confirmée » (`503` `discord-down` — vérifier #live) et délai dépassé
   (« son envoi peut encore aboutir » — parfois des heures après un
   redémarrage du bot, sous un mode lent). Aucune de ces lignes ne demande de
-  poster l'annonce à la main : l'envoi du bot a pu partir, ou partir encore. Côté bot, un salon fermé, une panne ou une permission
-  manquante est signalé dans le canal de logs, au plus une fois par heure par
-  incident. Deux pannes de la base sont tracées (une fois par heure et par
+  poster l'annonce à la main : l'envoi du bot a pu partir, ou partir encore.
+  Côté bot, voir ci-dessus (une fois par heure par cause réessayée, chaque
+  annonce abandonnée). Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est
   réservé, chaque passage réessaie pendant les deux heures) et une
   réservation qui n'a pas pu
@@ -257,7 +262,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   minute d'attente. Le bot ne connaît son dernier envoi que depuis son
   démarrage : juste après un redémarrage, l'envoi peut attendre la fin du
   mode lent (délai dépassé côté site, annonce non réessayée) — avec un mode
-  lent sur #live, donner au bot « Gérer les messages » ; une règle AutoMod qui bloque l'annonce est signalée de même.
+  lent sur #live, donner au bot « Gérer les messages ». Une règle AutoMod qui
+  bloque l'annonce est signalée au canal de logs, mais l'annonce n'est **pas**
+  réessayée (le même message serait bloqué de nouveau) : la règle corrigée
+  vaut pour les annonces suivantes.
 
 ## Information des joueurs (RGPD)
 
