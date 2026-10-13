@@ -232,10 +232,12 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   refus du corps (`400`), blocage par AutoMod (« une règle AutoMod du serveur
   a bloqué l'annonce … abandonnée »), « publication non confirmée » (`503`
   `discord-down` — vérifier #live) et délai dépassé (« son envoi peut encore
-  aboutir »). Aucune de ces lignes ne demande de
-  poster l'annonce à la main : l'envoi du bot a pu partir, ou partir encore.
-  Côté bot, voir ci-dessus (une fois par heure par cause réessayée, chaque
-  annonce abandonnée). Deux pannes de la base sont tracées (une fois par heure et par
+  aboutir »). Les deux dernières ne demandent pas de poster l'annonce à la
+  main : l'envoi du bot a pu partir, ou partir encore. Après un `400` ou un
+  blocage par AutoMod, rien n'est parti : la poster à la main (règle
+  corrigée) ne fait pas de doublon. Côté bot, voir ci-dessus (une fois par
+  heure par cause réessayée ; chaque blocage AutoMod, envoi incertain ou
+  requête coupée par le site ; un `400` n'est pas signalé au canal de logs). Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est
   réservé, chaque passage réessaie pendant les deux heures) et une
   réservation qui n'a pas pu

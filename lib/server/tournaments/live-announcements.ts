@@ -240,7 +240,7 @@ function groupParticipantType(rows: readonly LiveCandidateRow[]): ParticipantTyp
 const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
   rejected: "annonce refusée par le bot, abandonnée",
   "discord-refused":
-    "une règle AutoMod du serveur a bloqué l'annonce (détail au canal de logs du bot), abandonnée : le même message serait bloqué de nouveau",
+    "une règle AutoMod du serveur a bloqué l'annonce (détail au canal de logs du bot, ou dans ses journaux si la règle a bloqué aussi le signalement), abandonnée : le même message serait bloqué de nouveau",
   // L'envoi est terminé : ce que montre #live fait foi.
   uncertain:
     "publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live",
