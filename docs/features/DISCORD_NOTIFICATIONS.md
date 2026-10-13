@@ -4,7 +4,7 @@ Le site écrit aux joueurs sur Discord, par le canal interne du bot. Trois usage
 une seule mécanique : **le site rédige, le bot distribue**.
 
 - **Rappels de match** — l'annonce de l'horaire dès qu'un arbitre le pose ou le
-  change, puis un rappel une semaine et 24 h avant le coup d'envoi, en message
+  change, puis des rappels une semaine et 24 h avant le coup d'envoi, en message
   privé à chaque joueur des deux engagées. Le rappel « 1 h avant » a été retiré
   (demande de l'association, 2026-10) : le départ du match (push `MATCH_START`)
   en tient lieu.
@@ -101,8 +101,11 @@ partirait jamais.
 
 ### Programmer ou reprogrammer une manche
 
-`setMatchStartAt` efface les lignes `bg_match_reminders` de la manche **quand la
-date change réellement**, puis `notifyMatchScheduleChange`
+`setMatchStartAt` efface les lignes `bg_match_reminders` de la manche **quand une
+date est posée et change réellement** — une date **effacée** garde ses marques,
+inertes (le balayage ne lit que les manches datées), pour que la date reposée
+ensuite se lise « reprogrammé » : la marque `SEEN` dit que les joueurs
+connaissaient un horaire (`alreadyAnnounced`) —, puis `notifyMatchScheduleChange`
 (`lib/server/tournaments/schedule-notices.ts`) annonce l'horaire **sans attendre
 le balayage** :
 
@@ -110,7 +113,8 @@ le balayage** :
   chacun) : `announceMatchSchedule` réserve à neuf la marque `SEEN` — c'est elle
   qui interdit le doublon avec un balayage concurrent —, consomme les paliers
   déjà ouverts et envoie « Match programmé » (première date) ou « Match
-  reprogrammé » (date qui en remplace une autre). Avant, l'annonce attendait la
+  reprogrammé » (date qui en remplace une autre, avec « au lieu du … » quand
+  l'ancienne date est connue — pas après un effacement). Avant, l'annonce attendait la
   prochaine lecture de `/tournois`, et une date posée à plus de huit jours
   n'était annoncée par rien avant le rappel « une semaine ». En tournoi
   individuel, le message privé (annonce comme rappels) dit « **Ton match** »
@@ -129,7 +133,8 @@ le balayage** :
 Rien ne part pour une date **inchangée**, **effacée** ou **déjà passée**
 (correction d'archive). Une manche dont une engagée manque encore n'a pas
 d'annonce joueurs (le balayage l'annoncera) mais a sa ligne de journal et son
-push arbitre (« À déterminer »).
+push arbitre (« TBD », comme sur le plateau et au journal). Le push arbitre
+reprend le titre et le corps de l'annonce aux joueurs (clés `matchReminder.*`).
 
 ### Pourquoi la réservation précède l'envoi
 
