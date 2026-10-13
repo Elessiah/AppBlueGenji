@@ -219,10 +219,18 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   Un refus du corps (`400`) ou un délai dépassé n'est tracé que dans pm2
   (`console.error`). Côté bot, un salon fermé, une panne ou une permission
   manquante est signalé dans le canal de logs, au plus une fois par heure par
-  incident. Deux pannes de la base sont tracées sans essai suivant possible
-  ou promis : une réservation refusée (`réservation impossible`, réessayée au
-  passage suivant) et une réservation qui n'a pas pu être rendue
-  (`réservation non rendue`, l'annonce est perdue — à reposter à la main).
+  incident. Deux pannes de la base sont tracées (une fois par heure et par
+  match) : une réservation refusée (`réservation impossible` — rien n'est
+  réservé, le passage suivant réessaie) et une réservation qui n'a pas pu
+  être rendue (`réservation non rendue` — l'annonce est perdue, à reposter à
+  la main). Un match à l'antenne sans aucun lien exploitable (ni le sien ni
+  la chaîne officielle) n'est pas annoncé, et pm2 le dit, une fois par heure.
+  L'aide du champ de lien de la fenêtre de cast le rappelle : laissé vide, il
+  fait renvoyer l'annonce à la chaîne officielle.
+- **Information à l'inscription** : la mention sous le bouton d'inscription
+  (`register.streamNotice.TEAM`, `registrationStreamNotice`) dit aussi que le
+  nom de l'équipe est annoncé sur le Discord de l'association ; en individuel,
+  rien à ajouter — un joueur n'y est jamais nommé.
 - **Production — permissions Discord** dans #live : « Voir le salon »,
   « Envoyer des messages », « Mentionner @everyone, @here et tous les rôles »
   et « Intégrer des liens ». Sans la mention, le message part sans notifier ;
