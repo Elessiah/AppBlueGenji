@@ -165,7 +165,8 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
     await db.execute(`DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (${placeholders})`, params);
     return true;
   } catch (error) {
-    console.error(`[live-announce] ${label} : réservation non rendue, annonce non réessayée`, error);
+    const lost = rows.length > 1 ? "annonces non réessayées" : "annonce non réessayée";
+    console.error(`[live-announce] ${label} : réservation non rendue, ${lost}`, error);
     return false;
   }
 }
@@ -191,6 +192,24 @@ function warnOnce(kind: string, message: string): void {
   if (last !== undefined && now - last < LIVE_WARN_COOLDOWN_MS) return;
   lastWarnAt.set(kind, now);
   console.warn(`${message} (avertissement répété au plus une fois par heure)`);
+}
+
+/** Longueur maximale de la liste d'identifiants dans l'étiquette envoyée au bot (200 caractères en tout). */
+const CONTEXT_IDS_MAX_LENGTH = 170;
+
+/** « 40,41,42 », ou « 40,41,…+12 » quand la liste ne tient pas : jamais un identifiant coupé. */
+function contextIds(ids: readonly number[]): string {
+  const all = ids.join(",");
+  if (all.length <= CONTEXT_IDS_MAX_LENGTH) return all;
+  let shown = "";
+  let count = 0;
+  for (const id of ids) {
+    const next = count === 0 ? String(id) : `${shown},${id}`;
+    if (`${next},…+${ids.length - count - 1}`.length > CONTEXT_IDS_MAX_LENGTH) break;
+    shown = next;
+    count += 1;
+  }
+  return `${shown},…+${ids.length - count}`;
 }
 
 /** Identifiants des matchs d'un groupe. */
@@ -220,7 +239,7 @@ async function announce(group: AnnouncementGroup): Promise<number> {
   const plural = ids.length > 1;
   const noun = plural ? "matchs" : "match";
   const label = `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`;
-  const context = `live-announce match-${ids.join(",")}`;
+  const context = `live-announce match-${contextIds(ids)}`;
   const outcome = await pushLiveAnnouncement(message, group.url, context);
   if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
@@ -275,7 +294,19 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
     if (!url) continue;
     // Bot en panne : ne rien réserver qu'on sait ne pas pouvoir envoyer.
     if (isBotCircuitOpen()) break;
-    if (!(await claimAnnouncement(Number(row.id), String(row.pairing)))) continue;
+    let claimed: boolean;
+    try {
+      claimed = await claimAnnouncement(Number(row.id), String(row.pairing));
+    } catch (error) {
+      // Une réservation refusée par la base (verrou, panne) ne doit pas
+      // emporter les affiches déjà réservées de ce passage : elles partent.
+      console.error(
+        `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) : réservation impossible, réessayée au passage suivant`,
+        error,
+      );
+      continue;
+    }
+    if (!claimed) continue;
     const key = `${Number(row.tournament_id)} ${url}`;
     const group = groups.get(key);
     if (group) group.rows.push(row);
