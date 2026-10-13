@@ -240,13 +240,23 @@ describe("runLiveAnnouncementSweep", () => {
     expect(warnings[1]).toContain("salon #live fermé");
   });
 
-  it("délai dépassé : garde la réservation, pas de second @everyone si le bot a publié", async () => {
+  it("délai dépassé : garde la réservation, et ne pousse pas à poster à la main tout de suite", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("timed-out");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([]);
+    const line = String(jest.mocked(console.error).mock.calls[0][0]);
+    expect(line).toContain("son envoi peut encore aboutir");
+    expect(line).toContain("attendre plusieurs minutes avant de vérifier #live");
+  });
+
+  it("Discord lâché pendant l'envoi : garde la réservation, #live fait foi", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("uncertain");
     const { execute } = mockDb([AUTO_LIVE]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(releasesOf(execute)).toEqual([]);
     expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
-      "[live-announce] match 40 (tournoi 4) : publication non confirmée (bot sans réponse à temps ou Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live",
+      "[live-announce] match 40 (tournoi 4) : publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live et ne la poster à la main que si elle n'y est pas",
     );
   });
 
