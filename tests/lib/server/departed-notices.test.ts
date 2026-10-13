@@ -263,7 +263,7 @@ describe("noteDeletedMatches", () => {
     ]);
   });
 
-  it("ne lit rien de plus sans manche visée, et tolère une table absente", async () => {
+  it("ne lit rien de plus sans manche visée ni horaire tenu, et tolère une table des marques absente", async () => {
     const { mock, connection } = connectionHolding({});
     await noteDeletedMatches(connection, "tournament_id = ?", [7]);
     expect(mock.execute).toHaveBeenCalledTimes(1);
@@ -273,8 +273,11 @@ describe("noteDeletedMatches", () => {
     // Les marques, mais pas le contexte : aucun horaire tenu.
     expect(unheld.mock.execute).toHaveBeenCalledTimes(2);
 
+    // Table des marques absente : rien n'a jamais été reçu.
     const missing = connectionMock();
-    missing.execute.mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
+    missing.execute
+      .mockResolvedValueOnce([[{ id: 31, team1_id: 101, team2_id: 102 }]])
+      .mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
     await expect(noteDeletedMatches(fakeConnection(missing), "tournament_id = ?", [7])).resolves.toBeUndefined();
 
     const failing = connectionMock();
@@ -330,15 +333,31 @@ describe("une engagée n'est prévenue qu'une fois par transaction", () => {
 });
 
 describe("une manche n'est lue qu'une fois par transaction", () => {
-  it("une seconde sortie retrouve l'horaire lu par la première, même après l'effacement des marques", async () => {
+  it("une seconde sortie d'une détentrice retrouve l'horaire lu par la première, même après l'effacement des marques", async () => {
     const { mock, connection } = connectionHolding({ 31: AHEAD });
+    // 101 quitte la place 1 (adversaire 102) : l'affiche qui a reçu l'horaire est 101-102.
     await noteDepartedEntrants(connection, [DEPARTURE]);
     // Les marques ont été effacées entre-temps (forgetMatchReminders) : relire ne trouverait rien.
     mock.execute.mockResolvedValue([[]]);
-    await noteDepartedEntrants(connection, [{ matchId: 31, teamId: 109, opponentId: 102 }]);
+    // Puis 102 quitte la place 2 ; l'autre place porte déjà la remplaçante 109.
+    await noteDepartedEntrants(connection, [{ matchId: 31, teamId: 102, opponentId: 109 }]);
     expect(mock.execute).toHaveBeenCalledTimes(2);
     flushDepartedNotices(connection);
-    expect(jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0].map(({ teamId }) => teamId)).toEqual([101, 109]);
+    const sent = jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0];
+    // L'adversaire de l'horaire reçu, pas la remplaçante.
+    expect(sent.map(({ teamId, opponentId }) => [teamId, opponentId])).toEqual([
+      [101, 102],
+      [102, 101],
+    ]);
+  });
+
+  it("ne prévient pas une engagée posée puis retirée dans la même transaction : elle n'avait rien reçu", async () => {
+    const { connection } = connectionHolding({ 31: AHEAD });
+    await noteDepartedEntrants(connection, [DEPARTURE]);
+    // 109 a pris la place de 101, puis la quitte à son tour.
+    await noteDepartedEntrants(connection, [{ matchId: 31, teamId: 109, opponentId: 102 }]);
+    flushDepartedNotices(connection);
+    expect(jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0].map(({ teamId }) => teamId)).toEqual([101]);
   });
 
   it("oublie ce qu'elle a lu à la fin de la transaction", async () => {
@@ -358,5 +377,15 @@ describe("withoutSettledLater", () => {
     expect(withoutSettledLater(connection, [31, 32])).toEqual([32]);
     settleDepartures(connection, held, []);
     expect(withoutSettledLater(connection, [31, 32])).toEqual([31, 32]);
+  });
+});
+
+describe("lecture des marques par paquets", () => {
+  it("borne la liste IN (…) d'une suppression de plateau entier", async () => {
+    const doomed = Array.from({ length: 1200 }, (_, index) => ({ id: index + 1, team1_id: null, team2_id: null }));
+    const { mock, connection } = connectionHolding({}, { doomed });
+    await noteDeletedMatches(connection, "tournament_id = ?", [7]);
+    const reads = mock.execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT match_id"));
+    expect(reads.map(([, params]) => (params as unknown[]).length)).toEqual([501, 501, 201]);
   });
 });
