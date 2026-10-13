@@ -770,8 +770,10 @@ export function RgpdEn({
             <li>
               <strong>In which language</strong>: your account&apos;s, French or English — the language of the page
               at your last login, or the one you choose in <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>,
-              until you next log in from a page in the other language. The site keeps this single choice with every
-              account, subscribed or not, for the lifetime of the account; it appears in the export of your data and goes back to French if the
+              until you next log in from a page in the other language. This point does not depend on your agreement: the
+              site keeps this single choice with every account, subscribed or not, for the lifetime of the account, to
+              write to you in your language (performance of the service,{" "}
+              <LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>); it appears in the export of your data and goes back to French if the
               account is anonymized. Discord messages, for their part, stay in French.
             </li>
           </ul>
