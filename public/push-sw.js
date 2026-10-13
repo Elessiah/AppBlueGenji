@@ -106,7 +106,8 @@ function sitePath(value) {
   try {
     const url = new URL(value, self.location.origin);
     if (url.origin !== self.location.origin) return "/";
-    const path = decodeURIComponent(url.pathname).toLowerCase();
+    // Barres répétées réduites : `/en//api/…` mène à `/api/…`.
+    const path = decodeURIComponent(url.pathname).toLowerCase().replace(/\/{2,}/g, "/");
     if (/^\/(?:[a-z]{2}\/)?api(?:\/|$)/.test(path)) return "/";
   } catch {
     return "/";
