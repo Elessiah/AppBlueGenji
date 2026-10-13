@@ -140,7 +140,23 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const { execute } = await mockDb({});
 
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
-    expect(claimedKeys(execute)).toEqual(["P1D"]);
+    // Réservée avant l'envoi, la marque est rendue : rien n'a abouti.
+    expect(claimedKeys(execute)).toEqual(["P1D", "TOLD", "TOLD"]);
+    const [releaseSql, releaseParams] = execute.mock.calls[2] as unknown as [string, unknown[]];
+    expect(releaseSql).toMatch(/^DELETE FROM bg_match_reminders WHERE match_id = \? AND offset_key = \?/);
+    expect(releaseParams).toEqual([31, "TOLD"]);
+  });
+
+  it("réserve la marque d'horaire reçu avant l'envoi : une correction immédiate la lit déjà", async () => {
+    const { execute } = await mockDb({});
+    let toldBeforeSend = false;
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      toldBeforeSend = claimedKeys(execute).includes("TOLD");
+      return { sent: 1, unresolved: [], failed: [] };
+    });
+
+    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    expect(toldBeforeSend).toBe(true);
   });
 
   it("marque l'horaire reçu dès qu'un seul message privé a abouti", async () => {

@@ -15,10 +15,8 @@ describe("reprise des marques de rappel héritées", () => {
     expect(source).toMatch(/SELECT DISTINCT match_id, 'TOLD' FROM bg_match_reminders\s+WHERE offset_key IN \('P7D', 'PT1H'\)`/);
   });
 
-  it("ne recopie `P1D` (réservé avant l'envoi par le nouveau code) qu'avant toute marque `TOLD`", () => {
-    expect(source).toMatch(
-      /SELECT DISTINCT r\.match_id, 'TOLD' FROM bg_match_reminders r\s+WHERE r\.offset_key = 'P1D'\s+AND NOT EXISTS \(SELECT 1 FROM bg_match_reminders t WHERE t\.offset_key = 'TOLD'\)`/,
-    );
+  it("ne lit pas `P1D`, que le nouveau code réserve avant l'envoi", () => {
+    expect(source).not.toMatch(/offset_key = 'P1D'/);
   });
 
   it("efface la marque d'observation posée en silence par l'ancien balayage, pour une manche à venir", () => {
