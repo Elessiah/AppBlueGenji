@@ -79,13 +79,13 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "13 octobre 2026";
-const LAST_UPDATED_EN = "13 October 2026";
+const LAST_UPDATED_FR = "14 octobre 2026";
+const LAST_UPDATED_EN = "14 October 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux.
-const PRIVACY_LAST_UPDATED_FR = "13 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "13 October 2026";
+const PRIVACY_LAST_UPDATED_FR = "14 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "14 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
