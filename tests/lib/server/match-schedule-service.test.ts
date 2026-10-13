@@ -50,6 +50,7 @@ function world(
     failReminders?: boolean;
     missingReminders?: boolean;
     announced?: boolean;
+    toldStartAt?: Date | null;
   } = {},
 ) {
   const connection = connectionMock();
@@ -68,9 +69,10 @@ function world(
     if (options.missingReminders && sql.includes("bg_match_reminders")) {
       throw Object.assign(new Error("Table 'bg_match_reminders' doesn't exist"), { code: "ER_NO_SUCH_TABLE", errno: 1146 });
     }
-    if (sql.startsWith("SELECT 1 FROM bg_match_reminders")) {
+    if (sql.startsWith("SELECT start_at FROM bg_match_reminders")) {
       expect(params).toEqual([42, "TOLD"]);
-      return [options.announced ? [{ seen: 1 }] : []];
+      expect(sql).toMatch(/^SELECT start_at FROM bg_match_reminders/);
+      return [options.announced ? [{ start_at: options.toldStartAt ?? null }] : []];
     }
     if (sql.startsWith("DELETE FROM bg_match_reminders") && options.failReminders) {
       throw new Error("base injoignable");
@@ -146,6 +148,18 @@ describe("setMatchStartAt", () => {
     expect(writes.indexOf(seen!)).toBeGreaterThan(writes.indexOf(reminders!));
   });
 
+  it("rend l'horaire que les joueurs ont reçu en dernier", async () => {
+    world({
+      row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }),
+      announced: true,
+      toldStartAt: new Date("2099-08-27T18:30:00Z"),
+    });
+    await setMatchStartAt(42, FUTURE);
+    expect(notifyMatchScheduleChange).toHaveBeenCalledWith(
+      expect.objectContaining({ alreadyAnnounced: true, toldStartAt: "2099-08-27T18:30:00.000Z" }),
+    );
+  });
+
   it("garde la marque `TOLD` au ménage d'une date changée", async () => {
     const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), announced: true });
 
@@ -184,6 +198,7 @@ describe("setMatchStartAt", () => {
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: null,
       alreadyAnnounced: false,
+      toldStartAt: null,
       refereeScheduling: false,
       actor,
     });
@@ -199,6 +214,7 @@ describe("setMatchStartAt", () => {
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: "2099-08-28T18:30:00.000Z",
       alreadyAnnounced: false,
+      toldStartAt: null,
       refereeScheduling: false,
       actor: null,
     });
@@ -217,6 +233,7 @@ describe("setMatchStartAt", () => {
       startAt: null,
       previousStartAt: "2099-08-28T18:30:00.000Z",
       alreadyAnnounced: true,
+      toldStartAt: null,
       refereeScheduling: true,
       actor: null,
     });
@@ -229,6 +246,7 @@ describe("setMatchStartAt", () => {
       startAt: "2099-08-29T18:30:00.000Z",
       previousStartAt: null,
       alreadyAnnounced: true,
+      toldStartAt: null,
       refereeScheduling: false,
       actor: null,
     });

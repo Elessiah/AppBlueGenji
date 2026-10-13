@@ -41,6 +41,7 @@ function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChan
     startAt: NEW_START,
     previousStartAt: null,
     alreadyAnnounced: false,
+    toldStartAt: null,
     refereeScheduling: true,
     actor: ACTOR,
     ...overrides,
@@ -283,6 +284,17 @@ describe("notifyMatchScheduleChange — horaire retiré, arbitres", () => {
 describe("playerAnnouncement", () => {
   const now = new Date("2099-01-01T00:00:00Z");
 
+  it("cite l'horaire que les joueurs ont reçu, pas une date intermédiaire jamais envoyée", () => {
+    // 21:00 reçu ; 02:00 saisi de travers (passé, seulement journalisé) ; puis 22:00.
+    const told = "2099-01-01T21:00:00.000Z";
+    expect(
+      playerAnnouncement(
+        change({ startAt: "2099-01-01T22:00:00.000Z", previousStartAt: "2098-12-31T02:00:00.000Z", alreadyAnnounced: true, toldStartAt: told }),
+        now,
+      ),
+    ).toEqual({ rescheduled: true, previousStartAt: told });
+  });
+
   it("cite l'ancienne date reçue, encore devant", () => {
     expect(playerAnnouncement(change({ previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toEqual({
       rescheduled: true,
@@ -314,6 +326,15 @@ describe("playerAnnouncement", () => {
 
 describe("isAnnounceableClearing", () => {
   const now = new Date("2099-01-01T00:00:00Z");
+
+  it("annonce le retrait de l'horaire d'un match en retard (passé de peu)", () => {
+    expect(
+      isAnnounceableClearing(
+        change({ startAt: null, previousStartAt: "2098-12-31T20:00:00.000Z", alreadyAnnounced: true }),
+        now,
+      ),
+    ).toBe(true);
+  });
 
   it("retient un horaire reçu par les joueurs et encore devant", () => {
     expect(isAnnounceableClearing(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }), now)).toBe(
