@@ -106,7 +106,9 @@ Une engagée **remplacée** sur l'affiche (correction d'un score amont :
 `vacateSlot` dans `bracket-cascade.ts`, ou `pushTeamToTarget` dans
 `scoring.ts`) efface les marques de la manche, comme un retour en arrière
 (`forgetChangedPosters`, `rollback.ts`, qui épargne une rencontre rendue aux
-mêmes engagées) : la
+mêmes engagées, dans un sens ou dans l'autre ; une rencontre laissée
+incomplète perd les siennes, et sera annoncée de nouveau si le même résultat
+est ressaisi — un doublon plutôt que des engagées jamais prévenues) : la
 remplaçante n'a reçu aucun horaire, le balayage lui annoncera la date. Limite
 connue : l'engagée restée en place perd aussi sa marque `TOLD` (les marques
 sont par manche, pas par engagée) — un changement ou un retrait d'horaire
@@ -126,7 +128,16 @@ annonce) ne le prouvent. `TOLD` survit aux changements de date : c'est elle qui
 fait dire « reprogrammé » à la date suivante et « retiré » à une date effacée.
 Une preuve héritée (`P7D` / `PT1H`) est recopiée en `TOLD` au premier
 changement de date, avant que le ménage ne l'emporte. Une date posée sur un
-match **déjà joué** n'est que journalisée (ni joueurs, ni arbitres).
+match **déjà joué**, ou déjà passée, n'est que journalisée (ni joueurs, ni
+arbitres).
+
+**Passage à `TOLD` (déploiement de la PR #441).** Deux reprises de données,
+au démarrage (`RECENT_SCHEMA_CHANGES`), bornées aux lignes écrites avant le
+2026-10-31 : tout palier hérité (`P7D`, `P1D`, `PT1H` — l'ancien code ne les
+posait qu'avec un message) est recopié en `TOLD`, et une marque `SEEN` posée
+seule, en silence, par l'ancien balayage (sept à huit jours avant, dans
+l'attente du palier « une semaine ») est effacée pour une manche à venir — le
+nouveau balayage l'annoncera. À retirer de la liste une fois jouées partout.
 
 ### Programmer, reprogrammer ou retirer l'horaire d'une manche
 
