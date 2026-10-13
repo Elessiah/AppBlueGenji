@@ -851,8 +851,10 @@ describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés 
     // Sans planification par l'arbitrage, un retrait se tait (`clearedHeldStartAt`) : l'entrée le dit.
     expect(text()).toMatch(/ne planifie pas les matchs, un horaire retiré n'est pas annoncé/);
     // Le sujet push ne règle pas les messages privés, fondés sur l'intérêt légitime.
-    expect(text()).toMatch(/ne règle que les notifications push/);
-    expect(text()).toMatch(/intérêt légitime[^.]*tu peux t'y opposer \(droit d'opposition, voir « Vos droits » sur \/rgpd\)/);
+    // Destinataires réels : tous les membres actifs des équipes (`loadEntrantPlayerIds`).
+    expect(text()).toMatch(/aux membres des deux équipes du match \(coachs et managers compris ; aux deux joueurs en tournoi individuel\)/);
+    // La base et le droit d'opposition vivent sur /rgpd (modifiable), pas dans l'entrée figée.
+    expect(text()).toMatch(/ne règle que les notifications push, pas ces messages privés/);
     // Une manche supprimée par le moteur est poussée à tout le staff, auteur compris.
     expect(text()).toMatch(/quand une mise à jour du tournoi supprime un match planifié/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications"]);

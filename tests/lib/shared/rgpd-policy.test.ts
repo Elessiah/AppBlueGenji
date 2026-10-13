@@ -289,6 +289,8 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
       expect(entry?.extraBases).toEqual([{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }]);
     }
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04");
+    // Les messages vont à tous les membres actifs des équipes, pas aux seuls joueurs.
+    expect(t04?.dataSubjects).toContain("Autres membres des équipes engagées (coachs, managers, propriétaires)");
     expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, les rappels de match/);
   });
 
