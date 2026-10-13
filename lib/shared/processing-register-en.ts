@@ -667,12 +667,13 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "In-game and site usernames, team names, images of the game, in-game results and performance, as they appear on screen — neither webcam nor voice chat of the players",
       "Voice and username of the casters",
       "Link to the stream and replay of a match",
+      "Record of a match's Discord announcement: the match and the identifiers of its two entrants (teams or solo entries)",
     ],
     sensitiveData: "None",
     retention: [
-      "Live: nothing kept by the site, which only keeps the link to the channel",
+      "Live: the stream is not kept by the site, which only keeps the link to the channel",
       "Replay link: kept with the match, like its results (T03); the video stays on the platform until it is deleted by the channel that published it",
-      "Discord announcement: the site only keeps a record of the sending (the match and the paired teams), deleted with the match; the message stays in the channel until the association deletes it",
+      "Discord announcement: the site only keeps a record of the announcement (the match and the identifiers of its two entrants), made before sending, removed if nothing went out, otherwise deleted with the match; the message stays in the channel until the association deletes it",
       `Right to object: on request (“${REPORT_FORM_NAME_EN}” form, “GDPR” category), the player appears under a neutral name in subsequent streams, the replay link is removed from the site, and a video published by the association's channel is hidden or deleted`,
     ],
     recipients: [
