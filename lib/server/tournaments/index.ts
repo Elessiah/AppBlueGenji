@@ -184,6 +184,7 @@ import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
+import { dispatchLiveAnnouncements } from "./live-announcements";
 import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
 import { findTournamentsNeedingSync } from "./sync-scope";
@@ -624,6 +625,9 @@ export async function listTournamentBuckets(
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
   void dispatchMatchStartNotices().catch(() => undefined);
+  // Et pour l'annonce des lives : le mode `START_TIME` passe à l'antenne à
+  // l'heure dite, sans aucune écriture.
+  void dispatchLiveAnnouncements().catch(() => undefined);
   // Le journal des connexions se purge aussi sur ce trafic, pas seulement aux
   // connexions : une période sans connexion (sessions de 30 jours) garderait
   // sinon des lignes au-delà de la durée légale annoncée. Étranglée à l'heure.

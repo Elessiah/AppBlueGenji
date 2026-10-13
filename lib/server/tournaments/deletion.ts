@@ -132,6 +132,15 @@ async function purgeTournamentRows(
       [tournamentId],
     ),
   );
+  // Et pour les réservations d'annonce de live sur Discord, table tolérée aussi.
+  await ignoreMissingTable(
+    connection.execute(
+      `DELETE a FROM bg_live_announcements a
+       JOIN bg_matches m ON m.id = a.match_id
+       WHERE m.tournament_id = ?`,
+      [tournamentId],
+    ),
+  );
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(

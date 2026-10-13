@@ -448,6 +448,12 @@ async function deleteMatches(
         ids,
       ),
     );
+    await ignoreMissingTable(
+      connection.execute(
+        `DELETE FROM bg_live_announcements WHERE match_id IN (${placeholders})`,
+        ids,
+      ),
+    );
     await connection.execute(`DELETE FROM bg_matches WHERE id IN (${placeholders})`, ids);
   }
 }

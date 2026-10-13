@@ -109,4 +109,23 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
   } catch {
     // Table déjà présente, ou création refusée : les départs se taisent.
   }
+
+  // Réservation d'une annonce de live sur Discord (#live, `@everyone`) : une
+  // par match et par affiche — `docs/features/LIVE_STREAMS.md`. Même mécanique :
+  // la clé unique interdit qu'un balayage concurrent reposte.
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_live_announcements (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        match_id BIGINT NOT NULL,
+        pairing VARCHAR(48) NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bg_live_announcements (match_id, pairing),
+        CONSTRAINT fk_bg_live_announcements_match FOREIGN KEY (match_id)
+          REFERENCES bg_matches(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : les lives ne sont pas annoncés.
+  }
 }

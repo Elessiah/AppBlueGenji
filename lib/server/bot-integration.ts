@@ -582,3 +582,65 @@ export async function pushLeadershipAlert(
     { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: false },
   );
 }
+
+/**
+ * Issue d'une annonce de live poussée au bot :
+ *
+ * - `posted` — le bot a publié dans #live ;
+ * - `rejected` — le bot a refusé le corps (`400`) : le renvoyer tel quel ne
+ *   changerait rien, l'annonce est abandonnée ;
+ * - `unavailable` — rien n'est parti (bot injoignable, coupe-circuit ouvert,
+ *   salon fermé, panne) : l'appelant rend sa réservation et réessaiera.
+ */
+export type LiveAnnouncementOutcome = "posted" | "rejected" | "unavailable";
+
+/**
+ * Demande au bot d'annoncer un live dans le salon #live du serveur BlueGenji
+ * (`POST /internal/announce/live`) : il préfixe `@everyone` et ajoute le lien.
+ *
+ * Trafic de fond (le balayage des annonces) : le coupe-circuit est respecté,
+ * et jamais d'exception.
+ *
+ * @param message Texte rédigé par `formatLiveAnnouncement`, noms neutralisés.
+ * @param streamUrl Lien déjà validé par la liste blanche.
+ * @param context Étiquette de journalisation côté bot.
+ */
+export async function pushLiveAnnouncement(
+  message: string,
+  streamUrl: string,
+  context: string,
+): Promise<LiveAnnouncementOutcome> {
+  if (isCircuitOpen()) return "unavailable";
+
+  const baseUrl = resolveBotInternalUrl();
+  try {
+    const response = await fetch(`${baseUrl}/internal/announce/live`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...getInternalHeaders(),
+      },
+      body: JSON.stringify({ message, streamUrl, context }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_NOTIFY_FETCH_TIMEOUT_MS),
+    });
+    if (response.ok) {
+      recordSuccess();
+      return "posted";
+    }
+    // Un refus du corps n'est pas une panne du bot : il a répondu.
+    if (response.status === 400) {
+      recordSuccess();
+      return "rejected";
+    }
+    // Un bot d'une version antérieure ne connaît pas la route : il a répondu,
+    // le coupe-circuit n'a pas à s'ouvrir sur les autres appels ; l'annonce
+    // attendra son déploiement.
+    if (response.status === 404) return "unavailable";
+    recordFailure();
+    return "unavailable";
+  } catch {
+    recordFailure();
+    return "unavailable";
+  }
+}
