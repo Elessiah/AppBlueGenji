@@ -221,12 +221,15 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   manquante est signalé dans le canal de logs, au plus une fois par heure par
   incident. Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est
-  réservé, le passage suivant réessaie) et une réservation qui n'a pas pu
+  réservé, chaque passage réessaie pendant les deux heures) et une
+  réservation qui n'a pas pu
   être rendue (`réservation non rendue` — l'annonce est perdue, à reposter à
   la main). Un match à l'antenne sans aucun lien exploitable (ni le sien ni
-  la chaîne officielle) n'est pas annoncé, et pm2 le dit, une fois par heure.
-  L'aide du champ de lien de la fenêtre de cast le rappelle : laissé vide, il
-  fait renvoyer l'annonce à la chaîne officielle.
+  la chaîne officielle) n'est pas annoncé, et pm2 le dit, une fois par heure
+  — un lien ajouté dans les deux heures fait partir l'annonce, d'où la
+  consigne de ne pas la poster à la main. L'aide du champ de lien de la
+  fenêtre de cast le rappelle : laissé vide, il fait renvoyer l'annonce à la
+  chaîne officielle, ou ne la fait pas partir sans chaîne officielle.
 - **Information à l'inscription** : la mention sous le bouton d'inscription
   (`register.streamNotice.TEAM`, `registrationStreamNotice`) dit aussi que le
   nom de l'équipe est annoncé sur le Discord de l'association ; en individuel,
