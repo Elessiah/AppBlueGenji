@@ -11,6 +11,9 @@ import {
   WEB_ACCESS_LOG_RETENTION_DAYS,
 } from "@/lib/shared/processing-register";
 import { SITE_MINIMUM_AGE } from "@/lib/shared/terms-of-use";
+import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
+import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
+import enPush from "@/messages/en/push.json";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -513,7 +516,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
     // Suivie de l'entrée du contact données, de celle des suspensions puis de
     // celle du registre complété, publiées le même jour.
-    expect(PRIVACY_CHANGES.at(-10)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-11)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -540,7 +543,7 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
 
   it("précède l'entrée des suspensions, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-9)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-10)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -574,7 +577,7 @@ describe("PRIVACY_CHANGES — suspension d'un compte", () => {
 
   it("précède l'entrée du registre complété, publiée le lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-8)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-9)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -599,7 +602,7 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
 
   it("précède l'entrée des sauvegardes chez Hetzner, datée du 1er octobre 2026, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-7)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-8)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -639,7 +642,7 @@ describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-trait
 
   it("précède l'entrée des durées du bot, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-7)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -673,7 +676,7 @@ describe("PRIVACY_CHANGES — durées du bot (fil d'activité, journal du staff,
 
   it("précède l'entrée des scores map par map, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -699,7 +702,7 @@ describe("PRIVACY_CHANGES — scores map par map (codes de replay)", () => {
 
   it("précède l'entrée du code de replay facultatif, datée de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-06");
     expect(entry.audience).toBeUndefined();
   });
@@ -722,7 +725,7 @@ describe("PRIVACY_CHANGES — code de replay facultatif pour l'arbitrage", () =>
 
   it("précède l'entrée du suivi sans compte, datée de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-08");
     expect(entry.audience).toBeUndefined();
   });
@@ -746,7 +749,7 @@ describe("PRIVACY_CHANGES — suivi d'un tournoi sans compte", () => {
 
   it("précède l'entrée de la langue du compte, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-09");
     expect(entry.audience).toBeUndefined();
   });
@@ -782,9 +785,9 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-langue-du-compte")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+  it("précède l'entrée des horaires de match, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-14");
     expect(entry.audience).toBeUndefined();
   });
@@ -806,6 +809,54 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
     expect(text()).toMatch(/revient au français si le compte est anonymisé/);
     expect(text()).toMatch(/messages Discord, eux, restent en français/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications"]);
+  });
+
+  it("tient dans un message privé à elle seule", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  });
+});
+
+describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés (#441)", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-horaires-de-match")!;
+  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-15");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("dit ce qui part, à qui, ce qui est gardé et le réglage qui refuse le nouveau sujet du staff", () => {
+    expect(text()).toMatch(/pose, change ou retire l'horaire/);
+    expect(text()).toMatch(/message privé Discord et en notification push si tu les as activées/);
+    expect(text()).toMatch(/« Horaires et rappels de match »/);
+    // L'engagée qu'une mise à jour du tournoi retire d'un match est prévenue.
+    expect(text()).toMatch(/te retire, toi ou ton équipe, d'un match dont tu avais reçu l'horaire/);
+    // Paliers retirés : il ne reste que la veille.
+    expect(text()).toMatch(/un seul rappel reste, dans les 24 h/);
+    expect(text()).toMatch(/une semaine et une heure avant le match disparaissent/);
+    expect(text()).toMatch(/aucun pseudo de joueur/);
+    // `bg_match_reminders.start_at` : l'horaire annoncé, gardé avec le match.
+    expect(text()).toMatch(/garde, avec le match, l'horaire qui a été annoncé/);
+    expect(text()).toMatch(/ne garde pas le texte des messages/);
+    // Sujet push fondé sur le consentement : l'entrée nomme le réglage qui le refuse.
+    expect(text()).toMatch(/« Matchs planifiés », que tu peux couper dans « Mon profil »/);
+    expect(text()).toMatch(/sans nom sur Discord, avec le pseudo de son auteur dans les journaux du serveur/);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications"]);
+  });
+
+  it("nomme les sujets push sous leurs libellés publiés", () => {
+    expect(text()).toContain(`« ${PUSH_TOPICS.MATCH_REMINDER.label} »`);
+    expect(text()).toContain(`« ${PUSH_TOPICS.MATCH_SCHEDULED.label} »`);
+  });
+
+  it("en anglais, nomme les sujets push sous leurs libellés anglais publiés", () => {
+    const english = PRIVACY_CHANGES_EN[entry.id];
+    const englishText = [english.title, english.summary, ...english.details].join(" ");
+    expect(englishText).toContain(`“${enPush.topics.MATCH_REMINDER.label}”`);
+    expect(englishText).toContain(`“${enPush.topics.MATCH_SCHEDULED.label}”`);
+    expect(english.details).toHaveLength(entry.details.length);
   });
 
   it("tient dans un message privé à elle seule", () => {
