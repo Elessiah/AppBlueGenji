@@ -214,10 +214,13 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   balayage, pas d'un geste du staff, donc aucune ligne `staff-audit`. Un report
   est averti dans pm2 au plus une fois par heure, par cause et par match (ou
   groupe), la cause distincte :
-  « salon #live fermé au bot » (`503` de salon ou de permission), « Discord a
-  retenu l'annonce » (`503` de mode lent, d'AutoMod ou de panne passagère —
-  la cause exacte est au canal de logs du bot) ou « bot injoignable, en panne
-  ou d'une version sans annonces » ; passé deux heures, le match n'est plus réessayé.
+  « salon #live fermé au bot » (`503` de salon ou de permission), « le mode
+  lent de #live retient l'annonce », « Discord a refusé l'annonce … ou n'a pas
+  répondu au bot » (AutoMod, autre refus — la cause exacte est au canal de
+  logs du bot) ou « bot injoignable, en panne ou d'une version sans
+  annonces ». Un `503` `discord-down` (Discord lâché pendant l'envoi) est
+  traité comme un délai dépassé : « publication non confirmée », réservation
+  gardée, pas de nouvel essai ; passé deux heures, le match n'est plus réessayé.
   Un refus du corps (`400`) ou un délai dépassé n'est tracé que dans pm2
   (`console.error`). Côté bot, un salon fermé, une panne ou une permission
   manquante est signalé dans le canal de logs, au plus une fois par heure par
@@ -241,8 +244,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   et « Intégrer des liens ». Sans la mention, le message part sans notifier ;
   sans l'intégration, sans aperçu de la chaîne ; sans les deux premières, rien
   ne part et le site réessaie. Un mode lent sur #live retiendrait une annonce
-  postée pendant son délai après la précédente (sauf « Gérer les messages »
-  pour le bot) : le bot la refuse alors et le signale ; une règle AutoMod qui bloque l'annonce est signalée de même.
+  postée pendant son délai après la précédente (sauf si le bot a « Gérer les
+  messages » ou « Gérer le salon ») : le bot la refuse alors, le site
+  réessaie, et le canal de logs ne le signale que s'il reste plus d'une
+  minute d'attente ; une règle AutoMod qui bloque l'annonce est signalée de même.
 
 ## Information des joueurs (RGPD)
 
