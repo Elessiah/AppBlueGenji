@@ -91,7 +91,7 @@ describe("deleteTournament", () => {
 
     const sql = statements(execute);
     const matches = sql.findIndex((s) => /^DELETE FROM bg_matches/.test(s));
-    for (const table of ["bg_match_reminders", "bg_referee_alerts", "bg_match_start_notices"]) {
+    for (const table of ["bg_match_reminders", "bg_referee_alerts", "bg_match_start_notices", "bg_live_announcements"]) {
       const index = sql.findIndex((s) => s.includes(`FROM ${table}`) && s.startsWith("DELETE"));
       expect(index).toBeGreaterThanOrEqual(0);
       expect(index).toBeLessThan(matches);
