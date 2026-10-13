@@ -91,9 +91,9 @@ remplacé par une **annonce unique** portant la date
 Le partage entre les deux régimes tient à la **marque d'observation** `SEEN`,
 posée au premier passage du balayage sur cette manche (ou par `setMatchStartAt`,
 voir plus bas) : elle sépare « le site découvre cette date » de « le temps a
-passé depuis ». Sans elle, un match programmé à cinq heures recevrait le rappel
-« dans 24 heures » — la fenêtre du palier est bel et bien ouverte, mais ce
-qu'il annonce est faux.
+passé depuis ». Sans elle, un match programmé à cinq heures ne recevrait qu'un
+rappel, sans l'annonce qui porte sa date ; elle fait aussi verrou : seule la
+requête qui la pose annonce.
 
 C'est aussi ce qui impose la marge de `MATCH_REMINDER_LOOKAHEAD_MS` : le balayage
 lit **une journée plus loin** que le plus grand palier (48 h). Une fenêtre de
@@ -141,10 +141,13 @@ balayage** :
   devant et que le tournoi est **planifié par l'arbitrage** (sans l'option, un
   match sans horaire part en lancement : aucun nouvel horaire ne viendra, et le
   départ du match prévient les joueurs) — avec la même étiquette push que
-  l'annonce, qu'il remplace. Les corps push d'une reprogrammation et d'un
-  retrait commencent par le changement (« Nouveau coup d'envoi …, au lieu du
-  … » / « L'horaire prévu … est retiré … ») : c'est la fin d'un corps trop long
-  que `PUSH_BODY_MAX` coupe. En
+  l'annonce, qu'il remplace ; le bot le reçoit sous le contexte
+  `match-schedule-cleared` (journaux du bot). Les corps push d'une
+  reprogrammation et d'un retrait commencent par le changement (« Nouveau coup
+  d'envoi : …, au lieu du … » / « L'horaire du … est retiré … ») : c'est la fin
+  d'un corps trop long que `PUSH_BODY_MAX` coupe. Une engagée **remplacée**
+  (correction d'un score amont, `scoring.ts`) efface les marques de la manche :
+  la nouvelle n'a reçu aucun horaire. En
   tournoi individuel, le message privé (annonce, rappel, retrait) dit « **Ton
   match** » au lieu de « A contre B » : les deux noms sont des pseudos, et
   aucun pseudo de joueur ne passe par Discord — même règle que le push.
@@ -290,4 +293,4 @@ désigne le rôle arbitre, serveur par serveur.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : 24 h avant `bg_matches.start_at` (les paliers « une semaine » et « 1 h avant » sont retirés), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`). Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser, changer ou retirer la date (`setMatchStartAt`) efface ses rappels et l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé / Horaire du match retiré », marque `TOLD` = horaire reçu), aux arbitres (push `MATCH_SCHEDULED`, sauf retrait) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.
+- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : 24 h avant `bg_matches.start_at` (les paliers « une semaine » et « 1 h avant » sont retirés), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`). Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser ou changer la date (`setMatchStartAt`) efface ses paliers (un retrait garde toutes les marques), et poser, changer ou retirer l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé / Horaire du match retiré », marque `TOLD` = horaire reçu), aux arbitres (push `MATCH_SCHEDULED`, sauf retrait) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.
