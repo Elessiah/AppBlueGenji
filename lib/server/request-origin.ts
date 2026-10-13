@@ -4,6 +4,7 @@ import { fail, type ApiError } from "@/lib/server/http";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import {
   CROSS_SITE_REQUEST,
+  isSitePageNavigation,
   requestOriginRefusal,
 } from "@/lib/shared/request-origin";
 
@@ -71,4 +72,13 @@ export function rejectCrossSiteRequest(
   );
   if (refusal === null) return null;
   return fail(refusal, refusal === CROSS_SITE_REQUEST ? 403 : 415);
+}
+
+/** La navigation vient-elle d'un clic sur une page du site (voir `isSitePageNavigation`) ? */
+export function startedOnSitePage(req: Request): boolean {
+  return isSitePageNavigation({
+    secFetchSite: req.headers.get("sec-fetch-site"),
+    secFetchMode: req.headers.get("sec-fetch-mode"),
+    secFetchDest: req.headers.get("sec-fetch-dest"),
+  });
 }

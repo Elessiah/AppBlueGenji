@@ -109,7 +109,9 @@ une fois en production : la clé publique est gravée dans chaque abonnement.
 
 - Service worker `public/push-sw.js`, portée `/` : il affiche et ouvre, **rien
   d'autre** — aucun cache, aucune interception. Le lien d'une notification est
-  relu comme une entrée (chemin du site seulement). `pushsubscriptionchange`
+  relu comme une entrée (chemin du site seulement, jamais une route d'API :
+  ouverte d'ici, elle partirait du site comme un clic — `pushTargetPath` côté
+  serveur, `sitePath` côté service worker). `pushsubscriptionchange`
   renvoie l'abonnement renouvelé au site.
 - iPhone / iPad : Safari ne livre le push qu'à un site **ajouté à l'écran
   d'accueil et ouvert en app web** (mode autonome). Le manifeste reste en
@@ -160,6 +162,13 @@ comprises. Un abonnement sans remise depuis `PUSH_SUBSCRIPTION_RETENTION_DAYS`
 `PRIVACY_CHANGES` (`2026-09-notifications-push`), section « Notifications push »
 de `/rgpd`. **Aucune notification ne porte le pseudo d'un joueur**, même règle
 que les journaux Discord.
+
+**Langue** (lot 9-3) : chaque notification est rédigée dans la langue du compte
+destinataire (`bg_users.locale`, `fr` ou `en`). Le contenu passé à
+`notifyUsers` / `notifyStaff` est une fonction de la langue
+(`LocalizedPushContent`) ; `pushToUsers` en tire une charge par langue. Tout
+rédacteur nouveau prend la langue en dernier argument, ses textes dans
+`messages/{fr,en}/pushMessages.json`. Règle de pose : `I18N.md` § Langue du compte.
 
 ## Notes reprises de CLAUDE.md
 

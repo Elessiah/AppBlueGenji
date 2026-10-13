@@ -21,6 +21,8 @@
  */
 
 import { can, type Permission, type PlatformRole } from "./permissions";
+import type { Locale } from "./locales";
+import { leadsToApi } from "./safe-redirect";
 
 /**
  * Qui peut recevoir un sujet : tout joueur (`null`), ou seulement le staff qui
@@ -139,6 +141,15 @@ export type PushContent = {
   tag?: string;
 };
 
+/**
+ * Une notification **rédigée dans la langue de chaque destinataire** (lot
+ * 9-3) : la distribution (`pushToUsers`) la demande une fois par langue de
+ * compte (`bg_users.locale`). Toute notification adressée par
+ * `notifyUsers` / `notifyStaff` prend cette forme : un sujet ne peut pas
+ * partir en une seule langue.
+ */
+export type LocalizedPushContent = (locale: Locale) => PushContent;
+
 /** Ce que le service worker reçoit, chiffré, dans le corps du push. */
 export type PushPayload = {
   topic: PushTopic;
@@ -146,6 +157,8 @@ export type PushPayload = {
   body: string;
   url: string;
   tag: string;
+  /** Langue du texte : le service worker la déclare à la notification (lecteur d'écran, traduction). */
+  lang: Locale;
 };
 
 export const PUSH_TITLE_MAX = 80;
@@ -162,13 +175,16 @@ function clip(text: string, max: number): string {
  * Chemin sûr à ouvrir au clic. Un **chemin du site** seulement — une URL
  * absolue vers le site est ramenée à son chemin, tout le reste retombe sur
  * l'accueil : la notification s'affiche sous le nom du site, elle ne doit pas
- * mener ailleurs.
+ * mener ailleurs. Jamais une route d'API (`leadsToApi`) : ouverte par le
+ * service worker, elle partirait du site (`Sec-Fetch-Site: same-origin`), et
+ * un départ OAuth y passerait pour un clic sur la page (revue sécurité, lot 9-3).
  */
 export function pushTargetPath(url: string, siteOrigin: string | null = null): string {
   let path = url.trim();
   if (siteOrigin && path.startsWith(siteOrigin)) path = path.slice(siteOrigin.length) || "/";
   if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return "/";
   if (/[\u0000-\u001f\u007f]/.test(path)) return "/";
+  if (leadsToApi(path)) return "/";
   return path;
 }
 
@@ -179,7 +195,9 @@ export function pushTargetPath(url: string, siteOrigin: string | null = null): s
 export function buildPushPayload(
   topic: PushTopic,
   content: PushContent,
-  siteOrigin: string | null = null,
+  siteOrigin: string | null,
+  /** Obligatoire : un texte anglais déclaré français serait lu avec la mauvaise voix. */
+  lang: Locale,
 ): PushPayload {
   return {
     topic,
@@ -187,6 +205,7 @@ export function buildPushPayload(
     body: clip(content.body, PUSH_BODY_MAX),
     url: pushTargetPath(content.url, siteOrigin),
     tag: clip(content.tag ?? topic, PUSH_TAG_MAX) || topic,
+    lang,
   };
 }
 

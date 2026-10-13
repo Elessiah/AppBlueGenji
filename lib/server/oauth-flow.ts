@@ -66,6 +66,8 @@ import {
 } from "@/lib/shared/safe-redirect";
 import { DEFAULT_LOCALE, isLocale, localeHref, type Locale } from "@/lib/shared/locales";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
+import { recordLoginLocale } from "@/lib/server/users/account-locale";
+import { startedOnSitePage } from "@/lib/server/request-origin";
 
 /** Où retombe un rattachement, réussi ou non. */
 const PROFILE_PATH = "/profil";
@@ -175,7 +177,14 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
   // pas de champ de plus, la langue se relit dans la destination au retour.
   const redirectTo = sealedReturnPath(req.nextUrl.searchParams.get("redirect"), locale);
   const intent: OAuthIntent = req.nextUrl.searchParams.get("intent") === "link" ? "LINK" : "LOGIN";
-  const termsAccepted = req.nextUrl.searchParams.get("terms") === "1";
+  // Ce que la route de départ — un `GET` sans contrôle de provenance, qu'un
+  // autre site peut faire ouvrir — scelle de la page de départ (langue du
+  // compte, lot 9-3 ; conditions cochées) ne vaut que pour un départ **prouvé**
+  // cliqué sur une page du site (`startedOnSitePage`) : un lien posé ailleurs
+  // ne choisit ni l'un ni l'autre. Sans preuve, la langue reste telle qu'elle
+  // est, et une inscription se voit redemander les conditions (« terms »).
+  const localeFromPage = startedOnSitePage(req);
+  const termsAccepted = localeFromPage && req.nextUrl.searchParams.get("terms") === "1";
 
   if (intent === "LINK") {
     const user = await getCurrentUser();
@@ -186,7 +195,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
 
   try {
     const authorizationUrl = OAUTH_CLIENTS[provider].authorizationUrl(state);
-    await saveOAuthState({ provider, state, redirectTo, intent, termsAccepted });
+    await saveOAuthState({ provider, state, redirectTo, intent, termsAccepted, localeFromPage });
     return NextResponse.redirect(authorizationUrl);
   } catch (error) {
     const missing = isMissingConfiguration(error);
@@ -317,6 +326,11 @@ async function completeLogin(
     // l'appelant.
     const userId = await createOrGetOAuthUser(identity, { termsAccepted: saved.termsAccepted });
     await createSession(userId, `LOGIN_${provider}`);
+    // La langue du compte suit celle de la page d'où l'on s'est connecté
+    // (lot 9-3, `lib/server/users/account-locale.ts`) ; jamais bloquant. Un
+    // départ qui ne vient pas, preuve à l'appui, d'une page du site ne la
+    // change pas (`localeFromPage`) : il n'a pas choisi de langue.
+    if (saved.localeFromPage) await recordLoginLocale(userId, locale);
   } catch (error) {
     // Un compte neuf sans les conditions acceptées : la page de connexion le
     // dit, plutôt qu'un « échec de connexion » qui ferait réessayer pour rien.

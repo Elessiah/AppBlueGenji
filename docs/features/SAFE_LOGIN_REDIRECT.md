@@ -44,6 +44,7 @@ barre. Sont refusés, et remplacés par `/tournois` :
 | `/en//exemple.invalid`, `/regles//x` | `//` **n'importe où** dans le chemin : le préfixe de langue, retiré puis reposé, le démasquerait (lot 6) |
 | `/en/\exemple.invalid` | contre-barre n'importe où dans le chemin (lue comme une barre) |
 | `/en/%2F%2Fexemple.invalid`, `%5C` | barre ou contre-barre encodée, qu'un relais peut décoder |
+| `/api/auth/google/start?terms=1`, `/en/api/…`, `/%61pi/…`, `/x/../api/…` | route d'API, résolue comme le navigateur : ouverte depuis la page de connexion, elle passerait pour un clic sur le site (`Sec-Fetch-Site: same-origin`) et ouvrirait la session d'un autre compte (revue sécurité, lot 9-3) |
 | tout ce qui n'est pas une chaîne | paramètre absent, tableau, objet |
 
 Le dernier cas de refus n'est pas une précaution de forme : les navigateurs
@@ -73,8 +74,8 @@ traduite reste française (`/tournois`), un visiteur français reste français.
   une route pas encore traduite) ; le retour relit la langue dans cette
   destination (`sealedReturnLocale`), renvoie un refus sur `/en/connexion` et une
   réussite sur `loginDestination(saved.redirectTo, locale)`. Le cookie `bg_oauth`
-  ne gagne **aucun champ** (ce que `/rgpd` en dit, « la page où vous ramener »,
-  reste exact), et l'**adresse de rappel** enregistrée chez Google, Discord et
+  ne gagne **aucun champ de langue** (ce que `/rgpd` en dit, « la page où vous ramener »,
+  reste exact ; le lot 9-3 n'y ajoute que `localeFromPage`, départ cliqué sur une page du site), et l'**adresse de rappel** enregistrée chez Google, Discord et
   Blizzard (`/api/auth/<slug>/callback`) ne change pas. Sans cookie d'état
   lisible au retour (expiré, contexte qui l'isole), la langue n'est plus connue :
   le refus revient sur `/connexion`, en français.

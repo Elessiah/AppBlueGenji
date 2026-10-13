@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_BODY_MAX,
@@ -23,6 +25,9 @@ import {
   recruitmentAdHasEnglish,
   recruitmentErrorMessage,
   validateRecruitmentAdInput,
+  isSafeRecruitmentContactUrl,
+  recruitmentContactHref,
+  recruitmentDiscordHref,
   RECRUITMENT_FIELD_ERRORS,
   type RecruitmentAd,
 } from "@/lib/shared/recruitment";
@@ -485,5 +490,85 @@ describe("recruitmentSeenKept", () => {
   it("cookie absent ou illisible : rien à garder", () => {
     expect(recruitmentSeenKept(undefined, [5], [])).toEqual([]);
     expect(recruitmentSeenKept("abc", [5], [])).toEqual([]);
+  });
+});
+
+describe("lien de candidature (contactUrl) — revue juridique #439", () => {
+  it("accepte une adresse https:// ou mailto:", () => {
+    for (const url of ["https://support.example/ticket/42", "https://discord.gg/x", "mailto:recrutement@example.org"]) {
+      expect(isSafeRecruitmentContactUrl(url)).toBe(true);
+      expect(validateRecruitmentAdInput({ ...EN, title: "X", contactUrl: url }).ok).toBe(true);
+    }
+  });
+
+  it("refuse un lien relatif, un autre schéma ou une route d'API, rattaché au champ", () => {
+    for (const url of [
+      "/api/auth/google/start?terms=1&lang=en",
+      "https://bluegenji.example/api/auth/discord/start?terms=1",
+      "https://bluegenji.example/en/api/auth/google/start",
+      "https://bluegenji.example/%61pi/x/../api/auth/google/start",
+      // Barres répétées : le serveur mène `//api/…` à `/api/…` (passe 4).
+      "https://bluegenji.example//api/auth/google/start?terms=1&lang=en",
+      "https://bluegenji.example/x/..//api/a",
+      "javascript:alert(1)",
+      "http://support.example/ticket",
+      "data:text/html,x",
+      "pas une adresse",
+    ]) {
+      expect(isSafeRecruitmentContactUrl(url)).toBe(false);
+      const result = validateRecruitmentAdInput({ ...EN, title: "X", contactUrl: url });
+      expect(result).toEqual({ ok: false, error: "CONTACT_URL_INVALID" });
+    }
+    expect(RECRUITMENT_FIELD_ERRORS.CONTACT_URL_INVALID).toBe("contactUrl");
+    expect(recruitmentErrorMessage("CONTACT_URL_INVALID", "x")).toMatch(/https:\/\//);
+  });
+});
+
+describe("recruitmentContactHref — bouton « Postuler »", () => {
+  it("sert un lien accepté, jamais un lien enregistré avant la règle qu'elle refuse", () => {
+    expect(recruitmentContactHref("https://support.example/ticket/3")).toBe("https://support.example/ticket/3");
+    expect(recruitmentContactHref("/api/auth/google/start?terms=1")).toBeNull();
+    expect(recruitmentContactHref("javascript:alert(1)")).toBeNull();
+    expect(recruitmentContactHref(null)).toBeNull();
+    expect(recruitmentContactHref("")).toBeNull();
+  });
+
+  it("est le seul chemin d'un lien « Postuler » vers le DOM", () => {
+    const root = join(__dirname, "../../..");
+    for (const file of ["app/recrutement/AdDetailModal.tsx", "app/recrutement/RecruitmentSection.tsx", "components/recruitment-highlight.tsx"]) {
+      const source = readFileSync(join(root, file), "utf8");
+      expect(source).toContain("recruitmentContactHref(ad.contactUrl)");
+      expect(source).not.toMatch(/href=\{ad\.contactUrl\}/);
+    }
+  });
+});
+
+describe("recruitmentDiscordHref — contact Discord (revue juridique #439, passe 7)", () => {
+  it("fait un lien d'une invitation ou d'un profil Discord", () => {
+    expect(recruitmentDiscordHref("discord.gg/abc")).toBe("https://discord.gg/abc");
+    expect(recruitmentDiscordHref(" https://discord.com/invite/abc ")).toBe("https://discord.com/invite/abc");
+    expect(recruitmentDiscordHref("https://discordapp.com/users/1")).toBe("https://discordapp.com/users/1");
+  });
+
+  it("ne fait jamais un lien d'un pseudo ni d'un autre hôte (le site et ses routes d'API compris)", () => {
+    expect(recruitmentDiscordHref("arbitre_bg")).toBeNull();
+    expect(recruitmentDiscordHref("https://bluegenji.example/api/auth/google/start?terms=1&lang=en")).toBeNull();
+    expect(recruitmentDiscordHref("https://discord.gg.evil.example/x")).toBeNull();
+    expect(recruitmentDiscordHref(null)).toBeNull();
+  });
+
+  it("refuse à l'enregistrement un lien qui ne mène pas chez Discord, rattaché au champ", () => {
+    expect(
+      validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "https://bluegenji.example/api/auth/google/start?terms=1" }),
+    ).toEqual({ ok: false, error: "CONTACT_DISCORD_INVALID" });
+    expect(validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "discord.gg/abc" }).ok).toBe(true);
+    expect(validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "arbitre_bg" }).ok).toBe(true);
+    expect(RECRUITMENT_FIELD_ERRORS.CONTACT_DISCORD_INVALID).toBe("contactDiscord");
+  });
+
+  it("ContactTags ne rend un lien que par recruitmentDiscordHref", () => {
+    const source = readFileSync(join(__dirname, "../../..", "components/recruitment/ContactTags.tsx"), "utf8");
+    expect(source).toContain("recruitmentDiscordHref(ad.contactDiscord)");
+    expect(source).toContain("href={discordHref}");
   });
 });

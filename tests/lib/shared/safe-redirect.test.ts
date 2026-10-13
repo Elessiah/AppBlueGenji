@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DEFAULT_REDIRECT,
+  leadsToApi,
   loginDestination,
   safeRedirectPath,
   sealedReturnLocale,
@@ -96,6 +97,28 @@ describe("safeRedirectPath — ce qui est refusé", () => {
 
   it("accepte un repli explicite, pour les appelants qui en ont un autre", () => {
     expect(safeRedirectPath("https://exemple.invalid", "/")).toBe("/");
+  });
+
+  it.each([
+    "/api/auth/google/start?terms=1&lang=en",
+    "/api",
+    "/api/",
+    "/API/auth/discord/start",
+    "/en/api/auth/google/start",
+    "/fr/en/api/auth/google/start",
+    "/x/..%2fapi/auth/google/start",
+    "/x/..%5Capi/x",
+    "/tournois/../api/auth/google/start",
+    "/./api/profile",
+    "/%61pi/auth/google/start",
+    "/%E0%A4%A",
+  ])("refuse une route d'API, même déguisée — elle partirait du site comme un clic sur la page (%s)", (value) => {
+    expect(safeRedirectPath(value)).toBe(DEFAULT_REDIRECT);
+  });
+
+  it("garde les pages dont le nom commence comme l'API", () => {
+    expect(safeRedirectPath("/apiculture")).toBe("/apiculture");
+    expect(safeRedirectPath("/tournois/4?q=/api/x")).toBe("/tournois/4?q=/api/x");
   });
 });
 
@@ -254,6 +277,9 @@ describe("sealedReturnPath / sealedReturnLocale — la langue scellée dans le c
   it("préfixe la destination, même d'une route pas encore traduite", () => {
     expect(sealedReturnPath("/tournois/12?onglet=1", "en")).toBe("/en/tournois/12?onglet=1");
     expect(sealedReturnPath("/en/regles", "en")).toBe("/en/regles");
+    // Préfixes enchaînés ôtés tous : la destination ne coûte aucun renvoi, et sa langue est celle du départ.
+    expect(sealedReturnPath("/fr/en/regles", "en")).toBe("/en/regles");
+    expect(sealedReturnPath("/en/fr/regles", "fr")).toBe("/regles");
     expect(sealedReturnPath("/", "en")).toBe("/en");
     expect(sealedReturnPath(undefined, "en")).toBe("/en/tournois");
   });
@@ -290,5 +316,15 @@ describe("signedInLoginRedirect — /en/connexion est la même page", () => {
 
   it("garde une autre page anglaise", () => {
     expect(signedInLoginRedirect("/en/regles")).toBe("/en/regles");
+  });
+});
+
+describe("leadsToApi — barres répétées en tête (revue juridique #439, passe 4)", () => {
+  it.each(["//api/auth/google/start", "/x/..//api/a", "/\api/x", "///api", "/en//api/x"])("%p mène à l'API", (path) => {
+    expect(leadsToApi(path)).toBe(true);
+  });
+
+  it.each(["/", "/tournois", "/apis", "//tournois"])("%p ne mène pas à l'API", (path) => {
+    expect(leadsToApi(path)).toBe(false);
   });
 });

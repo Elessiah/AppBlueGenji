@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
   DONNEES_PROFIL,
@@ -51,8 +53,19 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 10 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(10);
+  it("has exactly 11 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(11);
+  });
+
+  it("déclare la langue du compte (lot 9-3) : exécution du contrat, durée du compte, remise au français", () => {
+    const locale = DONNEES_PROFIL.find((d) => d.donnee === "Langue du compte");
+    expect(locale?.base).toBe("Exécution du contrat");
+    expect(locale?.duree).toBe("Durée du compte");
+    expect(locale?.extraBases).toBeUndefined();
+    expect(locale?.finalite).toMatch(/notifications push/);
+    expect(locale?.finalite).toMatch(/Mon profil/);
+    expect(locale?.finalite).toMatch(/sauf les exceptions détaillées à la section Notifications push/);
+    expect(locale?.finalite).toMatch(/français par défaut, remis au français si le compte est anonymisé/);
   });
 
   it("déclare la majorité, facultative et affichée seulement sur choix du joueur", () => {
@@ -249,5 +262,18 @@ describe("DONNEE_SAUVEGARDES", () => {
   it("nomme l'hébergeur et le chiffrement", () => {
     expect(DONNEE_SAUVEGARDES.finalite).toMatch(/Hetzner, en Allemagne/);
     expect(DONNEE_SAUVEGARDES.finalite).toMatch(/chiffrées/i);
+  });
+});
+
+describe("/rgpd — données obligatoires : la langue du compte (revue juridique #439)", () => {
+  const read = (file: string) => readFileSync(join(__dirname, "../../..", file), "utf8");
+
+  it("dit en FR et en EN que tout compte garde une langue, non facultative et modifiable", () => {
+    expect(read("app/rgpd/page.tsx")).toMatch(/Il garde aussi une langue, français ou anglais \(le français par défaut\)/);
+    expect(read("app/rgpd/page.tsx")).toMatch(/vos\s+notifications push \(les messages Discord restent en français\)/);
+    expect(read("app/rgpd/page.tsx")).toMatch(/vous la changez dans Mon profil \(jusqu&apos;à votre prochaine connexion\s+faite dans l&apos;autre langue\)/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/It also keeps a language, French or English \(French by default\)/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/your push notifications to you \(Discord messages stay in\s+French\)/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
   });
 });

@@ -21,7 +21,7 @@
  * ne fait pas foi).
  */
 
-import { DEFAULT_LOCALE, localeHref, splitLocalePrefix, type Locale } from "./locales";
+import { DEFAULT_LOCALE, isApiPath, localeHref, splitLocalePrefix, type Locale } from "./locales";
 import { trimTrailingSlashes } from "./trim-trailing";
 
 /** Destination de repli : l'accueil de l'espace compétitif. */
@@ -52,7 +52,12 @@ const STRIPPED_BY_BROWSERS = /[\u0000-\u001f\u007f]/;
  * - sa variante à contre-barre (`/\exemple.invalid`), que les navigateurs
  *   traitent comme la précédente ;
  * - tout ce qui porte un caractère de contrôle, retiré par le navigateur avant
- *   résolution et qui ferait réapparaître les cas ci-dessus.
+ *   résolution et qui ferait réapparaître les cas ci-dessus ;
+ * - une route d'API (`/api/…`, préfixe de langue, `.`/`..` ou encodage
+ *   compris) : ce n'est pas une page. Ouverte depuis la page de connexion, elle
+ *   partirait **du site** — `/api/auth/google/start?terms=1&lang=en` y
+ *   passerait pour un clic sur la page (`Sec-Fetch-Site: same-origin`) et
+ *   ouvrirait, sitôt connecté, la session d'un autre compte (revue sécurité).
  */
 export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDIRECT): string {
   if (typeof value !== "string") return fallback;
@@ -64,8 +69,55 @@ export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDI
   // `//` comme `/\` : le navigateur y lit une autorité, pas un chemin.
   if (candidate.startsWith("//") || candidate.startsWith("/\\")) return fallback;
   if (UNSAFE_PATH_SEPARATOR.test(pathPart(candidate))) return fallback;
+  if (leadsToApi(candidate)) return fallback;
 
   return candidate;
+}
+
+/**
+ * Le chemin d'une destination **tel que le navigateur le résoudra** (`.`/`..`
+ * retirés, encodage défait, barres répétées réduites), en minuscules, sans barre finale ni préfixes de
+ * langue (`/en/connexion` est la même page que `/connexion`, lot 6) — ou
+ * `null` si l'encodage est illisible ou porte une barre encodée. Seule lecture de « où mène vraiment ce
+ * chemin » : refus des routes d'API ({@link safeRedirectPath}) et de la page de
+ * connexion ({@link signedInLoginRedirect}).
+ */
+function resolvedSitePath(href: string): string | null {
+  // Barre ou contre-barre encodée : décodée **après** la résolution des `..`,
+  // elle en ferait apparaître de nouveaux (`/x/..%2fapi`). Aucun chemin du
+  // site n'en porte.
+  const rawPath = pathPart(href);
+  if (/%2f|%5c/i.test(rawPath)) return null;
+  // Barres (et contre-barres, lues comme des barres) répétées réduites **avant**
+  // l'analyse : `new URL("//api/…", base)` y lirait un hôte (`api`) et rendrait
+  // `/`, alors que le serveur mène `//api/…` à `/api/…` (renvoi 308 sur le site).
+  const flattened = rawPath.replaceAll("\\", "/").replaceAll(/\/{2,}/g, "/") + href.slice(rawPath.length);
+  let path: string;
+  try {
+    path = decodeURIComponent(new URL(flattened, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
+  } catch {
+    return null;
+  }
+  // Barres répétées ramenées à une : `/en//api/…` mène à `/api/…` (le
+  // middleware retire les barres de tête après le préfixe de langue). Les
+  // préfixes sont ôtés **tous** : `/fr/en/api/…` y mène aussi, par deux renvois.
+  return withoutLocalePrefixes(trimTrailingSlashes(path.toLowerCase().replaceAll(/\/{2,}/g, "/")) || "/");
+}
+
+/** Le chemin sans **aucun** de ses préfixes de langue (`/fr/en/regles` → `/regles`). */
+function withoutLocalePrefixes(path: string): string {
+  let rest = path;
+  for (let split = splitLocalePrefix(rest); split.prefixed !== null; split = splitLocalePrefix(rest)) rest = split.path;
+  return rest;
+}
+
+/**
+ * Le chemin mène-t-il à une route d'API ? Un encodage illisible est tenu pour
+ * suspect. Sert aussi au lien d'une notification push (`pushTargetPath`).
+ */
+export function leadsToApi(href: string): boolean {
+  const path = resolvedSitePath(href);
+  return path === null || isApiPath(path);
 }
 
 /**
@@ -112,7 +164,7 @@ export function sealedReturnPath(value: unknown, locale: Locale): string {
   const safe = safeRedirectPath(value);
   const path = pathPart(safe);
   const suffix = safe.slice(path.length);
-  const bare = splitLocalePrefix(path).path;
+  const bare = withoutLocalePrefixes(path);
   if (locale === DEFAULT_LOCALE) return `${bare}${suffix}`;
   return `/${locale}${bare === "/" ? "" : bare}${suffix}`;
 }
@@ -136,14 +188,8 @@ const LOGIN_PATH = "/connexion";
  */
 export function signedInLoginRedirect(value: unknown): string {
   const target = safeRedirectPath(value);
-  let path: string;
-  try {
-    path = decodeURIComponent(new URL(target, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
-  } catch {
-    // Encodage illisible : dans le doute, la destination par défaut.
-    return DEFAULT_REDIRECT;
-  }
-  // `/en/connexion` est la même page (lot 6) : comparée sans préfixe de langue.
-  path = splitLocalePrefix(trimTrailingSlashes(path)).path;
+  const path = resolvedSitePath(target);
+  // Encodage illisible : dans le doute, la destination par défaut.
+  if (path === null) return DEFAULT_REDIRECT;
   return path === LOGIN_PATH || path.startsWith(`${LOGIN_PATH}/`) ? DEFAULT_REDIRECT : target;
 }

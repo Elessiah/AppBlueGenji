@@ -42,8 +42,9 @@ import type frProfile from "@/messages/fr/profile.json";
 import type frReports from "@/messages/fr/reports.json";
 import type frImageCrop from "@/messages/fr/imageCrop.json";
 import type frPush from "@/messages/fr/push.json";
+import type frPushMessages from "@/messages/fr/pushMessages.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -124,6 +125,12 @@ export type Messages = {
   imageCrop: typeof frImageCrop;
   /** Réglage des notifications push (lot 9-2), deux langues dans son module — `components/notifications/push-text.ts`. */
   push: typeof frPush;
+  /**
+   * Contenu des notifications push, rédigé dans la langue de chaque
+   * destinataire (lot 9-3, `bg_users.locale`) — serveur seulement,
+   * `lib/shared/push-messages.ts`.
+   */
+  pushMessages: typeof frPushMessages;
 };
 
 /**

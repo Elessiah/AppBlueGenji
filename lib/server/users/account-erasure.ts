@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { ignoreMissingTable, isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
+import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 
 /**
  * L'effacement pur et simple, sous le verrou de `deleteOwnAccount`.
@@ -94,9 +95,13 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
              -- datée restée seule serait une trace de plus sans objet.
              terms_version = NULL,
              terms_accepted_at = NULL,
+             -- La langue du compte (lot 9-3) revient au défaut (DEFAULT_LOCALE,
+             -- celui de la colonne) : un compte qui ne recevra plus rien n'a
+             -- plus de langue à retenir.
+             locale = ?,
              is_deleted = 1
          WHERE id = ?`,
-        [pseudo, userId],
+        [pseudo, DEFAULT_LOCALE, userId],
       );
       break;
     } catch (error) {

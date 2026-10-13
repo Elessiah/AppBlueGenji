@@ -39,9 +39,9 @@ describe("pushToUsers", () => {
   it("ne fait rien sans configuration, ni sans destinataire", async () => {
     const query = jest.fn<SqlQuery>();
     pool({ query });
-    expect(await pushToUsers([1], "MATCH_START", { title: "t", body: "b", url: "/" }, {}, null)).toBe(0);
-    expect(await pushToUsers([], "MATCH_START", { title: "t", body: "b", url: "/" }, {}, CONFIG)).toBe(0);
-    expect(await pushToUsers([0, -2, 1.5], "MATCH_START", { title: "t", body: "b", url: "/" }, {}, CONFIG)).toBe(0);
+    expect(await pushToUsers([1], "MATCH_START", () => ({ title: "t", body: "b", url: "/" }), {}, null)).toBe(0);
+    expect(await pushToUsers([], "MATCH_START", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(0);
+    expect(await pushToUsers([0, -2, 1.5], "MATCH_START", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(0);
     expect(query).not.toHaveBeenCalled();
   });
 
@@ -49,7 +49,7 @@ describe("pushToUsers", () => {
     const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     pool({ query });
 
-    await pushToUsers([3, 3, 4], "SCORE_TO_CONFIRM", { title: "t", body: "b", url: "/" }, {}, CONFIG);
+    await pushToUsers([3, 3, 4], "SCORE_TO_CONFIRM", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG);
 
     const [sql, params] = query.mock.calls[0];
     expect(sql).toMatch(/u\.is_deleted = 0/);
@@ -78,7 +78,7 @@ describe("pushToUsers", () => {
     const count = await pushToUsers(
       [1],
       "MATCH_START",
-      { title: "Ton match commence", body: "b", url: "https://site.test/tournois/4" },
+      () => ({ title: "Ton match commence", body: "b", url: "https://site.test/tournois/4" }),
       { urgency: "high" },
       CONFIG,
     );
@@ -93,10 +93,71 @@ describe("pushToUsers", () => {
     expect(query.mock.calls[2][1]).toEqual([10]);
   });
 
+  it("rédige chaque appareil dans la langue de son titulaire, une fois par langue", async () => {
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([
+        [
+          { id: 20, ...SUB, locale: "en" },
+          { id: 21, ...SUB, locale: "fr" },
+          { id: 22, ...SUB, locale: "en" },
+          // Valeur inattendue (base pas encore migrée, par exemple) : le français.
+          { id: 23, ...SUB, locale: null },
+        ],
+      ])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+    const content = jest.fn((locale: "fr" | "en") => ({
+      title: locale === "en" ? "Your match is starting" : "Ton match commence",
+      body: "b",
+      url: locale === "en" ? "/en/tournois/4" : "/tournois/4",
+    }));
+
+    expect(await pushToUsers([1, 2, 3], "MATCH_START", content, {}, CONFIG)).toBe(4);
+
+    expect(query.mock.calls[0][0]).toMatch(/SELECT s\.id, s\.endpoint, s\.p256dh, s\.auth, u\.locale/);
+    expect(content.mock.calls.map(([locale]) => locale).sort()).toEqual(["en", "fr"]);
+    const sent = jest
+      .mocked(sendWebPush)
+      .mock.calls.map((call) => JSON.parse(call[2]) as { title: string; url: string; lang: string });
+    expect(sent.map((payload) => payload.title)).toEqual([
+      "Your match is starting",
+      "Ton match commence",
+      "Your match is starting",
+      "Ton match commence",
+    ]);
+    expect(sent[0].url).toBe("/en/tournois/4");
+    // La charge déclare sa langue : le service worker la donne à la notification.
+    expect(sent.map((payload) => payload.lang)).toEqual(["en", "fr", "en", "fr"]);
+  });
+
+  it("rédige toutes les langues avant le premier envoi : un échec de rédaction n'envoie rien à moitié", async () => {
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest.fn<SqlQuery>().mockResolvedValueOnce([
+      [
+        { id: 50, ...SUB, locale: "fr" },
+        { id: 51, ...SUB, locale: "en" },
+      ],
+    ]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+    const content = (locale: "fr" | "en") => {
+      if (locale === "en") throw new Error("rédaction impossible");
+      return { title: "Ton match commence", body: "b", url: "/" };
+    };
+
+    expect(await pushToUsers([1, 2], "MATCH_START", content, {}, CONFIG)).toBe(0);
+
+    expect(sendWebPush).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
   it("ne lève jamais : une panne rend zéro", async () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     pool({ query: jest.fn<SqlQuery>().mockRejectedValue(new Error("panne")) });
-    expect(await pushToUsers([1], "MATCH_START", { title: "t", body: "b", url: "/" }, {}, CONFIG)).toBe(0);
+    expect(await pushToUsers([1], "MATCH_START", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(0);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
@@ -104,7 +165,7 @@ describe("pushToUsers", () => {
   it("se tait sur une table absente", async () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     pool({ query: jest.fn<SqlQuery>().mockRejectedValue(Object.assign(new Error("x"), { code: "ER_NO_SUCH_TABLE" })) });
-    expect(await pushToUsers([1], "MATCH_START", { title: "t", body: "b", url: "/" }, {}, CONFIG)).toBe(0);
+    expect(await pushToUsers([1], "MATCH_START", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(0);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });

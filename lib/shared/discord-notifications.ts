@@ -162,17 +162,25 @@ export function openedMatchReminders(
   );
 }
 
+/**
+ * Formateur des dates de match, construit au premier usage puis gardé : un
+ * balayage de rappels en rédige un par engagé (message Discord et push
+ * français), et un `Intl.DateTimeFormat` coûte cher à construire.
+ */
+let matchStartFormat: Intl.DateTimeFormat | null = null;
+
 /** Date et heure d'un match, en français, fuseau de Paris. */
 export function formatMatchStart(startAt: string | Date): string {
   const date = startAt instanceof Date ? startAt : new Date(startAt);
-  return new Intl.DateTimeFormat("fr-FR", {
+  matchStartFormat ??= new Intl.DateTimeFormat("fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Europe/Paris",
-  }).format(date);
+  });
+  return matchStartFormat.format(date);
 }
 
 /** Ce qu'un rappel doit dire d'un match. */

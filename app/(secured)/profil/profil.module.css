@@ -229,6 +229,18 @@
 
 /* ── Champs ───────────────────────────────────────────────────────────────── */
 
+/* Langue du compte, sous le réglage des notifications : détachée de son
+   dernier paragraphe par l'écart du panneau lui-même (14 px). */
+.accountLocale {
+  margin-top: 14px;
+}
+
+/* Pendant l'enregistrement, le champ reste utilisable (un second choix part à
+   la suite) : seul le curseur dit l'attente. */
+.accountLocale select[aria-busy="true"] {
+  cursor: progress;
+}
+
 /* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
    mention légale. 12 px et `--ink-soft`, contre 11 px et `--ink-quiet` partout
    avant. */

@@ -229,6 +229,10 @@ describe("normalizeReportPagePath", () => {
     "/tab\tx",
     "",
     `/${"a".repeat(400)}`,
+    // Route d'API (revue juridique #439) : un clic du staff y lancerait un départ OAuth.
+    "/api/auth/discord/start?terms=1&lang=en",
+    "/en/api/auth/google/start",
+    "/x/..//api/auth/google/start",
   ])("écarte ce qui n'est pas un chemin du site : %p", (value) => {
     expect(normalizeReportPagePath(value)).toBeNull();
   });

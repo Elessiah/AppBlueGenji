@@ -18,6 +18,7 @@ jest.mock("@/lib/server/users/discord-challenges", () => {
   };
 });
 jest.mock("@/lib/server/users/sign-in", () => ({ createOrGetDiscordUser: jest.fn() }));
+jest.mock("@/lib/server/users/account-locale", () => ({ recordLoginLocale: jest.fn(async () => undefined) }));
 
 import { POST } from "@/app/api/auth/discord/verify/route";
 import { createSession } from "@/lib/server/auth";
@@ -26,6 +27,7 @@ import { createOrGetDiscordUser } from "@/lib/server/users/sign-in";
 import { DISCORD_CODE_VERIFY_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
+import { recordLoginLocale } from "@/lib/server/users/account-locale";
 
 /**
  * Le plafond de vérification, et **l'axe sur lequel il est posé**.
@@ -135,6 +137,17 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
     expect(res.status).toBe(200);
     expect(verifyMock).toHaveBeenCalledWith(VICTIM_CHALLENGE, "424242");
     expect(createSessionMock).toHaveBeenCalledWith(42, "LOGIN_DISCORD_CODE");
+    // Sans langue envoyée (page d'avant le lot) : rien d'écrit, le compte garde la sienne (lot 9-3).
+    expect(recordLoginLocale).not.toHaveBeenCalled();
+  });
+
+  it("retient la langue de la page de connexion, et n'écrit rien pour une valeur inconnue (lot 9-3)", async () => {
+    verifyMock.mockResolvedValue({ discordId: VICTIM_DISCORD, handle: "keryan" });
+    expect((await request({ challenge: VICTIM_CHALLENGE, code: "424242", locale: "en" })).status).toBe(200);
+    expect(recordLoginLocale).toHaveBeenLastCalledWith(42, "en");
+    expect(recordLoginLocale).toHaveBeenCalledTimes(1);
+    expect((await request({ challenge: VICTIM_CHALLENGE, code: "424242", locale: "de" })).status).toBe(200);
+    expect(recordLoginLocale).toHaveBeenCalledTimes(1);
   });
 
   it("ouvre le compte **du défi** et transmet le tag prouvé", async () => {

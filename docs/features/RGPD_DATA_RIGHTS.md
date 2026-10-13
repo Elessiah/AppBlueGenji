@@ -42,7 +42,8 @@ affichées dans le tableau « Données collectées ») :
   `bg_users` part, avec elle ses identités, ses sessions et le fichier de son
   avatar. Sinon il est **anonymisé** immédiatement — pseudo remplacé par un
   **pseudo d'emprunt** (`lib/shared/anonymous-pseudos.ts`), identités,
-  coordonnées, avatar, rôles de plateforme et consentements effacés, la ligne restant pour que le palmarès des
+  coordonnées, avatar, rôles de plateforme et consentements effacés, langue du
+  compte remise au défaut (`DEFAULT_LOCALE`, `fr`), la ligne restant pour que le palmarès des
   équipes adverses tienne debout. Dans les deux cas c'est immédiat, jamais un
   job différé. Les copies de sauvegarde chiffrées gardent le compte **30 jours au
   plus**, et une restauration rejoue les suppressions **de compte** intervenues
@@ -68,7 +69,8 @@ affichées dans le tableau « Données collectées ») :
   (`getCurrentUser`). N'exporte jamais les données d'un tiers.
 - **Service** : `exportOwnData(userId)` dans `lib/server/users/data-export.ts`.
   Rassemble le compte et ses identifiants bruts (ID Discord et méthode de
-  rattachement, tag et date de certification, identifiants Google et Blizzard),
+  rattachement, tag et date de certification, identifiants Google et Blizzard,
+  langue du compte `account.locale`),
   le profil et ses réglages de visibilité, les statistiques, l'historique
   d'équipes, le palmarès, les changements de traitement dont le joueur a pris
   connaissance, ses **acceptations des conditions d'utilisation**, les

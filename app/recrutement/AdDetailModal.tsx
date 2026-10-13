@@ -14,6 +14,7 @@ import {
   RECRUITMENT_PRIORITY_EXPOSURE,
   type RecruitmentAd,
   formatRecruitmentBody,
+  recruitmentContactHref,
 } from "@/lib/shared/recruitment";
 import styles from "./AdDetailModal.module.css";
 
@@ -34,6 +35,7 @@ interface AdDetailModalProps {
  */
 export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
   const { t, locale } = useRecruitmentText();
+  const applyHref = recruitmentContactHref(ad.contactUrl);
   const dialogRef = useDialogBehavior({ open: true, onClose });
   const backdrop = useBackdropDismiss(onClose);
   const titleId = `annonce-titre-${ad.id}`;
@@ -106,9 +108,9 @@ export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
           <CyberButton variant="ghost" onClick={onClose}>
             {t("detail.close")}
           </CyberButton>
-          {ad.contactUrl && (
+          {applyHref && (
             <CyberButton variant="primary" asChild>
-              <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
+              <a href={applyHref} target="_blank" rel="noopener noreferrer">
                 {t("card.apply")}
               </a>
             </CyberButton>

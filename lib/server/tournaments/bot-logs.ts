@@ -39,7 +39,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
-import { refereeAlertPush } from "@/lib/shared/push-messages";
+import { refereeAlertPush, type RefereeAlertKind, type RefereeAlertMatch } from "@/lib/shared/push-messages";
 import { notifyTournamentStart } from "./player-pushes";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
@@ -122,7 +122,12 @@ export interface ResolvedBotLog {
   entry: PendingBotLog;
   channel: BotEventChannel;
   message: string;
+  /** Manche d'une alerte arbitre : le push la nomme et y mène (lot 9-3). */
+  refereeMatch?: RefereeAlertMatch;
 }
+
+/** Ligne d'une alerte arbitre, avec sa manche relue. */
+type ResolvedRefereeLine = { message: string; refereeMatch: RefereeAlertMatch };
 
 /**
  * Clés de réservation des alertes arbitre, par nature d'évènement.
@@ -314,7 +319,7 @@ export function flushBotLogs(connection: PoolConnection): void {
     const announcedConflicts = new Set<number>();
 
     /** Envoie une ligne déjà rédigée, et dit si les arbitres l'ont reçue. */
-    async function deliver({ entry, channel, message }: ResolvedBotLog): Promise<void> {
+    async function deliver({ entry, channel, message, refereeMatch }: ResolvedBotLog): Promise<void> {
       if (channel !== "REFEREE") {
         await sendBotLog(message);
         // Le coup d'envoi est une ligne de journal pour le staff, et une
@@ -343,7 +348,8 @@ export function flushBotLogs(connection: PoolConnection): void {
         const report = await notifyStaff({
           topic: "REFEREE_ALERT",
           discord: () => pushRefereeAlert(message, "referee-alert", { honourCircuit: true }),
-          push: refereeAlertPush(message, refereePushKey(entry)),
+          push: (locale) =>
+            refereeAlertPush(message, refereePushKey(entry), locale, refereeAlertKind(entry), refereeMatch ?? null),
         });
         sent = report.discord !== null;
       } catch {
@@ -427,6 +433,11 @@ function refereeAlertClaimId(entry: PendingBotLog): number | null {
  */
 function refereePushKey(entry: PendingBotLog): string {
   return "matchId" in entry ? `${entry.kind}-${entry.matchId}` : entry.kind;
+}
+
+/** Nature d'une alerte d'arbitrage, pour la rédiger hors du français du journal (lot 9-3). */
+function refereeAlertKind(entry: PendingBotLog): RefereeAlertKind {
+  return entry.kind === "score_conflict" || entry.kind === "score_report_stalled" ? entry.kind : "other";
 }
 
 function refereeAlertMatchId(entry: PendingBotLog): number {
@@ -677,8 +688,9 @@ export async function resolveBotLogs(
 
   for (const entry of entries) {
     try {
-      const message = await resolveOne(entry);
-      if (message) messages.push({ entry, channel: botEventChannel(entry.kind), message });
+      const resolved = await resolveOne(entry);
+      const line = typeof resolved === "string" ? { message: resolved } : resolved;
+      if (line?.message) messages.push({ entry, channel: botEventChannel(entry.kind), ...line });
     } catch {
       // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
     }
@@ -903,20 +915,34 @@ async function resolveMatchFinishedLog(
   });
 }
 
+/** La manche d'une alerte, telle que le push la nomme. */
+function refereeMatchOf(context: RefereeAlertContext): RefereeAlertMatch {
+  return {
+    tournamentId: context.tournament.id,
+    tournamentName: context.tournament.name,
+    matchId: context.matchId,
+    bracket: context.bracket,
+    roundNumber: context.roundNumber,
+  };
+}
+
 async function resolveScoreConflictLog(
   entry: Extract<PendingBotLog, { kind: "score_conflict" }>,
-): Promise<string | null> {
+): Promise<ResolvedRefereeLine | null> {
   const context = await loadRefereeAlertContext(entry.matchId);
-  return context === null ? null : formatScoreConflictAlert(context);
+  return context === null ? null : { message: formatScoreConflictAlert(context), refereeMatch: refereeMatchOf(context) };
 }
 
 async function resolveScoreReportStalledLog(
   entry: Extract<PendingBotLog, { kind: "score_report_stalled" }>,
-): Promise<string | null> {
+): Promise<ResolvedRefereeLine | null> {
   const context = await loadRefereeAlertContext(entry.matchId);
   return context === null
     ? null
-    : formatStalledScoreReportAlert(context, SCORE_REPORT_TIMEOUT_MINUTES);
+    : {
+        message: formatStalledScoreReportAlert(context, SCORE_REPORT_TIMEOUT_MINUTES),
+        refereeMatch: refereeMatchOf(context),
+      };
 }
 
 async function resolveTournamentStartedLog(
@@ -987,7 +1013,7 @@ async function resolveEndurancePenaltyLiftedLog(
   });
 }
 
-async function resolveOne(entry: PendingBotLog): Promise<string | null> {
+async function resolveOne(entry: PendingBotLog): Promise<string | ResolvedRefereeLine | null> {
   switch (entry.kind) {
     case "tournament_created":
       return resolveTournamentCreatedLog(entry);

@@ -3,6 +3,7 @@
 import { CyberButton } from "@/components/cyber";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
 import { BilingualField } from "@/components/ui/bilingual-field";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   type RecruitmentAd,
@@ -159,31 +160,45 @@ export function RecruitmentAdEditor({
         </span>
       </div>
 
-      <label className={styles.modalField}>
-        <span className={styles.modalLabel}>Lien de candidature (optionnel)</span>
+      <div className={styles.modalField}>
+        <label className={styles.modalLabel} htmlFor="recruitment-contact-url">
+          Lien de candidature (optionnel)
+        </label>
         <input
+          id="recruitment-contact-url"
           className={styles.modalInput}
+          inputMode="url"
           value={form.contactUrl}
           maxLength={2048}
           placeholder="https://…/ticket (SpiceWorks, formulaire…)"
+          {...errors.aria("contactUrl", "recruitment-contact-url-hint")}
           onChange={(e) => onChange("contactUrl", e.target.value)}
         />
-        <span className={styles.modalHint}>
-          Bouton « Postuler → » de l'annonce. Idéal : un lien vers un ticket SpiceWorks.
+        <span id="recruitment-contact-url-hint" className={styles.modalHint}>
+          Bouton « Postuler → » de l'annonce : une adresse https:// (idéal : un ticket SpiceWorks)
+          ou mailto:.
         </span>
-      </label>
+        <FieldErrorText fieldId="recruitment-contact-url" message={errors.message("contactUrl")} />
+      </div>
 
-      <label className={styles.modalField}>
-        <span className={styles.modalLabel}>Contact Discord (optionnel)</span>
+      <div className={styles.modalField}>
+        <label className={styles.modalLabel} htmlFor="recruitment-contact-discord">
+          Contact Discord (optionnel)
+        </label>
         <input
+          id="recruitment-contact-discord"
           className={styles.modalInput}
           value={form.contactDiscord}
           maxLength={RECRUITMENT_DISCORD_MAX}
           placeholder="pseudo#0000 ou lien d'invitation"
+          {...errors.aria("contactDiscord", "recruitment-contact-discord-hint")}
           onChange={(e) => onChange("contactDiscord", e.target.value)}
         />
-        <span className={styles.modalHint}>Pseudo (copiable) ou lien d'invitation Discord.</span>
-      </label>
+        <span id="recruitment-contact-discord-hint" className={styles.modalHint}>
+          Pseudo (copiable) ou lien d&apos;invitation Discord.
+        </span>
+        <FieldErrorText fieldId="recruitment-contact-discord" message={errors.message("contactDiscord")} />
+      </div>
       {!editing && prefilledDiscord && (
         <p className={styles.modalHint}>
           Discord pré-rempli depuis ton profil — modifie ou efface librement.

@@ -13,6 +13,7 @@ import { resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration"
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 import { fakePool, fakeConnection } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";
+import { resolvePush } from "../../helpers/push";
 
 const ENTRANT = [
   {
@@ -203,7 +204,7 @@ describe("reportTournamentIssue", () => {
     expect(userIds).toEqual([5]);
     expect(topic).toBe("REFEREE_ALERT");
     // Le texte du joueur reste sur Discord.
-    expect(content.body).not.toContain(VALID_MESSAGE);
+    expect(resolvePush(content).body).not.toContain(VALID_MESSAGE);
   });
 
   it("accepte un signalement même si aucun arbitre n'a pu être joint", async () => {

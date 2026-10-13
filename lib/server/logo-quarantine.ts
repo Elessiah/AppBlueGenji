@@ -255,7 +255,7 @@ export function notifyTeamLogoRemoved(
           message: formatLogoRemovedNotice({ teamName, url, grounds, termsUrl: moderationTermsUrl(), staffReason }),
           context: "logo-removed",
         },
-        push: moderationPush({ kind: "REMOVED", teamName, teamId, reportId }),
+        push: (locale) => moderationPush({ kind: "REMOVED", teamName, teamId, reportId }, locale),
       }),
     )
     .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", error));
@@ -276,7 +276,7 @@ export function notifyUserAvatarRemoved(userId: number, reportId: number | null,
           message: formatAvatarRemovedNotice({ url, grounds, termsUrl: moderationTermsUrl(), staffReason }),
           context: "avatar-removed",
         },
-        push: moderationPush({ kind: "REMOVED", reportId }),
+        push: (locale) => moderationPush({ kind: "REMOVED", reportId }, locale),
       }),
     )
     .catch((error) => console.error("[moderation] joueur non prévenu de la suppression", error));
@@ -554,7 +554,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
           message: formatLogoHiddenNotice({ teamName, purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }),
           context: "logo-hidden",
         },
-        push: moderationPush({ kind: "HIDDEN", teamName, teamId, reportId }),
+        push: (locale) => moderationPush({ kind: "HIDDEN", teamName, teamId, reportId }, locale),
       }),
     )
     .catch((error) => console.error("[moderation] équipe non prévenue du masquage", error));
@@ -651,7 +651,7 @@ export async function hideUserAvatarForReport(
           message: formatAvatarHiddenNotice({ purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }),
           context: "avatar-hidden",
         },
-        push: moderationPush({ kind: "HIDDEN", reportId }),
+        push: (locale) => moderationPush({ kind: "HIDDEN", reportId }, locale),
       }),
     )
     .catch((error) => console.error("[moderation] joueur non prévenu du masquage", error));
@@ -847,7 +847,8 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
         notifyUsers(recipients, {
           topic: "MODERATION",
           discord: { message: formatLogoRestoredNotice({ teamName }), context: "logo-restored" },
-          push: moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }),
+          push: (locale) =>
+            moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }, locale),
         }),
       )
       .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
@@ -870,7 +871,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
         notifyUsers(recipients, {
           topic: "MODERATION",
           discord: { message: formatAvatarRestoredNotice(), context: "avatar-restored" },
-          push: moderationPush({ kind: "RESTORED", reportId: null }),
+          push: (locale) => moderationPush({ kind: "RESTORED", reportId: null }, locale),
         }),
       )
       .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", error));

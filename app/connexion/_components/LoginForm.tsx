@@ -206,6 +206,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           code,
           pseudo: pseudo.trim() ? pseudo : undefined,
           termsAccepted,
+          // La langue de la page devient celle du compte (lot 9-3).
+          locale: text.locale,
         }),
       });
       const payload = (await response.json()) as { error?: string; suspension?: unknown };

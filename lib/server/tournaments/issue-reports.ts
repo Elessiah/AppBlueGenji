@@ -27,7 +27,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
-import { tournamentMatchHref } from "@/lib/shared/match-anchor";
+import { issueReportPush } from "@/lib/shared/push-messages";
 import {
   buildIssueReportMessage,
   matchRoundLabel,
@@ -60,7 +60,15 @@ export interface IssueReportResult {
 }
 
 /** Manche signalée, telle que le message à l'arbitrage la décrit. */
-type ReportedMatch = { round: string; team1: LogEntrant | null; team2: LogEntrant | null; id: number };
+type ReportedMatch = {
+  round: string;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  id: number;
+  /** Plateau et manche, pour nommer la manche hors du français du journal (lot 9-3). */
+  bracket: string;
+  roundNumber: number;
+};
 
 /**
  * Relit la manche désignée par un signalement et vérifie que l'engagé la joue.
@@ -98,6 +106,8 @@ async function loadReportedMatch(
     team1: row.team1_name ? { name: row.team1_name, participantType } : null,
     team2: row.team2_name ? { name: row.team2_name, participantType } : null,
     id: matchId,
+    bracket: String(row.bracket),
+    roundNumber: Number(row.round_number),
   };
 }
 
@@ -159,18 +169,13 @@ export async function reportTournamentIssue(
     match,
     message,
   });
-  const pushedRound = match ? `, ${match.round}` : "";
   const { discord: alert, pushed } = await notifyStaff({
     topic: "REFEREE_ALERT",
     discord: () => pushRefereeAlert(alertMessage, "issue-report"),
     // Le texte du joueur reste sur Discord : une notification s'affiche sur un
     // écran verrouillé, elle ne dit que ce qui attend un arbitre, et où.
-    push: {
-      title: "Arbitrage requis",
-      body: `Problème signalé · ${String(context.tournament_name)}${pushedRound}.`,
-      url: tournamentMatchHref(tournamentId, match?.id ?? null),
-      tag: `issue-${tournamentId}-${match?.id ?? 0}`,
-    },
+    push: (locale) =>
+      issueReportPush({ tournamentId, tournamentName: String(context.tournament_name), match }, locale),
   });
 
   // Le bot injoignable est remonté, pas avalé : répondre « signalement envoyé »

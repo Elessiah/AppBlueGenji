@@ -16,6 +16,7 @@ import {
   resetMatchStartNoticeThrottle,
 } from "@/lib/server/tournaments/player-pushes";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { resolvePush } from "../../helpers/push";
 
 const CONFIG = { publicKey: "pk", privateKey: {} as WebPushConfig["privateKey"], subject: "mailto:a@b.test" };
 
@@ -109,11 +110,11 @@ describe("dispatchMatchStartNotices", () => {
     expect(side1.discord).toEqual([null, null]);
     expect(side1.notification.topic).toBe("MATCH_START");
     expect(side1.notification.discord).toBeUndefined();
-    expect(side1.notification.push.body).toContain("Renards contre Nova");
-    expect(side1.notification.push.title).toBe("Ton match commence");
+    expect(resolvePush(side1.notification.push).body).toContain("Renards contre Nova");
+    expect(resolvePush(side1.notification.push).title).toBe("Ton match commence");
     expect(side1.notification.pushOptions).toEqual({ urgency: "high", ttlSeconds: 15 * 60 });
     expect(side2.userIds).toEqual([20]);
-    expect(side2.notification.push.body).toContain("Nova contre Renards");
+    expect(resolvePush(side2.notification.push).body).toContain("Nova contre Renards");
   });
 
   it("ne lit que l'appariement courant, jouable, dans la fenêtre, et pas déjà annoncé", async () => {
@@ -137,7 +138,7 @@ describe("dispatchMatchStartNotices", () => {
     const { execute } = mockDb([{ ...LOBBY_MATCH, launched_at: new Date() }]);
     await dispatchMatchStartNotices();
     expect(execute.mock.calls.at(-1)?.[1]).toEqual([40, "1:2", "LAUNCHED"]);
-    expect(pushes()[0].notification.push.title).toBe("Ton match est lancé");
+    expect(resolvePush(pushes()[0].notification.push).title).toBe("Ton match est lancé");
   });
 
   it("ne fait pas sonner deux fois un départ déjà appelé", async () => {
@@ -182,7 +183,7 @@ describe("dispatchMatchStartNotices", () => {
     mockDb([{ ...LOBBY_MATCH, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" }]);
     await dispatchMatchStartNotices();
     for (const push of pushes()) {
-      expect(push.notification.push.body).not.toMatch(/Kiro|Nova/);
+      expect(resolvePush(push.notification.push).body).not.toMatch(/Kiro|Nova/);
     }
   });
 
@@ -257,15 +258,15 @@ describe("notifyScoreToConfirm", () => {
     expect(loadEntrantMatchLeaderIds).toHaveBeenCalledWith([2]);
     const [push] = pushes();
     expect(push.notification.topic).toBe("SCORE_TO_CONFIRM");
-    expect(push.notification.push.body).toContain("Renards a saisi");
-    expect(push.notification.push.url).toBe("/tournois/4#match-40");
+    expect(resolvePush(push.notification.push).body).toContain("Renards a saisi");
+    expect(resolvePush(push.notification.push).url).toBe("/tournois/4#match-40");
   });
 
   it("ne nomme pas l'adversaire en tournoi individuel", async () => {
     reported({ participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
     jest.mocked(loadEntrantMatchLeaderIds).mockResolvedValue(new Map([[2, [20]]]));
     await notifyScoreToConfirm(40);
-    expect(pushes()[0].notification.push.body).toContain("Ton adversaire a saisi");
+    expect(resolvePush(pushes()[0].notification.push).body).toContain("Ton adversaire a saisi");
   });
 
   it.each([
@@ -303,7 +304,7 @@ describe("notifyTournamentStart", () => {
     const [push] = pushes();
     expect(push.userIds).toEqual([10, 11, 20]);
     expect(push.notification.topic).toBe("TOURNAMENT_START");
-    expect(push.notification.push.url).toBe("/tournois/4");
+    expect(resolvePush(push.notification.push).url).toBe("/tournois/4");
   });
 
   it("ne fait rien pour un tournoi disparu", async () => {

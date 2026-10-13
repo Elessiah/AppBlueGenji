@@ -189,6 +189,29 @@ describe("resolveBotLogs", () => {
     expect(entry.message).toContain("Les Renards 2–1 Team Nova");
   });
 
+  it("une alerte arbitre emporte sa manche, que le push nomme et vers laquelle il mène (lot 9-3)", async () => {
+    mockDb([[{ ...MATCH_ROW, team1_score: null, team2_score: null, participant_type: "TEAM" }]]);
+
+    const [entry] = await resolveBotLogs([{ kind: "score_conflict", matchId: 31 }]);
+
+    expect(entry.channel).toBe("REFEREE");
+    expect(entry.refereeMatch).toEqual({
+      tournamentId: 12,
+      tournamentName: "Coupe BlueGenji",
+      matchId: 31,
+      bracket: "UPPER",
+      roundNumber: 2,
+    });
+  });
+
+  it("une ligne de journal n'emporte aucune manche", async () => {
+    mockDb([[MATCH_ROW]]);
+
+    const [entry] = await resolveBotLogs([{ kind: "match_finished", matchId: 31 }]);
+
+    expect(entry).not.toHaveProperty("refereeMatch");
+  });
+
   it("ignore les byes, dont le score est posé par le moteur", async () => {
     mockDb([[{ ...MATCH_ROW, is_bye: 1 }]]);
 

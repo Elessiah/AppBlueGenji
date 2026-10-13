@@ -100,6 +100,31 @@ describe("middleware — adresses préfixées refusées ou renvoyées", () => {
     expect(call("/fr/api/x", { method: "POST" }).status).toBe(404);
   });
 
+  it.each([
+    "/en//api/auth/google/start?terms=1&lang=en",
+    "/fr//api/x",
+    "/fr/en/api/auth/google/start",
+    "/fr/en//api/auth/google/start",
+    "/en/%61pi/x",
+    "/fr/x/..%2fapi/x",
+  ])("répond 404 à une adresse qu'un renvoi mènerait sous /api/ (%s), sans renvoi", (path) => {
+    const response = call(path);
+    expect(response.status).toBe(404);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("sert une route anglaise traduite sans la juger comme un renvoi", () => {
+    const response = call("/en/regles");
+    expect(response.status).not.toBe(404);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("renvoie toujours une page dont le nom commence comme l'API", () => {
+    const response = call("/fr/apiculture");
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/apiculture`);
+  });
+
   it("redirige /fr/… en 308 vers l'adresse sans préfixe", () => {
     const response = call("/fr/regles?x=1");
     expect(response.status).toBe(308);

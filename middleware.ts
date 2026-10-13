@@ -4,6 +4,7 @@ import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
+import { leadsToApi } from "@/lib/shared/safe-redirect";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 import { DOCUMENT_REQUEST_HEADER, LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 
@@ -113,7 +114,8 @@ export function middleware(request: NextRequest) {
 /**
  * Ce qu'une adresse préfixée reçoit **avant** tout rendu.
  *
- * - `/en/api/…` (et `/fr/api/…`) : **404**, jamais réécrit ni redirigé.
+ * - `/en/api/…` (et `/fr/api/…`, `/en//api/…`, `/fr/en/api/…` : toute adresse
+ *   qu'un renvoi mènerait sous `/api/`) : **404**, jamais réécrit ni redirigé.
  *   Réécrite vers `/api/…`, une écriture intersite échapperait à
  *   {@link guardApiRequest}, qui ne voit que les chemins commençant par
  *   `/api/` : le 403 `CROSS_SITE_REQUEST` serait contourné.
@@ -127,8 +129,14 @@ export function middleware(request: NextRequest) {
  */
 function localeGate(request: NextRequest, path: string, prefixed: Locale | null): NextResponse | null {
   if (prefixed === null) return null;
+  // La destination d'un renvoi est jugée **telle qu'elle sera** (barres de tête
+  // réduites, préfixes enchaînés ôtés) : `/en//api/…` ou `/fr/en/api/…`
+  // mèneraient sinon à `/api/…` par un ou deux renvois, chacun depuis le site
+  // (revue sécurité du lot 9-3).
   if (isApiPath(path)) return new NextResponse(null, { status: 404 });
   if (prefixed === "en" && isMigratedRoute(path)) return null;
+  const redirectPath = `/${path.replace(/^[/\\]+/, "")}`;
+  if (leadsToApi(redirectPath)) return new NextResponse(null, { status: 404 });
   // Adresse absolue sur la racine **publique** (`APP_URL`) : l'adaptateur de
   // Next lit tout `Location` par `new URL` sans base (une adresse relative le
   // fait échouer) et récrit sur l'origine de la requête celui qui la partage —
@@ -141,7 +149,7 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   // `BG_PUBLIC_ORIGIN` : `APP_URL` figée à la compilation (`next.config.ts`),
   // seule lisible dans le bac à sable edge de `next start`.
   const base = process.env.BG_PUBLIC_ORIGIN?.trim().replace(/\/+$/, "") || siteBaseUrl() || request.nextUrl.origin; // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
-  const target = new URL(`/${path.replace(/^[/\\]+/, "")}${request.nextUrl.search}`, base);
+  const target = new URL(`${redirectPath}${request.nextUrl.search}`, base);
   return NextResponse.redirect(target, prefixed === "en" ? 307 : 308);
 }
 

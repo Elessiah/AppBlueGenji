@@ -204,7 +204,10 @@ export function RgpdEn({
           <p>
             <strong>Mandatory and optional data.</strong> To exist, an account only needs a means of logging in
             — the Google, Discord or Blizzard identifier of the chosen provider — and a site username, assigned
-            automatically at creation. Without a means of logging in, no account can be created: public pages
+            automatically at creation. It also keeps a language, French or English (French by default), set at
+            login or chosen in My profile, used to write your push notifications to you (Discord messages stay in
+            French): it is not optional, but you can change it in My profile (until you next log in from a page
+            in the other language). Without a means of logging in, no account can be created: public pages
             remain readable, but you can neither join a team nor register for a tournament. The provider also
             sends what the table describes for it, which comes with the login: the Discord username from
             Discord, the BattleTag from Blizzard (kept up to date at each login as long as the Battle.net
@@ -420,8 +423,9 @@ export function RgpdEn({
               <strong>bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
               or Blizzard, and deleted on return. It lasts ten minutes at most and only contains a single-use random
               token (anti-CSRF protection), the provider&apos;s name, the page to bring you back to, the purpose of
-              the login (logging in or linking an account) and whether you accepted the terms of use. No personal
-              identifier.
+              the login (logging in or linking an account), whether you accepted the terms of use and whether the
+              login was started from a page of the site (otherwise neither the account language nor the acceptance of
+              the terms is recorded). No personal identifier.
             </li>
             <li>
               <strong>bg_suspension_notice</strong> — set only <strong>if a login is refused because your account
@@ -747,7 +751,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm, of a
-            tournament&apos;s kick-off, of match reminders and of what concerns your account or your team.{" "}
+            tournament&apos;s kickoff, of match reminders and of what concerns your account or your team.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>
@@ -766,6 +770,17 @@ export function RgpdEn({
               <strong>For how long</strong>: until you turn them off, your browser revokes the subscription or you
               delete your account — and at most {PUSH_SUBSCRIPTION_RETENTION_DAYS} days without a notification
               delivered.
+            </li>
+            <li>
+              <strong>In which language</strong>: your account&apos;s, French or English — the language of the site
+              page you last logged in from (a login started elsewhere, from a link or a bookmark, does not change it, nor does a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information);
+              French by default, in particular for an account that has not logged in again since this setting arrived), or the
+              one you choose in <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>,
+              until you next log in from a page in the other language. This point does not depend on your agreement: the
+              site keeps this single choice with every account, subscribed or not, for the lifetime of the account, to
+              write to you in your language (performance of the service,{" "}
+              <LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>); it appears in the export of your data and goes back to French if the
+              account is anonymized. Discord messages, for their part, stay in French.
             </li>
           </ul>
         </div>

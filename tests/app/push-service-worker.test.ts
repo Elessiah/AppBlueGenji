@@ -183,6 +183,16 @@ describe("service worker du site", () => {
     expect(options).toMatchObject({ body: "Déclare-toi prêt.", tag: "t", data: { url: "/tournois/4#match-9" } });
   });
 
+  it("déclare la langue de la charge, le français sans langue ou pour une valeur inconnue (lot 9-3)", async () => {
+    const worker = loadWorker();
+    worker.fire("push", { data: { json: () => ({ title: "Your match is starting", lang: "en" }) } });
+    worker.fire("push", { data: { json: () => ({ title: "Ton match commence" }) } });
+    worker.fire("push", { data: { json: () => ({ title: "x", lang: "<script>" }) } });
+    await Promise.all(worker.waited);
+    const calls = worker.showNotification.mock.calls as unknown as [string, { lang: string }][];
+    expect(calls.map(([, options]) => options.lang)).toEqual(["en", "fr", "fr"]);
+  });
+
   it("porte l'icône de l'app déclarée au manifeste", async () => {
     const { APP_ICONS } = await import("@/lib/shared/web-manifest");
     const worker = loadWorker();
@@ -206,6 +216,30 @@ describe("service worker du site", () => {
     const calls = worker.showNotification.mock.calls as unknown as [string, { data: { url: string } }][];
     expect(calls[0][1].data.url).toBe("/");
     expect(calls[1][0]).toBe("BlueGenji Esport");
+  });
+
+  it("ramène une route d'API à l'accueil du site, même déguisée (lot 9-3)", async () => {
+    const worker = loadWorker();
+    const urls = [
+      "/api/auth/google/start?terms=1",
+      "/en/api/x",
+      "/de/api/x",
+      "/en//api/auth/google/start",
+      "/fr/en//api/auth/google/start",
+      "/x/..%2fapi/auth/google/start",
+      "/fr/%2F/api/x",
+      "/%61pi/auth/x",
+      "/API",
+      "/tournois/../api/x",
+      "/%E0%A4%A",
+      "/\t/evil.test",
+      "/\n/evil.test/tournois",
+    ];
+    for (const url of urls) worker.fire("push", { data: { json: () => ({ title: "x", url }) } });
+    worker.fire("push", { data: { json: () => ({ title: "x", url: "/apiculture" }) } });
+    await Promise.all(worker.waited);
+    const calls = worker.showNotification.mock.calls as unknown as [string, { data: { url: string } }][];
+    expect(calls.map((call) => call[1].data.url)).toEqual([...urls.map(() => "/"), "/apiculture"]);
   });
 
   it("au clic, rend le focus à l'onglet déjà ouvert sur la page", async () => {

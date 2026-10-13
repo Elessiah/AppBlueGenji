@@ -132,6 +132,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Displaying a public profile (username, avatar, in-game usernames according to visibility settings)",
       "Putting players in touch (adding each other in game, team recruitment)",
       "Exporting one's data and deleting one's account from “My profile”",
+      "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information), does not change it; French by default), or the one chosen in “My profile”",
     ],
     legalBasis:
       "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible",
@@ -141,6 +142,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Overwatch (BattleTag), Marvel Rivals and Discord usernames; certification of the Discord username",
       "Declared adulthood (yes / no / not specified)",
       "Visibility settings, availability for recruitment, roles on the platform",
+      "Account language (French or English), reset to French on anonymization",
       "No real name, no email address, no phone number, no postal address",
     ],
     sensitiveData: "None",
@@ -540,6 +542,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "The device's subscription address, provided by the browser, and its encryption keys",
       "Date of subscription and of the last notification delivered",
       "Notification topics turned off by the account",
+      "Account language (T01), in which the notification is written",
     ],
     sensitiveData: "None",
     retention: [

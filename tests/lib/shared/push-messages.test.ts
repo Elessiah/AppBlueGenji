@@ -41,17 +41,17 @@ describe("matchStartPush", () => {
 describe("matchReminderPush", () => {
   it("dit le délai, l'adversaire et l'heure de Paris", () => {
     const content = matchReminderPush(
-      { ...SIDE, roundLabel: "Tour 2", startAt: "2026-09-10T18:00:00Z" },
-      "1 heure",
+      { ...SIDE, bracket: "UPPER", roundNumber: 2, startAt: "2026-09-10T18:00:00Z" },
+      "PT1H",
     );
     expect(content.title).toBe("Match dans 1 heure");
-    expect(content.body).toContain("Tour 2");
+    expect(content.body).toContain("Manche 2");
     expect(content.body).toContain("20:00");
     expect(content.tag).not.toBe(matchStartPush(SIDE, "LOBBY").tag);
   });
 
   it("annonce un horaire sans délai", () => {
-    expect(matchReminderPush({ ...SIDE, roundLabel: "Tour 1", startAt: new Date() }, null).title).toBe(
+    expect(matchReminderPush({ ...SIDE, bracket: "UPPER", roundNumber: 1, startAt: new Date() }, null).title).toBe(
       "Match programmé",
     );
   });
@@ -65,7 +65,7 @@ describe("tournoi individuel", () => {
       matchStartPush(solo, "LOBBY"),
       matchStartPush(solo, "LAUNCHED"),
       scoreToConfirmPush(solo),
-      matchReminderPush({ ...solo, roundLabel: "Tour 1", startAt: "2026-09-10T18:00:00Z" }, "1 heure"),
+      matchReminderPush({ ...solo, bracket: "UPPER", roundNumber: 1, startAt: "2026-09-10T18:00:00Z" }, "PT1H"),
     ]) {
       expect(content.body).not.toContain("Kiro");
       expect(content.body).not.toContain("Nova");
@@ -122,10 +122,10 @@ describe("rédacteurs", () => {
     expect(privacyChangePush([]).url).toBe("/rgpd");
   });
 
-  it("arbitrage : reprend la ligne sans Markdown, et mène à son lien", () => {
+  it("arbitrage : reprend la ligne sans Markdown, sans jamais en tirer le lien", () => {
     const content = refereeAlertPush("⚠️ **Conflit de score** — Coupe · https://site.test/tournois/4", "score_conflict-40");
     expect(content.body).toBe("⚠️ Conflit de score — Coupe ·");
-    expect(content.url).toBe("https://site.test/tournois/4");
+    expect(content.url).toBe("/tournois");
     expect(refereeAlertPush("sans lien", "k").url).toBe("/tournois");
   });
 

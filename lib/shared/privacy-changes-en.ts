@@ -338,6 +338,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the paragraph “Following a tournament without an account”"],
   },
+  "2026-10-langue-du-compte": {
+    title: "Notifications: in your account's language",
+    summary:
+      "Your account now keeps a language, French or English: push notifications reach you in that language.",
+    details: [
+      "The account's language is that of the site page you last logged in from (a login started elsewhere, from a link or a bookmark, does not change it, nor does a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information); French by default, in particular for an account that has not logged in again since this change); you can change it in “My profile”, Notifications section — that choice holds until you next log in from a page in the other language.",
+      "The site only keeps this choice (French or English), for the lifetime of the account. It appears in the export of your data and goes back to French if the account is anonymized.",
+      "Discord messages stay in French.",
+    ],
+    linkLabels: ["Read the “Push notifications” section"],
+  },
 };
 
 /**

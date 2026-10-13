@@ -184,6 +184,23 @@ describe("exportOwnData", () => {
     expect(data.account.pseudo).toBe("Player");
   });
 
+  it("rend la langue du compte, français si la ligne n'en porte pas (lot 9-3)", async () => {
+    const run = async (locale: unknown) => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[exportRow({ locale })]])
+        .mockResolvedValueOnce([[fullProfileRow({ locale })]])
+        .mockResolvedValue([[]]);
+      await mockDb(execute);
+      const data = await exportOwnData(42);
+      expect(execute.mock.calls[0][0]).toMatch(/\blocale\b/);
+      return data.account.locale;
+    };
+    expect(await run("en")).toBe("en");
+    expect(await run("fr")).toBe("fr");
+    expect(await run(null)).toBe("fr");
+  });
+
   it("throws PROFILE_NOT_FOUND when the account does not exist or is deleted", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);

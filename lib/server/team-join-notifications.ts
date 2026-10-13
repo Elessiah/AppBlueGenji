@@ -81,6 +81,6 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   await notifyUsers(recipients, {
     topic: "TEAM_JOIN_REQUEST",
     discord: { message: formatTeamJoinRequestNotice({ teamName: teams[0].name, url }), context: "team-join-request" },
-    push: teamJoinRequestPush({ teamId, teamName: teams[0].name }),
+    push: (locale) => teamJoinRequestPush({ teamId, teamName: teams[0].name }, locale),
   });
 }

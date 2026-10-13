@@ -1,0 +1,93 @@
+{
+  "pairing": "{team} vs {opponent}",
+  "pairingSolo": "Your match",
+  "matchStart": {
+    "titleLobby": "Your match is starting",
+    "titleLaunched": "Your match has been launched",
+    "bodyLobby": "{pairing} · {tournament}. Mark yourself ready.",
+    "bodyLaunched": "{pairing} · {tournament}. Have a good game!"
+  },
+  "matchReminder": {
+    "title": "Match in {offset}",
+    "titleScheduled": "Match scheduled",
+    "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
+    "offset": {
+      "P7D": "a week",
+      "P1D": "24 hours",
+      "PT1H": "1 hour"
+    }
+  },
+  "round": {
+    "playoff": "Playoffs · round {round}",
+    "lower": "Lower bracket · round {round}",
+    "grand": "Grand final",
+    "thirdPlace": "Third-place match",
+    "default": "Round {round}"
+  },
+  "scoreToConfirm": {
+    "title": "Score to confirm",
+    "body": "{opponent} entered the score of your match ({tournament}). Confirm it, or review it.",
+    "soloOpponent": "Your opponent"
+  },
+  "tournamentStart": {
+    "title": "The tournament is starting",
+    "body": "{tournament} has started. Find your first match on the tournament page."
+  },
+  "teamJoinRequest": {
+    "title": "Join request",
+    "body": "A player is asking to join {team}. Answer from the team's page."
+  },
+  "contentReport": {
+    "title": "A report concerns you",
+    "body": "Report ({category}): no decision has been made. Read it and appeal it if it's unfounded."
+  },
+  "moderation": {
+    "title": "Moderation decision",
+    "logo": {
+      "HIDDEN": "The logo of {team} has been hidden.",
+      "REMOVED": "The logo of {team} has been deleted.",
+      "RESTORED": "The logo of {team} has been restored."
+    },
+    "avatar": {
+      "HIDDEN": "Your avatar has been hidden.",
+      "REMOVED": "Your avatar has been deleted.",
+      "RESTORED": "Your avatar has been restored."
+    },
+    "next": {
+      "restored": "The appeal was accepted.",
+      "contest": "You can appeal the decision.",
+      "writeUs": "Write to the association if you hold the rights to it."
+    }
+  },
+  "suspension": {
+    "suspended": "Your account has been suspended. The decision, its grounds and how to appeal it are shown at your next login attempt.",
+    "lifted": "Your account's suspension has been lifted: you can log in again."
+  },
+  "privacyChange": {
+    "title": "Your data: what's changing",
+    "fallback": "Processing of your data",
+    "body": "{first}. The details are waiting for you on your next visit.",
+    "bodyMore": "{first} (and {others, plural, one {# other} other {# others}}). The details are waiting for you on your next visit."
+  },
+  "refereeAlert": {
+    "title": "Referee needed",
+    "score_conflict": "Conflicting scores are waiting for a referee.",
+    "score_report_stalled": "A score has been waiting too long for confirmation: a referee needs to decide.",
+    "other": "An alert is waiting for a referee.",
+    "score_conflictMatch": "Conflicting scores · {tournament}, {round}: a referee is needed.",
+    "score_report_stalledMatch": "Score awaiting confirmation for too long · {tournament}, {round}: a referee needs to decide.",
+    "otherMatch": "Alert · {tournament}, {round}: a referee is needed."
+  },
+  "issueReport": {
+    "body": "Problem reported · {tournament}.",
+    "bodyRound": "Problem reported · {tournament}, {round}."
+  },
+  "staffReport": {
+    "titleReport": "New report",
+    "titleContest": "Appeal received",
+    "bodyReport": "A report is waiting for moderation.",
+    "bodyContest": "A moderation decision is being appealed.",
+    "titleSaturated": "Surge of reports",
+    "bodySaturated": "The next reports reach the panel without an alert."
+  }
+}

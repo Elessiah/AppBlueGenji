@@ -151,3 +151,31 @@ export function requestOriginRefusal(
 
   return null;
 }
+
+/**
+ * Une **navigation** (`GET` de haut niveau, sans `Origin`) vient-elle d'un clic
+ * sur une page du site ? Seul `Sec-Fetch-Site: same-origin` le prouve, avec
+ * `Sec-Fetch-Mode: navigate` et `Sec-Fetch-Dest: document` : posé
+ * par le navigateur, hors de portée d'une page. Tout le reste — autre site,
+ * sous-domaine (`same-site`), favori ou adresse tapée (`none`), en-tête absent
+ * (navigateur d'avant 2023) — n'en est pas une preuve. Le `Referer` n'est pas
+ * lu : une page peut le taire, et un hôte seul n'en dit pas le schéma.
+ *
+ * Sert au départ OAuth (`lib/server/oauth-flow.ts`), route `GET` qu'un autre
+ * site peut faire ouvrir : ce qu'il scelle de la page de départ (langue,
+ * conditions acceptées) ne doit pas pouvoir être choisi par ce site.
+ */
+export function isSitePageNavigation(signals: {
+  secFetchSite: string | null;
+  secFetchMode: string | null;
+  secFetchDest: string | null;
+}): boolean {
+  const header = (value: string | null) => value?.trim().toLowerCase() ?? null;
+  // Une **navigation de document** : une image, un `fetch`, un cadre ou un
+  // préchargement venus d'une page du site ne sont pas un clic sur un bouton.
+  return (
+    header(signals.secFetchSite) === "same-origin" &&
+    header(signals.secFetchMode) === "navigate" &&
+    header(signals.secFetchDest) === "document"
+  );
+}

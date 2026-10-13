@@ -479,6 +479,18 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   (langue déjà scellée dans l'état OAuth depuis le lot 6).
 - **Langue du compte** et notifications push par langue : lot 9-3.
 
+### Ce que le lot 9-3 a établi (2026-10-12) — écarts au plan
+
+- **Empilé sur 9-2**. Langue du compte posée **à chaque connexion** (langue de la page de
+  connexion) et par un choix dans `/profil`, valable jusqu'à la connexion suivante faite dans l'autre
+  langue — plutôt qu'un choix figé que personne ne retrouverait. Détail : `I18N.md` § Langue du
+  compte.
+- **Seules les notifications push** suivent la langue du compte ; Discord reste français (D6), le
+  staff aussi (D4). L'alerte d'arbitrage anglaise nomme le tournoi et la manche quand l'alerte
+  porte sur un match (sinon une phrase par nature d'alerte) : le texte Discord n'est pas traduit.
+- **Base légale** de la langue du compte : T01 (« exécution du service »), décision de
+  l'utilisateur (2026-10-13).
+
 ### Raccordement, sujet par sujet
 
 | Sujet | Règle proposée |
@@ -517,7 +529,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 7b ✅ (7b-1, 7b-2) | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a ✅ (8a-1, 8a-2) | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b ✅ (8b-1, 8b-2) | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
-| 9 (9-1 ✅, 9-2 ✅, 9-3) | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
+| 9 (9-1 ✅, 9-2 ✅, 9-3 ✅) | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
 | ~~10~~ | ~~Admin~~ | **Abandonné** : l'admin reste en français (D4) | — | — | — |
 
 **Ordre** : 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7a/7b (en parallèle possible) → 8a → 8b → 9. Les lots

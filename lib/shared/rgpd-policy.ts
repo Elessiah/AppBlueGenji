@@ -139,6 +139,16 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     base: "Consentement",
     duree: "Durée du compte",
   },
+  {
+    donnee: "Langue du compte",
+    // Lot i18n 9-3 (`bg_users.locale`) : base T01, décision de l'utilisateur
+    // (2026-10-13) — sert à rédiger les notifications push, pas un choix
+    // facultatif de visibilité.
+    finalite:
+      "Français ou anglais : la langue des notifications push. Celle de la page du site d'où part ta dernière connexion (sauf les exceptions détaillées à la section Notifications push), ou celle que tu choisis dans Mon profil ; français par défaut, remis au français si le compte est anonymisé",
+    base: "Exécution du contrat",
+    duree: "Durée du compte",
+  },
 ];
 
 export const DONNEE_TOURNOIS: DonneEntry = {

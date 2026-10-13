@@ -107,6 +107,7 @@ Ce qu'elle contient aujourd'hui :
 | — (scores map par map) | `bg_match_maps` | table neuve (son `CREATE TABLE` est sa migration ; la clé unique sert les lectures par match) — détail map par map, voir `docs/features/MAP_SCORES.md` |
 | — (BG Survie, sortie anticipée) | `bg_tournaments` | `endurance_early_exit` — option « hors course » avant la fin, `0` par défaut : éteinte sur tout tournoi existant, sans remplissage (`docs/features/BG_SURVIE_MODE.md`) |
 | — (certification Discord volontaire) | `bg_users` | `discord_pseudo_from_discord` — `1` quand Discord a nommé le tag (connexion, rattachement, code), condition de la certification en un clic ; `0` sans remplissage pour les tags antérieurs |
+| — (i18n lot 9-3) | `bg_users` | `locale` — `ENUM('fr','en')`, défaut `fr` : langue des notifications push, posée par une connexion par code Discord (langue de la page), par une connexion Google / Discord / Blizzard dont le départ est prouvé cliqué sur une page du site (`startedOnSitePage`), et depuis `/profil` — inchangée sinon (`lib/server/users/account-locale.ts`) ; remise à `fr` à l'anonymisation, exportée |
 
 `bg_matches.launched_at` n'est **pas** dans la liste, et c'est volontaire : son
 ajout s'accompagne d'un **remplissage** (les matchs déjà jouables au déploiement

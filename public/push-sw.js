@@ -96,6 +96,25 @@ function sitePath(value) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
     return "/";
   }
+  // Caractère de contrôle : le navigateur le retire avant de résoudre, et
+  // `/\t/autre.site` deviendrait une adresse d'un autre site.
+  if (/[\u0000-\u001f\u007f]/.test(value)) return "/";
+  // Barre ou contre-barre encodée : décodée après la résolution des `..`, elle
+  // en ferait apparaître de nouveaux (`/x/..%2fapi`).
+  if (/%2f|%5c/i.test(value.split(/[?#]/)[0])) return "/";
+  // Résolu, le lien doit rester sur le site, et ne jamais mener à une route
+  // d'API (règle de `leadsToApi` côté serveur ; tout préfixe de deux lettres,
+  // même enchaîné, compte pour une langue) : ouverte d'ici, elle partirait du site comme un
+  // clic sur la page.
+  try {
+    const url = new URL(value, self.location.origin);
+    if (url.origin !== self.location.origin) return "/";
+    // Barres répétées réduites : `/en//api/…` mène à `/api/…`.
+    const path = decodeURIComponent(url.pathname).toLowerCase().replace(/\/{2,}/g, "/");
+    if (/^\/(?:[a-z]{2}\/)*api(?:\/|$)/.test(path)) return "/";
+  } catch {
+    return "/";
+  }
   return value;
 }
 
@@ -113,7 +132,9 @@ self.addEventListener("push", (event) => {
     // la notification porte le même visage que l'icône du site.
     icon: "/icons/icon-192.png",
     badge: "/favicon.png",
-    lang: "fr",
+    // Langue du texte, celle du compte (lot 9-3) : le lecteur d'écran prend la
+    // bonne voix. Une charge d'avant le lot n'en porte pas : elle est française.
+    lang: data.lang === "en" ? "en" : "fr",
     data: { url: sitePath(data.url) },
   };
   // Même étiquette = la notification remplace la précédente sans resonner

@@ -21,6 +21,7 @@ import {
 } from "@/lib/server/account-suspensions";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { registerSessionStream, resetSessionStreams } from "@/lib/server/session-streams";
+import { resolvePush } from "../../helpers/push";
 
 const actor = { id: 1, pseudo: "Modo" };
 const input = { reason: "Propos haineux répétés pendant un match", ground: "BEHAVIOR" as const, durationDays: 7 };
@@ -207,8 +208,8 @@ describe("suspendAccount", () => {
     expect(notification.topic).toBe("MODERATION");
     expect(notification.discord?.message).toContain(`Faits retenus : ${input.reason}.`);
     expect(notification.discord?.message).toContain("https://site.test/conditions-utilisation#comportement");
-    expect(notification.push.url).toBe("/connexion");
-    expect(notification.push.body).not.toContain(input.reason);
+    expect(resolvePush(notification.push).url).toBe("/connexion");
+    expect(resolvePush(notification.push).body).not.toContain(input.reason);
   });
 
   it("refuse son propre compte sans rien ouvrir", async () => {

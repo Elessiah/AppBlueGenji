@@ -32,9 +32,14 @@ import {
   scoreToConfirmPush,
   tournamentStartPush,
 } from "@/lib/shared/push-messages";
-import type { PushContent } from "@/lib/shared/push-notifications";
+import type { LocalizedPushContent } from "@/lib/shared/push-notifications";
 
-async function pushTo(userIds: readonly number[], topic: "MATCH_START" | "SCORE_TO_CONFIRM" | "TOURNAMENT_START", push: PushContent, urgent: boolean) {
+async function pushTo(
+  userIds: readonly number[],
+  topic: "MATCH_START" | "SCORE_TO_CONFIRM" | "TOURNAMENT_START",
+  push: LocalizedPushContent,
+  urgent: boolean,
+) {
   if (userIds.length === 0) return 0;
   // Sans canal Discord : ces notifications n'en ont pas. Les comptes supprimés
   // sont écartés par la distribution elle-même (`pushToUsers`).
@@ -181,7 +186,7 @@ async function runMatchStartSweep(): Promise<number> {
       pushed += await pushTo(
         players.get(side.teamId) ?? [],
         "MATCH_START",
-        matchStartPush({ ...base, teamName: side.teamName, opponentName: side.opponentName }, phase),
+        (locale) => matchStartPush({ ...base, teamName: side.teamName, opponentName: side.opponentName }, phase, locale),
         true,
       );
     }
@@ -190,7 +195,7 @@ async function runMatchStartSweep(): Promise<number> {
       pushed += await pushTo(
         [Number(row.caster_user_id)],
         "MATCH_START",
-        matchStartPush({ ...base, teamName: sides[0].teamName, opponentName: sides[0].opponentName }, phase),
+        (locale) => matchStartPush({ ...base, teamName: sides[0].teamName, opponentName: sides[0].opponentName }, phase, locale),
         true,
       );
     }
@@ -327,14 +332,18 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
     return pushTo(
       players.get(waitingTeamId) ?? [],
       "SCORE_TO_CONFIRM",
-      scoreToConfirmPush({
-        tournamentId: Number(row.tournament_id),
-        tournamentName: String(row.tournament_name),
-        matchId,
-        teamName: String(team1Reported ? row.team2_name : row.team1_name),
-        opponentName: String(team1Reported ? row.team1_name : row.team2_name),
-        solo: row.participant_type === "SOLO",
-      }),
+      (locale) =>
+        scoreToConfirmPush(
+          {
+            tournamentId: Number(row.tournament_id),
+            tournamentName: String(row.tournament_name),
+            matchId,
+            teamName: String(team1Reported ? row.team2_name : row.team1_name),
+            opponentName: String(team1Reported ? row.team1_name : row.team2_name),
+            solo: row.participant_type === "SOLO",
+          },
+          locale,
+        ),
       false,
     );
   } catch (error) {
@@ -365,7 +374,7 @@ export async function notifyTournamentStart(tournamentId: number): Promise<numbe
     return pushTo(
       [...new Set([...players.values()].flat())],
       "TOURNAMENT_START",
-      tournamentStartPush({ tournamentId, tournamentName: String(tournaments[0].name) }),
+      (locale) => tournamentStartPush({ tournamentId, tournamentName: String(tournaments[0].name) }, locale),
       false,
     );
   } catch (error) {

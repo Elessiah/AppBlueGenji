@@ -58,7 +58,8 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(login).toContain("String(TERMS_VERSION)");
     // Les trois portes transmettent l'acceptation.
     expect(login).toContain("termsAccepted={termsAccepted}");
-    expect(login).toMatch(/termsAccepted,\s*\}\)/);
+    // Suivie de la langue de la page, devenue celle du compte (lot 9-3).
+    expect(login).toMatch(/termsAccepted,\s*(?:\/\/[^\n]*\s*)?locale: text\.locale,\s*\}\)/);
     expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, termsAccepted, locale })");
   });
 
@@ -151,6 +152,9 @@ describe("dossier du panneau", () => {
   it("annonce la durée de conservation par la constante, pas par un nombre écrit", () => {
     expect(detail).toContain("{REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard");
     expect(detail).not.toMatch(/effacé 30 jours/);
+  });
+  it("n'ouvre jamais d'un clic une page d'origine qui mène à l'API (revue juridique #439)", () => {
+    expect(detail).toContain("report.pagePath && !leadsToApi(report.pagePath) ? (");
   });
 });
 

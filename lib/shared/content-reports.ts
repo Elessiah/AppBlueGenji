@@ -23,6 +23,7 @@
  */
 
 import { LOGO_QUARANTINE_MONTHS, logoQuarantinePurgeDate, type LogoQuarantineView } from "./logo-quarantine";
+import { leadsToApi } from "./safe-redirect";
 
 /**
  * Catégories d'un signalement.
@@ -359,6 +360,10 @@ export function normalizeReportPagePath(value: unknown): string | null {
   if (path.length === 0 || path.length > REPORT_PAGE_PATH_MAX_LENGTH) return null;
   if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return null;
   if (/[\u0000-\u001F\u007F]/.test(path) || /\s/.test(path)) return null;
+  // Le staff ouvre ce chemin d'un clic (« Page d'origine ») : une route d'API
+  // y ferait partir, depuis une page du site, un départ OAuth qui scellerait
+  // une acceptation des conditions et une langue du compte non données.
+  if (leadsToApi(path)) return null;
   return path;
 }
 

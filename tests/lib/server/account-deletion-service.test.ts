@@ -313,7 +313,8 @@ describe("deleteOwnAccount — l'anonymisation sous un pseudo d'emprunt", () => 
 
     const update = anonymization(queries);
     expect(ANONYMOUS_PSEUDOS).toContain(update.params[0]);
-    expect(update.params[1]).toBe(7);
+    // [pseudo, DEFAULT_LOCALE (langue remise au défaut, lot 9-3), id]
+    expect(update.params[2]).toBe(7);
     expect(update.sql).not.toContain("compte_supprime_");
   });
 

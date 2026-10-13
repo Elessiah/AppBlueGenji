@@ -1,0 +1,386 @@
+{
+  "matchStart.lobby": {
+    "title": "Ton match commence",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji. Déclare-toi prêt.",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31"
+  },
+  "matchStart.launched": {
+    "title": "Ton match est lancé",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji. Bonne partie !",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31"
+  },
+  "matchStart.solo": {
+    "title": "Ton match commence",
+    "body": "Ton match · Coupe BlueGenji. Déclare-toi prêt.",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31"
+  },
+  "reminder.UPPER.1.P7D": {
+    "title": "Match dans une semaine",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Manche 1. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.UPPER.1.P1D": {
+    "title": "Match dans 24 heures",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Manche 1. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.UPPER.1.PT1H": {
+    "title": "Match dans 1 heure",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Manche 1. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.UPPER.1.null": {
+    "title": "Match programmé",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Manche 1. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.LOWER.2.P7D": {
+    "title": "Match dans une semaine",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.LOWER.2.P1D": {
+    "title": "Match dans 24 heures",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.LOWER.2.PT1H": {
+    "title": "Match dans 1 heure",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.LOWER.2.null": {
+    "title": "Match programmé",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.GRAND.1.P7D": {
+    "title": "Match dans une semaine",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Grande finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.GRAND.1.P1D": {
+    "title": "Match dans 24 heures",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Grande finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.GRAND.1.PT1H": {
+    "title": "Match dans 1 heure",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Grande finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.GRAND.1.null": {
+    "title": "Match programmé",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Grande finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.THIRD_PLACE.1.P7D": {
+    "title": "Match dans une semaine",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Petite finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.THIRD_PLACE.1.P1D": {
+    "title": "Match dans 24 heures",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Petite finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.THIRD_PLACE.1.PT1H": {
+    "title": "Match dans 1 heure",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Petite finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.THIRD_PLACE.1.null": {
+    "title": "Match programmé",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Petite finale. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.UPPER.1001.P7D": {
+    "title": "Match dans une semaine",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Play-offs · tour 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.UPPER.1001.P1D": {
+    "title": "Match dans 24 heures",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Play-offs · tour 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.UPPER.1001.PT1H": {
+    "title": "Match dans 1 heure",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Play-offs · tour 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.UPPER.1001.null": {
+    "title": "Match programmé",
+    "body": "Les Renards contre Team Nova · Coupe BlueGenji, Play-offs · tour 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "reminder.solo": {
+    "title": "Match dans 1 heure",
+    "body": "Ton match · Coupe BlueGenji, Manche 1. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-reminder"
+  },
+  "scoreToConfirm.team": {
+    "title": "Score à confirmer",
+    "body": "Team Nova a saisi le score de votre match (Coupe BlueGenji). Confirme-le, ou conteste-le.",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-score"
+  },
+  "scoreToConfirm.solo": {
+    "title": "Score à confirmer",
+    "body": "Ton adversaire a saisi le score de votre match (Coupe BlueGenji). Confirme-le, ou conteste-le.",
+    "url": "/tournois/7#match-31",
+    "tag": "rencontre-31-score"
+  },
+  "tournamentStart": {
+    "title": "Le tournoi commence",
+    "body": "Coupe est lancé. Retrouve ton premier match sur la page du tournoi.",
+    "url": "/tournois/7",
+    "tag": "tournament-7-start"
+  },
+  "teamJoinRequest": {
+    "title": "Demande d'adhésion",
+    "body": "Un joueur demande à rejoindre Les Renards. Réponds depuis la fiche de l'équipe.",
+    "url": "/equipes/5",
+    "tag": "team-5-join"
+  },
+  "contentReport.COPYRIGHT": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement (Droit d'auteur) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.",
+    "url": "/signalements/12",
+    "tag": "report-12"
+  },
+  "contentReport.MODERATION": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement (Modération) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.",
+    "url": "/signalements/12",
+    "tag": "report-12"
+  },
+  "contentReport.BUG": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement (Bug) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.",
+    "url": "/signalements/12",
+    "tag": "report-12"
+  },
+  "contentReport.RGPD": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement (RGPD) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.",
+    "url": "/signalements/12",
+    "tag": "report-12"
+  },
+  "contentReport.HOSTING": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement (Hébergeur) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.",
+    "url": "/signalements/12",
+    "tag": "report-12"
+  },
+  "contentReport.OTHER": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement (Autre) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.",
+    "url": "/signalements/12",
+    "tag": "report-12"
+  },
+  "contentReport.CONTEST": {
+    "title": "Un signalement te concerne",
+    "body": "Signalement (Contestation) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé.",
+    "url": "/signalements/12",
+    "tag": "report-12"
+  },
+  "moderation.logo.HIDDEN.12": {
+    "title": "Décision de modération",
+    "body": "Le logo de Les Renards a été masqué. Tu peux contester la décision.",
+    "url": "/signalements/12",
+    "tag": "moderation-team-5"
+  },
+  "moderation.avatar.HIDDEN.12": {
+    "title": "Décision de modération",
+    "body": "Ton avatar a été masqué. Tu peux contester la décision.",
+    "url": "/signalements/12",
+    "tag": "moderation-avatar"
+  },
+  "moderation.logo.HIDDEN.null": {
+    "title": "Décision de modération",
+    "body": "Le logo de Les Renards a été masqué. Écris à l'association si tu en détiens les droits.",
+    "url": "/equipes/5",
+    "tag": "moderation-team-5"
+  },
+  "moderation.avatar.HIDDEN.null": {
+    "title": "Décision de modération",
+    "body": "Ton avatar a été masqué. Écris à l'association si tu en détiens les droits.",
+    "url": "/profil",
+    "tag": "moderation-avatar"
+  },
+  "moderation.logo.REMOVED.12": {
+    "title": "Décision de modération",
+    "body": "Le logo de Les Renards a été supprimé. Tu peux contester la décision.",
+    "url": "/signalements/12",
+    "tag": "moderation-team-5"
+  },
+  "moderation.avatar.REMOVED.12": {
+    "title": "Décision de modération",
+    "body": "Ton avatar a été supprimé. Tu peux contester la décision.",
+    "url": "/signalements/12",
+    "tag": "moderation-avatar"
+  },
+  "moderation.logo.REMOVED.null": {
+    "title": "Décision de modération",
+    "body": "Le logo de Les Renards a été supprimé. Écris à l'association si tu en détiens les droits.",
+    "url": "/equipes/5",
+    "tag": "moderation-team-5"
+  },
+  "moderation.avatar.REMOVED.null": {
+    "title": "Décision de modération",
+    "body": "Ton avatar a été supprimé. Écris à l'association si tu en détiens les droits.",
+    "url": "/profil",
+    "tag": "moderation-avatar"
+  },
+  "moderation.logo.RESTORED.12": {
+    "title": "Décision de modération",
+    "body": "Le logo de Les Renards a été rétabli. La contestation a été acceptée.",
+    "url": "/signalements/12",
+    "tag": "moderation-team-5"
+  },
+  "moderation.avatar.RESTORED.12": {
+    "title": "Décision de modération",
+    "body": "Ton avatar a été rétabli. La contestation a été acceptée.",
+    "url": "/signalements/12",
+    "tag": "moderation-avatar"
+  },
+  "moderation.logo.RESTORED.null": {
+    "title": "Décision de modération",
+    "body": "Le logo de Les Renards a été rétabli. La contestation a été acceptée.",
+    "url": "/equipes/5",
+    "tag": "moderation-team-5"
+  },
+  "moderation.avatar.RESTORED.null": {
+    "title": "Décision de modération",
+    "body": "Ton avatar a été rétabli. La contestation a été acceptée.",
+    "url": "/profil",
+    "tag": "moderation-avatar"
+  },
+  "suspension.SUSPENDED": {
+    "title": "Décision de modération",
+    "body": "Ton compte a été suspendu. La décision, ses motifs et le moyen de la contester s'affichent à ta prochaine tentative de connexion.",
+    "url": "/connexion",
+    "tag": "moderation-suspension"
+  },
+  "suspension.LIFTED": {
+    "title": "Décision de modération",
+    "body": "La suspension de ton compte a été levée : tu peux de nouveau te connecter.",
+    "url": "/connexion",
+    "tag": "moderation-suspension"
+  },
+  "privacyChange.0": {
+    "title": "Tes données : ce qui change",
+    "body": "Traitement de tes données. Le détail t'attend à ta prochaine visite.",
+    "url": "/rgpd",
+    "tag": "privacy-change"
+  },
+  "privacyChange.1": {
+    "title": "Tes données : ce qui change",
+    "body": "A. Le détail t'attend à ta prochaine visite.",
+    "url": "/rgpd",
+    "tag": "privacy-change"
+  },
+  "privacyChange.2": {
+    "title": "Tes données : ce qui change",
+    "body": "A (et 1 autre). Le détail t'attend à ta prochaine visite.",
+    "url": "/rgpd",
+    "tag": "privacy-change"
+  },
+  "privacyChange.3": {
+    "title": "Tes données : ce qui change",
+    "body": "A (et 2 autres). Le détail t'attend à ta prochaine visite.",
+    "url": "/rgpd",
+    "tag": "privacy-change"
+  },
+  "refereeAlert.url": {
+    "title": "Arbitrage requis",
+    "body": "Conflit de score · <@123",
+    "url": "https://site.test/tournois/7#match-31",
+    "tag": "referee-score_conflict-31"
+  },
+  "refereeAlert.nourl": {
+    "title": "Arbitrage requis",
+    "body": "Score en attente",
+    "url": "/tournois",
+    "tag": "referee-score_report_stalled"
+  },
+  "staffReport.report": {
+    "title": "Nouveau signalement",
+    "body": "Un signalement attend la modération.",
+    "url": "/admin/signalements",
+    "tag": "staff-report-12"
+  },
+  "staffReport.contest": {
+    "title": "Contestation reçue",
+    "body": "Une décision de modération est contestée.",
+    "url": "/admin/signalements",
+    "tag": "staff-report-12"
+  },
+  "staffReport.saturated": {
+    "title": "Afflux de signalements",
+    "body": "Les signalements suivants arrivent au panneau sans alerte.",
+    "url": "/admin/signalements",
+    "tag": "staff-report-saturated"
+  },
+  "issueReport.UPPER.1": {
+    "title": "Arbitrage requis",
+    "body": "Problème signalé · Coupe, Manche 1.",
+    "url": "/tournois/7#match-31",
+    "tag": "issue-7-31"
+  },
+  "issueReport.LOWER.2": {
+    "title": "Arbitrage requis",
+    "body": "Problème signalé · Coupe, Loser bracket · manche 2.",
+    "url": "/tournois/7#match-31",
+    "tag": "issue-7-31"
+  },
+  "issueReport.GRAND.1": {
+    "title": "Arbitrage requis",
+    "body": "Problème signalé · Coupe, Grande finale.",
+    "url": "/tournois/7#match-31",
+    "tag": "issue-7-31"
+  },
+  "issueReport.THIRD_PLACE.1": {
+    "title": "Arbitrage requis",
+    "body": "Problème signalé · Coupe, Petite finale.",
+    "url": "/tournois/7#match-31",
+    "tag": "issue-7-31"
+  },
+  "issueReport.UPPER.1001": {
+    "title": "Arbitrage requis",
+    "body": "Problème signalé · Coupe, Play-offs · tour 2.",
+    "url": "/tournois/7#match-31",
+    "tag": "issue-7-31"
+  },
+  "issueReport.none": {
+    "title": "Arbitrage requis",
+    "body": "Problème signalé · Coupe.",
+    "url": "/tournois/7",
+    "tag": "issue-7-0"
+  }
+}

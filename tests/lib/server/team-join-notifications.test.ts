@@ -11,6 +11,7 @@ import { pushToUsers } from "@/lib/server/push-subscriptions";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP } from "@/lib/shared/team-join-request-notice";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { resolvePush } from "../../helpers/push";
 
 type Rows = { requests?: number; allTeams?: number; team?: { name: string } | null; members?: Record<string, unknown>[] };
 
@@ -95,9 +96,9 @@ describe("notifyTeamJoinRequest", () => {
     const [userIds, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
     expect(userIds).toEqual([9]);
     expect(topic).toBe("TEAM_JOIN_REQUEST");
-    expect(content.url).toBe("/equipes/5");
+    expect(resolvePush(content).url).toBe("/equipes/5");
     // Aucun pseudo de joueur dans la notification.
-    expect(content.body).not.toContain("Owner");
+    expect(resolvePush(content).body).not.toContain("Owner");
   });
 
   it("ne prévient personne quand l'équipe n'a aucune gestion", async () => {

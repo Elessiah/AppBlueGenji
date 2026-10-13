@@ -260,7 +260,11 @@ function RgpdFr({
             <strong>Données obligatoires et facultatives.</strong> Un compte n&apos;a besoin,
             pour exister, que d&apos;un moyen de connexion — l&apos;identifiant Google, Discord
             ou Blizzard du fournisseur choisi — et d&apos;un pseudo site, attribué d&apos;office à
-            la création. Sans moyen de connexion, aucun compte ne peut être créé : les pages
+            la création. Il garde aussi une langue, français ou anglais (le français par défaut),
+            posée à la connexion ou choisie dans Mon profil, qui sert à vous écrire vos
+            notifications push (les messages Discord restent en français) : elle n&apos;est pas
+            facultative, mais vous la changez dans Mon profil (jusqu&apos;à votre prochaine connexion
+            faite dans l&apos;autre langue). Sans moyen de connexion, aucun compte ne peut être créé : les pages
             publiques restent lisibles, mais on ne peut ni rejoindre une équipe ni
             s&apos;inscrire à un tournoi. Le fournisseur transmet en outre ce que le tableau
             décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
@@ -544,8 +548,10 @@ function RgpdFr({
               par Google, Discord ou Blizzard, et supprimé dès le retour. Il dure dix minutes
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
               anti-CSRF), le nom du fournisseur, la page où vous ramener, l&apos;objet de la
-              connexion (se connecter ou rattacher un compte) et si vous avez accepté les conditions
-              d&apos;utilisation. Aucun identifiant de personne.
+              connexion (se connecter ou rattacher un compte), si vous avez accepté les conditions
+              d&apos;utilisation et si la connexion a été lancée depuis une page du site (sans
+              quoi ni la langue du compte ni l&apos;acceptation des conditions ne sont retenues).
+              Aucun identifiant de personne.
             </li>
             <li>
               <strong>bg_suspension_notice</strong> — déposé uniquement <strong>si une connexion
@@ -936,6 +942,18 @@ function RgpdFr({
               <strong>Combien de temps</strong> : jusqu&apos;à ce que vous les désactiviez, que votre
               navigateur révoque l&apos;abonnement ou que vous supprimiez votre compte — et au plus{" "}
               {PUSH_SUBSCRIPTION_RETENTION_DAYS} jours sans notification remise.
+            </li>
+            <li>
+              <strong>Dans quelle langue</strong> : celle de votre compte, français ou anglais — la
+              langue de la page du site d&apos;où vous vous êtes connecté la dernière fois (une connexion
+              lancée d&apos;ailleurs, par un lien ou un favori, ne la change pas, ni une connexion par le bouton
+              Google, Discord ou Blizzard depuis un navigateur qui ne l&apos;indique pas (trop ancien, ou qui retire cette indication) ; le français par défaut,
+              notamment pour un compte qui ne s&apos;est pas reconnecté depuis l&apos;arrivée de ce réglage), ou celle que vous choisissez dans{" "}
+              <Link href="/profil#notifications">Mon profil</Link>, jusqu&apos;à votre prochaine connexion
+              faite dans l&apos;autre langue. Ce point ne dépend pas de votre accord : le site garde ce seul
+              choix avec tout compte, abonné ou non, le temps du compte, pour vous écrire dans votre langue
+              (exécution du service, <Link href="/rgpd/registre#t01">registre, T01</Link>) ; il figure dans l&apos;export de vos données et revient au français si le compte
+              est anonymisé. Les messages Discord, eux, restent en français.
             </li>
           </ul>
         </div>

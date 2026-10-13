@@ -1,0 +1,58 @@
+/**
+ * Langue du compte (`bg_users.locale`, lot 9-3 de la traduction, décision D5).
+ *
+ * **Ce qu'elle choisit** : la langue des notifications push que le site envoie
+ * au joueur (`lib/server/push-subscriptions.ts`). Les messages privés Discord
+ * restent en français (D6) ; les pages, elles, suivent toujours leur adresse
+ * (`/en/...`) — la langue du compte ne redirige personne.
+ *
+ * **Comment elle est posée**, règle retenue pour surprendre le moins :
+ *
+ * - à chaque **connexion**, la langue de la page d'où le joueur se connecte
+ *   (`/connexion` ou `/en/connexion` : langue scellée dans l'aller-retour
+ *   OAuth, ou envoyée avec le code Discord) — c'est la langue dans laquelle il
+ *   utilise le site. Un départ OAuth venu d'ailleurs que d'une page du site
+ *   (lien d'un autre site, favori) connecte sans la changer
+ *   (`localeFromPage`, `lib/server/oauth-state.ts`) ;
+ * - par un **choix explicite** dans « Mon profil », qui vaut jusqu'à la
+ *   prochaine connexion faite dans l'autre langue (l'écran le dit).
+ *
+ * Défaut `fr` : un compte qui ne s'est pas reconnecté depuis garde le
+ * français. Effacée avec le compte, remise au défaut à l'anonymisation
+ * (`account-erasure.ts`), exportée avec les données du compte.
+ */
+import { getDatabase } from "@/lib/server/database";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/shared/locales";
+
+/** Code de refus d'une langue inconnue (`PUT /api/profile/locale`). */
+export const INVALID_LOCALE = "INVALID_LOCALE";
+
+/**
+ * Enregistre la langue du compte. Une seule instruction, sans lecture
+ * préalable ; un compte supprimé n'est jamais touché (`is_deleted = 0`).
+ * Rend `true` si une ligne vivante porte désormais cette langue.
+ */
+export async function recordAccountLocale(userId: number, locale: Locale): Promise<boolean> {
+  if (!Number.isInteger(userId) || userId <= 0 || !isLocale(locale)) return false;
+  const db = await getDatabase();
+  const [result] = await db.execute(`UPDATE bg_users SET locale = ? WHERE id = ? AND is_deleted = 0`, [locale, userId]);
+  return Number((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
+}
+
+/**
+ * La même écriture **sans jamais faire échouer** ce qui l'appelle : une
+ * connexion ne doit pas tomber parce que la langue n'a pas pu s'écrire (base
+ * qui n'a pas encore joué l'`ALTER`, par exemple). L'échec reste au journal.
+ */
+export async function recordLoginLocale(userId: number, locale: Locale): Promise<void> {
+  try {
+    await recordAccountLocale(userId, locale);
+  } catch (error) {
+    console.error("[account-locale] langue de connexion non enregistrée", error);
+  }
+}
+
+/** Une valeur lue en base (ou absente) ramenée à une langue connue. */
+export function accountLocaleFromRow(value: unknown): Locale {
+  return isLocale(value) ? value : DEFAULT_LOCALE;
+}

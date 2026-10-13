@@ -6,6 +6,7 @@ jest.mock("@/lib/server/account-identities");
 jest.mock("@/lib/server/google-oauth");
 jest.mock("@/lib/server/discord-oauth");
 jest.mock("@/lib/server/blizzard-oauth");
+jest.mock("@/lib/server/users/account-locale", () => ({ recordLoginLocale: jest.fn(async () => undefined) }));
 
 import crypto from "node:crypto";
 import { NextRequest } from "next/server";
@@ -23,6 +24,7 @@ import { buildBlizzardAuthorizationUrl, fetchBlizzardUser } from "@/lib/server/b
 import type { OAuthProvider } from "@/lib/shared/oauth-providers";
 import { AccountSuspendedError } from "@/lib/server/account-suspensions";
 import { SUSPENSION_NOTICE_COOKIE, parseSuspensionNotice } from "@/lib/shared/account-suspension";
+import { recordLoginLocale } from "@/lib/server/users/account-locale";
 import { authUser } from "../../helpers/auth-user";
 
 /**
@@ -78,14 +80,16 @@ describe("startOAuth", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: false,
+      localeFromPage: false,
     });
   });
 
   it("scelle l'acceptation des conditions d'utilisation, et seulement `terms=1`", async () => {
-    await startOAuth(request("http://localhost:3000/api/auth/x/start?terms=1"), "GOOGLE");
+    const fromPage = (url: string) => new NextRequest(url, { headers: { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } });
+    await startOAuth(fromPage("http://localhost:3000/api/auth/x/start?terms=1"), "GOOGLE");
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: true }));
 
-    await startOAuth(request("http://localhost:3000/api/auth/x/start?terms=true"), "GOOGLE");
+    await startOAuth(fromPage("http://localhost:3000/api/auth/x/start?terms=true"), "GOOGLE");
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: false }));
   });
 
@@ -188,6 +192,7 @@ describe("completeOAuth — contrôles d'état", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
 
     const response = await callback("GOOGLE");
@@ -207,6 +212,7 @@ describe("completeOAuth — contrôles d'état", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
 
     const response = await callback("BLIZZARD");
@@ -223,6 +229,7 @@ describe("completeOAuth — contrôles d'état", () => {
     redirectTo: "/profil",
     intent: "LINK" as const,
     termsAccepted: false,
+    localeFromPage: true,
   });
 
   it("ramène au profil un **rattachement** annulé chez le fournisseur", async () => {
@@ -278,6 +285,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
     return completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
@@ -304,6 +312,81 @@ describe("completeOAuth — connexion", () => {
     );
     expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
     expect(response.headers.get("location")).toBe("http://localhost:3000/tournois");
+    // Langue du compte : celle de la page de départ (lot 9-3).
+    expect(recordLoginLocale).toHaveBeenCalledWith(7, "fr");
+  });
+
+  it("retient l'anglais comme langue du compte pour une connexion partie de /en (lot 9-3)", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    jest.mocked(consumeOAuthState).mockResolvedValue({
+      provider: "GOOGLE",
+      state: STATE,
+      redirectTo: "/en/tournois",
+      intent: "LOGIN",
+      termsAccepted: true,
+      localeFromPage: true,
+    });
+    await completeOAuth(request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`), "GOOGLE");
+    expect(recordLoginLocale).toHaveBeenCalledWith(7, "en");
+    expect(jest.mocked(recordLoginLocale).mock.invocationCallOrder[0]).toBeGreaterThan(
+      jest.mocked(createSession).mock.invocationCallOrder[0],
+    );
+  });
+
+  it.each([
+    ["un lien d'un autre site", "cross-site"],
+    ["un sous-domaine", "same-site"],
+    ["un favori ou une adresse tapée", "none"],
+  ])("ne scelle pas la langue d'un départ venu par %s (lot 9-3)", async (_label, site) => {
+    await startOAuth(
+      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": site, "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } }),
+      "DISCORD",
+    );
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/en/tournois", localeFromPage: false }));
+  });
+
+  it("scelle la langue d'un départ cliqué sur une page du site", async () => {
+    await startOAuth(
+      new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers: { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } }),
+      "GOOGLE",
+    );
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: true }));
+  });
+
+  it.each<[string, Record<string, string>]>([
+    ["sans aucun en-tête de provenance", {}],
+    ["d'un navigateur ancien, même avec un Referer du site (une page peut le taire, un hôte n'en dit pas le schéma)", { referer: "http://localhost:3000/en/connexion" }],
+  ])("ne scelle pas la langue d'un départ %s", async (_label, headers) => {
+    await startOAuth(new NextRequest("http://localhost:3000/api/auth/x/start?lang=en", { headers }), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ localeFromPage: false }));
+  });
+
+  it.each<[string, Record<string, string>, boolean]>([
+    ["un autre site", { "sec-fetch-site": "cross-site" }, false],
+    ["un sous-domaine", { "sec-fetch-site": "same-site" }, false],
+    ["un favori ou une adresse tapée", { "sec-fetch-site": "none" }, false],
+    ["un navigateur sans en-tête, Referer tu", {}, false],
+    ["une image du site", { "sec-fetch-site": "same-origin", "sec-fetch-mode": "no-cors", "sec-fetch-dest": "image" }, false],
+    ["une page du site", { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" }, true],
+  ])("conditions cochées (`terms=1`) depuis %s : retenues = %s", async (_label, headers, expected) => {
+    await startOAuth(new NextRequest("http://localhost:3000/api/auth/x/start?terms=1", { headers }), "DISCORD");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: expected }));
+  });
+
+  it("une connexion partie d'ailleurs que d'une page du site ouvre la session sans toucher à la langue du compte", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    jest.mocked(consumeOAuthState).mockResolvedValue({
+      provider: "GOOGLE",
+      state: STATE,
+      redirectTo: "/en/tournois",
+      intent: "LOGIN",
+      termsAccepted: true,
+      localeFromPage: false,
+    });
+    const response = await completeOAuth(request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`), "GOOGLE");
+    expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/tournois");
+    expect(recordLoginLocale).not.toHaveBeenCalled();
   });
 
   it("retient le **pseudo** Discord, pas son nom d'affichage", async () => {
@@ -394,6 +477,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "https://exemple.invalid/phishing",
       intent: "LOGIN",
       termsAccepted: true,
+      localeFromPage: true,
     });
 
     const response = await completeOAuth(
@@ -425,6 +509,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/tournois",
       intent: "LINK",
       termsAccepted: true,
+      localeFromPage: true,
     });
     return completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
@@ -473,6 +558,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/en/tournois",
       intent: "LINK",
       termsAccepted: true,
+      localeFromPage: true,
     });
     const response = await completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
@@ -486,6 +572,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/en/tournois",
       intent: "LINK",
       termsAccepted: true,
+      localeFromPage: true,
     });
     const cancelled = await completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?error=access_denied&state=${STATE}`),
@@ -574,7 +661,7 @@ describe("aller-retour OAuth — la langue du départ", () => {
   const callback = (provider: OAuthProvider, query = `?code=abc&state=${STATE}`) =>
     completeOAuth(request(`http://localhost:3000/api/auth/x/callback${query}`), provider);
   const sealed = (redirectTo: string, provider: OAuthProvider = "GOOGLE") =>
-    jest.mocked(consumeOAuthState).mockResolvedValue({ provider, state: STATE, redirectTo, intent: "LOGIN", termsAccepted: true });
+    jest.mocked(consumeOAuthState).mockResolvedValue({ provider, state: STATE, redirectTo, intent: "LOGIN", termsAccepted: true, localeFromPage: true });
 
   it("scelle la destination dans la langue du départ, même vers une route pas encore traduite", async () => {
     await startOAuth(request("http://localhost:3000/api/auth/x/start?redirect=%2Ftournois%2F4&lang=en"), "DISCORD");
@@ -592,10 +679,10 @@ describe("aller-retour OAuth — la langue du départ", () => {
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ redirectTo: "/regles" }));
   });
 
-  it("n'ajoute aucun champ au cookie d'état", async () => {
+  it("n'ajoute au cookie d'état que la provenance du départ, jamais la langue à part", async () => {
     await startOAuth(request("http://localhost:3000/api/auth/x/start?lang=en"), "GOOGLE");
     expect(Object.keys(jest.mocked(saveOAuthState).mock.calls[0][0]).sort()).toEqual(
-      ["intent", "provider", "redirectTo", "state", "termsAccepted"],
+      ["intent", "localeFromPage", "provider", "redirectTo", "state", "termsAccepted"],
     );
   });
 

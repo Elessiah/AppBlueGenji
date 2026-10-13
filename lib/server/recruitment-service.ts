@@ -53,6 +53,8 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
     domain: row.domain,
     roles: row.roles,
     body: row.body,
+    // Rendu brut : le bouton « Postuler » passe par `recruitmentContactHref`,
+    // le formulaire de gestion montre le lien tel qu'il est enregistré.
     contactUrl: row.contact_url,
     contactDiscord: row.contact_discord,
     contactDiscordId: row.contact_discord_id,

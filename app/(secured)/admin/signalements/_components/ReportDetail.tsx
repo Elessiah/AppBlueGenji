@@ -13,6 +13,7 @@ import {
   type ReportView,
 } from "@/lib/shared/content-reports";
 import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
+import { leadsToApi } from "@/lib/shared/safe-redirect";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
 import { ReportTargetCard } from "./ReportTargetCard";
@@ -163,12 +164,14 @@ export function ReportDetail({
         <div>
           <dt>Page d&apos;origine</dt>
           <dd>
-            {report.pagePath ? (
+            {/* Un chemin d'API (dossier enregistré avant la règle de
+                normalizeReportPagePath) se lit, il ne s'ouvre pas d'un clic. */}
+            {report.pagePath && !leadsToApi(report.pagePath) ? (
               <Link href={report.pagePath} target="_blank" rel="noreferrer" className={styles.inlineLink}>
                 {report.pagePath}
               </Link>
             ) : (
-              "—"
+              (report.pagePath ?? "—")
             )}
           </dd>
         </div>

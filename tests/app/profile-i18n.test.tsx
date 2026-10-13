@@ -57,6 +57,7 @@ import ProfileLayout, { generateMetadata as profileMetadata } from "@/app/(secur
 import { generateMetadata as reportMetadata } from "@/app/(secured)/signalements/[id]/layout";
 import ProfilePage from "@/app/(secured)/profil/page";
 import { ProfileSection } from "@/app/(secured)/profil/_components/ProfileSection";
+import { AccountLocaleField } from "@/app/(secured)/profil/_components/AccountLocaleField";
 import { ConnectedAppsSection } from "@/app/(secured)/profil/ConnectedAppsSection";
 import { OtherSessionsPanel } from "@/app/(secured)/profil/OtherSessionsPanel";
 import { BattletagVisibilityNotice } from "@/app/(secured)/profil/BattletagVisibilityNotice";
@@ -424,6 +425,78 @@ describe("anglais — phrases", () => {
     for (const code of Object.keys(PUSH_ERROR_MESSAGES)) expect(pushErrorText(push, code)).not.toMatch(ACCENTED);
     const reports = scopedText("en", EN.reports);
     for (const code of Object.keys(EN.reports.errors)) expect(reportErrorText(reports, code)).not.toMatch(ACCENTED);
+  });
+});
+
+describe("langue du compte (lot 9-3)", () => {
+  it("en anglais : libellé, règle dite, chaque langue nommée dans sa langue", () => {
+    const html = inEnglish(<AccountLocaleField initial="en" />);
+    expect(html).toContain(">Notification language</label>");
+    expect(html).toContain("It follows the page&#x27;s language each time you log in");
+    expect(html).toContain("until you next log in from a page in the other language");
+    expect(html).toContain('<option value="fr" lang="fr">Français</option>');
+    expect(html).toContain('<option value="en" lang="en" selected="">English</option>');
+    expect(html).toContain('aria-describedby="profile-account-locale-hint"');
+    // Hors les noms de langue, rien de français.
+    expectEnglish(html.replace(/<option[^>]*>[^<]*<\/option>/g, ""));
+  });
+
+  it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const field = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/AccountLocaleField.tsx"), "utf8");
+    expect(field).not.toContain("aria-disabled={");
+    expect(field).toContain("aria-busy={busy || undefined}");
+    expect(field).not.toMatch(/\sdisabled=\{/);
+    // Un second choix pendant l'envoi n'est pas perdu : affiché, puis envoyé à la suite.
+    expect(field).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = value;\s*setLocale\(value\);\s*return;/);
+    expect(field).toContain("const outcome = await runQueuedSaves<Locale>({");
+    // Une langue relue ailleurs est reprise sans remonter le champ (ni perdre l'envoi ou le focus).
+    expect(field).toContain("if (initial !== shown && !busy && !chosenHere) {");
+    // Un seul toast de succès par geste, après le dernier envoi, et aucun au fil des envois.
+    expect(field.match(/showSuccess\(/g)).toHaveLength(1);
+    expect(field).toContain('if (outcome.confirmed) showSuccess(t("accountLocale.saved"));');
+    expect(field).toContain("if (outcome.upToDate) fieldErrors.clear();");
+    // Une erreur n'est rattachée (focus repris) que si le champ a encore le focus.
+    expect(field).toContain("if (document.activeElement?.id === FIELD_ID) fieldErrors.report(code, message);");
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
+      "<AccountLocaleField initial={data.accountLocale} />",
+    );
+    // Détachée du réglage des notifications qui la précède (passe d'auto-contrôle).
+    expect(field).toContain("s.accountLocale");
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8")).toMatch(/\.accountLocale \{\s*margin-top: 14px;/);
+    // Au repos, rien d'occupé ni de désactivé.
+    const html = renderToStaticMarkup(<AccountLocaleField initial="fr" />);
+    expect(html).not.toContain("aria-busy");
+    expect(html).not.toContain("disabled");
+  });
+
+  it("pendant l'envoi : seul le curseur dit l'attente, le champ ne se donne pas pour inerte", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
+    expect(css).toMatch(/\.accountLocale select\[aria-busy="true"\] \{\s*cursor: progress;\s*\}/);
+    expect(css).not.toMatch(/accountLocale[^{]*\{[^}]*opacity/);
+    // Le commentaire de `.hint` reste collé à sa règle.
+    expect(css).toMatch(/12 px et `--ink-soft`[^*]*avant\. \*\/\s*\.hint \{/);
+  });
+
+  it("une langue refusée : phrase dans la langue de la page, rattachée au champ", async () => {
+    expect(profileErrorMessage("INVALID_LOCALE", EN_PROFILE)).toBe("The language sent is invalid. Reload the page, then try again.");
+    expect(profileErrorMessage("INVALID_LOCALE")).toBe("La langue envoyée est invalide. Recharge la page puis réessaie.");
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const field = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/AccountLocaleField.tsx"), "utf8");
+    expect(field).toContain('{ INVALID_LOCALE: "locale" }');
+    expect(field).toContain('{...fieldErrors.aria("locale", HINT_ID)}');
+    expect(field).toContain('<FieldErrorText fieldId={FIELD_ID} message={fieldErrors.message("locale")} />');
+  });
+
+  it("en français : libellé et règle", () => {
+    const html = renderToStaticMarkup(<AccountLocaleField initial="fr" />);
+    expect(html).toContain(">Langue des notifications</label>");
+    expect(html).toContain("prochaine connexion faite dans l&#x27;autre langue");
+    expect(html).toContain('<option value="fr" lang="fr" selected="">Français</option>');
   });
 });
 

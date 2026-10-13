@@ -1,5 +1,6 @@
 import { type CountdownOverride, isCountdownHeld } from "./pausable-countdown";
 import { DEFAULT_LOCALE, type Locale } from "./locales";
+import { leadsToApi } from "./safe-redirect";
 import { checkEnglish, englishCodes, englishErrorMessage, optionalStaffText, staffText } from "./staff-translation";
 
 /**
@@ -449,6 +450,83 @@ export type RecruitmentValidationResult =
   | { ok: false; error: string };
 
 /**
+ * Lien « Postuler » acceptable : une adresse absolue `https:` qui ne mène à
+ * aucune route d'API, ou un `mailto:`. Un lien relatif, un autre schéma
+ * (`javascript:`, `http:`…) ou une route d'API sont refusés : un clic sur
+ * `/api/auth/<p>/start?terms=1&lang=en` partirait d'une page du site
+ * (`Sec-Fetch-Site: same-origin`) et enregistrerait une acceptation des
+ * conditions et une langue du compte que personne n'a données. Le chemin est
+ * jugé quel que soit l'hôte (l'adresse du site n'est pas connue ici) : un
+ * ticket ou un formulaire n'a pas à viser une route `/api`.
+ */
+export function isSafeRecruitmentContactUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "mailto:") return true;
+  if (url.protocol !== "https:") return false;
+  return !leadsToApi(url.pathname);
+}
+
+/** Hôtes d'un lien d'invitation ou de profil Discord. */
+const DISCORD_LINK_HOSTS: ReadonlySet<string> = new Set([
+  "discord.gg",
+  "discord.com",
+  "www.discord.com",
+  "discordapp.com",
+  "www.discordapp.com",
+]);
+
+/**
+ * Le contact Discord d'une annonce saisi comme un lien (`https://…`,
+ * invitation `discord.gg`) : son `href` s'il mène chez Discord, sinon `null` — un
+ * pseudo à copier n'est pas un lien, et un lien vers un autre hôte (le site
+ * lui-même, `/api/auth/<p>/start?terms=1` compris) ne le devient jamais.
+ */
+export function recruitmentDiscordHref(value: string | null | undefined): string | null {
+  const v = value?.trim();
+  if (!v || !looksLikeDiscordLink(v)) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return DISCORD_LINK_HOSTS.has(url.hostname.toLowerCase()) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Saisie qui se présente comme un lien (et non comme un pseudo). */
+function looksLikeDiscordLink(value: string): boolean {
+  return /^(https?:\/\/|discord\.gg\/)/i.test(value);
+}
+
+/**
+ * Refus des liens de contact d'une annonce, ou `null` : le lien « Postuler »
+ * (`isSafeRecruitmentContactUrl`), et un contact Discord saisi comme un lien,
+ * qui doit mener chez Discord (`recruitmentDiscordHref`).
+ */
+function contactLinksError(contactUrl: string | null, contactDiscord: string | null): string | null {
+  if (contactUrl !== null && !isSafeRecruitmentContactUrl(contactUrl)) return "CONTACT_URL_INVALID";
+  if (contactDiscord !== null && looksLikeDiscordLink(contactDiscord) && recruitmentDiscordHref(contactDiscord) === null) {
+    return "CONTACT_DISCORD_INVALID";
+  }
+  return null;
+}
+
+/**
+ * Lien « Postuler » servi, ou `null` : un lien enregistré avant la règle et
+ * qu'elle refuse ne devient jamais un bouton. Le formulaire de gestion, lui,
+ * le montre tel quel — l'enregistrer le fait refuser, champ désigné, plutôt
+ * que l'effacer en silence.
+ */
+export function recruitmentContactHref(contactUrl: string | null | undefined): string | null {
+  return contactUrl && isSafeRecruitmentContactUrl(contactUrl) ? contactUrl : null;
+}
+
+/**
  * Valide et normalise une annonce de recrutement. Le titre est requis ; le pôle
  * défaut « AUTRE » ; le statut défaut « OPTIONAL » (facultative). Référent / missions /
  * corps / lien / Discord sont optionnels et ramenés à `null` si vides.
@@ -490,6 +568,8 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
   if (!bodyEn.ok) return bodyEn;
   const contactUrl = normalizeOptional(input.contactUrl, RECRUITMENT_URL_MAX);
   const contactDiscord = normalizeOptional(input.contactDiscord, RECRUITMENT_DISCORD_MAX);
+  const contactError = contactLinksError(contactUrl, contactDiscord);
+  if (contactError) return { ok: false, error: contactError };
 
   // ID Discord dérivé : on l'ignore silencieusement s'il n'a pas la forme d'un
   // snowflake, et on le neutralise si aucun pseudo Discord ne l'accompagne (il ne
@@ -889,12 +969,24 @@ export const RECRUITMENT_FIELD_ERRORS = {
   ROLES_EN_TOO_LONG: "rolesEn",
   BODY_EN_REQUIRED: "bodyEn",
   BODY_EN_TOO_LONG: "bodyEn",
+  CONTACT_URL_INVALID: "contactUrl",
+  CONTACT_DISCORD_INVALID: "contactDiscord",
 } as const;
-export type RecruitmentField = "title" | "titleEn" | "roles" | "rolesEn" | "body" | "bodyEn";
+export type RecruitmentField =
+  | "title"
+  | "titleEn"
+  | "roles"
+  | "rolesEn"
+  | "body"
+  | "bodyEn"
+  | "contactUrl"
+  | "contactDiscord";
 
 const RECRUITMENT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   TITLE_REQUIRED: "Le titre est requis.",
   TITLE_TOO_LONG: `Titre trop long (${RECRUITMENT_TITLE_MAX} caractères maximum).`,
+  CONTACT_URL_INVALID: "Le lien de candidature doit être une adresse https:// (hors route d'API du site) ou mailto:.",
+  CONTACT_DISCORD_INVALID: "Un contact Discord saisi comme un lien doit mener à discord.gg ou discord.com (sinon, saisis un pseudo).",
 };
 
 /** Phrase d'un refus ; un code inconnu garde sa forme d'origine (« Échec : CODE »). */

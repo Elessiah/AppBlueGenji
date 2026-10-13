@@ -246,7 +246,7 @@ export async function suspendAccount(
           }),
           context: "account-suspended",
         },
-        push: suspensionPush("SUSPENDED"),
+        push: (locale) => suspensionPush("SUSPENDED", locale),
       }),
     )
     .catch((error) => console.error("[moderation] joueur non prévenu de sa suspension", error));
@@ -280,7 +280,7 @@ export async function liftSuspension(targetUserId: number, actor: StaffActor): P
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: { message: formatSuspensionLiftedNotice(active.id), context: "account-suspension-lifted" },
-        push: suspensionPush("LIFTED"),
+        push: (locale) => suspensionPush("LIFTED", locale),
       }),
     )
     .catch((error) => console.error("[moderation] joueur non prévenu de la levée", error));

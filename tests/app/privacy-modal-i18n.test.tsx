@@ -69,7 +69,8 @@ describe("PrivacyChangesModal — langue de la page", () => {
     expect(html).not.toMatch(/<a [^>]*href="[^"]*profil#identite"[^>]*hrefLang="fr"/);
     expect(legalPageText(html)).toContain("Change my username or avatar");
     expect(legalPageText(html)).not.toContain("(in French)");
-    expect(render("fr")).not.toMatch(/hrefLang|en français/);
+    // La mention « (en français) » d'un lien ; « restent en français » est du texte.
+    expect(render("fr")).not.toMatch(/hrefLang|\(en français\)/);
   });
 
   it("un seul changement : titre au singulier dans chaque langue", () => {

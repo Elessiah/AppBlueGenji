@@ -21,10 +21,13 @@ import {
   PUSH_TOPIC_KEYS,
   buildPushPayload,
   isPushTopic,
-  type PushContent,
+  type LocalizedPushContent,
   type PushSubscriptionInput,
   type PushTopic,
 } from "@/lib/shared/push-notifications";
+import { type Locale } from "@/lib/shared/locales";
+import { cached } from "@/lib/shared/intl-cache";
+import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
 
 export function endpointHash(endpoint: string): string {
@@ -140,6 +143,8 @@ type SubscriptionRow = RowDataPacket & {
   endpoint: string;
   p256dh: string;
   auth: string;
+  /** Langue du compte abonné (lot 9-3) ; toute valeur inattendue vaut le français. */
+  locale: string | null;
 };
 
 /** Envois simultanés au plus : un tournoi prévient des dizaines d'appareils. */
@@ -168,7 +173,7 @@ export type PushOptions = {
 export async function pushToUsers(
   userIds: readonly number[],
   topic: PushTopic,
-  content: PushContent,
+  content: LocalizedPushContent,
   options: PushOptions = {},
   config: WebPushConfig | null = webPushConfig(),
 ): Promise<number> {
@@ -178,7 +183,7 @@ export async function pushToUsers(
     const db = await getDatabase();
     const placeholders = ids.map(() => "?").join(", ");
     const [rows] = await db.query<SubscriptionRow[]>(
-      `SELECT s.id, s.endpoint, s.p256dh, s.auth
+      `SELECT s.id, s.endpoint, s.p256dh, s.auth, u.locale
        FROM bg_push_subscriptions s
        JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
        WHERE s.user_id IN (${placeholders})
@@ -188,10 +193,21 @@ export async function pushToUsers(
     );
     if (rows.length === 0) return 0;
 
-    const payload = JSON.stringify(buildPushPayload(topic, content, siteBaseUrl()));
+    // Une charge par langue de compte (lot 9-3), rédigée une seule fois
+    // chacune **avant le premier envoi** : une rédaction qui échouerait
+    // n'interromprait pas une distribution à moitié faite. Chaque appareil
+    // reçoit la notification dans la langue de son titulaire.
+    const origin = siteBaseUrl();
+    const payloads = new Map<Locale, string>();
+    const deliveries = rows.map((row) => ({
+      row,
+      payload: cached(payloads, accountLocaleFromRow(row.locale), (locale) =>
+        JSON.stringify(buildPushPayload(topic, content(locale), origin, locale)),
+      ),
+    }));
     const sent: number[] = [];
     const gone: number[] = [];
-    await inBatches(rows, PUSH_CONCURRENCY, async (row) => {
+    await inBatches(deliveries, PUSH_CONCURRENCY, async ({ row, payload }) => {
       const outcome = await sendWebPush(
         config,
         { endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth },

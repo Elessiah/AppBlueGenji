@@ -261,19 +261,22 @@ async function dispatchPlannedSend(
     await notifyUsers(recipients, {
       topic: "MATCH_REMINDER",
       discord: { message, context: offset ? "match-reminder" : "match-scheduled" },
-      push: matchReminderPush(
-        {
-          tournamentId: Number(match.tournament_id),
-          tournamentName: context.tournamentName,
-          matchId: Number(match.id),
-          teamName: side.teamName,
-          opponentName: side.opponentName,
-          roundLabel,
-          startAt: match.start_at,
-          solo: match.participant_type === "SOLO",
-        },
-        offset ? offset.label : null,
-      ),
+      push: (locale) =>
+        matchReminderPush(
+          {
+            tournamentId: Number(match.tournament_id),
+            tournamentName: context.tournamentName,
+            matchId: Number(match.id),
+            teamName: side.teamName,
+            opponentName: side.opponentName,
+            bracket: String(match.bracket),
+            roundNumber: Number(match.round_number),
+            startAt: match.start_at,
+            solo: match.participant_type === "SOLO",
+          },
+          offset ? offset.key : null,
+          locale,
+        ),
     });
     dispatched += 1;
   }
