@@ -231,6 +231,11 @@ export function formatForfeitCancelledLog(context: {
   return `${lead("🔙", "Abandon annulé", context.tournament)} : ${entrantLabel(context.entrant)} revient en lice, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
+/** « A vs B » d'une ligne d'horaire, une place encore vide se lisant « TBD ». */
+function scheduledPairLabel(team1: LogEntrant | null, team2: LogEntrant | null): string {
+  return `${team1 ? entrantLabel(team1) : "TBD"} vs ${team2 ? entrantLabel(team2) : "TBD"}`;
+}
+
 /**
  * Match programmé ou reprogrammé par l'arbitrage
  * (`lib/server/tournaments/match-schedule.ts`).
@@ -252,15 +257,14 @@ export function formatMatchScheduledLog(context: {
   /** Date effacée puis reposée : « reprogrammé » sans ancienne date à citer. */
   rescheduled?: boolean;
 }): string {
-  const team1 = context.team1 ? entrantLabel(context.team1) : "TBD";
-  const team2 = context.team2 ? entrantLabel(context.team2) : "TBD";
+  const pair = scheduledPairLabel(context.team1, context.team2);
   const rescheduled = context.rescheduled ?? context.previousStartAt !== null;
   const kind = rescheduled ? "Match reprogrammé" : "Match programmé";
   const previous =
     context.previousStartAt === null ? "" : `, au lieu du ${formatMatchStart(context.previousStartAt)}`;
   return (
     `${lead("🗓️", kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber)} — ` +
-    `${team1} vs ${team2} (#${context.matchId}), coup d'envoi ${formatMatchStart(context.startAt)} ` +
+    `${pair} (#${context.matchId}), coup d'envoi ${formatMatchStart(context.startAt)} ` +
     `(heure de Paris)${previous}, par ${ANONYMOUS_STAFF_LABEL}.`
   );
 }
@@ -279,12 +283,10 @@ export function formatMatchScheduleClearedLog(context: {
   team2: LogEntrant | null;
   previousStartAt: string | Date;
 }): string {
-  const team1 = context.team1 ? entrantLabel(context.team1) : "TBD";
-  const team2 = context.team2 ? entrantLabel(context.team2) : "TBD";
   return (
     `${lead("🗓️", "Horaire retiré", context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber)} — ` +
-    `${team1} vs ${team2} (#${context.matchId}), le coup d'envoi du ${formatMatchStart(context.previousStartAt)} ` +
-    `(heure de Paris) est retiré, par ${ANONYMOUS_STAFF_LABEL}.`
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), l'horaire du ` +
+    `${formatMatchStart(context.previousStartAt)} (heure de Paris) est retiré, par ${ANONYMOUS_STAFF_LABEL}.`
   );
 }
 

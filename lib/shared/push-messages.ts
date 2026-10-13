@@ -27,7 +27,7 @@ import enPush from "@/messages/en/pushMessages.json";
 import frPush from "@/messages/fr/pushMessages.json";
 import enReports from "@/messages/en/reports.json";
 import frReports from "@/messages/fr/reports.json";
-import { formatMatchStart, type ScheduleAnnouncement } from "./discord-notifications";
+import { formatMatchStart, type MatchReminderOffsetKey, type ScheduleAnnouncement } from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
@@ -86,7 +86,7 @@ export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", loc
 }
 
 /** Palier d'un rappel (`MATCH_REMINDER_OFFSETS`), par sa clé. */
-export type MatchReminderOffsetKey = "P1D";
+export type { MatchReminderOffsetKey } from "./discord-notifications";
 
 /**
  * Libellé d'une manche (`matchRoundLabel`, français du journal Discord) dans

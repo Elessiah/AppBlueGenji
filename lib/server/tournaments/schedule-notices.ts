@@ -53,6 +53,13 @@ export type MatchScheduleChange = {
    * la date a été effacée entre-temps.
    */
   alreadyAnnounced: boolean;
+  /**
+   * Le tournoi est planifié par l'arbitrage. Sans l'option, un match sans
+   * horaire part en lancement : un horaire retiré ne sera pas remplacé, et
+   * l'avis « le nouvel horaire te sera annoncé » mentirait (le départ du match,
+   * `MATCH_START`, prévient les joueurs).
+   */
+  refereeScheduling: boolean;
   /** Auteur du geste, `null` hors d'une requête du staff. */
   actor: StaffActor | null;
 };
@@ -102,12 +109,19 @@ async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | n
   return rows[0] ?? null;
 }
 
+/** Les deux engagées d'une manche pour le journal (`null` : place encore vide). */
+function logEntrants(row: ScheduledMatchInfoRow): { team1: LogEntrant | null; team2: LogEntrant | null } {
+  const participantType = toParticipantType(row.participant_type);
+  const entrant = (name: string | null): LogEntrant | null => (name === null ? null : { name, participantType });
+  return { team1: entrant(row.team1_name), team2: entrant(row.team2_name) };
+}
+
 /** Prévient les arbitres et écrit la ligne du journal. */
 async function notifyReferees(change: MatchScheduleChange & { startAt: string }): Promise<number> {
   const row = await loadMatchInfo(change.matchId);
   if (!row) return 0;
   const participantType = toParticipantType(row.participant_type);
-  const entrant = (name: string | null): LogEntrant | null => (name === null ? null : { name, participantType });
+  const { team1, team2 } = logEntrants(row);
   const announcement = staffAnnouncement(change);
   const tournament = { id: Number(row.tournament_id), name: String(row.tournament_name) };
 
@@ -116,8 +130,8 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
     matchId: change.matchId,
     bracket: String(row.bracket),
     roundNumber: Number(row.round_number),
-    team1: entrant(row.team1_name),
-    team2: entrant(row.team2_name),
+    team1,
+    team2,
     startAt: change.startAt,
     previousStartAt: change.previousStartAt,
     rescheduled: announcement.rescheduled,
@@ -147,9 +161,14 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
   return pushed;
 }
 
-/** L'horaire effacé mérite-t-il d'être annoncé aux joueurs ? Reçu, et encore devant. */
+/**
+ * L'horaire effacé mérite-t-il d'être annoncé aux joueurs ? Reçu, encore
+ * devant, et dans un tournoi planifié par l'arbitrage (un nouvel horaire
+ * viendra).
+ */
 export function isAnnounceableClearing(change: MatchScheduleChange, now: Date = new Date()): boolean {
-  if (change.startAt !== null || change.previousStartAt === null || !change.alreadyAnnounced) return false;
+  if (change.startAt !== null || change.previousStartAt === null) return false;
+  if (!change.alreadyAnnounced || !change.refereeScheduling) return false;
   const previous = new Date(change.previousStartAt).getTime();
   return Number.isFinite(previous) && previous > now.getTime();
 }
@@ -159,16 +178,13 @@ async function logScheduleCleared(change: MatchScheduleChange & { previousStartA
   if (!change.actor) return;
   const row = await loadMatchInfo(change.matchId);
   if (!row) return;
-  const participantType = toParticipantType(row.participant_type);
-  const entrant = (name: string | null): LogEntrant | null => (name === null ? null : { name, participantType });
   publishStaffAction(
     formatMatchScheduleClearedLog({
       tournament: { id: Number(row.tournament_id), name: String(row.tournament_name) },
       matchId: change.matchId,
       bracket: String(row.bracket),
       roundNumber: Number(row.round_number),
-      team1: entrant(row.team1_name),
-      team2: entrant(row.team2_name),
+      ...logEntrants(row),
       previousStartAt: change.previousStartAt,
     }),
     change.actor,

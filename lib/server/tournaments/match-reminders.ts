@@ -159,8 +159,8 @@ function matchSides(match: ScheduledMatchRow): { teamId: number; teamName: strin
 }
 
 /**
- * Un envoi retenu : soit un palier de rappel, soit l'annonce d'une manche
- * programmée tardivement (`offset === null`).
+ * Un envoi retenu : un palier de rappel, l'annonce d'un horaire
+ * (`offset === null`), ou l'avis d'un horaire retiré (`clearedStartAt`).
  */
 type PlannedSend = {
   match: ScheduledMatchRow;
@@ -169,6 +169,8 @@ type PlannedSend = {
   remaining: MatchReminderOffset[];
   /** Annonce d'une date qui en remplace une autre (« Match reprogrammé »). */
   announcement?: ScheduleAnnouncement;
+  /** Horaire retiré par l'arbitrage (« Horaire du match retiré »). */
+  clearedStartAt?: string;
 };
 
 /**
@@ -207,7 +209,10 @@ async function planMatchSends(
     for (const offset of opened) await claimReminder(matchId, offset.key);
     const openedKeys = new Set(opened.map((offset) => offset.key));
     const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
-    return [{ match, offset: null, remaining: [...remaining] }];
+    // Les joueurs avaient déjà reçu un horaire (date changée quand une place
+    // s'était vidée) : la date découverte ici en remplace une.
+    const announcement = { rescheduled: alreadySent.has(MATCH_TOLD_KEY) };
+    return [{ match, offset: null, remaining: [...remaining], announcement }];
   }
 
   // `alreadySent` porte aussi la marque d'observation, qui n'est pas un palier :
@@ -232,7 +237,7 @@ async function planMatchSends(
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 async function dispatchPlannedSend(
-  { match, offset, remaining, announcement = { rescheduled: false } }: PlannedSend,
+  { match, offset, remaining, announcement = { rescheduled: false }, clearedStartAt }: PlannedSend,
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
 ): Promise<number> {
   let dispatched = 0;
@@ -245,47 +250,51 @@ async function dispatchPlannedSend(
     const recipients = recipientsByTeam.get(side.teamId) ?? [];
     if (recipients.length === 0) continue;
 
+    const solo = match.participant_type === "SOLO";
+    // Un avis de retrait porte l'horaire qui ne vaut plus.
+    const startAt = clearedStartAt ?? match.start_at;
     const context = {
       tournamentName: String(match.tournament_name),
       tournamentUrl: url,
       teamName: side.teamName,
       opponentName: side.opponentName,
       roundLabel,
-      startAt: match.start_at,
-      solo: match.participant_type === "SOLO",
+      startAt,
+      solo,
+    };
+    const pushSide = {
+      tournamentId: Number(match.tournament_id),
+      tournamentName: context.tournamentName,
+      matchId: Number(match.id),
+      teamName: side.teamName,
+      opponentName: side.opponentName,
+      bracket: String(match.bracket),
+      roundNumber: Number(match.round_number),
+      startAt,
+      solo,
     };
 
-    const message = offset
-      ? buildMatchReminderMessage(offset, context)
-      : buildMatchScheduleAnnouncement(context, remaining, announcement);
+    let message: string;
+    if (clearedStartAt) message = buildMatchScheduleClearedNotice(context);
+    else if (offset) message = buildMatchReminderMessage(offset, context);
+    else message = buildMatchScheduleAnnouncement(context, remaining, announcement);
 
+    const offsetKey = offset ? offset.key : null;
     await notifyUsers(recipients, {
       topic: "MATCH_REMINDER",
       discord: { message, context: offset ? "match-reminder" : "match-scheduled" },
       push: (locale) =>
-        matchReminderPush(
-          {
-            tournamentId: Number(match.tournament_id),
-            tournamentName: context.tournamentName,
-            matchId: Number(match.id),
-            teamName: side.teamName,
-            opponentName: side.opponentName,
-            bracket: String(match.bracket),
-            roundNumber: Number(match.round_number),
-            startAt: match.start_at,
-            solo: match.participant_type === "SOLO",
-          },
-          offset ? offset.key : null,
-          locale,
-          announcement,
-        ),
+        clearedStartAt
+          ? matchScheduleClearedPush(pushSide, locale)
+          : matchReminderPush(pushSide, offsetKey, locale, announcement),
     });
     dispatched += 1;
   }
   // Un horaire parti le dit en base : une date posée plus tard se lira
   // « reprogrammée », une date effacée « retirée » (`setMatchStartAt`) — ce que
-  // ni la marque d'observation ni celle d'un palier ne prouvent.
-  if (dispatched > 0) await claimReminder(Number(match.id), MATCH_TOLD_KEY);
+  // ni la marque d'observation ni celle d'un palier ne prouvent. Un avis de
+  // retrait n'en pose pas : la marque est déjà là, c'est elle qui l'a permis.
+  if (dispatched > 0 && !clearedStartAt) await claimReminder(Number(match.id), MATCH_TOLD_KEY);
   return dispatched;
 }
 
@@ -374,44 +383,7 @@ export async function announceMatchScheduleCleared(matchId: number, previousStar
   if (!match) return 0;
 
   const recipientsByTeam = await loadRecipientsByTeam([Number(match.team1_id), Number(match.team2_id)]);
-  const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
-  const url = tournamentPageUrl(Number(match.tournament_id));
-  const solo = match.participant_type === "SOLO";
-  let dispatched = 0;
-  for (const side of matchSides(match)) {
-    const recipients = recipientsByTeam.get(side.teamId) ?? [];
-    if (recipients.length === 0) continue;
-    const context = {
-      tournamentName: String(match.tournament_name),
-      tournamentUrl: url,
-      teamName: side.teamName,
-      opponentName: side.opponentName,
-      roundLabel,
-      startAt: previousStartAt,
-      solo,
-    };
-    await notifyUsers(recipients, {
-      topic: "MATCH_REMINDER",
-      discord: { message: buildMatchScheduleClearedNotice(context), context: "match-scheduled" },
-      push: (locale) =>
-        matchScheduleClearedPush(
-          {
-            tournamentId: Number(match.tournament_id),
-            tournamentName: context.tournamentName,
-            matchId: Number(match.id),
-            teamName: side.teamName,
-            opponentName: side.opponentName,
-            bracket: String(match.bracket),
-            roundNumber: Number(match.round_number),
-            startAt: previousStartAt,
-            solo,
-          },
-          locale,
-        ),
-    });
-    dispatched += 1;
-  }
-  return dispatched;
+  return dispatchPlannedSend({ match, offset: null, remaining: [], clearedStartAt: previousStartAt }, recipientsByTeam);
 }
 
 async function runSweep(now: Date): Promise<number> {

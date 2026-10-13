@@ -135,7 +135,12 @@ export async function setMatchStartAt(
   if (!blank && startAt === null) throw new Error("INVALID_MATCH_START_AT");
 
   const outcome = await withConnection(async (connection) => {
-    let written: { tournamentId: number; previousStartAt: string | null; bothEntrants: boolean };
+    let written: {
+      tournamentId: number;
+      previousStartAt: string | null;
+      bothEntrants: boolean;
+      refereeScheduling: boolean;
+    };
     await connection.beginTransaction();
     try {
       const locked = await lockScheduleRow(connection, matchId);
@@ -167,6 +172,7 @@ export async function setMatchStartAt(
         tournamentId: Number(row.tournament_id),
         previousStartAt: toIso(row.start_at),
         bothEntrants: row.team1_id !== null && row.team2_id !== null,
+        refereeScheduling,
       };
     } catch (error) {
       await connection.rollback().catch(() => undefined);
@@ -230,6 +236,7 @@ export async function setMatchStartAt(
     startAt,
     previousStartAt: outcome.previousStartAt,
     alreadyAnnounced: outcome.alreadyAnnounced,
+    refereeScheduling: outcome.refereeScheduling,
     actor,
   }).catch(() => undefined);
   return startAt;

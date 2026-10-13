@@ -13,10 +13,10 @@
     "titleRescheduled": "Match rescheduled",
     "titleCleared": "Match time removed",
     "body": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time).",
-    "bodyRescheduled": "{pairing} · {tournament}, {round}. Kickoff: {start} (Paris time), instead of {previous}.",
-    "bodyCleared": "{pairing} · {tournament}, {round}. The kickoff planned for {previous} (Paris time) has been removed: you'll be told the new time.",
+    "bodyRescheduled": "New kickoff: {start} (Paris time), instead of {previous}. {pairing} · {tournament}, {round}.",
+    "bodyCleared": "The time planned for {previous} (Paris time) has been removed: you'll be told the new one. {pairing} · {tournament}, {round}.",
     "offset": {
-      "P1D": "24 hours"
+      "P1D": "less than 24 hours"
     }
   },
   "matchScheduled": {

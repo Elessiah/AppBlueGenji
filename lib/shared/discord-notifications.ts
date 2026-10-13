@@ -38,8 +38,15 @@ export type MatchReminderOffsetKey = "P1D";
 export interface MatchReminderOffset {
   key: MatchReminderOffsetKey;
   minutesBefore: number;
-  /** Formulation employée dans le message (« dans 24 heures »). */
+  /** Délai tel que l'annonce le promet (« Prochain rappel : 24 heures avant »). */
   label: string;
+  /**
+   * Délai tel que le rappel le dit (« dans moins de 24 heures »). Le balayage
+   * n'est entraîné que par le trafic : le rappel peut partir n'importe quand
+   * dans sa fenêtre, jusqu'à quelques minutes du coup d'envoi — il ne promet
+   * donc pas un délai exact, l'horaire du message le donne.
+   */
+  dueLabel: string;
 }
 
 /**
@@ -50,7 +57,7 @@ export interface MatchReminderOffset {
  * sépare du suivant.
  */
 export const MATCH_REMINDER_OFFSETS: readonly MatchReminderOffset[] = [
-  { key: "P1D", minutesBefore: 24 * 60, label: "24 heures" },
+  { key: "P1D", minutesBefore: 24 * 60, label: "24 heures", dueLabel: "moins de 24 heures" },
 ];
 
 const MINUTE_MS = 60_000;
@@ -248,7 +255,7 @@ export function buildMatchReminderMessage(
   context: MatchReminderContext,
 ): string {
   const lines = [
-    `**Rappel de match — dans ${offset.label}**`,
+    `**Rappel de match — dans ${offset.dueLabel}**`,
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     pairingLine(context),
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
@@ -308,7 +315,7 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
     "**Horaire du match retiré**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     pairingLine(context),
-    `Le coup d'envoi prévu ${formatMatchStart(context.startAt)} (heure de Paris) est retiré : le nouvel horaire te sera annoncé.`,
+    `L'horaire prévu ${formatMatchStart(context.startAt)} (heure de Paris) est retiré : le nouvel horaire te sera annoncé.`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
   return lines.join("\n");
