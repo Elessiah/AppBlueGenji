@@ -3,11 +3,12 @@
 Le site écrit aux joueurs sur Discord, par le canal interne du bot. Trois usages,
 une seule mécanique : **le site rédige, le bot distribue**.
 
-- **Rappels de match** — l'annonce de l'horaire dès qu'un arbitre le pose ou le
-  change, puis des rappels une semaine et 24 h avant le coup d'envoi, en message
-  privé à chaque joueur des deux engagées. Le rappel « 1 h avant » a été retiré
-  (demande de l'association, 2026-10) : le départ du match (push `MATCH_START`)
-  en tient lieu.
+- **Rappels de match** — l'annonce de l'horaire dès qu'un arbitre le pose, le
+  change ou le retire, puis un rappel 24 h avant le coup d'envoi, en message
+  privé à chaque joueur des deux engagées. Les rappels « une semaine » et
+  « 1 h avant » ont été retirés (demande de l'association, 2026-10 : trop de
+  notifications) — l'annonce immédiate tient lieu du premier, le départ du
+  match (push `MATCH_START`) du second.
 - **Signalement d'un problème** — un inscrit alerte le staff depuis la page du
   tournoi ou depuis un match ; le bot le relaie au canal de logs et au rôle
   arbitre.
@@ -54,20 +55,17 @@ ce qui reste dû.
 Un `setInterval` de processus aurait été remis à zéro à chaque redéploiement et
 dupliqué à chaque worker.
 
-### Les paliers, et pourquoi ce sont des fenêtres
+### Le palier, et pourquoi c'est une fenêtre
 
-`MATCH_REMINDER_OFFSETS` déclare deux paliers, du plus lointain au plus proche :
-`P7D`, `P1D`. Chacun ne vaut que dans **sa propre fenêtre** —
-`[début − palier, début − palier suivant)`, le dernier s'arrêtant au coup
-d'envoi.
+`MATCH_REMINDER_OFFSETS` ne déclare plus qu'un palier : `P1D` (24 h avant). Il
+ne vaut que dans **sa propre fenêtre** — `[début − palier, début − palier
+suivant)`, le dernier s'arrêtant au coup d'envoi. La règle tient pour tout
+palier qu'on rajouterait : sans ce découpage, plusieurs rappels partiraient
+d'un coup pour une manche programmée tard, dans la même seconde.
 
-Sans ce découpage, une manche programmée pour dans trois heures déclencherait
-d'un coup les deux rappels — « dans une semaine » et « dans 24 heures » — pour
-le même match, dans la même seconde.
-
-L'ancien palier `PT1H` (une heure avant) a été retiré : ses lignes déjà posées
-dans `bg_match_reminders` restent inertes, le balayage ne lisant que les clés
-des paliers déclarés.
+Les anciens paliers `P7D` (une semaine) et `PT1H` (une heure avant) ont été
+retirés : leurs lignes déjà posées dans `bg_match_reminders` restent inertes,
+le balayage ne lisant que les clés des paliers déclarés.
 
 Rien ne part une fois le match commencé : un rappel en retard n'est plus un
 rappel, et un match reprogrammé vers le passé (correction d'archive) ne doit
@@ -75,73 +73,89 @@ réveiller personne.
 
 ### Une date posée tardivement : l'annonce
 
-Le staff programme souvent une manche à trois jours, parfois à cinq heures. Les
-paliers déjà dépassés ne sont alors **pas rattrapés** : ils sont consommés sans
-message et remplacés par une **annonce unique** portant la date
-(`buildMatchScheduleAnnouncement`). Les paliers encore devant, eux, suivent leur
-cours.
+Un palier déjà dépassé n'est **pas rattrapé** : il est consommé sans message et
+remplacé par une **annonce unique** portant la date
+(`buildMatchScheduleAnnouncement`). Le palier encore devant, lui, suit son cours.
 
 | Date posée par l'arbitrage | Ce que reçoit le joueur |
 | --- | --- |
-| à J-10 | annonce tout de suite, puis P7D, P1D |
-| à J-3 | annonce (« Match programmé, le … »), puis P1D |
+| à J-10 ou J-3 | annonce tout de suite (« Match programmé, le … »), puis P1D |
 | à H-5 | annonce, et rien après |
+| retirée | « Horaire du match retiré », s'il l'avait reçue et qu'elle était encore devant |
 
 Le partage entre les deux régimes tient à la **marque d'observation** `SEEN`,
-posée au premier passage du balayage sur cette manche : elle sépare « le site
-découvre cette date » de « le temps a passé depuis ». Sans elle, un match
-programmé à trois jours recevrait le rappel « dans une semaine » — la fenêtre du
-palier est bel et bien ouverte, mais ce qu'il annonce est faux.
+posée au premier passage du balayage sur cette manche (ou par `setMatchStartAt`,
+voir plus bas) : elle sépare « le site découvre cette date » de « le temps a
+passé depuis ». Sans elle, un match programmé à cinq heures recevrait le rappel
+« dans 24 heures » — la fenêtre du palier est bel et bien ouverte, mais ce
+qu'il annonce est faux.
 
 C'est aussi ce qui impose la marge de `MATCH_REMINDER_LOOKAHEAD_MS` : le balayage
-lit **une journée plus loin** que le plus grand palier. Une fenêtre de lecture
-égale à l'horizon ferait découvrir chaque manche à la seconde exacte où le palier
-« une semaine » s'ouvre — donc toujours par le régime d'annonce, et ce palier ne
+lit **une journée plus loin** que le plus grand palier (48 h). Une fenêtre de
+lecture égale à l'horizon ferait découvrir chaque manche à la seconde exacte où
+le palier s'ouvre — donc toujours par le régime d'annonce, et ce palier ne
 partirait jamais.
 
-### Programmer ou reprogrammer une manche
+### La marque `TOLD` : un horaire reçu
 
-`setMatchStartAt` efface les lignes `bg_match_reminders` de la manche **quand une
-date est posée et change réellement**, après y avoir lu si les joueurs avaient
-**reçu** un horaire (`alreadyAnnounced` : une marque `ANNOUNCE`, posée quand une
-annonce part vraiment, ou un rappel `P7D` / `P1D` — jamais `SEEN`, que le
-balayage pose aussi en silence). Une date **effacée** garde ses marques, inertes
-(le balayage ne lit que les manches datées), pour que la date reposée ensuite se
-lise encore « reprogrammé ». Puis `notifyMatchScheduleChange`
-(`lib/server/tournaments/schedule-notices.ts`) annonce l'horaire **sans attendre
-le balayage** :
+`dispatchPlannedSend` pose `TOLD` dès qu'une annonce ou un rappel est **parti**
+vers au moins une engagée. Ni `SEEN` (le balayage la pose aussi en silence) ni
+la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
+annonce) ne le prouvent. `TOLD` survit aux changements de date : c'est elle qui
+fait dire « reprogrammé » à la date suivante et « retiré » à une date effacée.
+
+### Programmer, reprogrammer ou retirer l'horaire d'une manche
+
+`setMatchStartAt`, **quand la date change réellement**, lit d'abord `TOLD`
+(`alreadyAnnounced`) puis, si une date est posée :
+
+- les deux engagées connues, efface les lignes de la manche **sauf** `SEEN` et
+  `TOLD`, et pose `SEEN` dans le même geste. Un balayage qui passerait entre ce
+  ménage et l'annonce ne peut donc plus la prendre pour lui (et annoncer sans
+  l'ancienne date) : il ne peut prendre qu'un palier ouvert, dont le rappel
+  porte la nouvelle date — l'annonce se tait alors ;
+- une engagée manquante, efface tout sauf `TOLD` : le balayage annoncera la
+  manche quand elle sera connue.
+
+Une date **effacée** garde toutes ses marques (inertes : le balayage ne lit que
+les manches datées). Puis `notifyMatchScheduleChange`
+(`lib/server/tournaments/schedule-notices.ts`) prévient **sans attendre le
+balayage** :
 
 - **Joueurs** des deux engagées (équipes ou entrées solo, push dans la langue de
-  chacun) : `announceMatchSchedule` réserve à neuf la marque `SEEN` — c'est elle
-  qui interdit le doublon avec un balayage concurrent —, consomme les paliers
-  déjà ouverts et envoie « Match programmé » (première date) ou « Match
-  reprogrammé » (les joueurs avaient reçu un horaire), avec « , au lieu du … »
-  quand l'ancienne date est connue — pas après un effacement. Une date posée
-  quand une place était vide n'a jamais été annoncée : sa remplaçante se dit
-  « programmé », sans ancienne date. Avant, l'annonce attendait la
-  prochaine lecture de `/tournois`, et une date posée à plus de huit jours
-  n'était annoncée par rien avant le rappel « une semaine ». En tournoi
-  individuel, le message privé (annonce comme rappels) dit « **Ton match** »
-  au lieu de « A contre B » : les deux noms sont des pseudos, et aucun pseudo
-  de joueur ne passe par Discord — même règle que le push.
+  chacun, message privé Discord en français) : `announceMatchSchedule` consomme
+  le palier déjà ouvert et envoie « Match programmé » ou « Match reprogrammé »
+  — reprogrammé seulement si les joueurs avaient reçu un horaire (`TOLD`), avec
+  « , au lieu du … » quand l'ancienne date est connue (pas après un
+  effacement). Une date posée quand une place était vide n'a jamais été
+  annoncée : sa remplaçante se dit « programmé », sans ancienne date. Une date
+  **retirée** (`announceMatchScheduleCleared`) donne « Horaire du match
+  retiré » — seulement si les joueurs l'avaient reçue et qu'elle était encore
+  devant — avec la même étiquette push que l'annonce, qu'il remplace. En
+  tournoi individuel, le message privé (annonce, rappel, retrait) dit « **Ton
+  match** » au lieu de « A contre B » : les deux noms sont des pseudos, et
+  aucun pseudo de joueur ne passe par Discord — même règle que le push.
 - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la permission
-  `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`).
-  « Reprogrammé » dès qu'une date précédait (ils la voyaient sur le plateau).
-  Même étiquette que l'annonce aux joueurs (`rencontre-<id>-reminder`) : un
-  arbitre engagé dans le match ne garde qu'une notification.
+  `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`),
+  pour une date posée ou changée (pas pour un retrait). « Reprogrammé » dès
+  qu'une date précédait (ils la voyaient sur le plateau). Même étiquette que
+  l'annonce aux joueurs (`rencontre-<id>-reminder`) : un arbitre engagé dans le
+  match ne garde qu'une notification. Le push reprend le titre et le corps de
+  l'annonce aux joueurs (clés `matchReminder.*`) ; une place vide s'y lit
+  « TBD », comme sur le plateau et au journal.
 - **Journal Discord** : une ligne `formatMatchScheduledLog` (« 🗓️ Match
   programmé / reprogrammé — « Tournoi » (#id) : Manche 2 — A vs B (#42), coup
-  d'envoi …, par le staff »), qui rappelle l'ancien horaire d'une
-  reprogrammation. Auteur anonyme sur Discord, nommé dans pm2
+  d'envoi …, au lieu du …, par le staff ») ou `formatMatchScheduleClearedLog`
+  (« 🗓️ Horaire retiré — … le coup d'envoi du … (heure de Paris) est retiré,
+  par le staff »). Auteur anonyme sur Discord, nommé dans pm2
   (`publishStaffAction`) ; engagées par `entrantLabel` (« un joueur » en
   tournoi individuel). Pas de message privé au rôle arbitre : ce n'est pas une
   alerte qui attend une intervention.
 
-Rien ne part pour une date **inchangée**, **effacée** ou **déjà passée**
-(correction d'archive). Une manche dont une engagée manque encore n'a pas
-d'annonce joueurs (le balayage l'annoncera) mais a sa ligne de journal et son
-push arbitre (« TBD », comme sur le plateau et au journal). Le push arbitre
-reprend le titre et le corps de l'annonce aux joueurs (clés `matchReminder.*`).
+Rien ne part pour une date **inchangée**, ni pour une date posée **déjà
+passée** (correction d'archive) ; un retrait sans date d'avant n'est même pas
+journalisé. Une manche dont une engagée manque encore n'a pas d'annonce joueurs
+(le balayage l'annoncera) mais a sa ligne de journal et son push arbitre.
 
 ### Pourquoi la réservation précède l'envoi
 
@@ -263,4 +277,4 @@ désigne le rôle arbitre, serveur par serveur.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : une semaine puis 24 h avant `bg_matches.start_at` (le palier « 1 h avant » est retiré), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`), sans quoi une manche programmée à trois heures déclencherait les deux rappels d'un coup. Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser ou changer la date (`setMatchStartAt`) efface ses rappels et l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé »), aux arbitres (push `MATCH_SCHEDULED`) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.
+- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : 24 h avant `bg_matches.start_at` (les paliers « une semaine » et « 1 h avant » sont retirés), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`). Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser, changer ou retirer la date (`setMatchStartAt`) efface ses rappels et l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé / Horaire du match retiré », marque `TOLD` = horaire reçu), aux arbitres (push `MATCH_SCHEDULED`, sauf retrait) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.
