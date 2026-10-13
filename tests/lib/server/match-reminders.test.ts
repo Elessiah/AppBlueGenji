@@ -984,6 +984,7 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     tournamentName: "Coupe BlueGenji",
     phaseId: 0,
     solo: false,
+    refereeScheduling: true,
     bracket: "UPPER",
     roundNumber: 2,
     swiss: false,
@@ -1077,9 +1078,21 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     expect(resolvePush(content).tag).toBe("rencontre-31-reminder");
   });
 
-  it("se tait quand la nouvelle rencontre a déjà un horaire : son annonce suivra", async () => {
-    await mockWithdrawnDb([{ ...CURRENT, id: 45, team1_id: 101, team2_id: 102 }]);
-    expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
+  it("se tait quand la nouvelle rencontre tient le même horaire", async () => {
+    await mockWithdrawnDb([{ ...CURRENT, id: 45, team1_id: 101, team2_id: 102, start_at: "2026-09-10 18:00:00" }]);
+    expect(await announceEntrantsWithdrawn([{ ...DEPARTED, heldStartAt: "2026-09-10 18:00:00" }])).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("retire l'horaire reçu quand la nouvelle rencontre en a un autre (son annonce suivra)", async () => {
+    await mockWithdrawnDb([{ ...CURRENT, id: 45, team1_id: 101, team2_id: 102, start_at: new Date("2026-09-12T18:00:00Z") }]);
+    expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(1);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("match-schedule-cleared");
+  });
+
+  it("se tait dans un tournoi sans horaires d'arbitrage dont la nouvelle rencontre n'a pas d'horaire", async () => {
+    await mockWithdrawnDb([{ ...CURRENT, id: 45, team1_id: 101, team2_id: 102, start_at: null }]);
+    expect(await announceEntrantsWithdrawn([{ ...DEPARTED, match: { ...MATCH, refereeScheduling: false } }])).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 

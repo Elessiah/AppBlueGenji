@@ -10,6 +10,7 @@ import {
   noteDeletedMatches,
   noteDepartedEntrants,
   settleDepartures,
+  withoutSettledLater,
 } from "@/lib/server/tournaments/departed-notices";
 import { announceEntrantsWithdrawn } from "@/lib/server/tournaments/match-reminders";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
@@ -25,6 +26,7 @@ function contextRow(id: number, overrides: Record<string, unknown> = {}) {
     phase_id: 0,
     tournament_name: "Coupe BlueGenji",
     participant_type: "TEAM",
+    referee_scheduling: 1,
     bracket: "UPPER",
     round_number: 2,
     swiss_round: 0,
@@ -37,6 +39,7 @@ const MATCH_31 = {
   tournamentName: "Coupe BlueGenji",
   phaseId: 0,
   solo: false,
+  refereeScheduling: true,
   bracket: "UPPER",
   roundNumber: 2,
   swiss: false,
@@ -56,7 +59,7 @@ function connectionHolding(
     if (sql.startsWith("SELECT match_id, start_at")) {
       return [Object.entries(held).map(([matchId, startAt]) => ({ match_id: Number(matchId), start_at: startAt }))];
     }
-    if (sql.startsWith("SELECT m.id, m.team1_id, m.team2_id")) return [options.doomed ?? []];
+    if (sql.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) return [options.doomed ?? []];
     if (sql.startsWith("SELECT m.id, m.tournament_id")) {
       const ids = (params as number[]).filter((id) => held[id] !== undefined);
       return [ids.map((id) => contextRow(id, options.contexts?.[id]))];
@@ -247,10 +250,12 @@ describe("noteDeletedMatches", () => {
     await noteDeletedMatches(connection, "tournament_id = ? AND round_number = ?", [7, 3]);
 
     const [sql, params] = sqlOf(mock, 0);
-    expect(sql).toMatch(/^SELECT m\.id, m\.team1_id, m\.team2_id FROM bg_matches m\s+WHERE tournament_id = \? AND round_number = \?/);
-    // Seules les manches dont un horaire a été reçu sont lues.
-    expect(sql).toMatch(/EXISTS \(SELECT 1 FROM bg_match_reminders r WHERE r\.match_id = m\.id AND r\.offset_key = \?\)/);
-    expect(params).toEqual([7, 3, "TOLD"]);
+    // Sous verrou, une seule table : une marque posée par un envoi concurrent
+    // n'échappe pas à la lecture qui suit, et l'envoi qui n'a pas encore posé
+    // la sienne attend la suppression.
+    expect(sql).toBe("SELECT id, team1_id, team2_id FROM bg_matches WHERE tournament_id = ? AND round_number = ? FOR UPDATE");
+    expect(params).toEqual([7, 3]);
+    expect(sqlOf(mock, 1)[0]).toMatch(/^SELECT match_id, start_at FROM bg_match_reminders[\s\S]*FOR UPDATE$/);
     flushDepartedNotices(connection);
     expect(jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0].map(({ teamId, opponentId }) => [teamId, opponentId])).toEqual([
       [101, 102],
@@ -258,10 +263,15 @@ describe("noteDeletedMatches", () => {
     ]);
   });
 
-  it("ne lit rien de plus quand aucune manche supprimée n'a d'horaire reçu, et tolère une table absente", async () => {
+  it("ne lit rien de plus sans manche visée, et tolère une table absente", async () => {
     const { mock, connection } = connectionHolding({});
     await noteDeletedMatches(connection, "tournament_id = ?", [7]);
     expect(mock.execute).toHaveBeenCalledTimes(1);
+
+    const unheld = connectionHolding({}, { doomed: [{ id: 31, team1_id: 101, team2_id: 102 }] });
+    await noteDeletedMatches(unheld.connection, "tournament_id = ?", [7]);
+    // Les marques, mais pas le contexte : aucun horaire tenu.
+    expect(unheld.mock.execute).toHaveBeenCalledTimes(2);
 
     const missing = connectionMock();
     missing.execute.mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
@@ -316,5 +326,37 @@ describe("une engagée n'est prévenue qu'une fois par transaction", () => {
     await noteDepartedEntrants(connection, [DEPARTURE, { ...DEPARTURE, teamId: 102, opponentId: 101 }]);
     flushDepartedNotices(connection);
     expect(jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0].map(({ teamId }) => teamId)).toEqual([101, 102]);
+  });
+});
+
+describe("une manche n'est lue qu'une fois par transaction", () => {
+  it("une seconde sortie retrouve l'horaire lu par la première, même après l'effacement des marques", async () => {
+    const { mock, connection } = connectionHolding({ 31: AHEAD });
+    await noteDepartedEntrants(connection, [DEPARTURE]);
+    // Les marques ont été effacées entre-temps (forgetMatchReminders) : relire ne trouverait rien.
+    mock.execute.mockResolvedValue([[]]);
+    await noteDepartedEntrants(connection, [{ matchId: 31, teamId: 109, opponentId: 102 }]);
+    expect(mock.execute).toHaveBeenCalledTimes(2);
+    flushDepartedNotices(connection);
+    expect(jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0].map(({ teamId }) => teamId)).toEqual([101, 109]);
+  });
+
+  it("oublie ce qu'elle a lu à la fin de la transaction", async () => {
+    const { mock, connection } = connectionHolding({ 31: AHEAD });
+    await noteDepartedEntrants(connection, [DEPARTURE]);
+    discardDepartedNotices(connection);
+    await noteDepartedEntrants(connection, [DEPARTURE]);
+    expect(mock.execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT match_id"))).toHaveLength(2);
+  });
+});
+
+describe("withoutSettledLater", () => {
+  it("écarte les manches qu'un retour en arrière réglera lui-même, jusqu'à leur règlement", async () => {
+    const { connection } = connectionHolding({});
+    expect(withoutSettledLater(connection, [31, 32])).toEqual([31, 32]);
+    const held = await holdDepartures(connection, [31]);
+    expect(withoutSettledLater(connection, [31, 32])).toEqual([32]);
+    settleDepartures(connection, held, []);
+    expect(withoutSettledLater(connection, [31, 32])).toEqual([31, 32]);
   });
 });

@@ -1,7 +1,15 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
 // Avis à l'engagée sortante : couverts par `departed-notices-wiring.test.ts`.
-jest.mock("@/lib/server/tournaments/departed-notices");
+// Seule la lecture des horaires tenus est simulée ; `withoutSettledLater` reste réel.
+jest.mock("@/lib/server/tournaments/departed-notices", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/departed-notices")>(
+    "@/lib/server/tournaments/departed-notices",
+  ),
+  noteDepartedEntrants: jest.fn(),
+  flushDepartedNotices: jest.fn(),
+  discardDepartedNotices: jest.fn(),
+}));
 
 import type { PoolConnection } from "mysql2/promise";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";

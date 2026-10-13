@@ -2,13 +2,22 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
-jest.mock("@/lib/server/tournaments/departed-notices");
+// Seule la lecture des horaires tenus est simulée ; `withoutSettledLater` reste réel.
+jest.mock("@/lib/server/tournaments/departed-notices", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/departed-notices")>(
+    "@/lib/server/tournaments/departed-notices",
+  ),
+  noteDepartedEntrants: jest.fn(),
+  flushDepartedNotices: jest.fn(),
+  discardDepartedNotices: jest.fn(),
+}));
 jest.mock("@/lib/server/tournaments/reminder-marks");
 
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import {
   discardDepartedNotices,
   flushDepartedNotices,
+  holdDepartures,
   noteDepartedEntrants,
 } from "@/lib/server/tournaments/departed-notices";
 import { forgetMatchReminders } from "@/lib/server/tournaments/reminder-marks";
@@ -30,6 +39,7 @@ function slotConnection(previous: { team1_id: number | null; team2_id: number | 
   const mock = connectionMock();
   mock.execute.mockImplementation(async (sql: string) => {
     if (sql.startsWith("SELECT team1_id, team2_id")) return [[previous]];
+    if (sql.startsWith("SELECT match_id, start_at")) return [[]];
     return [{ affectedRows: 1 }];
   });
   return fakeConnection(mock);
@@ -54,6 +64,13 @@ describe("pushTeamToTarget — engagée remplacée", () => {
     // La place se lit sous verrou : le remplacement se décide sur l'état actuel.
     const [sql] = jest.mocked(connection.execute).mock.calls[0] as unknown as [string];
     expect(sql).toMatch(/FOR UPDATE$/);
+  });
+
+  it("laisse les marques d'une manche qu'un retour en arrière réglera lui-même", async () => {
+    const connection = slotConnection({ team1_id: 7, team2_id: 10 });
+    await holdDepartures(connection, [2]);
+    await pushTeamToTarget(connection, 2, 1, 9);
+    expect(forgetMatchReminders).toHaveBeenCalledWith(connection, []);
   });
 
   it("ne note rien quand la place était vide, ou garde la même engagée", async () => {

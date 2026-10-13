@@ -123,9 +123,18 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
     expect(res.status).toBe(400);
   });
 
-  it("remonte 500 sur une panne inattendue", async () => {
-    jest.mocked(setMatchStartAt).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
+  it("remonte 500 sur une panne inattendue, avec un code et jamais le texte de l'erreur", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(setMatchStartAt)
+      .mockRejectedValue(new Error("Deadlock found when trying to get lock; try restarting transaction"));
     const res = await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"));
     expect(res.status).toBe(500);
+    const body = JSON.stringify(await res.json());
+    expect(body).toContain("MATCH_SCHEDULE_UPDATE_FAILED");
+    expect(body).not.toContain("Deadlock");
+    // Le texte reste dans pm2.
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 });

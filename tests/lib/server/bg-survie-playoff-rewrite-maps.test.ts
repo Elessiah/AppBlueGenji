@@ -118,4 +118,17 @@ describe("BG Survie — tour d'arbre final réécrit", () => {
     await writePlayoffRound(conn, 7, 101, [plan[0]], existing);
     expect(noteDeletedMatches).toHaveBeenCalledWith(conn, "tournament_id = ? AND round_number = ?", [7, 101]);
   });
+
+  it("tient pour la même rencontre les mêmes engagées reposées dans l'autre sens", async () => {
+    jest.mocked(noteDepartedEntrants).mockClear();
+    const { conn, execute } = playoffConnection(false);
+    const swapped = [
+      { bracket: "UPPER" as const, pairing: { teamAId: 2, teamBId: 1 } },
+      { bracket: "UPPER" as const, pairing: { teamAId: 4, teamBId: 3 } },
+    ];
+    await writePlayoffRound(conn, 7, 101, swapped, existing);
+    // Ni avis, ni marques effacées : l'horaire tenu vaut toujours.
+    expect(noteDepartedEntrants).not.toHaveBeenCalled();
+    expect(execute.mock.calls.some(([sql]) => sql.includes("bg_match_reminders"))).toBe(false);
+  });
 });
