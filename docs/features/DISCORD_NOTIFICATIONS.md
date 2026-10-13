@@ -159,8 +159,10 @@ entre-temps, garde le sien ; un avis de retrait le remet à `NULL` : la
 date suivante se dit « reprogrammée », sans rien citer. Une date rendue à
 l'horaire que les joueurs tiennent déjà (après une saisie de travers seulement
 journalisée) ne leur est pas réannoncée, et garde ses marques (le rappel déjà
-parti ne repart pas) ; une date déjà passée, annoncée à personne, laisse elle
-aussi les marques en place.
+parti ne repart pas) — sauf un palier daté d'un **autre** horaire (pris pour
+une date intermédiaire dont l'annonce n'a atteint personne), qui ferait sauter
+au balayage le rappel 24 h de l'horaire rendu ; une date déjà passée, annoncée
+à personne, laisse elle aussi les marques en place.
 
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
 rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
