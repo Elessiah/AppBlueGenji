@@ -382,10 +382,21 @@ describe("withoutSettledLater", () => {
 
 describe("lecture des marques par paquets", () => {
   it("borne la liste IN (…) d'une suppression de plateau entier", async () => {
-    const doomed = Array.from({ length: 1200 }, (_, index) => ({ id: index + 1, team1_id: null, team2_id: null }));
+    const doomed = Array.from({ length: 1200 }, (_, index) => ({ id: index + 1, team1_id: 10_000 + index, team2_id: null }));
     const { mock, connection } = connectionHolding({}, { doomed });
     await noteDeletedMatches(connection, "tournament_id = ?", [7]);
     const reads = mock.execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT match_id"));
     expect(reads.map(([, params]) => (params as unknown[]).length)).toEqual([501, 501, 201]);
+  });
+});
+
+describe("noteDeletedMatches et retour en arrière", () => {
+  it("ne lit ni ne verrouille les marques des manches qu'un retour en arrière règle lui-même", async () => {
+    const { mock, connection } = connectionHolding({}, { doomed: [{ id: 31, team1_id: 101, team2_id: 102 }] });
+    await holdDepartures(connection, [31]);
+    mock.execute.mockClear();
+    await noteDeletedMatches(connection, "id IN (?)", [31]);
+    // La lecture des places, rien de plus.
+    expect(mock.execute).toHaveBeenCalledTimes(1);
   });
 });
