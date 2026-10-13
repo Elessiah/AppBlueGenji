@@ -30,7 +30,7 @@ import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/shared/bot-logs";
-import type { ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
+import { MATCH_SEEN_KEY, type ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
 import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
@@ -308,6 +308,20 @@ async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchSc
   reportFailures(results, "[notify] horaire retiré non annoncé");
 }
 
+/** Rend l'observation posée pour cet horaire par `setMatchStartAt`. Ne lève jamais. */
+async function releaseSeenMark(matchId: number, startAt: string): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`, [
+      matchId,
+      MATCH_SEEN_KEY,
+      new Date(startAt),
+    ]);
+  } catch {
+    // Base injoignable : l'annonce attendra un changement d'horaire.
+  }
+}
+
 /** Un avis manqué se dit dans pm2 ; une table absente (base en création) se tait. */
 function reportFailures(results: PromiseSettledResult<unknown>[], label: string): void {
   for (const result of results) {
@@ -327,6 +341,9 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
     row = await loadMatchInfo(change.matchId);
   } catch (error) {
     reportFailures([{ status: "rejected", reason: error }], "[notify] horaire de match non annoncé");
+    // L'observation posée avec la date ferait taire le balayage : rendue, il
+    // annoncera la manche (au meilleur effort — la base peut être injoignable).
+    if (startAt !== null) await releaseSeenMark(change.matchId, startAt);
     return;
   }
   if (!row) return;

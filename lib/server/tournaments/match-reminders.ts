@@ -185,10 +185,15 @@ function sentKeysOf(row: SweepMatchRow): Set<string> {
 async function claimReminder(match: ScheduledMatch, offsetKey: string): Promise<boolean> {
   const db = await getDatabase();
   const matchId = Number(match.id);
+  // La ligne retient l'horaire pour lequel elle est prise : seul l'envoi de cet
+  // horaire peut la rendre (`releaseClaims`). Les engagées aussi sont
+  // vérifiées : une affiche changée a vu ses marques effacées, et ses nouvelles
+  // engagées attendent leur annonce.
   const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
-       SELECT ?, ? FROM bg_matches WHERE id = ? AND start_at = ?`,
-    [matchId, offsetKey, matchId, match.start_at],
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
+       SELECT ?, ?, start_at FROM bg_matches
+        WHERE id = ? AND start_at = ? AND team1_id = ? AND team2_id = ?`,
+    [matchId, offsetKey, matchId, match.start_at, Number(match.team1_id), Number(match.team2_id)],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
@@ -388,11 +393,15 @@ async function releaseClaims(send: PlannedSend): Promise<void> {
   const keys = send.claimed ?? [];
   if (keys.length === 0) return;
   const db = await getDatabase();
+  // Seulement les marques prises pour **cet** horaire : un changement plus
+  // récent a posé les siennes (`setMatchStartAt` date l'observation), qu'un
+  // ancien envoi en échec n'a pas à effacer.
   await db
-    .execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key IN (${keys.map(() => "?").join(", ")})`, [
-      Number(send.match.id),
-      ...keys,
-    ])
+    .execute(
+      `DELETE FROM bg_match_reminders
+        WHERE match_id = ? AND offset_key IN (${keys.map(() => "?").join(", ")}) AND start_at <=> ?`,
+      [Number(send.match.id), ...keys, new Date(send.match.start_at)],
+    )
     .catch(() => undefined);
 }
 
@@ -631,20 +640,20 @@ export async function announceMatchSchedule(
   if (!match || new Date(match.start_at).getTime() <= now.getTime()) return 0;
 
   const opened = openedMatchReminders(match.start_at, now);
-  for (const offset of opened) {
-    if (!(await claimReminder(match, offset.key))) return 0;
-  }
-  const openedKeys = new Set(opened.map((offset) => offset.key));
-  const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
   // En cas d'échec avant les joueurs, l'observation posée par `setMatchStartAt`
   // est rendue avec les paliers : le balayage annoncera la manche.
-  const send: PlannedSend = {
-    match,
-    offset: null,
-    remaining: [...remaining],
-    announcement,
-    claimed: [MATCH_SEEN_KEY, ...openedKeys],
-  };
+  const send: PlannedSend = { match, offset: null, remaining: [], announcement, claimed: [MATCH_SEEN_KEY] };
+  try {
+    for (const offset of opened) {
+      if (!(await claimReminder(match, offset.key))) return 0;
+      send.claimed?.push(offset.key);
+    }
+  } catch (error) {
+    await releaseClaims(send);
+    throw error;
+  }
+  const openedKeys = new Set(opened.map((offset) => offset.key));
+  send.remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
   const recipientsByTeam = await recipientsOrRelease([send]);
   return dispatchPlannedSend(send, recipientsByTeam);
 }

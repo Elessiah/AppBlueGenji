@@ -194,10 +194,13 @@ async function resetReminderMarks(
     // un interblocage, que la transaction perdante rendrait en refus de
     // l'horaire. Dans cet ordre, la transaction n'insère plus rien après avoir
     // verrouillé un intervalle : au pire, l'autre attend son tour.
-    await connection.execute(`INSERT IGNORE INTO bg_match_reminders (match_id, offset_key) VALUES (?, ?)`, [
-      matchId,
-      MATCH_SEEN_KEY,
-    ]);
+    // L'observation porte l'horaire qu'elle couvre : un ancien envoi en échec
+    // ne rend que les marques de son horaire (`releaseClaims`).
+    await connection.execute(
+      `INSERT INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE start_at = ?`,
+      [matchId, MATCH_SEEN_KEY, new Date(startAt), new Date(startAt)],
+    );
     await connection.execute(
       `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
       [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY],

@@ -25,20 +25,11 @@ export async function pushTeamToTarget(
     `SELECT team1_id, team2_id FROM bg_matches WHERE id = ? LIMIT 1`,
     [targetMatchId],
   );
-  const previousTeamId =
-    targetSlot === 1 ? beforeRows[0]?.team1_id ?? null : beforeRows[0]?.team2_id ?? null;
-
-  if (targetSlot === 1) {
-    await connection.execute(`UPDATE bg_matches SET team1_id = ? WHERE id = ?`, [
-      teamId,
-      targetMatchId,
-    ]);
-  } else {
-    await connection.execute(`UPDATE bg_matches SET team2_id = ? WHERE id = ?`, [
-      teamId,
-      targetMatchId,
-    ]);
-  }
+  const before = beforeRows[0];
+  if (!before) return;
+  const previousTeamId = targetSlot === 1 ? before.team1_id : before.team2_id;
+  const otherTeamId = targetSlot === 1 ? before.team2_id : before.team1_id;
+  const column = targetSlot === 1 ? "team1_id" : "team2_id";
 
   // Remplacer un engagé par un **autre** (correction d'un score amont) fait de
   // cette ligne une autre affiche : l'antenne ouverte sur l'ancienne ne vaut
@@ -46,10 +37,15 @@ export async function pushTeamToTarget(
   // l'accueil vers une chaîne qui ne montre pas cette rencontre.
   // Remplir un créneau encore vide, en revanche, ne fait que matérialiser le
   // match prévu : une diffusion programmée à l'avance doit lui survivre.
-  if (previousTeamId !== null && Number(previousTeamId) !== teamId) {
-    await connection.execute(`UPDATE bg_matches SET live_started_at = NULL WHERE id = ?`, [
-      targetMatchId,
-    ]);
+  const replacing = previousTeamId !== null && Number(previousTeamId) !== teamId;
+  // Une seule écriture : la place, le statut (l'autre place est connue de la
+  // lecture d'avant) et, sur un remplacement, l'antenne.
+  await connection.execute(
+    `UPDATE bg_matches SET ${column} = ?, status = ?${replacing ? ", live_started_at = NULL" : ""} WHERE id = ?`,
+    [teamId, otherTeamId === null ? "PENDING" : "READY", targetMatchId],
+  );
+
+  if (replacing) {
     // Les marques de rappel appartenaient aussi à l'ancienne affiche : la
     // nouvelle engagée n'a reçu aucun horaire (« reprogrammé, au lieu du … »
     // lui mentirait) et doit recevoir l'annonce — comme après un retour en
@@ -61,20 +57,4 @@ export async function pushTeamToTarget(
     ]);
     await forgetMatchReminders(connection, [targetMatchId]);
   }
-
-  const [rows] = await connection.execute<
-    (RowDataPacket & { team1_id: number | null; team2_id: number | null })[]
-  >(
-    `SELECT team1_id, team2_id FROM bg_matches WHERE id = ? LIMIT 1`,
-    [targetMatchId],
-  );
-
-  const row = rows[0];
-  const nextStatus =
-    row.team1_id !== null && row.team2_id !== null ? "READY" : "PENDING";
-
-  await connection.execute(`UPDATE bg_matches SET status = ? WHERE id = ?`, [
-    nextStatus,
-    targetMatchId,
-  ]);
 }
