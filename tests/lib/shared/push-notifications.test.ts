@@ -55,6 +55,18 @@ describe("registre des sujets", () => {
     expect(visiblePushTopics({ isAdmin: true })).toEqual(PUSH_TOPIC_KEYS);
   });
 
+  it("réserve les matchs programmés à l'arbitrage (permission `tournaments`)", () => {
+    expect(PUSH_TOPICS.MATCH_SCHEDULED.audience).toBe("tournaments");
+    expect(canReceivePushTopic({ roles: [] }, "MATCH_SCHEDULED")).toBe(false);
+    expect(canReceivePushTopic({ roles: ["CASTER" as const] }, "MATCH_SCHEDULED")).toBe(false);
+    expect(canReceivePushTopic({ roles: ["ARBITRE" as const] }, "MATCH_SCHEDULED")).toBe(true);
+    expect(canReceivePushTopic({ isAdmin: true }, "MATCH_SCHEDULED")).toBe(true);
+  });
+
+  it("ne promet plus le rappel « 1 h avant » dans la description des rappels", () => {
+    expect(PUSH_TOPICS.MATCH_REMINDER.description).not.toMatch(/1 h/);
+  });
+
   it("nettoie une liste de sujets coupés reçue du réseau", () => {
     expect(sanitizeDisabledTopics(["MATCH_REMINDER", "INCONNU", "MATCH_START", "MATCH_START", 3])).toEqual([
       "MATCH_START",

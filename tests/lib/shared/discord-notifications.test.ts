@@ -38,14 +38,21 @@ describe("dueMatchReminders", () => {
     expect(dueMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
-  it("déclenche le palier 1 h jusqu'au coup d'envoi", () => {
-    expect(dueMatchReminders(START, before(60)).map((o) => o.key)).toEqual(["PT1H"]);
-    expect(dueMatchReminders(START, before(1)).map((o) => o.key)).toEqual(["PT1H"]);
+  it("n'a plus de rappel « 1 h avant » : le palier 24 h court jusqu'au coup d'envoi", () => {
+    expect(MATCH_REMINDER_OFFSETS.map((o) => o.key)).toEqual(["P7D", "P1D"]);
+    expect(MATCH_REMINDER_OFFSETS.some((o) => o.minutesBefore < 24 * 60)).toBe(false);
+    expect(dueMatchReminders(START, before(60)).map((o) => o.key)).toEqual(["P1D"]);
+    expect(dueMatchReminders(START, before(1)).map((o) => o.key)).toEqual(["P1D"]);
+  });
+
+  it("ne renvoie rien dans la dernière heure une fois les 24 h envoyées", () => {
+    expect(dueMatchReminders(START, before(60), ["P7D", "P1D"])).toEqual([]);
+    expect(dueMatchReminders(START, before(30), ["P7D", "P1D"])).toEqual([]);
   });
 
   it("n'envoie qu'un seul rappel pour un match programmé à la dernière minute", () => {
-    // Le piège : sans fenêtres, les trois paliers seraient dus d'un coup.
-    expect(dueMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["PT1H"]);
+    // Le piège : sans fenêtres, les deux paliers seraient dus d'un coup.
+    expect(dueMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
   it("ne déclenche plus rien une fois le match commencé", () => {
@@ -58,13 +65,11 @@ describe("dueMatchReminders", () => {
   });
 
   it("ignore un palier envoyé qui ne concerne pas la fenêtre courante", () => {
-    expect(dueMatchReminders(START, before(30), ["P7D", "P1D"]).map((o) => o.key)).toEqual([
-      "PT1H",
-    ]);
+    expect(dueMatchReminders(START, before(30), ["P7D"]).map((o) => o.key)).toEqual(["P1D"]);
   });
 
   it("accepte une date sous forme de chaîne", () => {
-    expect(dueMatchReminders(START.toISOString(), before(60)).map((o) => o.key)).toEqual(["PT1H"]);
+    expect(dueMatchReminders(START.toISOString(), before(60)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
   it("ne déclenche rien sans horaire ni sur une date illisible", () => {
@@ -106,12 +111,8 @@ describe("openedMatchReminders", () => {
     expect(openedMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P7D", "P1D"]);
   });
 
-  it("retient les trois paliers pour une date posée à trente minutes", () => {
-    expect(openedMatchReminders(START, before(30)).map((o) => o.key)).toEqual([
-      "P7D",
-      "P1D",
-      "PT1H",
-    ]);
+  it("retient les deux paliers pour une date posée à trente minutes", () => {
+    expect(openedMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["P7D", "P1D"]);
   });
 
   it("ne retient rien une fois le match commencé", () => {
@@ -142,10 +143,7 @@ describe("buildMatchScheduleAnnouncement", () => {
   };
 
   it("porte la date plutôt qu'un délai, et annonce le prochain rappel", () => {
-    const message = buildMatchScheduleAnnouncement(context, [
-      MATCH_REMINDER_OFFSETS[1],
-      MATCH_REMINDER_OFFSETS[2],
-    ]);
+    const message = buildMatchScheduleAnnouncement(context, [MATCH_REMINDER_OFFSETS[1]]);
     expect(message).toContain("**Match programmé**");
     expect(message).toContain("20:00");
     // Le prochain rappel est le plus lointain des paliers restants, pas le plus proche.
@@ -157,6 +155,12 @@ describe("buildMatchScheduleAnnouncement", () => {
     const message = buildMatchScheduleAnnouncement(context, []);
     expect(message).not.toContain("Prochain rappel");
     expect(message).toContain("**Les Renards** contre **Team Nova**");
+  });
+
+  it("dit « reprogrammé » quand la date en remplace une autre", () => {
+    const message = buildMatchScheduleAnnouncement(context, [], true);
+    expect(message).toContain("**Match reprogrammé**");
+    expect(message).not.toContain("**Match programmé**");
   });
 });
 
@@ -171,8 +175,8 @@ describe("buildMatchReminderMessage", () => {
   };
 
   it("nomme le palier, les deux engagées et l'horaire", () => {
-    const message = buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[2], context);
-    expect(message).toContain("dans 1 heure");
+    const message = buildMatchReminderMessage(MATCH_REMINDER_OFFSETS[1], context);
+    expect(message).toContain("dans 24 heures");
     expect(message).toContain("Coupe BlueGenji · Manche 2");
     expect(message).toContain("**Les Renards** contre **Team Nova**");
     expect(message).toContain("https://bluegenji.fr/tournois/7");

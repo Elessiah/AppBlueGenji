@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/schedule-notices");
 
 import { withConnection } from "@/lib/server/database";
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { notifyMatchScheduleChange } from "@/lib/server/tournaments/schedule-notices";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 type Row = {
@@ -69,6 +71,7 @@ const FUTURE = "2099-08-29T18:30:00Z";
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(notifyMatchScheduleChange).mockResolvedValue(undefined);
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -125,6 +128,45 @@ describe("setMatchStartAt", () => {
     const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }) });
     await setMatchStartAt(42, "2026-08-29T18:30:00Z");
     expect(writes.some((w) => w.sql.startsWith("DELETE"))).toBe(false);
+  });
+
+  it("annonce une première date avec son auteur, après le ménage des rappels", async () => {
+    world();
+    const actor = { id: 9, pseudo: "Arbitre" };
+
+    await setMatchStartAt(42, FUTURE, actor);
+
+    expect(notifyMatchScheduleChange).toHaveBeenCalledWith({
+      matchId: 42,
+      startAt: "2099-08-29T18:30:00.000Z",
+      previousStartAt: null,
+      actor,
+    });
+  });
+
+  it("annonce un changement de date avec l'ancien horaire", async () => {
+    world({ row: matchRow({ start_at: new Date("2099-08-28T18:30:00Z") }) });
+
+    await setMatchStartAt(42, FUTURE);
+
+    expect(notifyMatchScheduleChange).toHaveBeenCalledWith({
+      matchId: 42,
+      startAt: "2099-08-29T18:30:00.000Z",
+      previousStartAt: "2099-08-28T18:30:00.000Z",
+      actor: null,
+    });
+  });
+
+  it("rend la date même si l'annonce échoue", async () => {
+    world();
+    jest.mocked(notifyMatchScheduleChange).mockRejectedValue(new Error("bot éteint"));
+    await expect(setMatchStartAt(42, FUTURE)).resolves.toBe("2099-08-29T18:30:00.000Z");
+  });
+
+  it("n'annonce rien pour un match introuvable", async () => {
+    world({ row: null });
+    await expect(setMatchStartAt(42, FUTURE)).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(notifyMatchScheduleChange).not.toHaveBeenCalled();
   });
 
   it("n'échoue pas quand le ménage des rappels échoue", async () => {

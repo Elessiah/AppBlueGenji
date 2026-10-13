@@ -42,7 +42,7 @@ const ROUNDS: [string, number][] = [
   ["THIRD_PLACE", 1],
   ["UPPER", PLAYOFF_ROUND_OFFSET + 1],
 ];
-const OFFSETS: (MatchReminderOffsetKey | null)[] = ["P7D", "P1D", "PT1H", null];
+const OFFSETS: (MatchReminderOffsetKey | null)[] = ["P7D", "P1D", null];
 const REFEREE_LINE = "**Conflit** de score · <@123> https://site.test/tournois/7#match-31";
 
 /** Les mêmes cas que la fixture, rédigés dans `locale`. */
@@ -60,7 +60,7 @@ function allCases(locale: Locale): Record<string, PushContent> {
       );
     }
   }
-  out["reminder.solo"] = matchReminderPush({ ...SOLO, bracket: "UPPER", roundNumber: 1, startAt: START }, "PT1H", locale);
+  out["reminder.solo"] = matchReminderPush({ ...SOLO, bracket: "UPPER", roundNumber: 1, startAt: START }, "P1D", locale);
   out["scoreToConfirm.team"] = scoreToConfirmPush(SIDE, locale);
   out["scoreToConfirm.solo"] = scoreToConfirmPush(SOLO, locale);
   out["tournamentStart"] = tournamentStartPush({ tournamentId: 7, tournamentName: "Coupe" }, locale);
@@ -97,7 +97,14 @@ describe("notifications push — français inchangé", () => {
   it("rend chaque cas à l'identique de la version d'avant le lot 9-3", () => {
     // Seule différence voulue (revue sécurité) : le lien d'une alerte d'arbitrage
     // n'est plus la première URL de la ligne Discord — le texte, lui, est inchangé.
-    const before = { ...FR_BEFORE, "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" } };
+    // Le rappel « 1 h avant » (`PT1H`) a depuis été retiré : ses cas sortent de
+    // la comparaison, et le cas solo se lit au palier de 24 h.
+    const kept = Object.fromEntries(Object.entries(FR_BEFORE).filter(([name]) => !name.endsWith(".PT1H")));
+    const before = {
+      ...kept,
+      "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" },
+      "reminder.solo": { ...FR_BEFORE["reminder.solo"], title: "Match dans 24 heures" },
+    };
     expect(allCases("fr")).toEqual(before);
   });
 
@@ -156,7 +163,7 @@ describe("notifications push — anglais", () => {
     expect(en["reminder.LOWER.2.P1D"].body).toContain("Lower bracket · round 2");
     expect(en["reminder.LOWER.2.P1D"].body).toContain("(Paris time)");
     expect(en["reminder.UPPER.1.null"].title).toBe("Match scheduled");
-    expect(en[`reminder.UPPER.${PLAYOFF_ROUND_OFFSET + 1}.PT1H`].body).toContain("Playoffs · round 2");
+    expect(en[`reminder.UPPER.${PLAYOFF_ROUND_OFFSET + 1}.P1D`].body).toContain("Playoffs · round 2");
     expect(en["privacyChange.1"].body).toBe("A. The details are waiting for you on your next visit.");
     expect(en["privacyChange.2"].body).toContain("(and 1 other)");
     expect(en["privacyChange.3"].body).toContain("(and 2 others)");
@@ -175,7 +182,7 @@ describe("notifications push — anglais", () => {
 
   it("donne l'heure de coup d'envoi en anglais, heure de Paris, sur 24 heures", () => {
     // 18:00 UTC le 10 septembre 2026 = 20:00 à Paris (heure d'été).
-    expect(en["reminder.UPPER.1.PT1H"].body).toContain("Thursday, September 10 at 20:00");
+    expect(en["reminder.UPPER.1.P1D"].body).toContain("Thursday, September 10 at 20:00");
   });
 
   it("ne reprend pas en anglais le texte Discord, resté français (D6)", () => {

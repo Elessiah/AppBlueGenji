@@ -66,7 +66,7 @@ describe("PUT /api/admin/matches/[matchId]/schedule — permissions", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ startAt: "2026-08-29T18:30:00.000Z" });
-    expect(setMatchStartAt).toHaveBeenCalledWith(42, "2026-08-29T18:30:00Z");
+    expect(setMatchStartAt).toHaveBeenCalledWith(42, "2026-08-29T18:30:00Z", { id: arbitre.id, pseudo: arbitre.pseudo });
   });
 
   it("accepte un admin", async () => {
@@ -74,7 +74,7 @@ describe("PUT /api/admin/matches/[matchId]/schedule — permissions", () => {
     jest.mocked(setMatchStartAt).mockResolvedValue(null);
 
     expect((await PUT(req({ startAt: null }), params("42"))).status).toBe(200);
-    expect(setMatchStartAt).toHaveBeenCalledWith(42, null);
+    expect(setMatchStartAt).toHaveBeenCalledWith(42, null, { id: admin.id, pseudo: admin.pseudo });
   });
 });
 
@@ -106,7 +106,7 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
       params("42"),
     );
     expect(res.status).toBe(200);
-    expect(setMatchStartAt).toHaveBeenCalledWith(42, null);
+    expect(setMatchStartAt).toHaveBeenCalledWith(42, null, { id: admin.id, pseudo: admin.pseudo });
   });
 
   it("remonte 404 sur un match introuvable", async () => {

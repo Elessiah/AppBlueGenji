@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   contentReportPush,
   matchReminderPush,
+  matchScheduledStaffPush,
   matchStartPush,
   moderationPush,
   privacyChangePush,
@@ -42,9 +43,9 @@ describe("matchReminderPush", () => {
   it("dit le délai, l'adversaire et l'heure de Paris", () => {
     const content = matchReminderPush(
       { ...SIDE, bracket: "UPPER", roundNumber: 2, startAt: "2026-09-10T18:00:00Z" },
-      "PT1H",
+      "P1D",
     );
-    expect(content.title).toBe("Match dans 1 heure");
+    expect(content.title).toBe("Match dans 24 heures");
     expect(content.body).toContain("Manche 2");
     expect(content.body).toContain("20:00");
     expect(content.tag).not.toBe(matchStartPush(SIDE, "LOBBY").tag);
@@ -54,6 +55,70 @@ describe("matchReminderPush", () => {
     expect(matchReminderPush({ ...SIDE, bracket: "UPPER", roundNumber: 1, startAt: new Date() }, null).title).toBe(
       "Match programmé",
     );
+  });
+
+  it("annonce un horaire changé, en français et en anglais", () => {
+    const side = { ...SIDE, bracket: "UPPER", roundNumber: 1, startAt: "2026-09-10T18:00:00Z" };
+    expect(matchReminderPush(side, null, "fr", true).title).toBe("Match reprogrammé");
+    const en = matchReminderPush(side, null, "en", true);
+    expect(en.title).toBe("Match rescheduled");
+    expect(en.body).toContain("Kickoff: Thursday, September 10 at 20:00 (Paris time)");
+    expect(en.url).toBe("/en/tournois/7#match-31");
+    // Un palier garde son titre : `rescheduled` ne vaut que pour l'annonce.
+    expect(matchReminderPush(side, "P7D", "fr", true).title).toBe("Match dans une semaine");
+  });
+});
+
+describe("matchScheduledStaffPush", () => {
+  const input = {
+    tournamentId: 7,
+    tournamentName: "Coupe BlueGenji",
+    matchId: 31,
+    team1Name: "Les Renards",
+    team2Name: "Team Nova",
+    solo: false,
+    bracket: "LOWER",
+    roundNumber: 2,
+    startAt: "2026-09-10T18:00:00Z",
+  };
+
+  it("nomme les deux équipes, la manche et l'heure de Paris, et mène au match", () => {
+    const content = matchScheduledStaffPush(input, false);
+    expect(content).toEqual({
+      title: "Match programmé",
+      body: "Les Renards contre Team Nova · Coupe BlueGenji, Loser bracket · manche 2. Coup d'envoi jeudi 10 septembre à 20:00 (heure de Paris).",
+      url: "/tournois/7#match-31",
+      tag: "rencontre-31-schedule",
+    });
+    expect(content.tag).not.toBe(matchReminderPush({ ...SIDE, ...input }, null).tag);
+  });
+
+  it("dit « reprogrammé » quand la date en remplace une autre", () => {
+    expect(matchScheduledStaffPush(input, true).title).toBe("Match reprogrammé");
+  });
+
+  it("se rédige en anglais", () => {
+    const content = matchScheduledStaffPush(input, true, "en");
+    expect(content.title).toBe("Match rescheduled");
+    expect(content.body).toBe(
+      "Les Renards vs Team Nova · Coupe BlueGenji, Lower bracket · round 2. Kickoff: Thursday, September 10 at 20:00 (Paris time).",
+    );
+    expect(content.url).toBe("/en/tournois/7#match-31");
+    expect(matchScheduledStaffPush(input, false, "en").title).toBe("Match scheduled");
+  });
+
+  it("écrit « À déterminer » pour une place encore vide", () => {
+    expect(matchScheduledStaffPush({ ...input, team2Name: null }, false).body).toContain("Les Renards contre À déterminer");
+    expect(matchScheduledStaffPush({ ...input, team1Name: null }, false, "en").body).toContain("TBD vs Team Nova");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel", () => {
+    for (const locale of ["fr", "en"] as const) {
+      const content = matchScheduledStaffPush({ ...input, team1Name: "Kiro", team2Name: "Nova", solo: true }, false, locale);
+      expect(`${content.title} ${content.body}`).not.toMatch(/Kiro|Nova/);
+    }
+    expect(matchScheduledStaffPush({ ...input, solo: true }, false).body).toMatch(/^Un match · /);
+    expect(matchScheduledStaffPush({ ...input, solo: true }, false, "en").body).toMatch(/^A match · /);
   });
 });
 
@@ -65,7 +130,12 @@ describe("tournoi individuel", () => {
       matchStartPush(solo, "LOBBY"),
       matchStartPush(solo, "LAUNCHED"),
       scoreToConfirmPush(solo),
-      matchReminderPush({ ...solo, bracket: "UPPER", roundNumber: 1, startAt: "2026-09-10T18:00:00Z" }, "PT1H"),
+      matchReminderPush({ ...solo, bracket: "UPPER", roundNumber: 1, startAt: "2026-09-10T18:00:00Z" }, "P1D"),
+      matchReminderPush({ ...solo, bracket: "UPPER", roundNumber: 1, startAt: "2026-09-10T18:00:00Z" }, null, "fr", true),
+      matchScheduledStaffPush(
+        { ...solo, team1Name: "Kiro", team2Name: "Nova", bracket: "UPPER", roundNumber: 1, startAt: "2026-09-10T18:00:00Z" },
+        true,
+      ),
     ]) {
       expect(content.body).not.toContain("Kiro");
       expect(content.body).not.toContain("Nova");

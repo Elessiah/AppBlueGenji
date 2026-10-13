@@ -94,6 +94,17 @@ describe("notifyStaff", () => {
     expect(pushToUsers).toHaveBeenCalledWith([1], "STAFF_REPORT", PUSH, undefined);
   });
 
+  it("prévient les arbitres d'un match programmé, sauf l'auteur du geste", async () => {
+    jest.mocked(subscribedStaffCandidates).mockResolvedValue([
+      { userId: 1, isAdmin: true, rolesJson: null },
+      { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
+      { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]) },
+      { userId: 5, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
+    ]);
+    await notifyStaff({ topic: "MATCH_SCHEDULED", push: PUSH, excludeUserIds: [2] });
+    expect(pushToUsers).toHaveBeenCalledWith([1, 5], "MATCH_SCHEDULED", PUSH, undefined);
+  });
+
   it("ne vise aucun staff pour un sujet destiné à tous les joueurs", async () => {
     await notifyStaff({ topic: "MATCH_START", push: PUSH });
     expect(subscribedStaffCandidates).not.toHaveBeenCalled();
