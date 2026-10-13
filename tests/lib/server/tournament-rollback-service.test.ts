@@ -306,6 +306,21 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statements(execute).some((sql) => sql.startsWith("DELETE FROM bg_matches"))).toBe(false);
   });
 
+  it("efface les marques de rappel des rencontres détachées : leurs futures engagées n'ont reçu aucun horaire", async () => {
+    const { execute } = setup({
+      format: "SINGLE",
+      matches: [
+        playedRow({ id: 1, round_number: 1, next_winner_match_id: 3 }),
+        playedRow({ id: 2, round_number: 1, next_winner_match_id: 3 }),
+        row({ id: 3, round_number: 2 }),
+      ],
+    });
+
+    await rollbackCurrentRound(7);
+
+    expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")?.[1]).toEqual([3]);
+  });
+
   it("efface aussi le résultat des rencontres détachées", async () => {
     // Elles n'ont pas été jouées, mais le moteur a pu en *résoudre* certaines :
     // un bye détaché qui garderait son vainqueur annoncerait un gagnant sans

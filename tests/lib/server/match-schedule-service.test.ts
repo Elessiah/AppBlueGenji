@@ -44,7 +44,13 @@ function matchRow(overrides: Partial<Row> = {}): Row {
  * écritures. Les requêtes sont reconnues à leur texte, pas à leur rang.
  */
 function world(
-  options: { row?: Row | null; refereeScheduling?: boolean; failReminders?: boolean; announced?: boolean } = {},
+  options: {
+    row?: Row | null;
+    refereeScheduling?: boolean;
+    failReminders?: boolean;
+    missingReminders?: boolean;
+    announced?: boolean;
+  } = {},
 ) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
@@ -59,8 +65,11 @@ function world(
     if (sql.startsWith("SELECT referee_scheduling FROM bg_tournaments")) {
       return [[{ referee_scheduling: options.refereeScheduling ? 1 : 0 }]];
     }
+    if (options.missingReminders && sql.includes("bg_match_reminders")) {
+      throw Object.assign(new Error("Table 'bg_match_reminders' doesn't exist"), { code: "ER_NO_SUCH_TABLE", errno: 1146 });
+    }
     if (sql.startsWith("SELECT 1 FROM bg_match_reminders")) {
-      expect(params).toEqual([42, "TOLD"]);
+      expect(params).toEqual([42, "TOLD", "P7D", "PT1H"]);
       return [options.announced ? [{ seen: 1 }] : []];
     }
     if (sql.startsWith("DELETE FROM bg_match_reminders") && options.failReminders) {
@@ -227,12 +236,35 @@ describe("setMatchStartAt", () => {
     expect(notifyMatchScheduleChange).not.toHaveBeenCalled();
   });
 
-  it("n'échoue pas quand le ménage des rappels échoue", async () => {
-    world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), failReminders: true });
-    await expect(setMatchStartAt(42, "2026-08-30T18:30:00Z")).resolves.toBe(
-      "2026-08-30T18:30:00.000Z",
-    );
-    expect(publishMatchUpdatedEvent).toHaveBeenCalled();
+  it("défait la date quand le ménage des rappels échoue, plutôt qu'un horaire dont personne n'est prévenu", async () => {
+    const { connection } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), failReminders: true });
+    await expect(setMatchStartAt(42, "2026-08-30T18:30:00Z")).rejects.toThrow("base injoignable");
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(notifyMatchScheduleChange).not.toHaveBeenCalled();
+  });
+
+  it("tolère une table des rappels absente : rien à lire ni à effacer", async () => {
+    const { connection } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), missingReminders: true });
+    await expect(setMatchStartAt(42, "2026-08-30T18:30:00Z")).resolves.toBe("2026-08-30T18:30:00.000Z");
+    expect(connection.commit).toHaveBeenCalled();
+    expect(notifyMatchScheduleChange).toHaveBeenCalledWith(expect.objectContaining({ alreadyAnnounced: false }));
+  });
+
+  it("remet les marques à jour avant le commit : un balayage ne voit jamais la nouvelle date avec les anciennes", async () => {
+    const { connection } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }) });
+    const order: string[] = [];
+    const execute = connection.execute.getMockImplementation()!;
+    connection.execute.mockImplementation(async (raw: string, params?: unknown) => {
+      if (raw.includes("bg_match_reminders")) order.push("marks");
+      return execute(raw, params);
+    });
+    connection.commit.mockImplementation(async () => {
+      order.push("commit");
+    });
+    await setMatchStartAt(42, "2026-08-30T18:30:00Z");
+    expect(order.indexOf("commit")).toBeGreaterThan(order.lastIndexOf("marks"));
   });
 
   it("refuse une date inexploitable avant même de lire le match", async () => {

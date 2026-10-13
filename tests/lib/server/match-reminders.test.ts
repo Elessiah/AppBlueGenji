@@ -91,7 +91,8 @@ function sentMessages(): string[] {
 beforeEach(() => {
   jest.clearAllMocks();
   resetMatchReminderThrottle();
-  jest.mocked(pushToUsers).mockResolvedValue(0);
+  // Un appareil atteint par push : l'horaire est reçu (marque `TOLD`).
+  jest.mocked(pushToUsers).mockResolvedValue(1);
   jest.mocked(pushDiscordDirectMessages).mockResolvedValue({
     sent: 0,
     unresolved: [],
@@ -130,6 +131,24 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_reminders/);
     expect(params).toEqual([31, "P1D"]);
+    expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
+  });
+
+  it("ne marque rien comme reçu quand rien n'a abouti (bot injoignable, aucun appareil)", async () => {
+    jest.mocked(pushToUsers).mockResolvedValue(0);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
+    const { execute } = await mockDb({});
+
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(claimedKeys(execute)).toEqual(["P1D"]);
+  });
+
+  it("marque l'horaire reçu dès qu'un seul message privé a abouti", async () => {
+    jest.mocked(pushToUsers).mockResolvedValue(0);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    const { execute } = await mockDb({});
+
+    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
     expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
   });
 
