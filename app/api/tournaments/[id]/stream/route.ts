@@ -311,6 +311,16 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
             } catch {
               cleanup();
             }
+            // Un match `START_TIME` passe à l'antenne à l'heure dite, sans
+            // aucune écriture : tant qu'un spectateur suit un tournoi, son
+            // annonce dans #live part à l'heure, pas au prochain évènement.
+            // Étranglé à dix secondes pour tout le processus ; hors production,
+            // pas même chargé (les annonces n'y partent jamais).
+            if (process.env.NODE_ENV === "production") {
+              void import("@/lib/server/tournaments/live-announcements")
+                .then(({ dispatchLiveAnnouncements }) => dispatchLiveAnnouncements())
+                .catch(() => undefined);
+            }
           }, HEARTBEAT_MS);
           heartbeat.unref?.();
 

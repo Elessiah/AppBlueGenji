@@ -26,6 +26,12 @@
  * relancé est annoncé de nouveau. Une affiche changée (ré-appariement) est une
  * autre rencontre, donc une autre annonce.
  *
+ * **Un message par diffusion, pas par match.** Les matchs d'un même tournoi
+ * qu'un même passage trouve à l'antenne sur le même lien (une ronde lancée
+ * d'un coup, repliée sur la chaîne officielle) partent en un seul message :
+ * le serveur ne reçoit pas quatre `@everyone` en quelques secondes vers la
+ * même chaîne. Chaque affiche garde sa propre réservation.
+ *
  * **Fraîcheur : deux heures.** Un match n'est annoncé que dans les deux heures
  * qui suivent son passage à l'antenne (`LIVE_ANNOUNCE_MAX_AGE_MINUTES`) : un
  * déploiement, une table recréée ou une longue panne du bot ne réveillent
@@ -39,7 +45,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { formatLiveAnnouncement, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
+import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { toParticipantType } from "@/lib/shared/participants";
 import type { MatchStatus } from "@/lib/shared/types";
@@ -151,40 +157,81 @@ async function releaseAnnouncement(matchId: number, pairing: string): Promise<vo
   }
 }
 
-/** Annonce un match réservé. @returns `true` si le bot l'a publié. */
-async function announce(row: LiveCandidateRow, url: string): Promise<boolean> {
-  const matchId = Number(row.id);
-  const message = formatLiveAnnouncement({
-    tournamentName: String(row.tournament_name),
-    participantType: toParticipantType(row.participant_type),
-    team1Name: String(row.team1_name),
-    team2Name: String(row.team2_name),
+/** Matchs réservés d'un même tournoi, à l'antenne sur un même lien. */
+interface AnnouncementGroup {
+  url: string;
+  rows: LiveCandidateRow[];
+}
+
+/** Délai entre deux avertissements pm2 d'une même panne : le balayage réessaie toutes les dix secondes. */
+const LIVE_WARN_COOLDOWN_MS = 60 * 60 * 1000;
+
+const lastWarnAt = new Map<string, number>();
+
+/** Avertit pm2 d'une panne, au plus une fois par heure et par nature de panne. */
+function warnOnce(kind: string, message: string): void {
+  const now = Date.now();
+  const last = lastWarnAt.get(kind);
+  if (last !== undefined && now - last < LIVE_WARN_COOLDOWN_MS) return;
+  lastWarnAt.set(kind, now);
+  console.warn(`${message} (avertissement répété au plus une fois par heure)`);
+}
+
+/** « 40, 41 » : les matchs d'un groupe, pour les traces. */
+function matchIdsOf(group: AnnouncementGroup): string {
+  return group.rows.map((row) => Number(row.id)).join(", ");
+}
+
+/** Annonce un groupe réservé. @returns Le nombre de matchs publiés. */
+async function announce(group: AnnouncementGroup): Promise<number> {
+  const [first] = group.rows;
+  const message = formatLiveAnnouncementGroup({
+    tournamentName: String(first.tournament_name),
+    participantType: toParticipantType(first.participant_type),
+    pairings: group.rows.map((row) => ({ team1Name: String(row.team1_name), team2Name: String(row.team2_name) })),
   });
-  const outcome = await pushLiveAnnouncement(message, url, `live-announce match-${matchId}`);
-  if (outcome === "posted") {
+  const ids = matchIdsOf(group);
+  const plural = group.rows.length > 1;
+  const label = plural ? `matchs ${ids}` : `match ${ids}`;
+  const context = `live-announce match-${group.rows.map((row) => Number(row.id)).join(",")}`;
+  const outcome = await pushLiveAnnouncement(message, group.url, context);
+  if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
-    console.info(`[live-announce] match ${matchId} (tournoi ${Number(row.tournament_id)}) annoncé dans #live`);
-    return true;
+    const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner @everyone absente)" : "";
+    const announced = plural ? "annoncés" : "annoncé";
+    console.info(`[live-announce] ${label} (tournoi ${Number(first.tournament_id)}) ${announced} dans #live${silent}`);
+    return group.rows.length;
   }
   if (outcome === "rejected") {
-    // Renvoyer le même corps ne changerait rien : la réservation est gardée.
-    console.error(`[live-announce] match ${matchId} : annonce refusée par le bot, abandonnée`);
-    return false;
+    // Renvoyer le même corps ne changerait rien : les réservations sont gardées.
+    console.error(`[live-announce] ${label} : annonce refusée par le bot, abandonnée`);
+    return 0;
   }
-  await releaseAnnouncement(matchId, String(row.pairing));
-  console.warn(`[live-announce] match ${matchId} : bot indisponible, annonce reportée`);
-  return false;
+  for (const row of group.rows) await releaseAnnouncement(Number(row.id), String(row.pairing));
+  if (outcome === "channel-closed") {
+    warnOnce(
+      "channel-closed",
+      `[live-announce] ${label} : salon #live fermé au bot (introuvable ou sans permission d'écrire), annonce reportée`,
+    );
+  } else {
+    warnOnce(
+      "unavailable",
+      `[live-announce] ${label} : bot injoignable ou d'une version sans annonces, annonce reportée`,
+    );
+  }
+  return 0;
 }
 
 /**
- * Un passage : réserve puis annonce chaque match passé à l'antenne.
+ * Un passage : réserve puis annonce chaque match passé à l'antenne, groupés
+ * par tournoi et par lien.
  *
  * @param now Instant de référence, injectable pour les tests.
- * @returns Le nombre d'annonces publiées.
+ * @returns Le nombre de matchs annoncés.
  */
 export async function runLiveAnnouncementSweep(now: number = Date.now()): Promise<number> {
   const rows = await loadCandidates();
-  let posted = 0;
+  const groups = new Map<string, AnnouncementGroup>();
   for (const row of rows) {
     if (!isOnAir(row, now)) continue;
     // Pas de lien exploitable, pas d'annonce : il n'y aurait rien à regarder.
@@ -193,8 +240,13 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
     // Bot en panne : ne rien réserver qu'on sait ne pas pouvoir envoyer.
     if (isBotCircuitOpen()) break;
     if (!(await claimAnnouncement(Number(row.id), String(row.pairing)))) continue;
-    if (await announce(row, url)) posted += 1;
+    const key = `${Number(row.tournament_id)} ${url}`;
+    const group = groups.get(key);
+    if (group) group.rows.push(row);
+    else groups.set(key, { url, rows: [row] });
   }
+  let posted = 0;
+  for (const group of groups.values()) posted += await announce(group);
   return posted;
 }
 
@@ -250,6 +302,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetLiveAnnouncementThrottle(): void {
   lastSweepAt = 0;
+  lastWarnAt.clear();
   pendingSweep = null;
   if (trailingTimer) clearTimeout(trailingTimer);
   trailingTimer = null;

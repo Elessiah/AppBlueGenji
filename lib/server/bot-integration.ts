@@ -586,13 +586,31 @@ export async function pushLeadershipAlert(
 /**
  * Issue d'une annonce de live poussée au bot :
  *
- * - `posted` — le bot a publié dans #live ;
+ * - `posted` — le bot a publié dans #live, avec la mention `@everyone` ;
+ * - `posted-silent` — publié, mais **sans notifier** : le bot n'a pas la
+ *   permission de mentionner tout le serveur dans #live (le bot le signale au
+ *   canal de logs ; renvoyer reposterait le même message) ;
  * - `rejected` — le bot a refusé le corps (`400`) : le renvoyer tel quel ne
  *   changerait rien, l'annonce est abandonnée ;
- * - `unavailable` — rien n'est parti (bot injoignable, coupe-circuit ouvert,
- *   salon fermé, panne) : l'appelant rend sa réservation et réessaiera.
+ * - `channel-closed` — le bot a répondu `503` : salon #live introuvable ou
+ *   fermé au bot, rien n'est parti ;
+ * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
+ *   coupe-circuit ouvert, bot d'une version antérieure, panne).
+ *
+ * Sur `channel-closed` et `unavailable`, l'appelant rend sa réservation et
+ * réessaiera.
  */
-export type LiveAnnouncementOutcome = "posted" | "rejected" | "unavailable";
+export type LiveAnnouncementOutcome = "posted" | "posted-silent" | "rejected" | "channel-closed" | "unavailable";
+
+/** Lit `mentionEveryone` du bilan du bot ; un corps illisible vaut une mention faite. */
+async function announcedWithoutMention(response: Response): Promise<boolean> {
+  try {
+    const body = (await response.json()) as { mentionEveryone?: unknown } | null;
+    return body?.mentionEveryone === false;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Demande au bot d'annoncer un live dans le salon #live du serveur BlueGenji
@@ -626,7 +644,7 @@ export async function pushLiveAnnouncement(
     });
     if (response.ok) {
       recordSuccess();
-      return "posted";
+      return (await announcedWithoutMention(response)) ? "posted-silent" : "posted";
     }
     // Un refus du corps n'est pas une panne du bot : il a répondu.
     if (response.status === 400) {
@@ -637,7 +655,8 @@ export async function pushLiveAnnouncement(
     // #live lui est fermé (`503`, permission retirée) : il a répondu, le
     // coupe-circuit n'a pas à s'ouvrir — il suspendrait les rappels et alertes
     // de fond pour un réglage de salon ; l'annonce attendra.
-    if (response.status === 404 || response.status === 503) return "unavailable";
+    if (response.status === 503) return "channel-closed";
+    if (response.status === 404) return "unavailable";
     recordFailure();
     return "unavailable";
   } catch {
