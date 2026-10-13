@@ -57,7 +57,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_REMINDER: {
     label: "Horaires et rappels de match",
-    description: "L'horaire d'un match quand il est posé, changé ou retiré, puis un rappel dans les 24 h qui précèdent.",
+    description: "L'horaire d'un match quand il est posé, changé ou retiré, puis un rappel dans les 24 h qui précèdent le coup d'envoi.",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {

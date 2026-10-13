@@ -251,7 +251,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match reminders and refereeing alerts",
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, match reminders and referee alerts",
     dataSubjects: ["Players taking part in a tournament", "Referees", "Casters registered on a match"],
     dataCategories: [
       "Discord username and identifier",

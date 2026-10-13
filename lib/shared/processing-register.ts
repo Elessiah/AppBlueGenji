@@ -424,11 +424,11 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
-      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et un rappel de match dans les 24 h qui précèdent",
+      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et un rappel de match dans les 24 h qui précèdent le coup d'envoi",
       "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
     ],
     legalBasis:
-      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour les rappels de match et les alertes d'arbitrage",
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match et les alertes d'arbitrage",
     dataSubjects: ["Joueurs engagés dans un tournoi", "Arbitres", "Casters inscrits sur un match"],
     dataCategories: [
       "Pseudo et identifiant Discord",
