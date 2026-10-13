@@ -207,16 +207,23 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     console.error(`[live-announce] ${label} : annonce refusée par le bot, abandonnée`);
     return 0;
   }
+  if (outcome === "uncertain") {
+    // Le bot a pu publier après le délai : réessayer risquerait un second
+    // `@everyone` à tout le serveur. Les réservations sont gardées.
+    console.error(`[live-announce] ${label} : bot sans réponse à temps, annonce peut-être publiée, non réessayée`);
+    return 0;
+  }
   for (const row of group.rows) await releaseAnnouncement(Number(row.id), String(row.pairing));
+  const retry = "annonce reportée, réessayée tant que le match a commencé depuis moins de deux heures";
   if (outcome === "channel-closed") {
     warnOnce(
       "channel-closed",
-      `[live-announce] ${label} : salon #live fermé au bot (introuvable ou sans permission d'écrire), annonce reportée`,
+      `[live-announce] ${label} : salon #live fermé au bot (introuvable ou sans permission d'écrire), ${retry}`,
     );
   } else {
     warnOnce(
       "unavailable",
-      `[live-announce] ${label} : bot injoignable ou d'une version sans annonces, annonce reportée`,
+      `[live-announce] ${label} : bot injoignable, en panne ou d'une version sans annonces, ${retry}`,
     );
   }
   return 0;

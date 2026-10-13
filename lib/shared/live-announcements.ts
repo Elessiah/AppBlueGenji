@@ -14,6 +14,9 @@
  * Plusieurs matchs du même tournoi passés à l'antenne ensemble sur le **même**
  * lien (le cas d'une ronde lancée d'un coup, repliée sur la chaîne officielle)
  * partent en **un seul** message : un `@everyone` par diffusion, pas par match.
+ * Le tournoi vient alors en tête, puis une affiche par ligne — un nom d'équipe
+ * ne peut pas en contenir (`discordInline`), alors qu'il peut contenir « et »
+ * ou une virgule.
  */
 import { discordInline } from "./discord-text";
 import { entrantLabel } from "./log-privacy";
@@ -41,32 +44,58 @@ export interface LiveAnnouncementGroup {
   pairings: readonly LiveAnnouncementPairing[];
 }
 
-/** « A, B et C » — la liste française. */
-function frenchList(items: readonly string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} et ${items[items.length - 1]}`;
+/**
+ * Longueur au-delà de laquelle une annonce groupée cesse d'énumérer ses
+ * affiches : le bot coupe un message de plus de 1 800 caractères, et une liste
+ * tronquée au milieu d'un nom n'apprend rien à personne.
+ */
+export const LIVE_ANNOUNCEMENT_MAX_LENGTH = 1500;
+
+/** Affiche « A contre B », noms neutralisés. */
+function pairingLine(pairing: LiveAnnouncementPairing, participantType: ParticipantType): string {
+  const first = entrantLabel({ name: pairing.team1Name, participantType });
+  const second = entrantLabel({ name: pairing.team2Name, participantType });
+  return `${first} contre ${second}`;
+}
+
+/** « 1 autre match » / « 3 autres matchs ». */
+function otherMatches(count: number): string {
+  return count === 1 ? "1 autre match" : `${count} autres matchs`;
 }
 
 /**
- * Texte d'une annonce groupée, sans la mention ni le lien (ajoutés par le bot).
- * En tournoi individuel, plusieurs affiches ne s'énumèrent pas (« un joueur
- * contre un joueur et un joueur contre un joueur » ne dirait rien) : le texte
- * compte les matchs.
+ * Texte d'une annonce, sans la mention ni le lien (ajoutés par le bot).
+ *
+ * - Une affiche : « 🔴 En direct : A contre B — Tournoi ».
+ * - Plusieurs : le tournoi en tête, puis une affiche par ligne ; au-delà de
+ *   {@link LIVE_ANNOUNCEMENT_MAX_LENGTH}, une dernière ligne compte le reste.
+ * - Tournoi individuel, plusieurs affiches : « un joueur contre un joueur »
+ *   répété ne dirait rien, le texte compte les matchs.
  *
  * @param group Le tournoi et ses affiches (au moins une).
- * @returns Une ligne, prête à partir.
+ * @returns Le texte, prêt à partir.
  */
 export function formatLiveAnnouncementGroup(group: LiveAnnouncementGroup): string {
   const tournament = discordInline(group.tournamentName);
-  if (group.participantType === "SOLO" && group.pairings.length > 1) {
-    return `🔴 En direct : ${group.pairings.length} matchs — ${tournament}`;
+  const count = group.pairings.length;
+  if (count === 1) {
+    return `🔴 En direct : ${pairingLine(group.pairings[0], group.participantType)} — ${tournament}`;
   }
-  const pairings = group.pairings.map((pairing) => {
-    const first = entrantLabel({ name: pairing.team1Name, participantType: group.participantType });
-    const second = entrantLabel({ name: pairing.team2Name, participantType: group.participantType });
-    return `${first} contre ${second}`;
-  });
-  return `🔴 En direct : ${frenchList(pairings)} — ${tournament}`;
+  if (group.participantType === "SOLO") {
+    return `🔴 En direct : ${count} matchs — ${tournament}`;
+  }
+  let text = `🔴 En direct — ${tournament} :`;
+  for (let index = 0; index < count; index += 1) {
+    const line = `\n• ${pairingLine(group.pairings[index], group.participantType)}`;
+    const rest = count - index;
+    // Place gardée pour la ligne qui compterait le reste.
+    const reserve = rest > 1 ? `\n• et ${otherMatches(rest)}`.length : 0;
+    if (text.length + line.length + reserve > LIVE_ANNOUNCEMENT_MAX_LENGTH) {
+      return `${text}\n• et ${otherMatches(rest)}`;
+    }
+    text += line;
+  }
+  return text;
 }
 
 /**

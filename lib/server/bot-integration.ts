@@ -594,13 +594,29 @@ export async function pushLeadershipAlert(
  *   changerait rien, l'annonce est abandonnée ;
  * - `channel-closed` — le bot a répondu `503` : salon #live introuvable ou
  *   fermé au bot, rien n'est parti ;
+ * - `uncertain` — le bot n'a pas répondu à temps : il a pu publier quand même
+ *   (Discord lent). L'appelant **garde** sa réservation : une annonce perdue
+ *   vaut mieux qu'un second `@everyone` à tout le serveur ;
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
  *
  * Sur `channel-closed` et `unavailable`, l'appelant rend sa réservation et
  * réessaiera.
  */
-export type LiveAnnouncementOutcome = "posted" | "posted-silent" | "rejected" | "channel-closed" | "unavailable";
+export type LiveAnnouncementOutcome =
+  | "posted"
+  | "posted-silent"
+  | "rejected"
+  | "channel-closed"
+  | "uncertain"
+  | "unavailable";
+
+/** Vrai si `fetch` a échoué parce que le délai d'attente est écoulé. */
+function isTimeoutError(error: unknown): boolean {
+  // `DOMException` n'hérite pas toujours d'`Error` selon l'environnement : lu par son nom.
+  const name = typeof error === "object" && error !== null ? (error as { name?: unknown }).name : undefined;
+  return name === "TimeoutError" || name === "AbortError";
+}
 
 /** Lit `mentionEveryone` du bilan du bot ; un corps illisible vaut une mention faite. */
 async function announcedWithoutMention(response: Response): Promise<boolean> {
@@ -659,8 +675,10 @@ export async function pushLiveAnnouncement(
     if (response.status === 404) return "unavailable";
     recordFailure();
     return "unavailable";
-  } catch {
+  } catch (error) {
     recordFailure();
-    return "unavailable";
+    // Le délai écoulé ne dit pas que rien n'est parti : la requête a pu
+    // atteindre le bot, qui publie encore.
+    return isTimeoutError(error) ? "uncertain" : "unavailable";
   }
 }
