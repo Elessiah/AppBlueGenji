@@ -596,9 +596,11 @@ export async function pushLeadershipAlert(
  *   fermé au bot (permission), rien n'est parti ;
  * - `slowed` — le bot a répondu `503` : le mode lent de #live retient
  *   l'annonce (`reason` `slowmode`, `slowmode-short`), rien n'est parti ;
- * - `discord-held` — le bot a répondu `503` : Discord a refusé l'annonce
- *   (AutoMod, autre refus) ou n'a pas répondu en lisant le salon, rien n'est
- *   parti ;
+ * - `discord-refused` — le bot a répondu `503` : Discord a refusé le message
+ *   (AutoMod, autre refus explicite). Le même message serait refusé de
+ *   nouveau : l'appelant **garde** sa réservation, comme sur un `400` ;
+ * - `discord-held` — le bot a répondu `503` : Discord n'a pas répondu en
+ *   lisant le salon, rien n'est parti ;
  * - `uncertain` — le bot a répondu que Discord a lâché pendant l'envoi
  *   (`503`, `reason` `discord-down`) : l'annonce a pu partir, l'envoi est
  *   terminé ;
@@ -620,12 +622,16 @@ export type LiveAnnouncementOutcome =
   | "channel-closed"
   | "slowed"
   | "discord-held"
+  | "discord-refused"
   | "uncertain"
   | "timed-out"
   | "unavailable";
 
 /** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
 const CHANNEL_CLOSED_REASONS = new Set(["missing", "no-view", "no-send", "send-denied"]);
+
+/** Raisons d'un `503` du bot qui disent que Discord a refusé le message lui-même. */
+const DISCORD_REFUSED_REASONS = new Set(["automod", "send-rejected"]);
 
 /** Raisons d'un `503` du bot qui disent que le mode lent de #live retient l'annonce. */
 const SLOWED_REASONS = new Set(["slowmode", "slowmode-short"]);
@@ -637,7 +643,7 @@ const SLOWED_REASONS = new Set(["slowmode", "slowmode-short"]);
  */
 async function classifyUnavailable(
   response: Response,
-): Promise<"channel-closed" | "slowed" | "discord-held" | "uncertain" | "unavailable"> {
+): Promise<"channel-closed" | "slowed" | "discord-held" | "discord-refused" | "uncertain" | "unavailable"> {
   let body: { error?: unknown; reason?: unknown } | null = null;
   try {
     body = (await response.json()) as { error?: unknown; reason?: unknown } | null;
@@ -651,6 +657,9 @@ async function classifyUnavailable(
   if (SLOWED_REASONS.has(reason)) return "slowed";
   // Discord a lâché pendant l'envoi : le message a pu partir.
   if (reason === "discord-down") return "uncertain";
+  // Refus explicite : le renvoyer tel quel serait refusé de nouveau (et chaque
+  // essai bloqué par AutoMod alerterait la modération).
+  if (DISCORD_REFUSED_REASONS.has(reason)) return "discord-refused";
   return "discord-held";
 }
 

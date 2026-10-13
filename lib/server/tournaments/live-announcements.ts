@@ -43,7 +43,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
@@ -232,6 +232,31 @@ function groupParticipantType(rows: readonly LiveCandidateRow[]): ParticipantTyp
   return solo ? "SOLO" : toParticipantType(rows[0].participant_type);
 }
 
+/**
+ * Issues qui abandonnent l'annonce (réservation gardée), et ce que pm2 en dit.
+ * Aucune ne demande de la poster à la main : l'envoi du bot a pu partir, ou
+ * partir encore.
+ */
+const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
+  rejected: "annonce refusée par le bot, abandonnée",
+  "discord-refused":
+    "Discord a refusé l'annonce (AutoMod ou autre refus — cause au canal de logs du bot), abandonnée : le même message serait refusé de nouveau",
+  // L'envoi est terminé : ce que montre #live fait foi.
+  uncertain:
+    "publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live",
+  // L'envoi du bot peut encore aboutir : #live vide maintenant ne prouve rien.
+  "timed-out":
+    "bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, mode lent — parfois des heures après un redémarrage du bot), annonce non réessayée",
+};
+
+/** Issues qui reportent l'annonce (réservation rendue), et leur cause dans pm2. */
+const POSTPONED_CAUSES: Partial<Record<LiveAnnouncementOutcome, string>> & { unavailable: string } = {
+  "channel-closed": "salon #live fermé au bot (introuvable ou sans permission d'écrire)",
+  slowed: "le mode lent de #live retient l'annonce (le bot y a posté peu avant)",
+  "discord-held": "Discord n'a pas répondu au bot en lisant le salon (panne passagère)",
+  unavailable: "bot injoignable, en panne ou d'une version sans annonces",
+};
+
 /** Annonce un groupe réservé. @returns Le nombre de matchs publiés. */
 async function announce(group: AnnouncementGroup): Promise<number> {
   const [first] = group.rows;
@@ -253,52 +278,19 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     console.info(`[live-announce] ${label} ${announced} dans #live${silent}`);
     return group.rows.length;
   }
-  if (outcome === "rejected") {
-    // Renvoyer le même corps ne changerait rien : les réservations sont gardées.
-    console.error(`[live-announce] ${label} : annonce refusée par le bot, abandonnée`);
-    return 0;
-  }
-  // Le bot a pu publier : réessayer risquerait un second `@everyone` à tout
-  // le serveur. Les réservations sont gardées.
-  if (outcome === "uncertain") {
-    // L'envoi est terminé : ce que montre #live fait foi.
-    console.error(
-      `[live-announce] ${label} : publication non confirmée (Discord en panne pendant l'envoi), annonce peut-être publiée, non réessayée — vérifier #live et ne la poster à la main que si elle n'y est pas`,
-    );
-    return 0;
-  }
-  if (outcome === "timed-out") {
-    // L'envoi du bot peut encore aboutir : #live vide maintenant ne prouve rien.
-    console.error(
-      `[live-announce] ${label} : bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, mode lent), annonce non réessayée — attendre plusieurs minutes avant de vérifier #live, et ne la poster à la main que si elle n'y est toujours pas`,
-    );
+  const abandoned = ABANDONED_OUTCOMES[outcome];
+  if (abandoned) {
+    // Rien à renvoyer : refusé tel quel, ou peut-être déjà publié (un second
+    // `@everyone` serait pire qu'une annonce perdue). Réservations gardées.
+    console.error(`[live-announce] ${label} : ${abandoned}`);
     return 0;
   }
   if (!(await releaseAnnouncements(group.rows, label))) return 0;
   const retry = plural
     ? "annonces reportées, réessayées tant que les matchs ont commencé depuis moins de deux heures"
     : "annonce reportée, réessayée tant que le match a commencé depuis moins de deux heures";
-  if (outcome === "channel-closed") {
-    warnOnce(
-      `channel-closed ${context}`,
-      `[live-announce] ${label} : salon #live fermé au bot (introuvable ou sans permission d'écrire), ${retry}`,
-    );
-  } else if (outcome === "slowed") {
-    warnOnce(
-      `slowed ${context}`,
-      `[live-announce] ${label} : le mode lent de #live retient l'annonce (le bot y a posté peu avant), ${retry}`,
-    );
-  } else if (outcome === "discord-held") {
-    warnOnce(
-      `discord-held ${context}`,
-      `[live-announce] ${label} : Discord a refusé l'annonce (AutoMod ou autre refus) ou n'a pas répondu au bot — cause au canal de logs du bot, ou dans ses journaux si Discord était en panne, ${retry}`,
-    );
-  } else {
-    warnOnce(
-      `unavailable ${context}`,
-      `[live-announce] ${label} : bot injoignable, en panne ou d'une version sans annonces, ${retry}`,
-    );
-  }
+  const cause = POSTPONED_CAUSES[outcome] ?? POSTPONED_CAUSES.unavailable;
+  warnOnce(`${outcome} ${context}`, `[live-announce] ${label} : ${cause}, ${retry}`);
   return 0;
 }
 
