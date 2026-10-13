@@ -11,7 +11,8 @@
  * - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la
  *   permission `tournaments`, **sauf l'auteur** du geste.
  * - **Journal** : une ligne au canal de logs, auteur anonymisé (« le staff »)
- *   et nommé dans pm2 (`auditStaffAction`, écrit dès le commit). Aucun pseudo de joueur : les
+ *   et nommé dans pm2 (`publishStaffAction`, même ligne + auteur), précédée
+ *   dès le commit d'une trace pm2 courte (`auditStaffAction`). Aucun pseudo de joueur : les
  *   engagées passent par `entrantLabel`.
  *
  * Une date **effacée** est journalisée et, si les joueurs avaient reçu
@@ -30,7 +31,7 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { toIso } from "@/lib/server/serialization";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
-import { auditStaffAction, postStaffLog } from "@/lib/server/staff-audit";
+import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/shared/bot-logs";
 import { MATCH_SEEN_KEY, type ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
 import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
@@ -217,7 +218,7 @@ async function notifyReferees(
     previousStartAt: change.previousStartAt,
     rescheduled: announcement.rescheduled,
   });
-  if (change.actor) postStaffLog(line);
+  if (change.actor) publishStaffAction(line, change.actor);
   // Un match joué ne se rejouera pas : la date est une correction d'archive,
   // tracée au journal mais annoncée à personne (les joueurs non plus).
   if (!push || isPlayedMatchStatus(row.status)) return 0;
@@ -272,7 +273,7 @@ async function logScheduleCleared(
   now: Date,
 ): Promise<void> {
   if (change.actor) {
-    postStaffLog(
+    publishStaffAction(
       formatMatchScheduleClearedLog({
         tournament: { id: Number(row.tournament_id), name: String(row.tournament_name) },
         matchId: change.matchId,
@@ -282,6 +283,7 @@ async function logScheduleCleared(
         ...logEntrants(row),
         previousStartAt: change.previousStartAt,
       }),
+      change.actor,
     );
   }
   // Les arbitres avaient reçu « Match programmé » pour cet horaire : l'avis de
@@ -409,9 +411,10 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
 /**
  * La trace pm2 du geste, écrite **dès le commit** (avant toute lecture) :
  * l'auteur reste nommé même si le serveur s'arrête avant la relecture de la
- * manche, ou si elle échoue. La ligne Discord, anonyme et détaillée (tournoi,
- * engagées), suit après la relecture. La trace de modération n'est pas
- * optionnelle (`staff-audit.ts`).
+ * manche, ou si elle échoue. La ligne détaillée (tournoi, engagées) suit après
+ * la relecture par `publishStaffAction` : anonyme sur Discord, et la même avec
+ * l'auteur dans pm2 — deux lignes pm2 par geste, reliées par `#id` du match.
+ * La trace de modération n'est pas optionnelle (`staff-audit.ts`).
  */
 function auditScheduleGesture(change: MatchScheduleChange): void {
   if (!change.actor) return;

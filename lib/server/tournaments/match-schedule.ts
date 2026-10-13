@@ -376,10 +376,11 @@ export async function setMatchStartAt(
     return written;
   }));
 
-  publishMatchUpdatedEvent(outcome.tournamentId, { landingLive: true });
   // Joueurs, arbitres et journal apprennent l'horaire posé, changé ou retiré
   // (`./schedule-notices`) — sans retenir la réponse, après le commit qui a
-  // aussi remis les marques de rappel à jour.
+  // aussi remis les marques de rappel à jour. Appelé **avant** la publication
+  // de l'évènement, qui peut lever : la trace pm2 du geste, écrite dans le même
+  // tour, ne doit pas en dépendre.
   void notifyMatchScheduleChange({
     matchId,
     startAt,
@@ -391,5 +392,6 @@ export async function setMatchStartAt(
     entrantIds: outcome.entrantIds,
     actor,
   }).catch(() => undefined);
+  publishMatchUpdatedEvent(outcome.tournamentId, { landingLive: true });
   return startAt;
 }
