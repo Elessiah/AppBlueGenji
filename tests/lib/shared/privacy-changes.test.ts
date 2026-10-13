@@ -857,7 +857,8 @@ describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés 
     expect(text()).toMatch(/ne règle que les notifications push, pas ces messages privés/);
     // Une manche supprimée par le moteur est poussée à tout le staff, auteur compris.
     expect(text()).toMatch(/quand une mise à jour du tournoi supprime un match planifié/);
-    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications"]);
+    // Messages privés sur intérêt légitime : la section des droits (opposition) est à un clic (art. 21.4).
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications", "/rgpd#exercer-vos-droits"]);
   });
 
   it("nomme les sujets push sous leurs libellés publiés", () => {
