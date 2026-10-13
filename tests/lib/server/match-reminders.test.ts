@@ -308,8 +308,9 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
   });
 
   it("dit « reprogrammé » quand les joueurs avaient reçu un autre horaire", async () => {
-    // `SEEN` absente mais `TOLD` présente, ou une preuve héritée (`P7D`).
-    for (const key of ["TOLD", "P7D"]) {
+    // `SEEN` absente mais `TOLD` présente (les preuves héritées y sont
+    // recopiées au démarrage).
+    for (const key of ["TOLD"]) {
       jest.mocked(pushDiscordDirectMessages).mockClear();
       resetMatchReminderThrottle();
       await mockDb({ sent: [{ match_id: 31, offset_key: key }] });

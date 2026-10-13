@@ -69,7 +69,7 @@ function world(
       throw Object.assign(new Error("Table 'bg_match_reminders' doesn't exist"), { code: "ER_NO_SUCH_TABLE", errno: 1146 });
     }
     if (sql.startsWith("SELECT 1 FROM bg_match_reminders")) {
-      expect(params).toEqual([42, "TOLD", "P7D", "PT1H"]);
+      expect(params).toEqual([42, "TOLD"]);
       return [options.announced ? [{ seen: 1 }] : []];
     }
     if (sql.startsWith("DELETE FROM bg_match_reminders") && options.failReminders) {
@@ -146,15 +146,14 @@ describe("setMatchStartAt", () => {
     expect(writes.indexOf(seen!)).toBeGreaterThan(writes.indexOf(reminders!));
   });
 
-  it("recopie une preuve héritée en `TOLD` avant que le ménage ne l'emporte", async () => {
+  it("garde la marque `TOLD` au ménage d'une date changée", async () => {
     const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), announced: true });
 
     await setMatchStartAt(42, "2026-08-30T18:30:00Z");
 
-    const told = writes.find((w) => w.sql.startsWith("INSERT IGNORE") && w.params[1] === "TOLD");
     const cleanup = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
-    expect(told?.params).toEqual([42, "TOLD"]);
-    expect(writes.indexOf(told!)).toBeLessThan(writes.indexOf(cleanup!));
+    expect(cleanup?.params).toContain("TOLD");
+    expect(notifyMatchScheduleChange).toHaveBeenCalledWith(expect.objectContaining({ alreadyAnnounced: true }));
   });
 
   it("laisse le balayage annoncer une manche dont une engagée manque encore", async () => {

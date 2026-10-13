@@ -330,6 +330,25 @@ describe("rollbackCurrentRound — écritures", () => {
     expect(statementWith(execute, "DELETE FROM bg_match_reminders WHERE match_id IN")?.[1]).toEqual([3]);
   });
 
+  it("compare les affiches après la réconciliation : un bye reposé rend sa place", async () => {
+    const { execute } = setup({
+      format: "SINGLE",
+      matches: [
+        playedRow({ id: 1, round_number: 1, next_winner_match_id: 3 }),
+        playedRow({ id: 2, round_number: 1, next_winner_match_id: 3 }),
+        row({ id: 3, round_number: 2, team1_id: 10, team2_id: 20 }),
+      ],
+    });
+
+    await rollbackCurrentRound(7);
+
+    const posterReads = execute.mock.calls
+      .map((call, index) => ({ sql: String(call[0]), order: execute.mock.invocationCallOrder[index] }))
+      .filter(({ sql }) => sql.startsWith("SELECT id, team1_id, team2_id FROM bg_matches"));
+    expect(posterReads).toHaveLength(2);
+    expect(posterReads[1].order).toBeGreaterThan(jest.mocked(tryAutoResolveByes).mock.invocationCallOrder[0]);
+  });
+
   it("tient pour la même affiche les mêmes engagées reposées dans l'autre sens", async () => {
     const { execute } = setup({
       format: "SINGLE",

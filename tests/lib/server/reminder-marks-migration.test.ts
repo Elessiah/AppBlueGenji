@@ -11,10 +11,14 @@ const source = readFileSync(join(process.cwd(), "lib/server/database/recent-sche
 
 describe("reprise des marques de rappel héritées", () => {
   it("recopie en `TOLD` les paliers posés par l'ancien code, toujours avec un message", () => {
-    const statement = source.slice(source.indexOf("INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)"));
-    expect(statement).toMatch(/^INSERT IGNORE INTO bg_match_reminders \(match_id, offset_key\)\s+SELECT DISTINCT match_id, 'TOLD'/);
     expect(MATCH_TOLD_KEY).toBe("TOLD");
-    expect(statement).toMatch(/WHERE offset_key IN \('P7D', 'P1D', 'PT1H'\) AND sent_at < '2026-10-31'/);
+    expect(source).toMatch(/SELECT DISTINCT match_id, 'TOLD' FROM bg_match_reminders\s+WHERE offset_key IN \('P7D', 'PT1H'\)`/);
+  });
+
+  it("ne recopie `P1D` (réservé avant l'envoi par le nouveau code) qu'avant toute marque `TOLD`", () => {
+    expect(source).toMatch(
+      /SELECT DISTINCT r\.match_id, 'TOLD' FROM bg_match_reminders r\s+WHERE r\.offset_key = 'P1D'\s+AND NOT EXISTS \(SELECT 1 FROM bg_match_reminders t WHERE t\.offset_key = 'TOLD'\)`/,
+    );
   });
 
   it("efface la marque d'observation posée en silence par l'ancien balayage, pour une manche à venir", () => {
