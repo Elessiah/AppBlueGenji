@@ -109,7 +109,9 @@ une fois en production : la clé publique est gravée dans chaque abonnement.
 
 - Service worker `public/push-sw.js`, portée `/` : il affiche et ouvre, **rien
   d'autre** — aucun cache, aucune interception. Le lien d'une notification est
-  relu comme une entrée (chemin du site seulement). `pushsubscriptionchange`
+  relu comme une entrée (chemin du site seulement, jamais une route d'API :
+  ouverte d'ici, elle partirait du site comme un clic — `pushTargetPath` côté
+  serveur, `sitePath` côté service worker). `pushsubscriptionchange`
   renvoie l'abonnement renouvelé au site.
 - iPhone / iPad : Safari ne livre le push qu'à un site **ajouté à l'écran
   d'accueil et ouvert en app web** (mode autonome). Le manifeste reste en
