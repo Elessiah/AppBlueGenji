@@ -345,11 +345,12 @@ le plus récent :
   programmé / reprogrammé — « Tournoi » (#id) : Manche 2 — A vs B (#42), coup
   d'envoi …, au lieu du …, par le staff ») ou `formatMatchScheduleClearedLog`
   (« 🗓️ Horaire retiré — … l'horaire du … (heure de Paris) est retiré,
-  par le staff »). Auteur anonyme sur Discord (`postStaffLog`, après la
-  relecture de la manche), nommé dans pm2 **dès le commit**, avant toute
-  lecture (`auditStaffAction` : « 🗓️ Horaire du match #42 posé au … (était …) »
-  — un arrêt du serveur ou une relecture en échec ne laisse pas de geste sans
-  auteur) ; engagées par `entrantLabel` (« un joueur » en
+  par le staff »). Auteur anonyme sur Discord, nommé dans pm2
+  (`publishStaffAction`, la même ligne + l'auteur, après la relecture de la
+  manche) ; une trace pm2 courte la précède **dès le commit**, avant toute
+  lecture et avant la publication de l'évènement (`auditStaffAction` :
+  « 🗓️ Horaire du match #42 posé au … (était …) ») — un arrêt du serveur ou une
+  relecture en échec ne laisse pas de geste sans auteur ; engagées par `entrantLabel` (« un joueur » en
   tournoi individuel). Pas de message privé au rôle arbitre : ce n'est pas une
   alerte qui attend une intervention.
 
@@ -598,8 +599,9 @@ engagées inconnues n'est annoncée qu'à l'approche du match (balayage, 48 h).
 Elle dit aussi qu'un retrait se tait hors planification par l'arbitrage
 (`clearedHeldStartAt`), et que le sujet push ne règle pas les messages privés
 (la base légale et le droit d'opposition vivent sur `/rgpd`). La trace pm2 du
-geste part dès le commit, la ligne Discord après la relecture : une manche
-illisible ou supprimée entre-temps n'a que la première.
+geste part dès le commit, la ligne détaillée (Discord, et pm2 avec l'auteur)
+après la relecture : une manche illisible ou supprimée entre-temps n'a que la
+première.
 Sur `/rgpd`, l'identifiant et le pseudo Discord portent, à côté du contrat,
 l'intérêt légitime pour ces messages (`MATCH_TIME_DM_SCOPE`), que le droit
 d'opposition nomme ; la politique du bot dit que le site lui transmet aussi le
