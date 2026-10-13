@@ -560,13 +560,13 @@ Données
 Pseudos en jeu et du site, noms d'équipe, images de la partie, résultats et performances en jeu, tels qu'ils apparaissent à l'écran — ni webcam ni chat vocal des joueurs
 Voix et pseudo des casters
 Lien de la diffusion et de la rediffusion d'un match
-Trace de l'annonce d'un match sur Discord : le match et les identifiants de ses deux engagés (équipes ou inscriptions individuelles)
+Trace de l'annonce d'un match sur Discord : le match, les identifiants de ses deux engagés (équipes ou inscriptions individuelles) et la date de l'annonce
 Données sensibles
 Aucune
 Conservation
 Direct : la diffusion n'est pas conservée par le site, qui n'en garde que le lien de la chaîne
 Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée
-Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match et les identifiants de ses deux engagés), posée avant l'envoi, retirée si rien n'est parti, sinon effacée avec le match ; le message reste dans le salon jusqu'à sa suppression par l'association
+Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), posée avant l'envoi, retirée pour un nouvel essai quand le bot était indisponible, sinon effacée avec le match ; le message reste dans le salon jusqu'à sa suppression par l'association
 Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée
 Destinataires
 Public des plateformes de diffusion et du site

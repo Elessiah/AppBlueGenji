@@ -896,7 +896,7 @@ describe("PRIVACY_CHANGES — matchs diffusés annoncés sur Discord (#442)", ()
     // `entrantLabel` : jamais un pseudo, « un joueur » en individuel.
     expect(text()).toMatch(/aucun pseudo de joueur : en tournoi individuel, chaque engagé s'écrit « un joueur »/);
     // `bg_live_announcements` : (match, affiche), supprimée avec le match.
-    expect(text()).toMatch(/trace de l'annonce \(le match et les identifiants de ses deux engagés\), effacée avec le match/);
+    expect(text()).toMatch(/trace de l'annonce \(le match, les identifiants de ses deux engagés et sa date\), effacée avec le match/);
     expect(text()).toMatch(/chez Discord \(États-Unis\)/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#retransmission", "/rgpd#destinataires"]);
   });

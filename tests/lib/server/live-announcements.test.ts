@@ -272,6 +272,29 @@ describe("runLiveAnnouncementSweep", () => {
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(3);
   });
 
+  it("réservation impossible à rendre : la trace pm2 nomme les matchs et ne promet pas d'essai", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("unavailable");
+    const { execute } = mockDb([AUTO_LIVE]);
+    execute.mockImplementation(async (sql) => {
+      if (sql.startsWith("INSERT IGNORE")) return [{ affectedRows: 1 }];
+      throw new Error("DB_DOWN");
+    });
+    await runLiveAnnouncementSweep(NOW);
+    expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
+      "[live-announce] match 40 (tournoi 4) : réservation non rendue, annonce non réessayée",
+    );
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it("un groupe reporté s'accorde au pluriel", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
+    mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain(
+      "matchs 40, 41 (tournoi 4) : salon #live fermé au bot (introuvable ou sans permission d'écrire), annonces reportées, réessayées tant que les matchs ont commencé",
+    );
+  });
+
   it("un groupe resté sans réponse rend toutes ses réservations", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("unavailable");
     const { execute } = mockDb([
