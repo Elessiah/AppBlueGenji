@@ -39,6 +39,25 @@ function matchRow(overrides: Partial<Row> = {}): Row {
   };
 }
 
+/** Lecture du tournoi, puis verrous du tournoi et de la manche, notés dans `order`. */
+function lockReply(sql: string, params: unknown, row: Row | null, order: string[]): [unknown[]] | null {
+  if (sql.startsWith("SELECT tournament_id FROM bg_matches")) {
+    order.push("tournament_id");
+    return [row ? [{ tournament_id: row.tournament_id }] : []];
+  }
+  if (sql.startsWith("SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE")) {
+    order.push("lock_tournament");
+    expect(params).toEqual([7]);
+    return [[{ id: 7 }]];
+  }
+  if (sql.startsWith("SELECT id, tournament_id, status")) {
+    order.push("lock_match");
+    expect(sql).toContain("FOR UPDATE");
+    return [row ? [row] : []];
+  }
+  return null;
+}
+
 /**
  * Base simulée : la ligne du match (sous verrou), l'option du tournoi, puis les
  * écritures. Les requêtes sont reconnues à leur texte, pas à leur rang.
@@ -57,12 +76,12 @@ function world(
   connection.rollback.mockResolvedValue(undefined);
   const row = options.row === undefined ? matchRow() : options.row;
   const writes: { sql: string; params: unknown[] }[] = [];
+  /** Ordre des lectures et verrous : tournoi avant manche. */
+  const order: string[] = [];
   connection.execute.mockImplementation(async (raw: string, params?: unknown) => {
     const sql = raw.replace(/\s+/g, " ").trim();
-    if (sql.startsWith("SELECT id, tournament_id, status")) {
-      expect(sql).toContain("FOR UPDATE");
-      return [row ? [row] : []];
-    }
+    const locked = lockReply(sql, params, row, order);
+    if (locked) return locked;
     if (sql.startsWith("SELECT referee_scheduling FROM bg_tournaments")) {
       return [[{ referee_scheduling: options.refereeScheduling ? 1 : 0 }]];
     }
@@ -81,7 +100,7 @@ function world(
     return [{ affectedRows: 1 }];
   });
   jest.mocked(withConnection).mockImplementation(async (run) => run(fakeConnection(connection)));
-  return { connection, writes };
+  return { connection, writes, order };
 }
 
 const FUTURE = "2099-08-29T18:30:00Z";
@@ -109,6 +128,16 @@ describe("setMatchStartAt", () => {
     expect(connection.beginTransaction).toHaveBeenCalled();
     expect(connection.commit).toHaveBeenCalled();
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+  });
+
+  it("verrouille le tournoi avant la manche, comme toute écriture du moteur", async () => {
+    const { connection, order } = world();
+    await setMatchStartAt(42, FUTURE);
+    expect(order).toEqual(["tournament_id", "lock_tournament", "lock_match"]);
+    // Le tournoi est lu avant la transaction : aucune lecture ordinaire n'y précède les verrous.
+    const begin = connection.beginTransaction.mock.invocationCallOrder[0];
+    const firstRead = connection.execute.mock.invocationCallOrder[0];
+    expect(firstRead).toBeLessThan(begin);
   });
 
   it("accepte la valeur brute d'un champ datetime-local", async () => {
@@ -219,6 +248,7 @@ describe("setMatchStartAt", () => {
       alreadyAnnounced: false,
       toldStartAt: null,
       refereeScheduling: false,
+      entrantIds: [1, 2],
       actor,
     });
   });
@@ -235,6 +265,7 @@ describe("setMatchStartAt", () => {
       alreadyAnnounced: false,
       toldStartAt: null,
       refereeScheduling: false,
+      entrantIds: [1, 2],
       actor: null,
     });
   });
@@ -254,6 +285,7 @@ describe("setMatchStartAt", () => {
       alreadyAnnounced: true,
       toldStartAt: null,
       refereeScheduling: true,
+      entrantIds: [1, 2],
       actor: null,
     });
 
@@ -267,6 +299,7 @@ describe("setMatchStartAt", () => {
       alreadyAnnounced: true,
       toldStartAt: null,
       refereeScheduling: false,
+      entrantIds: [1, 2],
       actor: null,
     });
   });
@@ -329,12 +362,12 @@ describe("setMatchStartAt", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
-  it("signale un match introuvable sans rien écrire, et défait la transaction", async () => {
+  it("signale un match introuvable sans rien écrire, ni ouvrir de transaction", async () => {
     const { connection, writes } = world({ row: null });
 
     await expect(setMatchStartAt(999, "2026-08-29T18:30:00Z")).rejects.toThrow("MATCH_NOT_FOUND");
     expect(writes).toHaveLength(0);
-    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 

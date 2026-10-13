@@ -30,6 +30,9 @@ const ROW = {
   participant_type: "TEAM",
   bracket: "LOWER",
   round_number: 2,
+  start_at: new Date(NEW_START),
+  team1_id: 101,
+  team2_id: 102,
   team1_name: "Les Renards",
   team2_name: "Team Nova",
   status: "READY",
@@ -43,6 +46,7 @@ function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChan
     alreadyAnnounced: false,
     toldStartAt: null,
     refereeScheduling: true,
+    entrantIds: [101, 102],
     actor: ACTOR,
     ...overrides,
   };
@@ -426,6 +430,27 @@ describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     expect(notifyStaff).not.toHaveBeenCalled();
     error.mockRestore();
+  });
+});
+
+describe("notifyMatchScheduleChange — engagées changées après l'écriture", () => {
+  it("laisse l'annonce au balayage quand une place a été remplie entre-temps", async () => {
+    mockMatch();
+    // Sous le verrou, la seconde place était vide : aucune marque d'observation posée.
+    await notifyMatchScheduleChange(change({ entrantIds: [101, null] }));
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    // Journal et arbitres suivent : ils ne dépendent pas des marques.
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(notifyStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne prévient pas d'un retrait une engagée qui a remplacé celle qui l'avait reçu", async () => {
+    mockMatch();
+    await notifyMatchScheduleChange(
+      change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, entrantIds: [101, 999] }),
+    );
+    expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
+    expect(logLine()).toContain("Horaire retiré");
   });
 });
 

@@ -152,7 +152,10 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_reminders/);
-    expect(params).toEqual([31, "P1D"]);
+    // Réservé pour l'horaire lu : un horaire déplacé entre-temps fait échouer
+    // la réservation, et l'annonce du nouveau garde son palier.
+    expect(sql).toMatch(/FROM bg_matches WHERE id = \? AND start_at = \?/);
+    expect(params).toEqual([31, "P1D", 31, START]);
     expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
   });
 
@@ -219,14 +222,57 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     });
 
     const sweep = dispatchDueMatchReminders(ONE_HOUR_BEFORE);
-    for (let tick = 0; tick < 100 && calls < 3; tick += 1) {
+    for (let tick = 0; tick < 100 && calls < 4; tick += 1) {
       await new Promise((resolve) => setImmediate(resolve));
     }
-    expect(calls).toBe(3);
+    // Les deux engagées de la manche 31 (l'une bloquée) et celles de la 32.
+    expect(calls).toBe(4);
     release();
 
     // Chaque envoi compte, même terminé en même temps qu'un autre.
     expect(await sweep).toBe(4);
+  });
+
+  it("un envoi en échec n'arrête pas le balayage, et sa marque d'horaire reçu est rendue", async () => {
+    // Mêmes engagées (mêmes destinataires), noms distincts pour reconnaître la manche.
+    const { execute } = await mockDb({
+      matches: [MATCH, { ...MATCH, id: 32, team1_name: "Les Loups", team2_name: "Orion" }],
+      sent: [...SEEN, { match_id: 32, offset_key: "SEEN" }],
+    });
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) => {
+      if (message.includes("Les Renards")) throw new Error("bot en panne");
+      return { sent: 1, unresolved: [], failed: [] };
+    });
+    jest.mocked(pushToUsers).mockResolvedValue(0);
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    // La manche 31 échoue ; la 32 part quand même.
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(error).toHaveBeenCalled();
+    // La marque réservée pour la 31 est rendue : rien n'y est arrivé.
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][])
+      .filter(([sql]) => sql.startsWith("DELETE FROM bg_match_reminders"))
+      .map(([, params]) => params);
+    expect(releases).toEqual([[31, "TOLD"]]);
+  });
+
+  it("garde la marque d'horaire reçu quand une seule engagée a été atteinte", async () => {
+    const { execute } = await mockDb({});
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) => {
+      if (message.includes("**Team Nova** contre")) throw new Error("bot en panne");
+      return { sent: 1, unresolved: [], failed: [] };
+    });
+    jest.mocked(pushToUsers).mockResolvedValue(0);
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+
+    expect(error).toHaveBeenCalled();
+    expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
+    const writes = (execute.mock.calls as unknown as [string, unknown[]][]).filter(
+      ([sql]) => sql.startsWith("DELETE") || sql.startsWith("UPDATE"),
+    );
+    expect(writes).toEqual([]);
   });
 
   it("réserve la marque d'horaire reçu avant l'envoi : une correction immédiate la lit déjà", async () => {
