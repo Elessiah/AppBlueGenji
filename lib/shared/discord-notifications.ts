@@ -134,8 +134,10 @@ export const MATCH_REMINDER_LOOKAHEAD_MS = MATCH_REMINDER_HORIZON_MS + 24 * 60 *
  *
  * Elle ne correspond à aucun message : elle marque que le site a vu cette date,
  * et sépare donc « le match vient d'être programmé » de « le temps a passé
- * depuis ». Sans elle, un match programmé à cinq heures recevrait le rappel
- * « dans 24 heures », puisque la fenêtre de ce palier est bel et bien ouverte.
+ * depuis ». Sans elle, un match programmé à cinq heures recevrait un simple
+ * rappel au lieu de l'annonce qui porte la date — et c'est aussi le verrou de
+ * l'annonce : seule la requête qui pose la marque annonce
+ * (`setMatchStartAt` la pose lui-même quand il annonce).
  */
 export const MATCH_SEEN_KEY = "SEEN";
 
@@ -291,8 +293,9 @@ export function buildMatchScheduleAnnouncement(
     announcement.rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     pairingLine(context),
-    `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)` +
-      (previous ? `, au lieu du ${formatMatchStart(previous)}` : ""),
+    previous
+      ? `Nouveau coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris), au lieu du ${formatMatchStart(previous)}`
+      : `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
   if (remaining.length > 0) {
     // Le prochain rappel est le palier restant le plus **lointain** : la liste
@@ -315,7 +318,7 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
     "**Horaire du match retiré**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     pairingLine(context),
-    `L'horaire prévu ${formatMatchStart(context.startAt)} (heure de Paris) est retiré : le nouvel horaire te sera annoncé.`,
+    `L'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) est retiré : un nouvel horaire te sera annoncé.`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
   return lines.join("\n");

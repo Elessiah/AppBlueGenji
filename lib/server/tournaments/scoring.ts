@@ -5,6 +5,7 @@ import { checkMapList, sameMapLists, type MatchMapInput } from "@/lib/shared/mat
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
+import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
 import {
@@ -72,6 +73,13 @@ export async function pushTeamToTarget(
     await connection.execute(`UPDATE bg_matches SET live_started_at = NULL WHERE id = ?`, [
       targetMatchId,
     ]);
+    // Les marques de rappel appartenaient aussi à l'ancienne affiche : la
+    // nouvelle engagée n'a reçu aucun horaire (« reprogrammé, au lieu du … »
+    // lui mentirait) et doit recevoir l'annonce — comme après un retour en
+    // arrière (`./rollback.ts`). Table tolérée absente, comme là-bas.
+    await ignoreMissingTable(
+      connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [targetMatchId]),
+    );
   }
 
   const [rows] = await connection.execute<

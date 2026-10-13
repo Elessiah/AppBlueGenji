@@ -180,11 +180,9 @@ type PlannedSend = {
  * Deux régimes, séparés par la marque d'observation (`MATCH_SEEN_KEY`) :
  *
  * - **Première observation.** Le site découvre cette date. Si des paliers sont
- *   déjà ouverts — la date a été posée à trois jours, à cinq heures — ils sont
- *   consommés sans message et remplacés par une **annonce** unique qui porte la
- *   date. Sans cela, une manche programmée à trois jours recevrait le rappel
- *   « dans une semaine » : la fenêtre du palier est bel et bien ouverte, mais
- *   ce qu'il annonce est faux.
+ *   déjà ouverts — la date a été posée à cinq heures — ils sont consommés sans
+ *   message et remplacés par une **annonce** unique qui porte la date. Sans
+ *   cela, la manche ne recevrait qu'un rappel, sans l'annonce de son horaire.
  * - **Ensuite.** Régime normal : le palier dont la fenêtre s'ouvre part avec sa
  *   formulation.
  *
@@ -274,15 +272,24 @@ async function dispatchPlannedSend(
       solo,
     };
 
+    // Le contexte dit au bot (et à ses journaux) de quel message il s'agit.
     let message: string;
-    if (clearedStartAt) message = buildMatchScheduleClearedNotice(context);
-    else if (offset) message = buildMatchReminderMessage(offset, context);
-    else message = buildMatchScheduleAnnouncement(context, remaining, announcement);
+    let discordContext: string;
+    if (clearedStartAt) {
+      message = buildMatchScheduleClearedNotice(context);
+      discordContext = "match-schedule-cleared";
+    } else if (offset) {
+      message = buildMatchReminderMessage(offset, context);
+      discordContext = "match-reminder";
+    } else {
+      message = buildMatchScheduleAnnouncement(context, remaining, announcement);
+      discordContext = "match-scheduled";
+    }
 
     const offsetKey = offset ? offset.key : null;
     await notifyUsers(recipients, {
       topic: "MATCH_REMINDER",
-      discord: { message, context: offset ? "match-reminder" : "match-scheduled" },
+      discord: { message, context: discordContext },
       push: (locale) =>
         clearedStartAt
           ? matchScheduleClearedPush(pushSide, locale)
@@ -322,8 +329,8 @@ const SCHEDULED_MATCH_SELECT = `${MATCH_WITH_ENTRANTS_SELECT}
  * ou de changer (`setMatchStartAt`), **sans attendre** le balayage.
  *
  * Le balayage seul laissait deux trous : il ne passe qu'à la lecture de la
- * liste des tournois, et une date posée au-delà de sa fenêtre de lecture (plus
- * de sa fenêtre de lecture) n'était annoncée par rien avant son rappel. Ici
+ * liste des tournois, et une date posée au-delà de sa fenêtre de lecture
+ * n'était annoncée par rien avant son rappel. Ici
  * l'annonce part tout de suite, quelle que soit l'échéance.
  *
  * L'appelant (`setMatchStartAt`) a effacé les paliers de l'ancienne date et
