@@ -247,7 +247,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
-      "Sending by Discord direct message the announcement of a match's time (set, changed or removed) and a match reminder 24 h before",
+      "Sending by Discord direct message the announcement of a match's time (set, changed or removed) and a match reminder within the 24 h before kickoff",
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
     ],
     legalBasis:
