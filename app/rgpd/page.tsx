@@ -260,7 +260,9 @@ function RgpdFr({
             <strong>Données obligatoires et facultatives.</strong> Un compte n&apos;a besoin,
             pour exister, que d&apos;un moyen de connexion — l&apos;identifiant Google, Discord
             ou Blizzard du fournisseur choisi — et d&apos;un pseudo site, attribué d&apos;office à
-            la création. Sans moyen de connexion, aucun compte ne peut être créé : les pages
+            la création. Il garde aussi une langue, français ou anglais (le français par défaut),
+            posée à la connexion ou choisie dans Mon profil, qui sert à vous écrire vos
+            notifications : elle n&apos;est pas facultative, mais vous la changez quand vous voulez. Sans moyen de connexion, aucun compte ne peut être créé : les pages
             publiques restent lisibles, mais on ne peut ni rejoindre une équipe ni
             s&apos;inscrire à un tournoi. Le fournisseur transmet en outre ce que le tableau
             décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
