@@ -133,7 +133,8 @@ arbitre qui corrige sa saisie dans la seconde le lit déjà) et rendu à son
 date suivante se dit « reprogrammée », sans rien citer. Une date rendue à
 l'horaire que les joueurs tiennent déjà (après une saisie de travers seulement
 journalisée) ne leur est pas réannoncée, et garde ses marques (le rappel déjà
-parti ne repart pas).
+parti ne repart pas) ; une date déjà passée, annoncée à personne, laisse elle
+aussi les marques en place.
 
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
 rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
