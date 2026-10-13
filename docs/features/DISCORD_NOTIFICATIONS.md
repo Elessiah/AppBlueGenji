@@ -102,10 +102,12 @@ partirait jamais.
 ### Programmer ou reprogrammer une manche
 
 `setMatchStartAt` efface les lignes `bg_match_reminders` de la manche **quand une
-date est posée et change réellement** — une date **effacée** garde ses marques,
-inertes (le balayage ne lit que les manches datées), pour que la date reposée
-ensuite se lise « reprogrammé » : la marque `SEEN` dit que les joueurs
-connaissaient un horaire (`alreadyAnnounced`) —, puis `notifyMatchScheduleChange`
+date est posée et change réellement**, après y avoir lu si les joueurs avaient
+**reçu** un horaire (`alreadyAnnounced` : une marque `ANNOUNCE`, posée quand une
+annonce part vraiment, ou un rappel `P7D` / `P1D` — jamais `SEEN`, que le
+balayage pose aussi en silence). Une date **effacée** garde ses marques, inertes
+(le balayage ne lit que les manches datées), pour que la date reposée ensuite se
+lise encore « reprogrammé ». Puis `notifyMatchScheduleChange`
 (`lib/server/tournaments/schedule-notices.ts`) annonce l'horaire **sans attendre
 le balayage** :
 
@@ -113,8 +115,10 @@ le balayage** :
   chacun) : `announceMatchSchedule` réserve à neuf la marque `SEEN` — c'est elle
   qui interdit le doublon avec un balayage concurrent —, consomme les paliers
   déjà ouverts et envoie « Match programmé » (première date) ou « Match
-  reprogrammé » (date qui en remplace une autre, avec « au lieu du … » quand
-  l'ancienne date est connue — pas après un effacement). Avant, l'annonce attendait la
+  reprogrammé » (les joueurs avaient reçu un horaire), avec « , au lieu du … »
+  quand l'ancienne date est connue — pas après un effacement. Une date posée
+  quand une place était vide n'a jamais été annoncée : sa remplaçante se dit
+  « programmé », sans ancienne date. Avant, l'annonce attendait la
   prochaine lecture de `/tournois`, et une date posée à plus de huit jours
   n'était annoncée par rien avant le rappel « une semaine ». En tournoi
   individuel, le message privé (annonce comme rappels) dit « **Ton match** »
@@ -122,6 +126,9 @@ le balayage** :
   de joueur ne passe par Discord — même règle que le push.
 - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la permission
   `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`).
+  « Reprogrammé » dès qu'une date précédait (ils la voyaient sur le plateau).
+  Même étiquette que l'annonce aux joueurs (`rencontre-<id>-reminder`) : un
+  arbitre engagé dans le match ne garde qu'une notification.
 - **Journal Discord** : une ligne `formatMatchScheduledLog` (« 🗓️ Match
   programmé / reprogrammé — « Tournoi » (#id) : Manche 2 — A vs B (#42), coup
   d'envoi …, par le staff »), qui rappelle l'ancien horaire d'une
