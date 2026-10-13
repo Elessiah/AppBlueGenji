@@ -123,6 +123,27 @@ describe("notifyMatchScheduleChange — première date", () => {
   });
 });
 
+describe("notifyMatchScheduleChange — ronde suisse", () => {
+  it("dit « Ronde N » au journal et aux arbitres, \"Round N\" en anglais", async () => {
+    const execute = mockMatch({ ...ROW, bracket: "UPPER", swiss_round: 1 });
+
+    await notifyMatchScheduleChange(change());
+
+    expect(String(execute.mock.calls[0][0])).toContain("AS swiss_round");
+    expect(logLine()).toContain("Ronde 2 — Les Renards vs Team Nova (#42)");
+    expect(resolvePush(staffCall().push).body).toContain("Coupe BlueGenji, Ronde 2");
+    expect(resolvePush(staffCall().push, "en").body).toContain("Coupe BlueGenji, Round 2");
+  });
+
+  it("garde « Manche N » hors ronde suisse", async () => {
+    mockMatch({ ...ROW, bracket: "UPPER", swiss_round: 0 });
+
+    await notifyMatchScheduleChange(change());
+
+    expect(logLine()).toContain("Manche 2 — Les Renards vs Team Nova (#42)");
+  });
+});
+
 describe("notifyMatchScheduleChange — date changée", () => {
   it("dit « reprogrammé » partout et rappelle l'ancien horaire au journal", async () => {
     mockMatch();

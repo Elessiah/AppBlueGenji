@@ -474,6 +474,22 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
   });
 
+  it("nomme une ronde suisse « Ronde N » dans le message privé et le push, \"Round N\" en anglais", async () => {
+    const { query } = await mockAnnounceDb({ matches: [{ ...MATCH, swiss_round: 1 }] });
+
+    expect(await announceMatchSchedule(31, { rescheduled: false }, TEN_DAYS_BEFORE)).toBe(2);
+
+    const [sql] = query.mock.calls[0] as unknown as [string];
+    expect(sql).toContain("AS swiss_round");
+    for (const message of sentMessages()) {
+      expect(message).toContain("Ronde 2");
+      expect(message).not.toContain("Manche 2");
+    }
+    const [, , content] = jest.mocked(pushToUsers).mock.calls[0];
+    expect(resolvePush(content).body).toContain("Coupe BlueGenji, Ronde 2");
+    expect(resolvePush(content, "en").body).toContain("Coupe BlueGenji, Round 2");
+  });
+
   it("prévient le joueur d'une entrée solo sans nommer personne, ni en push ni sur Discord", async () => {
     await mockAnnounceDb({
       matches: [{ ...MATCH, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" }],

@@ -266,6 +266,14 @@ describe("matchRoundLabel", () => {
     expect(matchRoundLabel("THIRD_PLACE", 4)).toBe("Petite finale");
   });
 
+  it("dit « Ronde N » en ronde suisse, comme la vue suisse du site", () => {
+    expect(matchRoundLabel("UPPER", 3, true)).toBe("Ronde 3");
+    expect(matchRoundLabel("UPPER", 3, false)).toBe("Manche 3");
+    // Les autres parties de plateau gardent leur nom : une ronde suisse n'en a pas.
+    expect(matchRoundLabel("LOWER", 2, true)).toBe("Tableau perdants · manche 2");
+    expect(matchRoundLabel("GRAND", 1, true)).toBe("Grande finale");
+  });
+
   it("retombe sur la manche pour un plateau inconnu", () => {
     expect(matchRoundLabel("AUTRE", 5)).toBe("Manche 5");
   });

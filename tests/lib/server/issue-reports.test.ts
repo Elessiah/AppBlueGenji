@@ -113,6 +113,16 @@ describe("reportTournamentIssue", () => {
     expect(message).toContain("Match : Manche 2 — Les Renards vs Team Nova (#31)");
   });
 
+  it("dit « Ronde N » pour une manche de ronde suisse", async () => {
+    const execute = await mockDb([ENTRANT, [{ ...MATCH[0], swiss_round: 1 }]]);
+
+    await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
+
+    expect(String(execute.mock.calls[1]?.[0])).toContain("AS swiss_round");
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).toContain("Match : Ronde 2 — Les Renards vs Team Nova (#31)");
+  });
+
   it("refuse un message hors bornes avant toute lecture", async () => {
     const execute = await mockDb([ENTRANT]);
 

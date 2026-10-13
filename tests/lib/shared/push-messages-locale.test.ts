@@ -228,6 +228,13 @@ describe("notifications push — anglais", () => {
     expect(fr31.url).toBe("/tournois/7#match-31");
   });
 
+  it("nomme une ronde suisse « Ronde N » / \"Round N\", comme la vue suisse du site", () => {
+    expect(pushRoundLabel("UPPER", 4, "fr", true)).toBe("Ronde 4");
+    expect(pushRoundLabel("UPPER", 4, "fr", true)).toBe(matchRoundLabel("UPPER", 4, true));
+    expect(pushRoundLabel("UPPER", 4, "en", true)).toBe("Round 4");
+    expect(pushRoundLabel("UPPER", 4, "fr")).toBe("Manche 4");
+  });
+
   it("écrit « Playoffs » comme le reste du site anglais", () => {
     expect(pushRoundLabel("UPPER", PLAYOFF_ROUND_OFFSET, "en")).toBe("Playoffs · round 1");
   });
