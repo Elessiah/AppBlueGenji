@@ -402,12 +402,12 @@ type DoomedRow = PosterRow & { status: string; start_at: Date | string | null };
  * Les arbitres avaient reçu « Match programmé » pour une manche supprimée
  * (marque `STAFF`, encore valable) : son retrait leur sera poussé après le
  * commit — la marque part avec la manche. Mêmes conditions qu'un retrait par
- * l'arbitre : la manche n'est pas jouée, et tient encore l'horaire poussé
- * (un horaire déjà retiré, ou jamais remplacé chez eux, ne se retire pas deux
- * fois).
+ * l'arbitre : la manche n'est pas jouée, et la marque tient encore un horaire
+ * valable — celui que montrent leurs appareils (un retrait déjà poussé l'a
+ * oubliée : il ne se pousse pas deux fois).
  */
 async function noteStaffRemovals(connection: PoolConnection, rows: readonly DoomedRow[]): Promise<void> {
-  const open = rows.filter((row) => row.start_at !== null && !isPlayedMatchStatus(String(row.status)));
+  const open = rows.filter((row) => !isPlayedMatchStatus(String(row.status)));
   if (open.length === 0) return;
   const staffRows: HeldRow[] = [];
   try {
@@ -424,11 +424,7 @@ async function noteStaffRemovals(connection: PoolConnection, rows: readonly Doom
     if (isMissingTableError(error)) return;
     throw error;
   }
-  const startOf = new Map(open.map((row) => [Number(row.id), new Date(row.start_at as Date | string).getTime()]));
   const times = stillValidTimes(staffRows);
-  for (const [matchId, startAt] of times) {
-    if (new Date(startAt).getTime() !== startOf.get(matchId)) times.delete(matchId);
-  }
   if (times.size === 0) return;
   const matches = await loadWithdrawnMatches(connection, [...times.keys()]);
   const posters = new Map(open.map((row) => [Number(row.id), toPoster(row)]));

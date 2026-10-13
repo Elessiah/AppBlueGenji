@@ -69,7 +69,7 @@ export type MatchScheduleChange = {
   toldStartAt: string | null;
   /**
    * L'horaire poussé aux arbitres en dernier (`STAFF`, `null` : aucun) — seul
-   * celui-là voit son retrait poussé ({@link refereesWerePushed}).
+   * celui-là voit son retrait poussé ({@link staffTimeToRemove}).
    */
   staffStartAt: string | null;
   /**
@@ -288,7 +288,11 @@ async function logScheduleCleared(
   // Les arbitres avaient reçu « Match programmé » pour cet horaire : l'avis de
   // retrait le remplace sur leur appareil (même étiquette).
   if (!stillCurrent(row, change) || isPlayedMatchStatus(row.status)) return;
-  if (!refereesWerePushed(change, now)) return;
+  // L'horaire que montrent leurs appareils : le dernier qui les a atteints,
+  // pas forcément le dernier posé (un changement qui n'a atteint personne a
+  // rendu la marque à l'horaire d'avant).
+  const shown = staffTimeToRemove(change, now);
+  if (shown === null) return;
   const { pushed } = await notifyStaff({
     topic: "MATCH_SCHEDULED",
     excludeUserIds: change.actor ? [change.actor.id] : [],
@@ -304,27 +308,28 @@ async function logScheduleCleared(
           bracket: String(row.bracket),
           roundNumber: Number(row.round_number),
           swiss: isSwissRound(row),
-          startAt: change.previousStartAt,
+          startAt: shown,
         },
         locale,
       ),
   });
   // Retiré chez eux : un retrait ne se pousse qu'une fois.
-  if (pushed > 0) await forgetStaffPush(change.matchId, change.previousStartAt);
+  if (pushed > 0) await forgetStaffPush(change.matchId, shown);
 }
 
 /**
- * Les arbitres ont-ils reçu l'horaire retiré ? Seulement s'il est celui que
- * tient la marque `STAFF` (posée quand « Match programmé » les a atteints) —
- * une date seulement journalisée (passée, match joué ou tournoi clos à la
- * pose) n'a rien à remplacer —, et s'il vaut encore (devant, ou passé de moins
- * de 12 h).
+ * L'horaire à retirer chez les arbitres, ou `null` : celui que tient la marque
+ * `STAFF` — le dernier « Match programmé » qui les a atteints, même si un
+ * changement plus récent n'a atteint personne —, s'il vaut encore (devant, ou
+ * passé de moins de 12 h). Sans marque, rien à remplacer : la date n'a été que
+ * journalisée (passée, match joué ou tournoi clos à la pose), ou son retrait
+ * a déjà été poussé.
  */
-export function refereesWerePushed(change: MatchScheduleChange, now: Date = new Date()): boolean {
-  if (change.previousStartAt === null || change.staffStartAt === null) return false;
-  const previous = new Date(change.previousStartAt).getTime();
-  if (!Number.isFinite(previous) || new Date(change.staffStartAt).getTime() !== previous) return false;
-  return previous > now.getTime() - HELD_TIME_GRACE_MS;
+export function staffTimeToRemove(change: MatchScheduleChange, now: Date = new Date()): string | null {
+  if (change.staffStartAt === null) return null;
+  const shown = new Date(change.staffStartAt).getTime();
+  if (!Number.isFinite(shown) || shown <= now.getTime() - HELD_TIME_GRACE_MS) return null;
+  return change.staffStartAt;
 }
 
 /** Horaire effacé : journal, avis aux arbitres, et aux joueurs qui l'avaient reçu. */
