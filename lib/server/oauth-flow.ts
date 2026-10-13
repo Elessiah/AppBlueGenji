@@ -67,6 +67,7 @@ import {
 import { DEFAULT_LOCALE, isLocale, localeHref, type Locale } from "@/lib/shared/locales";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
+import { requestNavigationProvenance } from "@/lib/server/request-origin";
 
 /** Où retombe un rattachement, réussi ou non. */
 const PROFILE_PATH = "/profil";
@@ -160,20 +161,6 @@ function linkFailure(base: string, provider: OAuthProvider, code: string, locale
 }
 
 /**
- * Le départ vient-il d'un clic sur une page du site ? `Sec-Fetch-Site`, posé
- * par le navigateur et hors de portée d'une page, le dit : `same-origin`
- * seulement. Un lien d'un autre site (`cross-site`), d'un sous-domaine
- * (`same-site`) ou un favori, une adresse tapée (`none`) n'ont pas choisi la
- * langue de la page — la route de départ est un `GET` sans contrôle de
- * provenance, qu'un autre site peut faire ouvrir. Sans l'en-tête (navigateur
- * ancien, qui ne le pose jamais), la langue est retenue comme avant.
- */
-function startedFromSitePage(req: NextRequest): boolean {
-  const site = req.headers.get("sec-fetch-site");
-  return site === null || site === "same-origin";
-}
-
-/**
  * Départ : pose l'état et envoie le navigateur chez le fournisseur.
  *
  * `intent=link` **exige une session ici**, et non au retour. Les deux contrôles
@@ -190,8 +177,17 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
   // pas de champ de plus, la langue se relit dans la destination au retour.
   const redirectTo = sealedReturnPath(req.nextUrl.searchParams.get("redirect"), locale);
   const intent: OAuthIntent = req.nextUrl.searchParams.get("intent") === "link" ? "LINK" : "LOGIN";
-  const termsAccepted = req.nextUrl.searchParams.get("terms") === "1";
-  const localeFromPage = startedFromSitePage(req);
+  // Ce que la route de départ — un `GET` sans contrôle de provenance, qu'un
+  // autre site peut faire ouvrir — scelle de la page de départ ne doit pas
+  // pouvoir être choisi par ce site (`navigationProvenance`) :
+  // - la **langue** ne devient celle du compte que pour un départ prouvé venu
+  //   d'une page du site — un doute la laisse telle qu'elle est (lot 9-3) ;
+  // - les **conditions** cochées sont écartées pour un départ prouvé venu
+  //   d'ailleurs ; dans le doute (navigateur ancien sans en-têtes), elles
+  //   valent comme avant, sans quoi une inscription y bouclerait sur « terms ».
+  const provenance = requestNavigationProvenance(req);
+  const localeFromPage = provenance === "site";
+  const termsAccepted = provenance !== "elsewhere" && req.nextUrl.searchParams.get("terms") === "1";
 
   if (intent === "LINK") {
     const user = await getCurrentUser();
@@ -335,8 +331,8 @@ async function completeLogin(
     await createSession(userId, `LOGIN_${provider}`);
     // La langue du compte suit celle de la page d'où l'on s'est connecté
     // (lot 9-3, `lib/server/users/account-locale.ts`) ; jamais bloquant. Un
-    // départ venu d'ailleurs que d'une page du site ne la change pas
-    // (`startedFromSitePage`) : il n'a pas choisi de langue.
+    // départ qui ne vient pas, preuve à l'appui, d'une page du site ne la
+    // change pas (`localeFromPage`) : il n'a pas choisi de langue.
     if (saved.localeFromPage) await recordLoginLocale(userId, locale);
   } catch (error) {
     // Un compte neuf sans les conditions acceptées : la page de connexion le

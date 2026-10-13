@@ -4,7 +4,9 @@ import { fail, type ApiError } from "@/lib/server/http";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import {
   CROSS_SITE_REQUEST,
+  navigationProvenance,
   requestOriginRefusal,
+  type NavigationProvenance,
 } from "@/lib/shared/request-origin";
 
 /**
@@ -71,4 +73,13 @@ export function rejectCrossSiteRequest(
   );
   if (refusal === null) return null;
   return fail(refusal, refusal === CROSS_SITE_REQUEST ? 403 : 415);
+}
+
+/** Provenance d'une navigation vers le site (voir `navigationProvenance`). */
+export function requestNavigationProvenance(req: Request): NavigationProvenance {
+  return navigationProvenance({
+    secFetchSite: req.headers.get("sec-fetch-site"),
+    referer: req.headers.get("referer"),
+    siteHosts: siteHosts(req),
+  });
 }

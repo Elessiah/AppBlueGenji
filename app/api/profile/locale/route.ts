@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 import { INVALID_LOCALE, recordAccountLocale } from "@/lib/server/users/account-locale";
+import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isLocale } from "@/lib/shared/locales";
 
 /**
@@ -25,9 +26,9 @@ export async function PUT(req: Request) {
   if (!isLocale(locale)) return fail(INVALID_LOCALE, 400);
 
   try {
-    // Compte supprimé entre-temps : rien d'écrit, et la session n'a plus lieu
-    // d'être — même code que les autres écritures du profil.
-    if (!(await recordAccountLocale(user.id, locale))) return fail("ACCOUNT_DELETED", 409);
+    // Compte supprimé entre-temps : rien d'écrit — même code que les autres
+    // écritures du profil (`profile-update.ts`, avatar).
+    if (!(await recordAccountLocale(user.id, locale))) return fail(ACCOUNT_DELETED_ERROR, 409);
     return ok({ locale });
   } catch (error) {
     console.error("[profile] PUT locale failed:", error);
