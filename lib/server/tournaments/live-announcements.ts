@@ -273,6 +273,11 @@ async function announce(group: AnnouncementGroup): Promise<number> {
       `channel-closed ${context}`,
       `[live-announce] ${label} : salon #live fermé au bot (introuvable ou sans permission d'écrire), ${retry}`,
     );
+  } else if (outcome === "discord-held") {
+    warnOnce(
+      `discord-held ${context}`,
+      `[live-announce] ${label} : Discord a retenu l'annonce (mode lent, AutoMod ou panne passagère — cause au canal de logs du bot), ${retry}`,
+    );
   } else {
     warnOnce(
       `unavailable ${context}`,

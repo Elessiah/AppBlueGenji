@@ -593,23 +593,44 @@ export async function pushLeadershipAlert(
  * - `rejected` — le bot a refusé le corps (`400`) : le renvoyer tel quel ne
  *   changerait rien, l'annonce est abandonnée ;
  * - `channel-closed` — le bot a répondu `503` : salon #live introuvable ou
- *   fermé au bot, rien n'est parti ;
+ *   fermé au bot (permission), rien n'est parti ;
+ * - `discord-held` — le bot a répondu `503` pour une autre raison qu'il
+ *   nomme (`reason`) : mode lent, AutoMod, panne passagère de Discord ;
  * - `uncertain` — le bot n'a pas répondu à temps : il a pu publier quand même
  *   (Discord lent). L'appelant **garde** sa réservation : une annonce perdue
  *   vaut mieux qu'un second `@everyone` à tout le serveur ;
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
  *
- * Sur `channel-closed` et `unavailable`, l'appelant rend sa réservation et
- * réessaiera.
+ * Sur `channel-closed`, `discord-held` et `unavailable`, l'appelant rend sa
+ * réservation et réessaiera.
  */
 export type LiveAnnouncementOutcome =
   | "posted"
   | "posted-silent"
   | "rejected"
   | "channel-closed"
+  | "discord-held"
   | "uncertain"
   | "unavailable";
+
+/** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
+const CHANNEL_CLOSED_REASONS = new Set(["missing", "no-view", "no-send", "send-denied"]);
+
+/**
+ * Classe un `503` du bot par sa raison (`reason`). Un bot qui ne la donne pas
+ * (version antérieure) est lu comme un salon fermé, comme avant.
+ */
+async function classifyUnavailable(response: Response): Promise<"channel-closed" | "discord-held"> {
+  try {
+    const body = (await response.json()) as { reason?: unknown } | null;
+    const reason = body?.reason;
+    if (typeof reason === "string" && !CHANNEL_CLOSED_REASONS.has(reason)) return "discord-held";
+  } catch {
+    // Corps illisible : lu comme un salon fermé.
+  }
+  return "channel-closed";
+}
 
 /** Vrai si `fetch` a échoué parce que le délai d'attente est écoulé. */
 function isTimeoutError(error: unknown): boolean {
@@ -671,7 +692,7 @@ export async function pushLiveAnnouncement(
     // #live lui est fermé (`503`, permission retirée) : il a répondu, le
     // coupe-circuit n'a pas à s'ouvrir — il suspendrait les rappels et alertes
     // de fond pour un réglage de salon ; l'annonce attendra.
-    if (response.status === 503) return "channel-closed";
+    if (response.status === 503) return classifyUnavailable(response);
     if (response.status === 404) return "unavailable";
     recordFailure();
     return "unavailable";
