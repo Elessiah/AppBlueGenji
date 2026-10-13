@@ -96,6 +96,14 @@ function sitePath(value) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
     return "/";
   }
+  // Jamais une route d'API (même règle que `leadsToApi`, côté serveur) : ouverte
+  // d'ici, elle partirait du site comme un clic sur la page.
+  try {
+    const path = decodeURIComponent(new URL(value, self.location.origin).pathname).toLowerCase();
+    if (/^\/(?:(?:en|fr)\/)?api(?:\/|$)/.test(path)) return "/";
+  } catch {
+    return "/";
+  }
   return value;
 }
 

@@ -75,18 +75,30 @@ export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDI
 }
 
 /**
- * Le chemin mène-t-il à une route d'API, **tel que le navigateur le
- * résoudra** (`.`/`..` retirés, encodage défait, préfixe de langue ôté) ? Un
- * encodage illisible est tenu pour suspect.
+ * Le chemin d'une destination **tel que le navigateur le résoudra** (`.`/`..`
+ * retirés, encodage défait), en minuscules, sans barre finale ni préfixe de
+ * langue (`/en/connexion` est la même page que `/connexion`, lot 6) — ou
+ * `null` si l'encodage est illisible. Seule lecture de « où mène vraiment ce
+ * chemin » : refus des routes d'API ({@link safeRedirectPath}) et de la page de
+ * connexion ({@link signedInLoginRedirect}).
  */
-function leadsToApi(href: string): boolean {
+function resolvedSitePath(href: string): string | null {
   let path: string;
   try {
     path = decodeURIComponent(new URL(href, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
   } catch {
-    return true;
+    return null;
   }
-  return isApiPath(splitLocalePrefix(trimTrailingSlashes(path.toLowerCase()) || "/").path);
+  return splitLocalePrefix(trimTrailingSlashes(path.toLowerCase()) || "/").path;
+}
+
+/**
+ * Le chemin mène-t-il à une route d'API ? Un encodage illisible est tenu pour
+ * suspect. Sert aussi au lien d'une notification push (`pushTargetPath`).
+ */
+export function leadsToApi(href: string): boolean {
+  const path = resolvedSitePath(href);
+  return path === null || isApiPath(path);
 }
 
 /**
@@ -157,14 +169,8 @@ const LOGIN_PATH = "/connexion";
  */
 export function signedInLoginRedirect(value: unknown): string {
   const target = safeRedirectPath(value);
-  let path: string;
-  try {
-    path = decodeURIComponent(new URL(target, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
-  } catch {
-    // Encodage illisible : dans le doute, la destination par défaut.
-    return DEFAULT_REDIRECT;
-  }
-  // `/en/connexion` est la même page (lot 6) : comparée sans préfixe de langue.
-  path = splitLocalePrefix(trimTrailingSlashes(path)).path;
+  const path = resolvedSitePath(target);
+  // Encodage illisible : dans le doute, la destination par défaut.
+  if (path === null) return DEFAULT_REDIRECT;
   return path === LOGIN_PATH || path.startsWith(`${LOGIN_PATH}/`) ? DEFAULT_REDIRECT : target;
 }

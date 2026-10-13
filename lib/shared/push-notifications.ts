@@ -22,6 +22,7 @@
 
 import { can, type Permission, type PlatformRole } from "./permissions";
 import type { Locale } from "./locales";
+import { leadsToApi } from "./safe-redirect";
 
 /**
  * Qui peut recevoir un sujet : tout joueur (`null`), ou seulement le staff qui
@@ -174,13 +175,16 @@ function clip(text: string, max: number): string {
  * Chemin sûr à ouvrir au clic. Un **chemin du site** seulement — une URL
  * absolue vers le site est ramenée à son chemin, tout le reste retombe sur
  * l'accueil : la notification s'affiche sous le nom du site, elle ne doit pas
- * mener ailleurs.
+ * mener ailleurs. Jamais une route d'API (`leadsToApi`) : ouverte par le
+ * service worker, elle partirait du site (`Sec-Fetch-Site: same-origin`), et
+ * un départ OAuth y passerait pour un clic sur la page (revue sécurité, lot 9-3).
  */
 export function pushTargetPath(url: string, siteOrigin: string | null = null): string {
   let path = url.trim();
   if (siteOrigin && path.startsWith(siteOrigin)) path = path.slice(siteOrigin.length) || "/";
   if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return "/";
   if (/[\u0000-\u001f\u007f]/.test(path)) return "/";
+  if (leadsToApi(path)) return "/";
   return path;
 }
 
