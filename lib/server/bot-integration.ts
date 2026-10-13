@@ -633,10 +633,11 @@ export async function pushLiveAnnouncement(
       recordSuccess();
       return "rejected";
     }
-    // Un bot d'une version antérieure ne connaît pas la route : il a répondu,
-    // le coupe-circuit n'a pas à s'ouvrir sur les autres appels ; l'annonce
-    // attendra son déploiement.
-    if (response.status === 404) return "unavailable";
+    // Un bot d'une version antérieure ne connaît pas la route, ou le salon
+    // #live lui est fermé (`503`, permission retirée) : il a répondu, le
+    // coupe-circuit n'a pas à s'ouvrir — il suspendrait les rappels et alertes
+    // de fond pour un réglage de salon ; l'annonce attendra.
+    if (response.status === 404 || response.status === 503) return "unavailable";
     recordFailure();
     return "unavailable";
   } catch {
