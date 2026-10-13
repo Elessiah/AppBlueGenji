@@ -136,13 +136,18 @@ même étiquette que l'annonce qu'il remplace. Chemins couverts :
   constatent sur l'état d'arrivée (`settleDepartures`) : une pose
   intermédiaire de la réconciliation (exemption tranchée) ne prévient pas une
   engagée qui n'avait rien reçu, et n'efface pas l'horaire de celles qui
-  l'avaient ;
+  l'avaient (`withoutSettledLater` : `pushTeamToTarget` et la cascade
+  laissent les marques de ces manches au retour en arrière, qui les efface si
+  l'affiche d'arrivée a changé) ;
 - manches **supprimées** par le moteur — ronde suisse ou de Survie
   réappariée, manche de BlueGenji Survie défaite, arbre final refait, plateau
   périmé reconstruit — et rencontres d'arbre final réécrites sur place.
 
 Avant chaque `DELETE FROM bg_matches` du moteur, `noteDeletedMatches` (même
-filtre, constant) relève les manches dont un horaire a été reçu ; un test
+filtre, constant) lit les manches visées **sous verrou** (une seule table) puis
+leurs marques `TOLD` sous verrou : une marque posée par un envoi concurrent
+après l'image de la transaction n'échappe pas, et un envoi qui n'a pas encore
+posé la sienne attend la suppression puis ne trouve plus la manche ; un test
 balaie les sources pour qu'aucune suppression n'y échappe
 (`departed-notices-wiring.test.ts`). La suppression d'un tournoi entier n'est
 pas couverte (le tournoi disparaît).
@@ -156,7 +161,10 @@ verrouillante sans jointure pour toutes les sortantes (`noteDepartedEntrants`,
 est celui **de l'horaire reçu**, relevé avant le changement (si les deux
 engagées sortent l'une après l'autre, chacune a l'autre pour adversaire),
 jamais l'occupant actuel de l'autre place. Une engagée n'est notée qu'une
-fois par manche et par transaction. L'avis part après le commit avec le
+fois par manche et par transaction, et une manche n'est lue qu'une fois par
+transaction : une seconde sortie sur la même manche (deux remplacements, ou une
+exemption puis une correction) retrouve l'horaire lu par la première, alors
+que ses marques ont été effacées entre-temps (le moteur n'écrit jamais `TOLD`). L'avis part après le commit avec le
 journal (`flushBotLogs`) et se jette avec lui si le changement échoue
 (`discardBotLogs`) — même contrat de cycle de vie ; plafond de 512 avis par
 transaction (une ronde suisse entière réappariée en compte deux par manche ;
@@ -171,9 +179,13 @@ Ce que dit l'avis se décide sur l'état d'arrivée, relu après le commit : une
 engagée **reposée contre le même adversaire dans la même manche** (même
 tournoi, phase, partie de plateau et numéro — une ronde réappariée ou un
 plateau refait recrée ses rencontres) n'a perdu que son horaire et lit
-« Horaire du match retiré » (un nouvel horaire lui sera annoncé), ou rien si la
-nouvelle rencontre a déjà un horaire (son annonce suit) ; les autres lisent
-« Match retiré de ton programme ». L'étiquette reste celle de l'ancienne
+« Horaire du match retiré » (un nouvel horaire lui sera annoncé) — rien si la
+nouvelle rencontre tient le même horaire, ni dans un tournoi sans horaires
+d'arbitrage (`referee_scheduling`) dont la nouvelle rencontre n'en a pas : le
+lancement préviendra, comme après un retrait ; les autres lisent « Match
+retiré de ton programme ». Une rencontre d'arbre final de BlueGenji Survie
+réécrite avec les mêmes engagées dans l'autre sens n'est pas « changée » (paire
+non ordonnée, comme au retour en arrière). L'étiquette reste celle de l'ancienne
 rencontre (l'avis remplace son annonce sur l'appareil) ; le lien du push mène à
 la rencontre qui existe, ou à la page du tournoi quand elle a disparu. Trois
 lectures pour tous les avis (`announceEntrantsWithdrawn` : manches d'avant et
@@ -398,7 +410,8 @@ arbitre rend aussi l'observation posée par `setMatchStartAt`, et le balayage
 annoncera la manche. `setMatchStartAt` est rejoué sur interblocage, ou sur le
 refus de l'isolation par instantané de MariaDB (`ER_CHECKREAD`, 1020)
 (`retryOnDeadlock`, `lib/server/tournaments/deadlock-retry.ts`, partagé avec le
-report de score). Une date posée sur un match au score saisi ne pose pas
+report de score) ; une panne qui persiste ne sort de la route qu'en code
+(`MATCH_SCHEDULE_UPDATE_FAILED`), son texte reste dans pm2. Une date posée sur un match au score saisi ne pose pas
 d'observation (tout part sauf `TOLD`) : si la rencontre revient à jouer, le
 balayage l'annoncera. La place remplacée par `pushTeamToTarget` se lit sous
 verrou (`FOR UPDATE`).
