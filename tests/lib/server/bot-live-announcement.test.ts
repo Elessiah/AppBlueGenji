@@ -67,6 +67,25 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
+  it("rend « discord-held » sur un 503 dont la raison n'est pas le salon (mode lent, AutoMod, panne de Discord)", async () => {
+    for (const reason of ["slowmode-short", "slowmode", "automod", "send-rejected", "discord-unreachable", "discord-down"]) {
+      jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason }, { status: 503 }));
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("discord-held");
+    }
+    expect(isBotCircuitOpen()).toBe(false);
+  });
+
+  it("rend « channel-closed » pour une raison de salon ou de permission", async () => {
+    for (const reason of ["missing", "no-view", "no-send", "send-denied"]) {
+      jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason }, { status: 503 }));
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("channel-closed");
+    }
+  });
+
   it("rend « channel-closed » sur un salon fermé (503) sans ouvrir le coupe-circuit des autres appels", async () => {
     jest
       .spyOn(global, "fetch")

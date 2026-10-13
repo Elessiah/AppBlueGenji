@@ -200,6 +200,16 @@ describe("runLiveAnnouncementSweep", () => {
     expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("salon #live fermé au bot");
   });
 
+  it("Discord a retenu l'annonce : rend la réservation, sans accuser les permissions du bot", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-held");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+    const warning = String(jest.mocked(console.warn).mock.calls[0][0]);
+    expect(warning).toContain("Discord a retenu l'annonce");
+    expect(warning).not.toContain("permission");
+  });
+
   it("un autre match reporté pour la même cause laisse aussi sa trace", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
     mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 55, tournament_id: 7, pairing: "5:6", launch_pairing: "5:6" }]);
