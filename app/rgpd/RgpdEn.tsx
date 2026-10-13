@@ -806,8 +806,8 @@ export function RgpdEn({
           </p>
           <ul>
             <li>
-              <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match reminders,
-              notifications) and the staff-only channels, which carry no player username; and logging in through
+              <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match times and
+              reminders, notifications) and the staff-only channels, which carry no player username; and logging in through
               Discord, if you choose it.
             </li>
             <li>

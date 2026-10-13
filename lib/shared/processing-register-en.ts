@@ -263,7 +263,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     sensitiveData: "None",
     retention: [
       "Certified username: until it is changed or the account is deleted",
-      "Records of reminders and alerts sent (match and step, without content): kept with the match, so with no time limit",
+      "Records of reminders and alerts sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
       "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played",
     ],
     recipients: [
@@ -284,7 +284,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose: "Keeping the staff informed of notable events on the platform",
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
-      "Traceability of refereeing actions (penalties, removal of participants, rollbacks), for moderation",
+      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed), for moderation",
     ],
     legalBasis: "Legitimate interest (administration and oversight of refereeing)",
     dataSubjects: ["Staff"],
@@ -366,7 +366,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exclusion of a user from the relay by moderation — valid for the whole network of partner servers (community moderation), hence the list of exclusions open to the administrators of each server",
       "Activity statistics (/stats command, which shows each person only their own activity; the bot's dashboard)",
       "Confirming memberships of the association and scheduled reminders on its servers",
-      "Delivering messages written by the site: codes, reminders, moderation notices (report naming the person, logo hidden, removed or deleted), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one",
+      "Delivering messages written by the site: codes, match times and reminders, moderation notices (report naming the person, logo hidden, removed or deleted), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one",
     ],
     legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing",
     dataSubjects: [

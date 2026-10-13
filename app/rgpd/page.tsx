@@ -982,7 +982,7 @@ function RgpdFr({
           <ul>
             <li>
               <strong>Discord</strong> (États-Unis) : les messages privés du bot (code de
-              connexion, rappels de match, notifications) et les salons réservés au staff, qui ne
+              connexion, horaires et rappels de match, notifications) et les salons réservés au staff, qui ne
               portent aucun pseudo de joueur ; et la connexion par Discord, si vous la choisissez.
             </li>
             <li>

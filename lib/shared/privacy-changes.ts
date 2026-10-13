@@ -661,6 +661,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
   },
+  // PR #441 : l'horaire d'un match annoncé dès qu'il est posé, changé ou
+  // retiré (et l'engagée retirée d'un match prévenue), un seul rappel la
+  // veille, un nouveau sujet push pour le staff des tournois. `publishedAt` :
+  // lendemain de la mise en ligne.
+  {
+    id: "2026-10-horaires-de-match",
+    publishedAt: "2026-10-15",
+    title: "Horaires de match annoncés, changés ou retirés",
+    summary:
+      "Quand l'arbitrage pose, change ou retire l'horaire d'un de tes matchs, tu en es prévenu aussitôt ; un seul rappel reste, dans les 24 h qui précèdent le coup d'envoi.",
+    details: [
+      "L'annonce part aux joueurs des deux camps du match, en message privé Discord et en notification push si tu les as activées (sujet « Horaires et rappels de match »). Tu es aussi prévenu quand une mise à jour du tournoi te retire, toi ou ton équipe, d'un match dont tu avais reçu l'horaire.",
+      "Les rappels une semaine et une heure avant le match disparaissent.",
+      "Ces messages ne portent aucun pseudo de joueur : des noms d'équipe, ou « Ton match » en tournoi individuel.",
+      "Le site garde, avec le match, l'horaire qui a été annoncé, pour te dire « au lieu du … » s'il change ; il ne garde pas le texte des messages.",
+      "Si tu fais partie du staff des tournois et que tu as activé les notifications push, tu es aussi prévenu quand un autre membre planifie un match, ou en change ou en retire l'horaire (sujet « Matchs planifiés », que tu peux couper dans « Mon profil »). Chaque horaire posé, changé ou retiré est consigné au journal d'activité du staff : sans nom sur Discord, avec le pseudo de son auteur dans les journaux du serveur.",
+    ],
+    links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

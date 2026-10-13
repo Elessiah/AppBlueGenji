@@ -349,6 +349,19 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the “Push notifications” section"],
   },
+  "2026-10-horaires-de-match": {
+    title: "Match times announced, changed or removed",
+    summary:
+      "When the referees set, change or remove the time of one of your matches, you are told right away; a single reminder remains, within the 24 h before kickoff.",
+    details: [
+      "The announcement goes to the players on both sides of the match, by Discord direct message and by push notification if you turned them on (topic “Match times and reminders”). You are also told when a tournament update removes you, or your team, from a match whose time you had received.",
+      "The reminders one week and one hour before the match are gone.",
+      "These messages carry no player username: team names, or “Your match” in a solo tournament.",
+      "The site keeps, with the match, the time that was announced, to tell you “instead of …” if it changes; it does not keep the text of the messages.",
+      "If you are on the tournament staff and turned on push notifications, you are also told when another member schedules a match, or changes or removes its time (topic “Scheduled matches”, which you can turn off in “My profile”). Each time set, changed or removed is recorded in the staff activity log: unnamed on Discord, with its author's username in the server logs.",
+    ],
+    linkLabels: ["Read the “Push notifications” section"],
+  },
 };
 
 /**
