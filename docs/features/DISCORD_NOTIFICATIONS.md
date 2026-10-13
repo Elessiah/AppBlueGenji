@@ -265,7 +265,11 @@ son rappel en double.
 
 **Coût du balayage.** Sa fenêtre se lit par l'index `idx_bg_matches_start_at`
 (sans lui, chaque passage relisait toute l'histoire des matchs), et une manche
-dont le dernier palier (`P1D`) est déjà pris n'y est plus relue. Une première
+dont le dernier palier (`P1D`) est déjà pris n'y est plus relue ; une manche
+déjà observée n'y est lue qu'à l'ouverture de son premier palier (24 h avant) —
+au-delà, seules les manches jamais vues (à annoncer). Les marques
+d'observation et d'horaire reçu viennent avec chaque manche, dans la même
+requête. Une première
 observation dont un palier ne peut être réservé rend sa marque `SEEN` : le
 passage suivant annoncera la manche. L'horaire écrit par `setMatchStartAt`
 perd ses millisecondes (la colonne `DATETIME` les arrondirait), pour que les
@@ -282,7 +286,10 @@ réservation ne vaut que **pour l'horaire lu** (`INSERT … SELECT … WHERE
 start_at = ?`) : un arbitre qui déplace la manche entre la lecture du balayage
 et son envoi la fait échouer, et l'annonce du nouvel horaire garde son
 palier. Juste avant l'envoi, la pose de `TOLD` relit l'horaire actuel de la
-manche : déplacé depuis, rien ne part (l'annonce de l'arbitre s'en charge).
+manche et ses engagées : horaire déplacé ou engagée remplacée depuis, rien ne
+part (l'annonce de l'arbitre, ou celle de la nouvelle affiche, s'en charge) ;
+un avis de retrait dont la marque `TOLD` a disparu entre-temps ne part pas non
+plus.
 Une réservation qui échoue (attente de verrou, interblocage) est journalisée
 et réessayée au passage suivant, sans retenir les autres manches. Une marque
 `TOLD` prise par un envoi concurrent n'est ni réécrite ni rendue par le
