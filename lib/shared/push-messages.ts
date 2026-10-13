@@ -217,26 +217,33 @@ export function matchScheduleClearedPush(side: ScheduledMatchSide, locale: Local
  * (même règle que pour les joueurs). Une place encore vide se lit « TBD »,
  * comme sur le plateau et au journal.
  */
+type StaffScheduleInput = {
+  tournamentId: number;
+  tournamentName: string;
+  matchId: number;
+  team1Name: string | null;
+  team2Name: string | null;
+  solo: boolean;
+  bracket: string;
+  roundNumber: number;
+  startAt: string | Date;
+};
+
+/** « A contre B » pour l'arbitrage : « Un match » en solo, « TBD » pour une place vide. */
+function staffPairing(input: StaffScheduleInput, text: PushText): string {
+  const tbd = text.t("matchScheduled.tbd");
+  return input.solo
+    ? text.t("matchScheduled.pairingSolo")
+    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+}
+
 export function matchScheduledStaffPush(
-  input: {
-    tournamentId: number;
-    tournamentName: string;
-    matchId: number;
-    team1Name: string | null;
-    team2Name: string | null;
-    solo: boolean;
-    bracket: string;
-    roundNumber: number;
-    startAt: string | Date;
-  },
+  input: StaffScheduleInput,
   announcement: ScheduleAnnouncement,
   locale: Locale = DEFAULT_LOCALE,
 ): PushContent {
   const text = TEXT[locale];
-  const tbd = text.t("matchScheduled.tbd");
-  const pairingText = input.solo
-    ? text.t("matchScheduled.pairingSolo")
-    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+  const pairingText = staffPairing(input, text);
   return {
     title: announcementTitle(null, announcement.rescheduled, text),
     body: scheduleBody(
@@ -253,6 +260,26 @@ export function matchScheduledStaffPush(
     // Étiquette distincte de l'annonce aux joueurs : un arbitre engagé dans le
     // match garde les deux, plutôt que de voir sa version joueur (« Ton
     // match ») remplacée par la version arbitre (« Un match »).
+    tag: `${matchTag(input.matchId)}-schedule`,
+  };
+}
+
+/**
+ * Horaire retiré, pour l'arbitrage (`MATCH_SCHEDULED`) : `input.startAt` porte
+ * l'horaire qui ne vaut plus. Même étiquette que l'avis « programmé » qu'il
+ * remplace sur l'appareil.
+ */
+export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("matchReminder.titleCleared"),
+    body: text.t("matchScheduled.bodyCleared", {
+      previous: pushMatchStart(input.startAt, locale),
+      pairing: staffPairing(input, text),
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
     tag: `${matchTag(input.matchId)}-schedule`,
   };
 }

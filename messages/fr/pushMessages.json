@@ -21,7 +21,8 @@
   },
   "matchScheduled": {
     "pairingSolo": "Un match",
-    "tbd": "TBD"
+    "tbd": "TBD",
+    "bodyCleared": "L'horaire du {previous} (heure de Paris) est retiré. {pairing} · {tournament}, {round}."
   },
   "round": {
     "playoff": "Play-offs · tour {round}",

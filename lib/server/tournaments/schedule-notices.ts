@@ -15,7 +15,8 @@
  *
  * Une date **effacée** est journalisée et, si les joueurs avaient reçu
  * l'horaire et qu'il était encore devant, leur est annoncée (« Horaire du
- * match retiré ») ; pas de push aux arbitres. Rien ne part pour une date
+ * match retiré ») ; les arbitres aussi, si l'horaire était encore devant (leur
+ * avis « programmé » est remplacé). Rien ne part pour une date
  * inchangée ; une date déjà passée (correction d'archive) ou posée sur un
  * match déjà joué n'est que journalisée. Tout est au
  * meilleur effort et après le commit : l'horaire est enregistré, une panne de
@@ -30,7 +31,7 @@ import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/sh
 import type { ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
 import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
-import { matchScheduledStaffPush } from "@/lib/shared/push-messages";
+import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "./match-reminders";
 
 type ScheduledMatchInfoRow = RowDataPacket & {
@@ -187,23 +188,47 @@ export function isAnnounceableClearing(change: MatchScheduleChange, now: Date = 
 
 /** Ligne du journal pour un horaire retiré. */
 async function logScheduleCleared(change: MatchScheduleChange & { previousStartAt: string }): Promise<void> {
-  if (!change.actor) return;
   const row = await loadMatchInfo(change.matchId);
   if (!row) return;
-  publishStaffAction(
-    formatMatchScheduleClearedLog({
-      tournament: { id: Number(row.tournament_id), name: String(row.tournament_name) },
-      matchId: change.matchId,
-      bracket: String(row.bracket),
-      roundNumber: Number(row.round_number),
-      ...logEntrants(row),
-      previousStartAt: change.previousStartAt,
-    }),
-    change.actor,
-  );
+  if (change.actor) {
+    publishStaffAction(
+      formatMatchScheduleClearedLog({
+        tournament: { id: Number(row.tournament_id), name: String(row.tournament_name) },
+        matchId: change.matchId,
+        bracket: String(row.bracket),
+        roundNumber: Number(row.round_number),
+        ...logEntrants(row),
+        previousStartAt: change.previousStartAt,
+      }),
+      change.actor,
+    );
+  }
+  // Les arbitres avaient reçu « Match programmé » pour cet horaire encore
+  // devant : l'avis de retrait le remplace sur leur appareil (même étiquette).
+  const previous = new Date(change.previousStartAt).getTime();
+  if (row.status === "COMPLETED" || !Number.isFinite(previous) || previous <= Date.now()) return;
+  await notifyStaff({
+    topic: "MATCH_SCHEDULED",
+    excludeUserIds: change.actor ? [change.actor.id] : [],
+    push: (locale) =>
+      matchScheduleClearedStaffPush(
+        {
+          tournamentId: Number(row.tournament_id),
+          tournamentName: String(row.tournament_name),
+          matchId: change.matchId,
+          team1Name: row.team1_name,
+          team2Name: row.team2_name,
+          solo: toParticipantType(row.participant_type) === "SOLO",
+          bracket: String(row.bracket),
+          roundNumber: Number(row.round_number),
+          startAt: change.previousStartAt,
+        },
+        locale,
+      ),
+  });
 }
 
-/** Horaire effacé : journal, et avis aux joueurs qui l'avaient reçu. */
+/** Horaire effacé : journal, avis aux arbitres, et aux joueurs qui l'avaient reçu. */
 async function notifyScheduleCleared(change: MatchScheduleChange): Promise<void> {
   const { previousStartAt } = change;
   if (previousStartAt === null) return;

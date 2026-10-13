@@ -21,7 +21,8 @@
   },
   "matchScheduled": {
     "pairingSolo": "A match",
-    "tbd": "TBD"
+    "tbd": "TBD",
+    "bodyCleared": "The time set for {previous} (Paris time) has been removed. {pairing} · {tournament}, {round}."
   },
   "round": {
     "playoff": "Playoffs · round {round}",
