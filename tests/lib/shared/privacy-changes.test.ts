@@ -782,10 +782,10 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-langue-du-compte")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, datée du lendemain de la mise en ligne prévue, pour tous les comptes", () => {
+  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
-    expect(entry.publishedAt).toBe("2026-10-13");
+    expect(entry.publishedAt).toBe("2026-10-14");
     expect(entry.audience).toBeUndefined();
   });
 

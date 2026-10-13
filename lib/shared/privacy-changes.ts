@@ -646,11 +646,11 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [{ href: "/rgpd#suivi-sans-compte", label: "Lire le paragraphe « Suivre un tournoi sans compte »" }],
   },
   // Lot i18n 9-3 : la langue du compte (`bg_users.locale`) choisit celle des
-  // notifications push. `publishedAt` : provisoire — à fixer au jour réel de
-  // la mise en ligne par qui fusionne (décision requise du lot).
+  // notifications push. `publishedAt` : lendemain de la mise en ligne
+  // (fusion et déploiement le 13 octobre 2026).
   {
     id: "2026-10-langue-du-compte",
-    publishedAt: "2026-10-13",
+    publishedAt: "2026-10-14",
     title: "Notifications : dans la langue de ton compte",
     summary:
       "Ton compte retient désormais une langue, français ou anglais : les notifications push te parviennent dans cette langue.",
