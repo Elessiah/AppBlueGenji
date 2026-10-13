@@ -120,6 +120,15 @@ concerne plus (le plateau le montre).
 
 ### La marque `TOLD` : un horaire reçu
 
+La ligne `TOLD` retient aussi **l'horaire envoyé** (`bg_match_reminders.start_at`,
+colonne ajoutée par cette PR, aux deux endroits du schéma) : c'est l'horaire que
+les joueurs tiennent. « Au lieu du … » le cite, et « Horaire du match retiré »
+le retire — jamais une date intermédiaire seulement journalisée (date passée
+saisie de travers). Une marque héritée de l'ancien code n'en a pas (`NULL`) :
+on retombe alors sur la date d'avant. L'horaire tenu vaut tant qu'il est devant
+ou passé depuis moins de 12 h (un match en retard qu'on décale ou dont on
+retire l'horaire).
+
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
 rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
 reçoit « reprogrammé »), puis la rend si rien n'a **abouti** (aucun message
