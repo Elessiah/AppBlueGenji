@@ -104,7 +104,8 @@ découvre parte une journée avant l'ouverture du rappel, plutôt qu'à sa place
 
 Une engagée **remplacée** sur l'affiche (correction d'un score amont :
 `vacateSlot` dans `bracket-cascade.ts`, ou `pushTeamToTarget` dans
-`scoring.ts`) efface les marques de la manche, comme un retour en arrière
+`scoring.ts`) efface les marques de la manche (`forgetMatchReminders`,
+`reminder-marks.ts`, seul point de cette règle), comme un retour en arrière
 (`forgetChangedPosters`, `rollback.ts`, comparé après la réconciliation —
 byes reposés compris —, qui épargne une rencontre rendue aux mêmes engagées,
 dans un sens ou dans l'autre ; une rencontre laissée
@@ -119,9 +120,10 @@ concerne plus (le plateau le montre).
 
 ### La marque `TOLD` : un horaire reçu
 
-`dispatchPlannedSend` pose `TOLD` dès qu'une annonce ou un rappel a **abouti**
-(un message privé remis ou un appareil atteint) pour au moins une engagée — un
-bot injoignable sans appareil abonné ne pose rien. Une manche programmée avant
+`dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
+rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
+reçoit « reprogrammé »), puis la rend si rien n'a **abouti** (aucun message
+privé remis, aucun appareil atteint — bot injoignable sans appareil abonné). Une manche programmée avant
 l'arrivée de `TOLD` a ses preuves héritées recopiées en `TOLD` au démarrage
 (voir « Passage à `TOLD` ») : `TOLD` est la seule source (`MATCH_TOLD_KEYS`). Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
@@ -133,10 +135,10 @@ arbitres).
 
 **Passage à `TOLD` (déploiement de la PR #441).** Deux reprises de données,
 au démarrage (`RECENT_SCHEMA_CHANGES`), sans effet une seconde fois : tout
-palier hérité est recopié en `TOLD` (l'ancien code ne les posait qu'avec un
-message) — `P7D` / `PT1H` toujours, le nouveau code ne les écrivant jamais,
-`P1D` seulement tant qu'aucune marque `TOLD` n'existe (le nouveau code le
-réserve avant l'envoi) ; et une marque `SEEN` posée seule, en silence, par
+palier hérité `P7D` / `PT1H` est recopié en `TOLD` (l'ancien code ne les
+posait qu'avec un message, le nouveau ne les écrit jamais ; `P1D` n'est pas
+lu — le nouveau code le réserve avant l'envoi, et l'ancien ne le posait jamais
+sans `P7D`) ; et une marque `SEEN` posée seule, en silence, par
 l'ancien balayage (sept à huit jours avant, dans l'attente du palier « une
 semaine ») est effacée pour une manche à venir, jusqu'au 2026-10-31 — le
 nouveau balayage l'annoncera. À retirer de la liste une fois jouées partout.
@@ -188,6 +190,8 @@ balayage** :
   aucun pseudo de joueur ne passe par Discord — même règle que le push.
 - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la permission
   `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`),
+  et **sauf les joueurs du match** (un arbitre engagé reçoit déjà l'annonce
+  des joueurs, que la version arbitre ne doit pas remplacer sur son appareil),
   pour une date posée ou changée (pas pour un retrait). « Reprogrammé » dès
   qu'une date précédait (ils la voyaient sur le plateau). Même étiquette que
   l'annonce aux joueurs (`rencontre-<id>-reminder`) : un arbitre engagé dans le
