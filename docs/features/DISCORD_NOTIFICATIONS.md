@@ -132,8 +132,9 @@ fait dire « reprogrammé » à la date suivante et « retiré » à une date ef
 Une date posée sur un
 match **déjà joué** (ou dont le score est saisi, `AWAITING_CONFIRMATION`), ou
 déjà passée, n'est que journalisée (ni joueurs, ni arbitres). Le dialogue
-d'horaire de l'arbitre le dit (`schedule.hint` / `hintPlanning`, FR + EN) :
-chaque horaire posé, changé ou retiré est annoncé aux joueurs.
+d'horaire de l'arbitre dit qui sera prévenu (`schedule.notice` /
+`noticePlanning`, ou `noticeTbd` quand une place est encore vide : l'annonce
+attend alors le balayage, dans les 48 h qui précèdent le coup d'envoi).
 
 **Passage à `TOLD` (déploiement de la PR #441).** Deux reprises de données,
 au démarrage (`RECENT_SCHEMA_CHANGES`), sans effet une seconde fois : tout
