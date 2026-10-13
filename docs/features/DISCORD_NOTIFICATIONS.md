@@ -112,7 +112,10 @@ le balayage** :
   déjà ouverts et envoie « Match programmé » (première date) ou « Match
   reprogrammé » (date qui en remplace une autre). Avant, l'annonce attendait la
   prochaine lecture de `/tournois`, et une date posée à plus de huit jours
-  n'était annoncée par rien avant le rappel « une semaine ».
+  n'était annoncée par rien avant le rappel « une semaine ». En tournoi
+  individuel, le message privé (annonce comme rappels) dit « **Ton match** »
+  au lieu de « A contre B » : les deux noms sont des pseudos, et aucun pseudo
+  de joueur ne passe par Discord — même règle que le push.
 - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la permission
   `tournaments`, **sauf l'auteur** du geste (`notifyStaff({ excludeUserIds })`).
 - **Journal Discord** : une ligne `formatMatchScheduledLog` (« 🗓️ Match
