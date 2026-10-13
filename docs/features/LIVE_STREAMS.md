@@ -147,7 +147,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   repostent jamais. La réservation n'est **rendue** que si rien n'est parti —
   bot injoignable ou d'une version antérieure, salon fermé (`503`) — et le
   balayage suivant réessaie tant que le match est à l'antenne ; un refus du
-  corps (`400`) la garde. Elle part avec la ligne du match (suppression du
+  corps (`400`) la garde. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
+  du bot : un salon fermé ne doit pas suspendre les rappels de fond ; côté
+  bot, chaque incident n'est signalé au canal de logs qu'une fois par heure.
+  Elle part avec la ligne du match (suppression du
   tournoi, retour en arrière, plateau régénéré) : un match recréé puis relancé
   est annoncé de nouveau. Une affiche changée par un ré-appariement est une
   autre rencontre, donc une autre annonce.
