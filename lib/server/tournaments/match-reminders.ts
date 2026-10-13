@@ -102,10 +102,8 @@ function playableMatch(row: MatchNotice, startAt: MaybeInstant): ScheduledMatch 
   return { ...row, team1_id, team2_id, team1_name, team2_name, start_at: startAt };
 }
 
-type SentReminderRow = RowDataPacket & {
-  match_id: number;
-  offset_key: string;
-};
+/** Une manche lue par le balayage, avec ses marques d'observation et d'horaire reçu. */
+type SweepMatchRow = ScheduledMatchRow & { seen_mark: number; told_mark: number };
 
 /**
  * Étranglement du balayage.
@@ -119,6 +117,9 @@ const SWEEP_THROTTLE_MS = 60_000;
 
 /** Le palier le plus proche du coup d'envoi : pris, le cycle de rappels est fini. */
 const LAST_REMINDER_KEY = [...MATCH_REMINDER_OFFSETS].sort((a, b) => a.minutesBefore - b.minutesBefore)[0].key;
+
+/** Avance du premier palier (le plus lointain) : avant, une manche observée n'a rien de dû. */
+const FIRST_REMINDER_LEAD_SECONDS = Math.max(...MATCH_REMINDER_OFFSETS.map((offset) => offset.minutesBefore)) * 60;
 
 /** Manches envoyées en même temps par un balayage. */
 const SWEEP_CONCURRENCY = 4;
@@ -156,26 +157,16 @@ async function loadRecipientsByTeam(
   return byTeam;
 }
 
-/** Clés déjà posées pour une manche : paliers envoyés et marque d'observation. */
-async function loadSentReminders(matchIds: number[]): Promise<Map<number, Set<string>>> {
-  const sent = new Map<number, Set<string>>();
-  if (matchIds.length === 0) return sent;
-
-  const db = await getDatabase();
-  const placeholders = matchIds.map(() => "?").join(", ");
-  const [rows] = await db.query<SentReminderRow[]>(
-    `SELECT match_id, offset_key FROM bg_match_reminders WHERE match_id IN (${placeholders})`,
-    matchIds,
-  );
-
-  for (const row of rows) {
-    const matchId = Number(row.match_id);
-    const keys = sent.get(matchId);
-    if (keys) keys.add(row.offset_key);
-    else sent.set(matchId, new Set([row.offset_key]));
-  }
-
-  return sent;
+/**
+ * Clés déjà posées pour une manche du balayage, lues par sa requête même : la
+ * manche n'y est que si son dernier palier n'est pas pris, il ne reste donc à
+ * savoir que l'observation et l'horaire reçu.
+ */
+function sentKeysOf(row: SweepMatchRow): Set<string> {
+  const keys = new Set<string>();
+  if (Number(row.seen_mark) === 1) keys.add(MATCH_SEEN_KEY);
+  if (Number(row.told_mark) === 1) keys.add(MATCH_TOLD_KEY);
+  return keys;
 }
 
 /**
@@ -217,9 +208,18 @@ type ToldMark = {
 
 type ToldStateRow = RowDataPacket & {
   match_start_at: MaybeInstant;
+  match_team1_id: number | null;
+  match_team2_id: number | null;
   told_id: number | null;
   start_at: MaybeInstant;
 };
+
+/** La manche relue a toujours les engagées de l'envoi. */
+function samePoster(state: ToldStateRow, match: ScheduledMatch): boolean {
+  return (
+    Number(state.match_team1_id) === Number(match.team1_id) && Number(state.match_team2_id) === Number(match.team2_id)
+  );
+}
 
 /** Même instant, `null` compris (une chaîne `dateStrings` ou une `Date`). */
 function sameInstant(a: MaybeInstant, b: MaybeInstant): boolean {
@@ -241,9 +241,11 @@ const UNTOUCHED = (matchId: number): ToldMark => ({
  * joueurs ne tiendront plus d'horaire). Une marque déjà là garde de quoi être
  * rendue. `null` : personne à prévenir.
  *
- * Relit au passage l'horaire **actuel** de la manche : un arbitre qui l'a
- * déplacé (ou retiré, ou reposé) depuis la lecture de l'envoi a fait partir sa
- * propre annonce — envoyer celle-ci dirait aux joueurs un horaire périmé.
+ * Relit au passage l'horaire et les engagées **actuels** de la manche : un
+ * arbitre qui l'a déplacée (ou en a retiré, ou reposé l'horaire) depuis la
+ * lecture de l'envoi a fait partir sa propre annonce — envoyer celle-ci dirait
+ * aux joueurs un horaire périmé ; une engagée remplacée entre-temps (correction
+ * de score) n'a rien à recevoir de l'ancienne affiche.
  *
  * @param sentStart L'horaire que l'envoi annonce (`null` : un avis de retrait,
  *                  la manche ne doit plus en avoir).
@@ -259,17 +261,19 @@ async function openToldMark(
   const matchId = Number(match.id);
   const db = await getDatabase();
   const [rows] = await db.execute<ToldStateRow[]>(
-    `SELECT m.start_at AS match_start_at, r.id AS told_id, r.start_at
+    `SELECT m.start_at AS match_start_at, m.team1_id AS match_team1_id, m.team2_id AS match_team2_id,
+            r.id AS told_id, r.start_at
        FROM bg_matches m
        LEFT JOIN bg_match_reminders r ON r.match_id = m.id AND r.offset_key = ?
       WHERE m.id = ? LIMIT 1`,
     [MATCH_TOLD_KEY, matchId],
   );
   const state = rows[0];
-  if (!state || !sameInstant(state.match_start_at, sentStart)) return "stale";
+  if (!state || !sameInstant(state.match_start_at, sentStart) || !samePoster(state, match)) return "stale";
   if (state.told_id === null) {
-    // Un avis de retrait suppose la marque : sans elle, rien à poser.
-    if (sentStart === null) return null;
+    // Un avis de retrait suppose la marque : effacée depuis (affiche changée,
+    // retour en arrière), personne ne tient plus cet horaire — rien ne part.
+    if (sentStart === null) return "stale";
     // Perdue au profit d'un envoi concurrent : celui-ci n'a rien écrit, il n'a
     // rien à rendre — sans quoi il effacerait l'horaire que l'autre a remis.
     if (!(await claimToldMark(matchId, sentStart))) return UNTOUCHED(matchId);
@@ -525,24 +529,23 @@ async function dispatchPlannedSend(
 }
 
 /**
- * Manches non jouées aux deux engagées connues. Un score déjà saisi
- * (`AWAITING_CONFIRMATION`) dit que la rencontre a eu lieu : rien à annoncer.
+ * Manches du balayage : à venir, non jouées (un score déjà saisi,
+ * `AWAITING_CONFIRMATION`, dit que la rencontre a eu lieu), aux deux engagées
+ * connues, avec leurs marques d'observation et d'horaire reçu (clé unique).
+ * Le balayage y ajoute sa fenêtre de lecture (index `idx_bg_matches_start_at`).
+ * Paramètres : clé d'observation, clé d'horaire reçu.
  */
-const MATCH_WITH_ENTRANTS_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
+const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
-            t1.name AS team1_name, t2.name AS team2_name
+            t1.name AS team1_name, t2.name AS team2_name,
+            EXISTS (SELECT 1 FROM bg_match_reminders sm WHERE sm.match_id = m.id AND sm.offset_key = ?) AS seen_mark,
+            EXISTS (SELECT 1 FROM bg_match_reminders tm WHERE tm.match_id = m.id AND tm.offset_key = ?) AS told_mark
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')`;
-
-/**
- * Manches à venir, non jouées, aux deux engagées connues — le balayage y ajoute
- * sa fenêtre de lecture (index `idx_bg_matches_start_at`).
- */
-const SCHEDULED_MATCH_SELECT = `${MATCH_WITH_ENTRANTS_SELECT}
+      WHERE m.status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')
         AND m.start_at IS NOT NULL
         AND m.start_at > NOW()`;
 
@@ -624,16 +627,26 @@ async function runSweep(now: Date): Promise<number> {
   // s'ouvre, plutôt qu'à sa place.
   // Une manche dont le dernier palier est déjà pris n'a plus rien à recevoir
   // de ce cycle : elle n'est plus relue à chaque passage (clé unique).
-  const [matches] = await db.query<ScheduledMatchRow[]>(
-    `${SCHEDULED_MATCH_SELECT}
+  // Une manche déjà observée n'a rien à recevoir avant l'ouverture de son
+  // premier palier : au-delà, seule une manche jamais vue (à annoncer) est lue.
+  const [matches] = await db.query<SweepMatchRow[]>(
+    `${SWEEP_MATCH_SELECT}
         AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
+        AND (m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
+             OR NOT EXISTS (SELECT 1 FROM bg_match_reminders seen
+                             WHERE seen.match_id = m.id AND seen.offset_key = ?))
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
                          WHERE done.match_id = m.id AND done.offset_key = ?)`,
-    [Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000), LAST_REMINDER_KEY],
+    [
+      MATCH_SEEN_KEY,
+      MATCH_TOLD_KEY,
+      Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000),
+      FIRST_REMINDER_LEAD_SECONDS,
+      MATCH_SEEN_KEY,
+      LAST_REMINDER_KEY,
+    ],
   );
   if (matches.length === 0) return 0;
-
-  const sentByMatch = await loadSentReminders(matches.map((m) => Number(m.id)));
 
   // La réservation précède le chargement des destinataires : elle est ce qui
   // interdit le doublon, et la retarder d'une requête ouvrirait la fenêtre
@@ -645,7 +658,7 @@ async function runSweep(now: Date): Promise<number> {
     // les autres manches : celles déjà réservées doivent partir, sans quoi leur
     // palier serait consommé sans message. Celle-ci réessaiera au passage suivant.
     try {
-      planned.push(...(await planMatchSends(match, now, sentByMatch.get(Number(match.id)) ?? new Set())));
+      planned.push(...(await planMatchSends(match, now, sentKeysOf(match))));
     } catch (error) {
       console.error("[match-reminders] réservation de rappel en échec", error);
     }
