@@ -27,6 +27,7 @@ import {
   validateRecruitmentAdInput,
   isSafeRecruitmentContactUrl,
   recruitmentContactHref,
+  recruitmentDiscordHref,
   RECRUITMENT_FIELD_ERRORS,
   type RecruitmentAd,
 } from "@/lib/shared/recruitment";
@@ -539,5 +540,35 @@ describe("recruitmentContactHref — bouton « Postuler »", () => {
       expect(source).toContain("recruitmentContactHref(ad.contactUrl)");
       expect(source).not.toMatch(/href=\{ad\.contactUrl\}/);
     }
+  });
+});
+
+describe("recruitmentDiscordHref — contact Discord (revue juridique #439, passe 7)", () => {
+  it("fait un lien d'une invitation ou d'un profil Discord", () => {
+    expect(recruitmentDiscordHref("discord.gg/abc")).toBe("https://discord.gg/abc");
+    expect(recruitmentDiscordHref(" https://discord.com/invite/abc ")).toBe("https://discord.com/invite/abc");
+    expect(recruitmentDiscordHref("https://discordapp.com/users/1")).toBe("https://discordapp.com/users/1");
+  });
+
+  it("ne fait jamais un lien d'un pseudo ni d'un autre hôte (le site et ses routes d'API compris)", () => {
+    expect(recruitmentDiscordHref("arbitre_bg")).toBeNull();
+    expect(recruitmentDiscordHref("https://bluegenji.example/api/auth/google/start?terms=1&lang=en")).toBeNull();
+    expect(recruitmentDiscordHref("https://discord.gg.evil.example/x")).toBeNull();
+    expect(recruitmentDiscordHref(null)).toBeNull();
+  });
+
+  it("refuse à l'enregistrement un lien qui ne mène pas chez Discord, rattaché au champ", () => {
+    expect(
+      validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "https://bluegenji.example/api/auth/google/start?terms=1" }),
+    ).toEqual({ ok: false, error: "CONTACT_DISCORD_INVALID" });
+    expect(validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "discord.gg/abc" }).ok).toBe(true);
+    expect(validateRecruitmentAdInput({ ...EN, title: "X", contactDiscord: "arbitre_bg" }).ok).toBe(true);
+    expect(RECRUITMENT_FIELD_ERRORS.CONTACT_DISCORD_INVALID).toBe("contactDiscord");
+  });
+
+  it("ContactTags ne rend un lien que par recruitmentDiscordHref", () => {
+    const source = readFileSync(join(__dirname, "../../..", "components/recruitment/ContactTags.tsx"), "utf8");
+    expect(source).toContain("recruitmentDiscordHref(ad.contactDiscord)");
+    expect(source).toContain("href={discordHref}");
   });
 });
