@@ -26,6 +26,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { inBatches } from "@/lib/shared/in-batches";
 import { toIso } from "@/lib/server/serialization";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
@@ -355,15 +356,22 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
   ];
   const names = new Map<number, string>();
   if (teamIds.length > 0) {
-    const db = await getDatabase();
-    const [rows] = await db.query<(RowDataPacket & { id: number; name: string })[]>(
-      `SELECT id, name FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
-      teamIds,
-    );
-    for (const row of rows) names.set(Number(row.id), String(row.name));
+    // Noms illisibles : le retrait part quand même (« TBD »), la marque étant
+    // partie avec la manche — rien ne pourrait le renvoyer.
+    try {
+      const db = await getDatabase();
+      const [rows] = await db.query<(RowDataPacket & { id: number; name: string })[]>(
+        `SELECT id, name FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
+        teamIds,
+      );
+      for (const row of rows) names.set(Number(row.id), String(row.name));
+    } catch (error) {
+      if (!isMissingTableError(error)) console.error("[notify] noms des engagées illisibles", error);
+    }
   }
   const nameOf = (id: number | null) => (id === null ? null : (names.get(id) ?? null));
-  for (const removal of removals) {
+  // Quelques-uns à la fois : une ronde entière peut être supprimée d'un coup.
+  await inBatches(removals, STAFF_REMOVAL_CONCURRENCY, async (removal) => {
     const { match } = removal;
     try {
       await notifyStaff({
@@ -389,8 +397,11 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
     } catch (error) {
       if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", error);
     }
-  }
+  });
 }
+
+/** Retraits aux arbitres envoyés en même temps. */
+const STAFF_REMOVAL_CONCURRENCY = 4;
 
 /** Un avis manqué se dit dans pm2 ; une table absente (base en création) se tait. */
 function reportFailures(results: PromiseSettledResult<unknown>[], label: string): void {

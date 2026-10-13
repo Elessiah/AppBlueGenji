@@ -29,6 +29,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { MATCH_STAFF_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
 import { announceEntrantsWithdrawn, type DepartedEntrant, type WithdrawnMatch } from "./match-reminders";
@@ -382,8 +383,8 @@ export async function noteDeletedMatches(
   filterSql: string,
   params: readonly (string | number)[],
 ): Promise<void> {
-  const [rows] = await connection.execute<PosterRow[]>(
-    `SELECT id, team1_id, team2_id FROM bg_matches WHERE ${filterSql} FOR UPDATE`,
+  const [rows] = await connection.execute<DoomedRow[]>(
+    `SELECT id, team1_id, team2_id, status, start_at FROM bg_matches WHERE ${filterSql} FOR UPDATE`,
     [...params],
   );
   if (rows.length === 0) return;
@@ -394,15 +395,23 @@ export async function noteDeletedMatches(
   await noteStaffRemovals(connection, rows);
 }
 
+/** Une manche sur le point d'être supprimée : ses places, son état, son horaire. */
+type DoomedRow = PosterRow & { status: string; start_at: Date | string | null };
+
 /**
  * Les arbitres avaient reçu « Match programmé » pour une manche supprimée
  * (marque `STAFF`, encore valable) : son retrait leur sera poussé après le
- * commit — la marque part avec la manche.
+ * commit — la marque part avec la manche. Mêmes conditions qu'un retrait par
+ * l'arbitre : la manche n'est pas jouée, et tient encore l'horaire poussé
+ * (un horaire déjà retiré, ou jamais remplacé chez eux, ne se retire pas deux
+ * fois).
  */
-async function noteStaffRemovals(connection: PoolConnection, rows: readonly PosterRow[]): Promise<void> {
+async function noteStaffRemovals(connection: PoolConnection, rows: readonly DoomedRow[]): Promise<void> {
+  const open = rows.filter((row) => row.start_at !== null && !isPlayedMatchStatus(String(row.status)));
+  if (open.length === 0) return;
   const staffRows: HeldRow[] = [];
   try {
-    for (const ids of chunkIds(rows.map((row) => Number(row.id)))) {
+    for (const ids of chunkIds(open.map((row) => Number(row.id)))) {
       const [chunkRows] = await connection.execute<HeldRow[]>(
         `SELECT match_id, start_at FROM bg_match_reminders
           WHERE match_id IN (${sqlPlaceholders(ids.length)}) AND offset_key = ?
@@ -415,10 +424,14 @@ async function noteStaffRemovals(connection: PoolConnection, rows: readonly Post
     if (isMissingTableError(error)) return;
     throw error;
   }
+  const startOf = new Map(open.map((row) => [Number(row.id), new Date(row.start_at as Date | string).getTime()]));
   const times = stillValidTimes(staffRows);
+  for (const [matchId, startAt] of times) {
+    if (new Date(startAt).getTime() !== startOf.get(matchId)) times.delete(matchId);
+  }
   if (times.size === 0) return;
   const matches = await loadWithdrawnMatches(connection, [...times.keys()]);
-  const posters = new Map(rows.map((row) => [Number(row.id), toPoster(row)]));
+  const posters = new Map(open.map((row) => [Number(row.id), toPoster(row)]));
   const { staffRemovals } = stateOf(connection);
   for (const [matchId, startAt] of times) {
     const match = matches.get(matchId);
