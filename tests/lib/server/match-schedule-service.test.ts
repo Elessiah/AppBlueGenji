@@ -246,8 +246,10 @@ describe("setMatchStartAt", () => {
     expect(marks).toHaveLength(2);
     // L'observation est redatée à l'horaire rendu : un échec tardif de l'avis
     // intermédiaire ne la rend pas.
-    expect(marks[0].sql).toMatch(/^UPDATE bg_match_reminders SET start_at = \? WHERE match_id = \? AND offset_key = \?/);
-    expect(marks[0].params).toEqual([new Date(FUTURE), 42, "SEEN"]);
+    // Reposée si elle manque (match à jouer) : le balayage ne réannonce pas l'horaire tenu.
+    expect(marks[0].sql).toMatch(/^INSERT INTO bg_match_reminders \(match_id, offset_key, start_at\) VALUES \(\?, \?, \?\)/);
+    expect(marks[0].sql).toContain("ON DUPLICATE KEY UPDATE start_at = ?");
+    expect(marks[0].params).toEqual([42, "SEEN", new Date(FUTURE), new Date(FUTURE)]);
     expect(marks[1].sql).toMatch(/^DELETE FROM bg_match_reminders/);
     expect(marks[1].sql).toContain("start_at IS NOT NULL AND start_at <> ?");
     expect(marks[1].params).toEqual([42, "SEEN", "TOLD", new Date(FUTURE)]);
@@ -414,6 +416,18 @@ describe("setMatchStartAt", () => {
     expect(writes).toHaveLength(0);
     expect(connection.beginTransaction).not.toHaveBeenCalled();
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("rendue à l'horaire tenu sur un match au score saisi, ne fait que redater l'observation", async () => {
+    const { writes } = world({
+      row: matchRow({ status: "AWAITING_CONFIRMATION", start_at: new Date("2099-08-28T18:30:00Z") }),
+      announced: true,
+      toldStartAt: new Date(FUTURE),
+    });
+    await setMatchStartAt(42, FUTURE);
+    const seen = writes.find((w) => w.sql.includes("bg_match_reminders") && w.params.includes("SEEN"));
+    expect(seen?.sql).toMatch(/^UPDATE bg_match_reminders SET start_at = \?/);
+    expect(writes.some((w) => w.sql.startsWith("INSERT"))).toBe(false);
   });
 
   it("ne pose pas d'observation sur un match au score saisi : s'il revient à jouer, le balayage l'annoncera", async () => {
