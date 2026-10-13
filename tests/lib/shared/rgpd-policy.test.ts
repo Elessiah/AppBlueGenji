@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
   DONNEES_PROFIL,
@@ -260,5 +262,16 @@ describe("DONNEE_SAUVEGARDES", () => {
   it("nomme l'hébergeur et le chiffrement", () => {
     expect(DONNEE_SAUVEGARDES.finalite).toMatch(/Hetzner, en Allemagne/);
     expect(DONNEE_SAUVEGARDES.finalite).toMatch(/chiffrées/i);
+  });
+});
+
+describe("/rgpd — données obligatoires : la langue du compte (revue juridique #439)", () => {
+  const read = (file: string) => readFileSync(join(__dirname, "../../..", file), "utf8");
+
+  it("dit en FR et en EN que tout compte garde une langue, non facultative et modifiable", () => {
+    expect(read("app/rgpd/page.tsx")).toMatch(/Il garde aussi une langue, français ou anglais \(le français par défaut\)/);
+    expect(read("app/rgpd/page.tsx")).toMatch(/elle n&apos;est pas facultative, mais vous la changez quand vous voulez/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/It also keeps a language, French or English \(French by default\)/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/it is not optional, but you\s+can change it whenever you like/);
   });
 });
