@@ -238,8 +238,15 @@ describe("setMatchStartAt", () => {
       toldStartAt: new Date(FUTURE),
     });
     await setMatchStartAt(42, FUTURE);
-    // Ni ménage ni marque reposée : le rappel déjà parti pour cet horaire ne repart pas.
-    expect(writes.some((w) => w.sql.includes("bg_match_reminders"))).toBe(false);
+    // Ni ménage général ni marque reposée : le rappel déjà parti pour cet
+    // horaire ne repart pas. Seul part un palier daté d'un **autre** horaire
+    // (pris pour une date intermédiaire dont l'annonce n'a atteint personne),
+    // sans quoi le rappel 24 h de l'horaire rendu sauterait pour de bon.
+    const marks = writes.filter((w) => w.sql.includes("bg_match_reminders"));
+    expect(marks).toHaveLength(1);
+    expect(marks[0].sql).toMatch(/^DELETE FROM bg_match_reminders/);
+    expect(marks[0].sql).toContain("start_at IS NOT NULL AND start_at <> ?");
+    expect(marks[0].params).toEqual([42, "SEEN", "TOLD", new Date(FUTURE)]);
   });
 
   it("garde la marque `TOLD` au ménage d'une date changée", async () => {
