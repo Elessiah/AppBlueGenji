@@ -214,8 +214,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   balayage, pas d'un geste du staff, donc aucune ligne `staff-audit`. Un report
   est averti dans pm2 au plus une fois par heure, par cause et par match (ou
   groupe), la cause distincte :
-  « salon #live fermé au bot » (`503`) ou « bot injoignable, en panne ou d'une
-  version sans annonces » ; passé deux heures, le match n'est plus réessayé.
+  « salon #live fermé au bot » (`503` de salon ou de permission), « Discord a
+  retenu l'annonce » (`503` de mode lent, d'AutoMod ou de panne passagère —
+  la cause exacte est au canal de logs du bot) ou « bot injoignable, en panne
+  ou d'une version sans annonces » ; passé deux heures, le match n'est plus réessayé.
   Un refus du corps (`400`) ou un délai dépassé n'est tracé que dans pm2
   (`console.error`). Côté bot, un salon fermé, une panne ou une permission
   manquante est signalé dans le canal de logs, au plus une fois par heure par
