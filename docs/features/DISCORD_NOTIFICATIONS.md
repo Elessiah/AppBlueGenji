@@ -578,6 +578,19 @@ tous les arbitres. Il ne bornait qu'une rafale — sept cents messages par jour
 restaient possibles —, d'où un second plafond, `ISSUE_REPORT_DAILY_RULE`
 (vingt par 24 h et par utilisateur), qui couvre une soirée difficile.
 
+## Information des joueurs (RGPD)
+
+L'annonce immédiate des horaires (posés, changés, retirés), l'avis à l'engagée
+retirée d'un match, la fin des paliers « une semaine » et « 1 h » et le sujet
+push `MATCH_SCHEDULED` du staff sont annoncés par l'entrée
+`2026-10-horaires-de-match` de `PRIVACY_CHANGES` (FR + EN) : aucune donnée
+nouvelle sur les joueurs, mais un sujet push fondé sur le consentement ouvert
+d'office aux abonnés du staff (l'entrée nomme le réglage qui le coupe), l'horaire
+annoncé gardé avec le match (`bg_match_reminders.start_at`) et chaque geste de
+planification nommé dans pm2. Registre : T04 (traces : match, palier et horaire
+annoncé), T05 (horaires parmi les gestes d'arbitrage tracés), T08 (messages
+remis), T12 ; `/rgpd` (section 08, ID Discord, transferts) dans les deux langues.
+
 ## Configuration
 
 Côté site, rien de nouveau : le canal interne existant (`BOT_INTERNAL_URL`,
