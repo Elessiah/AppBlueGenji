@@ -150,11 +150,13 @@ async function claimAnnouncement(matchId: number, pairing: string): Promise<bool
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
-/** Rend une réservation : rien n'est parti, le prochain balayage réessaiera. */
-async function releaseAnnouncement(matchId: number, pairing: string): Promise<void> {
+/** Rend les réservations d'un groupe, en une requête : rien n'est parti, le prochain balayage réessaiera. */
+async function releaseAnnouncements(rows: readonly LiveCandidateRow[]): Promise<void> {
   try {
     const db = await getDatabase();
-    await db.execute(`DELETE FROM bg_live_announcements WHERE match_id = ? AND pairing = ?`, [matchId, pairing]);
+    const placeholders = rows.map(() => "(?, ?)").join(", ");
+    const params = rows.flatMap((row) => [Number(row.id), String(row.pairing)]);
+    await db.execute(`DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (${placeholders})`, params);
   } catch (error) {
     console.error("[live-announce] réservation non rendue", error);
   }
@@ -171,7 +173,10 @@ const LIVE_WARN_COOLDOWN_MS = 60 * 60 * 1000;
 
 const lastWarnAt = new Map<string, number>();
 
-/** Avertit pm2 d'une panne, au plus une fois par heure et par nature de panne. */
+/**
+ * Avertit pm2 d'une panne, au plus une fois par heure et par clé : la cause
+ * **et** les matchs, pour que chaque match reporté laisse sa trace.
+ */
 function warnOnce(kind: string, message: string): void {
   const now = Date.now();
   const last = lastWarnAt.get(kind);
@@ -180,9 +185,9 @@ function warnOnce(kind: string, message: string): void {
   console.warn(`${message} (avertissement répété au plus une fois par heure)`);
 }
 
-/** « 40, 41 » : les matchs d'un groupe, pour les traces. */
-function matchIdsOf(group: AnnouncementGroup): string {
-  return group.rows.map((row) => Number(row.id)).join(", ");
+/** Identifiants des matchs d'un groupe. */
+function matchIdsOf(group: AnnouncementGroup): number[] {
+  return group.rows.map((row) => Number(row.id));
 }
 
 /**
@@ -204,10 +209,10 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     pairings: group.rows.map((row) => ({ team1Name: String(row.team1_name), team2Name: String(row.team2_name) })),
   });
   const ids = matchIdsOf(group);
-  const plural = group.rows.length > 1;
+  const plural = ids.length > 1;
   const noun = plural ? "matchs" : "match";
-  const label = `${noun} ${ids} (tournoi ${Number(first.tournament_id)})`;
-  const context = `live-announce match-${group.rows.map((row) => Number(row.id)).join(",")}`;
+  const label = `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`;
+  const context = `live-announce match-${ids.join(",")}`;
   const outcome = await pushLiveAnnouncement(message, group.url, context);
   if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
@@ -227,16 +232,16 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     console.error(`[live-announce] ${label} : bot sans réponse à temps, annonce peut-être publiée, non réessayée`);
     return 0;
   }
-  for (const row of group.rows) await releaseAnnouncement(Number(row.id), String(row.pairing));
+  await releaseAnnouncements(group.rows);
   const retry = "annonce reportée, réessayée tant que le match a commencé depuis moins de deux heures";
   if (outcome === "channel-closed") {
     warnOnce(
-      "channel-closed",
+      `channel-closed ${context}`,
       `[live-announce] ${label} : salon #live fermé au bot (introuvable ou sans permission d'écrire), ${retry}`,
     );
   } else {
     warnOnce(
-      "unavailable",
+      `unavailable ${context}`,
       `[live-announce] ${label} : bot injoignable, en panne ou d'une version sans annonces, ${retry}`,
     );
   }
