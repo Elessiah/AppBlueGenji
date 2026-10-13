@@ -36,6 +36,7 @@ import {
   notifyUsers,
   type NotificationRecipient,
 } from "@/lib/server/notify";
+import { usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush } from "@/lib/shared/push-messages";
 import {
   FIRST_SCHEDULE,
@@ -147,7 +148,16 @@ async function loadRecipientsByTeam(
     [...playersByTeam.values()].flat(),
     "declared",
   );
-  const byUser = new Map(recipients.map((recipient) => [recipient.userId, recipient]));
+  // Seuls comptent les joueurs qu'un message atteindrait : un tag Discord, ou
+  // un appareil abonné aux rappels. Une engagée sans aucun ne pose pas la
+  // marque d'horaire reçu (qui ferait dire « reprogrammé » à des joueurs qui
+  // n'ont rien reçu), et ne coûte ni écriture ni lecture d'abonnements.
+  const pushable = await usersReachableByPush(
+    recipients.filter((recipient) => recipient.discord === null).map((recipient) => recipient.userId),
+    "MATCH_REMINDER",
+  );
+  const reachable = recipients.filter((recipient) => recipient.discord !== null || pushable.has(recipient.userId));
+  const byUser = new Map(reachable.map((recipient) => [recipient.userId, recipient]));
   const byTeam = new Map<number, NotificationRecipient[]>();
   for (const [teamId, userIds] of playersByTeam) {
     byTeam.set(

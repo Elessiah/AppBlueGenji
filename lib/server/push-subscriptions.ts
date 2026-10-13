@@ -159,6 +159,34 @@ export type PushOptions = {
 };
 
 /**
+ * Comptes qu'un push de ce sujet atteindrait : au moins un appareil abonné, le
+ * sujet non coupé, compte non supprimé — la règle de `pushToUsers`, en une
+ * lecture pour toute une liste. Sans configuration push, ou sans la table
+ * (création avalée au démarrage) : personne.
+ */
+export async function usersReachableByPush(
+  userIds: readonly number[],
+  topic: PushTopic,
+  config: WebPushConfig | null = webPushConfig(),
+): Promise<Set<number>> {
+  const ids = [...new Set(userIds.filter((id) => Number.isInteger(id) && id > 0))];
+  if (!config || ids.length === 0) return new Set();
+  const db = await getDatabase();
+  const rows = await rowsOrEmptyIfMissingTable(
+    db.query<(RowDataPacket & { user_id: number })[]>(
+      `SELECT DISTINCT s.user_id
+         FROM bg_push_subscriptions s
+         JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
+        WHERE s.user_id IN (${ids.map(() => "?").join(", ")})
+          AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
+                          WHERE o.user_id = s.user_id AND o.topic = ?)`,
+      [...ids, topic],
+    ),
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
+}
+
+/**
  * Remet un message à tous les appareils des comptes donnés, sauf ceux qui ont
  * coupé ce sujet et les comptes supprimés.
  *
