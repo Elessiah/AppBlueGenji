@@ -199,13 +199,13 @@ export async function pushToUsers(
     const origin = siteBaseUrl();
     const payloads = new Map<Locale, string>();
     const payloadFor = (raw: unknown): string => {
-      const locale = accountLocaleFromRow(raw);
+      // Un contenu non traduit est français, pour tous : une seule charge,
+      // quelle que soit la langue des comptes, et sa langue déclarée est `fr`.
+      const locale = typeof content === "function" ? accountLocaleFromRow(raw) : DEFAULT_LOCALE;
       let payload = payloads.get(locale);
       if (payload === undefined) {
-        // Un contenu non traduit est français : sa langue déclarée aussi.
         const localized = typeof content === "function" ? content(locale) : content;
-        const lang = typeof content === "function" ? locale : DEFAULT_LOCALE;
-        payload = JSON.stringify(buildPushPayload(topic, localized, origin, lang));
+        payload = JSON.stringify(buildPushPayload(topic, localized, origin, locale));
         payloads.set(locale, payload);
       }
       return payload;

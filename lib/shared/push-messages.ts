@@ -18,7 +18,10 @@
  * notification à rédiger par langue (`LocalizedPushContent`). Les messages
  * privés Discord, eux, restent en français (D6).
  *
- * Module pur : chaque rédacteur se teste sans réseau.
+ * Module pur : chaque rédacteur se teste sans réseau. **Serveur seulement**
+ * malgré son dossier : il embarque les deux langues et les catégories des deux
+ * `reports.json` — aucun module client ne doit l'atteindre, même par un détour
+ * (`tests/lib/shared/push-messages-server-side.test.ts`).
  */
 import enPush from "@/messages/en/pushMessages.json";
 import frPush from "@/messages/fr/pushMessages.json";
