@@ -119,6 +119,22 @@ async function reopenEngineResolved(
 }
 
 /**
+ * Une engagée **quitte** l'affiche : les marques de rappel (horaire reçu,
+ * observation, palier) appartenaient à l'ancienne, la remplaçante n'a rien
+ * reçu et doit recevoir l'annonce — même règle que `pushTeamToTarget`, qui ne
+ * la verrait plus (le créneau étant vide quand la nouvelle équipe y arrive).
+ * Table tolérée absente, comme dans `./rollback.ts`.
+ */
+async function forgetDepartedPosterReminders(
+  connection: PoolConnection,
+  targetId: number,
+  leaving: boolean,
+): Promise<void> {
+  if (!leaving) return;
+  await ignoreMissingTable(connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [targetId]));
+}
+
+/**
  * Vide un créneau d'aval et défait tout ce qui en était descendu.
  *
  * `keepTeamId` : l'équipe que la correction va reposer dans ce créneau. S'il
@@ -168,14 +184,7 @@ async function vacateSlot(
      WHERE id = ?`,
     [statusFromTeams(team1 === null ? null : Number(team1), team2 === null ? null : Number(team2)), targetId],
   );
-  // Les marques de rappel (horaire reçu, observation, palier) appartenaient à
-  // l'ancienne affiche : la remplaçante n'a rien reçu, et doit recevoir
-  // l'annonce — même règle que `pushTeamToTarget`, qui ne la verrait plus.
-  if (leaving) {
-    await ignoreMissingTable(
-      connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [targetId]),
-    );
-  }
+  await forgetDepartedPosterReminders(connection, targetId, leaving);
   return reopened;
 }
 
