@@ -322,7 +322,10 @@ async function dispatchPlannedSend(
   return dispatched;
 }
 
-/** Manches non jouées aux deux engagées connues. */
+/**
+ * Manches non jouées aux deux engagées connues. Un score déjà saisi
+ * (`AWAITING_CONFIRMATION`) dit que la rencontre a eu lieu : rien à annoncer.
+ */
 const MATCH_WITH_ENTRANTS_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type,
@@ -331,7 +334,7 @@ const MATCH_WITH_ENTRANTS_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.r
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.status <> 'COMPLETED'`;
+      WHERE m.status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')`;
 
 /**
  * Manches à venir, non jouées, aux deux engagées connues — le balayage y ajoute

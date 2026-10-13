@@ -251,7 +251,7 @@
     "loading": "Loading…",
     "notes": {
       "GOOGLE": "One-click login. No email address is saved.",
-      "DISCORD": "Login, verification of your tag, and match reminders by direct message.",
+      "DISCORD": "Login, verification of your tag, and match times and reminders by direct message.",
       "BLIZZARD": "Login, and your BattleTag kept up to date by Blizzard."
     },
     "linked": "Linked",

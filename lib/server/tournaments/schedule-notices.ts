@@ -113,6 +113,11 @@ async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | n
   return rows[0] ?? null;
 }
 
+/** La rencontre a eu lieu : jouée, ou score saisi en attente de confirmation. */
+function isPlayed(status: string): boolean {
+  return status === "COMPLETED" || status === "AWAITING_CONFIRMATION";
+}
+
 /** Les deux engagées d'une manche pour le journal (`null` : place encore vide). */
 function logEntrants(row: ScheduledMatchInfoRow): { team1: LogEntrant | null; team2: LogEntrant | null } {
   const participantType = toParticipantType(row.participant_type);
@@ -146,7 +151,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string },
   if (change.actor) publishStaffAction(line, change.actor);
   // Un match joué ne se rejouera pas : la date est une correction d'archive,
   // tracée au journal mais annoncée à personne (les joueurs non plus).
-  if (!push || row.status === "COMPLETED") return 0;
+  if (!push || isPlayed(row.status)) return 0;
 
   // L'auteur ne se prévient pas lui-même. Un arbitre qui joue ce match reçoit
   // les deux versions (étiquettes distinctes) : un doublon plutôt qu'une
@@ -206,7 +211,7 @@ async function logScheduleCleared(change: MatchScheduleChange & { previousStartA
   // Les arbitres avaient reçu « Match programmé » pour cet horaire encore
   // devant : l'avis de retrait le remplace sur leur appareil (même étiquette).
   const previous = new Date(change.previousStartAt).getTime();
-  if (row.status === "COMPLETED" || !Number.isFinite(previous) || previous <= Date.now()) return;
+  if (isPlayed(row.status) || !Number.isFinite(previous) || previous <= Date.now()) return;
   await notifyStaff({
     topic: "MATCH_SCHEDULED",
     excludeUserIds: change.actor ? [change.actor.id] : [],
