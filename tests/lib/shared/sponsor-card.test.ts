@@ -79,6 +79,21 @@ describe("sponsorWebsiteHref", () => {
   );
 });
 
+describe("sponsorWebsiteHref — jamais une route d'API (revue juridique #439)", () => {
+  it.each([
+    "https://bluegenji.example/api/auth/google/start?terms=1&lang=en",
+    "https://bluegenji.example//api/auth/google/start?terms=1",
+    "https://bluegenji.example/en/api/auth/discord/start",
+    "http://bluegenji.example/x/..//api/a",
+  ])("refuse %p", (url) => {
+    expect(sponsorWebsiteHref(url)).toBeNull();
+  });
+
+  it("garde un site dont le chemin ne mène pas à /api", () => {
+    expect(sponsorWebsiteHref("https://exemple.fr/apis-et-outils")).toBe("https://exemple.fr/apis-et-outils");
+  });
+});
+
 describe("sponsorWebsiteLabel", () => {
   it("shows the host without www", () => {
     expect(sponsorWebsiteLabel("https://www.instant-gaming.com/?igr=gamer-1")).toBe("instant-gaming.com");

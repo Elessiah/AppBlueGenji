@@ -503,6 +503,9 @@ describe("lien de candidature (contactUrl) — revue juridique #439", () => {
       "https://bluegenji.example/api/auth/discord/start?terms=1",
       "https://bluegenji.example/en/api/auth/google/start",
       "https://bluegenji.example/%61pi/x/../api/auth/google/start",
+      // Barres répétées : le serveur mène `//api/…` à `/api/…` (passe 4).
+      "https://bluegenji.example//api/auth/google/start?terms=1&lang=en",
+      "https://bluegenji.example/x/..//api/a",
       "javascript:alert(1)",
       "http://support.example/ticket",
       "data:text/html,x",

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DEFAULT_REDIRECT,
+  leadsToApi,
   loginDestination,
   safeRedirectPath,
   sealedReturnLocale,
@@ -315,5 +316,15 @@ describe("signedInLoginRedirect — /en/connexion est la même page", () => {
 
   it("garde une autre page anglaise", () => {
     expect(signedInLoginRedirect("/en/regles")).toBe("/en/regles");
+  });
+});
+
+describe("leadsToApi — barres répétées en tête (revue juridique #439, passe 4)", () => {
+  it.each(["//api/auth/google/start", "/x/..//api/a", "/\api/x", "///api", "/en//api/x"])("%p mène à l'API", (path) => {
+    expect(leadsToApi(path)).toBe(true);
+  });
+
+  it.each(["/", "/tournois", "/apis", "//tournois"])("%p ne mène pas à l'API", (path) => {
+    expect(leadsToApi(path)).toBe(false);
   });
 });
