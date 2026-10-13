@@ -1,4 +1,5 @@
 import { isStoredUploadIn, toDiskUploadPath } from "./uploads";
+import { leadsToApi } from "./safe-redirect";
 import type { Locale } from "./locales";
 import { checkEnglish, englishCodes, hasEnglish, optionalStaffText } from "./staff-translation";
 
@@ -138,6 +139,22 @@ export type SponsorValidationResult =
   | { ok: false; error: string };
 
 /**
+ * Site d'un partenaire acceptable à l'enregistrement : une adresse absolue
+ * `http(s):` dont le chemin ne mène à aucune route d'API (même règle que le
+ * lien « Postuler » et que `sponsorWebsiteHref` à l'affichage) — un clic sur
+ * `/api/auth/<p>/start?terms=1` partirait d'une page du site et enregistrerait
+ * une acceptation des conditions que personne n'a donnée.
+ */
+function isServableSponsorWebsite(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") && !leadsToApi(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Valide et normalise une entrée de sponsor. Le nom est requis ; le palier
  * (tier) défaut « PARTNER » ; logo/bandeau/site/description sont optionnels et
  * ramenés à `null` si vides. Le bandeau doit être un fichier téléversé
@@ -161,6 +178,7 @@ export function validateSponsorInput(input: SponsorInput): SponsorValidationResu
     return { ok: false, error: "INVALID_LOGO_URL" };
   }
   const websiteUrl = normalizeOptional(input.websiteUrl, SPONSOR_URL_MAX);
+  if (websiteUrl !== null && !isServableSponsorWebsite(websiteUrl)) return { ok: false, error: "INVALID_WEBSITE_URL" };
 
   const bannerUrl = parseSponsorBanner(input.bannerUrl);
   if (bannerUrl === false) return { ok: false, error: "INVALID_BANNER_URL" };
@@ -196,6 +214,7 @@ export function sponsorEnglishMissing(sponsor: Pick<Sponsor, "description" | "de
 /** Champ du formulaire que chaque refus désigne (`useFieldErrors`). */
 export const SPONSOR_FIELD_ERRORS = {
   DESCRIPTION_TOO_LONG: "description",
+  INVALID_WEBSITE_URL: "websiteUrl",
   DESCRIPTION_EN_REQUIRED: "descriptionEn",
   DESCRIPTION_EN_TOO_LONG: "descriptionEn",
 } as const;

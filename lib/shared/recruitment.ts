@@ -472,6 +472,16 @@ export function isSafeRecruitmentContactUrl(value: string): boolean {
 }
 
 /**
+ * Lien « Postuler » servi, ou `null` : un lien enregistré avant la règle et
+ * qu'elle refuse ne devient jamais un bouton. Le formulaire de gestion, lui,
+ * le montre tel quel — l'enregistrer le fait refuser, champ désigné, plutôt
+ * que l'effacer en silence.
+ */
+export function recruitmentContactHref(contactUrl: string | null | undefined): string | null {
+  return contactUrl && isSafeRecruitmentContactUrl(contactUrl) ? contactUrl : null;
+}
+
+/**
  * Valide et normalise une annonce de recrutement. Le titre est requis ; le pôle
  * défaut « AUTRE » ; le statut défaut « OPTIONAL » (facultative). Référent / missions /
  * corps / lien / Discord sont optionnels et ramenés à `null` si vides.

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
 import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import {
@@ -62,7 +63,11 @@ const EMPTY_FORM: FormState = {
 };
 
 /** `id` des champs de la description, cibles de `useFieldErrors`. */
-const DESCRIPTION_FIELD_IDS = { description: "sponsor-description", descriptionEn: "sponsor-description-en" } as const;
+const DESCRIPTION_FIELD_IDS = {
+  description: "sponsor-description",
+  descriptionEn: "sponsor-description-en",
+  websiteUrl: "sponsor-website-url",
+} as const;
 
 /** Traduction des refus de l'API partenaires, affichée en notification. */
 function sponsorErrorMessage(code: string | undefined, fallback: string): string {
@@ -78,6 +83,8 @@ function sponsorErrorMessage(code: string | undefined, fallback: string): string
       return `Description trop longue (${SPONSOR_DESCRIPTION_MAX} caractères maximum).`;
     case "INVALID_BANNER_URL":
       return "Le bandeau doit être un fichier importé.";
+    case "INVALID_WEBSITE_URL":
+      return "Le site web doit être une adresse http(s):// complète, hors route d'API du site.";
     case "INVALID_LOGO_URL":
       return "Ce logo est une image d'une autre partie du site : importe-le ou colle une adresse externe.";
     default:
@@ -557,16 +564,25 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
             </select>
           </label>
 
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Site web (optionnel)</span>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel} htmlFor={DESCRIPTION_FIELD_IDS.websiteUrl}>
+              Site web (optionnel)
+            </label>
             <input
+              id={DESCRIPTION_FIELD_IDS.websiteUrl}
               className={styles.modalInput}
+              inputMode="url"
               value={form.websiteUrl}
               maxLength={2048}
               placeholder="https://exemple.com"
-              onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))}
+              {...fieldErrors.aria("websiteUrl")}
+              onChange={(e) => {
+                fieldErrors.clear("websiteUrl");
+                setForm((f) => ({ ...f, websiteUrl: e.target.value }));
+              }}
             />
-          </label>
+            <FieldErrorText fieldId={DESCRIPTION_FIELD_IDS.websiteUrl} message={fieldErrors.message("websiteUrl")} />
+          </div>
 
           <div className={styles.modalField}>
             <span className={styles.modalLabel}>Bandeau (optionnel)</span>

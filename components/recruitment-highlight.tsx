@@ -19,6 +19,7 @@ import {
   buildRecruitmentPreview,
   isRecruitmentBannerRotating,
   recruitmentAdAnchor,
+  recruitmentContactHref,
   recruitmentModalStart,
   serializeRecruitmentSeen,
 } from "@/lib/shared/recruitment";
@@ -391,6 +392,7 @@ function RecruitmentArrivalModal({
   const ad = ads[position];
   const meta = adMeta(ad, text);
   const preview = buildRecruitmentPreview(ad.body, MODAL_PREVIEW_MAX);
+  const applyHref = recruitmentContactHref(ad.contactUrl);
   const titleId = `recruitment-arrival-title-${ad.id}`;
 
   return (
@@ -444,14 +446,14 @@ function RecruitmentArrivalModal({
           </CyberButton>
           {/* La lecture complète se fait toujours sur la page de recrutement :
               la modale d'accueil reste un teaser, jamais un pavé de 2 000 signes. */}
-          <CyberButton variant={ad.contactUrl ? "ghost" : "primary"} asChild>
+          <CyberButton variant={applyHref ? "ghost" : "primary"} asChild>
             <LocaleLink href={adHref(ad)} onClick={dismiss}>
               {t("highlight.read")}
             </LocaleLink>
           </CyberButton>
-          {ad.contactUrl && (
+          {applyHref && (
             <CyberButton variant="primary" asChild>
-              <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer" onClick={dismiss}>
+              <a href={applyHref} target="_blank" rel="noopener noreferrer" onClick={dismiss}>
                 {t("highlight.apply")}
               </a>
             </CyberButton>

@@ -35,6 +35,7 @@ import {
   RECRUITMENT_PRIORITY_DESCRIPTIONS,
   RECRUITMENT_PRIORITY_EXPOSURE,
   RECRUITMENT_PRIORITY_LABELS,
+  recruitmentContactHref,
 } from "@/lib/shared/recruitment";
 import { AdDetailModal } from "./AdDetailModal";
 import { RecruitmentAdEditor } from "./RecruitmentAdEditor";
@@ -386,6 +387,7 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
     const saved = ads[index] ?? ad;
     const enMissing = isAdmin && !recruitmentAdHasEnglish(saved);
     const preview = buildRecruitmentPreview(ad.body);
+    const applyHref = recruitmentContactHref(ad.contactUrl);
     const canUp = canMoveRecruitmentAd(ads, index, -1);
     const canDown = canMoveRecruitmentAd(ads, index, 1);
     // Pourquoi une flèche est grisée : le filtre, ou la limite de son statut.
@@ -486,9 +488,9 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
         <ContactTags ad={ad} />
 
         <div className={styles.cardFooter}>
-          {ad.contactUrl && (
+          {applyHref && (
             <CyberButton variant={ad.contactPreferred === "LINK" ? "primary" : "ghost"} asChild>
-              <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
+              <a href={applyHref} target="_blank" rel="noopener noreferrer">
                 {t("card.apply")}
               </a>
             </CyberButton>
