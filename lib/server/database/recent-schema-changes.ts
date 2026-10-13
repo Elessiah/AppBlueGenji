@@ -202,6 +202,23 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // choisit la langue des notifications push. Défaut `fr` : tout compte
     // existant garde le français jusqu'à sa prochaine connexion.
     `ALTER TABLE bg_users ADD COLUMN locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr' AFTER terms_accepted_at`,
+    // PR #441 — marque `TOLD` (un horaire reçu, `lib/shared/discord-notifications.ts`).
+    // Données seulement, bornées aux lignes écrites par l'ancien code des
+    // rappels (avant la date ci-dessous, postérieure au déploiement) : rejouées
+    // à chaque démarrage, elles ne font rien une seconde fois.
+    // 1. Un palier posé par l'ancien code l'était toujours avec un message :
+    //    il prouve un horaire reçu.
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
+       SELECT DISTINCT match_id, 'TOLD' FROM bg_match_reminders
+        WHERE offset_key IN ('P7D', 'P1D', 'PT1H') AND sent_at < '2026-10-31'`,
+    // 2. Une marque d'observation seule, posée en silence par l'ancien balayage
+    //    (sept à huit jours avant, dans l'attente du palier « une semaine »
+    //    retiré) : sans elle, la manche sera annoncée par le nouveau balayage.
+    `DELETE r FROM bg_match_reminders r
+       JOIN bg_matches m ON m.id = r.match_id
+       LEFT JOIN bg_match_reminders o ON o.match_id = r.match_id AND o.offset_key <> 'SEEN'
+      WHERE r.offset_key = 'SEEN' AND o.id IS NULL
+        AND r.sent_at < '2026-10-31' AND m.start_at > NOW()`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

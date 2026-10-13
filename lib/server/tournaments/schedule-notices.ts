@@ -16,8 +16,8 @@
  * Une date **effacée** est journalisée et, si les joueurs avaient reçu
  * l'horaire et qu'il était encore devant, leur est annoncée (« Horaire du
  * match retiré ») ; pas de push aux arbitres. Rien ne part pour une date
- * inchangée, ni pour une date posée déjà passée (correction d'archive) ; une
- * date posée sur un match déjà joué n'est que journalisée. Tout est au
+ * inchangée ; une date déjà passée (correction d'archive) ou posée sur un
+ * match déjà joué n'est que journalisée. Tout est au
  * meilleur effort et après le commit : l'horaire est enregistré, une panne de
  * notification n'y change rien.
  */
@@ -119,8 +119,11 @@ function logEntrants(row: ScheduledMatchInfoRow): { team1: LogEntrant | null; te
   return { team1: entrant(row.team1_name), team2: entrant(row.team2_name) };
 }
 
-/** Prévient les arbitres et écrit la ligne du journal. */
-async function notifyReferees(change: MatchScheduleChange & { startAt: string }): Promise<number> {
+/**
+ * Écrit la ligne du journal et, pour une date à annoncer (`push`), prévient les
+ * arbitres.
+ */
+async function notifyReferees(change: MatchScheduleChange & { startAt: string }, push: boolean): Promise<number> {
   const row = await loadMatchInfo(change.matchId);
   if (!row) return 0;
   const participantType = toParticipantType(row.participant_type);
@@ -142,7 +145,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
   if (change.actor) publishStaffAction(line, change.actor);
   // Un match joué ne se rejouera pas : la date est une correction d'archive,
   // tracée au journal mais annoncée à personne (les joueurs non plus).
-  if (row.status === "COMPLETED") return 0;
+  if (!push || row.status === "COMPLETED") return 0;
 
   const { pushed } = await notifyStaff({
     topic: "MATCH_SCHEDULED",
@@ -222,10 +225,12 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
     await notifyScheduleCleared(change);
     return;
   }
-  if (!isAnnounceableSchedule(change)) return;
+  if (startAt === change.previousStartAt) return;
+  // Une date déjà passée (correction d'archive) n'est que journalisée.
+  const announceable = isAnnounceableSchedule(change);
   const results = await Promise.allSettled([
-    announceMatchSchedule(change.matchId, playerAnnouncement(change)),
-    notifyReferees({ ...change, startAt }),
+    announceable ? announceMatchSchedule(change.matchId, playerAnnouncement(change)) : Promise.resolve(0),
+    notifyReferees({ ...change, startAt }, announceable),
   ]);
   for (const result of results) {
     if (result.status === "rejected" && !isMissingTableError(result.reason)) {

@@ -275,7 +275,12 @@ async function loadPosters(connection: PoolConnection, matchIds: readonly number
       `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
-    for (const row of rows) posters.set(Number(row.id), `${row.team1_id ?? ""}:${row.team2_id ?? ""}`);
+    // Paire non ordonnée : les mêmes engagées reposées dans l'autre sens
+    // forment la même affiche.
+    for (const row of rows) {
+      const pair = [row.team1_id, row.team2_id].map((id) => (id === null ? "" : String(Number(id)))).sort();
+      posters.set(Number(row.id), pair.join(":"));
+    }
   }
   return posters;
 }
@@ -285,8 +290,11 @@ async function loadPosters(connection: PoolConnection, matchIds: readonly number
  * changé** une fois re-remplies : leurs nouvelles engagées n'ont reçu aucun
  * horaire et doivent recevoir l'annonce (même règle que `bracket-cascade.ts`).
  * Une rencontre rendue aux mêmes engagées garde les siennes — sans quoi elle
- * serait annoncée une seconde fois. Table tolérée absente, comme dans
- * `deleteMatches`.
+ * serait annoncée une seconde fois. Limite connue : une rencontre laissée
+ * incomplète (le résultat défait ne la remplit plus) perd ses marques, et sera
+ * annoncée de nouveau si le même résultat est ressaisi — une annonce en double
+ * vaut mieux que de nouvelles engagées jamais prévenues. Table tolérée
+ * absente, comme dans `deleteMatches`.
  */
 async function forgetChangedPosters(
   connection: PoolConnection,
