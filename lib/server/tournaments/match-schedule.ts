@@ -165,8 +165,7 @@ async function resetReminderMarks(
   connection: PoolConnection,
   matchId: number,
   startAt: string | null,
-  /** Deux engagées connues, et la rencontre reste à jouer (aucun score saisi). */
-  announceable: boolean,
+  poster: { bothEntrants: boolean; played: boolean },
 ): Promise<ToldSchedule> {
   let told: ToldRow[];
   try {
@@ -185,59 +184,78 @@ async function resetReminderMarks(
   // date déjà passée (correction d'archive, saisie de travers) n'est annoncée à
   // personne : elle laisse aussi les marques en place, que le balayage — qui ne
   // lit que les dates à venir — ignore, et que la date suivante retrouve.
-  if (result.toldStartAt !== null && result.toldStartAt === startAt) {
-    // Le palier pris pour l'horaire intermédiaire (son annonce n'a atteint
-    // personne) ne vaut pas pour celui-ci : gardé, il ferait sauter au balayage
-    // le rappel 24 h de l'horaire rendu, pour de bon. Les marques de l'horaire
-    // rendu (ou héritées, sans horaire) restent. L'observation, elle, est
-    // redatée : un échec tardif de l'avis intermédiaire ne doit pas la rendre
-    // (`releaseDatedMarks` ne rend que les marques de son horaire).
-    // Absente (un passage par un match joué l'a retirée), elle est reposée pour
-    // un match à jouer : sans elle, le balayage réannoncerait un horaire que
-    // les joueurs tiennent déjà. Insertion avant l'effacement, comme plus bas.
-    await connection.execute(
-      announceable
-        ? `INSERT INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)
-           ON DUPLICATE KEY UPDATE start_at = ?`
-        : `UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`,
-      announceable
-        ? [matchId, MATCH_SEEN_KEY, new Date(startAt), new Date(startAt)]
-        : [new Date(startAt), matchId, MATCH_SEEN_KEY],
-    );
-    await connection.execute(
-      `DELETE FROM bg_match_reminders
-        WHERE match_id = ? AND offset_key NOT IN (?, ?) AND start_at IS NOT NULL AND start_at <> ?`,
-      [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY, new Date(startAt)],
-    );
+  if (startAt !== null && result.toldStartAt === startAt) {
+    await restoreHeldMarks(connection, matchId, startAt, poster.bothEntrants);
     return result;
   }
-  if (startAt !== null && new Date(startAt).getTime() <= Date.now()) return result;
-  if (startAt !== null && announceable) {
-    // L'insertion **avant** l'effacement : un `DELETE` sur une manche sans
-    // marque verrouille l'intervalle de l'index qui l'entoure, et une insertion
-    // qui suivrait dans la même transaction attendrait celui qu'une autre
-    // programmation (manche voisine, même intervalle) tient de la même façon —
-    // un interblocage, que la transaction perdante rendrait en refus de
-    // l'horaire. Dans cet ordre, la transaction n'insère plus rien après avoir
-    // verrouillé un intervalle : au pire, l'autre attend son tour.
-    // L'observation porte l'horaire qu'elle couvre : un ancien envoi en échec
-    // ne rend que les marques de son horaire (`releaseClaims`).
-    await connection.execute(
-      `INSERT INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE start_at = ?`,
-      [matchId, MATCH_SEEN_KEY, new Date(startAt), new Date(startAt)],
-    );
+  if (startAt === null || new Date(startAt).getTime() <= Date.now()) return result;
+  if (poster.bothEntrants && !poster.played) {
+    await upsertSeenMark(connection, matchId, startAt);
     await connection.execute(
       `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key NOT IN (?, ?)`,
       [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY],
     );
-  } else if (startAt !== null) {
+  } else {
+    // Une engagée manque, ou la rencontre est jouée (score saisi) : pas
+    // d'observation — le balayage annoncera la manche quand elle sera à jouer.
     await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key <> ?`, [
       matchId,
       MATCH_TOLD_KEY,
     ]);
   }
   return result;
+}
+
+/**
+ * Pose (ou redate) l'observation pour cet horaire — **toujours avant** un
+ * effacement dans la même transaction : un `DELETE` sur une manche sans marque
+ * verrouille l'intervalle de l'index qui l'entoure, et une insertion qui
+ * suivrait attendrait celui qu'une autre programmation (manche voisine, même
+ * intervalle) tient de la même façon — un interblocage, que la transaction
+ * perdante rendrait en refus de l'horaire. Dans cet ordre, la transaction
+ * n'insère plus rien après avoir verrouillé un intervalle.
+ *
+ * L'observation porte l'horaire qu'elle couvre : un ancien envoi en échec ne
+ * rend que les marques de son horaire (`releaseDatedMarks`).
+ */
+async function upsertSeenMark(connection: PoolConnection, matchId: number, startAt: string): Promise<void> {
+  await connection.execute(
+    `INSERT INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE start_at = ?`,
+    [matchId, MATCH_SEEN_KEY, new Date(startAt), new Date(startAt)],
+  );
+}
+
+/**
+ * Date rendue à l'horaire que les joueurs tiennent. Le palier pris pour un
+ * horaire intermédiaire (son annonce n'a atteint personne) ne vaut pas pour
+ * celui-ci : gardé, il ferait sauter au balayage le rappel 24 h de l'horaire
+ * rendu, pour de bon. Les marques de l'horaire rendu (ou héritées, sans
+ * horaire) restent. L'observation est redatée — reposée si elle manque (un
+ * passage par un match joué l'a retirée) —, deux engagées connues : sans elle,
+ * le balayage réannoncerait un horaire tenu, et un échec tardif de l'avis
+ * intermédiaire la rendrait.
+ */
+async function restoreHeldMarks(
+  connection: PoolConnection,
+  matchId: number,
+  startAt: string,
+  bothEntrants: boolean,
+): Promise<void> {
+  if (bothEntrants) {
+    await upsertSeenMark(connection, matchId, startAt);
+  } else {
+    await connection.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
+      new Date(startAt),
+      matchId,
+      MATCH_SEEN_KEY,
+    ]);
+  }
+  await connection.execute(
+    `DELETE FROM bg_match_reminders
+      WHERE match_id = ? AND offset_key NOT IN (?, ?) AND start_at IS NOT NULL AND start_at <> ?`,
+    [matchId, MATCH_SEEN_KEY, MATCH_TOLD_KEY, new Date(startAt)],
+  );
 }
 
 type ToldRow = RowDataPacket & { start_at: Date | string | null };
@@ -325,15 +343,10 @@ export async function setMatchStartAt(
       const told =
         previousStartAt === startAt
           ? NOTHING_TOLD
-          : await resetReminderMarks(
-              connection,
-              matchId,
-              startAt,
-              // Un match joué (score saisi) n'est annoncé à personne : pas
-              // d'observation posée pour lui — s'il revient à jouer, le
-              // balayage l'annoncera.
-              row.team1_id !== null && row.team2_id !== null && !isPlayedMatchStatus(row.status),
-            );
+          : await resetReminderMarks(connection, matchId, startAt, {
+              bothEntrants: row.team1_id !== null && row.team2_id !== null,
+              played: isPlayedMatchStatus(row.status),
+            });
       await connection.commit();
       written = {
         tournamentId: Number(row.tournament_id),

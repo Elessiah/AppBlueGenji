@@ -173,7 +173,8 @@ function sentKeysOf(row: SweepMatchRow): Set<string> {
 }
 
 /**
- * Réserve un palier pour une manche — **pour l'horaire lu** : la réservation
+ * Réserve une marque (observation, palier, horaire reçu) pour une manche —
+ * **pour l'horaire lu** : la réservation
  * échoue si l'horaire a changé depuis la lecture (un arbitre l'a déplacé entre
  * la lecture du balayage et son envoi). Sans cette condition, le balayage
  * enverrait l'ancien horaire et prendrait le palier que l'annonce du nouveau
@@ -184,7 +185,7 @@ function sentKeysOf(row: SweepMatchRow): Set<string> {
  *          `false` si une autre requête l'a prise entre-temps, ou si
  *          l'horaire n'est plus celui-là.
  */
-async function claimReminder(match: ScheduledMatch, offsetKey: string): Promise<boolean> {
+async function claimDatedMark(match: ScheduledMatch, offsetKey: string): Promise<boolean> {
   const db = await getDatabase();
   const matchId = Number(match.id);
   // La ligne retient l'horaire pour lequel elle est prise : seul l'envoi de cet
@@ -286,7 +287,9 @@ async function openToldMark(
     // d'être posée par un autre envoi) — rien ne part d'ici, et rien n'est à
     // rendre. Deux envois d'un même horaire ne coexistent pas : les
     // réservations (observation, palier) en laissent passer un seul.
-    if (!(await claimToldMark(match, sentStart))) return "stale";
+    // L'horaire envoyé est celui de la manche (vérifié juste au-dessus) : la
+    // marque le recopie de la manche, sous la même condition que tout palier.
+    if (!(await claimDatedMark(match, MATCH_TOLD_KEY))) return "stale";
     return { matchId, claimed: true, previous: null, unchanged: false, sent: sentStart };
   }
   const previous = state.start_at === null ? null : new Date(state.start_at);
@@ -341,24 +344,6 @@ async function setToldTime(match: ScheduledMatch, startAt: Date | null): Promise
   );
   return ((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
 }
-
-/**
- * Réserve la marque d'horaire reçu, avec l'horaire envoyé — si la manche porte
- * encore cet horaire et ces engagées (condition dans l'écriture même, comme
- * `claimReminder`). `false` : elle existait, ou la manche a changé.
- */
-async function claimToldMark(match: ScheduledMatch, startAt: Date): Promise<boolean> {
-  const db = await getDatabase();
-  const matchId = Number(match.id);
-  const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
-       SELECT ?, ?, ? FROM bg_matches
-        WHERE id = ? AND start_at = ? AND team1_id = ? AND team2_id = ?`,
-    [matchId, MATCH_TOLD_KEY, startAt, matchId, startAt, Number(match.team1_id), Number(match.team2_id)],
-  );
-  return (result as { affectedRows?: number }).affectedRows === 1;
-}
-
 
 /** Les deux engagées d'une manche, chacune face à l'autre. */
 function matchSides(match: ScheduledMatch): { teamId: number; teamName: string; opponentName: string }[] {
@@ -419,7 +404,7 @@ async function planMatchSends(
     // La marque d'observation fait aussi office de verrou : seule la requête
     // qui la pose annonce, les concurrentes laissent la manche pour le passage
     // suivant.
-    if (!(await claimReminder(match, MATCH_SEEN_KEY))) return [];
+    if (!(await claimDatedMark(match, MATCH_SEEN_KEY))) return [];
 
     // Première observation : l'horaire n'a pas été annoncé à ces engagées
     // (`setMatchStartAt` pose la marque quand il annonce) — on l'annonce, quelle
@@ -428,7 +413,7 @@ async function planMatchSends(
     const claimed = [MATCH_SEEN_KEY];
     try {
       for (const offset of opened) {
-        if (await claimReminder(match, offset.key)) claimed.push(offset.key);
+        if (await claimDatedMark(match, offset.key)) claimed.push(offset.key);
       }
     } catch (error) {
       // Rendue, l'observation laisse l'annonce au passage suivant ; gardée,
@@ -453,7 +438,7 @@ async function planMatchSends(
 
   const planned: PlannedSend[] = [];
   for (const offset of due) {
-    if (await claimReminder(match, offset.key)) {
+    if (await claimDatedMark(match, offset.key)) {
       planned.push({ match, offset, remaining: [], claimed: [offset.key] });
     }
   }
@@ -640,7 +625,7 @@ export async function announceMatchSchedule(
   const send: PlannedSend = { match, offset: null, remaining: [], announcement, claimed: [MATCH_SEEN_KEY] };
   try {
     for (const offset of opened) {
-      if (!(await claimReminder(match, offset.key))) return 0;
+      if (!(await claimDatedMark(match, offset.key))) return 0;
       send.claimed?.push(offset.key);
     }
   } catch (error) {

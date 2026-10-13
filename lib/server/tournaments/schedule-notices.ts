@@ -232,19 +232,11 @@ async function notifyReferees(
 }
 
 /**
- * L'horaire effacé mérite-t-il d'être annoncé aux joueurs ? Reçu, encore
- * devant, et dans un tournoi planifié par l'arbitrage (un nouvel horaire
- * viendra).
+ * L'horaire effacé à annoncer aux joueurs, ou `null` s'il n'y a rien à leur
+ * dire : reçu, encore valable (devant, ou passé de peu), et dans un tournoi
+ * planifié par l'arbitrage (un nouvel horaire viendra).
  */
-export function isAnnounceableClearing(change: MatchScheduleChange, now: Date = new Date()): boolean {
-  return clearedHeldStartAt(change, now) !== null;
-}
-
-/**
- * L'horaire retiré à annoncer aux joueurs, ou `null` s'il n'y a rien à leur
- * dire — la règle de {@link isAnnounceableClearing}, qui rend aussi l'horaire.
- */
-function clearedHeldStartAt(change: MatchScheduleChange, now: Date): string | null {
+export function clearedHeldStartAt(change: MatchScheduleChange, now: Date = new Date()): string | null {
   if (change.startAt !== null || change.previousStartAt === null || !change.refereeScheduling) return null;
   return heldStartAt(change, now);
 }
