@@ -96,11 +96,18 @@ function sitePath(value) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
     return "/";
   }
-  // Jamais une route d'API (même règle que `leadsToApi`, côté serveur) : ouverte
-  // d'ici, elle partirait du site comme un clic sur la page.
+  // Caractère de contrôle : le navigateur le retire avant de résoudre, et
+  // `/\t/autre.site` deviendrait une adresse d'un autre site.
+  if (/[\u0000-\u001f\u007f]/.test(value)) return "/";
+  // Résolu, le lien doit rester sur le site, et ne jamais mener à une route
+  // d'API (règle de `leadsToApi` côté serveur ; tout préfixe de deux lettres
+  // compte pour une langue) : ouverte d'ici, elle partirait du site comme un
+  // clic sur la page.
   try {
-    const path = decodeURIComponent(new URL(value, self.location.origin).pathname).toLowerCase();
-    if (/^\/(?:(?:en|fr)\/)?api(?:\/|$)/.test(path)) return "/";
+    const url = new URL(value, self.location.origin);
+    if (url.origin !== self.location.origin) return "/";
+    const path = decodeURIComponent(url.pathname).toLowerCase();
+    if (/^\/(?:[a-z]{2}\/)?api(?:\/|$)/.test(path)) return "/";
   } catch {
     return "/";
   }
