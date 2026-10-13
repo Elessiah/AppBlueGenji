@@ -60,6 +60,13 @@ export type MatchScheduleChange = {
    * `MATCH_START`, prévient les joueurs).
    */
   refereeScheduling: boolean;
+  /**
+   * Les engagées de la manche **sous le verrou** de l'écriture : celles dont
+   * les marques de rappel viennent d'être remises à jour. Relue ensuite, la
+   * manche peut en avoir changé (score propagé, correction) — ses avis aux
+   * joueurs reviennent alors au balayage.
+   */
+  entrantIds: [number | null, number | null];
   /** Auteur du geste, `null` hors d'une requête du staff. */
   actor: StaffActor | null;
 };
@@ -127,6 +134,17 @@ async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | n
     [matchId],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * La manche relue a les engagées de l'écriture : les marques posées ou lues
+ * sous verrou (`SEEN`, `TOLD`) sont bien les leurs. Sinon (place remplie ou
+ * engagée remplacée entre-temps), annoncer doublerait l'annonce du balayage,
+ * ou préviendrait d'un retrait des joueurs qui n'avaient rien reçu.
+ */
+function sameEntrants(row: ScheduledMatchInfoRow, change: MatchScheduleChange): boolean {
+  const ids = [row.team1_id, row.team2_id].map((id) => (id === null ? null : Number(id)));
+  return ids[0] === change.entrantIds[0] && ids[1] === change.entrantIds[1];
 }
 
 /** La rencontre a eu lieu : jouée, ou score saisi en attente de confirmation. */
@@ -260,7 +278,7 @@ async function notifyScheduleCleared(row: ScheduledMatchInfoRow, change: MatchSc
   if (previousStartAt === null) return;
   const results = await Promise.allSettled([
     logScheduleCleared(row, { ...change, previousStartAt }),
-    isAnnounceableClearing(change)
+    isAnnounceableClearing(change) && sameEntrants(row, change)
       ? announceMatchScheduleCleared(row, heldStartAt(change) ?? previousStartAt)
       : Promise.resolve(0),
   ]);
@@ -300,7 +318,7 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   const announceable = isAnnounceableSchedule(change);
   const playersAlreadyHoldIt = change.alreadyAnnounced && change.toldStartAt === startAt;
   const results = await Promise.allSettled([
-    announceable && !playersAlreadyHoldIt
+    announceable && !playersAlreadyHoldIt && sameEntrants(row, change)
       ? announceMatchSchedule(row, playerAnnouncement(change))
       : Promise.resolve(0),
     notifyReferees(row, { ...change, startAt }, announceable),

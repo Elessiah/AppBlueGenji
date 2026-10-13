@@ -28,6 +28,7 @@ import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import { publishMatchUpdatedEvent } from "./notifications";
+import { lockTournamentRow } from "./registration";
 import { notifyMatchScheduleChange } from "./schedule-notices";
 
 type MatchScheduleRow = RowDataPacket & {
@@ -83,6 +84,19 @@ function scheduleUpdateSql(leaving: boolean, scoreNoted: boolean): string {
           SET start_at = ?, lobby_opened_at = NULL, team1_ready_at = NULL,
               team2_ready_at = NULL, caster_ready_at = NULL
           WHERE id = ?`;
+}
+
+/**
+ * Le tournoi d'une manche, lu **hors transaction** : il ne change jamais, et
+ * une lecture ordinaire dans la transaction, avant ses verrous, y figerait un
+ * état périmé (`REPEATABLE READ`).
+ */
+async function matchTournamentId(connection: PoolConnection, matchId: number): Promise<number | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
+    `SELECT tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
+    [matchId],
+  );
+  return rows[0] ? Number(rows[0].tournament_id) : null;
 }
 
 async function lockScheduleRow(
@@ -182,6 +196,11 @@ async function resetReminderMarks(
 }
 
 type ToldRow = RowDataPacket & { start_at: Date | string | null };
+
+/** Identifiant d'une place de la manche (`null` : vide). */
+function nullableId(value: number | string | null): number | null {
+  return value === null ? null : Number(value);
+}
 type ToldSchedule = { alreadyAnnounced: boolean; toldStartAt: string | null };
 const NOTHING_TOLD: ToldSchedule = { alreadyAnnounced: false, toldStartAt: null };
 
@@ -220,9 +239,18 @@ export async function setMatchStartAt(
       alreadyAnnounced: boolean;
       toldStartAt: string | null;
       refereeScheduling: boolean;
+      entrantIds: [number | null, number | null];
     };
+    const tournamentId = await matchTournamentId(connection, matchId);
+    if (tournamentId === null) throw new Error("MATCH_NOT_FOUND");
     await connection.beginTransaction();
     try {
+      // Le tournoi d'abord, comme toute écriture du moteur (score, correction,
+      // retour en arrière) : sans cet ordre, une correction de score qui efface
+      // les marques de rappel d'une manche voisine (verrou d'intervalle) puis
+      // met à jour celle-ci, et cette programmation qui tient la manche puis
+      // pose sa marque, s'attendraient l'une l'autre — un interblocage.
+      await lockTournamentRow(connection, tournamentId);
       const locked = await lockScheduleRow(connection, matchId);
       if (!locked) throw new Error("MATCH_NOT_FOUND");
       const { row, refereeScheduling } = locked;
@@ -258,6 +286,7 @@ export async function setMatchStartAt(
         previousStartAt,
         ...told,
         refereeScheduling,
+        entrantIds: [nullableId(row.team1_id), nullableId(row.team2_id)],
       };
     } catch (error) {
       await connection.rollback().catch(() => undefined);
@@ -278,6 +307,7 @@ export async function setMatchStartAt(
     alreadyAnnounced: outcome.alreadyAnnounced,
     toldStartAt: outcome.toldStartAt,
     refereeScheduling: outcome.refereeScheduling,
+    entrantIds: outcome.entrantIds,
     actor,
   }).catch(() => undefined);
   return startAt;

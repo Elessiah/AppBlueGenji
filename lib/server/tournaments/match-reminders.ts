@@ -173,16 +173,24 @@ async function loadSentReminders(matchIds: number[]): Promise<Map<number, Set<st
 }
 
 /**
- * Réserve un palier pour une manche.
+ * Réserve un palier pour une manche — **pour l'horaire lu** : la réservation
+ * échoue si l'horaire a changé depuis la lecture (un arbitre l'a déplacé entre
+ * la lecture du balayage et son envoi). Sans cette condition, le balayage
+ * enverrait l'ancien horaire et prendrait le palier que l'annonce du nouveau
+ * attend — qui se tairait. L'`INSERT … SELECT` lit la ligne du match sous
+ * verrou partagé : une programmation en cours est attendue, puis relue.
  *
  * @returns `true` si la réservation est acquise (c'est à nous d'envoyer),
- *          `false` si une autre requête l'a prise entre-temps.
+ *          `false` si une autre requête l'a prise entre-temps, ou si
+ *          l'horaire n'est plus celui-là.
  */
-async function claimReminder(matchId: number, offsetKey: string): Promise<boolean> {
+async function claimReminder(match: ScheduledMatch, offsetKey: string): Promise<boolean> {
   const db = await getDatabase();
+  const matchId = Number(match.id);
   const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key) VALUES (?, ?)`,
-    [matchId, offsetKey],
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key)
+       SELECT ?, ? FROM bg_matches WHERE id = ? AND start_at = ?`,
+    [matchId, offsetKey, matchId, match.start_at],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
@@ -304,19 +312,17 @@ async function planMatchSends(
   now: Date,
   alreadySent: Set<string>,
 ): Promise<PlannedSend[]> {
-  const matchId = Number(match.id);
-
   if (!alreadySent.has(MATCH_SEEN_KEY)) {
     // La marque d'observation fait aussi office de verrou : seule la requête
     // qui la pose annonce, les concurrentes laissent la manche pour le passage
     // suivant.
-    if (!(await claimReminder(matchId, MATCH_SEEN_KEY))) return [];
+    if (!(await claimReminder(match, MATCH_SEEN_KEY))) return [];
 
     // Première observation : l'horaire n'a pas été annoncé à ces engagées
     // (`setMatchStartAt` pose la marque quand il annonce) — on l'annonce, quelle
     // que soit l'échéance.
     const opened = openedMatchReminders(match.start_at, now);
-    for (const offset of opened) await claimReminder(matchId, offset.key);
+    for (const offset of opened) await claimReminder(match, offset.key);
     const openedKeys = new Set(opened.map((offset) => offset.key));
     const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
     // Les joueurs avaient déjà reçu un horaire (manche programmée avant la
@@ -334,95 +340,116 @@ async function planMatchSends(
 
   const planned: PlannedSend[] = [];
   for (const offset of due) {
-    if (await claimReminder(matchId, offset.key)) {
+    if (await claimReminder(match, offset.key)) {
       planned.push({ match, offset, remaining: [] });
     }
   }
   return planned;
 }
 
+/** Une engagée de la manche, face à l'autre. */
+type MatchSide = ReturnType<typeof matchSides>[number];
+
 /**
- * Envoie un envoi retenu aux deux engagées de la manche.
+ * Le message d'un envoi pour une engagée : message privé Discord (français) et
+ * push dans la langue de chaque destinataire.
+ *
+ * @returns L'envoi a-t-il atteint quelqu'un (message privé remis, ou appareil) ?
+ */
+async function sendToSide(
+  { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt }: PlannedSend,
+  side: MatchSide,
+  recipients: NotificationRecipient[],
+): Promise<boolean> {
+  const swiss = isSwissRound(match);
+  const solo = match.participant_type === "SOLO";
+  // Un avis de retrait porte l'horaire qui ne vaut plus.
+  const startAt = clearedStartAt ?? match.start_at;
+  const context = {
+    tournamentName: String(match.tournament_name),
+    tournamentUrl: tournamentPageUrl(Number(match.tournament_id)),
+    teamName: side.teamName,
+    opponentName: side.opponentName,
+    roundLabel: matchRoundLabel(String(match.bracket), Number(match.round_number), swiss),
+    startAt,
+    solo,
+  };
+  const pushSide = {
+    tournamentId: Number(match.tournament_id),
+    tournamentName: context.tournamentName,
+    matchId: Number(match.id),
+    teamName: side.teamName,
+    opponentName: side.opponentName,
+    bracket: String(match.bracket),
+    roundNumber: Number(match.round_number),
+    swiss,
+    startAt,
+    solo,
+  };
+
+  // Le contexte dit au bot (et à ses journaux) de quel message il s'agit.
+  let message: string;
+  let discordContext: string;
+  if (clearedStartAt) {
+    message = buildMatchScheduleClearedNotice(context);
+    discordContext = "match-schedule-cleared";
+  } else if (offset) {
+    message = buildMatchReminderMessage(offset, context);
+    discordContext = "match-reminder";
+  } else {
+    message = buildMatchScheduleAnnouncement(context, remaining, announcement);
+    discordContext = "match-scheduled";
+  }
+
+  const offsetKey = offset ? offset.key : null;
+  const report = await notifyUsers(recipients, {
+    topic: "MATCH_REMINDER",
+    discord: { message, context: discordContext },
+    push: (locale) =>
+      clearedStartAt
+        ? matchScheduleClearedPush(pushSide, locale)
+        : matchReminderPush(pushSide, offsetKey, locale, announcement),
+  });
+  return (report.discord?.sent ?? 0) > 0 || report.pushed > 0;
+}
+
+/**
+ * Envoie un envoi retenu aux deux engagées de la manche, **en même temps** :
+ * chacune attend le bot puis ses appareils, rien ne lie l'une à l'autre.
  *
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 async function dispatchPlannedSend(
-  { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt }: PlannedSend,
+  send: PlannedSend,
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
 ): Promise<number> {
-  let dispatched = 0;
-  let delivered = false;
-  const swiss = isSwissRound(match);
-  const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number), swiss);
-  const url = tournamentPageUrl(Number(match.tournament_id));
-
+  const { match, clearedStartAt } = send;
   // Un horaire parti le dit en base, avec l'horaire envoyé : une date posée
   // plus tard se lira « reprogrammée, au lieu du … », une date effacée
   // « retirée » (`setMatchStartAt`) — ce que ni la marque d'observation ni
   // celle d'un palier ne prouvent. Posée **avant** l'envoi (un arbitre qui
   // corrige sa saisie dans la seconde la lit déjà), rendue à son état d'avant
-  // si rien n'a abouti. Un avis de retrait la garde, sans horaire.
+  // si rien n'a abouti — même sur une erreur. Un avis de retrait la garde,
+  // sans horaire.
   const told = await openToldMark(match, recipientsByTeam, clearedStartAt ? null : new Date(match.start_at));
 
   // Un message par engagée, pas un pour tout le monde : chaque joueur lit
   // « ton équipe contre l'autre », dans le bon sens.
-  for (const side of matchSides(match)) {
-    const recipients = recipientsByTeam.get(side.teamId) ?? [];
-    if (recipients.length === 0) continue;
-
-    const solo = match.participant_type === "SOLO";
-    // Un avis de retrait porte l'horaire qui ne vaut plus.
-    const startAt = clearedStartAt ?? match.start_at;
-    const context = {
-      tournamentName: String(match.tournament_name),
-      tournamentUrl: url,
-      teamName: side.teamName,
-      opponentName: side.opponentName,
-      roundLabel,
-      startAt,
-      solo,
-    };
-    const pushSide = {
-      tournamentId: Number(match.tournament_id),
-      tournamentName: context.tournamentName,
-      matchId: Number(match.id),
-      teamName: side.teamName,
-      opponentName: side.opponentName,
-      bracket: String(match.bracket),
-      roundNumber: Number(match.round_number),
-      swiss,
-      startAt,
-      solo,
-    };
-
-    // Le contexte dit au bot (et à ses journaux) de quel message il s'agit.
-    let message: string;
-    let discordContext: string;
-    if (clearedStartAt) {
-      message = buildMatchScheduleClearedNotice(context);
-      discordContext = "match-schedule-cleared";
-    } else if (offset) {
-      message = buildMatchReminderMessage(offset, context);
-      discordContext = "match-reminder";
-    } else {
-      message = buildMatchScheduleAnnouncement(context, remaining, announcement);
-      discordContext = "match-scheduled";
-    }
-
-    const offsetKey = offset ? offset.key : null;
-    const report = await notifyUsers(recipients, {
-      topic: "MATCH_REMINDER",
-      discord: { message, context: discordContext },
-      push: (locale) =>
-        clearedStartAt
-          ? matchScheduleClearedPush(pushSide, locale)
-          : matchReminderPush(pushSide, offsetKey, locale, announcement),
-    });
-    dispatched += 1;
-    if ((report.discord?.sent ?? 0) > 0 || report.pushed > 0) delivered = true;
-  }
-  await closeToldMark(told, delivered);
-  return dispatched;
+  const targets = matchSides(match)
+    .map((side) => ({ side, recipients: recipientsByTeam.get(side.teamId) ?? [] }))
+    .filter(({ recipients }) => recipients.length > 0);
+  const results = await Promise.allSettled(
+    targets.map(({ side, recipients }) => sendToSide(send, side, recipients)),
+  );
+  // Une engagée atteinte suffit : l'horaire est reçu, même si l'autre envoi a
+  // échoué. Rien d'atteint (ou tout en échec) : la marque reprend son état.
+  await closeToldMark(
+    told,
+    results.some((result) => result.status === "fulfilled" && result.value),
+  );
+  const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failure) throw failure.reason;
+  return targets.length;
 }
 
 /**
@@ -479,11 +506,10 @@ export async function announceMatchSchedule(
 ): Promise<number> {
   const match = playableMatch(notice, notice.start_at);
   if (!match || new Date(match.start_at).getTime() <= now.getTime()) return 0;
-  const matchId = Number(match.id);
 
   const opened = openedMatchReminders(match.start_at, now);
   for (const offset of opened) {
-    if (!(await claimReminder(matchId, offset.key))) return 0;
+    if (!(await claimReminder(match, offset.key))) return 0;
   }
   const openedKeys = new Set(opened.map((offset) => offset.key));
   const remaining = MATCH_REMINDER_OFFSETS.filter((offset) => !openedKeys.has(offset.key));
@@ -535,13 +561,12 @@ async function runSweep(now: Date): Promise<number> {
 
   // La réservation précède le chargement des destinataires : elle est ce qui
   // interdit le doublon, et la retarder d'une requête ouvrirait la fenêtre
-  // qu'elle est censée fermer.
+  // qu'elle est censée fermer. Quelques manches à la fois : une ronde suisse
+  // fraîchement appariée en réserve des dizaines.
   const planned: PlannedSend[] = [];
-  for (const match of matches) {
-    planned.push(
-      ...(await planMatchSends(match, now, sentByMatch.get(Number(match.id)) ?? new Set())),
-    );
-  }
+  await inBatches(matches, SWEEP_CONCURRENCY, async (match) => {
+    planned.push(...(await planMatchSends(match, now, sentByMatch.get(Number(match.id)) ?? new Set())));
+  });
   if (planned.length === 0) return 0;
 
   const teamIds = [
@@ -555,10 +580,16 @@ async function runSweep(now: Date): Promise<number> {
   // doublon quel que soit l'ordre.
   let dispatched = 0;
   await inBatches(planned, SWEEP_CONCURRENCY, async (send) => {
-    // Lu après l'attente : `dispatched += await …` lirait le compteur avant,
-    // et perdrait les envois concurrents du même lot.
-    const sent = await dispatchPlannedSend(send, recipientsByTeam);
-    dispatched += sent;
+    // Un envoi qui échoue ne retient pas les autres : leurs réservations sont
+    // déjà prises, et un passage interrompu les perdrait pour de bon.
+    try {
+      // Lu après l'attente : `dispatched += await …` lirait le compteur avant,
+      // et perdrait les envois concurrents du même lot.
+      const sent = await dispatchPlannedSend(send, recipientsByTeam);
+      dispatched += sent;
+    } catch (error) {
+      console.error("[match-reminders] envoi de rappel en échec", error);
+    }
   });
   return dispatched;
 }
