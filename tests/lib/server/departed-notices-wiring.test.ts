@@ -12,7 +12,7 @@ import {
   noteDepartedEntrants,
 } from "@/lib/server/tournaments/departed-notices";
 import { forgetMatchReminders } from "@/lib/server/tournaments/reminder-marks";
-import { pushTeamToTarget } from "@/lib/server/tournaments/scoring";
+import { pushTeamToTarget } from "@/lib/server/tournaments/target-slot";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";

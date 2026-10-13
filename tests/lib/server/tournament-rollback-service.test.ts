@@ -10,6 +10,7 @@ jest.mock("@/lib/server/tournaments/phases");
 jest.mock("@/lib/server/tournaments/phases-repository");
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/scoring");
+jest.mock("@/lib/server/tournaments/target-slot");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/bot-logs");
 
@@ -22,7 +23,7 @@ import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { loadPhases } from "@/lib/server/tournaments/phases-repository";
 import { resetRegistrationRanks } from "@/lib/server/tournaments/repository";
-import { pushTeamToTarget } from "@/lib/server/tournaments/scoring";
+import { pushTeamToTarget } from "@/lib/server/tournaments/target-slot";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
