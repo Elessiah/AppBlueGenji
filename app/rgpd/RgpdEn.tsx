@@ -751,7 +751,8 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm, of a
-            tournament&apos;s kickoff, of match reminders and of what concerns your account or your team.{" "}
+            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminder, and of what
+            concerns your account or your team.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>

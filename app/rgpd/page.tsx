@@ -921,8 +921,8 @@ function RgpdFr({
         <div className={styles.prose}>
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
-            score à confirmer, du coup d&apos;envoi d&apos;un tournoi, des rappels de match et de ce
-            qui concerne votre compte ou votre équipe. <strong>Rien ne part sans votre geste</strong> :
+            score à confirmer, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
+            changé ou retiré) et de son rappel, et de ce qui concerne votre compte ou votre équipe. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
           </p>
