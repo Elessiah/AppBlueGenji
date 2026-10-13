@@ -17,7 +17,7 @@ jest.mock("@/lib/server/tournaments/reminder-marks", () => ({
 import { getDatabase } from "@/lib/server/database";
 import { forgetStaffPush, markStaffPushed, releaseStaffPush } from "@/lib/server/tournaments/reminder-marks";
 import { notifyStaff } from "@/lib/server/notify";
-import { auditStaffAction, postStaffLog } from "@/lib/server/staff-audit";
+import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
 import {
   heldStartAt,
@@ -80,7 +80,7 @@ function staffCall() {
 }
 
 function logLine(): string {
-  return jest.mocked(postStaffLog).mock.calls[0][0];
+  return jest.mocked(publishStaffAction).mock.calls[0][0];
 }
 
 beforeEach(() => {
@@ -133,7 +133,7 @@ describe("notifyMatchScheduleChange — première date", () => {
 
     await notifyMatchScheduleChange(change());
 
-    expect(postStaffLog).toHaveBeenCalledWith(expect.any(String));
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     expect(auditStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toContain("🗓️ Match programmé — « Coupe BlueGenji » (#7)");
@@ -212,7 +212,7 @@ describe("notifyMatchScheduleChange — rien à annoncer", () => {
     await notifyMatchScheduleChange(change({ previousStartAt: NEW_START }));
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     expect(notifyStaff).not.toHaveBeenCalled();
-    expect(postStaffLog).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
   it("ne fait que journaliser une date posée déjà passée (correction d'archive)", async () => {
@@ -227,14 +227,14 @@ describe("notifyMatchScheduleChange — rien à annoncer", () => {
     mockMatch();
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: null, alreadyAnnounced: true }));
     expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
-    expect(postStaffLog).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
   it("ne prévient pas les arbitres d'une manche disparue", async () => {
     mockMatch(null);
     await notifyMatchScheduleChange(change());
     expect(notifyStaff).not.toHaveBeenCalled();
-    expect(postStaffLog).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
   });
 });
 
@@ -268,7 +268,7 @@ describe("notifyMatchScheduleChange — vie privée et cas limites", () => {
   it("ne journalise rien sans auteur, mais prévient tous les arbitres", async () => {
     mockMatch();
     await notifyMatchScheduleChange(change({ actor: null }));
-    expect(postStaffLog).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
     expect(staffCall().excludeUserIds).toEqual([]);
   });
 
@@ -296,7 +296,7 @@ describe("notifyMatchScheduleChange — arbitre engagé dans le match", () => {
 describe("notifyMatchScheduleChange — match déjà joué", () => {
   it("journalise une date posée sur un match joué ou au score saisi, sans prévenir les arbitres", async () => {
     for (const status of ["COMPLETED", "AWAITING_CONFIRMATION"]) {
-      jest.mocked(postStaffLog).mockClear();
+      jest.mocked(publishStaffAction).mockClear();
       mockMatch({ ...ROW, status });
       await notifyMatchScheduleChange(change());
       expect(logLine()).toContain("Match programmé");
@@ -505,7 +505,7 @@ describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(announceMatchSchedule).toHaveBeenCalledWith(expect.objectContaining(ROW), expect.anything());
-    expect(postStaffLog).toHaveBeenCalledTimes(1);
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
     expect(notifyStaff).toHaveBeenCalledTimes(1);
   });
 
@@ -561,7 +561,7 @@ describe("notifyMatchScheduleChange — engagées changées après l'écriture",
     await notifyMatchScheduleChange(change({ entrantIds: [101, null] }));
     expect(announceMatchSchedule).not.toHaveBeenCalled();
     // Journal et arbitres suivent : ils ne dépendent pas des marques.
-    expect(postStaffLog).toHaveBeenCalledTimes(1);
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
     expect(notifyStaff).toHaveBeenCalledTimes(1);
   });
 
@@ -611,7 +611,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
     expect(push.body).toMatch(/^L'horaire du .+ \(heure de Paris\) est retiré\. Les Renards contre Team Nova · Coupe BlueGenji, Tableau perdants · manche 2\.$/);
     expect(push.tag).toBe("rencontre-42-schedule");
     expect(resolvePush(staffCall().push, "en").title).toBe("Match time removed");
-    expect(postStaffLog).toHaveBeenCalledWith(expect.any(String));
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     expect(auditStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toMatch(/^🗓️ Horaire retiré — « Coupe BlueGenji » \(#7\)/u);
@@ -633,7 +633,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
       change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, toldStartAt: OLD_START, actor: null }),
     );
     expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), OLD_START);
-    expect(postStaffLog).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
   it("ne nomme aucun joueur au journal en tournoi individuel", async () => {
@@ -740,7 +740,7 @@ describe("notifyMatchScheduleChange — trace pm2 du geste, dès le commit", () 
     ).resolves.toBeUndefined();
 
     expect(auditText()).toBe(`🗓️ Horaire du match #42 retiré (était ${OLD_START})`);
-    expect(postStaffLog).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
     error.mockRestore();
   });
 
@@ -748,7 +748,7 @@ describe("notifyMatchScheduleChange — trace pm2 du geste, dès le commit", () 
     mockMatch(null);
     await notifyMatchScheduleChange(change());
     expect(auditText()).toBe(`🗓️ Horaire du match #42 posé au ${NEW_START} (était vide)`);
-    expect(postStaffLog).not.toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
   });
 
   it("ne trace rien sans auteur, ni pour une date inchangée", async () => {

@@ -373,6 +373,18 @@ describe("setMatchStartAt", () => {
     await expect(setMatchStartAt(42, FUTURE)).resolves.toBe("2099-08-29T18:30:00.000Z");
   });
 
+  it("lance l'annonce (et sa trace pm2) avant de publier l'évènement, qui peut lever", async () => {
+    world();
+    jest.mocked(publishMatchUpdatedEvent).mockImplementationOnce(() => {
+      throw new Error("publication impossible");
+    });
+    await expect(setMatchStartAt(42, FUTURE, { id: 9, pseudo: "ArbitreZelé" })).rejects.toThrow("publication impossible");
+    expect(notifyMatchScheduleChange).toHaveBeenCalledWith(expect.objectContaining({ actor: { id: 9, pseudo: "ArbitreZelé" } }));
+    expect(jest.mocked(notifyMatchScheduleChange).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(publishMatchUpdatedEvent).mock.invocationCallOrder[0],
+    );
+  });
+
   it("n'annonce rien pour un match introuvable", async () => {
     world({ row: null });
     await expect(setMatchStartAt(42, FUTURE)).rejects.toThrow("MATCH_NOT_FOUND");
