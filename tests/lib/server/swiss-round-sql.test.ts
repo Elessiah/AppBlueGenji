@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { isSwissRound, swissRoundSql } from "@/lib/server/tournaments/swiss-round-sql";
+import { isSwissRound, swissPhaseSql, swissRoundSql } from "@/lib/server/tournaments/swiss-round-sql";
 
 describe("swissRoundSql", () => {
   it("lit le format du tournoi, puis celui de la phase par sa clé primaire", () => {
@@ -12,6 +12,15 @@ describe("swissRoundSql", () => {
 
   it("suit les alias de la requête", () => {
     expect(swissRoundSql("mm", "tr")).toContain("tr.format = 'SWISS' OR (mm.phase_id <> 0");
+  });
+});
+
+describe("swissPhaseSql", () => {
+  it("ne lit que la phase, pour un appelant qui tient déjà le format du tournoi", () => {
+    const sql = swissPhaseSql("m");
+    expect(sql).not.toContain("format = 'SWISS' OR");
+    expect(sql).toContain("sp.id = m.phase_id AND sp.format = 'SWISS'");
+    expect(swissRoundSql("m", "t")).toContain(sql);
   });
 });
 

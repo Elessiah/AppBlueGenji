@@ -38,6 +38,9 @@ const ROW = {
   status: "READY",
 };
 
+/** La manche relue après un retrait : plus d'horaire. */
+const CLEARED_ROW = { ...ROW, start_at: null };
+
 function change(overrides: Partial<MatchScheduleChange> = {}): MatchScheduleChange {
   return {
     matchId: 42,
@@ -289,15 +292,15 @@ describe("notifyMatchScheduleChange — match déjà joué", () => {
 
 describe("notifyMatchScheduleChange — horaire retiré, arbitres", () => {
   it("ne prévient pas les arbitres d'un horaire déjà passé ni d'un match joué", async () => {
-    mockMatch();
+    mockMatch(CLEARED_ROW);
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: "2020-01-01T00:00:00.000Z", alreadyAnnounced: true }));
-    mockMatch({ ...ROW, status: "COMPLETED" });
+    mockMatch({ ...CLEARED_ROW, status: "COMPLETED" });
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
     expect(notifyStaff).not.toHaveBeenCalled();
   });
 
   it("ne nomme aucun joueur dans l'avis aux arbitres d'un tournoi individuel", async () => {
-    mockMatch({ ...ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
+    mockMatch({ ...CLEARED_ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START }));
     for (const locale of ["fr", "en"] as const) {
       const { title, body } = resolvePush(staffCall().push, locale);
@@ -405,12 +408,12 @@ describe("notifyMatchScheduleChange — une seule lecture de la manche", () => {
   });
 
   it("lit la manche une fois pour un horaire retiré", async () => {
-    const execute = mockMatch();
+    const execute = mockMatch(CLEARED_ROW);
 
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
 
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining(ROW), OLD_START);
+    expect(announceMatchScheduleCleared).toHaveBeenCalledWith(expect.objectContaining(CLEARED_ROW), OLD_START);
   });
 
   it("ne lit rien pour une date réécrite à l'identique", async () => {
@@ -445,7 +448,7 @@ describe("notifyMatchScheduleChange — engagées changées après l'écriture",
   });
 
   it("ne prévient pas d'un retrait une engagée qui a remplacé celle qui l'avait reçu", async () => {
-    mockMatch();
+    mockMatch(CLEARED_ROW);
     await notifyMatchScheduleChange(
       change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, entrantIds: [101, 999] }),
     );
@@ -454,9 +457,28 @@ describe("notifyMatchScheduleChange — engagées changées après l'écriture",
   });
 });
 
+describe("notifyMatchScheduleChange — changement déjà remplacé", () => {
+  it("laisse joueurs et arbitres au changement plus récent, mais journalise", async () => {
+    // Relue, la manche porte déjà l'horaire d'une correction plus récente.
+    mockMatch({ ...ROW, start_at: new Date("2099-09-11T18:00:00.000Z") });
+    await notifyMatchScheduleChange(change());
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(notifyStaff).not.toHaveBeenCalled();
+    expect(logLine()).toContain("Match programmé");
+  });
+
+  it("ne prévient pas d'un retrait quand un horaire a été reposé depuis", async () => {
+    mockMatch();
+    await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
+    expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
+    expect(notifyStaff).not.toHaveBeenCalled();
+    expect(logLine()).toContain("Horaire retiré");
+  });
+});
+
 describe("notifyMatchScheduleChange — horaire retiré", () => {
   it("prévient les joueurs qui l'avaient reçu, les arbitres sauf l'auteur, et journalise", async () => {
-    mockMatch();
+    mockMatch(CLEARED_ROW);
 
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
 
@@ -478,14 +500,14 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
   });
 
   it("journalise sans prévenir les joueurs d'un horaire qu'ils n'avaient pas reçu", async () => {
-    mockMatch();
+    mockMatch(CLEARED_ROW);
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: false }));
     expect(announceMatchScheduleCleared).not.toHaveBeenCalled();
     expect(logLine()).toContain("Horaire retiré");
   });
 
   it("ne journalise rien sans auteur, mais prévient les joueurs", async () => {
-    mockMatch();
+    mockMatch(CLEARED_ROW);
     await notifyMatchScheduleChange(
       change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true, actor: null }),
     );
@@ -494,14 +516,14 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
   });
 
   it("ne nomme aucun joueur au journal en tournoi individuel", async () => {
-    mockMatch({ ...ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
+    mockMatch({ ...CLEARED_ROW, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
     await notifyMatchScheduleChange(change({ startAt: null, previousStartAt: OLD_START, alreadyAnnounced: true }));
     expect(logLine()).toContain("un joueur vs un joueur");
     expect(logLine()).not.toMatch(/Kiro|Nova/);
   });
 
   it("n'échoue jamais, même si l'avis aux joueurs échoue", async () => {
-    mockMatch();
+    mockMatch(CLEARED_ROW);
     jest.mocked(announceMatchScheduleCleared).mockRejectedValue(new Error("bot éteint"));
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     await expect(
