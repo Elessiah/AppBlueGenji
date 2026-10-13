@@ -591,7 +591,7 @@ La référence est désormais `I18N.md` ; cette table en garde l'historique.
 | Manche | Round | Unité d'un arbre / d'une ronde. |
 | Map / carte | Map | Une manche d'un match (score par map). |
 | BO5 / FT3 | Bo5 / FT3 (First to 3) | Notation gardée telle quelle. |
-| Haut / bas de tableau, Grande finale | Upper / Lower bracket, Grand final | |
+| Tableau principal / Tableau perdants (notifications : « Tableau perdants · manche N »), Grande finale | Upper / Lower bracket, Grand final | Nom du site (`tournament.json` → `bracketLabels`) ; « bas de tableau » et « Loser bracket » ne s'emploient plus. |
 | Forfait, double forfait | Forfeit, double forfeit | |
 | Arbitre | Referee | |
 | Signalement | Report | |
