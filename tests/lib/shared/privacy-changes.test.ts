@@ -12,6 +12,7 @@ import {
 } from "@/lib/shared/processing-register";
 import { SITE_MINIMUM_AGE } from "@/lib/shared/terms-of-use";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
+import { MATCH_REMINDER_LOOKAHEAD_MS } from "@/lib/shared/discord-notifications";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import enPush from "@/messages/en/push.json";
 import {
@@ -835,6 +836,10 @@ describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés 
     expect(text()).toMatch(/te retire, toi ou ton équipe, d'un match dont tu avais reçu l'horaire/);
     // Paliers retirés : il ne reste que la veille.
     expect(text()).toMatch(/un seul rappel reste, dans les 24 h/);
+    // L'annonce n'est immédiate que si les deux camps sont connus (sinon le balayage, 48 h avant).
+    expect(text()).not.toMatch(/aussitôt/);
+    expect(text()).toMatch(/sinon à l'approche du match \(dans les 48 h qui précèdent\)/);
+    expect(MATCH_REMINDER_LOOKAHEAD_MS).toBe(48 * 60 * 60 * 1000);
     expect(text()).toMatch(/une semaine et une heure avant le match disparaissent/);
     expect(text()).toMatch(/aucun pseudo de joueur/);
     // `bg_match_reminders.start_at` : l'horaire annoncé, gardé avec le match.
@@ -842,7 +847,9 @@ describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés 
     expect(text()).toMatch(/ne garde pas le texte des messages/);
     // Sujet push fondé sur le consentement : l'entrée nomme le réglage qui le refuse.
     expect(text()).toMatch(/« Matchs planifiés », que tu peux couper dans « Mon profil »/);
-    expect(text()).toMatch(/sans nom sur Discord, avec le pseudo de son auteur dans les journaux du serveur/);
+    expect(text()).toMatch(/sans nom sur Discord, avec le pseudo et l'identifiant de compte de son auteur dans les journaux du serveur/);
+    // Une manche supprimée par le moteur est poussée à tout le staff, auteur compris.
+    expect(text()).toMatch(/quand une mise à jour du tournoi supprime un match planifié/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#notifications"]);
   });
 
