@@ -143,8 +143,8 @@ type SubscriptionRow = RowDataPacket & {
   endpoint: string;
   p256dh: string;
   auth: string;
-  /** Langue du compte abonné (lot 9-3) ; absente sur une base pas encore migrée. */
-  locale?: string | null;
+  /** Langue du compte abonné (lot 9-3) ; toute valeur inattendue vaut le français. */
+  locale: string | null;
 };
 
 /** Envois simultanés au plus : un tournoi prévient des dizaines d'appareils. */
@@ -194,21 +194,24 @@ export async function pushToUsers(
     if (rows.length === 0) return 0;
 
     // Une charge par langue de compte (lot 9-3), rédigée une seule fois
-    // chacune : chaque appareil reçoit la notification dans la langue de son
-    // titulaire.
+    // chacune **avant le premier envoi** : une rédaction qui échouerait
+    // n'interromprait pas une distribution à moitié faite. Chaque appareil
+    // reçoit la notification dans la langue de son titulaire.
     const origin = siteBaseUrl();
     const payloads = new Map<Locale, string>();
-    const payloadFor = (raw: unknown): string =>
-      cached(payloads, accountLocaleFromRow(raw), (locale) =>
+    const deliveries = rows.map((row) => ({
+      row,
+      payload: cached(payloads, accountLocaleFromRow(row.locale), (locale) =>
         JSON.stringify(buildPushPayload(topic, content(locale), origin, locale)),
-      );
+      ),
+    }));
     const sent: number[] = [];
     const gone: number[] = [];
-    await inBatches(rows, PUSH_CONCURRENCY, async (row) => {
+    await inBatches(deliveries, PUSH_CONCURRENCY, async ({ row, payload }) => {
       const outcome = await sendWebPush(
         config,
         { endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth },
-        payloadFor(row.locale),
+        payload,
         options,
       );
       if (outcome === "SENT") sent.push(Number(row.id));
