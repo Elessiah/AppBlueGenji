@@ -57,7 +57,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_REMINDER: {
     label: "Rappels de match",
-    description: "L'annonce de l'horaire d'un match (ou de son changement), puis des rappels une semaine et 24 h avant.",
+    description: "L'horaire d'un match dès qu'il est posé ou changé, puis des rappels une semaine et 24 h avant.",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {

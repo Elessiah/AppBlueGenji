@@ -21,7 +21,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
-import { MATCH_SEEN_KEY } from "@/lib/shared/discord-notifications";
+import { MATCH_TOLD_KEYS } from "@/lib/shared/discord-notifications";
 import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
@@ -176,16 +176,20 @@ export async function setMatchStartAt(
     // produire. Après le commit, sur la même connexion, et au meilleur effort :
     // une manche reprogrammée ne doit pas échouer parce que le ménage a échoué.
     //
-    // Une date **effacée** garde ses marques (inertes : le balayage ne lit que
-    // les manches datées) : quand une date est reposée, la marque
-    // d'observation dit encore que les joueurs connaissaient un horaire, et
-    // l'annonce se lit « Match reprogrammé » plutôt que « programmé ».
+    // Avant l'effacement, les marques disent si les joueurs avaient **reçu** un
+    // horaire (annonce ou rappel, `MATCH_TOLD_KEYS` — pas la marque
+    // d'observation, posée aussi en silence) : la nouvelle date se lit alors
+    // « Match reprogrammé ». Une date **effacée** garde ses marques (inertes :
+    // le balayage ne lit que les manches datées), pour que la date reposée
+    // ensuite le dise encore.
     let alreadyAnnounced = false;
     if (startAt !== null && written.previousStartAt !== startAt) {
       try {
         const [seen] = await connection.execute<RowDataPacket[]>(
-          `SELECT 1 FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
-          [matchId, MATCH_SEEN_KEY],
+          `SELECT 1 FROM bg_match_reminders
+            WHERE match_id = ? AND offset_key IN (${MATCH_TOLD_KEYS.map(() => "?").join(", ")})
+            LIMIT 1`,
+          [matchId, ...MATCH_TOLD_KEYS],
         );
         alreadyAnnounced = seen.length > 0;
         await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [matchId]);

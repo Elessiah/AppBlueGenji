@@ -38,6 +38,7 @@ import { matchReminderPush } from "@/lib/shared/push-messages";
 import {
   MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
+  MATCH_ANNOUNCED_KEY,
   MATCH_SEEN_KEY,
   buildMatchReminderMessage,
   buildMatchScheduleAnnouncement,
@@ -285,6 +286,10 @@ async function dispatchPlannedSend(
     });
     dispatched += 1;
   }
+  // Une annonce partie le dit en base : une date posée plus tard se lira
+  // « reprogrammée » (`setMatchStartAt`), ce que la marque d'observation,
+  // posée aussi en silence, ne peut pas prouver.
+  if (offset === null && dispatched > 0) await claimReminder(Number(match.id), MATCH_ANNOUNCED_KEY);
   return dispatched;
 }
 

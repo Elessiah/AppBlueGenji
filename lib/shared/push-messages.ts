@@ -231,7 +231,10 @@ export function matchScheduledStaffPush(
       locale,
     ),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
-    tag: `${matchTag(input.matchId)}-schedule`,
+    // Même étiquette que l'annonce aux joueurs : un arbitre engagé dans le
+    // match ne reçoit pas deux fois la même nouvelle — la seconde remplace la
+    // première sur l'appareil.
+    tag: `${matchTag(input.matchId)}-reminder`,
   };
 }
 

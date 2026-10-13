@@ -135,6 +135,20 @@ export const MATCH_REMINDER_LOOKAHEAD_MS = MATCH_REMINDER_HORIZON_MS + 24 * 60 *
 export const MATCH_SEEN_KEY = "SEEN";
 
 /**
+ * Marque posée quand une **annonce** d'horaire est réellement partie (au moins
+ * une engagée avait des destinataires). La marque d'observation ne le dit pas :
+ * le balayage la pose aussi en silence, quand aucun palier n'est encore ouvert.
+ * Tient dans `bg_match_reminders.offset_key` (`VARCHAR(8)`).
+ */
+export const MATCH_ANNOUNCED_KEY = "ANNOUNCE";
+
+/**
+ * Marques qui prouvent que les joueurs ont reçu un horaire : une annonce, ou
+ * un rappel. Une date qui en remplace une de celles-là se dit « reprogrammée ».
+ */
+export const MATCH_TOLD_KEYS: readonly string[] = [MATCH_ANNOUNCED_KEY, "P7D", "P1D"];
+
+/**
  * Paliers dont la fenêtre est **déjà ouverte** à `now`.
  *
  * Ce sont ceux qu'une date posée tardivement fait manquer d'un coup : une
@@ -276,9 +290,9 @@ export function buildMatchScheduleAnnouncement(
     announcement.rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
     `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
     pairingLine(context),
-    `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
+    `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)` +
+      (previous ? `, au lieu du ${formatMatchStart(previous)}` : ""),
   ];
-  if (previous) lines.push(`Au lieu du ${formatMatchStart(previous)}`);
   if (remaining.length > 0) {
     // Le prochain rappel est le palier restant le plus **lointain** : la liste
     // est ordonnée du plus lointain au plus proche, c'est donc le premier.

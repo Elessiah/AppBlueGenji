@@ -14,7 +14,7 @@
     },
     "MATCH_REMINDER": {
       "label": "Match reminders",
-      "description": "The announcement of a match's time (or of its change), then reminders one week and 24 h before."
+      "description": "A match's time as soon as it is set or changed, then reminders one week and 24 h before."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Join requests",

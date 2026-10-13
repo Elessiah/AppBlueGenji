@@ -23,6 +23,7 @@ import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { formatMatchScheduledLog } from "@/lib/shared/bot-logs";
+import type { ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
 import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduledStaffPush } from "@/lib/shared/push-messages";
@@ -46,20 +47,34 @@ export type MatchScheduleChange = {
   /** Horaire d'avant (ISO), `null` si la manche n'en avait pas. */
   previousStartAt: string | null;
   /**
-   * Les joueurs avaient déjà reçu un horaire (marque d'observation posée),
-   * même si la date a été effacée entre-temps.
+   * Les joueurs avaient déjà **reçu** un horaire (annonce ou rappel), même si
+   * la date a été effacée entre-temps.
    */
-  alreadyAnnounced?: boolean;
+  alreadyAnnounced: boolean;
   /** Auteur du geste, `null` hors d'une requête du staff. */
   actor: StaffActor | null;
 };
 
 /**
- * La date en remplace-t-elle une que les joueurs connaissaient ? Une date
- * précédente, ou une annonce déjà faite d'une date effacée depuis.
+ * Ce que l'annonce dit aux **joueurs** : « reprogrammé », avec l'ancienne date,
+ * seulement s'ils avaient reçu un horaire — une date posée quand une place était
+ * encore vide, jamais annoncée, ne se cite pas.
  */
-export function isReschedule(change: MatchScheduleChange): boolean {
-  return change.previousStartAt !== null || change.alreadyAnnounced === true;
+export function playerAnnouncement(change: MatchScheduleChange): ScheduleAnnouncement {
+  return change.alreadyAnnounced
+    ? { rescheduled: true, previousStartAt: change.previousStartAt }
+    : { rescheduled: false, previousStartAt: null };
+}
+
+/**
+ * Ce que l'annonce dit aux **arbitres** et au journal : la date précédente,
+ * qu'ils voyaient sur le plateau, ou une annonce faite d'une date effacée depuis.
+ */
+export function staffAnnouncement(change: MatchScheduleChange): ScheduleAnnouncement {
+  return {
+    rescheduled: change.previousStartAt !== null || change.alreadyAnnounced,
+    previousStartAt: change.previousStartAt,
+  };
 }
 
 /** L'horaire mérite-t-il d'être annoncé ? Posé, changé, et encore devant. */
@@ -91,7 +106,7 @@ async function notifyReferees(change: MatchScheduleChange & { startAt: string })
   if (!row) return 0;
   const participantType = toParticipantType(row.participant_type);
   const entrant = (name: string | null): LogEntrant | null => (name === null ? null : { name, participantType });
-  const announcement = { rescheduled: isReschedule(change), previousStartAt: change.previousStartAt };
+  const announcement = staffAnnouncement(change);
   const tournament = { id: Number(row.tournament_id), name: String(row.tournament_name) };
 
   const line = formatMatchScheduledLog({
@@ -138,10 +153,7 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   const { startAt } = change;
   if (startAt === null || !isAnnounceableSchedule(change)) return;
   const results = await Promise.allSettled([
-    announceMatchSchedule(change.matchId, {
-      rescheduled: isReschedule(change),
-      previousStartAt: change.previousStartAt,
-    }),
+    announceMatchSchedule(change.matchId, playerAnnouncement(change)),
     notifyReferees({ ...change, startAt }),
   ]);
   for (const result of results) {
