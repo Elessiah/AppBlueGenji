@@ -16,3 +16,18 @@ export function publishStaffAction(discordLine: string, actor: StaffActor): void
   console.info(staffAuditLine(discordLine, actor));
   void sendBotLog(discordLine).catch(() => undefined);
 }
+
+/**
+ * La moitié pm2 de {@link publishStaffAction}, seule : pour un geste dont la
+ * ligne Discord ne peut s'écrire qu'après une lecture (noms à relire). La
+ * trace part **avant** cette lecture — un arrêt du serveur entre le commit et
+ * elle ne doit pas laisser un geste sans auteur.
+ */
+export function auditStaffAction(text: string, actor: StaffActor): void {
+  console.info(staffAuditLine(text, actor));
+}
+
+/** La moitié Discord de {@link publishStaffAction} : le geste est déjà tracé dans pm2. */
+export function postStaffLog(discordLine: string): void {
+  void sendBotLog(discordLine).catch(() => undefined);
+}

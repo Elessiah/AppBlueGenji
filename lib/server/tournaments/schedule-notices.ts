@@ -11,7 +11,7 @@
  * - **Arbitres** : push `MATCH_SCHEDULED` aux comptes qui portent la
  *   permission `tournaments`, **sauf l'auteur** du geste.
  * - **Journal** : une ligne au canal de logs, auteur anonymisé (« le staff »)
- *   et nommé dans pm2 (`publishStaffAction`). Aucun pseudo de joueur : les
+ *   et nommé dans pm2 (`auditStaffAction`, écrit dès le commit). Aucun pseudo de joueur : les
  *   engagées passent par `entrantLabel`.
  *
  * Une date **effacée** est journalisée et, si les joueurs avaient reçu
@@ -30,10 +30,10 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { toIso } from "@/lib/server/serialization";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { notifyStaff } from "@/lib/server/notify";
-import { publishStaffAction } from "@/lib/server/staff-audit";
+import { auditStaffAction, postStaffLog } from "@/lib/server/staff-audit";
 import { formatMatchScheduleClearedLog, formatMatchScheduledLog } from "@/lib/shared/bot-logs";
 import { MATCH_SEEN_KEY, type ScheduleAnnouncement } from "@/lib/shared/discord-notifications";
-import { staffAuditLine, type LogEntrant, type StaffActor } from "@/lib/shared/log-privacy";
+import type { LogEntrant, StaffActor } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import { matchScheduleClearedStaffPush, matchScheduledStaffPush } from "@/lib/shared/push-messages";
 import type { DeletedStaffTime } from "./departed-notices";
@@ -217,7 +217,7 @@ async function notifyReferees(
     previousStartAt: change.previousStartAt,
     rescheduled: announcement.rescheduled,
   });
-  if (change.actor) publishStaffAction(line, change.actor);
+  if (change.actor) postStaffLog(line);
   // Un match joué ne se rejouera pas : la date est une correction d'archive,
   // tracée au journal mais annoncée à personne (les joueurs non plus).
   if (!push || isPlayedMatchStatus(row.status)) return 0;
@@ -272,7 +272,7 @@ async function logScheduleCleared(
   now: Date,
 ): Promise<void> {
   if (change.actor) {
-    publishStaffAction(
+    postStaffLog(
       formatMatchScheduleClearedLog({
         tournament: { id: Number(row.tournament_id), name: String(row.tournament_name) },
         matchId: change.matchId,
@@ -282,7 +282,6 @@ async function logScheduleCleared(
         ...logEntrants(row),
         previousStartAt: change.previousStartAt,
       }),
-      change.actor,
     );
   }
   // Les arbitres avaient reçu « Match programmé » pour cet horaire : l'avis de
@@ -408,17 +407,17 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
 }
 
 /**
- * La trace du geste quand la manche n'a pu être relue après le commit (base
- * injoignable, manche supprimée entre-temps) : l'horaire a changé, son auteur
- * reste nommé dans pm2 — sans la ligne Discord, faute de tournoi et
- * d'engagées à citer. La trace de modération n'est pas optionnelle
- * (`staff-audit.ts`).
+ * La trace pm2 du geste, écrite **dès le commit** (avant toute lecture) :
+ * l'auteur reste nommé même si le serveur s'arrête avant la relecture de la
+ * manche, ou si elle échoue. La ligne Discord, anonyme et détaillée (tournoi,
+ * engagées), suit après la relecture. La trace de modération n'est pas
+ * optionnelle (`staff-audit.ts`).
  */
-function auditUnreadSchedule(change: MatchScheduleChange): void {
+function auditScheduleGesture(change: MatchScheduleChange): void {
   if (!change.actor) return;
   const before = change.previousStartAt ?? "vide";
   const what = change.startAt === null ? `retiré (était ${before})` : `posé au ${change.startAt} (était ${before})`;
-  console.info(staffAuditLine(`🗓️ Horaire du match #${change.matchId} ${what} — manche illisible après l'enregistrement`, change.actor));
+  auditStaffAction(`🗓️ Horaire du match #${change.matchId} ${what}`, change.actor);
 }
 
 /** Retraits aux arbitres envoyés en même temps. */
@@ -438,12 +437,14 @@ function reportFailures(results: PromiseSettledResult<unknown>[], label: string)
 export async function notifyMatchScheduleChange(change: MatchScheduleChange): Promise<void> {
   const { startAt } = change;
   if (startAt === change.previousStartAt) return;
+  // Avant tout `await` : l'appelant ne l'attend pas, la trace part donc dans
+  // le même tour que le commit.
+  auditScheduleGesture(change);
   let row: ScheduledMatchInfoRow | null;
   try {
     row = await loadMatchInfo(change.matchId);
   } catch (error) {
     reportFailures([{ status: "rejected", reason: error }], "[notify] horaire de match non annoncé");
-    auditUnreadSchedule(change);
     // L'observation posée avec la date ferait taire le balayage : rendue, il
     // annoncera la manche (au meilleur effort — la base peut être injoignable).
     // Pas quand la date est rendue à l'horaire que les joueurs tiennent :
@@ -453,10 +454,7 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
     }
     return;
   }
-  if (!row) {
-    auditUnreadSchedule(change);
-    return;
-  }
+  if (!row) return;
   if (startAt === null) {
     await notifyScheduleCleared(row, change);
     return;
