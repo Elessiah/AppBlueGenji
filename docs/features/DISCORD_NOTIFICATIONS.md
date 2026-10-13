@@ -163,8 +163,8 @@ journalisée) ne leur est pas réannoncée, et garde ses marques (le rappel déj
 parti ne repart pas) — sauf un palier daté d'un **autre** horaire (pris pour
 une date intermédiaire dont l'annonce n'a atteint personne), qui ferait sauter
 au balayage le rappel 24 h de l'horaire rendu ; l'observation y est redatée
-(reposée si un passage par un match joué l'avait retirée, pour un match à
-jouer), pour qu'un échec tardif de l'avis intermédiaire ne la rende pas et que
+(reposée si un passage par un match joué l'avait retirée, deux engagées
+connues), pour qu'un échec tardif de l'avis intermédiaire ne la rende pas et que
 le balayage ne réannonce pas l'horaire tenu ; une date déjà passée, annoncée
 à personne, laisse elle aussi les marques en place.
 
