@@ -45,11 +45,15 @@ describe("inBatches", () => {
     expect(calls).toBe(0);
   });
 
-  it("laisse remonter l'échec d'un élément", async () => {
+  it("laisse remonter l'échec d'un élément, après avoir traité tous les autres", async () => {
+    const done: number[] = [];
     await expect(
-      inBatches([1], 4, async () => {
-        throw new Error("échec");
+      inBatches([1, 2, 3], 2, async (item) => {
+        if (item === 1) throw new Error("échec");
+        await new Promise((resolve) => setImmediate(resolve));
+        done.push(item);
       }),
     ).rejects.toThrow("échec");
+    expect(done.sort((a, b) => a - b)).toEqual([2, 3]);
   });
 });

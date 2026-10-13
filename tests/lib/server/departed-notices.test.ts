@@ -91,9 +91,13 @@ describe("noteDepartedEntrants puis flushDepartedNotices", () => {
   it("borne la file d'une transaction", async () => {
     const { connection } = connectionHolding({ 31: AHEAD });
     const many = Array.from({ length: 40 }, (_, index) => ({ matchId: 31, teamId: 200 + index, slot: 1 as const }));
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
     await noteDepartedEntrants(connection, many);
     flushDepartedNotices(connection);
     expect(jest.mocked(announceEntrantsWithdrawn).mock.calls[0][0]).toHaveLength(32);
+    // Le dépassement se dit dans pm2.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("8 avis"));
+    warn.mockRestore();
   });
 
   it("jette les avis d'une correction qui n'a pas abouti", async () => {
