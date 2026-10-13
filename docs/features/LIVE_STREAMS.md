@@ -151,6 +151,22 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   tournoi, retour en arrière, plateau régénéré) : un match recréé puis relancé
   est annoncé de nouveau. Une affiche changée par un ré-appariement est une
   autre rencontre, donc une autre annonce.
+- **Fraîcheur : deux heures** (`LIVE_ANNOUNCE_MAX_AGE_MINUTES`). Seul un
+  passage à l'antenne de moins de deux heures est annoncé, mesuré par l'horloge
+  de la base (`NOW()`) sur la colonne du mode : `launched_at` (`AUTO`),
+  `start_at` (`START_TIME`, ou son `launched_at` pour l'affiche courante quand
+  le match est devenu jouable après son heure), `live_started_at` (`MANUAL`).
+  Un déploiement, une table recréée ou une longue panne du bot ne réveillent
+  donc jamais `@everyone` pour un match commencé depuis longtemps.
+- **Pas de sujet `PUSH_TOPICS`** : c'est une publication de salon public, pas
+  une notification personnelle — personne ne s'y abonne ni ne s'en désabonne
+  sur le site ; la règle « toute notification = un sujet push » ne s'applique
+  pas.
+- **RGPD** : registre **T16** (finalité « annoncer le début d'un match
+  diffusé », destinataires membres du serveur et Discord, transfert Discord
+  sous DPF), `/rgpd#retransmission` et la liste Discord de `/rgpd#destinataires`
+  (FR et EN), politique du bot (`bot-legal-content.ts`) et entrée
+  `2026-10-annonce-des-matchs-diffuses` de `PRIVACY_CHANGES`.
 - **Lien** : la diffusion du match, à défaut la chaîne officielle du tournoi —
   celle que le site désigne au spectateur d'un match sans lien propre. Chacun
   repasse par `normalizeStreamUrl`, et le bot revalide la liste blanche. Sans
