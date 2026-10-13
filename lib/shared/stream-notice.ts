@@ -30,7 +30,10 @@ export const STREAM_NOTICE_OBJECTION =
  */
 export function registrationStreamNotice(solo: boolean): string {
   const shown = solo ? "ton pseudo et tes résultats en jeu" : "ton pseudo, le nom de ton équipe et tes résultats en jeu";
-  return `Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ${shown} — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre.`;
+  // L'annonce dans #live nomme les équipes, jamais un joueur (« un joueur » en
+  // individuel) : seule la mention d'équipe la signale.
+  const discord = solo ? "" : " Au début d'un match diffusé, le nom de ton équipe est aussi annoncé sur le Discord de l'association.";
+  return `Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ${shown} — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre.${discord}`;
 }
 
 /** Libellé du lien qui suit la mention de `registrationStreamNotice`. */

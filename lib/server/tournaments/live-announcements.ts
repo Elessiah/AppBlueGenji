@@ -183,15 +183,20 @@ const LIVE_WARN_COOLDOWN_MS = 60 * 60 * 1000;
 const lastWarnAt = new Map<string, number>();
 
 /**
- * Avertit pm2 d'une panne, au plus une fois par heure et par clé : la cause
- * **et** les matchs, pour que chaque match reporté laisse sa trace.
+ * Avertit pm2, au plus une fois par heure et par clé : la cause **et** les
+ * matchs, pour que chaque match reporté laisse sa trace sans que le balayage,
+ * qui repasse toutes les dix secondes, n'inonde le journal.
+ *
+ * @param error Erreur jointe : la trace part alors en `console.error`.
  */
-function warnOnce(kind: string, message: string): void {
+function warnOnce(kind: string, message: string, error?: unknown): void {
   const now = Date.now();
   const last = lastWarnAt.get(kind);
   if (last !== undefined && now - last < LIVE_WARN_COOLDOWN_MS) return;
   lastWarnAt.set(kind, now);
-  console.warn(`${message} (avertissement répété au plus une fois par heure)`);
+  const text = `${message} (avertissement répété au plus une fois par heure)`;
+  if (error === undefined) console.warn(text);
+  else console.error(text, error);
 }
 
 /** Longueur maximale de la liste d'identifiants dans l'étiquette envoyée au bot (200 caractères en tout). */
@@ -291,7 +296,13 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
     if (!isOnAir(row, now)) continue;
     // Pas de lien exploitable, pas d'annonce : il n'y aurait rien à regarder.
     const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
-    if (!url) continue;
+    if (!url) {
+      warnOnce(
+        `no-link ${Number(row.id)}`,
+        `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) à l'antenne sans lien de diffusion exploitable (ni le match ni le tournoi) : pas d'annonce`,
+      );
+      continue;
+    }
     // Bot en panne : ne rien réserver qu'on sait ne pas pouvoir envoyer.
     if (isBotCircuitOpen()) break;
     let claimed: boolean;
@@ -300,7 +311,8 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
     } catch (error) {
       // Une réservation refusée par la base (verrou, panne) ne doit pas
       // emporter les affiches déjà réservées de ce passage : elles partent.
-      console.error(
+      warnOnce(
+        `claim ${Number(row.id)}`,
         `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) : réservation impossible, réessayée au passage suivant`,
         error,
       );
