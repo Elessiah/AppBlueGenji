@@ -319,7 +319,7 @@ function describeGroup(group: AnnouncementGroup): { label: string; context: stri
  */
 async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Promise<void> {
   if (SHARED_POSTPONEMENTS.has(outcome)) postponeRetries();
-  else holdMatches(group.rows);
+  else holdGroup(group);
   const { label, context, plural } = describeGroup(group);
   if (!(await releaseAnnouncements(group.rows, label))) return;
   const retry = plural
@@ -393,7 +393,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
   const rows = await loadCandidates();
   const groups = new Map<string, AnnouncementGroup>();
   for (const row of rows) {
-    if (!isOnAir(row, now) || isHeld(Number(row.id))) continue;
+    if (!isOnAir(row, now)) continue;
     // Pas de lien exploitable, pas d'annonce : il n'y aurait rien à regarder.
     const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
     if (!url) {
@@ -403,10 +403,13 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
       );
       continue;
     }
+    const key = groupKey(Number(row.tournament_id), url);
+    // Diffusion refusée par Discord il y a moins d'une minute : elle attend,
+    // et tout match qui la rejoint attend avec elle (un seul `@everyone`).
+    if (isHeld(key)) continue;
     // Bot en panne : ne rien réserver qu'on sait ne pas pouvoir envoyer.
     if (isBotCircuitOpen()) break;
     if (!(await tryClaim(row))) continue;
-    const key = `${Number(row.tournament_id)} ${url}`;
     const group = groups.get(key);
     if (group) group.rows.push(row);
     else groups.set(key, { url, rows: [row] });
@@ -450,30 +453,50 @@ export const LIVE_ANNOUNCE_RETRY_DELAY_MS = 60_000;
 
 let retryNotBefore = 0;
 
-/** Matchs dont l'annonce a été refusée par Discord, et l'instant de leur prochain essai. */
-const heldUntil = new Map<number, number>();
+/**
+ * Diffusions (tournoi et lien) dont l'annonce a été refusée par Discord, et
+ * l'instant de leur prochain essai. Par diffusion et non par match : un match
+ * lancé pendant la pause sur la même chaîne attend avec les autres, et tous
+ * partent en un seul message.
+ */
+const heldUntil = new Map<string, number>();
 
-/** Met en pause les seuls matchs d'un groupe refusé. */
-function holdMatches(rows: readonly LiveCandidateRow[]): void {
-  const now = Date.now();
-  // Un match sorti de l'antenne n'est plus relu : sa pause échue s'oublie ici.
-  for (const [matchId, at] of heldUntil) if (at <= now) heldUntil.delete(matchId);
-  const until = now + LIVE_ANNOUNCE_RETRY_DELAY_MS;
-  for (const row of rows) heldUntil.set(Number(row.id), until);
+/** Clé d'une diffusion : un message par tournoi et par lien. */
+function groupKey(tournamentId: number, url: string): string {
+  return `${tournamentId} ${url}`;
 }
 
-/** Vrai si le match attend encore son prochain essai ; oublie les pauses échues. */
-function isHeld(matchId: number): boolean {
-  const until = heldUntil.get(matchId);
+/** Met en pause la seule diffusion d'un groupe refusé. */
+function holdGroup(group: AnnouncementGroup): void {
+  const now = Date.now();
+  // Une diffusion terminée n'est plus relue : sa pause échue s'oublie ici.
+  for (const [key, at] of heldUntil) if (at <= now) heldUntil.delete(key);
+  heldUntil.set(groupKey(Number(group.rows[0].tournament_id), group.url), now + LIVE_ANNOUNCE_RETRY_DELAY_MS);
+  scheduleTrailingSweep(LIVE_ANNOUNCE_RETRY_DELAY_MS);
+}
+
+/**
+ * Vrai si la diffusion attend encore son prochain essai : la relève est alors
+ * programmée à son terme, pour qu'il ne dépende pas d'un prochain évènement.
+ * Oublie une pause échue.
+ */
+function isHeld(key: string): boolean {
+  const until = heldUntil.get(key);
   if (until === undefined) return false;
-  if (Date.now() < until) return true;
-  heldUntil.delete(matchId);
+  const left = until - Date.now();
+  if (left > 0) {
+    scheduleTrailingSweep(left);
+    return true;
+  }
+  heldUntil.delete(key);
   return false;
 }
 
 /** Reporte le prochain balayage d'une {@link LIVE_ANNOUNCE_RETRY_DELAY_MS}. */
 function postponeRetries(): void {
   retryNotBefore = Date.now() + LIVE_ANNOUNCE_RETRY_DELAY_MS;
+  // L'essai suivant tombe à son terme, même sans nouvel évènement.
+  scheduleTrailingSweep(LIVE_ANNOUNCE_RETRY_DELAY_MS);
 }
 
 let lastSweepAt = 0;
