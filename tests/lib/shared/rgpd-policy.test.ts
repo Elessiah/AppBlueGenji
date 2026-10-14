@@ -311,6 +311,8 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   });
 
   it("déclare le pseudo #live et le choix des messages privés de match (revue juridique #444)", () => {
+    expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toMatch(/annonces #live d'un tournoi individuel qui ont publié votre pseudo restent dans le salon Discord jusqu'à leur suppression, sur une demande distincte/);
+    expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toMatch(/#live announcements of a solo tournament that posted your username stay in the Discord channel until they are deleted, on a separate request/);
     // S'opposer au pseudo #live = ne pas s'inscrire (décision du 2026-10-14) : le droit d'opposition le dit.
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Exception : le pseudo publié dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire/);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/Exception: the username posted in the #live announcement of a solo tournament — objecting to it means not registering/);
