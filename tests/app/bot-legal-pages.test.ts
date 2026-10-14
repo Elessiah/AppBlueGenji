@@ -465,3 +465,21 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(TERMS_OF_SERVICE.en.sections.at(-1)?.meta).toBe("CONTACT");
   });
 });
+
+describe("politique du bot — pseudo solo dans #live et messages de match (RGPD-DM-SWITCH)", () => {
+  const fr = JSON.stringify(PRIVACY_POLICY.fr);
+  const en = JSON.stringify(PRIVACY_POLICY.en);
+
+  it("dit le pseudo public d'une entrée individuelle dans #live, plus « jamais un pseudo » (FR et EN)", () => {
+    expect(fr).toContain("en tournoi individuel, le pseudo public BlueGenji de chaque joueur");
+    expect(fr).not.toContain("« un joueur » en tournoi individuel, jamais un pseudo");
+    expect(en).toContain("in a solo tournament, each player's public BlueGenji username");
+    expect(en).not.toContain("“a player” in a solo tournament, never a username");
+  });
+
+  it("renvoie à « Mon profil » pour couper les messages de match, et avance sa date (FR et EN)", () => {
+    expect(fr).toContain("un joueur peut couper ceux de ses matchs (horaire, rappel) dans « Mon profil »");
+    expect(en).toContain("a player can turn off those about their matches (time, reminder) in “My profile”");
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["16 octobre 2026", "16 October 2026"]);
+  });
+});

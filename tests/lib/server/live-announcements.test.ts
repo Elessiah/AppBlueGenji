@@ -152,6 +152,12 @@ describe("runLiveAnnouncementSweep", () => {
     expect(message).not.toContain("Lucas");
   });
 
+  it("type illisible mais entrée individuelle dans le groupe : l'invité sans compte reste « un joueur »", async () => {
+    mockDb([{ ...AUTO_LIVE, participant_type: null, team1_name: "Lucas Martin", team2_solo_user_id: 8, team2_pseudo: "Bravo" }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+  });
+
   it("liveEntrantName : équipe par son nom, entrée solo par son pseudo, sinon « un joueur » (null)", () => {
     expect(liveEntrantName(null, "Renards", null, "TEAM")).toBe("Renards");
     expect(liveEntrantName(null, "Renards", null, "inconnu")).toBe("Renards");

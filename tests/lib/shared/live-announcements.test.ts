@@ -91,6 +91,17 @@ describe("formatLiveAnnouncementGroup", () => {
     );
   });
 
+  it("aucun nom publiable dans toute la diffusion : compte les matchs au lieu de répéter « un joueur contre un joueur »", () => {
+    const anonymous = { team1Name: null, team2Name: null };
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", pairings: [anonymous, anonymous, anonymous] })).toBe(
+      "🔴 En direct : 3 matchs — Solo Cup",
+    );
+    // Un seul nom suffit pour énumérer.
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", pairings: [anonymous, { team1Name: "Alpha", team2Name: null }] })).toBe(
+      "🔴 En direct — Solo Cup :\n• un joueur contre un joueur\n• Alpha contre un joueur",
+    );
+  });
+
   it("reste lisible quand un nom d'équipe contient « et », une virgule ou un saut de ligne", () => {
     const text = formatLiveAnnouncementGroup({
       tournamentName: "Coupe",

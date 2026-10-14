@@ -492,6 +492,9 @@ describe("langue du compte (lot 9-3)", () => {
     expect(source).toContain("runQueuedSaves<boolean>");
     expect(source).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = next;\s*setEnabled\(next\);\s*return;/);
     expect(source).not.toMatch(/disabled=/);
+    // Une relecture de la fiche commencée avant l'envoi ne recouvre pas le choix enregistré ici.
+    expect(source).toMatch(/if \(outcome\.stored\) setChosenHere\(true\);/);
+    expect(source).toMatch(/initial !== shown && !busy && \(!chosenHere \|\| initial === undefined\)/);
   });
 
   it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
