@@ -524,26 +524,43 @@ porte jamais. Le push qui porte le check-in **ouvre l'invitation** au toucher :
 une notification n'ouvre que des adresses du site (`public/push-sw.js`) et une
 adresse écrite dans son texte ne se touche pas — il mène donc à `/check-in`
 (`CHECK_IN_PATH`, `app/check-in/route.ts`, redirection 307 vers
-`CHECK_IN_INVITE_URL`) au lieu de la fiche du match. Idempotence : la mécanique des paliers (#441) — réservé avant
+`CHECK_IN_INVITE_URL`, figée au build par `force-static` — sans lui, Next 15
+exécuterait la route à chaque clic) au lieu de la fiche du match. Idempotence : la mécanique des paliers (#441) — réservé avant
 l'envoi, daté de l'horaire ; reprogrammer l'efface (`setMatchStartAt`), retirer
 l'horaire laisse les marques inertes, une manche jouée ou d'un tournoi clos
 n'est pas lue. Le dernier palier étant désormais `PT10H`, c'est lui qui sort une
-manche du balayage.
+manche du balayage ; entre-temps, une manche dont le rappel 24 h est pris n'est
+**pas relue** avant l'ouverture du palier 10 h (`WAITING_OFFSETS` : un `NOT
+EXISTS` par palier suivi d'un autre) — sans quoi chaque manche entre H-24 et
+H-10 serait relue, et sa marque `P1D` re-tentée, à chaque passage pendant
+14 heures.
 
 **Arbitres — `lib/server/tournaments/referee-digest.ts`.** Lancé par le même
-balayage (`dispatchDueMatchReminders`, après les rappels, échec indépendant).
+balayage (`dispatchDueMatchReminders`), **de front** avec les rappels
+(`Promise.allSettled` : il n'attend pas les envois aux joueurs, un bot lent ne
+le retarde pas), échec indépendant — une table absente se tait, comme au
+balayage. Chaque passage n'exécute d'abord qu'une **sonde** d'une ligne
+(`DIGEST_DUE_PROBE`, `LIMIT 1`) : la marge n'est lue et jointe que si une
+manche est due.
 Dès qu'une manche non encore citée entre dans ses 10 dernières heures
 (`REFEREE_DIGEST_LEAD_MS`), **un** message cite toutes les manches non citées
 des 12 prochaines heures (marge `REFEREE_DIGEST_GROUPING_MS` de 2 h : une
 soirée échelonnée tient en un message), dans l'ordre du coup d'envoi. Chaque
 manche citée reçoit la marque `REFS` (`REFEREE_DIGEST_KEY`), réservée avant
 l'envoi pour son horaire et son affiche : citée une fois par horaire ;
-reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
+reprogrammée ou d'affiche changée, elle est citée de nouveau. Les réservations
+partent quatre à la fois (`inBatches`, comme le balayage) — une ronde suisse en
+compte des dizaines ; une réservation en échec ne retient pas les autres.
+Canaux :
 
 - push `REFEREE_DIGEST` (« Programme d'arbitrage », audience `tournaments`,
   `notifyStaff`, langue de chacun) — `refereeDigestPush`, titre « Programme
   d'arbitrage : N matchs à venir » (pas « des 10 prochaines heures » : la
-  marge en cite jusqu'à 12 h), cinq lignes au plus puis « … et N autre(s) »
+  marge en cite jusqu'à 12 h), cinq lignes au plus **et dans la borne du corps
+  d'un push** (`PUSH_BODY_MAX`, 240 caractères, « … et N autres » et fuseau
+  compris : coupé au-delà, le push perdrait ces deux lignes et l'arbitre
+  croirait la liste complète ; une seule ligne trop longue est raccourcie), et
+  le corps garde ses retours à la ligne (`clipPushText(…, keepLines)`), puis « … et N autre(s) »
   (pluriel ICU), puis une dernière ligne « Heure de Paris » / « Paris time »
   (un arbitre à l'étranger lirait sinon son heure locale ; en dernier, car une
   notification repliée ne montre que la première ligne, qui reste un match) ; chaque ligne nomme
@@ -552,9 +569,12 @@ reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
   manche tiennent en une ligne (« 8 matchs (Coupe, Manche 1) », pluriel ICU)
   au lieu de lignes « Un match » identiques ; « … et N autres » compte les
   matchs. Le lien mène à la fiche du tournoi quand le programme
-  n'en cite qu'un, à `/tournois` sinon ; l'étiquette nomme **toutes** les
-  manches citées (`referee-digest-<id>-<id>…`), pour qu'un programme suivant
-  ne remplace jamais sur l'appareil un précédent qui en cite d'autres ;
+  n'en cite qu'un, à `/tournois` sinon ; l'étiquette porte la première
+  manche, le nombre et une **empreinte** de toutes les manches citées
+  (`referee-digest-<id>-<n>-<FNV-1a>`, bornée à `PUSH_TAG_MAX` = 64 : une
+  liste écrite en entier y serait coupée et deux programmes au même début
+  confondus), pour qu'un programme suivant ne remplace jamais sur l'appareil
+  un précédent qui en cite d'autres ;
 - une **ligne** au canal de logs Discord (`sendBotLog`), là où les arbitres
   suivent déjà les horaires posés — `formatRefereeDigestLog` : engagées par
   `entrantLabel` (« un joueur » en solo), tournoi `« nom » (#id)`, aucun auteur

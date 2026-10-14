@@ -90,6 +90,15 @@ qui n'a pas atteint le bot mais a atteint l'appareil d'un arbitre n'est pas anno
 série (`lib/shared/latest-value-writer.ts`) : deux cases cochées coup sur coup
 ne peuvent plus laisser au serveur la liste la plus ancienne.
 
+Bornes du contenu (`buildPushPayload`) : titre 80, corps 240 (`PUSH_BODY_MAX`),
+étiquette 64 caractères, coupés par caractère (`clipPushText`). Le titre est
+replié sur une ligne ; le **corps garde ses retours à la ligne** (programme
+d'arbitrage), chaque ligne repliée, les lignes vides ôtées. Un rédacteur dont la
+fin compte la protège lui-même : le programme d'arbitrage ne garde que les
+lignes qui tiennent (« … et N autres » et le fuseau compris), le rappel du
+check-in raccourcit son début plutôt que l'invitation ; une étiquette qui
+nommerait une liste en porte une empreinte.
+
 ## Protocole
 
 `lib/server/web-push.ts`, sur `node:crypto`, sans dépendance : VAPID (RFC 8292,
