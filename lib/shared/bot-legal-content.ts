@@ -87,7 +87,7 @@ const LAST_UPDATED_EN = "14 October 2026";
 // matchs diffusés dans #live, la politique seule ; le pseudo solo dans #live et
 // l'interrupteur des messages de match (RGPD-DM-SWITCH), la politique seule ;
 // base du pseudo solo, AutoMod et avis « Match retiré » (LEGAL-FOLLOWUP-444),
-// la politique seule.
+// les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions).
 const PRIVACY_LAST_UPDATED_FR = "17 octobre 2026";
 const PRIVACY_LAST_UPDATED_EN = "17 October 2026";
 

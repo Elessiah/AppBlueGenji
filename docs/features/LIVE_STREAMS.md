@@ -342,9 +342,16 @@ nommé = ne pas s'inscrire, une annonce passée est supprimée sur demande. Dit 
 T16, `/rgpd#retransmission`, `DONNEES_PROFIL` (« Pseudo site »), le droit
 d'opposition, la mention d'inscription solo, `STREAM_NOTICE_LIVE` (conditions,
 version 4) et la politique du bot. **AutoMod** : si une règle AutoMod de Discord
-bloque une annonce, son texte (pseudo compris en individuel) peut parvenir au
-salon d'alertes des modérateurs du serveur — déclaré en destinataire de T16, sur
-`/rgpd` et dans la politique du bot. La configuration réelle d'AutoMod sur le
+bloque **ou signale** une annonce, son texte (pseudo compris en individuel) peut
+parvenir au salon d'alertes des modérateurs du serveur. T16 en fait une finalité
+(modérer le serveur), sur l'**intérêt légitime** de l'association ; l'alerte reste
+jusqu'à sa suppression par les modérateurs, ou sur demande (c'est l'opposition) —
+**décision requise** : aucune durée fixe. Textes à tenir ensemble : T16
+(finalité, base, destinataire, conservation, transfert), T08, T01 (suppression),
+`/rgpd` (#retransmission, tableau `AUTOMOD_ALERT_SCOPE`, suppression du compte,
+transfert Discord), `DROITS` (effacement, opposition), la confirmation de
+suppression (`account-deletion.ts`, `profile.json`), l'entrée `PRIVACY_CHANGES`
+et la politique du bot. La configuration réelle d'AutoMod sur le
 serveur (salon d'alertes posé ou non) n'est pas connue du code : **décision
 requise** pour la préciser, la déclaration dit « peut ». Elle ne montre que le **pseudo**, le **nom
 d'équipe** et les **résultats et performances en jeu** — ni webcam ni chat
