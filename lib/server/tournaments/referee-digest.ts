@@ -125,6 +125,8 @@ type CurrentRow = RowDataPacket & {
   team2_id: number | null;
   status: string;
   tournament_state: string;
+  /** La marque `REFS` de cette manche est-elle encore là, pour l'horaire lu ? */
+  marked: number;
 };
 
 const PLAYED = new Set<string>(PLAYED_MATCH_STATUSES);
@@ -135,10 +137,12 @@ const PLAYED = new Set<string>(PLAYED_MATCH_STATUSES);
  * — le programme, s'il citait encore l'ancien, pourrait arriver après lui et
  * laisser l'arbitre sur une heure fausse. Une manche reprogrammée, retirée,
  * d'affiche changée, jouée entre-temps (score saisi) ou d'un tournoi clos sort
- * du programme, et sa marque est rendue (`releaseDigestMarks`, pour l'horaire
- * lu seulement) : un retrait n'efface aucune marque, et sans ce rendu une
- * manche reposée au même horaire ne serait plus jamais citée. Une relecture
- * en échec n'arrête pas l'envoi (meilleur effort : les marques sont prises).
+ * du programme. Sa marque, si elle est encore là, est rendue
+ * (`releaseDigestMarks`, pour l'horaire lu seulement) ; une marque déjà
+ * effacée (reprogrammation, retrait, affiche changée — même si l'horaire est
+ * depuis revenu à l'identique) sort aussi la manche : le programme suivant la
+ * citera, la citer ici la dirait deux fois. Une relecture en échec n'arrête
+ * pas l'envoi (meilleur effort : les marques sont prises).
  */
 async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
   if (rows.length === 0) return [];
@@ -146,10 +150,12 @@ async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
   try {
     const db = await getDatabase();
     const [current] = await db.query<CurrentRow[]>(
-      `SELECT m.id, m.start_at, m.team1_id, m.team2_id, m.status, t.state AS tournament_state
+      `SELECT m.id, m.start_at, m.team1_id, m.team2_id, m.status, t.state AS tournament_state,
+              EXISTS (SELECT 1 FROM bg_match_reminders r
+                       WHERE r.match_id = m.id AND r.offset_key = ? AND r.start_at = m.start_at) AS marked
          FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
         WHERE m.id IN (${sqlPlaceholders(rows.length)})`,
-      rows.map((row) => Number(row.id)),
+      [REFEREE_DIGEST_KEY, ...rows.map((row) => Number(row.id))],
     );
     byId = new Map(current.map((row) => [Number(row.id), row]));
   } catch (error) {
@@ -160,6 +166,10 @@ async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
   const dropped: DigestRow[] = [];
   for (const row of rows) {
     const fresh = byId.get(Number(row.id));
+    // Marque effacée entre-temps (horaire retiré puis reposé à l'identique,
+    // A → B → A) : la manche sera citée par le programme suivant — la citer
+    // ici aussi la dirait deux fois. Rien à rendre : la marque n'est plus là.
+    if (fresh !== undefined && Number(fresh.marked) !== 1) continue;
     const unchanged =
       fresh !== undefined &&
       fresh.start_at !== null &&
