@@ -509,6 +509,11 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(en).toContain("if a Discord AutoMod rule blocks a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel");
   });
 
+  it("dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande (FR et EN)", () => {
+    expect(fr).toContain("Une annonce bloquée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.");
+    expect(en).toContain("An announcement blocked by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.");
+  });
+
   it("dit la base des messages de match et du pseudo solo, sans obligation légale (FR et EN)", () => {
     expect(fr).toContain("le site garde ce choix dans l'intérêt légitime du joueur, pour l'honorer");
     // Revue UI/UX #445 : « son » désignait le site ; l'intérêt est celui du joueur (registre T04, /rgpd).

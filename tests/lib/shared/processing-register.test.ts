@@ -29,6 +29,7 @@ import {
   WEB_ACCESS_LOG_RETENTION_DAYS,
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
@@ -183,6 +184,24 @@ describe("PROCESSING_ACTIVITIES", () => {
 
   it("ne déclare aucune adresse e-mail collectée", () => {
     expect(byRef("T01").dataCategories.join(" ")).toMatch(/aucune adresse e-mail/i);
+  });
+});
+
+describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
+  const fr = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref)!;
+  const en = (ref: string) => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref)!;
+
+  it("T08 remet l'avis « Match retiré » et nomme les modérateurs destinataires d'une alerte AutoMod", () => {
+    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match, avis de retrait d'un match \(« Match retiré »\), avis de modération/);
+    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders, notices of removal from a match \(“Match retiré”\), moderation notices/);
+    expect(fr("T08").recipients).toContain("Modérateurs du serveur Discord de l'association, si une règle AutoMod de Discord bloque une annonce #live (traitement T16)");
+    expect(en("T08").recipients).toContain("Moderators of the association's Discord server, if a Discord AutoMod rule blocks a #live announcement (processing activity T16)");
+  });
+
+  it("T16 dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande", () => {
+    expect(fr("T16").retention.join(" ")).toMatch(/Alerte AutoMod \(annonce #live bloquée\) : gardée dans le salon d'alertes de modération du serveur jusqu'à sa suppression par les modérateurs, et supprimée sur demande/);
+    expect(en("T16").retention.join(" ")).toMatch(/AutoMod alert \(blocked #live announcement\): kept in the server's moderation alert channel until the moderators delete it, and deleted at the request/);
+    expect(fr("T16").retention).toHaveLength(en("T16").retention.length);
   });
 });
 
