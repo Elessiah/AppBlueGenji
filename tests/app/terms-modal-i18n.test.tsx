@@ -113,12 +113,14 @@ describe("TermsAcceptanceModal — langue de la page", () => {
 
   it("pendant l'enregistrement, les boutons gardent le focus : aria-disabled + aria-busy, jamais disabled natif", () => {
     const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
-    expect(modal).not.toMatch(/[^-]disabled=\{busy/);
+    // Aucun bouton nativement désactivé pendant l'envoi (la case, elle, peut l'être).
+    expect(modal).not.toMatch(/<CyberButton[^>]*[^-]disabled=\{busy/);
     expect(modal).not.toContain("disabled={busy || !checked}");
-    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(3);
+    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(2);
     expect(modal).toContain("aria-busy={busy || undefined}");
-    // La case est figée pendant l'envoi : « J'accepte » ne peut pas devenir nativement désactivé sous le focus.
-    expect(modal).toContain("if (!busy) setChecked(event.target.checked);");
+    // La case (sans le focus, qui est sur « J'accepte ») est figée pendant l'envoi, avec l'aspect éteint
+    // de `:disabled` : « J'accepte » ne peut pas devenir nativement désactivé sous le focus.
+    expect(modal).toMatch(/type="checkbox"\s+checked=\{checked\}[\s\S]*?disabled=\{busy\}/);
     expect(modal).toContain("disabled={!checked}");
   });
 
