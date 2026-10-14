@@ -478,7 +478,7 @@ T13 Acceptation des conditions d'utilisation
 Finalité principale
 Garder la preuve que les conditions d'utilisation du site ont été acceptées, et laquelle de leurs versions
 Sous-finalités
-Recueillir l'acceptation à la création du compte, à la création d'une équipe et en recevant la gestion d'une équipe
+Recueillir l'acceptation à la création du compte, à la création d'une équipe, en recevant la gestion d'une équipe et à une connexion où les conditions viennent d'être acceptées sur la page de connexion (une acceptation seulement gardée par le navigateur n'est pas reportée sur un compte existant)
 Redemander l'acceptation quand les conditions changent de version
 Base légale
 Exécution du service demandé par le joueur (contrat)

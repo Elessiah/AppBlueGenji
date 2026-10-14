@@ -204,6 +204,11 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
     expect(fr("T16").retention).toHaveLength(en("T16").retention.length);
   });
 
+  it("T13 recueille aussi l'acceptation à une connexion, seulement si elle vient d'être donnée sur la page (FR et EN)", () => {
+    expect(fr("T13").subPurposes.join(" ")).toMatch(/à une connexion où les conditions viennent d'être acceptées sur la page de connexion \(une acceptation seulement gardée par le navigateur n'est pas reportée sur un compte existant\)/);
+    expect(en("T13").subPurposes.join(" ")).toMatch(/at a login where the terms have just been accepted on the login page \(an acceptance only kept by the browser is not carried over to an existing account\)/);
+  });
+
   it("T08 garde la même durée de l'alerte AutoMod que T16 et la politique du bot, compte supprimé compris", () => {
     expect(fr("T08").retention.join(" ")).toMatch(/Alerte AutoMod d'une annonce #live bloquée : dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, même après la suppression du compte du joueur, et supprimée sur demande/);
     expect(en("T08").retention.join(" ")).toMatch(/AutoMod alert for a blocked #live announcement: in the moderation alert channel until the moderators delete it, even after the player's account is deleted, and deleted at the request/);
