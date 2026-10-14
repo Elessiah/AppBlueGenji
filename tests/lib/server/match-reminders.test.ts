@@ -1292,6 +1292,19 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     }
   });
 
+  /** Bot lent : les messages privés ne reviennent qu'à l'appel de la fonction rendue. */
+  function holdDirectMessages(): () => void {
+    let release: () => void = () => undefined;
+    const slowBot = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      await slowBot;
+      return { sent: 0, unresolved: [], failed: [] };
+    });
+    return () => release();
+  }
+
   it("lance le programme d'arbitrage au même balayage, sans que son échec retienne les rappels", async () => {
     const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
     jest.mocked(dispatchRefereeDigest).mockRejectedValue(new Error("bot"));
@@ -1309,14 +1322,7 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     jest.mocked(dispatchRefereeDigest).mockResolvedValue(0);
     await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
     // Un bot lent : les messages privés ne reviennent qu'au signal.
-    let release: () => void = () => undefined;
-    const slowBot = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
-      await slowBot;
-      return { sent: 0, unresolved: [], failed: [] };
-    });
+    const release = holdDirectMessages();
 
     const sweep = dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -1359,14 +1365,7 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     jest.mocked(dispatchRefereeDigest).mockResolvedValue(0);
     await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
     // Le balayage des joueurs reste pendu sur le bot.
-    let release: () => void = () => undefined;
-    const slowBot = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
-      await slowBot;
-      return { sent: 0, unresolved: [], failed: [] };
-    });
+    const release = holdDirectMessages();
     const sweep = dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
     await pendingRefereeDigest();
     expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
