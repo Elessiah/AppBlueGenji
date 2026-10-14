@@ -511,7 +511,12 @@ coup d'envoi sur Discord — <invitation> ». L'invitation est **une** constante
 écrire une invitation, `discord-invite-single-source.test.ts`), réexportée par
 `discord-notifications.ts` ; `CHECK_IN_OPENS_MINUTES_BEFORE = 15`, que le
 message privé et le push (`matchReminder.checkIn`, paramètre `{minutes}`)
-lisent tous deux. Le rappel
+lisent tous deux. À moins de 15 minutes du coup d'envoi (manche programmée au
+dernier moment, balayage tardif), « ouvre 15 minutes avant » désignerait un
+instant passé : `isCheckInOpen` (instant de l'envoi, `PlannedSend.now`) fait
+dire « le salon de check-in est déjà ouvert sur Discord » au message privé
+(`checkInLine(true)`) et « Check-in déjà ouvert sur Discord » / « Check-in
+already open on Discord » au push (`matchReminder.checkInOpen`). Le rappel
 24 h est gardé (deux rappels). Une manche annoncée moins de 10 h avant consomme
 `PT10H` sans message : c'est **l'annonce** qui porte la ligne de check-in
 (`MatchReminderContext.checkIn`, `checkIn` du push). Un avis de retrait ne la
@@ -539,8 +544,9 @@ reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
   `notifyStaff`, langue de chacun) — `refereeDigestPush`, titre « Programme
   d'arbitrage : N matchs à venir » (pas « des 10 prochaines heures » : la
   marge en cite jusqu'à 12 h), cinq lignes au plus puis « … et N autre(s) »
-  (pluriel ICU), sous une première ligne « Heure de Paris » / « Paris time »
-  (un arbitre à l'étranger lirait sinon son heure locale) ; chaque ligne nomme
+  (pluriel ICU), puis une dernière ligne « Heure de Paris » / « Paris time »
+  (un arbitre à l'étranger lirait sinon son heure locale ; en dernier, car une
+  notification repliée ne montre que la première ligne, qui reste un match) ; chaque ligne nomme
   le tournoi **et la manche** (`pushRoundLabel`, « Ronde N » en suisse). En
   solo, aucun pseudo : les matchs consécutifs d'un même créneau, tournoi et
   manche tiennent en une ligne (« 8 matchs (Coupe, Manche 1) », pluriel ICU)
@@ -552,7 +558,10 @@ reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
 - une **ligne** au canal de logs Discord (`sendBotLog`), là où les arbitres
   suivent déjà les horaires posés — `formatRefereeDigestLog` : engagées par
   `entrantLabel` (« un joueur » en solo), tournoi `« nom » (#id)`, aucun auteur
-  (c'est le site qui l'envoie), douze manches au plus **et 1 900 caractères**
+  (c'est le site qui l'envoie), chaque entrée avec sa manche
+  (`matchRoundLabel`) ; en solo, les matchs consécutifs d'un même créneau,
+  tournoi et manche en une entrée « 8 matchs (« Coupe » (#7), Manche 1) » ;
+  douze entrées au plus **et 1 900 caractères**
   (`REFEREE_DIGEST_LOG_MAX_LENGTH`) : Discord refuse un message de plus de
   2 000 caractères, que le bot envoie sans le découper — le programme, ses
   marques déjà posées, serait perdu. Les manches qui ne tiennent pas sont
