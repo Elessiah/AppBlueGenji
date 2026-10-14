@@ -19,6 +19,9 @@ import {
   soloPseudoRegisteredSince,
 } from "@/lib/server/tournaments/live-announcements";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 const NOW = Date.parse("2026-10-14T20:00:00Z");
@@ -151,6 +154,17 @@ describe("runLiveAnnouncementSweep", () => {
       );
     }
     expect(params).toEqual([since, since]);
+  });
+
+  it("les textes légaux datent le seuil comme le changement publié (FR et EN)", () => {
+    // Déplacer `publishedAt` déplace le seuil : ces textes doivent suivre.
+    expect(soloPseudoRegisteredSince()).toBe("2026-10-16 00:00:00");
+    const t16 = (list: typeof PROCESSING_ACTIVITIES) => JSON.stringify(list.find((sheet) => sheet.ref === "T16"));
+    expect(t16(PROCESSING_ACTIVITIES)).toContain("inscription antérieure au 16 octobre 2026");
+    expect(t16(PROCESSING_ACTIVITIES_EN)).toContain("registration made before 16 October 2026");
+    const policy = JSON.stringify(PRIVACY_POLICY);
+    expect(policy).toContain("inscription antérieure au 16 octobre 2026");
+    expect(policy).toContain("registration made before 16 October 2026");
   });
 
   it("donne au bot une version sans pseudo à citer dans son canal de logs en cas d'échec", async () => {
