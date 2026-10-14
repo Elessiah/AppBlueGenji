@@ -699,7 +699,6 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Public of the streaming platforms and of the site",
       "Streaming platforms (YouTube, Twitch, Kick), controllers of their own processing, including of their viewers' data; the site only links to the channels and embeds no player, it sends them no data",
       "Members of the association's Discord server, for the announcement posted in the #live channel (team names, or the public BlueGenji username of the players of a solo tournament)",
-      "Moderators of the association's server, when an AutoMod rule of the server blocks the announcement and posts an alert about it (the blocked text, username included)",
       "Discord (hosting of the channel)",
     ],
     transfers: [`United States: Discord (announcement posted in the #live channel) — ${transferBasisEn(["DISCORD"])}`],

@@ -4,12 +4,13 @@ import { toIso } from "@/lib/server/serialization";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
 /**
- * Annonces #live d'un match de l'une de ses entrées en tournoi individuel
- * (`bg_live_announcements`, registre T16) : le match, son tournoi et la date
- * de l'annonce. Le titulaire y retrouve les messages qui ont pu publier son
- * pseudo et peut en demander la suppression (droit d'accès, art. 15).
- * Une annonce sans trace (bot indisponible, trace retirée) n'est pas rendue :
- * le site ne la détient pas.
+ * Traces d'annonce #live d'un match de l'une de ses entrées en tournoi
+ * individuel (`bg_live_announcements`, registre T16) : le match, son tournoi
+ * et la date. Droit d'accès (art. 15) : la trace est une donnée détenue, que
+ * l'annonce ait abouti ou non, et qu'elle ait porté le pseudo (inscription
+ * depuis le 16 octobre 2026) ou « un joueur ». Une trace effacée (avec son
+ * match, ou retirée pour un nouvel essai) n'est plus rendue : le site ne la
+ * détient plus, même si le message Discord reste.
  */
 export async function listOwnLiveAnnouncements(userId: number): Promise<PersonalDataExport["liveAnnouncements"]> {
   const db = await getDatabase();

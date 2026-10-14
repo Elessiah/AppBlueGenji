@@ -878,7 +878,6 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Public des plateformes de diffusion et du site",
       "Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée",
       "Membres du serveur Discord de l'association, pour l'annonce publiée dans le salon #live (noms d'équipe, ou pseudo public BlueGenji des joueurs d'un tournoi individuel)",
-      "Modérateurs du serveur de l'association, quand une règle AutoMod du serveur bloque l'annonce et en publie une alerte (le texte bloqué, pseudo compris)",
       "Discord (hébergement du salon)",
     ],
     // Le site ne transmet rien aux plateformes : la diffusion est publiée par la

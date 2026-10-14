@@ -1027,8 +1027,10 @@ export type PersonalDataExport = {
     submittedAt: string | null;
   }[];
   /**
-   * Annonces #live d'un match de ses entrées en tournoi individuel
-   * (`bg_live_announcements`, T16) : match, tournoi, date de l'annonce.
+   * Traces d'annonce #live d'un match de ses entrées en tournoi individuel
+   * (`bg_live_announcements`, T16) : match, tournoi, date. Une trace dit
+   * qu'une annonce a été tentée ; elle ne porte le pseudo que pour une
+   * inscription faite depuis le 16 octobre 2026. Effacée avec le match.
    */
   liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null }[];
   /**
