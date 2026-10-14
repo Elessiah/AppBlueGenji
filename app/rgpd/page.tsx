@@ -1083,9 +1083,10 @@ function RgpdFr({
             auquel le joueur s&apos;inscrit, et le nom neutre ne vaut que pour la diffusion — un joueur qui
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
             une règle AutoMod de Discord bloque une annonce, son texte (pseudo compris en tournoi
-            individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur. Ces annonces
-            restent dans le salon tant que le salon #live existe ;
-            l&apos;équipe ou le joueur concerné peut en demander la suppression par le bouton « Signaler
+            individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
+            reste jusqu&apos;à sa suppression par les modérateurs. Ces annonces restent dans le salon tant
+            que le salon #live existe ; l&apos;équipe ou le joueur concerné peut en demander la
+            suppression, comme celle de ces alertes, par le bouton « Signaler
             un problème », catégorie RGPD.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>

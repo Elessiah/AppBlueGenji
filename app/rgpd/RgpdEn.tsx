@@ -895,8 +895,9 @@ export function RgpdEn({
             tournament the player registers for, and the neutral name applies to the stream only — a player who does
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks an announcement, its text (including the username in a solo tournament) may reach the
-            server moderators&apos; alert channel. These announcements stay in
-            the channel as long as the #live channel exists; the team or player concerned can ask for their deletion
+            server moderators&apos; alert channel, where the alert stays until the moderators delete it. These
+            announcements stay in the channel as long as the #live channel exists; the team or player concerned can
+            ask for their deletion, and for that of these alerts,
             through the “Report a problem” button, GDPR category.
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>

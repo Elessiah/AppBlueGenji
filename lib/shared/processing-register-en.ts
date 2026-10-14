@@ -382,7 +382,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exclusion of a user from the relay by moderation — valid for the whole network of partner servers (community moderation), hence the list of exclusions open to the administrators of each server",
       "Activity statistics (/stats command, which shows each person only their own activity; the bot's dashboard)",
       "Confirming memberships of the association and scheduled reminders on its servers",
-      "Delivering messages written by the site: codes, match times and reminders, moderation notices (report naming the person, logo hidden, removed or deleted), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the start of a streamed match posted in the #live channel of the association's server, with an @everyone mention (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)",
+      "Delivering messages written by the site: codes, match times and reminders, notices of removal from a match (“Match retiré”), moderation notices (report naming the person, logo hidden, removed or deleted), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the start of a streamed match posted in the #live channel of the association's server, with an @everyone mention (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)",
     ],
     legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing",
     dataSubjects: [
@@ -421,6 +421,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Members of the refereeing role of each server that has set one (/set-referee-role), for the site's refereeing alerts",
       "Members of partner servers, who read the relayed announcements",
       "Members of the association's Discord server, who read the announcement of streamed matches in the #live channel (processing activity T16)",
+      "Moderators of the association's Discord server, if a Discord AutoMod rule blocks a #live announcement (processing activity T16)",
       "Administrators of any server where the bot is installed (including a server created to invite it there) and holders of the bot administration role (/set-bot-admin), for the network's list of exclusions (/ban-list, reply visible only to the requester) — the exclusion applies to the whole network, each server must know who can no longer post there",
       "Discord (execution platform)",
     ],
@@ -693,6 +694,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Live: the stream is not kept by the site, which only keeps the link to the channel",
       "Replay link: kept with the match, like its results (T03); the video stays on the platform until it is deleted by the channel that published it",
       `Discord announcement: the site only keeps a record of the announcement (the match, the identifiers of its two entrants and its date), made before sending, removed for a new attempt when the bot was unavailable, otherwise deleted with the match; the message is kept in the channel as long as the #live channel exists, even after the player's account is deleted, and deleted at the request of the team or player concerned (“${REPORT_FORM_NAME_EN}” form, “GDPR” category)`,
+      `AutoMod alert (blocked #live announcement): kept in the server's moderation alert channel until the moderators delete it, and deleted at the request of the team or player concerned (“${REPORT_FORM_NAME_EN}” form, “GDPR” category)`,
       `Right to object: on request (“${REPORT_FORM_NAME_EN}” form, “GDPR” category), the player appears under a neutral name in subsequent streams, the replay link is removed from the site, and a video published by the association's channel is hidden or deleted; the #live announcement of a solo tournament keeps the public username, which falls under performance of the service and not legitimate interest: not being named in it means not registering`,
     ],
     recipients: [
