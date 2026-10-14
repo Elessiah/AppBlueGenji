@@ -305,8 +305,8 @@ describe("français inchangé — profil", () => {
     }
     // A solo player's #live announcements outlive the account (until deleted on request): every outcome says so.
     for (const subject of ["TOURNAMENTS", "SOLO_REGISTRATIONS", null] as const) {
-      expect(accountDeletionConsequences(subject)).toMatch(/salon #live du Discord, qui gardent ton pseudo jusqu'à leur suppression sur demande/);
-      expect(deletionConsequencesText(EN_PROFILE, subject)).toMatch(/Discord #live channel, which keep your username until they are deleted on request/);
+      expect(accountDeletionConsequences(subject)).toMatch(/salon #live du Discord \(et l'alerte de modération d'une annonce bloquée par AutoMod\), qui gardent ton pseudo jusqu'à leur suppression sur demande/);
+      expect(deletionConsequencesText(EN_PROFILE, subject)).toMatch(/Discord #live channel \(and the moderation alert for an announcement blocked by AutoMod\), which keep your username until they are deleted on request/);
     }
     for (const code of ["ACCOUNT_STILL_REFERENCED", "X", undefined]) {
       expect(deletionErrorText(FR_PROFILE, code)).toBe(accountDeletionErrorMessage(code));

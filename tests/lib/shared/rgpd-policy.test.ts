@@ -233,6 +233,13 @@ describe("DROITS", () => {
     expect(DROITS).toHaveLength(8);
   });
 
+  it("dit que l'alerte AutoMod d'une annonce #live survit au compte comme l'annonce, supprimée sur demande (FR et EN)", () => {
+    const erasureFr = DROITS.map((d) => d.text).find((t) => t.includes("Les annonces #live d'un tournoi individuel"));
+    const erasureEn = DROITS_EN.map((d) => d.text).find((t) => t.includes("The #live announcements of a solo tournament"));
+    expect(erasureFr).toMatch(/sur une demande distincte \(« Signaler un problème », catégorie RGPD\), comme l'alerte de modération d'une telle annonce bloquée par AutoMod/);
+    expect(erasureEn).toMatch(/on a separate request \(“Report a problem”, GDPR category\), as does the moderation alert for such an announcement blocked by AutoMod/);
+  });
+
   it("couvre le droit à la limitation (art. 18)", () => {
     const limitation = DROITS.find((d) => d.title.toLowerCase().includes("limitation"));
     expect(limitation?.text).toMatch(/art\. 18/);
