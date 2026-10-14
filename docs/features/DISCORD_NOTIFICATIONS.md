@@ -295,8 +295,11 @@ posée :
 - une engagée manquante, efface tout sauf `TOLD` : le balayage annoncera la
   manche quand elle sera connue.
 
-Une date **effacée** garde toutes ses marques (inertes : le balayage ne lit que
-les manches datées). Puis `notifyMatchScheduleChange`
+Une date **effacée** garde ses marques (inertes : le balayage ne lit que
+les manches datées), sauf la citation au programme d'arbitrage (`REFS`) : les
+arbitres ont reçu le retrait, et une date reposée à l'identique — rendue à
+l'horaire que les joueurs tiennent, marques gardées — doit reparaître au
+programme. Puis `notifyMatchScheduleChange`
 (`lib/server/tournaments/schedule-notices.ts`) prévient **sans attendre le
 balayage**, la manche lue **une fois** pour le journal, les arbitres et les
 joueurs (`announceMatchSchedule` / `announceMatchScheduleCleared` la reçoivent,
@@ -573,7 +576,10 @@ l'ancienne heure après le nouvel horaire poussé aux arbitres — et sa marque 
 rendue pour l'horaire lu (`releaseDigestMarks`) : un retrait n'efface aucune
 marque, et une manche reposée au même horaire ne serait sinon plus jamais
 citée ; la règle « pas de marge seule » s'applique ensuite. Une
-relecture en échec n'empêche pas l'envoi (les marques sont prises). Les réservations
+relecture en échec n'empêche pas l'envoi (les marques sont prises). Fenêtre
+résiduelle acceptée : une reprogrammation pendant l'envoi lui-même (quelques
+secondes : appareils, bot) peut encore croiser le programme ; le push
+`MATCH_SCHEDULED` du nouvel horaire, distinct, le dit aux arbitres. Les réservations
 partent quatre à la fois (`inBatches`, comme le balayage) — une ronde suisse en
 compte des dizaines ; une réservation en échec ne retient pas les autres. La
 réservation est celle des paliers (`claimDatedMark`, `reminder-marks.ts`,
