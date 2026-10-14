@@ -125,11 +125,15 @@ type CurrentRow = RowDataPacket & {
   team2_id: number | null;
   status: string;
   tournament_state: string;
-  /** La marque `REFS` de cette manche est-elle encore là, pour l'horaire lu ? */
-  marked: number;
+  /** L'horaire que tient la marque `REFS` de la manche (`null` : aucune). */
+  mark_at: Date | string | null;
 };
 
 const PLAYED = new Set<string>(PLAYED_MATCH_STATUSES);
+
+function sameInstant(a: Date | string | null, b: Date | string): boolean {
+  return a !== null && new Date(a).getTime() === new Date(b).getTime();
+}
 
 /**
  * Relit, en une instruction, les manches réservées juste avant l'envoi : un
@@ -151,8 +155,8 @@ async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
     const db = await getDatabase();
     const [current] = await db.query<CurrentRow[]>(
       `SELECT m.id, m.start_at, m.team1_id, m.team2_id, m.status, t.state AS tournament_state,
-              EXISTS (SELECT 1 FROM bg_match_reminders r
-                       WHERE r.match_id = m.id AND r.offset_key = ? AND r.start_at = m.start_at) AS marked
+              (SELECT r.start_at FROM bg_match_reminders r
+                WHERE r.match_id = m.id AND r.offset_key = ? LIMIT 1) AS mark_at
          FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
         WHERE m.id IN (${sqlPlaceholders(rows.length)})`,
       [REFEREE_DIGEST_KEY, ...rows.map((row) => Number(row.id))],
@@ -166,14 +170,15 @@ async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
   const dropped: DigestRow[] = [];
   for (const row of rows) {
     const fresh = byId.get(Number(row.id));
-    // Marque effacée entre-temps (horaire retiré puis reposé à l'identique,
-    // A → B → A) : la manche sera citée par le programme suivant — la citer
-    // ici aussi la dirait deux fois. Rien à rendre : la marque n'est plus là.
-    if (fresh !== undefined && Number(fresh.marked) !== 1) continue;
+    // Notre marque (celle de l'horaire lu) effacée entre-temps — horaire
+    // retiré puis reposé à l'identique, A → B → A : la manche sera citée par
+    // le programme suivant, la citer ici la dirait deux fois. Rien à rendre.
+    // Une marque encore datée de l'horaire lu (manche déplacée dans le passé,
+    // qui n'efface rien) est rendue plus bas, avec les autres manches changées.
+    if (fresh !== undefined && !sameInstant(fresh.mark_at, row.start_at)) continue;
     const unchanged =
       fresh !== undefined &&
-      fresh.start_at !== null &&
-      new Date(fresh.start_at).getTime() === new Date(row.start_at).getTime() &&
+      sameInstant(fresh.start_at, row.start_at) &&
       Number(fresh.team1_id) === Number(row.team1_id) &&
       Number(fresh.team2_id) === Number(row.team2_id) &&
       !PLAYED.has(String(fresh.status)) &&
