@@ -53,6 +53,7 @@ import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } 
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
 import type { MatchStatus } from "@/lib/shared/types";
 
 type LiveCandidateRow = RowDataPacket & {
@@ -308,10 +309,17 @@ function matchIdsOf(group: AnnouncementGroup): number[] {
  * exception à la règle « aucun pseudo sur Discord », décidée par l'utilisateur
  * (2026-10-14, `RGPD_LOGS_AND_VISITS.md`). Jamais le nom de l'entrée solo
  * (`bg_teams.name`, qui peut porter un suffixe de dédoublonnage) ; `null` pour
- * un compte supprimé, écrit « un joueur ».
+ * un compte supprimé, écrit « un joueur ». En tournoi individuel, une entrée
+ * sans compte (invité fantôme, nommé par le staff — souvent un prénom) s'écrit
+ * aussi « un joueur » : seul un pseudo de compte peut partir.
  */
-export function liveEntrantName(soloUserId: number | null, teamName: unknown, pseudo: unknown): string | null {
-  if (soloUserId == null) return String(teamName);
+export function liveEntrantName(
+  soloUserId: number | null,
+  teamName: unknown,
+  pseudo: unknown,
+  participantType: unknown,
+): string | null {
+  if (soloUserId == null) return isSoloTournament(toParticipantType(participantType)) ? null : String(teamName);
   return typeof pseudo === "string" && pseudo.trim() !== "" ? pseudo : null;
 }
 
@@ -410,8 +418,8 @@ async function announce(group: AnnouncementGroup): Promise<{ posted: number; pos
   const message = formatLiveAnnouncementGroup({
     tournamentName: String(first.tournament_name),
     pairings: group.rows.map((row) => ({
-      team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, row.team1_pseudo),
-      team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, row.team2_pseudo),
+      team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, row.team1_pseudo, row.participant_type),
+      team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, row.team2_pseudo, row.participant_type),
     })),
   });
   const { label, context, plural } = describeGroup(group);

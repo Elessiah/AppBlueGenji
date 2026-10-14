@@ -741,7 +741,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [
       { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
-      { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" },
+      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ],
   },
 ];

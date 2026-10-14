@@ -395,7 +395,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Match direct messages (time set, changed or removed, reminders, the “Match retiré” notice): legitimate interest, with a right to object. Untick “Discord direct messages about my matches” in “My profile”, Notifications section, to stop receiving them; your push notifications keep their own settings. The site keeps this choice for the life of the account, in your data export.",
       "Referee alerts and the refereeing schedule, sent to referees and administrators, fall under performance of the service and are not turned off this way.",
     ],
-    linkLabels: ["Read the “Match streaming” paragraph", "Read the “Push notifications” section"],
+    linkLabels: ["Read the “Match streaming” paragraph", "Read the “Match Discord direct messages” paragraph"],
   },
 };
 
