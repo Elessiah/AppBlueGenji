@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/push-subscriptions");
+jest.mock("@/lib/server/solo-entries-service");
 
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients } from "@/lib/server/notify";
+import { getFullProfile } from "@/lib/server/users/full-profile";
 import { matchDmEnabled, recordMatchDmPreference } from "@/lib/server/users/match-dm-preference";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -103,5 +105,49 @@ describe("loadNotificationRecipients — option matchDm", () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
     await expect(loadNotificationRecipients([1], "declared", { matchDm: true })).rejects.toThrow("lock");
     expect(query).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("getFullProfile — choix du titulaire seul", () => {
+  const USER_ROW = {
+    id: 42,
+    pseudo: "Player",
+    avatar_url: null,
+    overwatch_battletag: null,
+    marvel_rivals_tag: null,
+    discord_pseudo: null,
+    discord_verified_at: null,
+    is_adult: null,
+    visible_avatar: 0,
+    visible_overwatch: 0,
+    visible_marvel: 0,
+    visible_major: 0,
+    visible_discord: 0,
+    open_to_recruitment: 0,
+    is_admin: 0,
+    platform_roles_json: null,
+    is_deleted: 0,
+    locale: "fr",
+    match_dm_enabled: 0,
+    created_at: new Date("2026-01-01T00:00:00Z"),
+  };
+
+  const load = async (viewerId: number) => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[USER_ROW], []]).mockResolvedValue([[], []]);
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
+    return { profile: await getFullProfile({ id: viewerId }, 42), sql: String(execute.mock.calls[0][0]) };
+  };
+
+  it("lit et rend le choix à son titulaire", async () => {
+    const { profile, sql } = await load(42);
+    expect(sql).toMatch(/match_dm_enabled/);
+    expect(profile?.matchDmEnabled).toBe(false);
+  });
+
+  it("ne lit pas la colonne pour la fiche d'un autre : une migration en échec ne la casse pas", async () => {
+    const { profile, sql } = await load(7);
+    expect(sql).not.toMatch(/match_dm_enabled/);
+    expect(profile).not.toHaveProperty("matchDmEnabled");
   });
 });
