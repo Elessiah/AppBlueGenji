@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 
 /** `pushLiveAnnouncement` : contrat avec `POST /internal/announce/live` du bot. */
 
@@ -173,30 +173,28 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
-  it("rend « interrupted » sur une connexion coupée en route : le bot a pu publier avant de tomber", async () => {
-    for (const code of ["ECONNRESET", "UND_ERR_SOCKET", "EPIPE"]) {
-      jest
-        .spyOn(global, "fetch")
-        .mockRejectedValueOnce(new TypeError("fetch failed", { cause: Object.assign(new Error("coupé"), { code }) }));
-      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("interrupted");
-      await succeedOnce();
-    }
+  // Connexion coupée en route : le bot a pu publier avant de tomber. Connexion
+  // qui n'a pas abouti : rien n'est parti.
+  const TRANSPORT_FAILURES: [string, LiveAnnouncementOutcome][] = [
+    ["ECONNRESET", "interrupted"],
+    ["UND_ERR_SOCKET", "interrupted"],
+    ["EPIPE", "interrupted"],
+    ["ECONNREFUSED", "unavailable"],
+    ["ENOTFOUND", "unavailable"],
+    ["UND_ERR_CONNECT_TIMEOUT", "unavailable"],
+  ];
+  it.each(TRANSPORT_FAILURES)("connexion en échec %s : « %s »", async (code, expected) => {
+    jest
+      .spyOn(global, "fetch")
+      .mockRejectedValueOnce(new TypeError("fetch failed", { cause: Object.assign(new Error("échec"), { code }) }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe(expected);
+    await succeedOnce();
   });
 
   it("rend « unavailable » sur une erreur interne du bot (500) : elle naît avant l'envoi", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ error: "LIVE_ANNOUNCEMENT_FAILED" }, { status: 500 }));
     await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
     await succeedOnce();
-  });
-
-  it("rend « unavailable » quand la connexion n'a pas abouti : rien n'est parti", async () => {
-    for (const code of ["ECONNREFUSED", "ENOTFOUND", "UND_ERR_CONNECT_TIMEOUT"]) {
-      jest
-        .spyOn(global, "fetch")
-        .mockRejectedValueOnce(new TypeError("fetch failed", { cause: Object.assign(new Error("refusé"), { code }) }));
-      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
-      await succeedOnce();
-    }
   });
 
   it("rend « unavailable » sur un bot injoignable, puis court-circuite", async () => {

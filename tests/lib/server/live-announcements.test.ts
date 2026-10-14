@@ -7,7 +7,7 @@ jest.mock("@/lib/server/bot-integration", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import {
   LIVE_ANNOUNCE_MAX_AGE_MINUTES,
   LIVE_ANNOUNCE_RETRY_DELAY_MS,
@@ -265,35 +265,21 @@ describe("runLiveAnnouncementSweep", () => {
     expect(releasesOf(execute)).toEqual([[40, "5:7"]]);
   });
 
-  it("délai dépassé : garde la réservation, et ne pousse pas à poster à la main tout de suite", async () => {
-    jest.mocked(pushLiveAnnouncement).mockResolvedValue("timed-out");
+  // Aucune consigne de poster à la main quand l'envoi du bot a pu partir ;
+  // un jeton refusé désigne la configuration, pas un bot injoignable.
+  const TRACED_OUTCOMES: [string, LiveAnnouncementOutcome, "warn" | "error", unknown[], string, string][] = [
+    ["délai dépassé : l'envoi du bot peut encore partir", "timed-out", "error", [], "son envoi peut encore aboutir", "à la main"],
+    ["bot tombé avant sa réponse (redémarrage)", "interrupted", "error", [], "annonce peut-être publiée, non réessayée", "à la main"],
+    ["jeton interne refusé", "unauthorized", "warn", [[40, "1:2"]], "jeton interne refusé ou absent", "injoignable"],
+  ];
+  it.each(TRACED_OUTCOMES)("%s : réservation gardée ou rendue selon l'issue, trace pm2 juste", async (_label, outcome, level, released, says, never) => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue(outcome);
     const { execute } = mockDb([AUTO_LIVE]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
-    expect(releasesOf(execute)).toEqual([]);
-    const line = String(jest.mocked(console.error).mock.calls[0][0]);
-    expect(line).toContain("son envoi peut encore aboutir");
-    // Aucune consigne de la poster à la main : l'envoi du bot peut encore partir.
-    expect(line).not.toContain("à la main");
-  });
-
-  it("jeton interne refusé : rend la réservation, et pm2 désigne la configuration, pas le bot", async () => {
-    jest.mocked(pushLiveAnnouncement).mockResolvedValue("unauthorized");
-    const { execute } = mockDb([AUTO_LIVE]);
-    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
-    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
-    const line = String(jest.mocked(console.warn).mock.calls[0][0]);
-    expect(line).toContain("jeton interne refusé ou absent");
-    expect(line).not.toContain("injoignable");
-  });
-
-  it("bot tombé avant sa réponse (redémarrage) : garde la réservation, pas de second @everyone", async () => {
-    jest.mocked(pushLiveAnnouncement).mockResolvedValue("interrupted");
-    const { execute } = mockDb([AUTO_LIVE]);
-    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
-    expect(releasesOf(execute)).toEqual([]);
-    const line = String(jest.mocked(console.error).mock.calls[0][0]);
-    expect(line).toContain("annonce peut-être publiée, non réessayée");
-    expect(line).not.toContain("à la main");
+    expect(releasesOf(execute)).toEqual(released);
+    const line = String(jest.mocked(level === "warn" ? console.warn : console.error).mock.calls[0][0]);
+    expect(line).toContain(says);
+    expect(line).not.toContain(never);
   });
 
   it("Discord lâché pendant l'envoi : garde la réservation, #live fait foi", async () => {
@@ -507,6 +493,19 @@ describe("runLiveAnnouncementSweep", () => {
   });
 });
 
+/**
+ * Premier passage dont la diffusion est retenue par Discord (pause d'une
+ * minute), puis horloge avancée de trois secondes.
+ */
+async function holdFirstDiffusion() {
+  const held = { ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() };
+  jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
+  const { query } = mockDb([held]);
+  await dispatchLiveAnnouncements();
+  jest.setSystemTime(NOW + 3_000);
+  return { held, query };
+}
+
 describe("dispatchLiveAnnouncements", () => {
   it("ne fait rien hors production : ni lecture, ni réservation", async () => {
     jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "development" });
@@ -646,12 +645,8 @@ describe("dispatchLiveAnnouncements", () => {
   it("la fin d'une pause d'une minute ne repousse pas la relève à dix secondes d'un autre tournoi", async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
     try {
-      const held = { ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() };
-      jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
-      const { query } = mockDb([held]);
-      await dispatchLiveAnnouncements();
       // Trois secondes plus tard, un autre tournoi lance un match : appel étranglé.
-      jest.setSystemTime(NOW + 3_000);
+      const { held, query } = await holdFirstDiffusion();
       expect(await dispatchLiveAnnouncements()).toBe(0);
       const other = { ...held, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" };
       query.mockResolvedValue([[held, other]]);
@@ -670,12 +665,8 @@ describe("dispatchLiveAnnouncements", () => {
   it("une fin de pause remplacée par une relève plus proche revient, même si ce passage n'a rien lu", async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
     try {
-      const held = { ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() };
-      jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
-      const { query } = mockDb([held]);
-      await dispatchLiveAnnouncements();
       // Un appel étranglé arme une relève plus proche…
-      jest.setSystemTime(NOW + 3_000);
+      const { query } = await holdFirstDiffusion();
       await dispatchLiveAnnouncements();
       // …dont le passage ne lit rien : coupe-circuit du bot ouvert.
       jest.mocked(isBotCircuitOpen).mockReturnValue(true);
