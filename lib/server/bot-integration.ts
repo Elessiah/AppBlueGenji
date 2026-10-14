@@ -614,11 +614,14 @@ export async function pushLeadershipAlert(
  * Sur `uncertain`, `timed-out` et `interrupted`, l'appelant **garde** sa
  * réservation : une
  * annonce perdue vaut mieux qu'un second `@everyone` à tout le serveur ;
+ * - `unauthorized` — le bot a refusé le jeton interne (`401`), ou n'en a
+ *   pas (`503` `INTERNAL_API_TOKEN_NOT_CONFIGURED`) : rien n'est parti, la
+ *   configuration est en cause, pas le bot ;
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
  *
- * Sur `channel-closed`, `discord-held`, `discord-unreachable` et `unavailable`, l'appelant
- * rend sa réservation et réessaiera.
+ * Sur `channel-closed`, `discord-held`, `discord-unreachable`, `unauthorized`
+ * et `unavailable`, l'appelant rend sa réservation et réessaiera.
  */
 export type LiveAnnouncementOutcome =
   | "posted"
@@ -631,6 +634,7 @@ export type LiveAnnouncementOutcome =
   | "uncertain"
   | "timed-out"
   | "interrupted"
+  | "unauthorized"
   | "unavailable";
 
 /** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
@@ -646,14 +650,19 @@ const DISCORD_REFUSED_REASONS = new Set(["automod"]);
  */
 async function classifyUnavailable(
   response: Response,
-): Promise<"channel-closed" | "discord-held" | "discord-unreachable" | "discord-refused" | "uncertain" | "unavailable"> {
-  let body: { error?: unknown; reason?: unknown } | null = null;
+): Promise<
+  "channel-closed" | "discord-held" | "discord-unreachable" | "discord-refused" | "uncertain" | "timed-out" | "unauthorized" | "unavailable"
+> {
+  let body: { error?: unknown; reason?: unknown } | null;
   try {
     body = (await response.json()) as { error?: unknown; reason?: unknown } | null;
-  } catch {
-    // Corps illisible : rien ne dit que le salon est en cause.
+  } catch (error) {
+    // Corps coupé ou illisible : il pouvait dire `discord-down` (l'annonce a pu
+    // partir). Rendre la réservation risquerait un second `@everyone`.
+    return isTimeoutError(error) ? "timed-out" : "uncertain";
   }
-  // Un autre `503` du bot (jeton interne absent…) ne parle pas de #live.
+  if (body?.error === "INTERNAL_API_TOKEN_NOT_CONFIGURED") return "unauthorized";
+  // Un autre `503` du bot (configuration) ne parle pas de #live.
   if (body?.error !== "LIVE_CHANNEL_UNAVAILABLE") return "unavailable";
   const reason = body.reason;
   if (typeof reason !== "string" || CHANNEL_CLOSED_REASONS.has(reason)) return "channel-closed";
@@ -763,6 +772,12 @@ export async function pushLiveAnnouncement(
     // coupe-circuit n'a pas à s'ouvrir — il suspendrait les rappels et alertes
     // de fond pour un réglage de salon ; l'annonce attendra.
     if (response.status === 503) return classifyUnavailable(response);
+    // Jeton interne refusé : une configuration à corriger, pas un bot en
+    // panne — le coupe-circuit des autres appels n'a pas à s'ouvrir.
+    if (response.status === 401) {
+      await discardBody(response);
+      return "unauthorized";
+    }
     // Corps non lu : le relâcher rend la connexion au pool, au lieu de la
     // laisser occupée jusqu'au ramasse-miettes à chaque nouvel essai.
     await discardBody(response);

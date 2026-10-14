@@ -98,19 +98,31 @@ const FRESH_ON_AIR_SQL = `(
         OR (m.live_trigger = 'MANUAL' AND m.live_started_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE)
       )`;
 
-/** Noms d'hôte d'un poste de développement, jamais ceux du site public. */
-const LOCAL_HOST = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\]|0\.0\.0\.0)$|\.(localhost|test|local)$/i;
+/** Suffixes réservés aux réseaux locaux et aux tests, jamais au site public. */
+const LOCAL_SUFFIX = /\.(localhost|test|local|internal|lan|home\.arpa|invalid|example)$/i;
 
-/** Vrai si `APP_URL` désigne le site public : `https`, hors hôte local. */
+/** Adresse IPv4 écrite en chiffres (`10.0.0.2`, `192.168.1.20`…). */
+const IPV4_LITERAL = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+/**
+ * Vrai si `APP_URL` désigne le site public : `https` sur un **nom de
+ * domaine** — ni adresse IP (boucle locale, réseau privé), ni nom d'un seul
+ * mot (`localhost`, nom de machine), ni suffixe local ou de test.
+ */
 function servedUnderPublicName(): boolean {
   const base = siteBaseUrl();
   if (!base) return false;
+  let url: URL;
   try {
-    const url = new URL(base);
-    return url.protocol === "https:" && !LOCAL_HOST.test(url.hostname);
+    url = new URL(base);
   } catch {
     return false;
   }
+  if (url.protocol !== "https:") return false;
+  // `localhost.` (point final) désigne le même hôte que `localhost`.
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (host.startsWith("[") || IPV4_LITERAL.test(host)) return false;
+  return host.includes(".") && !LOCAL_SUFFIX.test(host);
 }
 
 /**
@@ -303,6 +315,8 @@ const POSTPONED_CAUSES: Partial<Record<LiveAnnouncementOutcome, string>> & { una
   "discord-held": DISCORD_HELD_CAUSE,
   // Même phrase : le staff lit la cause exacte au canal de logs du bot.
   "discord-unreachable": DISCORD_HELD_CAUSE,
+  unauthorized:
+    "jeton interne refusé ou absent (BOT_INTERNAL_TOKEN du site et INTERNAL_API_TOKEN du bot doivent être réglés et égaux)",
   unavailable: "bot injoignable, en panne ou d'une version sans annonces",
 };
 
@@ -317,6 +331,7 @@ type PostponedOutcome = keyof typeof POSTPONED_CAUSES;
  */
 const SHARED_POSTPONEMENTS: ReadonlySet<PostponedOutcome> = new Set<PostponedOutcome>([
   "unavailable",
+  "unauthorized",
   "channel-closed",
   "discord-unreachable",
 ]);

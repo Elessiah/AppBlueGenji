@@ -20,8 +20,16 @@
  * La neutralisation vit côté site parce que c'est lui qui **rédige** : le bot ne
  * fait que distribuer, et ne sait pas quelle partie d'un message est une saisie.
  *
- * Module pur, sans dépendance.
+ * Le texte passe d'abord par `visibleText` : un nom enregistré avant ce
+ * nettoyage, ou un nom de tournoi qui ne l'a jamais reçu, peut encore porter
+ * une commande de direction (U+202E retournerait tout le reste de la ligne)
+ * ou un caractère invisible glissé dans `https:/\u200C/` pour échapper à la
+ * neutralisation des adresses.
+ *
+ * Module pur.
  */
+import { visibleText } from "./visible-text";
+
 
 /** Caractères de balisage Discord, précédés d'une barre oblique inverse. */
 const MARKDOWN = /[\\*_~`|[\]()<>#-]/g;
@@ -65,7 +73,7 @@ function neutralize(value: string): string {
  * les horodatages dynamiques ne sont plus reconnus non plus.
  */
 export function discordInline(value: string): string {
-  return neutralize(value.replace(LINE_BREAKS, " ").replace(/\s+/g, " ").trim());
+  return neutralize(visibleText(value.replace(LINE_BREAKS, " ")));
 }
 
 /**
@@ -77,7 +85,7 @@ export function discordQuote(value: string): string {
   return value
     .replace(/\r\n?/g, "\n")
     .split(/[\n\u2028\u2029]/)
-    .map((line) => neutralize(line.replace(LINE_BREAKS, " ").trim()))
+    .map((line) => neutralize(visibleText(line.replace(LINE_BREAKS, " "))))
     // Une ligne vide ne se cite pas (`>` nu s'affiche comme un chevron et coupe
     // la citation) : les paragraphes se suivent dans le même bloc cité.
     .filter((text) => text.length > 0)

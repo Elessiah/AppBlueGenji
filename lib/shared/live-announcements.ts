@@ -105,5 +105,30 @@ export function formatLiveAnnouncementGroup(group: LiveAnnouncementGroup): strin
  * @returns Le lien `https` à publier, ou `null` : pas de lien, pas d'annonce.
  */
 export function liveAnnouncementUrl(matchUrl: unknown, tournamentUrl: unknown): string | null {
-  return normalizeStreamUrl(matchUrl) ?? normalizeStreamUrl(tournamentUrl);
+  return announceable(normalizeStreamUrl(matchUrl)) ?? announceable(normalizeStreamUrl(tournamentUrl));
+}
+
+/**
+ * Pages de redirection des plateformes de la liste blanche : un lien
+ * `youtube.com/redirect?q=https://piege.example` porte l'hôte de YouTube mais
+ * mène ailleurs.
+ */
+const REDIRECT_PATHS = /^\/(redirect|attribution_link)(\/|$)/i;
+
+/**
+ * Le lien d'une annonce `@everyone` ne doit mener qu'à la diffusion : ni page
+ * de redirection, ni adresse glissée dans le chemin ou la requête (en clair ou
+ * encodée).
+ */
+function announceable(url: string | null): string | null {
+  if (!url) return null;
+  const { pathname, search, hash } = new URL(url);
+  if (REDIRECT_PATHS.test(pathname)) return null;
+  let tail: string;
+  try {
+    tail = decodeURIComponent(pathname + search + hash);
+  } catch {
+    return null;
+  }
+  return /[a-z][a-z0-9+.-]*:\/\//i.test(tail) ? null : url;
 }
