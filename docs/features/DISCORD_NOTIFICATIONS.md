@@ -792,6 +792,11 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   `schedule.noticePlanning`, FR + EN) précise qu'un joueur qui a coupé ces
   messages ne reçoit pas le message privé, pour qu'un arbitre ne le tienne pas
   pour prévenu.
+- **Déclaration** : registre T04 (FR + EN), ligne « Choix des messages privés de
+  match » du tableau de `/rgpd` (`DONNEES_PROFIL`, intérêt légitime) et droit
+  d'opposition (`MATCH_TIME_DM_SCOPE`, qui nomme l'avis de retrait et la case).
+  Le pseudo du site porte en plus `LIVE_PSEUDO_SCOPE` (annonce #live), et T01 /
+  T08 citent l'annonce #live.
 
 ## Configuration
 
