@@ -22,13 +22,15 @@ function match(id: number, overrides: Partial<Parameters<typeof refereeDigestPus
 describe("refereeDigestPush", () => {
   it("liste les matchs, heure de Paris, en français et en anglais", () => {
     const fr = refereeDigestPush([match(1), match(2)], "fr");
-    expect(fr.title).toBe("Matchs des 10 prochaines heures");
+    expect(fr.title).toBe("Programme d'arbitrage : 2 matchs à venir");
     expect(fr.body).toBe("jeu. 20:00 · Renards 1 contre Nova 1 (Coupe)\njeu. 20:00 · Renards 2 contre Nova 2 (Coupe)");
     expect(fr.url).toBe("/tournois");
     expect(fr.tag).toBe("referee-digest-1");
 
     const en = refereeDigestPush([match(1)], "en");
-    expect(en.title).toBe("Match in the next 10 hours");
+    expect(en.title).toBe("Refereeing schedule: 1 upcoming match");
+    expect(refereeDigestPush([match(1)], "fr").title).toBe("Programme d'arbitrage : 1 match à venir");
+    expect(refereeDigestPush([match(1), match(2)], "en").title).toBe("Refereeing schedule: 2 upcoming matches");
     expect(en.body).toBe("Thu 20:00 · Renards 1 vs Nova 1 (Coupe)");
     expect(en.url).toBe("/en/tournois");
   });
@@ -39,6 +41,10 @@ describe("refereeDigestPush", () => {
     expect(lines).toHaveLength(REFEREE_DIGEST_PUSH_LINES + 1);
     expect(lines.at(-1)).toBe("… et 3 autres");
     expect(refereeDigestPush(many, "en").body.split("\n").at(-1)).toBe("… and 3 more");
+    // Un seul match au-delà de la borne : singulier (« 1 autre », pas « 1 autres »).
+    const oneMore = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 1 }, (_, index) => match(index + 1));
+    expect(refereeDigestPush(oneMore).body.split("\n").at(-1)).toBe("… et 1 autre");
+    expect(refereeDigestPush(oneMore, "en").body.split("\n").at(-1)).toBe("… and 1 more");
   });
 
   it("dit « Un match » en tournoi individuel", () => {
@@ -86,7 +92,7 @@ describe("formatRefereeDigestLog", () => {
     const line = formatRefereeDigestLog([entry(1), entry(2)]);
     expect(line).not.toContain("\n");
     expect(line).toBe(
-      "📋 Programme d'arbitrage — 2 matchs dans les 10 prochaines heures (heure de Paris) : " +
+      "📋 Programme d'arbitrage — 2 matchs à venir (heure de Paris) : " +
         "jeu. 20:00 Renards 1 vs Nova 1 (« Coupe » (#7), match #1) ; jeu. 20:00 Renards 2 vs Nova 2 (« Coupe » (#7), match #2).",
     );
     expect(line).not.toContain("staff");
@@ -95,7 +101,7 @@ describe("formatRefereeDigestLog", () => {
   it("borne les manches citées", () => {
     const many = Array.from({ length: REFEREE_DIGEST_LOG_ENTRIES + 2 }, (_, index) => entry(index + 1));
     expect(formatRefereeDigestLog(many)).toContain("… et 2 autres.");
-    expect(formatRefereeDigestLog([entry(1)])).toContain("1 match dans");
+    expect(formatRefereeDigestLog([entry(1)])).toContain("1 match à venir");
   });
 
   it("écrit « un joueur » en tournoi individuel", () => {

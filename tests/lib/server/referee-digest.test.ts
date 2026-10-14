@@ -96,10 +96,10 @@ describe("dispatchRefereeDigest", () => {
     expect(notification.topic).toBe("REFEREE_DIGEST");
     expect(notification.excludeUserIds).toBeUndefined();
     const push = resolvePush(notification.push);
-    expect(push.title).toBe("Matchs des 10 prochaines heures");
+    expect(push.title).toBe("Programme d'arbitrage : 3 matchs à venir");
     expect(push.body.split("\n")).toHaveLength(3);
     expect(push.body).toContain("Renards 1 contre Nova 1 (Coupe BlueGenji)");
-    expect(resolvePush(notification.push, "en").title).toBe("Matches in the next 10 hours");
+    expect(resolvePush(notification.push, "en").title).toBe("Refereeing schedule: 3 upcoming matches");
     expect(resolvePush(notification.push, "en").body).toContain("Renards 1 vs Nova 1 (Coupe BlueGenji)");
 
     const line = await publishedLine();
@@ -115,7 +115,7 @@ describe("dispatchRefereeDigest", () => {
     expect(await dispatchRefereeDigest(NOW)).toBe(1);
 
     const push = resolvePush(jest.mocked(notifyStaff).mock.calls[0][0].push);
-    expect(push.title).toBe("Match dans les 10 prochaines heures");
+    expect(push.title).toBe("Programme d'arbitrage : 1 match à venir");
     expect(push.body).not.toContain("Renards 1");
     expect(push.body).toContain("Renards 2");
   });
