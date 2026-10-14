@@ -21,6 +21,39 @@ import { retryOnDeadlock } from "./deadlock-retry";
 export const HELD_TIME_GRACE_MS = 12 * 60 * 60 * 1000;
 
 /**
+ * Réserve une marque (observation, palier, horaire reçu, citation au
+ * programme d'arbitrage) pour une manche —
+ * **pour l'horaire lu** : la réservation
+ * échoue si l'horaire a changé depuis la lecture (un arbitre l'a déplacé entre
+ * la lecture du balayage et son envoi). Sans cette condition, le balayage
+ * enverrait l'ancien horaire et prendrait le palier que l'annonce du nouveau
+ * attend — qui se tairait. L'`INSERT … SELECT` lit la ligne du match sous
+ * verrou partagé : une programmation en cours est attendue, puis relue.
+ *
+ * @returns `true` si la réservation est acquise (c'est à nous d'envoyer),
+ *          `false` si une autre requête l'a prise entre-temps, ou si
+ *          l'horaire n'est plus celui-là.
+ */
+export async function claimDatedMark(
+  match: { id: number; start_at: string | Date; team1_id: number; team2_id: number },
+  offsetKey: string,
+): Promise<boolean> {
+  const db = await getDatabase();
+  const matchId = Number(match.id);
+  // La ligne retient l'horaire pour lequel elle est prise : seul l'envoi de cet
+  // horaire peut la rendre (`releaseClaims`). Les engagées aussi sont
+  // vérifiées : une affiche changée a vu ses marques effacées, et ses nouvelles
+  // engagées attendent leur annonce.
+  const [result] = await db.execute(
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
+       SELECT ?, ?, start_at FROM bg_matches
+        WHERE id = ? AND start_at = ? AND team1_id = ? AND team2_id = ?`,
+    [matchId, offsetKey, matchId, match.start_at, Number(match.team1_id), Number(match.team2_id)],
+  );
+  return (result as { affectedRows?: number }).affectedRows === 1;
+}
+
+/**
  * Rend des marques réservées (observation, palier) — **seulement celles prises
  * pour cet horaire** (`start_at <=> ?` : chaque réservation date la sienne,
  * `setMatchStartAt` aussi). Un ancien envoi en échec n'efface ainsi jamais les

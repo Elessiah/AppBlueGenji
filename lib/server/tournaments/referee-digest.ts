@@ -26,6 +26,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
 import { formatRefereeDigestLog } from "@/lib/shared/bot-logs";
@@ -38,7 +39,7 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { PLAYED_MATCH_STATUSES } from "@/lib/shared/match-schedule";
 import { toParticipantType } from "@/lib/shared/participants";
 import { refereeDigestPush } from "@/lib/shared/push-messages";
-import { releaseDatedMarks } from "./reminder-marks";
+import { claimDatedMark } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 type DigestRow = RowDataPacket & {
@@ -91,20 +92,22 @@ const DIGEST_SELECT = `SELECT m.id, m.tournament_id, m.start_at, m.team1_id, m.t
 const CLAIM_CONCURRENCY = 4;
 
 /**
- * Réserve la citation d'une manche **pour l'horaire et l'affiche lus** : un
- * arbitre qui l'a déplacée entre la lecture et l'envoi l'emporte (sa nouvelle
- * date sera citée au programme suivant).
+ * Rend, en une instruction, les citations réservées par ce programme qui ne
+ * partira pas — chacune **pour l'horaire lu** (une manche reprogrammée
+ * entre-temps garde la marque de son nouvel horaire). Ne lève jamais : une
+ * marque non rendue attend le changement d'horaire suivant, pm2 le dit.
  */
-async function claimDigestMark(row: DigestRow): Promise<boolean> {
-  const db = await getDatabase();
-  const matchId = Number(row.id);
-  const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
-       SELECT ?, ?, start_at FROM bg_matches
-        WHERE id = ? AND start_at = ? AND team1_id = ? AND team2_id = ?`,
-    [matchId, REFEREE_DIGEST_KEY, matchId, row.start_at, Number(row.team1_id), Number(row.team2_id)],
-  );
-  return (result as { affectedRows?: number }).affectedRows === 1;
+async function releaseDigestMarks(rows: readonly DigestRow[]): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.execute(
+      `DELETE FROM bg_match_reminders
+        WHERE offset_key = ? AND (match_id, start_at) IN (${rows.map(() => "(?, ?)").join(", ")})`,
+      [REFEREE_DIGEST_KEY, ...rows.flatMap((row) => [Number(row.id), new Date(row.start_at)])],
+    );
+  } catch (error) {
+    if (!isMissingTableError(error)) console.error("[referee-digest] marques non rendues", error);
+  }
 }
 
 /**
@@ -136,7 +139,10 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
   const won = new Set<number>();
   await inBatches(rows, CLAIM_CONCURRENCY, async (row) => {
     try {
-      if (await claimDigestMark(row)) won.add(Number(row.id));
+      // Pour l'horaire et l'affiche lus : un arbitre qui a déplacé la manche
+      // entre la lecture et l'envoi l'emporte (sa nouvelle date sera citée au
+      // programme suivant).
+      if (await claimDatedMark(row, REFEREE_DIGEST_KEY)) won.add(Number(row.id));
     } catch (error) {
       console.error("[referee-digest] réservation en échec", error);
     }
@@ -149,7 +155,7 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
   // en avance, et la manche due ouvrirait un second programme. Rendues, ses
   // marques la laissent au programme que la prochaine manche due ouvrira.
   if (!claimed.some((row) => new Date(row.start_at).getTime() <= triggerAt)) {
-    await Promise.all(claimed.map((row) => releaseDatedMarks(Number(row.id), [REFEREE_DIGEST_KEY], row.start_at)));
+    await releaseDigestMarks(claimed);
     return 0;
   }
 
