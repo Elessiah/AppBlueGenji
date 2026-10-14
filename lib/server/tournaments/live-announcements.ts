@@ -167,7 +167,8 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
       WHERE m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
         AND ${FRESH_ON_AIR_SQL}
         AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
-                         WHERE a.match_id = m.id AND a.pairing = CONCAT(m.team1_id, ':', m.team2_id))
+                         WHERE a.match_id = m.id
+                           AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
       ORDER BY m.id`,
   );
   return rows;
@@ -189,6 +190,17 @@ function isOnAir(row: LiveCandidateRow, now: number): boolean {
 }
 
 /** Réserve l'annonce d'une affiche ; `false` si un autre passage l'a prise. */
+/**
+ * Clé de réservation d'une affiche : ses deux engagés **sans ordre**
+ * (`5:7` pour `7:5`). Un plateau réécrit qui remet les deux mêmes engagés dans
+ * l'autre ordre sur le même match (`rewrittenPlayoffMatchIds` l'attend) est la
+ * même rencontre, déjà annoncée : pas de second `@everyone`.
+ */
+function announceKey(pairing: string): string {
+  const [first, second] = pairing.split(":").map(Number);
+  return first <= second ? `${first}:${second}` : `${second}:${first}`;
+}
+
 async function claimAnnouncement(matchId: number, pairing: string): Promise<boolean> {
   const db = await getDatabase();
   const [result] = await db.execute(
@@ -209,7 +221,7 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
   try {
     const db = await getDatabase();
     const placeholders = rows.map(() => "(?, ?)").join(", ");
-    const params = rows.flatMap((row) => [Number(row.id), String(row.pairing)]);
+    const params = rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]);
     await db.execute(`DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (${placeholders})`, params);
     return true;
   } catch (error) {
@@ -420,7 +432,7 @@ async function announce(group: AnnouncementGroup): Promise<{ posted: number; pos
  */
 async function tryClaim(row: LiveCandidateRow): Promise<boolean> {
   try {
-    return await claimAnnouncement(Number(row.id), String(row.pairing));
+    return await claimAnnouncement(Number(row.id), announceKey(String(row.pairing)));
   } catch (error) {
     warnOnce(
       `claim ${Number(row.id)}`,

@@ -111,7 +111,8 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
   }
 
   // Réservation d'une annonce de live sur Discord (#live, `@everyone`) : une
-  // par match et par affiche — `docs/features/LIVE_STREAMS.md`. Même mécanique :
+  // par match et par affiche (`pairing` : les deux engagés sans ordre, `5:7`)
+  // — `docs/features/LIVE_STREAMS.md`. Même mécanique :
   // la clé unique interdit qu'un balayage concurrent reposte.
   try {
     await createTable(db, `
