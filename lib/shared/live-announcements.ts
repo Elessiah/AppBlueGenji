@@ -116,19 +116,41 @@ export function liveAnnouncementUrl(matchUrl: unknown, tournamentUrl: unknown): 
 const REDIRECT_PATHS = /^\/(redirect|attribution_link)(\/|$)/i;
 
 /**
+ * Ce qui, une fois décodé, désigne une autre adresse : un schéma suivi d'une
+ * barre (`https://`, `https:\\` que les navigateurs lisent pareil), ou une
+ * adresse sans schéma (`//hôte`, `\\hôte`).
+ */
+const EMBEDDED_ADDRESS = /:[\\/]|[\\/]{2}|\\/;
+
+/** Décode jusqu'à stabilité (trois passes au plus) ; `null` si illisible. */
+function fullyDecoded(value: string): string | null {
+  let current = value;
+  for (let pass = 0; pass < 3; pass++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(current);
+    } catch {
+      return null;
+    }
+    if (next === current) return current;
+    current = next;
+  }
+  // Encore encodé après trois passes : rien de ce qu'une diffusion emploie.
+  return null;
+}
+
+/**
  * Le lien d'une annonce `@everyone` ne doit mener qu'à la diffusion : ni page
- * de redirection, ni adresse glissée dans le chemin ou la requête (en clair ou
- * encodée).
+ * de redirection (même encodée, `/%72edirect`, ou derrière une barre doublée),
+ * ni autre adresse glissée dans le chemin, la requête ou l'ancre — en clair,
+ * encodée une ou plusieurs fois, avec ou sans schéma.
  */
 function announceable(url: string | null): string | null {
   if (!url) return null;
   const { pathname, search, hash } = new URL(url);
-  if (REDIRECT_PATHS.test(pathname)) return null;
-  let tail: string;
-  try {
-    tail = decodeURIComponent(pathname + search + hash);
-  } catch {
-    return null;
-  }
-  return /[a-z][a-z0-9+.-]*:\/\//i.test(tail) ? null : url;
+  const path = fullyDecoded(pathname);
+  const rest = fullyDecoded(search + hash);
+  if (path === null || rest === null) return null;
+  if (REDIRECT_PATHS.test(path.replace(/[\\/]+/g, "/"))) return null;
+  return EMBEDDED_ADDRESS.test(path) || EMBEDDED_ADDRESS.test(rest) ? null : url;
 }
