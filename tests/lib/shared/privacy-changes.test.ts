@@ -1030,11 +1030,13 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
     expect(entry.summary).toMatch(new RegExp(`conditions d'utilisation passent en version ${TERMS_VERSION}`));
     const terms = entry.details.find((detail) => detail.startsWith("Conditions d'utilisation"));
     expect(terms).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
-    expect(terms).toMatch(/prochaine connexion/);
-    // Revue UI/UX #445 : qui a déjà accepté la version 4 (connexion entre la mise en ligne et la
-    // publication de l'annonce) ne se la voit pas représenter — la promesse le dit.
-    expect(terms).toContain("si tu ne les as pas déjà acceptées, elles te sont présentées de nouveau");
-    expect(english.details.at(-1)).toContain("unless you have already accepted them, they are shown to you anew");
+    // Revue sécurité #445 : la modale de `/connexion` dépend du navigateur, pas du compte
+    // (ordinateur partagé) — la promesse le dit, sans annoncer une présentation garantie.
+    expect(terms).toContain("la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur");
+    expect(english.details.at(-1)).toContain("the login page shows them to you anew as long as they have not been accepted in your browser");
+    // Revue UI/UX #445 : qui a déjà accepté la version 4 ne se la voit pas représenter avant un geste de gestion.
+    expect(terms).toContain("si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion");
+    expect(english.details.at(-1)).toContain("if you manage a team and have not already accepted them, before your next management action");
     expect(entry.links?.at(-1)).toEqual({ href: TERMS_PATH, label: "Lire les conditions d'utilisation" });
     expect(english.title).toMatch(/terms of use updated/);
     expect(english.summary).toMatch(new RegExp(`terms of use move to version ${TERMS_VERSION}`));
