@@ -92,7 +92,9 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
         {entry.extraBases?.map((extra) => (
           <span key={extra.base} className={styles.extraBase}>
-            <span className={styles.badge}>{LEGAL_BASE_EN[extra.base]}</span> {extra.scope}
+            {/* Même base que la principale (pseudo dans #live) : la portée seule, sans second badge identique. */}
+            {extra.base === entry.base ? null : <><span className={styles.badge}>{LEGAL_BASE_EN[extra.base]}</span> </>}
+            {extra.scope}
           </span>
         ))}
       </DataCell>

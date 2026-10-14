@@ -172,7 +172,16 @@ export function TermsAcceptanceModal({
           </p>
         </ScrollArea>
         <label className={styles.check}>
-          <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={checked}
+            // Figée pendant l'envoi (sans `disabled`, qui ôterait le focus) : décocher en
+            // cours de route rendrait « J'accepte » nativement désactivé au retour.
+            onChange={(event) => {
+              if (!busy) setChecked(event.target.checked);
+            }}
+            aria-disabled={busy || undefined}
+          />
           <span>
             {richNodes(
               rich("termsModal.checkbox", {}, {
@@ -209,7 +218,7 @@ export function TermsAcceptanceModal({
             type="button"
             variant="primary"
             onClick={accept}
-            disabled={!checked && !busy}
+            disabled={!checked}
             aria-disabled={busy || undefined}
             aria-busy={busy || undefined}
           >

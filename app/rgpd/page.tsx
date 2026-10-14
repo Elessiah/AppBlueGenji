@@ -312,7 +312,9 @@ function RgpdFr({
                   <span className={styles.badge}>{d.base}</span>
                   {d.extraBases?.map((extra) => (
                     <span key={extra.base} className={styles.extraBase}>
-                      <span className={styles.badge}>{extra.base}</span> {extra.scope}
+                      {/* Même base que la principale (pseudo dans #live) : la portée seule, sans second badge identique. */}
+                      {extra.base === d.base ? null : <><span className={styles.badge}>{extra.base}</span> </>}
+                      {extra.scope}
                     </span>
                   ))}
                 </DataCell>

@@ -70,6 +70,16 @@ export function RgpdConsentModal({ onAccept, onRefuse, termsUpdated = false }: R
   const { t } = text;
   const frenchDocumentLang = text.locale === DEFAULT_LOCALE ? undefined : DEFAULT_LOCALE;
   const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
+  const termsLink = (children: ReadonlyArray<ReactNode>) => (
+    <LocaleLink
+      href={TERMS_PATH}
+      target="_blank"
+      rel="noreferrer"
+      style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+    >
+      {richNodes(children)}
+    </LocaleLink>
+  );
 
   return (
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
@@ -111,8 +121,14 @@ export function RgpdConsentModal({ onAccept, onRefuse, termsUpdated = false }: R
         </h2>
 
         {termsUpdated && (
+          // « relis-les » mène aux conditions : à 375 px, le lien de la case est
+          // plusieurs écrans plus bas.
           <p style={{ color: "var(--ink)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
-            {t("consent.termsUpdated", { version: TERMS_VERSION, date: formatTermsDateIn(text.locale) })}
+            {richNodes(
+              text.rich("consent.termsUpdated", { version: TERMS_VERSION, date: formatTermsDateIn(text.locale) }, {
+                terms: termsLink,
+              }),
+            )}
           </p>
         )}
 
@@ -174,18 +190,7 @@ export function RgpdConsentModal({ onAccept, onRefuse, termsUpdated = false }: R
           />
           <span>
             {richNodes(
-              text.rich("consent.terms", { age: SITE_MINIMUM_AGE }, {
-                terms: (children) => (
-                  <LocaleLink
-                    href={TERMS_PATH}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-                  >
-                    {richNodes(children)}
-                  </LocaleLink>
-                ),
-              }),
+              text.rich("consent.terms", { age: SITE_MINIMUM_AGE }, { terms: termsLink }),
             )}
           </span>
         </label>

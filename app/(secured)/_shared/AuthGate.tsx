@@ -64,18 +64,22 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
   // (`x-pathname`) et réutilise à la navigation. Requête et ancre `#match-…`
   // suivent.
   const spectatorId = tournamentIdFromMemberPath(splitLocalePrefix(pathname).path);
-  // Ancre lue après hydratation : le rendu serveur ne la connaît pas.
+  // Ancre lue après hydratation (le rendu serveur ne la connaît pas), relue à
+  // chaque navigation : la carte vit dans la mise en page sécurisée, qui reste
+  // montée d'une page à l'autre, et `pushState` ne déclenche pas `hashchange`.
+  const query = searchParams.toString();
   const [hash, setHash] = useState("");
   useEffect(() => {
     const read = () => setHash(globalThis.location.hash);
     read();
     globalThis.addEventListener("hashchange", read);
     return () => globalThis.removeEventListener("hashchange", read);
-  }, []);
+  }, [pathname, query]);
   useEffect(() => {
     if (spectatorId === null) return;
-    const { search, hash } = globalThis.location;
-    router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);
+    // Lu à l'instant du relais : l'état `hash` n'est pas encore posé au premier effet.
+    const { search, hash: anchor } = globalThis.location;
+    router.replace(`${spectatorTournamentPath(spectatorId)}${search}${anchor}`);
   }, [spectatorId, router]);
   // Pendant le relais, aucune carte « Connexion requise » : la fiche se lit
   // sans compte, l'annoncer fermée le temps d'un rendu serait faux. Un état
@@ -93,7 +97,7 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
   // `pathname` garde le préfixe de langue (`/en/…`) : la destination revient
   // dans la langue lue, et `LocaleLink` mène à la page de connexion de cette
   // même langue (`/en/connexion` depuis une page anglaise, lot 6).
-  const loginHref = authGateLoginHref(pathname, searchParams.toString(), hash);
+  const loginHref = authGateLoginHref(pathname, query, hash);
 
   return (
     <div className={styles.shell}>
