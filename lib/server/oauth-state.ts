@@ -27,6 +27,7 @@
 import { cookies } from "next/headers";
 import type { OAuthIntent, OAuthProvider } from "@/lib/shared/oauth-providers";
 import { isOAuthProvider } from "@/lib/shared/oauth-providers";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
 const OAUTH_COOKIE = "bg_oauth";
 /** Dix minutes : le temps de l'écran de consentement, pas une seconde de plus. */
@@ -63,7 +64,11 @@ function baseCookieOptions() {
 
 export async function saveOAuthState(payload: OAuthStatePayload): Promise<void> {
   const cookieStore = await cookies();
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  // La version acceptée voyage avec l'acceptation : un aller-retour parti avant
+  // une nouvelle version (mise en ligne pendant les dix minutes chez le
+  // fournisseur) ne vaut pas acceptation de celle-ci au retour.
+  const sealed = payload.termsAccepted ? { ...payload, termsVersion: TERMS_VERSION } : payload;
+  const encoded = Buffer.from(JSON.stringify(sealed)).toString("base64url");
   cookieStore.set(OAUTH_COOKIE, encoded, {
     ...baseCookieOptions(),
     maxAge: OAUTH_TTL_SECONDS,
@@ -85,18 +90,23 @@ export async function consumeOAuthState(): Promise<OAuthStatePayload | null> {
   if (!encoded) return null;
 
   try {
-    const parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as Partial<OAuthStatePayload>;
+    const parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as Partial<OAuthStatePayload> & {
+      termsVersion?: unknown;
+    };
     if (!isOAuthProvider(parsed.provider)) return null;
     if (typeof parsed.state !== "string" || parsed.state.length === 0) return null;
     if (typeof parsed.redirectTo !== "string" || parsed.redirectTo.length === 0) return null;
     const intent: OAuthIntent = parsed.intent === "LINK" ? "LINK" : "LOGIN";
+    // Acceptation scellée à une autre version (aller parti avant la mise en
+    // ligne d'une nouvelle) : rien n'est accepté.
+    const termsAccepted = parsed.termsAccepted === true && parsed.termsVersion === TERMS_VERSION;
     return {
       provider: parsed.provider,
       state: parsed.state,
       redirectTo: parsed.redirectTo,
       intent,
-      termsAccepted: parsed.termsAccepted === true,
-      termsAcceptedNow: parsed.termsAccepted === true && parsed.termsAcceptedNow === true,
+      termsAccepted,
+      termsAcceptedNow: termsAccepted && parsed.termsAcceptedNow === true,
       localeFromPage: parsed.localeFromPage === true,
     };
   } catch {

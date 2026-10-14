@@ -751,7 +751,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // aussi l'annonce des conditions d'utilisation en version 4 (même règle) :
   // la modale et le message privé de ce registre sont le seul canal qui touche
   // **chaque** compte une fois — la modale des conditions ne s'ouvre d'elle-même
-  // qu'aux gérants d'équipe, et celle de `/connexion` qu'à la connexion suivante.
+  // qu'aux gérants d'équipe, et celle de `/connexion` qu'à un navigateur qui ne les a
+  // pas encore acceptées.
   {
     id: "2026-10-base-pseudo-live-et-automod",
     title: "Ton pseudo dans #live : base légale précisée, conditions d'utilisation mises à jour",
@@ -762,7 +763,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Annonce #live d'un tournoi individuel : ton pseudo public y figure au titre de l'exécution du service — l'annonce fait partie du tournoi auquel tu t'inscris —, et non plus de l'intérêt légitime. Rien ne change dans les faits : pas de nom neutre pour cette annonce, ne pas t'inscrire reste le moyen de ne pas y être nommé, et une annonce passée est supprimée sur demande (« Signaler un problème », catégorie RGPD).",
       "Si une règle AutoMod de Discord bloque une annonce #live, son texte (ton pseudo compris en tournoi individuel) peut parvenir au salon d'alertes des modérateurs du serveur Discord de l'association.",
       "Messages privés de match : chacun se termine désormais par une ligne qui dit où les couper (« Mon profil », section Notifications). Le site garde ton choix dans ton intérêt légitime : c'est ce qui lui permet de l'honorer.",
-      "Conditions d'utilisation : la version 4, en vigueur depuis le 14 octobre 2026, reprend cette règle de l'annonce #live. Relis-les : si tu ne les as pas déjà acceptées, elles te sont présentées de nouveau à ta prochaine connexion et, si tu gères une équipe, avant ton prochain geste de gestion.",
+      "Conditions d'utilisation : la version 4, en vigueur depuis le 14 octobre 2026, reprend cette règle de l'annonce #live. Relis-les : la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur et, si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion.",
     ],
     links: [
       { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },

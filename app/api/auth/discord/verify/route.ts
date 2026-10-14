@@ -100,8 +100,10 @@ export async function POST(req: Request) {
     return ok({ success: true });
   } catch (error) {
     // Le code vient d'être consommé : un compte neuf refusé faute de conditions
-    // acceptées devra en redemander un. Le cas ne se présente qu'à un client qui
-    // contourne la case de `/connexion`.
+    // acceptées devra en redemander un. Le cas se présente à un client qui
+    // contourne la case de `/connexion`, ou à un onglet chargé avant une
+    // nouvelle version des conditions (`termsVersion` absent ou ancien) : le
+    // refus (`TERMS_REQUIRED`) dit de recharger la page, qui les présente.
     if ((error as Error).message === TERMS_REQUIRED) return fail(TERMS_REQUIRED, 400);
     // Compte suspendu : l'exposé de la décision part dans le corps, que la page
     // de connexion affiche — c'est le seul canal qui joigne un compte sans
