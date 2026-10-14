@@ -513,7 +513,11 @@ coup d'envoi sur Discord — <invitation> ». L'invitation est **une** constante
 24 h est gardé (deux rappels). Une manche annoncée moins de 10 h avant consomme
 `PT10H` sans message : c'est **l'annonce** qui porte la ligne de check-in
 (`MatchReminderContext.checkIn`, `checkIn` du push). Un avis de retrait ne la
-porte jamais. Idempotence : la mécanique des paliers (#441) — réservé avant
+porte jamais. Le push qui porte le check-in **ouvre l'invitation** au toucher :
+une notification n'ouvre que des adresses du site (`public/push-sw.js`) et une
+adresse écrite dans son texte ne se touche pas — il mène donc à `/check-in`
+(`CHECK_IN_PATH`, `app/check-in/route.ts`, redirection 307 vers
+`CHECK_IN_INVITE_URL`) au lieu de la fiche du match. Idempotence : la mécanique des paliers (#441) — réservé avant
 l'envoi, daté de l'horaire ; reprogrammer l'efface (`setMatchStartAt`), retirer
 l'horaire laisse les marques inertes, une manche jouée ou d'un tournoi clos
 n'est pas lue. Le dernier palier étant désormais `PT10H`, c'est lui qui sort une
@@ -533,11 +537,20 @@ reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
   `notifyStaff`, langue de chacun) — `refereeDigestPush`, titre « Programme
   d'arbitrage : N matchs à venir » (pas « des 10 prochaines heures » : la
   marge en cite jusqu'à 12 h), cinq lignes au plus puis « … et N autre(s) »
-  (pluriel ICU) ; « Un match » en solo ;
+  (pluriel ICU) ; chaque ligne nomme le tournoi **et la manche**
+  (`pushRoundLabel`, « Ronde N » en suisse) — en solo, « Un match » : la manche
+  distingue les lignes. Le lien mène à la fiche du tournoi quand le programme
+  n'en cite qu'un, à `/tournois` sinon ; l'étiquette nomme **toutes** les
+  manches citées (`referee-digest-<id>-<id>…`), pour qu'un programme suivant
+  ne remplace jamais sur l'appareil un précédent qui en cite d'autres ;
 - une **ligne** au canal de logs Discord (`sendBotLog`), là où les arbitres
   suivent déjà les horaires posés — `formatRefereeDigestLog` : engagées par
   `entrantLabel` (« un joueur » en solo), tournoi `« nom » (#id)`, aucun auteur
-  (c'est le site qui l'envoie), douze manches au plus.
+  (c'est le site qui l'envoie), douze manches au plus **et 1 900 caractères**
+  (`REFEREE_DIGEST_LOG_MAX_LENGTH`) : Discord refuse un message de plus de
+  2 000 caractères, que le bot envoie sans le découper — le programme, ses
+  marques déjà posées, serait perdu. Les manches qui ne tiennent pas sont
+  comptées dans « … et N autres ».
 
 Pas de message privé au rôle arbitre (`pushRefereeAlert`) : il sert aux
 alertes qui appellent une intervention. Le programme manqué (bot injoignable,
