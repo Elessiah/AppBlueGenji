@@ -253,7 +253,13 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     legalBasis:
       "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, the notice that a match leaves their schedule and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff, legitimate interest (smooth running of tournaments) remaining the basis with regard to the players and teams they mention",
-    dataSubjects: ["Players taking part in a tournament", "Other members of the teams taking part (coaches, managers, owners)", "Referees", "Casters registered on a match"],
+    dataSubjects: [
+      "Players taking part in a tournament",
+      "Other members of the teams taking part (coaches, managers, owners)",
+      "Referees",
+      "Casters registered on a match",
+      "Any account holder, for their match direct messages choice",
+    ],
     dataCategories: [
       "Discord username and identifier",
       "BattleTag",

@@ -146,6 +146,7 @@ Joueurs engagés dans un tournoi
 Autres membres des équipes engagées (coachs, managers, propriétaires)
 Arbitres
 Casters inscrits sur un match
+Tout titulaire de compte, pour son choix des messages privés de match
 Données
 Pseudo et identifiant Discord
 BattleTag

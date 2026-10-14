@@ -139,7 +139,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to erasure",
-    text: "You can request the deletion of your account and your profile data. See above for achievement data, and for connection data, which the law requires to be kept for one year (GDPR, art. 17.3.b).",
+    text: "You can request the deletion of your account and your profile data. See above for achievement data, and for connection data, which the law requires to be kept for one year (GDPR, art. 17.3.b). The #live announcements of a solo tournament that posted your username stay in the Discord channel until they are deleted, on a separate request (“Report a problem”, GDPR category).",
   },
   {
     title: "Right to restriction",
