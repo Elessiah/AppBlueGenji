@@ -182,7 +182,7 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
     expect(sheet("T16").dataCategories.join(" ")).toMatch(/Public BlueGenji username of the players of a solo tournament, posted in the #live announcement/);
     expect(sheet("T04").subPurposes.join(" ")).toMatch(/the notice that a match leaves their schedule/);
     expect(sheet("T04").legalBasis).toMatch(/legitimate interest \(smooth running of tournaments\) remaining the basis with regard to the players and teams they mention/);
-    expect(sheet("T01").retention.join(" ")).toMatch(/#live announcements of a solo tournament keep the username in the Discord channel until they are deleted on request \(T16\)/);
+    expect(sheet("T01").retention.join(" ")).toMatch(/#live announcements of a solo tournament keep the username in the Discord channel until they are deleted on request, and the AutoMod alert for such an announcement when blocked or flagged keeps it in the moderators' alert channel until they delete it or on request \(T16\)/);
     expect(sheet("T08").subPurposes.join(" ")).toMatch(/#live channel of the association's server, with an @everyone mention \(team names or, in a solo tournament, the players' public BlueGenji username/);
     expect(sheet("T16").subPurposes.join(" ")).toMatch(/or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier/);
     expect(sheet("T08").retention.join(" ")).toMatch(/#live announcements: in the channel as long as it exists, even after the player's account is deleted/);

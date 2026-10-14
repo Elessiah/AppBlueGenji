@@ -135,7 +135,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
     // T05 ne contredit pas T04 sur la base du programme d'arbitrage envoyé au staff.
     expect(t04.legalBasis).toMatch(/l'intérêt légitime \(bon déroulement des tournois\) restant la base à l'égard des joueurs et équipes qu'ils citent/);
-    expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande \(T16\)/);
+    expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande, et l'alerte AutoMod d'une telle annonce bloquée ou signalée le garde dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande \(T16\)/);
     expect(byRef("T08").subPurposes.join(" ")).toMatch(/salon #live du serveur de l'association, avec une mention @everyone \(noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs/);
     expect(byRef("T08").retention.join(" ")).toMatch(/Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur/);
     expect(byRef("T08").dataCategories.join(" ")).toMatch(/l'annonce #live, elle, reste publiée dans le salon \(traitement T16\)/);
@@ -212,6 +212,11 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
   it("T16 donne une base à l'alerte AutoMod : intérêt légitime de modérer le serveur, opposition = suppression (FR et EN)", () => {
     expect(fr("T16").legalBasis).toMatch(/intérêt légitime de l'association à modérer son serveur Discord pour l'alerte AutoMod d'une annonce #live bloquée ou signalée[^;]*droit d'opposition \(art\. 21\) : l'alerte est supprimée sur demande/);
     expect(en("T16").legalBasis).toMatch(/legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked or flagged #live announcement[^;]*right to object \(art\. 21\): the alert is deleted on request/);
+  });
+
+  it("T16 dit la finalité de modération de l'alerte AutoMod (FR et EN)", () => {
+    expect(fr("T16").subPurposes.join(" ")).toMatch(/Modérer le serveur Discord de l'association : une règle AutoMod de Discord qui bloque ou signale une annonce #live en copie le texte/);
+    expect(en("T16").subPurposes.join(" ")).toMatch(/Moderating the association's Discord server: a Discord AutoMod rule that blocks or flags a #live announcement copies its text/);
   });
 
   it("T08 garde la même durée de l'alerte AutoMod que T16 et la politique du bot, compte supprimé compris", () => {
