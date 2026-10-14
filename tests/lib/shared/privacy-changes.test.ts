@@ -965,6 +965,7 @@ describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de
     for (const pattern of [
       /pseudo public BlueGenji remplace « un joueur »/,
       /voire le nom de ton compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais ton identifiant Discord numérique/,
+      /modifiable dans Mon profil, sans effet sur une annonce déjà publiée/,
       /Un match d'équipes ne nomme toujours que les équipes/,
       /tant qu'il existe/,
       /demander la suppression/,

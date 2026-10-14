@@ -136,6 +136,9 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.legalBasis).toMatch(/l'intérêt légitime \(bon déroulement des tournois\) restant la base à l'égard des joueurs et équipes qu'ils citent/);
     expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande \(T16\)/);
     expect(byRef("T08").subPurposes.join(" ")).toMatch(/salon #live du serveur de l'association, avec une mention @everyone \(noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs/);
+    expect(byRef("T08").retention.join(" ")).toMatch(/Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur/);
+    expect(byRef("T08").dataCategories.join(" ")).toMatch(/l'annonce #live, elle, reste publiée dans le salon \(traitement T16\)/);
+    expect(byRef("T16").subPurposes.join(" ")).toMatch(/modifiable dans Mon profil, sans effet sur une annonce déjà publiée/);
     expect(byRef("T05").legalBasis).toMatch(/programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service \(T04\)/);
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
@@ -469,7 +472,7 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.transfers).toHaveLength(1);
     expect(sheet.transfers[0]).toMatch(/^États-Unis : Discord \(annonce publiée dans le salon #live\)/);
     // Décision du 2026-10-14 : pseudo public des joueurs d'un tournoi individuel.
-    expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*jamais le pseudo de leurs joueurs\) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs \(le pseudo de sa fiche, modifiable dans Mon profil : sans changement, le pseudo Discord ou le BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais l'identifiant Discord numérique/);
+    expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*jamais le pseudo de leurs joueurs\) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs \(le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais l'identifiant Discord numérique/);
     expect(sheet.retention.join(" ")).toMatch(/conservé dans le salon tant que le salon #live existe, même après la suppression du compte du joueur, et supprimé sur demande de l'équipe ou du joueur concerné/);
     expect(sheet.recipients.join(" ")).toMatch(/pseudo public BlueGenji des joueurs d'un tournoi individuel/);
     // Le pseudo publié dans #live est une catégorie de données de T16.
