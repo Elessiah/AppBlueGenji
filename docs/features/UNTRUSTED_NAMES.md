@@ -35,11 +35,16 @@ Tout fragment saisi par un utilisateur qui part vers le bot passe par l'une de
 deux fonctions :
 
 - `discordInline(value)` — fragment de phrase (nom d'équipe, de tournoi, motif
-  de pénalité) : une ligne, balisage échappé (`\ * _ ~ `` ` `` | [ ] ( ) < > # -`),
+  de pénalité) : d'abord `visibleText` (un nom ancien ou un nom de tournoi peut
+  encore porter U+202E ou un invisible), puis une ligne, balisage échappé (`\ * _ ~ `` ` `` | [ ] ( ) < > # -`),
   `@` suivi d'un espace de largeur nulle (`@everyone`, `@here` ne notifient plus),
-  `<` échappé (les mentions `<@…>`, `<@&…>`, `<#…>` ne sont plus reconnues) ;
+  `<` échappé (les mentions `<@…>`, `<@&…>`, `<#…>` ne sont plus reconnues),
+  adresse nue désamorcée (espace de largeur nulle dans `://` et après un point
+  suivi d'une lettre ou d'un chiffre : une équipe `https://faux-site.gg` ne
+  devient ni lien cliquable ni aperçu) ;
 - `discordQuote(value)` — texte libre sur plusieurs lignes (signalement d'un
-  problème) : mêmes neutralisations, chaque ligne **citée** (`> `) pour qu'aucune
+  problème) : mêmes neutralisations (`visibleText` ligne à ligne) sauf les
+  adresses, qui restent cliquables (une capture citée en preuve), chaque ligne **citée** (`> `) pour qu'aucune
   ne se fasse passer pour une ligne rédigée par le site.
 
 Points d'application : `entrantLabel` (toutes les lignes de journal, alertes

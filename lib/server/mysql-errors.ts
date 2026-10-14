@@ -54,11 +54,12 @@ export function isDeadlockMessage(message: unknown): boolean {
 /**
  * `true` si la table n'existe pas.
  *
- * Six tables de `lib/server/database/schema/` — et elles seules — sont créées dans
+ * Sept tables de `lib/server/database/schema/` — et elles seules — sont créées dans
  * un `try` dont le `catch` est muet : `bg_match_reminders`,
- * `bg_referee_alerts`, `bg_endurance_penalties` et les trois tables des
+ * `bg_referee_alerts`, `bg_endurance_penalties`, les trois tables des
  * notifications push (`bg_push_subscriptions`, `bg_push_topic_optouts`,
- * `bg_match_start_notices`). Une base où leur création a
+ * `bg_match_start_notices`) et les annonces de live
+ * (`bg_live_announcements`). Une base où leur création a
  * échoué reste debout, et c'est à leurs lecteurs de s'en accommoder plutôt que
  * d'emporter la fonctionnalité qui les appelle : un rappel perdu vaut mieux
  * qu'un report de score en erreur. Les purges — suppression d'un tournoi,

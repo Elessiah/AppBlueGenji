@@ -437,8 +437,12 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.legalBasis).toMatch(/droit d'opposition/);
     expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
-    // Le site ne fait que lier les chaînes : aucun transfert de sa part.
-    expect(sheet.transfers).toEqual(["Aucun"]);
+    // Le site ne fait que lier les chaînes : seule l'annonce #live passe par Discord.
+    expect(sheet.transfers).toHaveLength(1);
+    expect(sheet.transfers[0]).toMatch(/^États-Unis : Discord \(annonce publiée dans le salon #live\)/);
+    expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*« un joueur » en tournoi individuel, jamais un pseudo/);
+    expect(sheet.recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association/);
+    expect(sheet.retention.join(" ")).toMatch(/Annonce sur Discord : .* effacée avec le match/);
     expect(sheet.recipients.join(" ")).toMatch(/n'intègre aucun lecteur/);
     expect(sheet.dataCategories.join(" ")).toMatch(/ni webcam ni chat vocal des joueurs/);
     expect(sheet.retention.join(" ")).toMatch(/nom neutre/);

@@ -582,3 +582,219 @@ export async function pushLeadershipAlert(
     { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: false },
   );
 }
+
+/**
+ * Issue d'une annonce de live poussée au bot :
+ *
+ * - `posted` — le bot a publié dans #live, avec la mention `@everyone` ;
+ * - `posted-silent` — publié, mais **sans notifier** : le bot n'a pas la
+ *   permission de mentionner tout le serveur dans #live (le bot le signale au
+ *   canal de logs ; renvoyer reposterait le même message) ;
+ * - `rejected` — le bot a refusé le corps (`400`) : le renvoyer tel quel ne
+ *   changerait rien, l'annonce est abandonnée ;
+ * - `channel-closed` — le bot a répondu `503` : salon #live introuvable ou
+ *   fermé au bot (permission), rien n'est parti ;
+ * - `discord-refused` — le bot a répondu `503` : une règle AutoMod a bloqué
+ *   le message. Il serait bloqué de nouveau (et chaque essai alerterait la
+ *   modération) : l'appelant **garde** sa réservation, comme sur un `400` ;
+ * - `discord-held` — le bot a répondu `503` : Discord a refusé le message pour
+ *   une raison qui peut se régler (état du salon), rien n'est parti ;
+ * - `discord-unreachable` — le bot a répondu `503` : Discord n'a pas répondu
+ *   en lisant le salon (panne passagère, qui touche tout envoi), rien n'est
+ *   parti ;
+ * - `uncertain` — le bot a répondu que Discord a lâché pendant l'envoi
+ *   (`503`, `reason` `discord-down`) : l'annonce a pu partir, l'envoi est
+ *   terminé ;
+ * - `timed-out` — le bot n'a pas répondu à temps : son envoi peut **encore**
+ *   être en cours (Discord lent, limite de débit) ;
+ * - `interrupted` — la requête a atteint le bot, qui l'a lâchée sans bilan
+ *   (connexion coupée, par exemple par un redémarrage pendant l'envoi) : il a
+ *   pu publier avant.
+ *
+ * Sur `uncertain`, `timed-out` et `interrupted`, l'appelant **garde** sa
+ * réservation : une
+ * annonce perdue vaut mieux qu'un second `@everyone` à tout le serveur ;
+ * - `unauthorized` — le bot a refusé le jeton interne (`401`), ou n'en a
+ *   pas (`503` `INTERNAL_API_TOKEN_NOT_CONFIGURED`) : rien n'est parti, la
+ *   configuration est en cause, pas le bot ;
+ * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
+ *   coupe-circuit ouvert, bot d'une version antérieure, panne).
+ *
+ * Sur `channel-closed`, `discord-held`, `discord-unreachable`, `unauthorized`
+ * et `unavailable`, l'appelant rend sa réservation et réessaiera.
+ */
+export type LiveAnnouncementOutcome =
+  | "posted"
+  | "posted-silent"
+  | "rejected"
+  | "channel-closed"
+  | "discord-held"
+  | "discord-unreachable"
+  | "discord-refused"
+  | "uncertain"
+  | "timed-out"
+  | "interrupted"
+  | "unauthorized"
+  | "unavailable";
+
+/** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
+const CHANNEL_CLOSED_REASONS = new Set(["missing", "no-view", "no-send", "send-denied"]);
+
+/** Raisons d'un `503` du bot qui disent qu'AutoMod a bloqué le message lui-même. */
+const DISCORD_REFUSED_REASONS = new Set(["automod"]);
+
+/**
+ * Classe un `503` du bot par sa raison (`reason`). Un `503` d'annonce sans
+ * raison (bot d'une version antérieure) est lu comme un salon fermé, comme
+ * avant ; un autre `503` (configuration du bot) comme un bot indisponible.
+ */
+async function classifyUnavailable(
+  response: Response,
+): Promise<
+  "channel-closed" | "discord-held" | "discord-unreachable" | "discord-refused" | "uncertain" | "timed-out" | "unauthorized" | "unavailable"
+> {
+  let body: { error?: unknown; reason?: unknown } | null;
+  try {
+    body = (await response.json()) as { error?: unknown; reason?: unknown } | null;
+  } catch (error) {
+    // Corps coupé ou illisible : il pouvait dire `discord-down` (l'annonce a pu
+    // partir). Rendre la réservation risquerait un second `@everyone`.
+    return isTimeoutError(error) ? "timed-out" : "uncertain";
+  }
+  if (body?.error === "INTERNAL_API_TOKEN_NOT_CONFIGURED") return "unauthorized";
+  // Un autre `503` du bot (configuration) ne parle pas de #live.
+  if (body?.error !== "LIVE_CHANNEL_UNAVAILABLE") return "unavailable";
+  const reason = body.reason;
+  if (typeof reason !== "string" || CHANNEL_CLOSED_REASONS.has(reason)) return "channel-closed";
+  // Discord a lâché pendant l'envoi : le message a pu partir.
+  if (reason === "discord-down") return "uncertain";
+  // Bloqué par AutoMod : le renvoyer tel quel serait bloqué de nouveau, et
+  // chaque essai alerterait la modération.
+  if (DISCORD_REFUSED_REASONS.has(reason)) return "discord-refused";
+  // Discord muet en lisant le salon : la panne vaut pour tout envoi.
+  if (reason === "discord-unreachable") return "discord-unreachable";
+  return "discord-held";
+}
+
+/** Vrai si `fetch` a échoué parce que le délai d'attente est écoulé. */
+function isTimeoutError(error: unknown): boolean {
+  // `DOMException` n'hérite pas toujours d'`Error` selon l'environnement : lu par son nom.
+  const name = typeof error === "object" && error !== null ? (error as { name?: unknown }).name : undefined;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+/**
+ * Codes d'une connexion qui n'a pas abouti : la requête n'est jamais partie
+ * (bot arrêté, hôte inconnu), rien n'a pu être publié.
+ */
+const NOT_CONNECTED_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/**
+ * Vrai si `fetch` a échoué **avant** que la requête n'atteigne le bot. Une
+ * erreur sans code de connexion (configuration illisible) n'a rien envoyé non
+ * plus ; une connexion coupée en route (`ECONNRESET`, socket fermée), si : le
+ * bot a pu publier avant de tomber.
+ */
+function failedBeforeSending(error: unknown): boolean {
+  const cause = typeof error === "object" && error !== null ? (error as { cause?: unknown }).cause : undefined;
+  const code = typeof cause === "object" && cause !== null ? (cause as { code?: unknown }).code : undefined;
+  return typeof code !== "string" || NOT_CONNECTED_CODES.has(code);
+}
+
+/** Relâche un corps de réponse qu'on ne lira pas. Ne lève jamais. */
+async function discardBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // Flux déjà fermé : rien à relâcher.
+  }
+}
+
+/** Lit `mentionEveryone` du bilan du bot ; un corps illisible vaut une mention faite. */
+async function announcedWithoutMention(response: Response): Promise<boolean> {
+  try {
+    const body = (await response.json()) as { mentionEveryone?: unknown } | null;
+    return body?.mentionEveryone === false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Demande au bot d'annoncer un live dans le salon #live du serveur BlueGenji
+ * (`POST /internal/announce/live`) : il préfixe `@everyone` et ajoute le lien.
+ *
+ * Trafic de fond (le balayage des annonces) : le coupe-circuit est respecté,
+ * et jamais d'exception.
+ *
+ * @param message Texte rédigé par `formatLiveAnnouncementGroup`, noms neutralisés.
+ * @param streamUrl Lien déjà validé par la liste blanche.
+ * @param context Étiquette de journalisation côté bot.
+ */
+export async function pushLiveAnnouncement(
+  message: string,
+  streamUrl: string,
+  context: string,
+): Promise<LiveAnnouncementOutcome> {
+  if (isCircuitOpen()) return "unavailable";
+
+  const baseUrl = resolveBotInternalUrl();
+  try {
+    const response = await fetch(`${baseUrl}/internal/announce/live`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...getInternalHeaders(),
+      },
+      body: JSON.stringify({ message, streamUrl, context }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_NOTIFY_FETCH_TIMEOUT_MS),
+    });
+    if (response.ok) {
+      recordSuccess();
+      return (await announcedWithoutMention(response)) ? "posted-silent" : "posted";
+    }
+    // Un refus du corps n'est pas une panne du bot : il a répondu.
+    if (response.status === 400) {
+      recordSuccess();
+      await discardBody(response);
+      return "rejected";
+    }
+    // Un bot d'une version antérieure ne connaît pas la route, ou le salon
+    // #live lui est fermé (`503`, permission retirée) : il a répondu, le
+    // coupe-circuit n'a pas à s'ouvrir — il suspendrait les rappels et alertes
+    // de fond pour un réglage de salon ; l'annonce attendra.
+    if (response.status === 503) return classifyUnavailable(response);
+    // Jeton interne refusé : une configuration à corriger, pas un bot en
+    // panne — le coupe-circuit des autres appels n'a pas à s'ouvrir.
+    if (response.status === 401) {
+      await discardBody(response);
+      return "unauthorized";
+    }
+    // Corps non lu : le relâcher rend la connexion au pool, au lieu de la
+    // laisser occupée jusqu'au ramasse-miettes à chaque nouvel essai.
+    await discardBody(response);
+    if (response.status === 404) return "unavailable";
+    recordFailure();
+    // Un `500` du bot (`LIVE_ANNOUNCEMENT_FAILED`) naît avant l'envoi : toute
+    // erreur de l'envoi lui-même revient en `503` classé (`discord-down`…).
+    return "unavailable";
+  } catch (error) {
+    // Le délai écoulé ne dit pas que rien n'est parti : la requête a pu
+    // atteindre le bot, qui publie encore (Discord lent ou limitant #live). Il
+    // n'est pas compté comme une panne : quelques envois lents dans un salon ne
+    // doivent pas suspendre les rappels et alertes de fond.
+    if (isTimeoutError(error)) return "timed-out";
+    recordFailure();
+    // Connexion coupée en route (bot redémarré par un déploiement après son
+    // envoi, avant sa réponse) : l'annonce a pu partir.
+    return failedBeforeSending(error) ? "unavailable" : "interrupted";
+  }
+}

@@ -11,7 +11,8 @@
  *
  * Deux formes, selon la place du texte :
  * - {@link discordInline} pour un fragment dans une phrase (nom d'équipe, de
- *   tournoi) : une seule ligne, balisage échappé, mentions désamorcées ;
+ *   tournoi) : une seule ligne, balisage échappé, mentions et adresses nues
+ *   désamorcées ;
  * - {@link discordQuote} pour un texte libre sur plusieurs lignes : mêmes
  *   neutralisations, chaque ligne **citée** (`> `), si bien qu'aucune ne peut
  *   se faire passer pour une ligne écrite par le site.
@@ -19,8 +20,16 @@
  * La neutralisation vit côté site parce que c'est lui qui **rédige** : le bot ne
  * fait que distribuer, et ne sait pas quelle partie d'un message est une saisie.
  *
- * Module pur, sans dépendance.
+ * Le texte passe d'abord par `visibleText` : un nom enregistré avant ce
+ * nettoyage, ou un nom de tournoi qui ne l'a jamais reçu, peut encore porter
+ * une commande de direction (U+202E retournerait tout le reste de la ligne)
+ * ou un caractère invisible glissé dans `https:/\u200C/` pour échapper à la
+ * neutralisation des adresses.
+ *
+ * Module pur.
  */
+import { visibleText } from "./visible-text";
+
 
 /** Caractères de balisage Discord, précédés d'une barre oblique inverse. */
 const MARKDOWN = /[\\*_~`|[\]()<>#-]/g;
@@ -38,18 +47,37 @@ const MENTION_BREAK = "@\u200B";
 /** Barre oblique inverse, qui échappe le caractère qu'elle précède. */
 const BACKSLASH = String.fromCodePoint(92);
 
+/**
+ * Espace de largeur nulle glissée dans `://` et après un point suivi d'une
+ * lettre ou d'un chiffre : Discord ne reconnaît plus une adresse nue
+ * (`https://faux-nitro.gg`, `faux-nitro.gg/cadeau`) dans un nom, qui ne
+ * devient donc ni un lien cliquable ni un aperçu affiché sous le message —
+ * devant tout le serveur quand ce message est une annonce `@everyone`.
+ * L'affichage reste identique. Réservé aux **fragments** (`discordInline`) :
+ * un texte libre cité (`discordQuote`, signalement d'un problème) garde ses
+ * liens cliquables — une capture citée en preuve doit s'ouvrir chez l'arbitre.
+ */
+const URL_SCHEME = /:\/\//g;
+const DOMAIN_DOT = /\.(?=[\p{L}\p{N}])/gu;
+
 function neutralize(value: string): string {
   return value.replace(MARKDOWN, (char) => BACKSLASH + char).replace(/@/g, MENTION_BREAK);
+}
+
+/** Adresse nue désamorcée : ni lien, ni aperçu (fragments seulement). */
+function breakAddresses(value: string): string {
+  return value.replace(URL_SCHEME, ":\u200B//").replace(DOMAIN_DOT, ".\u200B");
 }
 
 /**
  * Fragment de phrase sûr : une ligne, sans balisage actif ni mention.
  *
  * `<` étant échappé, les mentions par identifiant (`<@…>`, `<@&…>`, `<#…>`) et
- * les horodatages dynamiques ne sont plus reconnus non plus.
+ * les horodatages dynamiques ne sont plus reconnus non plus ; une adresse nue
+ * n'est plus un lien.
  */
 export function discordInline(value: string): string {
-  return neutralize(value.replace(LINE_BREAKS, " ").replace(/\s+/g, " ").trim());
+  return breakAddresses(neutralize(visibleText(value.replace(LINE_BREAKS, " "))));
 }
 
 /**
@@ -61,7 +89,7 @@ export function discordQuote(value: string): string {
   return value
     .replace(/\r\n?/g, "\n")
     .split(/[\n\u2028\u2029]/)
-    .map((line) => neutralize(line.replace(LINE_BREAKS, " ").trim()))
+    .map((line) => neutralize(visibleText(line.replace(LINE_BREAKS, " "))))
     // Une ligne vide ne se cite pas (`>` nu s'affiche comme un chevron et coupe
     // la citation) : les paragraphes se suivent dans le même bloc cité.
     .filter((text) => text.length > 0)

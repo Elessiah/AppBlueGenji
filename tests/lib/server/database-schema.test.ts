@@ -451,6 +451,7 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       "bg_push_subscriptions",
       "bg_push_topic_optouts",
       "bg_match_start_notices",
+      "bg_live_announcements",
     ]) {
       const before = sql.slice(0, sql.indexOf(`CREATE TABLE IF NOT EXISTS ${tableName}`));
       expect(before.slice(-60)).toContain("try {");

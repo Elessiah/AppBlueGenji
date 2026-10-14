@@ -306,14 +306,14 @@ describe("runMigrations — tolérance d'un ALTER récent", () => {
     expect(rank(/^CREATE TABLE IF NOT EXISTS bg_referee_alerts/)).toBeGreaterThan(-1);
   });
 
-  it("tolère chacune des six tables accessoires, et elles seules", async () => {
+  it("tolère chacune des sept tables accessoires, et elles seules", async () => {
     const TOLERATED =
-      /^CREATE TABLE IF NOT EXISTS (bg_endurance_penalties|bg_match_reminders|bg_referee_alerts|bg_push_subscriptions|bg_push_topic_optouts|bg_match_start_notices)\b/;
+      /^CREATE TABLE IF NOT EXISTS (bg_endurance_penalties|bg_match_reminders|bg_referee_alerts|bg_push_subscriptions|bg_push_topic_optouts|bg_match_start_notices|bg_live_announcements)\b/;
     fail(TOLERATED, "ER_TABLEACCESS_DENIED_ERROR");
 
     await expect(getDatabase()).resolves.toBeDefined();
 
-    expect(count(TOLERATED)).toBe(6);
+    expect(count(TOLERATED)).toBe(7);
     expect(rank(/^SELECT TABLE_NAME t, COUNT\(\*\) n/)).toBeGreaterThan(-1);
   });
 

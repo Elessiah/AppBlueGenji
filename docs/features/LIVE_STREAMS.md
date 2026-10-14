@@ -122,6 +122,187 @@ Une seule boucle de sondage alimente les deux : `useLandingLive`, appelé par le
 `Hero` (`components/cyber/landing/`). Deux sondages séparés les feraient diverger
 le temps d'un tick — une carte annonçant un direct au-dessus d'un bouton absent.
 
+## Annonce sur Discord (#live, `@everyone`)
+
+Au **début** d'un match diffusé, le bot poste dans le salon #live du serveur
+BlueGenji esport (constante `LIVE_ANNOUNCE_CHANNEL_ID` côté bot,
+`src/notifications/liveAnnouncement.ts`) un message qui mentionne `@everyone`,
+nomme les deux engagés et le tournoi, et donne le lien de la diffusion —
+demande de l'association : deux matchs à la suite font donc deux annonces.
+
+- **Début du match = passage à l'antenne**, tel que `isMatchLive` le dérive :
+  lancement en `AUTO`, heure dite en `START_TIME`, clic « Lancer le direct » en
+  `MANUAL`. Le lancement compte pour l'**affiche courante** seulement
+  (`currentLaunchState`).
+- **Un balayage** (`lib/server/tournaments/live-announcements.ts`), pas un
+  crochet par écriture : cinq écritures posent `launched_at`, et `START_TIME`
+  passe à l'antenne sans écriture. Mêmes déclencheurs que les notifications de
+  départ (`PUSH_NOTIFICATIONS.md`) : chaque évènement de tournoi publié,
+  l'entretien de l'instantané qui ouvre un lancement, la lecture de la liste
+  des tournois — et, pour qu'un `START_TIME` parte **à l'heure**, le
+  battement (25 s) de chaque flux SSE ouvert sur un tournoi **en cours** — lu
+  sur la fiche que la salle tient à jour (`tournamentRoomCard`) et d'après
+  ses dates : un onglet oublié sur un tournoi terminé ne réveille rien —, en production
+  seulement. Étranglé à dix secondes pour tout le processus, avec relève ;
+  jamais attendu. Coût : une lecture indexée (`idx_bg_matches_live`) toutes
+  les dix secondes au plus, quel que soit le nombre de spectateurs ; aucune
+  tant que le coupe-circuit du bot est ouvert. Un `START_TIME` dont l'heure
+  n'est pas venue n'est pas lu.
+- **Un message par diffusion, pas par match** : les matchs d'un même tournoi
+  qu'un même balayage trouve à l'antenne sur le **même lien** (une ronde
+  lancée d'un coup, repliée sur la chaîne officielle) partent en un seul
+  message : « 🔴 En direct — Tournoi : » puis une affiche par ligne
+  (« • A contre B ») — un nom d'équipe peut contenir « et » ou une virgule,
+  jamais un saut de ligne ; passé 1 500 caractères
+  (`LIVE_ANNOUNCEMENT_MAX_LENGTH`), une dernière ligne compte le reste
+  (« • et 3 autres matchs ») plutôt que de laisser le bot couper un nom. En
+  tournoi individuel, « 🔴 En direct : 2 matchs — Tournoi ». Chaque affiche
+  garde sa réservation. Deux matchs **à la suite** restent deux annonces.
+- **Une annonce par match et par affiche** : `bg_live_announcements`
+  (clé unique `(match_id, pairing)`, `pairing` = les deux engagés **sans
+  ordre**, `5:7` pour `7:5` : un plateau réécrit qui inverse les deux mêmes
+  engagés ne réannonce pas) est réservée **avant** l'appel au bot.
+  Un balayage concurrent, un rafraîchissement, une relecture du flux, un direct
+  coupé puis relancé, un lancement annulé puis refait (horaire changé) ne
+  repostent jamais. La réservation n'est **rendue** que si rien n'est parti
+  pour une cause passagère — bot injoignable ou d'une version antérieure,
+  salon fermé, refus lié à l'état du salon ou Discord sans réponse en lisant
+  le salon (`503` `send-rejected`, `discord-unreachable`), panne du bot avant
+  l'envoi (`500`) — et
+  le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS` :
+  la même cause renverrait le même refus). Après un bot indisponible, un salon
+  fermé ou Discord muet en lisant le salon (`discord-unreachable`), la pause
+  vaut pour tout le processus et les groupes suivants du même passage sont
+  rendus sans appel au bot ; après un refus de Discord (`discord-held`, qui
+  peut tenir au message), elle ne vaut que pour cette diffusion (tournoi et
+  lien) — un match qui la rejoint pendant la pause attend avec elle, un seul
+  message part — et les autres tournois partent sans attendre. Une relève
+  tombe au terme de la pause, sans attendre un nouvel évènement. Le tout tant que
+  le match a commencé depuis moins de deux heures ; un
+  succès (même sans mention), un refus du corps (`400`) ou un blocage par
+  AutoMod (`503` `automod` : le même message serait bloqué de nouveau, et
+  chaque essai alerterait la modération) la
+  garde, comme un `503` `discord-down` (Discord lâché pendant l'envoi : il a
+  pu partir). Un **délai dépassé** (15 s) la garde aussi : le bot a
+  pu publier quand même, et une annonce perdue vaut mieux qu'un second
+  `@everyone` à tout le serveur (`timed-out`, `console.error` dans pm2 :
+  « son envoi peut encore aboutir », sans consigne d'action) ; il
+  n'est pas compté comme une panne du bot. Un bot **tombé en route** la garde
+  de même (`interrupted` : connexion coupée après l'envoi de la requête —
+  `ECONNRESET`, redémarrage pm2 d'un déploiement) : il a pu publier avant ;
+  une connexion qui n'a pas abouti (`ECONNREFUSED`, hôte inconnu) rend la
+  réservation. Un `503` au corps illisible la garde aussi (il pouvait dire
+  `discord-down`). Un jeton interne refusé (`401`) ou absent du bot (`503`
+  `INTERNAL_API_TOKEN_NOT_CONFIGURED` : la route exige le jeton même en boucle
+  locale) vaut `unauthorized` : réservation rendue, pause d'une minute pour tout
+  le processus, pm2 désigne `BOT_INTERNAL_TOKEN` / `INTERNAL_API_TOKEN`, sans
+  ouvrir le coupe-circuit. Le bot
+  répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
+  croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
+  du bot : un salon fermé ne doit pas suspendre les rappels de fond. Côté
+  bot, une cause que le site réessaie n'est signalée au canal de logs qu'une
+  fois par heure ; une annonce qu'il ne réessaie pas (blocage par AutoMod,
+  envoi incertain, requête déjà coupée par le site) l'est chacune.
+  Elle part avec la ligne du match (suppression du
+  tournoi, retour en arrière, plateau régénéré) : un match recréé puis relancé
+  est annoncé de nouveau. Une affiche changée par un ré-appariement est une
+  autre rencontre, donc une autre annonce.
+- **Fraîcheur : deux heures** (`LIVE_ANNOUNCE_MAX_AGE_MINUTES`). Seul un
+  passage à l'antenne de moins de deux heures est annoncé, mesuré par l'horloge
+  de la base (`NOW()`) sur la colonne du mode : `launched_at` (`AUTO`),
+  `start_at` (`START_TIME`, ou son `launched_at` pour l'affiche courante quand
+  le match est devenu jouable après son heure), `live_started_at` (`MANUAL`).
+  Un déploiement, une table recréée ou une longue panne du bot ne réveillent
+  donc jamais `@everyone` pour un match commencé depuis longtemps.
+- **Pas de sujet `PUSH_TOPICS`** : c'est une publication de salon public, pas
+  une notification personnelle — personne ne s'y abonne ni ne s'en désabonne
+  sur le site ; la règle « toute notification = un sujet push » ne s'applique
+  pas.
+- **RGPD** : registre **T16** (finalité « annoncer le début d'un match
+  diffusé », destinataires membres du serveur et Discord, transfert Discord
+  sous DPF), `/rgpd#retransmission` et la liste Discord de `/rgpd#destinataires`
+  (FR et EN), politique du bot (`bot-legal-content.ts`) et entrée
+  `2026-10-annonce-des-matchs-diffuses` de `PRIVACY_CHANGES`.
+- **Lien** : la diffusion du match, à défaut la chaîne officielle du tournoi —
+  celle que le site désigne au spectateur d'un match sans lien propre (badge
+  sans lien, bouton « Regarder le live » de l'accueil) ; un caster
+  indépendant renseigne donc son lien, sans quoi l'annonce renvoie à la
+  chaîne officielle comme le reste du site. Chacun
+  repasse par `normalizeStreamUrl`, et le bot revalide la liste blanche. Une
+  page de redirection d'un hôte autorisé (`youtube.com/redirect`,
+  `/attribution_link`) ou un lien qui porte une autre adresse dans son chemin
+  ou sa requête (en clair, encodée une ou plusieurs fois, `https:\` ou
+  `//hôte` sans schéma ; chemin décodé et barres doublées fusionnées) est
+  refusé : le lien d'un `@everyone` ne mène qu'à la diffusion. Sans lien exploitable, pas d'annonce.
+- **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
+  Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `entrantLabel`
+  (`discordInline` ; une entrée individuelle s'écrit « un joueur », jamais un
+  pseudo — décidé aussi par `bg_teams.solo_user_id`, pas seulement par le type
+  du tournoi). Le bot préfixe `@everyone` et n'autorise que cette mention
+  (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
+  permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
+  qui ne notifie personne aurait l'air d'une panne).
+- **Production seulement, activée explicitement, sur le site public**
+  (`NODE_ENV=production`, **`LIVE_ANNOUNCEMENTS_ENABLED=1`** — posée par le
+  seul `.env` de production, un tunnel https donnant un vrai nom de domaine à
+  un poste —, **et**
+  `APP_URL` en `https` sur un nom de domaine — ni adresse IP, boucle locale ou
+  réseau privé, ni nom d'un seul mot, ni suffixe local ou de test : `.localhost`,
+  `.test`, `.local`, `.internal`, `.lan`, `.home.arpa`, `.invalid`, `.example`) : une base de développement ne fait jamais écrire
+  `@everyone` au serveur, même devant un bot local branché par erreur sur le
+  vrai serveur — `npm start` sur un poste pose aussi `NODE_ENV=production`.
+- **Adresses dans les noms** : un nom d'équipe ou de tournoi qui ressemble à
+  une adresse (`https://…`, `exemple.gg/…`) ne devient ni lien ni aperçu sous
+  l'annonce — `discordInline` glisse une espace de largeur nulle dans `://` et
+  après un point suivi d'une lettre ou d'un chiffre. Le seul lien est celui du
+  bot, validé par la liste blanche.
+- **Traces** : pm2 `[live-announce] match N (tournoi T) annoncé dans #live`
+  (`matchs N, M (tournoi T) annoncés` pour un groupe ; « sans notifier » quand
+  la mention n'a pas pu partir — identifiants seuls, tournoi compris sur toutes
+  les lignes, échecs et reports aussi) ; l'annonce naît d'un
+  balayage, pas d'un geste du staff, donc aucune ligne `staff-audit`. Un report
+  est averti dans pm2 au plus une fois par heure, par cause et par match (ou
+  groupe), la cause distincte :
+  « salon #live fermé au bot » (`503` de salon ou de permission), « Discord a
+  refusé l'annonce (état du salon) ou n'a pas répondu au bot » ou « bot
+  injoignable, en panne ou d'une version sans
+  annonces » ou « jeton interne refusé ou absent » (`401`, ou `503`
+  `INTERNAL_API_TOKEN_NOT_CONFIGURED`) ; passé deux heures, le match n'est
+  plus réessayé. Un autre `503` qui ne concerne pas l'annonce se lit « bot
+  injoignable ». Les annonces abandonnées sont tracées en `console.error` :
+  refus du corps (`400`), blocage par AutoMod (« une règle AutoMod du serveur
+  a bloqué l'annonce … abandonnée »), « publication non confirmée » (`503`
+  `discord-down` — vérifier #live) et délai dépassé (« son envoi peut encore
+  aboutir »). Les deux dernières ne demandent pas de poster l'annonce à la
+  main : l'envoi du bot a pu partir, ou partir encore. Après un `400` ou un
+  blocage par AutoMod, rien n'est parti : la poster à la main (règle
+  corrigée) ne fait pas de doublon. Côté bot, voir ci-dessus (une fois par
+  heure par cause réessayée ; chaque blocage AutoMod, envoi incertain ou
+  requête coupée par le site ; un `400` n'est pas signalé au canal de logs). Deux pannes de la base sont tracées (une fois par heure et par
+  match) : une réservation refusée (`réservation impossible` — rien n'est
+  réservé, chaque passage réessaie pendant les deux heures) et une
+  réservation qui n'a pas pu
+  être rendue (`réservation non rendue` — l'annonce est perdue, à reposter à
+  la main). Un match à l'antenne sans aucun lien exploitable (ni le sien ni
+  la chaîne officielle) n'est pas annoncé, et pm2 le dit, une fois par heure
+  — un lien ajouté dans les deux heures fait partir l'annonce, d'où la
+  consigne de ne pas la poster à la main. L'aide du champ de lien de la
+  fenêtre de cast le rappelle : laissé vide, il fait renvoyer l'annonce à la
+  chaîne officielle, ou ne la fait pas partir sans chaîne officielle.
+- **Information à l'inscription** : la mention sous le bouton d'inscription
+  (`register.streamNotice.TEAM`, `registrationStreamNotice`) dit aussi que le
+  nom de l'équipe est annoncé sur le Discord de l'association ; en individuel,
+  rien à ajouter — un joueur n'y est jamais nommé.
+- **Production — permissions Discord** dans #live : « Voir le salon »,
+  « Envoyer des messages », « Mentionner @everyone, @here et tous les rôles »
+  et « Intégrer des liens ». Sans la mention, le message part sans notifier ;
+  sans l'intégration, sans aperçu de la chaîne ; sans les deux premières, rien
+  ne part et le site réessaie. Le mode lent du salon ne gêne pas : Discord
+  n'y soumet pas les bots. Une règle AutoMod qui
+  bloque l'annonce est signalée au canal de logs, mais l'annonce n'est **pas**
+  réessayée (le même message serait bloqué de nouveau) : la règle corrigée
+  vaut pour les annonces suivantes.
+
 ## Information des joueurs (RGPD)
 
 La retransmission est un traitement (registre, **T16**) : intérêt légitime de
@@ -129,7 +310,9 @@ l'association, droit d'opposition. Elle ne montre que le **pseudo**, le **nom
 d'équipe** et les **résultats et performances en jeu** — ni webcam ni chat
 vocal des joueurs. Le site ne fait que **lier** les chaînes, sans lecteur
 intégré : il ne transmet rien aux plateformes, qui traitent leurs spectateurs en
-responsables de leur propre traitement (T16 : transferts « Aucun »).
+responsables de leur propre traitement. Seule l'annonce d'un match dans le
+salon #live passe par Discord (T16 : transfert vers les États-Unis, Discord,
+§ Annonce sur Discord).
 
 Le joueur en est informé là où il s'engage, sans case à cocher — ce n'est pas
 un consentement : sous le bouton d'inscription de la fiche du tournoi

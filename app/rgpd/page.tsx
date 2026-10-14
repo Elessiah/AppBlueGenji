@@ -983,8 +983,9 @@ function RgpdFr({
           <ul>
             <li>
               <strong>Discord</strong> (États-Unis) : les messages privés du bot (code de
-              connexion, horaires et rappels de match, notifications) et les salons réservés au staff, qui ne
-              portent aucun pseudo de joueur ; et la connexion par Discord, si vous la choisissez.
+              connexion, horaires et rappels de match, notifications), les salons réservés au staff et
+              l&apos;annonce des matchs diffusés dans le salon #live, qui ne portent aucun pseudo de joueur ;
+              et la connexion par Discord, si vous la choisissez.
             </li>
             <li>
               <strong>Google et Blizzard</strong> (États-Unis) : seulement si vous vous connectez
@@ -1050,7 +1051,10 @@ function RgpdFr({
             {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors
             retiré du site, et une vidéo publiée par la chaîne de l&apos;association est masquée
             ou supprimée. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
-            responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>).
+            responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
+            début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
+            l&apos;association, avec une mention @everyone : le nom des deux équipes (« un joueur » en
+            tournoi individuel, jamais un pseudo), celui du tournoi et le lien de la diffusion.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
         </div>

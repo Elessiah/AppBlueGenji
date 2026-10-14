@@ -22,10 +22,17 @@ import { invalidateTournamentSnapshot } from "./snapshot";
  * match (`./player-pushes`), étranglé et jamais attendu. Import dynamique : ce
  * module est sur le chemin de chaque écriture, le push ne doit rien lui coûter
  * tant qu'il n'a rien à faire.
+ *
+ * L'annonce des lives sur Discord (`./live-announcements`) suit les mêmes
+ * déclencheurs : un lancement ouvre l'antenne d'un match `AUTO`, et le clic
+ * « Lancer le direct » publie aussi l'un de ces évènements.
  */
 function scheduleMatchStartNotices(): void {
   void import("./player-pushes")
     .then(({ dispatchMatchStartNotices }) => dispatchMatchStartNotices())
+    .catch(() => undefined);
+  void import("./live-announcements")
+    .then(({ dispatchLiveAnnouncements }) => dispatchLiveAnnouncements())
     .catch(() => undefined);
 }
 

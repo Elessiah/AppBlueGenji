@@ -684,6 +684,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
     ],
   },
+  // PR #442 : le début d'un match diffusé annoncé à tout le serveur Discord
+  // de l'association (#live, @everyone), avec les noms d'équipe — nouveaux
+  // destinataires et transfert vers Discord (registre, T16). `publishedAt` :
+  // lendemain de la mise en ligne prévue.
+  {
+    id: "2026-10-annonce-des-matchs-diffuses",
+    publishedAt: "2026-10-15",
+    title: "Matchs diffusés annoncés sur Discord",
+    summary:
+      "Au début d'un match diffusé en direct, le bot l'annonce à tout le serveur Discord de l'association, avec le nom des deux équipes.",
+    details: [
+      "L'annonce part dans le salon #live du serveur Discord de l'association, avec une mention @everyone : le nom des deux équipes, celui du tournoi et le lien de la diffusion.",
+      "Elle ne porte aucun pseudo de joueur : en tournoi individuel, chaque engagé s'écrit « un joueur ».",
+      "Le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), effacée avec le match. Le message reste dans le salon, chez Discord (États-Unis), jusqu'à sa suppression par l'association.",
+    ],
+    links: [
+      { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
+      { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
