@@ -509,7 +509,9 @@ chacun, engagées solo comprises — « Ton match »). Le message ajoute
 coup d'envoi sur Discord — <invitation> ». L'invitation est **une** constante,
 `CHECK_IN_INVITE_URL` dans `lib/shared/discord.ts` (seul fichier autorisé à
 écrire une invitation, `discord-invite-single-source.test.ts`), réexportée par
-`discord-notifications.ts` ; `CHECK_IN_OPENS_MINUTES_BEFORE = 15`. Le rappel
+`discord-notifications.ts` ; `CHECK_IN_OPENS_MINUTES_BEFORE = 15`, que le
+message privé et le push (`matchReminder.checkIn`, paramètre `{minutes}`)
+lisent tous deux. Le rappel
 24 h est gardé (deux rappels). Une manche annoncée moins de 10 h avant consomme
 `PT10H` sans message : c'est **l'annonce** qui porte la ligne de check-in
 (`MatchReminderContext.checkIn`, `checkIn` du push). Un avis de retrait ne la
@@ -537,9 +539,13 @@ reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
   `notifyStaff`, langue de chacun) — `refereeDigestPush`, titre « Programme
   d'arbitrage : N matchs à venir » (pas « des 10 prochaines heures » : la
   marge en cite jusqu'à 12 h), cinq lignes au plus puis « … et N autre(s) »
-  (pluriel ICU) ; chaque ligne nomme le tournoi **et la manche**
-  (`pushRoundLabel`, « Ronde N » en suisse) — en solo, « Un match » : la manche
-  distingue les lignes. Le lien mène à la fiche du tournoi quand le programme
+  (pluriel ICU), sous une première ligne « Heure de Paris » / « Paris time »
+  (un arbitre à l'étranger lirait sinon son heure locale) ; chaque ligne nomme
+  le tournoi **et la manche** (`pushRoundLabel`, « Ronde N » en suisse). En
+  solo, aucun pseudo : les matchs consécutifs d'un même créneau, tournoi et
+  manche tiennent en une ligne (« 8 matchs (Coupe, Manche 1) », pluriel ICU)
+  au lieu de lignes « Un match » identiques ; « … et N autres » compte les
+  matchs. Le lien mène à la fiche du tournoi quand le programme
   n'en cite qu'un, à `/tournois` sinon ; l'étiquette nomme **toutes** les
   manches citées (`referee-digest-<id>-<id>…`), pour qu'un programme suivant
   ne remplace jamais sur l'appareil un précédent qui en cite d'autres ;
@@ -551,6 +557,10 @@ reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
   2 000 caractères, que le bot envoie sans le découper — le programme, ses
   marques déjà posées, serait perdu. Les manches qui ne tiennent pas sont
   comptées dans « … et N autres ».
+
+RGPD : entrée `2026-10-rappel-de-check-in` de `PRIVACY_CHANGES` (FR/EN) —
+l'entrée #441 disait qu'un seul rappel restait — ; registre T04 (rappels,
+programme en push) et T05 (programme au journal du staff).
 
 Pas de message privé au rôle arbitre (`pushRefereeAlert`) : il sert aux
 alertes qui appellent une intervention. Le programme manqué (bot injoignable,
