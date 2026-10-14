@@ -405,7 +405,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "#live announcement of a solo tournament: your public username appears in it under performance of the service — the announcement is part of the tournament you register for — and no longer under legitimate interest. Nothing changes in practice: no neutral name for that announcement, not registering remains the way not to be named in it, and a past announcement is deleted on request (“Report a problem”, “GDPR” category).",
       "If a Discord AutoMod rule blocks a #live announcement, its text (including your username in a solo tournament) may reach the moderation alert channel of the association's Discord server.",
       "Match direct messages: each now ends with a line saying where to turn them off (“My profile”, Notifications section). The site keeps your choice in your legitimate interest: that is what lets it honour it.",
-      "Terms of use: version 4, in force since 14 October 2026, includes this #live announcement rule. Read them again: they are shown to you anew at your next login and, if you manage a team, before your next management action.",
+      "Terms of use: version 4, in force since 14 October 2026, includes this #live announcement rule. Read them again: unless you have already accepted them, they are shown to you anew at your next login and, if you manage a team, before your next management action.",
     ],
     linkLabels: [
       "Read the “Match streaming” paragraph",
