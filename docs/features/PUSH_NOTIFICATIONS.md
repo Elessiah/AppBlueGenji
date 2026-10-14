@@ -99,6 +99,12 @@ lignes qui tiennent (« … et N autres » et le fuseau compris), le rappel du
 check-in raccourcit son début plutôt que l'invitation ; une étiquette qui
 nommerait une liste en porte une empreinte.
 
+Une notification de même étiquette remplace la précédente **sans sonner** —
+sauf `renotify` (`PushContent.renotify`, porté par la charge seulement quand il
+est vrai, appliqué par `public/push-sw.js` à une notification étiquetée) : les
+rappels de match (24 h, puis 10 h avec le check-in) remplacent l'annonce du
+même match en sonnant, sans quoi le lien du check-in passerait inaperçu.
+
 ## Protocole
 
 `lib/server/web-push.ts`, sur `node:crypto`, sans dépendance : VAPID (RFC 8292,

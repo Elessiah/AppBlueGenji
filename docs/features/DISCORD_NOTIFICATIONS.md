@@ -538,10 +538,11 @@ H-10 serait relue, et sa marque `P1D` re-tentée, à chaque passage pendant
 14 heures.
 
 **Arbitres — `lib/server/tournaments/referee-digest.ts`.** Lancé par le même
-balayage (`dispatchDueMatchReminders`), **de front** avec les rappels et sous
-**son propre verrou** (`pendingDigest`) : il n'attend pas les envois aux joueurs
-(un bot lent ne le retarde pas), et le balayage suivant n'attend pas les
-appareils du staff ; un seul programme à la fois. Échec indépendant — une table
+balayage (`dispatchDueMatchReminders`), **de front** avec les rappels, sous
+**son propre verrou et son propre étranglement** d'une minute (`pendingDigest`,
+`lastDigestAt`, lancé avant le verrou du balayage) : un balayage long (ronde
+suisse annoncée d'un coup, bot lent) ne le retient pas, et le balayage suivant
+n'attend pas les appareils du staff ; un seul programme à la fois. Échec indépendant — une table
 absente se tait, comme au balayage. Chaque passage n'exécute d'abord qu'une **sonde** d'une ligne
 (`DIGEST_DUE_PROBE`, `LIMIT 1`) : la marge n'est lue et jointe que si une
 manche est due.
