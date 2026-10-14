@@ -60,7 +60,8 @@ export function OAuthButtons({
   terms: OAuthTermsConsent | null;
   /**
    * Les mêmes, relues **au clic** : l'acceptation « dans la page » expire à
-   * l'horloge, et l'adresse rendue peut dater d'avant une mise en veille.
+   * l'horloge. L'adresse rendue (`terms`) ne la porte jamais ; un clic simple
+   * part vers l'adresse relue, toute autre ouverture vers l'adresse rendue.
    */
   termsAtClick?: () => OAuthTermsConsent | null;
   /**
@@ -122,7 +123,16 @@ export function OAuthButtons({
                 onClick={
                   termsAtClick
                     ? (event) => {
-                        event.currentTarget.href = oauthStartPath(provider, { redirect, terms: termsAtClick(), locale });
+                        // Clic simple seulement : le clic du milieu, une touche
+                        // de modification ou « Ouvrir dans un nouvel onglet »
+                        // gardent l'adresse rendue, sans « dans la page ».
+                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                        const fresh = termsAtClick();
+                        if (!fresh?.acceptedNow) return;
+                        // Rien n'est réécrit dans le lien : revenu par « Précédent »,
+                        // il ne garde pas une acceptation que l'horloge a périmée.
+                        event.preventDefault();
+                        window.location.assign(oauthStartPath(provider, { redirect, terms: fresh, locale }));
                       }
                     : undefined
                 }

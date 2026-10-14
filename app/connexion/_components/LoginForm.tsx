@@ -119,16 +119,9 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // à celle relue du navigateur, qui peut être celle d'une autre personne
   // (ordinateur partagé) : seule la première met à jour un compte existant.
   // L'instant de l'acceptation fait foi, relu à l'horloge **au moment de
-  // partir** (`isAcceptedNow`) : un minuteur s'arrête quand la page est
-  // suspendue (ordinateur en veille, onglet gelé, retour arrière). Le minuteur
-  // ne sert qu'à rafraîchir les liens affichés.
+  // partir** (`isAcceptedNow`) — jamais un minuteur, qui s'arrête quand la page
+  // est suspendue (ordinateur en veille, onglet gelé, retour arrière).
   const acceptedAt = useRef<number | null>(null);
-  const [acceptedNow, setAcceptedNow] = useState(false);
-  useEffect(() => {
-    if (!acceptedNow) return;
-    const timer = window.setTimeout(() => setAcceptedNow(false), ACCEPTED_NOW_TTL_MS);
-    return () => window.clearTimeout(timer);
-  }, [acceptedNow]);
   const isAcceptedNow = useCallback(
     () => acceptedAt.current !== null && Date.now() - acceptedAt.current < ACCEPTED_NOW_TTL_MS,
     [],
@@ -159,15 +152,18 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     }
     setConsentGiven(true);
     acceptedAt.current = Date.now();
-    setAcceptedNow(true);
   };
 
   // Les conditions ne voyagent qu'une fois le stockage **lu** et le
   // consentement **donné** : `consentGiven` part à `true` pour ne pas faire
   // clignoter la modale, il ne vaut donc acceptation qu'après la lecture.
   const termsAccepted = consentRead && consentGiven;
-  const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow } : null;
-  // Relu au clic : l'adresse affichée peut dater d'avant une mise en veille.
+  // Les adresses **affichées** ne portent jamais « acceptées dans la page » :
+  // un lien ouvert autrement que d'un clic simple (clic du milieu, nouvel
+  // onglet, glisser) ne passe pas par `termsAtClick`, et l'adresse rendue peut
+  // dater d'avant une mise en veille. Seul le clic simple, relu à l'horloge,
+  // l'ajoute (`OAuthButtons`).
+  const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow: false } : null;
   const termsAtClick = useCallback(
     () => (termsAccepted ? { version: TERMS_VERSION, acceptedNow: isAcceptedNow() } : null),
     [termsAccepted, isAcceptedNow],
