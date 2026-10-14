@@ -6,7 +6,13 @@ import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
  * reposent sur l'intérêt légitime (registre T04), pas sur le contrat qui fonde
  * l'enregistrement de l'identifiant et du pseudo Discord.
  */
-export const MATCH_TIME_DM_SCOPE = "annonces d'horaire et rappels de match en message privé";
+export const MATCH_TIME_DM_SCOPE = "annonces d'horaire, rappels et avis de retrait de match en message privé";
+
+/**
+ * Le pseudo public d'un joueur inscrit en tournoi individuel part dans
+ * l'annonce #live (registre T16, intérêt légitime) et y survit au compte.
+ */
+export const LIVE_PSEUDO_SCOPE = "annonce #live d'un tournoi individuel, gardée dans le salon Discord jusqu'à sa suppression sur demande";
 
 /**
  * Bases légales citées par la politique — les mêmes que le registre
@@ -52,6 +58,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil. Un compte créé par Google avant le 30 septembre 2026 a pu recevoir le nom de ton compte Google : si c'est le cas, remplace-le dans Mon profil",
     base: "Exécution du contrat",
+    extraBases: [{ base: "Intérêt légitime", scope: LIVE_PSEUDO_SCOPE }],
     duree: "Durée du compte",
   },
   {
@@ -158,6 +165,15 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },
+  {
+    donnee: "Choix des messages privés de match",
+    // `bg_users.match_dm_enabled` : l'opposition aux messages privés de match
+    // (registre T04), exportée et remise au défaut à l'anonymisation.
+    finalite:
+      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs ; décoché dans Mon profil (ton opposition), il ne le fait plus. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+    base: "Intérêt légitime",
+    duree: "Durée du compte",
+  },
 ];
 
 export const DONNEE_TOURNOIS: DonneEntry = {
@@ -221,7 +237,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire et rappels de match en message privé).",
+    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels et avis de retrait de match en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil).",
   },
   {
     title: "Droit à la portabilité",

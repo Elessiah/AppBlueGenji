@@ -9,7 +9,7 @@
 
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
-import { DONNEES_PROFIL, MATCH_TIME_DM_SCOPE } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL, LIVE_PSEUDO_SCOPE, MATCH_TIME_DM_SCOPE } from "@/lib/shared/rgpd-policy";
 import type { DonneEntry, DroitEntry, LegalBase } from "@/lib/shared/rgpd-policy";
 
 /** The four legal bases (GDPR, art. 6.1), in English. */
@@ -31,7 +31,8 @@ const PROFIL_DUREE_EN: Record<string, string> = {
 const SCOPE_EN: Record<string, string> = {
   "présentation aux joueurs et au caster de ton match, à son lancement":
     "presentation to the players and caster of your match, at its launch",
-  [MATCH_TIME_DM_SCOPE]: "match time notices and reminders by direct message",
+  [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
+  [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request",
 };
 
 /** Data and purpose of each `DONNEES_PROFIL` row, same order. */
@@ -79,6 +80,10 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   [
     "Account language",
     "French or English: the language of push notifications. That of the site page your last login started from (except as detailed in the Push notifications section), or the one you choose in My profile; French by default, reset to French if the account is anonymized",
+  ],
+  [
+    "Match direct messages choice",
+    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches; unticked in My profile (your objection), it no longer does. Included in the export of your data, reset to the default if the account is anonymized",
   ],
 ];
 
@@ -142,7 +147,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to object",
-    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices and reminders by direct message).",
+    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile).",
   },
   {
     title: "Right to data portability",
