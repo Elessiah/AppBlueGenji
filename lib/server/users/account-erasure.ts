@@ -99,6 +99,8 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
              -- celui de la colonne) : un compte qui ne recevra plus rien n'a
              -- plus de langue à retenir.
              locale = ?,
+             -- L'opposition aux messages privés de match revient au défaut.
+             match_dm_enabled = 1,
              is_deleted = 1
          WHERE id = ?`,
         [pseudo, DEFAULT_LOCALE, userId],

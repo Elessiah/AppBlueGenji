@@ -53,7 +53,6 @@ import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } 
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
-import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { MatchStatus } from "@/lib/shared/types";
 
 type LiveCandidateRow = RowDataPacket & {
@@ -74,6 +73,9 @@ type LiveCandidateRow = RowDataPacket & {
   team2_name: string;
   team1_solo_user_id: number | null;
   team2_solo_user_id: number | null;
+  /** Pseudo public du joueur d'une entrée individuelle (`null` : équipe, ou compte supprimé). */
+  team1_pseudo: string | null;
+  team2_pseudo: string | null;
 };
 
 /**
@@ -158,12 +160,15 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
             m.live_started_at, m.live_url, m.launched_at, m.launch_pairing,
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
-            t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id
+            t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
+            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
                             AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
+       LEFT JOIN bg_users u1 ON u1.id = t1.solo_user_id AND u1.is_deleted = 0
+       LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0
       WHERE m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
         AND ${FRESH_ON_AIR_SQL}
         AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
@@ -298,13 +303,16 @@ function matchIdsOf(group: AnnouncementGroup): number[] {
 }
 
 /**
- * Type d'engagés d'un groupe. Une entrée individuelle (`solo_user_id`) porte le
- * nom de son joueur : elle s'écrit « un joueur » même si le type du tournoi
- * était illisible — un pseudo ne part jamais devant tout le serveur.
+ * Nom public d'un engagé dans l'annonce #live : le nom de l'équipe, ou, pour
+ * une entrée individuelle (`solo_user_id`), le **pseudo du compte** — seule
+ * exception à la règle « aucun pseudo sur Discord », décidée par l'utilisateur
+ * (2026-10-14, `RGPD_LOGS_AND_VISITS.md`). Jamais le nom de l'entrée solo
+ * (`bg_teams.name`, qui peut porter un suffixe de dédoublonnage) ; `null` pour
+ * un compte supprimé, écrit « un joueur ».
  */
-function groupParticipantType(rows: readonly LiveCandidateRow[]): ParticipantType {
-  const solo = rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null);
-  return solo ? "SOLO" : toParticipantType(rows[0].participant_type);
+export function liveEntrantName(soloUserId: number | null, teamName: unknown, pseudo: unknown): string | null {
+  if (soloUserId == null) return String(teamName);
+  return typeof pseudo === "string" && pseudo.trim() !== "" ? pseudo : null;
 }
 
 /**
@@ -401,8 +409,10 @@ async function announce(group: AnnouncementGroup): Promise<{ posted: number; pos
   const [first] = group.rows;
   const message = formatLiveAnnouncementGroup({
     tournamentName: String(first.tournament_name),
-    participantType: groupParticipantType(group.rows),
-    pairings: group.rows.map((row) => ({ team1Name: String(row.team1_name), team2Name: String(row.team2_name) })),
+    pairings: group.rows.map((row) => ({
+      team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, row.team1_pseudo),
+      team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, row.team2_pseudo),
+    })),
   });
   const { label, context, plural } = describeGroup(group);
   const outcome = await pushLiveAnnouncement(message, group.url, context);

@@ -55,6 +55,7 @@ export async function createAccountTables(db: Pool): Promise<void> {
       terms_version INT NULL,
       terms_accepted_at DATETIME NULL,
       locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr',
+      match_dm_enabled TINYINT(1) NOT NULL DEFAULT 1,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       is_deleted TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

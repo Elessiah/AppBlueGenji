@@ -136,6 +136,12 @@
     "hint": "Push notifications reach you in this language. It follows the page's language each time you log in: your choice here holds until you next log in from a page in the other language.",
     "saved": "Notification language saved."
   },
+  "matchDms": {
+    "label": "Discord direct messages about my matches",
+    "hint": "On by default: the bot messages you privately when one of your matches is scheduled, rescheduled or unscheduled, and for its reminders (day before, check-in). Untick to stop receiving them: your push notifications keep their own settings, and referees are still notified.",
+    "enabled": "Match direct messages turned on.",
+    "disabled": "Match direct messages turned off."
+  },
   "avatarUpdated": "Avatar updated.",
   "avatarDeleted": "Avatar deleted.",
   "invitations": {
@@ -197,7 +203,8 @@
       "DISCORD_TAG_LOCKED": "Your Discord account is linked: this tag comes from it. Rename yourself on Discord, then log in again to change it, or remove it.",
       "BATTLETAG_LOCKED": "Your Blizzard account is linked: this BattleTag comes from it. Remove Blizzard from “Connected apps” to change it, or untick “OW BattleTag” to stop publishing it.",
       "ACCOUNT_DELETED": "This account was just deleted: the change wasn't saved.",
-      "INVALID_LOCALE": "The language sent is invalid. Reload the page, then try again."
+      "INVALID_LOCALE": "The language sent is invalid. Reload the page, then try again.",
+      "INVALID_MATCH_DM_PREFERENCE": "The value sent is invalid. Reload the page, then try again."
     },
     "shared": {
       "UNAUTHORIZED": "Your session has expired. Log in again.",

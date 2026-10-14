@@ -910,6 +910,11 @@ export type FullProfileResponse = {
    * absente de toute autre fiche.
    */
   accountLocale?: Locale;
+  /**
+   * Messages privés Discord de match activés (`bg_users.match_dm_enabled`),
+   * pour son **seul titulaire** (`isSelf`) : absent de toute autre fiche.
+   */
+  matchDmEnabled?: boolean;
 };
 
 /**
@@ -946,6 +951,8 @@ export type PersonalDataExport = {
      * dans « Mon profil » — elle choisit la langue des notifications push.
      */
     locale: Locale;
+    /** Messages privés Discord de match activés (`bg_users.match_dm_enabled`). */
+    matchDmEnabled: boolean;
     createdAt: string;
   };
   profile: {

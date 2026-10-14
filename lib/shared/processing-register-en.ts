@@ -247,12 +247,12 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
-      "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed) and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server)",
+      "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed) and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, match reminders, referee alerts and the refereeing schedule",
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff",
     dataSubjects: ["Players taking part in a tournament", "Other members of the teams taking part (coaches, managers, owners)", "Referees", "Casters registered on a match"],
     dataCategories: [
       "Discord username and identifier",
@@ -665,7 +665,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Streaming a match live on the association's channel or a caster's (YouTube, Twitch or Kick)",
       "Publishing the link to its YouTube replay on the match page",
-      "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (“a player” in a solo tournament, never a username), tournament name and stream link",
+      "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (a username, never a first name or a Discord identifier; “a player” for a deleted account), tournament name and stream link",
     ],
     legalBasis:
       "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws; right to object (art. 21) open to each player",
@@ -680,13 +680,13 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     retention: [
       "Live: the stream is not kept by the site, which only keeps the link to the channel",
       "Replay link: kept with the match, like its results (T03); the video stays on the platform until it is deleted by the channel that published it",
-      "Discord announcement: the site only keeps a record of the announcement (the match, the identifiers of its two entrants and its date), made before sending, removed for a new attempt when the bot was unavailable, otherwise deleted with the match; the message stays in the channel until the association deletes it",
+      `Discord announcement: the site only keeps a record of the announcement (the match, the identifiers of its two entrants and its date), made before sending, removed for a new attempt when the bot was unavailable, otherwise deleted with the match; the message is kept in the channel as long as the #live channel exists, and deleted at the request of the team or player concerned (“${REPORT_FORM_NAME_EN}” form, “GDPR” category)`,
       `Right to object: on request (“${REPORT_FORM_NAME_EN}” form, “GDPR” category), the player appears under a neutral name in subsequent streams, the replay link is removed from the site, and a video published by the association's channel is hidden or deleted`,
     ],
     recipients: [
       "Public of the streaming platforms and of the site",
       "Streaming platforms (YouTube, Twitch, Kick), controllers of their own processing, including of their viewers' data; the site only links to the channels and embeds no player, it sends them no data",
-      "Members of the association's Discord server, for the announcement posted in the #live channel",
+      "Members of the association's Discord server, for the announcement posted in the #live channel (team names, or the public BlueGenji username of the players of a solo tournament)",
       "Discord (hosting of the channel)",
     ],
     transfers: [`United States: Discord (announcement posted in the #live channel) — ${transferBasisEn(["DISCORD"])}`],

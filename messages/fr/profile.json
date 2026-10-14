@@ -136,6 +136,12 @@
     "hint": "Les notifications push t'arrivent dans cette langue. Elle suit la langue de la page à chaque connexion : ton choix ici vaut jusqu'à ta prochaine connexion faite dans l'autre langue.",
     "saved": "Langue des notifications enregistrée."
   },
+  "matchDms": {
+    "label": "Messages privés Discord de mes matchs",
+    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, et pour ses rappels (veille, check-in). Décoche pour ne plus les recevoir : tes notifications push gardent leurs propres réglages, et les arbitres restent prévenus.",
+    "enabled": "Messages privés de match activés.",
+    "disabled": "Messages privés de match coupés."
+  },
   "avatarUpdated": "Avatar mis à jour.",
   "avatarDeleted": "Avatar supprimé.",
   "invitations": {
@@ -197,7 +203,8 @@
       "DISCORD_TAG_LOCKED": "Ton compte Discord est rattaché : ce tag vient de lui. Renomme-toi sur Discord puis reconnecte-toi pour en changer, ou retire-le.",
       "BATTLETAG_LOCKED": "Ton compte Blizzard est rattaché : ce BattleTag vient de lui. Retire Blizzard depuis « Applications connectées » pour en changer, ou décoche « BattleTag OW » pour cesser de le publier.",
       "ACCOUNT_DELETED": "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée.",
-      "INVALID_LOCALE": "La langue envoyée est invalide. Recharge la page puis réessaie."
+      "INVALID_LOCALE": "La langue envoyée est invalide. Recharge la page puis réessaie.",
+      "INVALID_MATCH_DM_PREFERENCE": "La valeur envoyée est invalide. Recharge la page puis réessaie."
     },
     "shared": {
       "UNAUTHORIZED": "Ta session a expiré. Reconnecte-toi.",

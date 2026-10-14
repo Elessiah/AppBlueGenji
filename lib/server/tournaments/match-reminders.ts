@@ -190,9 +190,12 @@ async function loadRecipientsByTeam(
   teamIds: number[],
 ): Promise<Map<number, NotificationRecipient[]>> {
   const playersByTeam = await loadEntrantPlayerIds(teamIds);
+  // `matchDm` : un joueur opposé aux messages privés de match n'a pas de canal
+  // Discord ici — il reste atteignable par push s'il y est abonné.
   const recipients = await loadNotificationRecipients(
     [...playersByTeam.values()].flat(),
     "declared",
+    { matchDm: true },
   );
   // Seuls comptent les joueurs qu'un message atteindrait : un tag Discord, ou
   // un appareil abonné aux rappels. Une engagée sans aucun ne pose pas la
