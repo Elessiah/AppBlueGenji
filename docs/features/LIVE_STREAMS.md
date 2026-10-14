@@ -171,8 +171,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   fermé ou Discord muet en lisant le salon (`discord-unreachable`), la pause
   vaut pour tout le processus et les groupes suivants du même passage sont
   rendus sans appel au bot ; après un refus de Discord (`discord-held`, qui
-  peut tenir au message), elle ne vaut que pour les matchs du groupe, et les
-  autres tournois partent sans attendre. Le tout tant que
+  peut tenir au message), elle ne vaut que pour cette diffusion (tournoi et
+  lien) — un match qui la rejoint pendant la pause attend avec elle, un seul
+  message part — et les autres tournois partent sans attendre. Une relève
+  tombe au terme de la pause, sans attendre un nouvel évènement. Le tout tant que
   le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un blocage par
   AutoMod (`503` `automod` : le même message serait bloqué de nouveau, et
