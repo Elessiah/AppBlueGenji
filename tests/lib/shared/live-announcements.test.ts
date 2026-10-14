@@ -102,6 +102,17 @@ describe("formatLiveAnnouncementGroup", () => {
     );
   });
 
+  it("un nom vide une fois neutralisé compte comme anonyme ; un pseudo public « un joueur » reste un nom", () => {
+    const blank = { team1Name: "​", team2Name: null };
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", pairings: [blank, blank] })).toBe(
+      "🔴 En direct : 2 matchs — Solo Cup",
+    );
+    const literal = { team1Name: "un joueur", team2Name: "un joueur" };
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", pairings: [literal, literal] })).toBe(
+      "🔴 En direct — Solo Cup :\n• un joueur contre un joueur\n• un joueur contre un joueur",
+    );
+  });
+
   it("reste lisible quand un nom d'équipe contient « et », une virgule ou un saut de ligne", () => {
     const text = formatLiveAnnouncementGroup({
       tournamentName: "Coupe",
