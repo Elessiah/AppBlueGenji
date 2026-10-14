@@ -467,6 +467,13 @@ describe("langue du compte (lot 9-3)", () => {
     );
   });
 
+  it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
+    const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
+    const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
+    expect(fr).toContain("pour tes matchs, ton choix dans « Mon profil »");
+    expect(en).toContain("for your matches, your choice in “My profile”");
+  });
+
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
