@@ -147,7 +147,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to object",
-    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile).",
+    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile). Exception: the username posted in the #live announcement of a solo tournament — objecting to it means not registering; a past announcement is deleted on request.",
   },
   {
     title: "Right to data portability",

@@ -672,7 +672,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (the username on their page, editable in My profile, with no effect on an announcement already posted: unless changed, the Discord username or BattleTag taken when the account was created, or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
     ],
     legalBasis:
-      "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws; right to object (art. 21) open to each player",
+      "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws; right to object (art. 21) open to each player, except for the username in the #live announcement of a solo tournament, which one objects to by not registering (a past announcement is deleted on request)",
     dataSubjects: ["Players of the streamed matches", "Casters"],
     dataCategories: [
       "In-game and site usernames, team names, images of the game, in-game results and performance, as they appear on screen — neither webcam nor voice chat of the players",

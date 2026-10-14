@@ -237,7 +237,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels et avis de retrait de match en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil).",
+    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels et avis de retrait de match en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil). Exception : le pseudo publié dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande.",
   },
   {
     title: "Droit à la portabilité",

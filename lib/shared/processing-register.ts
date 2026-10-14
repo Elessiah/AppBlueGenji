@@ -851,7 +851,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (pour une affiche d'équipes, jamais le pseudo de leurs joueurs) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais l'identifiant Discord numérique ; « un joueur » pour un compte supprimé, une entrée sans compte ou une inscription antérieure au 16 octobre 2026), nom du tournoi et lien de la diffusion",
     ],
     legalBasis:
-      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur, sauf pour le pseudo de l'annonce #live d'un tournoi individuel, à laquelle on s'oppose en ne s'inscrivant pas (une annonce passée est supprimée sur demande)",
     dataSubjects: ["Joueurs des matchs diffusés", "Casters"],
     dataCategories: [
       "Pseudos en jeu et du site, noms d'équipe, images de la partie, résultats et performances en jeu, tels qu'ils apparaissent à l'écran — ni webcam ni chat vocal des joueurs",
