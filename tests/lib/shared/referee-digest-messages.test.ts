@@ -91,6 +91,10 @@ describe("refereeDigestPush", () => {
     expect(refereeDigestPush([match(1), match(2)]).body.split("\n")).toHaveLength(3);
   });
 
+  it("écrit son corps en lignes, seul push à les garder", () => {
+    expect(refereeDigestPush([match(1)]).multiline).toBe(true);
+  });
+
   it("ne fond pas en une ligne deux tournois individuels homonymes au même créneau", () => {
     const solo = { solo: true, tournamentName: "Coupe du soir" };
     const body = refereeDigestPush([match(1, { ...solo, tournamentId: 7 }), match(2, { ...solo, tournamentId: 8 })]).body;
