@@ -290,7 +290,7 @@ const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
     "bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, limite de débit), annonce non réessayée",
   // Le bot est tombé en route : ce que montre #live fait foi.
   interrupted:
-    "bot tombé avant sa réponse (redémarrage ou erreur interne), annonce peut-être publiée, non réessayée — vérifier #live",
+    "bot tombé avant sa réponse (connexion coupée, redémarrage ?), annonce peut-être publiée, non réessayée — vérifier #live",
 };
 
 /** Cause pm2 d'un refus ou d'un silence de Discord rapporté par le bot. */

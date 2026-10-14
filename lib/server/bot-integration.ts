@@ -608,7 +608,7 @@ export async function pushLeadershipAlert(
  * - `timed-out` — le bot n'a pas répondu à temps : son envoi peut **encore**
  *   être en cours (Discord lent, limite de débit) ;
  * - `interrupted` — la requête a atteint le bot, qui l'a lâchée sans bilan
- *   (connexion coupée par un redémarrage, erreur `5xx` autre que `503`) : il a
+ *   (connexion coupée, par exemple par un redémarrage pendant l'envoi) : il a
  *   pu publier avant.
  *
  * Sur `uncertain`, `timed-out` et `interrupted`, l'appelant **garde** sa
@@ -768,9 +768,9 @@ export async function pushLiveAnnouncement(
     await discardBody(response);
     if (response.status === 404) return "unavailable";
     recordFailure();
-    // Une erreur interne du bot ne dit pas à quelle étape il est tombé : il a
-    // pu publier avant.
-    return response.status >= 500 ? "interrupted" : "unavailable";
+    // Un `500` du bot (`LIVE_ANNOUNCEMENT_FAILED`) naît avant l'envoi : toute
+    // erreur de l'envoi lui-même revient en `503` classé (`discord-down`…).
+    return "unavailable";
   } catch (error) {
     // Le délai écoulé ne dit pas que rien n'est parti : la requête a pu
     // atteindre le bot, qui publie encore (Discord lent ou limitant #live). Il
