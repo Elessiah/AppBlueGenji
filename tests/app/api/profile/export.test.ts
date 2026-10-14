@@ -30,6 +30,7 @@ function sampleExport(): PersonalDataExport {
       isAdult: true,
       isAdmin: false,
       locale: "fr",
+      matchDmEnabled: true,
       createdAt: "2026-01-01T00:00:00.000Z",
     },
     profile: {

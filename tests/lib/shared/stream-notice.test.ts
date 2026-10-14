@@ -28,9 +28,9 @@ describe("information sur la retransmission des matchs", () => {
   it("ne prête pas d'équipe à un engagé en individuel", () => {
     expect(registrationStreamNotice(false)).toMatch(/le nom de ton équipe/);
     expect(registrationStreamNotice(true)).not.toMatch(/équipe/);
-    // L'annonce dans #live nomme l'équipe ; une entrée individuelle n'y est jamais nommée.
+    // L'annonce dans #live nomme l'équipe ; une entrée individuelle, son pseudo (2026-10-14).
     expect(registrationStreamNotice(false)).toMatch(/le nom de ton équipe est aussi annoncé sur le Discord de l'association/);
-    expect(registrationStreamNotice(true)).not.toMatch(/Discord/);
+    expect(registrationStreamNotice(true)).toMatch(/ton pseudo est aussi annoncé sur le Discord de l'association/);
     for (const solo of [true, false]) {
       expect(registrationStreamNotice(solo)).toMatch(/diffusés en direct et enregistrés/);
       expect(registrationStreamNotice(solo)).toMatch(/jamais de webcam ni de chat vocal/);

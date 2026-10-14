@@ -49,6 +49,8 @@ type Recipient = {
   pseudo: string;
   discord_id: string | null;
   discord_pseudo: string | null;
+  /** `bg_users.match_dm_enabled` : absent = activé (défaut de la colonne). */
+  match_dm_enabled?: number;
 };
 
 const RECIPIENTS: Recipient[] = [
@@ -1070,6 +1072,16 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     return query;
   }
 
+  it("« Match retiré » : pas de message privé au joueur qui les a coupés, son push part", async () => {
+    await mockWithdrawnDb([CURRENT], NAMES, RECIPIENTS.map((r) => (r.id === 2 ? { ...r, match_dm_enabled: 0 } : r)));
+    expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(1);
+    const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][2]).toBe("match-withdrawn");
+    expect((calls[0][1] as { label: string }[]).map((r) => r.label)).toEqual(["Kiro"]);
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2]]);
+  });
+
   it("prévient les seuls joueurs de l'engagée retirée, par Discord et par push, dans la langue de chacun", async () => {
     const query = await mockWithdrawnDb();
 
@@ -1394,5 +1406,58 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
 
     expect(error).not.toHaveBeenCalledWith("[match-reminders] programme d'arbitrage en échec", expect.anything());
+  });
+});
+
+describe("messages privés de match coupés par le joueur (droit d'opposition)", () => {
+  const OPTED_OUT = (ids: number[]) =>
+    RECIPIENTS.map((r) => (ids.includes(r.id) ? { ...r, match_dm_enabled: 0 } : r));
+
+  it("lit le réglage avec les comptes destinataires", async () => {
+    const { query } = await mockDb({});
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    expect((query.mock.calls[2] as unknown as [string])[0]).toMatch(/match_dm_enabled/);
+  });
+
+  it("rappel : le joueur opposé n'a pas de message privé, son coéquipier si, et le push part à tous", async () => {
+    await mockDb({ recipients: OPTED_OUT([2]) });
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
+    const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][2]).toBe("match-reminder");
+    expect((calls[0][1] as { label: string }[]).map((r) => r.label)).toEqual(["Kiro"]);
+    expect((calls[1][1] as { label: string }[]).map((r) => r.label)).toEqual(["Nova"]);
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2], [3]]);
+  });
+
+  it("toute une engagée opposée : aucun appel au bot pour elle, ses appareils restent prévenus", async () => {
+    await mockDb({ recipients: OPTED_OUT([3]) });
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect((calls[0][1] as { label: string }[]).map((r) => r.label)).toEqual(["Kiro", "Ayla"]);
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2], [3]]);
+  });
+
+  it("opposé et sans appareil abonné : plus un destinataire du tout", async () => {
+    jest.mocked(usersReachableByPush).mockImplementation(async (ids) => new Set(ids.filter((id) => id !== 3)));
+    await mockDb({ recipients: OPTED_OUT([3]) });
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(1);
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2]]);
+  });
+
+  it("annonce d'horaire posé par l'arbitrage : même règle", async () => {
+    const recipients = OPTED_OUT([1, 2]);
+    const query = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble({}) }));
+    expect(await announceMatchSchedule(notice(), { rescheduled: false }, TEN_DAYS_BEFORE)).toBe(2);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("match-scheduled");
+    const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
+    expect(calls.every((call) => (call[1] as { label: string }[]).every((r) => r.label === "Nova"))).toBe(true);
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toContainEqual([1, 2]);
   });
 });

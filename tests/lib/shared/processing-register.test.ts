@@ -125,7 +125,13 @@ describe("PROCESSING_ACTIVITIES", () => {
 
   it("couvre le programme d'arbitrage : base légale, trace gardée, push et canal de logs, personnes citées", () => {
     const t04 = byRef("T04");
-    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*programme d'arbitrage/);
+    // Décision du 2026-10-14 : le staff est prévenu en exécution du service ;
+    // les messages de match des joueurs restent d'intérêt légitime, opposables.
+    expect(t04.legalBasis).toMatch(/exécution du service[^;]*programme d'arbitrage adressés au staff/);
+    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
+    expect(t04.subPurposes.join(" ")).toMatch(/couper ces messages privés depuis « Mon profil »/);
+    expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
+    expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
     expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; arbitre ou administrateur : programme d'arbitrage ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
@@ -455,7 +461,10 @@ describe("décisions de l'association du 2026-09-30", () => {
     // Le site ne fait que lier les chaînes : seule l'annonce #live passe par Discord.
     expect(sheet.transfers).toHaveLength(1);
     expect(sheet.transfers[0]).toMatch(/^États-Unis : Discord \(annonce publiée dans le salon #live\)/);
-    expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*« un joueur » en tournoi individuel, jamais un pseudo/);
+    // Décision du 2026-10-14 : pseudo public des joueurs d'un tournoi individuel.
+    expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*jamais le pseudo de leurs joueurs\) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs \(un pseudo, jamais un prénom ni un identifiant Discord/);
+    expect(sheet.retention.join(" ")).toMatch(/conservé dans le salon tant que le salon #live existe, et supprimé sur demande de l'équipe ou du joueur concerné/);
+    expect(sheet.recipients.join(" ")).toMatch(/pseudo public BlueGenji des joueurs d'un tournoi individuel/);
     expect(sheet.recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association/);
     expect(sheet.retention.join(" ")).toMatch(/Annonce sur Discord : .* effacée avec le match/);
     expect(sheet.recipients.join(" ")).toMatch(/n'intègre aucun lecteur/);

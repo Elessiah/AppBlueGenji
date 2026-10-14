@@ -136,11 +136,11 @@ Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux 
 Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé
 Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match
 Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement
-Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in)
+Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages
 Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)
 Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push
 Base légale
-Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match, les alertes d'arbitrage et le programme d'arbitrage
+Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match et les rappels de match envoyés aux joueurs, avec un droit d'opposition (art. 21) honoré par un interrupteur de « Mon profil » qui coupe tous leurs messages privés de match ; exécution du service (contrat — conditions d'utilisation, les arbitres et administrateurs agissant pour l'association) pour les alertes d'arbitrage et le programme d'arbitrage adressés au staff
 Personnes concernées
 Joueurs engagés dans un tournoi
 Autres membres des équipes engagées (coachs, managers, propriétaires)
@@ -152,10 +152,12 @@ BattleTag
 Date et adversaire du match
 Heure à laquelle chaque partie s'est déclarée prête, caster inscrit
 Motif d'un signalement
+Choix du joueur de recevoir ou non les messages privés Discord de ses matchs
 Données sensibles
 Aucune
 Conservation
 Pseudo certifié : jusqu'à sa modification ou la suppression du compte
+Choix des messages privés de match : jusqu'à sa modification ; remis au défaut à la suppression du compte
 Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée
 « Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués
 Destinataires
@@ -556,7 +558,7 @@ Diffuser en direct les matchs des tournois et en garder la rediffusion
 Sous-finalités
 Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)
 Publier sur la fiche du match le lien de sa rediffusion YouTube
-Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (« un joueur » en tournoi individuel, jamais un pseudo), nom du tournoi et lien de la diffusion
+Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (pour une affiche d'équipes, jamais le pseudo de leurs joueurs) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs (un pseudo, jamais un prénom ni un identifiant Discord ; « un joueur » pour un compte supprimé), nom du tournoi et lien de la diffusion
 Base légale
 Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur
 Personnes concernées
@@ -572,12 +574,12 @@ Aucune
 Conservation
 Direct : la diffusion n'est pas conservée par le site, qui n'en garde que le lien de la chaîne
 Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée
-Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), posée avant l'envoi, retirée pour un nouvel essai quand le bot était indisponible, sinon effacée avec le match ; le message reste dans le salon jusqu'à sa suppression par l'association
+Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), posée avant l'envoi, retirée pour un nouvel essai quand le bot était indisponible, sinon effacée avec le match ; le message est conservé dans le salon tant que le salon #live existe, et supprimé sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème », catégorie RGPD)
 Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée
 Destinataires
 Public des plateformes de diffusion et du site
 Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée
-Membres du serveur Discord de l'association, pour l'annonce publiée dans le salon #live
+Membres du serveur Discord de l'association, pour l'annonce publiée dans le salon #live (noms d'équipe, ou pseudo public BlueGenji des joueurs d'un tournoi individuel)
 Discord (hébergement du salon)
 Transferts hors UE
 États-Unis : Discord (annonce publiée dans le salon #live) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)

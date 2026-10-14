@@ -4,18 +4,16 @@ import {
   formatLiveAnnouncementGroup,
   liveAnnouncementUrl,
 } from "@/lib/shared/live-announcements";
-import type { ParticipantType } from "@/lib/shared/participants";
+import { entrantLabel } from "@/lib/shared/log-privacy";
 
 /** L'annonce d'un seul match. */
 function formatLiveAnnouncement(match: {
   tournamentName: string;
-  participantType: ParticipantType;
-  team1Name: string;
-  team2Name: string;
+  team1Name: string | null;
+  team2Name: string | null;
 }): string {
   return formatLiveAnnouncementGroup({
     tournamentName: match.tournamentName,
-    participantType: match.participantType,
     pairings: [{ team1Name: match.team1Name, team2Name: match.team2Name }],
   });
 }
@@ -23,14 +21,13 @@ function formatLiveAnnouncement(match: {
 describe("formatLiveAnnouncement", () => {
   it("nomme les deux équipes et le tournoi", () => {
     expect(
-      formatLiveAnnouncement({ tournamentName: "Coupe d'hiver", participantType: "TEAM", team1Name: "Renards", team2Name: "Nova" }),
+      formatLiveAnnouncement({ tournamentName: "Coupe d'hiver", team1Name: "Renards", team2Name: "Nova" }),
     ).toBe("🔴 En direct : Renards contre Nova — Coupe d'hiver");
   });
 
   it("neutralise mentions et balisage dans les noms saisis", () => {
     const text = formatLiveAnnouncement({
       tournamentName: "Open **gras**\n@here",
-      participantType: "TEAM",
       team1Name: "@everyone",
       team2Name: "<@&123>",
     });
@@ -44,7 +41,6 @@ describe("formatLiveAnnouncement", () => {
   it("une équipe nommée d'après une adresse ne devient ni lien ni aperçu sous l'@everyone", () => {
     const text = formatLiveAnnouncement({
       tournamentName: "Coupe www.piege.example",
-      participantType: "TEAM",
       team1Name: "https://fauxnitro.gg",
       team2Name: "fauxnitro.gg/cadeau",
     });
@@ -56,15 +52,29 @@ describe("formatLiveAnnouncement", () => {
     );
   });
 
-  it("ne nomme jamais un joueur : une entrée individuelle s'écrit « un joueur »", () => {
+  it("nomme les joueurs d'un tournoi individuel par leur pseudo (exception #live du 2026-10-14)", () => {
+    const text = formatLiveAnnouncement({ tournamentName: "Solo Cup", team1Name: "PseudoA", team2Name: "PseudoB" });
+    expect(text).toBe("🔴 En direct : PseudoA contre PseudoB — Solo Cup");
+  });
+
+  it("neutralise un pseudo piégé : mention, balisage, lien, saut de ligne", () => {
     const text = formatLiveAnnouncement({
       tournamentName: "Solo Cup",
-      participantType: "SOLO",
-      team1Name: "PseudoA",
-      team2Name: "PseudoB",
+      team1Name: "@everyone **gras** <@123>",
+      team2Name: "[clic](https://piege.example)\nligne",
     });
-    expect(text).toBe("🔴 En direct : un joueur contre un joueur — Solo Cup");
-    expect(text).not.toMatch(/Pseudo/);
+    expect(text).not.toMatch(/@everyone|<@123>|\*\*|\]\(https:/);
+    expect(text).not.toContain("\n");
+    expect(text).not.toMatch(/https:\/\/piege\.example/);
+  });
+
+  it("un joueur sans pseudo publiable (compte supprimé, pseudo vide) s'écrit « un joueur »", () => {
+    expect(formatLiveAnnouncement({ tournamentName: "Solo Cup", team1Name: null, team2Name: "PseudoB" })).toBe(
+      "🔴 En direct : un joueur contre PseudoB — Solo Cup",
+    );
+    expect(formatLiveAnnouncement({ tournamentName: "Solo Cup", team1Name: "\u200b", team2Name: null })).toBe(
+      "🔴 En direct : un joueur contre un joueur — Solo Cup",
+    );
   });
 });
 
@@ -76,7 +86,7 @@ describe("formatLiveAnnouncementGroup", () => {
   ];
 
   it("énumère les affiches d'une même diffusion, une par ligne, le tournoi en tête", () => {
-    expect(formatLiveAnnouncementGroup({ tournamentName: "Coupe d'hiver", participantType: "TEAM", pairings })).toBe(
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Coupe d'hiver", pairings })).toBe(
       "🔴 En direct — Coupe d'hiver :\n• Renards contre Nova\n• Orques contre Lynx\n• Givre contre Ombre",
     );
   });
@@ -84,7 +94,6 @@ describe("formatLiveAnnouncementGroup", () => {
   it("reste lisible quand un nom d'équipe contient « et », une virgule ou un saut de ligne", () => {
     const text = formatLiveAnnouncementGroup({
       tournamentName: "Coupe",
-      participantType: "TEAM",
       pairings: [
         { team1Name: "Ordre et Chaos", team2Name: "Lumière" },
         { team1Name: "Nord,\nSud", team2Name: "Est" },
@@ -95,7 +104,7 @@ describe("formatLiveAnnouncementGroup", () => {
 
   it("une longue ronde compte le reste au lieu d'être coupée par le bot", () => {
     const many = Array.from({ length: 40 }, (_, i) => ({ team1Name: `${"A".repeat(58)}${i}`, team2Name: `${"B".repeat(58)}${i}` }));
-    const text = formatLiveAnnouncementGroup({ tournamentName: "T".repeat(120), participantType: "TEAM", pairings: many });
+    const text = formatLiveAnnouncementGroup({ tournamentName: "T".repeat(120), pairings: many });
     expect(text.length).toBeLessThanOrEqual(LIVE_ANNOUNCEMENT_MAX_LENGTH);
     expect(text.startsWith(`🔴 En direct — ${"T".repeat(120)} :`)).toBe(true);
     const lines = text.split("\n");
@@ -116,7 +125,7 @@ describe("formatLiveAnnouncementGroup", () => {
     }
     const filler = Math.floor((LIVE_ANNOUNCEMENT_MAX_LENGTH - length - "\n•  contre ".length) / 2);
     pairs.push({ team1Name: "y".repeat(filler), team2Name: "y".repeat(filler) });
-    const text = formatLiveAnnouncementGroup({ tournamentName: "T", participantType: "TEAM", pairings: pairs });
+    const text = formatLiveAnnouncementGroup({ tournamentName: "T", pairings: pairs });
     expect(text.length).toBeLessThanOrEqual(LIVE_ANNOUNCEMENT_MAX_LENGTH);
     expect(text).not.toContain("autre");
     expect(text.split("\n")).toHaveLength(pairs.length + 1);
@@ -125,7 +134,7 @@ describe("formatLiveAnnouncementGroup", () => {
   it("au singulier : « et 1 autre match », et le compte juste", () => {
     const pairs = Array.from({ length: 3 }, () => ({ team1Name: "z".repeat(60), team2Name: "z".repeat(60) }));
     pairs.push({ team1Name: "w".repeat(700), team2Name: "w".repeat(700) });
-    const text = formatLiveAnnouncementGroup({ tournamentName: "T", participantType: "TEAM", pairings: pairs });
+    const text = formatLiveAnnouncementGroup({ tournamentName: "T", pairings: pairs });
     expect(text.split("\n")).toEqual([
       "🔴 En direct — T :",
       ...Array.from({ length: 3 }, () => `• ${"z".repeat(60)} contre ${"z".repeat(60)}`),
@@ -133,16 +142,20 @@ describe("formatLiveAnnouncementGroup", () => {
     ]);
   });
 
-  it("compte les matchs d'un tournoi individuel au lieu d'aligner des « un joueur »", () => {
-    const text = formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", participantType: "SOLO", pairings });
-    expect(text).toBe("🔴 En direct : 3 matchs — Solo Cup");
-    expect(text).not.toMatch(/Renards|Nova/);
+  it("énumère aussi les affiches d'un tournoi individuel, par pseudo", () => {
+    const solo = [
+      { team1Name: "Alpha", team2Name: "Bravo" },
+      { team1Name: null, team2Name: "Delta" },
+    ];
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", pairings: solo })).toBe(
+      "🔴 En direct — Solo Cup :\n• Alpha contre Bravo\n• un joueur contre Delta",
+    );
   });
 
   it("une seule affiche : le texte d'un match", () => {
-    expect(
-      formatLiveAnnouncementGroup({ tournamentName: "Solo Cup", participantType: "SOLO", pairings: pairings.slice(0, 1) }),
-    ).toBe("🔴 En direct : un joueur contre un joueur — Solo Cup");
+    expect(formatLiveAnnouncementGroup({ tournamentName: "Coupe", pairings: pairings.slice(0, 1) })).toBe(
+      "🔴 En direct : Renards contre Nova — Coupe",
+    );
   });
 });
 
@@ -200,5 +213,12 @@ describe("liveAnnouncementUrl", () => {
   it("rend null sans aucun lien", () => {
     expect(liveAnnouncementUrl(null, null)).toBeNull();
     expect(liveAnnouncementUrl("", "  ")).toBeNull();
+  });
+});
+
+describe("exception limitée à l'annonce #live", () => {
+  it("les autres messages Discord gardent « un joueur » pour une entrée individuelle", () => {
+    expect(entrantLabel({ name: "PseudoA", participantType: "SOLO" })).toBe("un joueur");
+    expect(entrantLabel({ name: "Renards", participantType: "TEAM" })).toBe("Renards");
   });
 });

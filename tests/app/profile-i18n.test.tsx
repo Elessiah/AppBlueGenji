@@ -58,6 +58,7 @@ import { generateMetadata as reportMetadata } from "@/app/(secured)/signalements
 import ProfilePage from "@/app/(secured)/profil/page";
 import { ProfileSection } from "@/app/(secured)/profil/_components/ProfileSection";
 import { AccountLocaleField } from "@/app/(secured)/profil/_components/AccountLocaleField";
+import { MatchDmField } from "@/app/(secured)/profil/_components/MatchDmField";
 import { ConnectedAppsSection } from "@/app/(secured)/profil/ConnectedAppsSection";
 import { OtherSessionsPanel } from "@/app/(secured)/profil/OtherSessionsPanel";
 import { BattletagVisibilityNotice } from "@/app/(secured)/profil/BattletagVisibilityNotice";
@@ -439,6 +440,31 @@ describe("langue du compte (lot 9-3)", () => {
     expect(html).toContain('aria-describedby="profile-account-locale-hint"');
     // Hors les noms de langue, rien de français.
     expectEnglish(html.replace(/<option[^>]*>[^<]*<\/option>/g, ""));
+  });
+
+  it("interrupteur des messages privés de match : libellé et aide en anglais, case liée à son aide", () => {
+    const on = inEnglish(<MatchDmField initial />);
+    expect(on).toContain("Discord direct messages about my matches");
+    expect(on).toContain("Untick to stop receiving them");
+    expect(on).toContain("referees are still notified");
+    expect(on).toContain('id="profile-match-dms"');
+    expect(on).toContain('aria-describedby="profile-match-dms-hint"');
+    expect(on).toMatch(/type="checkbox"[^>]*checked=""|checked=""[^>]*type="checkbox"/);
+    expectEnglish(on);
+    const off = inEnglish(<MatchDmField initial={false} />);
+    expect(off).not.toMatch(/checked=""/);
+  });
+
+  it("interrupteur des messages privés de match : le français dit l'opposition et les push à part", async () => {
+    const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
+    expect(fr.label).toBe("Messages privés Discord de mes matchs");
+    expect(fr.hint).toMatch(/Activés par défaut/);
+    expect(fr.hint).toMatch(/tes notifications push gardent leurs propres réglages, et les arbitres restent prévenus/);
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
+      "<MatchDmField initial={data?.matchDmEnabled} />",
+    );
   });
 
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
