@@ -93,8 +93,18 @@ plus la courante ; si c'était une version **antérieure**, elle l'annonce en t�
 (version N, en vigueur depuis le …) », FR et EN). Le gérant d'une équipe voit en
 plus la modale `TermsAcceptanceModal` titrée « Les conditions d'utilisation ont
 changé » (`UPDATED`). Un compte qui ne gère rien n'est pas bloqué : ses gestes
-n'exigent pas les conditions — **décision requise** si l'association veut une
-réacceptation imposée à tout compte, hors gestion d'équipe.
+n'exigent pas les conditions.
+
+**Prévenir tout le monde** (version 4, demande de l'association) : ni l'une ni
+l'autre modale n'atteint un compte connecté qui ne gère rien — sa session dure
+30 jours sans repasser par `/connexion`. L'annonce passe donc par le registre
+`PRIVACY_CHANGES` (`PRIVACY_CHANGES_CONSENT.md`), le seul canal qui touche
+**chaque** compte une fois et le garde par compte : l'entrée
+`2026-10-base-pseudo-live-et-automod`, qui porte la même règle (#live), dit la
+version, sa date d'entrée en vigueur et lie `/conditions-utilisation` (FR et EN)
+— modale à la page suivante, message privé Discord à qui ne l'a pas lue. Elle
+informe sans faire accepter : l'acceptation reste celle du tableau ci-dessus. À
+refaire à chaque version qui change une règle de fond pour tous les comptes.
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.
