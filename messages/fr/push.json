@@ -55,7 +55,7 @@
     "compactLead": "Sois prévenu même quand le site est fermé.",
     "devices": "{count, plural, one {1 appareil abonné} other {{count} appareils abonnés}} à ton compte. Les réglages ci-dessous valent pour tous.",
     "legend": "Me prévenir pour",
-    "discordHint": "Les messages privés Discord ne dépendent pas de ces réglages : ils suivent ton tag Discord.",
+    "discordHint": "Les messages privés Discord ne dépendent pas de ces réglages : ils suivent ton tag Discord et, pour tes matchs, ton choix dans « Mon profil ».",
     "notConfigured": "Les notifications push ne sont pas encore activées sur le site.",
     "checking": "Vérification de cet appareil…",
     "enabledHere": "Activées sur cet appareil",
