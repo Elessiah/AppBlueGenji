@@ -618,7 +618,13 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     // Marques lues dans la requête ; au-delà de 24 h, seule une manche jamais
     // observée est lue (`SEEN` absent, relu par sa colonne).
-    expect(params).toEqual(["SEEN", "TOLD", 2 * 24 * 60 * 60, "PT10H", 24 * 60 * 60]);
+    // Une manche dont le rappel 24 h est pris n'est pas relue avant l'ouverture
+    // du rappel 10 h (36 000 s) : sans cela, chaque passage la relirait et
+    // re-tenterait sa marque « 24 h » pendant 14 heures.
+    expect(params).toEqual(["SEEN", "TOLD", 2 * 24 * 60 * 60, "PT10H", "P1D", 10 * 60 * 60, 24 * 60 * 60]);
+    expect(sql).toMatch(
+      /NOT EXISTS \(SELECT 1 FROM bg_match_reminders sent\s+WHERE sent\.match_id = m\.id AND sent\.offset_key = \?\s+AND m\.start_at > DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)\)/,
+    );
     expect(sql).toMatch(/HAVING m\.start_at <= DATE_ADD\(NOW\(\), INTERVAL \? SECOND\) OR seen_mark = 0/);
     expect(sql).toMatch(/EXISTS \(SELECT 1 FROM bg_match_reminders sm WHERE sm\.match_id = m\.id AND sm\.offset_key = \?\) AS seen_mark/);
     // Une manche dont le rappel 10 h (le dernier) est déjà pris n'est plus relue.
@@ -1275,5 +1281,38 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
 
     expect(dispatchRefereeDigest).toHaveBeenCalledWith(FIVE_HOURS_BEFORE);
     expect(error).toHaveBeenCalledWith("[match-reminders] programme d'arbitrage en échec", expect.any(Error));
+  });
+
+  it("lance le programme d'arbitrage de front : il n'attend pas les envois aux joueurs", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    jest.mocked(dispatchRefereeDigest).mockResolvedValue(0);
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    // Un bot lent : les messages privés ne reviennent qu'au signal.
+    let release: () => void = () => undefined;
+    const slowBot = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      await slowBot;
+      return { sent: 0, unresolved: [], failed: [] };
+    });
+
+    const sweep = dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(dispatchRefereeDigest).toHaveBeenCalledWith(FIVE_HOURS_BEFORE);
+    release();
+    await sweep;
+  });
+
+  it("tait l'absence de table au programme d'arbitrage, comme au balayage", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    jest.mocked(dispatchRefereeDigest).mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE" }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+
+    expect(error).not.toHaveBeenCalledWith("[match-reminders] programme d'arbitrage en échec", expect.anything());
   });
 });

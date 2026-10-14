@@ -133,9 +133,11 @@ describe("buildPushPayload", () => {
   });
 
   it("replie les espaces et retombe sur le nom du site sans titre", () => {
-    const payload = buildPushPayload("MATCH_START", { title: "   ", body: "a\n\n b", url: "/", tag: "x" }, null, "fr");
+    const payload = buildPushPayload("MATCH_START", { title: "   ", body: "a  \n\n b\tc", url: "/", tag: "x" }, null, "fr");
     expect(payload.title).toBe("BlueGenji Esport");
-    expect(payload.body).toBe("a b");
+    // Le corps garde ses lignes (programme d'arbitrage), sans ligne vide ; le titre, jamais.
+    expect(payload.body).toBe("a\nb c");
+    expect(buildPushPayload("MATCH_START", { title: "a\nb", body: "", url: "/" }, null, "fr").title).toBe("a b");
     expect(payload.tag).toBe("x");
   });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { formatRefereeDigestLog, REFEREE_DIGEST_LOG_ENTRIES, REFEREE_DIGEST_LOG_MAX_LENGTH } from "@/lib/shared/bot-logs";
 import { matchReminderPush, refereeDigestPush, REFEREE_DIGEST_PUSH_LINES } from "@/lib/shared/push-messages";
-import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
+import { buildPushPayload, PUSH_BODY_MAX, PUSH_TAG_MAX, PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import { CHECK_IN_OPENS_MINUTES_BEFORE } from "@/lib/shared/discord-notifications";
 import enPush from "@/messages/en/push.json";
 import frPush from "@/messages/fr/push.json";
@@ -33,7 +33,7 @@ describe("refereeDigestPush", () => {
       "jeu. 20:00 · Renards 1 contre Nova 1 (Coupe, Manche 1)\njeu. 20:00 · Renards 2 contre Nova 2 (Coupe, Manche 1)\nHeure de Paris",
     );
     expect(fr.url).toBe("/tournois/7");
-    expect(fr.tag).toBe("referee-digest-1-2");
+    expect(fr.tag).toMatch(/^referee-digest-1-2-[0-9a-z]+$/);
 
     const en = refereeDigestPush([match(1)], "en");
     expect(en.title).toBe("Refereeing schedule: 1 upcoming match");
@@ -57,14 +57,16 @@ describe("refereeDigestPush", () => {
   });
 
   it("borne la liste et dit combien restent", () => {
-    const many = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 3 }, (_, index) => match(index + 1));
+    // Noms courts : les cinq lignes tiennent dans la borne du corps.
+    const short = (id: number) => match(id, { team1Name: "A", team2Name: "B", tournamentName: "C" });
+    const many = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 3 }, (_, index) => short(index + 1));
     const lines = refereeDigestPush(many).body.split("\n");
     expect(lines).toHaveLength(REFEREE_DIGEST_PUSH_LINES + 2);
     expect(lines.at(-2)).toBe("… et 3 autres");
     expect(lines.at(-1)).toBe("Heure de Paris");
     expect(refereeDigestPush(many, "en").body.split("\n").at(-2)).toBe("… and 3 more");
     // Un seul match au-delà de la borne : singulier (« 1 autre », pas « 1 autres »).
-    const oneMore = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 1 }, (_, index) => match(index + 1));
+    const oneMore = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 1 }, (_, index) => short(index + 1));
     expect(refereeDigestPush(oneMore).body.split("\n").at(-2)).toBe("… et 1 autre");
     expect(refereeDigestPush(oneMore, "en").body.split("\n").at(-2)).toBe("… and 1 more");
   });
@@ -84,6 +86,43 @@ describe("refereeDigestPush", () => {
     expect(refereeDigestPush(round, "en").body).toBe("Thu 20:00 · 8 matches (Coupe, Round 1)\nParis time");
     // Les équipes, elles, restent une ligne par match.
     expect(refereeDigestPush([match(1), match(2)]).body.split("\n")).toHaveLength(3);
+  });
+
+  it("tient dans la borne du corps d'un push : « … et N autres » et le fuseau arrivent toujours", () => {
+    const long = (id: number) =>
+      match(id, {
+        team1Name: `Les Renards Argentés du Nord ${id}`,
+        team2Name: `Nova Esport Académie ${id}`,
+        tournamentName: "Coupe d'automne BlueGenji",
+      });
+    for (const locale of ["fr", "en"] as const) {
+      const many = Array.from({ length: 8 }, (_, index) => long(index + 1));
+      const payload = buildPushPayload("REFEREE_DIGEST", refereeDigestPush(many, locale), null, locale);
+      // Le corps arrive tel quel : ni coupé (« … » final), ni replié en un paragraphe.
+      expect(Array.from(payload.body).length).toBeLessThanOrEqual(PUSH_BODY_MAX);
+      expect(payload.body).toBe(refereeDigestPush(many, locale).body);
+      const lines = payload.body.split("\n");
+      expect(lines.at(-1)).toBe(locale === "fr" ? "Heure de Paris" : "Paris time");
+      const listed = lines.length - 2;
+      expect(listed).toBeGreaterThanOrEqual(1);
+      expect(lines.at(-2)).toBe(locale === "fr" ? `… et ${8 - listed} autres` : `… and ${8 - listed} more`);
+    }
+
+    // Une seule ligne trop longue : raccourcie, le pied reste.
+    const huge = match(1, { tournamentName: "T".repeat(300) });
+    const body = refereeDigestPush([huge, match(2)]).body;
+    expect(Array.from(body).length).toBeLessThanOrEqual(PUSH_BODY_MAX);
+    expect(body.split("\n").slice(-2)).toEqual(["… et 1 autre", "Heure de Paris"]);
+  });
+
+  it("borne l'étiquette sans confondre deux programmes au même début", () => {
+    const ids = Array.from({ length: 20 }, (_, index) => 1000 + index);
+    const first = refereeDigestPush(ids.map((id) => match(id)));
+    const second = refereeDigestPush([...ids.slice(0, 19), 2000].map((id) => match(id)));
+    expect(first.tag?.length).toBeLessThanOrEqual(PUSH_TAG_MAX);
+    expect(second.tag?.length).toBeLessThanOrEqual(PUSH_TAG_MAX);
+    expect(first.tag).not.toBe(second.tag);
+    expect(first.tag).toBe(refereeDigestPush(ids.map((id) => match(id))).tag);
   });
 
   it("compte dans « … et N autres » les matchs des lignes regroupées qui ne tiennent pas", () => {
@@ -129,6 +168,23 @@ describe("matchReminderPush — check-in", () => {
     expect(matchReminderPush(open, null, "fr").body).toMatch(/Check-in déjà ouvert sur Discord : https:\/\/discord\.gg\/Sgdh3p4VhC$/);
     expect(matchReminderPush(open, null, "en").body).toMatch(/Check-in already open on Discord: https:\/\/discord\.gg\/Sgdh3p4VhC$/);
     expect(matchReminderPush(open, null, "fr").body).not.toContain("15 min avant");
+  });
+
+  it("garde l'invitation entière quand le corps est long (reprogrammation, noms longs)", () => {
+    const long = {
+      ...SIDE,
+      checkIn: true,
+      teamName: "Les Renards Argentés du Nord",
+      opponentName: "Nova Esport Académie de Lyon",
+      tournamentName: "Coupe d'automne BlueGenji — édition spéciale",
+    };
+    const announcement = { rescheduled: true, previousStartAt: new Date("2026-09-09T18:00:00Z") };
+    for (const locale of ["fr", "en"] as const) {
+      const content = matchReminderPush(long, null, locale, announcement);
+      const payload = buildPushPayload("MATCH_REMINDER", content, null, locale);
+      expect(Array.from(payload.body).length).toBeLessThanOrEqual(PUSH_BODY_MAX);
+      expect(payload.body).toMatch(/https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    }
   });
 
   it("ouvre l'invitation au toucher quand il porte le check-in, la fiche du match sinon", () => {

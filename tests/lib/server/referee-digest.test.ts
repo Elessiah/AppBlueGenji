@@ -33,9 +33,16 @@ function row(id: number, hoursAhead: number, overrides: Record<string, unknown> 
   };
 }
 
-/** Base : `query` sert la lecture du programme, `execute` les réservations (refusées pour `refused`). */
-function mockDb(rows: unknown[], refused: number[] = []) {
-  const query = jest.fn<SqlQuery>().mockResolvedValue([rows]);
+/**
+ * Base : `query` sert la sonde (`LIMIT 1` : une manche à ≤ sa borne haute ?) et
+ * la lecture du programme, `execute` les réservations (refusées pour `refused`).
+ */
+function mockDb(rows: ReturnType<typeof row>[], refused: number[] = []) {
+  const query = jest.fn<SqlQuery>(async (sql, params) => {
+    if (!/LIMIT 1/.test(sql)) return [rows];
+    const until = ((params as unknown[])[1] as Date).getTime();
+    return [rows.filter((candidate) => candidate.start_at.getTime() <= until).slice(0, 1).map(() => ({ due: 1 }))];
+  });
   const execute = jest.fn<SqlQuery>(async (_sql, params) => {
     const matchId = (params as unknown[])[0] as number;
     return [{ affectedRows: refused.includes(matchId) ? 0 : 1 }];
@@ -58,12 +65,27 @@ beforeEach(() => {
 });
 
 describe("dispatchRefereeDigest", () => {
-  it("lit les manches non citées des 12 prochaines heures, jouables, deux engagées connues", async () => {
+  it("sonde d'abord, en une ligne, une manche non citée dans ses 10 dernières heures", async () => {
     const { query } = mockDb([]);
 
     expect(await dispatchRefereeDigest(NOW)).toBe(0);
 
+    // Rien de dû : la marge de regroupement n'est ni lue ni jointe.
+    expect(query).toHaveBeenCalledTimes(1);
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/SELECT 1 AS due FROM bg_matches m/);
+    expect(sql).toMatch(/LIMIT 1$/);
+    expect(params).toEqual([NOW, new Date(NOW.getTime() + 10 * HOUR), "REFS"]);
+    expect(notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it("lit les manches non citées des 12 prochaines heures, jouables, deux engagées connues", async () => {
+    const { query } = mockDb([row(1, 9)]);
+
+    await dispatchRefereeDigest(NOW);
+
+    expect(query).toHaveBeenCalledTimes(2);
+    const [sql, params] = query.mock.calls[1] as [string, unknown[]];
     expect(params).toEqual([NOW, new Date(NOW.getTime() + 12 * HOUR), "REFS"]);
     expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
     expect(sql).toMatch(/t\.state <> 'FINISHED'/);
@@ -71,13 +93,13 @@ describe("dispatchRefereeDigest", () => {
     expect(sql).toMatch(/JOIN bg_teams t2/);
     expect(sql).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_match_reminders r WHERE r\.match_id = m\.id AND r\.offset_key = \?\)/);
     expect(sql).toMatch(/ORDER BY m\.start_at, m\.id/);
-    expect(notifyStaff).not.toHaveBeenCalled();
   });
 
   it("attend qu'une manche entre dans ses 10 dernières heures", async () => {
-    const { execute } = mockDb([row(1, 11), row(2, 11.5)]);
+    const { query, execute } = mockDb([row(1, 11), row(2, 11.5)]);
 
     expect(await dispatchRefereeDigest(NOW)).toBe(0);
+    expect(query).toHaveBeenCalledTimes(1);
     expect(execute).not.toHaveBeenCalled();
     expect(notifyStaff).not.toHaveBeenCalled();
   });
@@ -105,7 +127,7 @@ describe("dispatchRefereeDigest", () => {
     expect(push.body).toContain("Renards 1 contre Nova 1 (Coupe BlueGenji, Manche 1)");
     // Un seul tournoi cité : le lien mène à sa fiche.
     expect(push.url).toBe("/tournois/7");
-    expect(push.tag).toBe("referee-digest-1-2-3");
+    expect(push.tag).toMatch(/^referee-digest-1-3-[0-9a-z]+$/);
     expect(resolvePush(notification.push, "en").title).toBe("Refereeing schedule: 3 upcoming matches");
     expect(resolvePush(notification.push, "en").body).toContain("Renards 1 vs Nova 1 (Coupe BlueGenji, Round 1)");
     expect(resolvePush(notification.push, "en").url).toBe("/en/tournois/7");
@@ -125,7 +147,7 @@ describe("dispatchRefereeDigest", () => {
 
     await dispatchRefereeDigest(NOW);
 
-    expect(query.mock.calls[0][0]).toMatch(/AS swiss_round/);
+    expect(query.mock.calls[1][0]).toMatch(/AS swiss_round/);
     const notification = jest.mocked(notifyStaff).mock.calls[0][0];
     const push = resolvePush(notification.push);
     expect(push.body).toContain("(Coupe BlueGenji, Ronde 3)");
@@ -143,6 +165,48 @@ describe("dispatchRefereeDigest", () => {
     expect(push.title).toBe("Programme d'arbitrage : 1 match à venir");
     expect(push.body).not.toContain("Renards 1");
     expect(push.body).toContain("Renards 2");
+  });
+
+  it("réserve plusieurs manches de front, et cite dans l'ordre du coup d'envoi", async () => {
+    const rows = Array.from({ length: 8 }, (_, index) => row(index + 1, 9 + index * 0.1));
+    let inFlight = 0;
+    let peak = 0;
+    const execute = jest.fn<SqlQuery>(async (_sql, params) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      // La première réservation est la plus lente : les autres n'attendent pas.
+      const matchId = (params as unknown[])[0] as number;
+      await new Promise((resolve) => setTimeout(resolve, matchId === 1 ? 20 : 1));
+      inFlight -= 1;
+      return [{ affectedRows: 1 }];
+    });
+    const { query } = mockDb(rows);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(8);
+
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+    const body = resolvePush(jest.mocked(notifyStaff).mock.calls[0][0].push).body;
+    expect(body.indexOf("Renards 1 ")).toBeLessThan(body.indexOf("Renards 2 "));
+  });
+
+  it("une réservation en échec ne retient pas les autres manches", async () => {
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { query } = mockDb([row(1, 9), row(2, 9.5)]);
+    const execute = jest.fn<SqlQuery>(async (_sql, params) => {
+      if ((params as unknown[])[0] === 1) throw new Error("Lock wait timeout");
+      return [{ affectedRows: 1 }];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(1);
+
+    const push = resolvePush(jest.mocked(notifyStaff).mock.calls[0][0].push);
+    expect(push.body).not.toContain("Renards 1 ");
+    expect(push.body).toContain("Renards 2 ");
+    expect(errors).toHaveBeenCalledWith("[referee-digest] réservation en échec", expect.any(Error));
+    errors.mockRestore();
   });
 
   it("n'envoie rien quand toutes les réservations sont refusées", async () => {
