@@ -504,6 +504,11 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(en).toContain("(code, match time, reminder, removal from a match, moderation notice");
   });
 
+  it("les conditions du bot citent aussi l'avis « Match retiré » parmi les messages remis (FR et EN)", () => {
+    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("rappels de match et avis de retrait d'un match (« Match retiré »)");
+    expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("match reminders and notices of removal from a match (“Match retiré”)");
+  });
+
   it("déclare qu'un blocage AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {
     expect(fr).toContain("si une règle AutoMod de Discord bloque une annonce #live, son texte (pseudo public compris en tournoi individuel) peut parvenir au salon d'alertes de modération du serveur");
     expect(en).toContain("if a Discord AutoMod rule blocks a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel");

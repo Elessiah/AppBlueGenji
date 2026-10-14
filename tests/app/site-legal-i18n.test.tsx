@@ -236,6 +236,13 @@ describe("parité du texte : l'anglais suit le français, élément par élémen
   const numbers = (text: string) => (text.match(/\d+/g) ?? []).sort();
   const bold = (text: string) => (text.match(/\*\*/g) ?? []).length;
 
+  it("revue légale #445 : l'acceptation à la page de connexion figure à l'article « Acceptation » (FR et EN)", () => {
+    const fr = TERMS_SECTIONS.find((section) => section.id === "acceptation")!.paragraphs.join(" ");
+    const en = TERMS_SECTIONS_EN.find((section) => section.id === "acceptation")!.paragraphs.join(" ");
+    expect(fr).toContain("ainsi qu'en les acceptant sur la **page de connexion**, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur");
+    expect(en).toContain("as well as by accepting them on the **login page**, which presents them as long as they have not been accepted in the browser");
+  });
+
   it("mêmes sections, mêmes ancres, même ordre, mêmes liens", () => {
     expect(TERMS_SECTIONS_EN.map((section) => section.id)).toEqual(TERMS_SECTIONS.map((section) => section.id));
     TERMS_SECTIONS.forEach((section, index) => {
