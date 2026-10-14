@@ -294,6 +294,51 @@ export function formatMatchScheduleClearedLog(context: {
   );
 }
 
+/** Une manche du programme d'arbitrage, telle que le journal la cite. */
+export type RefereeDigestLogMatch = {
+  matchId: number;
+  tournament: BotLogTournament;
+  team1: LogEntrant;
+  team2: LogEntrant;
+  startAt: string | Date;
+};
+
+/** Manches citées au plus par la ligne du programme (le canal borne un message). */
+export const REFEREE_DIGEST_LOG_ENTRIES = 12;
+
+let digestTimeFormat: Intl.DateTimeFormat | null = null;
+
+/** « mer. 20:00 », heure de Paris : le programme tient sur une demi-journée. */
+function digestTime(startAt: string | Date): string {
+  digestTimeFormat ??= new Intl.DateTimeFormat("fr-FR", {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Paris",
+  });
+  return digestTimeFormat.format(startAt instanceof Date ? startAt : new Date(startAt));
+}
+
+/**
+ * Programme d'arbitrage (`lib/server/tournaments/referee-digest.ts`) : les
+ * matchs des 10 prochaines heures, **en une ligne** (règle 1), dans l'ordre du
+ * coup d'envoi. Engagées par `entrantLabel` (« un joueur » en tournoi
+ * individuel), tournoi par son nom et son identifiant. Aucun auteur : c'est le
+ * site qui l'envoie, pas un geste du staff.
+ */
+export function formatRefereeDigestLog(matches: readonly RefereeDigestLogMatch[]): string {
+  const shown = matches.slice(0, REFEREE_DIGEST_LOG_ENTRIES).map(
+    (match) =>
+      `${digestTime(match.startAt)} ${entrantLabel(match.team1)} vs ${entrantLabel(match.team2)} ` +
+      `(${tournamentLabel(match.tournament)}, match #${match.matchId})`,
+  );
+  const hidden = matches.length - shown.length;
+  if (hidden > 0) shown.push(`… et ${hidden} autre${hidden > 1 ? "s" : ""}`);
+  const count = `${matches.length} match${matches.length > 1 ? "s" : ""}`;
+  const subject = `${count} dans les 10 prochaines heures`;
+  return `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) : ${shown.join(" ; ")}.`;
+}
+
 /**
  * Retrait d'une inscription par le staff, avant le coup d'envoi
  * (`lib/shared/entrant-removal.ts`).

@@ -57,7 +57,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_REMINDER: {
     label: "Horaires et rappels de match",
-    description: "L'horaire d'un match quand il est posé, changé ou retiré, puis un rappel dans les 24 h qui précèdent le coup d'envoi.",
+    description: "L'horaire d'un match quand il est posé, changé ou retiré, puis un rappel 24 h et 10 h avant le coup d'envoi (avec le lien du check-in).",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {
@@ -88,6 +88,11 @@ export const PUSH_TOPICS = {
   MATCH_SCHEDULED: {
     label: "Matchs planifiés",
     description: "Un autre arbitre planifie un match, ou en change ou en retire l'horaire — ou une mise à jour du tournoi supprime un match planifié.",
+    audience: "tournaments",
+  },
+  REFEREE_DIGEST: {
+    label: "Programme d'arbitrage",
+    description: "Environ 10 h à l'avance, la liste des matchs à venir : horaires, tournois et équipes.",
     audience: "tournaments",
   },
   STAFF_REPORT: {

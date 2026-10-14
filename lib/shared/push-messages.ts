@@ -28,6 +28,8 @@ import frPush from "@/messages/fr/pushMessages.json";
 import enReports from "@/messages/en/reports.json";
 import frReports from "@/messages/fr/reports.json";
 import {
+  CHECK_IN_INVITE_URL,
+  CHECK_IN_REMINDER_KEY,
   FIRST_SCHEDULE,
   formatMatchStart,
   type MatchReminderOffsetKey,
@@ -145,6 +147,11 @@ type ScheduledMatchSide = MatchSide & {
   swiss?: boolean;
   startAt: string | Date;
   /**
+   * Le rappel porte le check-in (`CHECK_IN_INVITE_URL`) : par défaut, le
+   * rappel de 10 h ; aussi l'annonce qui a consommé son palier.
+   */
+  checkIn?: boolean;
+  /**
    * Rencontre vers laquelle mène le lien, quand ce n'est pas `matchId` (qui
    * reste l'étiquette) : la nouvelle rencontre d'une ronde réappariée, ou
    * `null` — la page du tournoi — pour une rencontre supprimée.
@@ -198,18 +205,20 @@ export function matchReminderPush(
 ): PushContent {
   const text = TEXT[locale];
   const change = offset ? FIRST_SCHEDULE : announcement;
+  const body = scheduleBody(
+    {
+      pairing: pairing(side, text),
+      tournament: side.tournamentName,
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
+      startAt: side.startAt,
+    },
+    change,
+    locale,
+  );
+  const checkIn = side.checkIn ?? offset === CHECK_IN_REMINDER_KEY;
   return {
     title: announcementTitle(offset, change.rescheduled, text),
-    body: scheduleBody(
-      {
-        pairing: pairing(side, text),
-        tournament: side.tournamentName,
-        round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
-        startAt: side.startAt,
-      },
-      change,
-      locale,
-    ),
+    body: checkIn ? `${body} ${text.t("matchReminder.checkIn", { invite: CHECK_IN_INVITE_URL })}` : body,
     url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-reminder`,
   };
@@ -333,6 +342,64 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
       locale,
     ),
     tag: `${matchTag(input.matchId)}-schedule`,
+  };
+}
+
+/** Une manche du programme d'arbitrage (`REFEREE_DIGEST`). */
+export type RefereeDigestMatch = {
+  matchId: number;
+  tournamentName: string;
+  team1Name: string;
+  team2Name: string;
+  solo: boolean;
+  startAt: string | Date;
+};
+
+/** Lignes du programme poussées au plus : le reste se dit « … et N autres ». */
+export const REFEREE_DIGEST_PUSH_LINES = 5;
+
+const DIGEST_TIME_FORMATS = new Map<Locale, Intl.DateTimeFormat>();
+
+/** « mer. 20:00 » / « Wed 20:00 », heure de Paris : le programme tient sur une demi-journée. */
+function digestTime(startAt: string | Date, locale: Locale): string {
+  const date = startAt instanceof Date ? startAt : new Date(startAt);
+  return cached(DIGEST_TIME_FORMATS, locale, (code) =>
+    new Intl.DateTimeFormat(INTL_LOCALE[code], {
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "Europe/Paris",
+    }),
+  ).format(date);
+}
+
+/**
+ * Programme d'arbitrage (`REFEREE_DIGEST`) : les matchs qui se jouent dans les
+ * 10 prochaines heures, un par ligne (heure de Paris, affiche, tournoi), dans
+ * l'ordre du coup d'envoi. Équipes nommées ; en tournoi individuel, « Un
+ * match » (aucun pseudo de joueur, comme partout). Le lien mène à la liste des
+ * tournois ; l'étiquette est propre au programme (un programme suivant ne
+ * remplace pas le précédent, qui liste d'autres matchs).
+ */
+export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const shown = matches.slice(0, REFEREE_DIGEST_PUSH_LINES).map((match) =>
+    text.t("refereeDigest.line", {
+      start: digestTime(match.startAt, locale),
+      pairing: match.solo
+        ? text.t("refereeDigest.pairingSolo")
+        : text.t("pairing", { team: match.team1Name, opponent: match.team2Name }),
+      tournament: match.tournamentName,
+    }),
+  );
+  const hidden = matches.length - shown.length;
+  if (hidden > 0) shown.push(text.t("refereeDigest.more", { count: hidden }));
+  return {
+    title: matches.length === 1 ? text.t("refereeDigest.titleOne") : text.t("refereeDigest.title"),
+    body: shown.join("\n"),
+    url: localeHref("/tournois", locale),
+    tag: `referee-digest-${matches[0]?.matchId ?? 0}`,
   };
 }
 

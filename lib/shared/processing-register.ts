@@ -424,8 +424,9 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
-      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et un rappel de match dans les 24 h qui précèdent le coup d'envoi",
+      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second avec le lien du salon de check-in)",
       "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
+      "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
       "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match et les alertes d'arbitrage",
@@ -714,7 +715,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match",
       "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
-      "Alertes d'arbitrage, matchs planifiés et alertes de modération pour le staff qui détient ces rôles",
+      "Alertes d'arbitrage, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles",
     ],
     legalBasis: "Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)",
     dataSubjects: ["Joueurs inscrits qui activent les notifications sur un appareil"],

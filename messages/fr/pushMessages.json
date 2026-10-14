@@ -18,8 +18,10 @@
     "titleWithdrawn": "Match retiré de ton programme",
     "bodyWithdrawn": "Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du {previous} (heure de Paris) ne te concerne plus. {pairing} · {tournament}, {round}.",
     "offset": {
-      "P1D": "moins de 24 heures"
-    }
+      "P1D": "moins de 24 heures",
+      "PT10H": "moins de 10 heures"
+    },
+    "checkIn": "Check-in sur Discord 15 min avant le match : {invite}"
   },
   "matchScheduled": {
     "pairingSolo": "Un match",
@@ -99,5 +101,12 @@
     "bodyContest": "Une décision de modération est contestée.",
     "titleSaturated": "Afflux de signalements",
     "bodySaturated": "Les signalements suivants arrivent au panneau sans alerte."
+  },
+  "refereeDigest": {
+    "title": "Matchs des 10 prochaines heures",
+    "titleOne": "Match dans les 10 prochaines heures",
+    "line": "{start} · {pairing} ({tournament})",
+    "more": "… et {count} autres",
+    "pairingSolo": "Un match"
   }
 }

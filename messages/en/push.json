@@ -14,7 +14,7 @@
     },
     "MATCH_REMINDER": {
       "label": "Match times and reminders",
-      "description": "A match's time when it is set, changed or removed, then a reminder within the 24 h before kickoff."
+      "description": "A match time when it is set, changed or removed, then a reminder 24 h and 10 h before kickoff (with the check-in link)."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Join requests",
@@ -39,6 +39,10 @@
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",
       "description": "Another referee schedules a match, or changes or removes its time — or a tournament update deletes a scheduled match."
+    },
+    "REFEREE_DIGEST": {
+      "label": "Refereeing schedule",
+      "description": "About 10 hours ahead, the list of upcoming matches: times, tournaments and teams."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",

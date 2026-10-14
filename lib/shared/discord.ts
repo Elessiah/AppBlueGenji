@@ -27,6 +27,15 @@ export const DISCORD_INVITE_CODE = "GB9ESEBZFW";
 export const DISCORD_INVITE_URL = `https://discord.gg/${DISCORD_INVITE_CODE}`;
 
 /**
+ * Invitation **publique** donnée par l'association pour le **check-in** des
+ * matchs (demande du 2026-10-09) : le rappel de 10 h aux joueurs la porte, le
+ * salon de check-in ouvrant un quart d'heure avant le coup d'envoi
+ * (`lib/shared/discord-notifications.ts`). Distincte de l'invitation du site
+ * tant que l'association ne dit pas qu'elles mènent au même serveur.
+ */
+export const CHECK_IN_INVITE_URL = "https://discord.gg/Sgdh3p4VhC";
+
+/**
  * Les invitations que le site a portées avant celle-ci.
  *
  * Elles ne sont pas là par nostalgie : le lien Discord de la page contact est

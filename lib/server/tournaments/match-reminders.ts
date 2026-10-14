@@ -24,7 +24,8 @@
  * l'insertion qui gagne envoie. Deux requêtes concurrentes déclenchent le même
  * balayage — sans ce verrou, le joueur recevrait son rappel en double. Le prix
  * est symétrique et assumé : un bot injoignable au moment précis de l'envoi
- * consomme le palier — et il n'en reste qu'un (24 h) : ce rappel-là est perdu.
+ * consomme le palier — ce rappel-là est perdu (il en reste deux : 24 h, puis
+ * 10 h, qui porte le check-in).
  * C'est le bon sens du risque — un rappel manqué ne s'excuse qu'une fois, un
  * rappel envoyé en boucle ne se rattrape pas.
  */
@@ -40,6 +41,7 @@ import {
 import { usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush } from "@/lib/shared/push-messages";
 import {
+  CHECK_IN_REMINDER_KEY,
   FIRST_SCHEDULE,
   MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
@@ -59,6 +61,7 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { PLAYED_MATCH_STATUSES, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { tournamentPageUrl } from "./app-url";
 import { onPoster, toPoster, type PosterRow } from "./match-poster";
+import { dispatchRefereeDigest } from "./referee-digest";
 import { releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -482,6 +485,14 @@ async function sendToSide(
   const solo = match.participant_type === "SOLO";
   // Un avis de retrait porte l'horaire qui ne vaut plus.
   const startAt = clearedStartAt ?? match.start_at;
+  // Le check-in : le rappel de 10 h, ou l'annonce qui a consommé son palier
+  // (manche programmée moins de 10 h avant) — jamais un avis de retrait.
+  let checkIn = false;
+  if (!clearedStartAt) {
+    checkIn = offset
+      ? offset.key === CHECK_IN_REMINDER_KEY
+      : !remaining.some((pending) => pending.key === CHECK_IN_REMINDER_KEY);
+  }
   const context = {
     tournamentName: String(match.tournament_name),
     tournamentUrl: tournamentPageUrl(Number(match.tournament_id)),
@@ -490,6 +501,7 @@ async function sendToSide(
     roundLabel: matchRoundLabel(String(match.bracket), Number(match.round_number), swiss),
     startAt,
     solo,
+    checkIn,
   };
   const pushSide = {
     tournamentId: Number(match.tournament_id),
@@ -502,6 +514,7 @@ async function sendToSide(
     swiss,
     startAt,
     solo,
+    checkIn,
   };
 
   // Le contexte dit au bot (et à ses journaux) de quel message il s'agit.
@@ -997,7 +1010,15 @@ export async function dispatchDueMatchReminders(now: Date = new Date()): Promise
   if (pendingSweep) return pendingSweep;
   if (Date.now() - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
 
-  pendingSweep = runSweep(now);
+  pendingSweep = runSweep(now).finally(async () => {
+    // « En même temps » que les rappels aux joueurs : le programme d'arbitrage,
+    // indépendant — son échec ne retient pas les rappels, ni l'inverse.
+    try {
+      await dispatchRefereeDigest(now);
+    } catch (error) {
+      console.error("[match-reminders] programme d'arbitrage en échec", error);
+    }
+  });
   try {
     return await pendingSweep;
   } finally {
