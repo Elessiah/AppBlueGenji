@@ -40,10 +40,14 @@
  *
  * **Production seulement** : une base de développement (seed `Test_`) ne doit
  * jamais faire écrire `@everyone` à 1 200 personnes, même devant un bot local
- * branché par erreur sur le vrai serveur.
+ * branché par erreur sur le vrai serveur. `NODE_ENV=production` ne suffit pas
+ * à le dire — `npm start` le pose aussi sur un poste de développement —, le
+ * site doit en plus être servi sous son nom public (`APP_URL` en `https`, hors
+ * `localhost`).
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { siteBaseUrl } from "@/lib/server/site-url";
 import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
@@ -94,9 +98,28 @@ const FRESH_ON_AIR_SQL = `(
         OR (m.live_trigger = 'MANUAL' AND m.live_started_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE)
       )`;
 
-/** Vrai si les annonces peuvent partir : en production seulement. */
+/** Noms d'hôte d'un poste de développement, jamais ceux du site public. */
+const LOCAL_HOST = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\]|0\.0\.0\.0)$|\.(localhost|test|local)$/i;
+
+/** Vrai si `APP_URL` désigne le site public : `https`, hors hôte local. */
+function servedUnderPublicName(): boolean {
+  const base = siteBaseUrl();
+  if (!base) return false;
+  try {
+    const url = new URL(base);
+    return url.protocol === "https:" && !LOCAL_HOST.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Vrai si les annonces peuvent partir : en production, sur le site public.
+ * Une compilation lancée par `npm start` sur un poste (`APP_URL` locale) ne
+ * poste rien, même devant la base du seed et un bot branché sur le vrai serveur.
+ */
 export function liveAnnouncementsEnabled(): boolean {
-  return process.env.NODE_ENV === "production";
+  return process.env.NODE_ENV === "production" && servedUnderPublicName();
 }
 
 /**
@@ -265,6 +288,9 @@ const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
   // L'envoi du bot peut encore aboutir : #live vide maintenant ne prouve rien.
   "timed-out":
     "bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, limite de débit), annonce non réessayée",
+  // Le bot est tombé en route : ce que montre #live fait foi.
+  interrupted:
+    "bot tombé avant sa réponse (redémarrage ou erreur interne), annonce peut-être publiée, non réessayée — vérifier #live",
 };
 
 /** Cause pm2 d'un refus ou d'un silence de Discord rapporté par le bot. */

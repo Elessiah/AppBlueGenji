@@ -34,7 +34,7 @@ import {
 } from "@/lib/server/stream-backpressure";
 import { acceptsGzip, GZIP_STREAM_HEADER } from "@/lib/server/sse-gzip";
 import { snapshotFrameOf } from "@/lib/server/tournaments/snapshot";
-import { dispatchLiveAnnouncements } from "@/lib/server/tournaments/live-announcements";
+import { dispatchLiveAnnouncements, liveAnnouncementsEnabled } from "@/lib/server/tournaments/live-announcements";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentSnapshot } from "@/lib/shared/types";
 import {
@@ -55,13 +55,13 @@ const HEARTBEAT_MS = 25_000;
 
 /**
  * Le battement doit-il relancer le balayage des annonces de live ? En
- * production, et pour un tournoi en cours seulement. La fiche est celle de la
+ * production sur le site public (`liveAnnouncementsEnabled`), et pour un tournoi en cours seulement. La fiche est celle de la
  * salle, tenue à jour par chaque diffusion (un tournoi terminé depuis
  * l'ouverture du flux ne relit plus rien), et l'état se lit aussi d'après
  * ses dates : un départ par l'horloge n'a pas toujours encore été diffusé.
  */
 function liveAnnouncementsDue(card: TournamentSnapshot["card"]): boolean {
-  if (process.env.NODE_ENV !== "production") return false;
+  if (!liveAnnouncementsEnabled()) return false;
   return card.state === "RUNNING" || computeTournamentState(card) === "RUNNING";
 }
 

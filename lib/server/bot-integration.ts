@@ -606,9 +606,13 @@ export async function pushLeadershipAlert(
  *   (`503`, `reason` `discord-down`) : l'annonce a pu partir, l'envoi est
  *   terminé ;
  * - `timed-out` — le bot n'a pas répondu à temps : son envoi peut **encore**
- *   être en cours (Discord lent, limite de débit).
+ *   être en cours (Discord lent, limite de débit) ;
+ * - `interrupted` — la requête a atteint le bot, qui l'a lâchée sans bilan
+ *   (connexion coupée par un redémarrage, erreur `5xx` autre que `503`) : il a
+ *   pu publier avant.
  *
- * Sur `uncertain` et `timed-out`, l'appelant **garde** sa réservation : une
+ * Sur `uncertain`, `timed-out` et `interrupted`, l'appelant **garde** sa
+ * réservation : une
  * annonce perdue vaut mieux qu'un second `@everyone` à tout le serveur ;
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
@@ -626,6 +630,7 @@ export type LiveAnnouncementOutcome =
   | "discord-refused"
   | "uncertain"
   | "timed-out"
+  | "interrupted"
   | "unavailable";
 
 /** Raisons d'un `503` du bot qui désignent le salon ou les permissions du bot. */
@@ -667,6 +672,31 @@ function isTimeoutError(error: unknown): boolean {
   // `DOMException` n'hérite pas toujours d'`Error` selon l'environnement : lu par son nom.
   const name = typeof error === "object" && error !== null ? (error as { name?: unknown }).name : undefined;
   return name === "TimeoutError" || name === "AbortError";
+}
+
+/**
+ * Codes d'une connexion qui n'a pas abouti : la requête n'est jamais partie
+ * (bot arrêté, hôte inconnu), rien n'a pu être publié.
+ */
+const NOT_CONNECTED_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/**
+ * Vrai si `fetch` a échoué **avant** que la requête n'atteigne le bot. Une
+ * erreur sans code de connexion (configuration illisible) n'a rien envoyé non
+ * plus ; une connexion coupée en route (`ECONNRESET`, socket fermée), si : le
+ * bot a pu publier avant de tomber.
+ */
+function failedBeforeSending(error: unknown): boolean {
+  const cause = typeof error === "object" && error !== null ? (error as { cause?: unknown }).cause : undefined;
+  const code = typeof cause === "object" && cause !== null ? (cause as { code?: unknown }).code : undefined;
+  return typeof code !== "string" || NOT_CONNECTED_CODES.has(code);
 }
 
 /** Relâche un corps de réponse qu'on ne lira pas. Ne lève jamais. */
@@ -738,7 +768,9 @@ export async function pushLiveAnnouncement(
     await discardBody(response);
     if (response.status === 404) return "unavailable";
     recordFailure();
-    return "unavailable";
+    // Une erreur interne du bot ne dit pas à quelle étape il est tombé : il a
+    // pu publier avant.
+    return response.status >= 500 ? "interrupted" : "unavailable";
   } catch (error) {
     // Le délai écoulé ne dit pas que rien n'est parti : la requête a pu
     // atteindre le bot, qui publie encore (Discord lent ou limitant #live). Il
@@ -746,6 +778,8 @@ export async function pushLiveAnnouncement(
     // doivent pas suspendre les rappels et alertes de fond.
     if (isTimeoutError(error)) return "timed-out";
     recordFailure();
-    return "unavailable";
+    // Connexion coupée en route (bot redémarré par un déploiement après son
+    // envoi, avant sa réponse) : l'annonce a pu partir.
+    return failedBeforeSending(error) ? "unavailable" : "interrupted";
   }
 }

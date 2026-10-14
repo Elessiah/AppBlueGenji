@@ -11,7 +11,8 @@
  *
  * Deux formes, selon la place du texte :
  * - {@link discordInline} pour un fragment dans une phrase (nom d'équipe, de
- *   tournoi) : une seule ligne, balisage échappé, mentions désamorcées ;
+ *   tournoi) : une seule ligne, balisage échappé, mentions et adresses nues
+ *   désamorcées ;
  * - {@link discordQuote} pour un texte libre sur plusieurs lignes : mêmes
  *   neutralisations, chaque ligne **citée** (`> `), si bien qu'aucune ne peut
  *   se faire passer pour une ligne écrite par le site.
@@ -38,8 +39,23 @@ const MENTION_BREAK = "@\u200B";
 /** Barre oblique inverse, qui échappe le caractère qu'elle précède. */
 const BACKSLASH = String.fromCodePoint(92);
 
+/**
+ * Espace de largeur nulle glissée dans `://` et après un point suivi d'une
+ * lettre ou d'un chiffre : Discord ne reconnaît plus une adresse nue
+ * (`https://faux-nitro.gg`, `faux-nitro.gg/cadeau`) dans un nom, qui ne
+ * devient donc ni un lien cliquable ni un aperçu affiché sous le message —
+ * devant tout le serveur quand ce message est une annonce `@everyone`.
+ * L'affichage reste identique.
+ */
+const URL_SCHEME = /:\/\//g;
+const DOMAIN_DOT = /\.(?=[\p{L}\p{N}])/gu;
+
 function neutralize(value: string): string {
-  return value.replace(MARKDOWN, (char) => BACKSLASH + char).replace(/@/g, MENTION_BREAK);
+  return value
+    .replace(MARKDOWN, (char) => BACKSLASH + char)
+    .replace(/@/g, MENTION_BREAK)
+    .replace(URL_SCHEME, ":\u200B//")
+    .replace(DOMAIN_DOT, ".\u200B");
 }
 
 /**
