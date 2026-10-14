@@ -47,7 +47,15 @@ function mockDb(
   const query = jest.fn<SqlQuery>(async (sql, params) => {
     if (/AS tournament_state/.test(sql)) {
       if (current instanceof Error) throw current;
-      return [current.map((match) => ({ status: "READY", tournament_state: "RUNNING", marked: 1, ...match }))];
+      // Par défaut, la marque tient l'horaire lu (celui de `rows`).
+      return [
+        current.map((match) => ({
+          status: "READY",
+          tournament_state: "RUNNING",
+          mark_at: rows.find((read) => read.id === match.id)?.start_at ?? null,
+          ...match,
+        })),
+      ];
     }
     if (!/LIMIT 1/.test(sql)) return [rows];
     const until = ((params as unknown[])[1] as Date).getTime();
@@ -276,7 +284,7 @@ describe("dispatchRefereeDigest", () => {
     const [sql, params] = query.mock.calls[2] as [string, unknown[]];
     expect(sql).toMatch(/FROM bg_matches m JOIN bg_tournaments t ON t\.id = m\.tournament_id\s+WHERE m\.id IN \(\?, \?\)$/);
     expect(sql).toMatch(/m\.status, t\.state AS tournament_state/);
-    expect(sql).toMatch(/r\.offset_key = \? AND r\.start_at = m\.start_at\) AS marked/);
+    expect(sql).toMatch(/WHERE r\.match_id = m\.id AND r\.offset_key = \? LIMIT 1\) AS mark_at/);
     expect(params).toEqual(["REFS", 1, 2]);
   });
 
@@ -300,8 +308,8 @@ describe("dispatchRefereeDigest", () => {
       [
         row(1, 9),
         // Affiche changée, horaire retiré : leur marque est déjà effacée.
-        row(2, 9.5, { team2_id: 999, marked: 0 }),
-        row(3, 9.8, { start_at: null, marked: 0 }),
+        row(2, 9.5, { team2_id: 999, mark_at: null }),
+        row(3, 9.8, { start_at: null, mark_at: null }),
         // Jouée, tournoi clos : la marque reste, elle est rendue.
         row(4, 9.9, { status: "AWAITING_CONFIRMATION" }),
         row(5, 9.95, { tournament_state: "FINISHED" }),
@@ -316,7 +324,7 @@ describe("dispatchRefereeDigest", () => {
 
   it("rend les marques de la marge quand la manche due a été déplacée après sa réservation", async () => {
     // Reprogrammée : sa marque est effacée par la reprogrammation.
-    const { execute } = mockDb([row(1, 9), row(2, 11)], [], [row(1, 13, { marked: 0 }), row(2, 11)]);
+    const { execute } = mockDb([row(1, 9), row(2, 11)], [], [row(1, 13, { mark_at: null }), row(2, 11)]);
 
     expect(await dispatchRefereeDigest(NOW)).toBe(0);
 
@@ -330,13 +338,24 @@ describe("dispatchRefereeDigest", () => {
   it("ne cite pas une manche dont la marque a été effacée pendant le programme, même revenue à son horaire", async () => {
     // Horaire retiré puis reposé à l'identique pendant les réservations : la
     // marque n'est plus là, le programme suivant citera la manche — une fois.
-    const { execute } = mockDb([row(1, 9), row(2, 9.5)], [], [row(1, 9), row(2, 9.5, { marked: 0 })]);
+    const { execute } = mockDb([row(1, 9), row(2, 9.5)], [], [row(1, 9), row(2, 9.5, { mark_at: null })]);
 
     expect(await dispatchRefereeDigest(NOW)).toBe(1);
 
     expect(await publishedLine()).not.toContain("Renards 2");
     // Rien à rendre : la marque n'est plus là.
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
+  });
+
+  it("rend la marque d'une manche déplacée dans le passé : reposée à son horaire, elle sera citée", async () => {
+    // Une date passée n'efface aucune marque : REFS tient encore l'horaire lu.
+    const past = new Date(NOW.getTime() - 2 * HOUR);
+    const { execute } = mockDb([row(1, 9), row(2, 9.5)], [], [row(1, 9), row(2, 9.5, { start_at: past })]);
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(1);
+
+    const release = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE")) as [string, unknown[]];
+    expect(release[1]).toEqual([2, "REFS", 2, row(2, 9.5).start_at]);
   });
 
   it("envoie quand même si la relecture échoue : les marques sont prises", async () => {
