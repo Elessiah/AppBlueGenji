@@ -1070,7 +1070,8 @@ function RgpdFr({
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
             l&apos;association, avec une mention @everyone : le nom des deux équipes (jamais le pseudo
             de leurs joueurs) ou, en tournoi individuel, le <strong>pseudo public BlueGenji</strong> des
-            deux joueurs (un pseudo, jamais un prénom ni un identifiant Discord), celui du tournoi et le
+            deux joueurs (un pseudo, jamais un prénom ni un identifiant Discord ; « un joueur » pour une
+            entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le
             lien de la diffusion. Le nom neutre ne vaut que pour la diffusion : un joueur qui ne veut pas
             voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Ces annonces
             restent dans le salon tant que le salon #live existe ;
