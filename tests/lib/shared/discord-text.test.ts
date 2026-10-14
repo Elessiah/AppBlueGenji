@@ -35,7 +35,21 @@ describe("discordInline", () => {
   it("échappe le balisage : un lien masqué ne devient pas cliquable", () => {
     const out = discordInline("[Valider le score](https://exemple.invalid/piege)");
     expect(hasMaskedLink(out)).toBe(false);
-    expect(out).toBe("\\[Valider le score\\]\\(https://exemple.invalid/piege\\)");
+    expect(out).toBe("\\[Valider le score\\]\\(https:\u200B//exemple.\u200Binvalid/piege\\)");
+  });
+
+  it("désamorce une adresse nue : un nom d'équipe ne devient ni lien ni aperçu", () => {
+    for (const name of ["https://fauxnitro.gg", "fauxnitro.gg/cadeau", "www.piege.example"]) {
+      const out = discordInline(name);
+      expect(out).not.toMatch(/[a-z]+:\/\//i);
+      expect(out).not.toMatch(/\.[a-z0-9]/i);
+      // Affichage identique : seules des espaces de largeur nulle sont ajoutées.
+      expect(out.replace(/\u200B/g, "")).toBe(name);
+    }
+  });
+
+  it("garde un nom ordinaire tel quel, ponctuation comprise", () => {
+    expect(discordInline("Team 2. Les Bleus : saison 1")).toBe("Team 2. Les Bleus : saison 1");
   });
 
   it("échappe gras, italique, barré, code, spoiler et titre", () => {

@@ -77,7 +77,7 @@ function releasesOf(execute: Db["execute"]): unknown[] {
 beforeEach(() => {
   jest.clearAllMocks();
   resetLiveAnnouncementThrottle();
-  jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
+  jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production", APP_URL: "https://site.example" });
   jest.mocked(isBotCircuitOpen).mockReturnValue(false);
   jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
   jest.spyOn(console, "info").mockImplementation(() => undefined);
@@ -252,6 +252,16 @@ describe("runLiveAnnouncementSweep", () => {
     const line = String(jest.mocked(console.error).mock.calls[0][0]);
     expect(line).toContain("son envoi peut encore aboutir");
     // Aucune consigne de la poster à la main : l'envoi du bot peut encore partir.
+    expect(line).not.toContain("à la main");
+  });
+
+  it("bot tombé avant sa réponse (redémarrage) : garde la réservation, pas de second @everyone", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("interrupted");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([]);
+    const line = String(jest.mocked(console.error).mock.calls[0][0]);
+    expect(line).toContain("annonce peut-être publiée, non réessayée");
     expect(line).not.toContain("à la main");
   });
 
@@ -473,6 +483,27 @@ describe("dispatchLiveAnnouncements", () => {
     expect(liveAnnouncementsEnabled()).toBe(false);
     expect(await dispatchLiveAnnouncements()).toBe(0);
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["absente", undefined],
+    ["locale (npm start sur un poste)", "http://localhost:3000"],
+    ["en https sur localhost", "https://localhost:3000"],
+    ["sur 127.0.0.1", "https://127.0.0.1"],
+    ["sur un nom .localhost", "https://app.localhost"],
+    ["sur un nom .test", "https://bluegenji.test"],
+    ["en http", "http://site.example"],
+    ["illisible", "site.example"],
+  ])("ne fait rien en production si APP_URL est %s", async (_label, appUrl) => {
+    jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production", APP_URL: appUrl });
+    const { query } = mockDb([AUTO_LIVE]);
+    expect(liveAnnouncementsEnabled()).toBe(false);
+    expect(await dispatchLiveAnnouncements()).toBe(0);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("part en production sur le site public", () => {
+    expect(liveAnnouncementsEnabled()).toBe(true);
   });
 
   it("est étranglé : un second appel immédiat ne relit pas la base", async () => {

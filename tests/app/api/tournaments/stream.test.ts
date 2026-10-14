@@ -12,6 +12,8 @@ jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
 jest.mock("@/lib/server/tournaments/live-announcements", () => ({
   dispatchLiveAnnouncements: jest.fn(async () => 0),
+  // La garde réelle (production ET site public) est testée avec le module.
+  liveAnnouncementsEnabled: jest.fn(() => process.env.NODE_ENV === "production"),
 }));
 
 import { GET } from "@/app/api/tournaments/[id]/stream/route";

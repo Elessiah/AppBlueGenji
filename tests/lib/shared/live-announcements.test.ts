@@ -41,6 +41,21 @@ describe("formatLiveAnnouncement", () => {
     expect(text).toContain("\\*\\*gras\\*\\*");
   });
 
+  it("une équipe nommée d'après une adresse ne devient ni lien ni aperçu sous l'@everyone", () => {
+    const text = formatLiveAnnouncement({
+      tournamentName: "Coupe www.piege.example",
+      participantType: "TEAM",
+      team1Name: "https://fauxnitro.gg",
+      team2Name: "fauxnitro.gg/cadeau",
+    });
+    // Le seul lien de l'annonce est celui que le bot ajoute sur sa ligne.
+    expect(text).not.toMatch(/https?:\/\//);
+    expect(text).not.toMatch(/\.[a-z]/);
+    expect(text.replace(/\u200B/g, "")).toBe(
+      "🔴 En direct : https://fauxnitro.gg contre fauxnitro.gg/cadeau — Coupe www.piege.example",
+    );
+  });
+
   it("ne nomme jamais un joueur : une entrée individuelle s'écrit « un joueur »", () => {
     const text = formatLiveAnnouncement({
       tournamentName: "Solo Cup",

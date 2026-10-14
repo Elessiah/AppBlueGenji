@@ -5,6 +5,12 @@ import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integra
 
 const originalEnv = { ...process.env };
 
+/** Une publication réussie remet le coupe-circuit à zéro entre deux échecs simulés. */
+async function succeedOnce(): Promise<void> {
+  jest.spyOn(global, "fetch").mockResolvedValueOnce(Response.json({ ok: true }));
+  await pushLiveAnnouncement("x", "https://twitch.tv/bg", "c");
+}
+
 describe("pushLiveAnnouncement", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -146,6 +152,32 @@ describe("pushLiveAnnouncement", () => {
     }
     // Des envois lents dans #live ne suspendent pas le trafic de fond.
     expect(isBotCircuitOpen()).toBe(false);
+  });
+
+  it("rend « interrupted » sur une connexion coupée en route : le bot a pu publier avant de tomber", async () => {
+    for (const code of ["ECONNRESET", "UND_ERR_SOCKET", "EPIPE"]) {
+      jest
+        .spyOn(global, "fetch")
+        .mockRejectedValueOnce(new TypeError("fetch failed", { cause: Object.assign(new Error("coupé"), { code }) }));
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("interrupted");
+      await succeedOnce();
+    }
+  });
+
+  it("rend « interrupted » sur une erreur interne du bot (500) : il a pu publier avant", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("erreur", { status: 500 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("interrupted");
+    await succeedOnce();
+  });
+
+  it("rend « unavailable » quand la connexion n'a pas abouti : rien n'est parti", async () => {
+    for (const code of ["ECONNREFUSED", "ENOTFOUND", "UND_ERR_CONNECT_TIMEOUT"]) {
+      jest
+        .spyOn(global, "fetch")
+        .mockRejectedValueOnce(new TypeError("fetch failed", { cause: Object.assign(new Error("refusé"), { code }) }));
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
+      await succeedOnce();
+    }
   });
 
   it("rend « unavailable » sur un bot injoignable, puis court-circuite", async () => {
