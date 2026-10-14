@@ -78,6 +78,35 @@ describe("langue du compte — anonymisation", () => {
   });
 });
 
+describe("messages privés de match — anonymisation", () => {
+  it("remet le choix au défaut par une instruction à part, sur la ligne supprimée", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+    const reset = execute.mock.calls.find(([sql]) => String(sql).includes("match_dm_enabled"));
+    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1 WHERE id = ? AND is_deleted = 1", [42]]);
+  });
+
+  it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.includes("match_dm_enabled")) throw missing;
+      return [[], []];
+    });
+    await expect(anonymizeAccount(fakeConnection({ execute }), 42)).resolves.not.toThrow();
+  });
+
+  it("laisse passer toute autre erreur", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.includes("match_dm_enabled")) throw Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" });
+      return [[], []];
+    });
+    await expect(anonymizeAccount(fakeConnection({ execute }), 42)).rejects.toThrow("lock");
+  });
+});
+
 describe("langue du compte — défaut de la colonne", () => {
   // L'anonymisation et accountLocaleFromRow écrivent DEFAULT_LOCALE : la
   // colonne (base neuve et base existante) doit avoir le même défaut.

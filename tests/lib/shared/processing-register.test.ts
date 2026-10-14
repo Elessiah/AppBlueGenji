@@ -463,7 +463,7 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.transfers[0]).toMatch(/^États-Unis : Discord \(annonce publiée dans le salon #live\)/);
     // Décision du 2026-10-14 : pseudo public des joueurs d'un tournoi individuel.
     expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*jamais le pseudo de leurs joueurs\) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs \(un pseudo, jamais un prénom ni un identifiant Discord/);
-    expect(sheet.retention.join(" ")).toMatch(/conservé dans le salon tant que le salon #live existe, et supprimé sur demande de l'équipe ou du joueur concerné/);
+    expect(sheet.retention.join(" ")).toMatch(/conservé dans le salon tant que le salon #live existe, même après la suppression du compte du joueur, et supprimé sur demande de l'équipe ou du joueur concerné/);
     expect(sheet.recipients.join(" ")).toMatch(/pseudo public BlueGenji des joueurs d'un tournoi individuel/);
     expect(sheet.recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association/);
     expect(sheet.retention.join(" ")).toMatch(/Annonce sur Discord : .* effacée avec le match/);

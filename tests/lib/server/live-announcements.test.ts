@@ -16,7 +16,9 @@ import {
   liveEntrantName,
   resetLiveAnnouncementThrottle,
   runLiveAnnouncementSweep,
+  soloPseudoRegisteredSince,
 } from "@/lib/server/tournaments/live-announcements";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 const NOW = Date.parse("2026-10-14T20:00:00Z");
@@ -134,6 +136,21 @@ describe("runLiveAnnouncementSweep", () => {
     const sql = String(query.mock.calls[0][0]);
     expect(sql).toMatch(/LEFT JOIN bg_users u1 ON u1\.id = t1\.solo_user_id AND u1\.is_deleted = 0/);
     expect(sql).toMatch(/LEFT JOIN bg_users u2 ON u2\.id = t2\.solo_user_id AND u2\.is_deleted = 0/);
+  });
+
+  it("ne lit le pseudo que d'une inscription faite depuis la publication du changement qui l'annonce", async () => {
+    const { query } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    const [sql, params] = query.mock.calls[0];
+    const since = soloPseudoRegisteredSince();
+    expect(since).toBe(`${PRIVACY_CHANGES.find((c) => c.id === "2026-10-pseudo-live-et-messages-de-match")?.publishedAt} 00:00:00`);
+    // Un joueur inscrit avant a lu « un joueur, jamais un pseudo » : son entrée le reste.
+    for (const alias of ["t1", "t2"]) {
+      expect(String(sql).replace(/\s+/g, " ")).toContain(
+        `EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.tournament_id = m.tournament_id AND r.team_id = ${alias}.id AND r.registered_at >= ?)`,
+      );
+    }
+    expect(params).toEqual([since, since]);
   });
 
   it("donne au bot une version sans pseudo à citer dans son canal de logs en cas d'échec", async () => {
