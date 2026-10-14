@@ -429,7 +429,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
-      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match et les alertes d'arbitrage",
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match, les alertes d'arbitrage et le programme d'arbitrage",
     dataSubjects: ["Joueurs engagés dans un tournoi", "Autres membres des équipes engagées (coachs, managers, propriétaires)", "Arbitres", "Casters inscrits sur un match"],
     dataCategories: [
       "Pseudo et identifiant Discord",
@@ -441,15 +441,19 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
-      "Traces d'envoi des rappels et alertes (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
+      "Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
       "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués",
     ],
     recipients: [
       "Administrateurs et arbitres de l'association",
       "Joueurs et caster d'un même match, de son lancement à sa fin",
       "Discord, qui achemine les messages",
+      "Service de push du navigateur de chaque arbitre ou administrateur abonné (programme d'arbitrage, traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
-    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
+    transfers: [
+      `États-Unis : Discord (acheminement des messages privés et du canal de logs) — ${transferBasis(["DISCORD"])}`,
+      `États-Unis : service de push du navigateur de l'arbitre ou de l'administrateur abonné, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+    ],
     security: [
       ...COMMON_SECURITY,
       "Pseudo non certifié invisible de tous, administrateurs compris ; pseudo certifié jamais montré à un visiteur sans compte",
@@ -466,7 +470,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
     ],
     legalBasis: "Intérêt légitime (administration et contrôle de l'arbitrage)",
-    dataSubjects: ["Staff"],
+    dataSubjects: ["Staff", "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)"],
     dataCategories: [
       "Sur Discord : noms d'équipe, scores, noms des tournois — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
       "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage",

@@ -252,7 +252,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, match reminders and referee alerts",
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, match reminders, referee alerts and the refereeing schedule",
     dataSubjects: ["Players taking part in a tournament", "Other members of the teams taking part (coaches, managers, owners)", "Referees", "Casters registered on a match"],
     dataCategories: [
       "Discord username and identifier",
@@ -264,15 +264,19 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     sensitiveData: "None",
     retention: [
       "Certified username: until it is changed or the account is deleted",
-      "Records of reminders and alerts sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
+      "Records of reminders, alerts and refereeing schedules sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
       "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played",
     ],
     recipients: [
       "The association's administrators and referees",
       "Players and caster of the same match, from its launch to its end",
       "Discord, which delivers the messages",
+      "The push service of the browser of each subscribed referee or administrator (refereeing schedule, processing activity T12), which delivers an encrypted message it cannot read",
     ],
-    transfers: [`United States: Discord (delivery of direct messages) — ${transferBasisEn(["DISCORD"])}`],
+    transfers: [
+      `United States: Discord (delivery of direct messages and of the log channel) — ${transferBasisEn(["DISCORD"])}`,
+      `United States: push service of the browser of the subscribed referee or administrator, which only receives end-to-end encrypted messages (RFC 8291) — ${transferBasisEn(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+    ],
     security: [
       ...COMMON_SECURITY_EN,
       "Uncertified username invisible to everyone, administrators included; certified username never shown to a visitor without an account",
@@ -289,7 +293,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
     legalBasis: "Legitimate interest (administration and oversight of refereeing)",
-    dataSubjects: ["Staff"],
+    dataSubjects: ["Staff", "Players and teams taking part in a tournament (referred to by team name, never by their username)"],
     dataCategories: [
       "On Discord: team names, scores, tournament names — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
       "In the server logs: username and identifier of the staff member who carried out a refereeing action",
