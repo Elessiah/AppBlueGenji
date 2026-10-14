@@ -43,7 +43,7 @@ import { reportConcernedHref, type ReportCategory } from "./content-reports";
 import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
-import type { PushContent } from "./push-notifications";
+import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -222,7 +222,7 @@ export function matchReminderPush(
   const checkIn = side.checkIn ?? offset === CHECK_IN_REMINDER_KEY;
   return {
     title: announcementTitle(offset, change.rescheduled, text),
-    body: checkIn ? `${body} ${checkInText(text, side.checkInOpen === true)}` : body,
+    body: checkIn ? withTail(body, checkInText(text, side.checkInOpen === true)) : body,
     // L'adresse écrite dans le texte ne se touche pas : le push du check-in
     // ouvre l'invitation (par le site, seule origine qu'une notification ouvre).
     url: checkIn ? CHECK_IN_PATH : localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
@@ -351,6 +351,35 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
   };
 }
 
+/** Longueur affichée (par caractère, comme la borne du push). */
+function charCount(text: string): number {
+  return Array.from(text).length;
+}
+
+/**
+ * `body` suivi de `tail`, dans la borne du corps d'un push : c'est `body` qui
+ * se raccourcit — une reprogrammation aux noms longs, suivie de la phrase du
+ * check-in, dépasse la borne, et la coupe finale tronquerait l'invitation.
+ */
+function withTail(body: string, tail: string): string {
+  const room = PUSH_BODY_MAX - charCount(tail) - 1;
+  return `${clipPushText(body, Math.max(room, 1))} ${tail}`;
+}
+
+/**
+ * Empreinte courte (FNV-1a 32 bits, base 36) d'une liste d'identifiants :
+ * l'étiquette d'un push est bornée à 64 caractères, une liste écrite en
+ * entier y serait coupée — et deux programmes au même début confondus.
+ */
+function idsFingerprint(ids: readonly number[]): string {
+  let hash = 0x811c9dc5;
+  for (const char of ids.join(",")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}
+
 /** Phrase du check-in : quand le salon ouvre, ou qu'il l'est déjà. */
 function checkInText(text: PushText, open: boolean): string {
   return open
@@ -402,8 +431,11 @@ function digestTime(startAt: string | Date, locale: Locale): string {
  * tiennent en une ligne « 5 matchs » plutôt qu'en cinq lignes identiques
  * « Un match ». Le lien mène au tournoi
  * quand le programme n'en cite qu'un, à la liste des tournois sinon.
- * L'étiquette nomme toutes les manches citées : un programme suivant, qui en
- * cite d'autres, ne remplace jamais le précédent sur l'appareil.
+ * Le corps garde ses lignes (`clipPushText`) et tient dans `PUSH_BODY_MAX` :
+ * les matchs qui n'y entrent pas se disent « … et N autres ».
+ * L'étiquette porte une empreinte de toutes les manches citées (bornée à
+ * 64 caractères) : un programme suivant, qui en cite d'autres, ne remplace
+ * jamais le précédent sur l'appareil.
  */
 export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
@@ -420,27 +452,45 @@ export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale
     const pairing = match.solo ? null : text.t("pairing", { team: match.team1Name, opponent: match.team2Name });
     lines.push({ start, tournament: match.tournamentName, round, pairing, count: 1 });
   }
-  const kept = lines.slice(0, REFEREE_DIGEST_PUSH_LINES);
-  const shown = [
-    ...kept.map((line) =>
-      text.t("refereeDigest.line", {
+  const rendered = lines.map((line) => ({
+    count: line.count,
+    // Une ligne par match : un nom ne doit pas en ouvrir une autre.
+    text: text
+      .t("refereeDigest.line", {
         start: line.start,
         pairing: line.pairing ?? text.t("refereeDigest.pairingSolo", { count: line.count }),
         tournament: line.tournament,
         round: line.round,
-      }),
-    ),
-  ];
-  const hidden = matches.length - kept.reduce((sum, line) => sum + line.count, 0);
-  if (hidden > 0) shown.push(text.t("refereeDigest.more", { count: hidden }));
-  shown.push(text.t("refereeDigest.timeZone"));
+      })
+      .replace(/\s+/g, " "),
+  }));
+  // Lignes gardées tant que le tout — « … et N autres » et « Heure de Paris »
+  // compris — tient dans la borne du corps (`PUSH_BODY_MAX`) : coupé au-delà,
+  // le push perdrait ces deux lignes, et l'arbitre croirait la liste complète.
+  const timeZone = text.t("refereeDigest.timeZone");
+  const footer = (hidden: number) =>
+    hidden > 0 ? [text.t("refereeDigest.more", { count: hidden }), timeZone] : [timeZone];
+  const shown: string[] = [];
+  let listed = 0;
+  for (const line of rendered) {
+    if (shown.length >= REFEREE_DIGEST_PUSH_LINES) break;
+    const next = [...shown, line.text, ...footer(matches.length - listed - line.count)];
+    if (shown.length > 0 && charCount(next.join("\n")) > PUSH_BODY_MAX) break;
+    shown.push(line.text);
+    listed += line.count;
+  }
+  const tail = footer(matches.length - listed);
+  // La première ligne reste, raccourcie s'il le faut : le pied doit arriver.
+  const room = PUSH_BODY_MAX - charCount(tail.join("\n")) - 1;
+  if (shown.length === 1 && charCount(shown[0]) > room) shown[0] = clipPushText(shown[0], Math.max(room, 1));
+  shown.push(...tail);
   const tournaments = new Set(matches.map((match) => match.tournamentId));
   const [onlyTournament] = tournaments;
   return {
     title: text.t("refereeDigest.title", { count: matches.length }),
     body: shown.join("\n"),
     url: localeHref(tournaments.size === 1 ? tournamentHref(onlyTournament) : "/tournois", locale),
-    tag: `referee-digest-${matches.map((match) => match.matchId).join("-")}`,
+    tag: `referee-digest-${matches[0]?.matchId ?? 0}-${matches.length}-${idsFingerprint(matches.map((match) => match.matchId))}`,
   };
 }
 

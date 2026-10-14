@@ -34,6 +34,7 @@ import {
   REFEREE_DIGEST_KEY,
   REFEREE_DIGEST_LEAD_MS,
 } from "@/lib/shared/discord-notifications";
+import { inBatches } from "@/lib/shared/in-batches";
 import { PLAYED_MATCH_STATUSES } from "@/lib/shared/match-schedule";
 import { toParticipantType } from "@/lib/shared/participants";
 import { refereeDigestPush } from "@/lib/shared/push-messages";
@@ -54,12 +55,12 @@ type DigestRow = RowDataPacket & {
   team2_name: string;
 };
 
-/** Manches à venir non citées, deux engagées connues, jusqu'à la borne donnée. */
-const DIGEST_SELECT = `SELECT m.id, m.tournament_id, m.start_at, m.team1_id, m.team2_id,
-            m.bracket, m.round_number, ${swissRoundSql("m", "t")},
-            t.name AS tournament_name, t.participant_type,
-            t1.name AS team1_name, t2.name AS team2_name
-       FROM bg_matches m
+/**
+ * Manches à venir non citées, jouables, deux engagées connues : la condition
+ * commune à la sonde et à la lecture du programme (paramètres : borne basse,
+ * borne haute, marque).
+ */
+const DIGEST_FROM = `FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
@@ -68,8 +69,25 @@ const DIGEST_SELECT = `SELECT m.id, m.tournament_id, m.start_at, m.team1_id, m.t
         AND m.start_at IS NOT NULL
         AND m.start_at > ?
         AND m.start_at <= ?
-        AND NOT EXISTS (SELECT 1 FROM bg_match_reminders r WHERE r.match_id = m.id AND r.offset_key = ?)
+        AND NOT EXISTS (SELECT 1 FROM bg_match_reminders r WHERE r.match_id = m.id AND r.offset_key = ?)`;
+
+/**
+ * Sonde : une manche non citée est-elle entrée dans ses 10 dernières heures ?
+ * Une ligne au plus — tant que la réponse est non (la plupart des balayages),
+ * la marge de regroupement n'est ni lue ni jointe.
+ */
+const DIGEST_DUE_PROBE = `SELECT 1 AS due ${DIGEST_FROM} LIMIT 1`;
+
+/** Manches du programme, jusqu'à la fin de la marge de regroupement. */
+const DIGEST_SELECT = `SELECT m.id, m.tournament_id, m.start_at, m.team1_id, m.team2_id,
+            m.bracket, m.round_number, ${swissRoundSql("m", "t")},
+            t.name AS tournament_name, t.participant_type,
+            t1.name AS team1_name, t2.name AS team2_name
+       ${DIGEST_FROM}
       ORDER BY m.start_at, m.id`;
+
+/** Réservations de marques menées de front (comme le balayage des rappels). */
+const CLAIM_CONCURRENCY = 4;
 
 /**
  * Réserve la citation d'une manche **pour l'horaire et l'affiche lus** : un
@@ -97,19 +115,33 @@ async function claimDigestMark(row: DigestRow): Promise<boolean> {
 export async function dispatchRefereeDigest(now: Date = new Date()): Promise<number> {
   const db = await getDatabase();
   const triggerAt = now.getTime() + REFEREE_DIGEST_LEAD_MS;
+  // Rien n'entre encore dans les 10 dernières heures : les manches de la marge
+  // attendent — elles partiront avec celle qui ouvrira le programme.
+  const [due] = await db.query<RowDataPacket[]>(DIGEST_DUE_PROBE, [now, new Date(triggerAt), REFEREE_DIGEST_KEY]);
+  if (due.length === 0) return 0;
+
   const [rows] = await db.query<DigestRow[]>(DIGEST_SELECT, [
     now,
     new Date(triggerAt + REFEREE_DIGEST_GROUPING_MS),
     REFEREE_DIGEST_KEY,
   ]);
-  // Rien n'entre encore dans les 10 dernières heures : les manches de la marge
-  // attendent — elles partiront avec celle qui ouvrira le programme.
+  // Une manche déplacée entre la sonde et la lecture : rien n'est plus dû.
   if (!rows.some((row) => new Date(row.start_at).getTime() <= triggerAt)) return 0;
 
-  const claimed: DigestRow[] = [];
-  for (const row of rows) {
-    if (await claimDigestMark(row)) claimed.push(row);
-  }
+  // Quelques réservations à la fois : une ronde suisse en compte des dizaines,
+  // une par aller-retour les ferait attendre l'une après l'autre. Une
+  // réservation en échec ne retient pas les autres (la manche sera citée au
+  // programme suivant) : celles déjà prises doivent partir.
+  const won = new Set<number>();
+  await inBatches(rows, CLAIM_CONCURRENCY, async (row) => {
+    try {
+      if (await claimDigestMark(row)) won.add(Number(row.id));
+    } catch (error) {
+      console.error("[referee-digest] réservation en échec", error);
+    }
+  });
+  // L'ordre du coup d'envoi, quel que soit l'ordre des réservations.
+  const claimed = rows.filter((row) => won.has(Number(row.id)));
   if (claimed.length === 0) return 0;
 
   const matches = claimed.map((row) => {

@@ -31,6 +31,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import {
   loadEntrantPlayerIds,
@@ -127,6 +128,19 @@ const SWEEP_THROTTLE_MS = 60_000;
 
 /** Le palier le plus proche du coup d'envoi : pris, le cycle de rappels est fini. */
 const LAST_REMINDER_KEY = [...MATCH_REMINDER_OFFSETS].sort((a, b) => a.minutesBefore - b.minutesBefore)[0].key;
+
+/**
+ * Paliers suivis d'un autre, avec l'ouverture du suivant (secondes avant le
+ * coup d'envoi) : tant que le suivant n'est pas ouvert, une manche dont ce
+ * palier est déjà pris n'a rien à recevoir — le balayage ne la relit pas
+ * (sans quoi chaque manche entre 24 h et 10 h serait relue, et sa marque
+ * « 24 h » re-tentée, à chaque passage pendant 14 heures).
+ */
+const WAITING_OFFSETS = [...MATCH_REMINDER_OFFSETS]
+  .sort((a, b) => b.minutesBefore - a.minutesBefore)
+  .flatMap((offset, index, sorted) =>
+    index + 1 < sorted.length ? [{ key: offset.key, nextOpensSeconds: sorted[index + 1].minutesBefore * 60 }] : [],
+  );
 
 /** Avance du premier palier (le plus lointain) : avant, une manche observée n'a rien de dû. */
 const FIRST_REMINDER_LEAD_SECONDS = Math.max(...MATCH_REMINDER_OFFSETS.map((offset) => offset.minutesBefore)) * 60;
@@ -948,17 +962,26 @@ async function runSweep(now: Date): Promise<number> {
   // de ce cycle : elle n'est plus relue à chaque passage (clé unique).
   // Une manche déjà observée n'a rien à recevoir avant l'ouverture de son
   // premier palier : au-delà, seule une manche jamais vue (à annoncer) est lue.
+  // Une manche dont le palier ouvert est déjà pris attend l'ouverture du
+  // suivant sans être relue (`WAITING_OFFSETS`).
+  const waiting = WAITING_OFFSETS.map(
+    () => `
+        AND NOT EXISTS (SELECT 1 FROM bg_match_reminders sent
+                         WHERE sent.match_id = m.id AND sent.offset_key = ?
+                           AND m.start_at > DATE_ADD(NOW(), INTERVAL ? SECOND))`,
+  ).join("");
   const [matches] = await db.query<SweepMatchRow[]>(
     `${SWEEP_MATCH_SELECT}
         AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
-                         WHERE done.match_id = m.id AND done.offset_key = ?)
+                         WHERE done.match_id = m.id AND done.offset_key = ?)${waiting}
      HAVING m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND) OR seen_mark = 0`,
     [
       MATCH_SEEN_KEY,
       MATCH_TOLD_KEY,
       Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000),
       LAST_REMINDER_KEY,
+      ...WAITING_OFFSETS.flatMap(({ key, nextOpensSeconds }) => [key, nextOpensSeconds]),
       FIRST_REMINDER_LEAD_SECONDS,
     ],
   );
@@ -1016,14 +1039,21 @@ export async function dispatchDueMatchReminders(now: Date = new Date()): Promise
   if (pendingSweep) return pendingSweep;
   if (Date.now() - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
 
-  pendingSweep = runSweep(now).finally(async () => {
-    // « En même temps » que les rappels aux joueurs : le programme d'arbitrage,
-    // indépendant — son échec ne retient pas les rappels, ni l'inverse.
+  // « En même temps » que les rappels aux joueurs, et **de front** : le
+  // programme d'arbitrage n'attend pas les envois aux joueurs (un bot lent, une
+  // ronde suisse annoncée d'un coup le retarderaient de plusieurs minutes).
+  // Indépendant : son échec ne retient pas les rappels, ni l'inverse.
+  const digest = (async () => {
     try {
       await dispatchRefereeDigest(now);
     } catch (error) {
-      console.error("[match-reminders] programme d'arbitrage en échec", error);
+      // Table absente (création avalée au démarrage) : rien à dire à chaque passage.
+      if (!isMissingTableError(error)) console.error("[match-reminders] programme d'arbitrage en échec", error);
     }
+  })();
+  pendingSweep = Promise.allSettled([runSweep(now), digest]).then(([sweep]) => {
+    if (sweep.status === "rejected") throw sweep.reason;
+    return sweep.value;
   });
   try {
     return await pendingSweep;

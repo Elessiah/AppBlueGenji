@@ -175,8 +175,19 @@ export const PUSH_TITLE_MAX = 80;
 export const PUSH_BODY_MAX = 240;
 export const PUSH_TAG_MAX = 64;
 
-function clip(text: string, max: number): string {
-  const clean = text.replace(/\s+/g, " ").trim();
+/**
+ * Replie les espaces et borne le texte (par caractère : un emoji n'est jamais
+ * coupé). `keepLines` garde les retours à la ligne d'un corps écrit en lignes
+ * (le programme d'arbitrage) — chaque ligne repliée, les lignes vides ôtées.
+ */
+export function clipPushText(text: string, max: number, keepLines = false): string {
+  const clean = keepLines
+    ? text
+        .split("\n")
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join("\n")
+    : text.replace(/\s+/g, " ").trim();
   const chars = Array.from(clean);
   return chars.length <= max ? clean : `${chars.slice(0, max - 1).join("")}…`;
 }
@@ -211,10 +222,10 @@ export function buildPushPayload(
 ): PushPayload {
   return {
     topic,
-    title: clip(content.title, PUSH_TITLE_MAX) || "BlueGenji Esport",
-    body: clip(content.body, PUSH_BODY_MAX),
+    title: clipPushText(content.title, PUSH_TITLE_MAX) || "BlueGenji Esport",
+    body: clipPushText(content.body, PUSH_BODY_MAX, true),
     url: pushTargetPath(content.url, siteOrigin),
-    tag: clip(content.tag ?? topic, PUSH_TAG_MAX) || topic,
+    tag: clipPushText(content.tag ?? topic, PUSH_TAG_MAX) || topic,
     lang,
   };
 }
