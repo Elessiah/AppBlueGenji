@@ -520,10 +520,35 @@ describe("dispatchLiveAnnouncements", () => {
         "live-announce tournoi-4 match-40",
         "live-announce tournoi-5 match-57",
       ]);
-      // Sa pause échue, le match refusé est réessayé.
-      jest.setSystemTime(NOW + LIVE_ANNOUNCE_RETRY_DELAY_MS + 1_000);
+      // Sa pause échue, le match refusé est réessayé seul, sans nouvel évènement.
       query.mockResolvedValue([[held]]);
-      expect(await dispatchLiveAnnouncements()).toBe(1);
+      const calls = jest.mocked(pushLiveAnnouncement).mock.calls.length;
+      await jest.advanceTimersByTimeAsync(LIVE_ANNOUNCE_RETRY_DELAY_MS);
+      expect(jest.mocked(pushLiveAnnouncement).mock.calls).toHaveLength(calls + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("un match lancé pendant la pause d'une diffusion refusée attend avec elle : un seul @everyone", async () => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const launched = new Date(NOW - 60_000).toISOString();
+      const first = { ...AUTO_LIVE, live_url: null, launched_at: launched };
+      const joined = { ...first, id: 44, pairing: "7:8", launch_pairing: "7:8" };
+      jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
+      const { query } = mockDb([first]);
+      await dispatchLiveAnnouncements();
+      // Même tournoi, même chaîne officielle, vingt secondes plus tard : il attend.
+      jest.setSystemTime(NOW + 20_000);
+      query.mockResolvedValue([[first, joined]]);
+      jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
+      expect(await dispatchLiveAnnouncements()).toBe(0);
+      expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
+      // Au terme de la pause, les deux partent ensemble.
+      await jest.advanceTimersByTimeAsync(LIVE_ANNOUNCE_RETRY_DELAY_MS);
+      expect(pushLiveAnnouncement).toHaveBeenCalledTimes(2);
+      expect(jest.mocked(pushLiveAnnouncement).mock.calls[1][2]).toBe("live-announce tournoi-4 match-40,44");
     } finally {
       jest.useRealTimers();
     }
