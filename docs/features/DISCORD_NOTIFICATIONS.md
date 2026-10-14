@@ -566,10 +566,13 @@ clé unique, puis `(match_id, start_at) IN …`),
 et elle attend le programme que la prochaine manche due
 ouvrira — sinon elle serait citée en avance et la manche due en ouvrirait un
 second. Juste avant l'envoi, les manches réservées sont **relues** en une
-instruction (`stillAsRead`) : une manche reprogrammée, retirée ou d'affiche
-changée **après** sa réservation (sa marque est alors effacée, et le nouvel
-horaire poussé aux arbitres) sort du programme — il ne lui renverrait pas
-l'ancienne heure ; la règle « pas de marge seule » s'applique ensuite. Une
+instruction (`stillAsRead`, manche et état du tournoi) : une manche
+reprogrammée, retirée, d'affiche changée, jouée (score saisi) ou d'un tournoi
+clos **après** sa réservation sort du programme — il ne renverrait pas
+l'ancienne heure après le nouvel horaire poussé aux arbitres — et sa marque est
+rendue pour l'horaire lu (`releaseDigestMarks`) : un retrait n'efface aucune
+marque, et une manche reposée au même horaire ne serait sinon plus jamais
+citée ; la règle « pas de marge seule » s'applique ensuite. Une
 relecture en échec n'empêche pas l'envoi (les marques sont prises). Les réservations
 partent quatre à la fois (`inBatches`, comme le balayage) — une ronde suisse en
 compte des dizaines ; une réservation en échec ne retient pas les autres. La
@@ -590,7 +593,8 @@ Canaux :
   (un arbitre à l'étranger lirait sinon son heure locale ; en dernier, car une
   notification repliée ne montre que la première ligne, qui reste un match) ; chaque ligne nomme
   le tournoi **et la manche** (`pushRoundLabel`, « Ronde N » en suisse). En
-  solo, aucun pseudo : les matchs consécutifs d'un même créneau, tournoi et
+  solo, aucun pseudo : les matchs consécutifs d'un même créneau, tournoi (par
+  identifiant : deux tournois homonymes restent deux lignes) et
   manche tiennent en une ligne (« 8 matchs (Coupe, Manche 1) », pluriel ICU)
   au lieu de lignes « Un match » identiques ; « … et N autres » compte les
   matchs. Le lien mène à la fiche du tournoi quand le programme
