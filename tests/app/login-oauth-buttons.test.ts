@@ -30,7 +30,7 @@ describe("boutons OAuth de la page de connexion", () => {
 
   it("pose des ancres ordinaires vers la route de départ", () => {
     // La langue de la page voyage aussi (lot 6) : un refus revient sur `/en/connexion`.
-    expect(buttons).toMatch(/<a\s+href=\{oauthStartPath\(provider, \{ redirect, termsAccepted, locale \}\)\}/);
+    expect(buttons).toMatch(/<a\s+href=\{oauthStartPath\(provider, \{ redirect, terms, locale \}\)\}/);
   });
 
   it("garde la page de connexion capable d'annoncer le refus qu'elle reçoit", () => {

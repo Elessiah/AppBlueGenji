@@ -58,6 +58,7 @@ describe("saveOAuthState", () => {
       redirectTo: "/tournois",
       intent: "LINK",
       termsAccepted: false,
+      termsAcceptedNow: false,
       localeFromPage: true,
     }).then(() => {
       const [name, value, options] = store.set.mock.calls[0] as [
@@ -72,6 +73,7 @@ describe("saveOAuthState", () => {
         redirectTo: "/tournois",
         intent: "LINK",
         termsAccepted: false,
+        termsAcceptedNow: false,
         localeFromPage: true,
       });
       expect(options.httpOnly).toBe(true);
@@ -83,12 +85,12 @@ describe("saveOAuthState", () => {
   it("pose `secure` en production, et pas en développement", async () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     let store = fakeCookies();
-    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: false, localeFromPage: false });
+    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: false, termsAcceptedNow: false, localeFromPage: false });
     expect((store.set.mock.calls[0][2] as Record<string, unknown>).secure).toBe(true);
 
     (process.env as Record<string, string | undefined>).NODE_ENV = "development";
     store = fakeCookies();
-    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: false, localeFromPage: false });
+    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: false, termsAcceptedNow: false, localeFromPage: false });
     expect((store.set.mock.calls[0][2] as Record<string, unknown>).secure).toBe(false);
   });
 });
@@ -105,6 +107,7 @@ describe("consumeOAuthState", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: false,
+      termsAcceptedNow: false,
       localeFromPage: false,
     });
     expect(store.set).toHaveBeenCalledWith(
@@ -146,6 +149,14 @@ describe("consumeOAuthState", () => {
 
     fakeCookies(encode({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: "1" }));
     await expect(consumeOAuthState()).resolves.toEqual(expect.objectContaining({ termsAccepted: false }));
+
+    // « Acceptées dans la page » n'a de sens qu'avec l'acceptation elle-même.
+    fakeCookies(encode({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: true, termsAcceptedNow: true }));
+    await expect(consumeOAuthState()).resolves.toEqual(expect.objectContaining({ termsAccepted: true, termsAcceptedNow: true }));
+    fakeCookies(encode({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: false, termsAcceptedNow: true }));
+    await expect(consumeOAuthState()).resolves.toEqual(expect.objectContaining({ termsAccepted: false, termsAcceptedNow: false }));
+    fakeCookies(encode({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: true, termsAcceptedNow: "1" }));
+    await expect(consumeOAuthState()).resolves.toEqual(expect.objectContaining({ termsAcceptedNow: false }));
   });
 
   it("rend la provenance du départ (lot 9-3) : seulement un `true` strict, absente d'un cookie d'avant = non", async () => {

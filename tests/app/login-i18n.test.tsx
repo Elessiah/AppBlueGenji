@@ -299,9 +299,9 @@ describe("formulaire — /en/connexion sans un mot de français", () => {
   it("avertissement de contexte (app iOS, navigateur intégré) en anglais", () => {
     for (const environment of ["IOS_INSTALLED_APP", "IN_APP_BROWSER"] as const) {
       const notice = loginEnvironmentNotice(environment, EN_TEXT);
-      const html = render(<OAuthButtons redirect="/en/regles" termsAccepted environmentNotice={notice} />, "en");
+      const html = render(<OAuthButtons redirect="/en/regles" terms={{ version: 4, acceptedNow: true }} environmentNotice={notice} />, "en");
       expectNoFrench(visibleText(html));
-      expect(html).toContain("/api/auth/google/start?redirect=%2Fen%2Fregles&amp;lang=en&amp;terms=1");
+      expect(html).toContain("/api/auth/google/start?redirect=%2Fen%2Fregles&amp;lang=en&amp;terms=4&amp;termsNow=1");
     }
   });
 

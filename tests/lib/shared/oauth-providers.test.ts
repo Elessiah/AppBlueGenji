@@ -73,6 +73,16 @@ describe("oauthStartPath", () => {
     );
   });
 
+  it("porte la version des conditions acceptées, et « dans la page » seulement si c'est le cas", () => {
+    expect(oauthStartPath("GOOGLE", { terms: { version: 4, acceptedNow: true } })).toBe(
+      "/api/auth/google/start?terms=4&termsNow=1",
+    );
+    expect(oauthStartPath("GOOGLE", { terms: { version: 4, acceptedNow: false } })).toBe(
+      "/api/auth/google/start?terms=4",
+    );
+    expect(oauthStartPath("GOOGLE", { terms: null })).toBe("/api/auth/google/start");
+  });
+
   it("ne pose aucun paramètre quand il n'y en a pas", () => {
     expect(oauthStartPath("BLIZZARD")).toBe("/api/auth/blizzard/start");
   });

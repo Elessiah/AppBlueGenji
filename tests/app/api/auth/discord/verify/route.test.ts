@@ -28,6 +28,7 @@ import { DISCORD_CODE_VERIFY_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
 /**
  * Le plafond de vérification, et **l'axe sur lequel il est posé**.
@@ -167,7 +168,24 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
       // Aucune case cochée dans ce corps : un compte existant se connecte, un
       // compte neuf serait refusé par le service (`TERMS_REQUIRED`).
       termsAccepted: false,
+      acceptedNow: false,
     });
+  });
+
+  it("ne retient l'acceptation qu'à la version en vigueur, et « dans la page » qu'avec elle", async () => {
+    verifyMock.mockResolvedValue({ discordId: VICTIM_DISCORD, handle: "keryan" });
+    const door = (termsAccepted: boolean, acceptedNow: boolean) => ({ method: "DM_CODE" as const, termsAccepted, acceptedNow });
+    const call = (extra: Record<string, unknown>) => request({ challenge: VICTIM_CHALLENGE, code: "424242", ...extra });
+
+    await call({ termsAccepted: true, termsVersion: TERMS_VERSION, termsAcceptedNow: true });
+    expect(createUserMock).toHaveBeenLastCalledWith(VICTIM_DISCORD, undefined, "keryan", door(true, true));
+    await call({ termsAccepted: true, termsVersion: TERMS_VERSION });
+    expect(createUserMock).toHaveBeenLastCalledWith(VICTIM_DISCORD, undefined, "keryan", door(true, false));
+    // Page chargée avant la nouvelle version (sans numéro, ou l'ancien) : rien n'est accepté.
+    for (const stale of [{}, { termsVersion: TERMS_VERSION - 1 }, { termsVersion: String(TERMS_VERSION) }]) {
+      await call({ termsAccepted: true, termsAcceptedNow: true, ...stale });
+      expect(createUserMock).toHaveBeenLastCalledWith(VICTIM_DISCORD, undefined, "keryan", door(false, false));
+    }
   });
 
   it("plafonne après la validation de forme, pas avant", async () => {

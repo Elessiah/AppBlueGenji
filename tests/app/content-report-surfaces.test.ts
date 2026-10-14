@@ -56,11 +56,14 @@ describe("conditions d'utilisation à la création du compte", () => {
   it("la version acceptée est retenue, pour redemander à la suivante", () => {
     const login = read("app/connexion/_components/LoginForm.tsx");
     expect(login).toContain("String(TERMS_VERSION)");
-    // Les trois portes transmettent l'acceptation.
-    expect(login).toContain("termsAccepted={termsAccepted}");
+    // Les trois portes transmettent l'acceptation, avec la version montrée et
+    // le fait qu'elle vient d'être donnée dans la page (pas relue du navigateur).
+    expect(login).toContain("terms={terms}");
+    expect(login).toContain("const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow } : null;");
     // Suivie de la langue de la page, devenue celle du compte (lot 9-3).
-    expect(login).toMatch(/termsAccepted,\s*(?:\/\/[^\n]*\s*)?locale: text\.locale,\s*\}\)/);
-    expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, termsAccepted, locale })");
+    expect(login).toMatch(/termsVersion: TERMS_VERSION,\s*termsAcceptedNow: acceptedNow,/);
+    expect(login).toMatch(/termsAcceptedNow: acceptedNow,[^}]*locale: text\.locale,/);
+    expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, terms, locale })");
   });
 
   it("les gérants d'équipe les acceptent depuis n'importe quelle page", () => {

@@ -11,6 +11,7 @@ jest.mock("@/lib/server/users/account-locale", () => ({ recordLoginLocale: jest.
 import crypto from "node:crypto";
 import { NextRequest } from "next/server";
 import { completeOAuth, startOAuth } from "@/lib/server/oauth-flow";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { createSession, getCurrentUser } from "@/lib/server/auth";
 import { consumeOAuthState, saveOAuthState } from "@/lib/server/oauth-state";
 import { createOrGetOAuthUser, linkOAuthIdentity } from "@/lib/server/account-identities";
@@ -80,17 +81,32 @@ describe("startOAuth", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: false,
+      termsAcceptedNow: false,
       localeFromPage: false,
     });
   });
 
-  it("scelle l'acceptation des conditions d'utilisation, et seulement `terms=1`", async () => {
+  it("scelle l'acceptation des conditions d'utilisation, et seulement à la version en vigueur", async () => {
     const fromPage = (url: string) => new NextRequest(url, { headers: { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } });
-    await startOAuth(fromPage("http://localhost:3000/api/auth/x/start?terms=1"), "GOOGLE");
-    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: true }));
+    await startOAuth(fromPage(`http://localhost:3000/api/auth/x/start?terms=${TERMS_VERSION}`), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: true, termsAcceptedNow: false }));
+
+    await startOAuth(fromPage(`http://localhost:3000/api/auth/x/start?terms=${TERMS_VERSION}&termsNow=1`), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: true, termsAcceptedNow: true }));
 
     await startOAuth(fromPage("http://localhost:3000/api/auth/x/start?terms=true"), "GOOGLE");
     expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: false }));
+  });
+
+  it("refuse l'acceptation d'une version antérieure (onglet de `/connexion` chargé avant la nouvelle)", async () => {
+    // Le paquet d'avant le changement envoyait `terms=1` ; une page restée sur
+    // la version précédente envoie son numéro : ni l'un ni l'autre n'accepte
+    // une version qu'il n'a pas montrée, même avec `termsNow`.
+    const fromPage = (url: string) => new NextRequest(url, { headers: { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" } });
+    for (const stale of ["1", String(TERMS_VERSION - 1), `${TERMS_VERSION}0`, ""]) {
+      await startOAuth(fromPage(`http://localhost:3000/api/auth/x/start?terms=${stale}&termsNow=1`), "GOOGLE");
+      expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: false, termsAcceptedNow: false }));
+    }
   });
 
   it("filtre la destination avant de l'écrire dans le cookie", async () => {
@@ -192,6 +208,7 @@ describe("completeOAuth — contrôles d'état", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
 
@@ -212,6 +229,7 @@ describe("completeOAuth — contrôles d'état", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
 
@@ -229,6 +247,7 @@ describe("completeOAuth — contrôles d'état", () => {
     redirectTo: "/profil",
     intent: "LINK" as const,
     termsAccepted: false,
+    termsAcceptedNow: false,
     localeFromPage: true,
   });
 
@@ -285,6 +304,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
     return completeOAuth(
@@ -308,7 +328,7 @@ describe("completeOAuth — connexion", () => {
         handle: null,
         avatarUrl: "https://exemple.test/a.png",
       },
-      { termsAccepted: true },
+      { termsAccepted: true, acceptedNow: false },
     );
     expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
     expect(response.headers.get("location")).toBe("http://localhost:3000/tournois");
@@ -324,6 +344,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "/en/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
     await completeOAuth(request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`), "GOOGLE");
@@ -368,9 +389,9 @@ describe("completeOAuth — connexion", () => {
     ["un navigateur sans en-tête, Referer tu", {}, false],
     ["une image du site", { "sec-fetch-site": "same-origin", "sec-fetch-mode": "no-cors", "sec-fetch-dest": "image" }, false],
     ["une page du site", { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" }, true],
-  ])("conditions cochées (`terms=1`) depuis %s : retenues = %s", async (_label, headers, expected) => {
-    await startOAuth(new NextRequest("http://localhost:3000/api/auth/x/start?terms=1", { headers }), "DISCORD");
-    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: expected }));
+  ])("conditions acceptées (`terms=<version>`) depuis %s : retenues = %s", async (_label, headers, expected) => {
+    await startOAuth(new NextRequest(`http://localhost:3000/api/auth/x/start?terms=${TERMS_VERSION}&termsNow=1`, { headers }), "DISCORD");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: expected, termsAcceptedNow: expected }));
   });
 
   it("une connexion partie d'ailleurs que d'une page du site ouvre la session sans toucher à la langue du compte", async () => {
@@ -381,6 +402,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "/en/tournois",
       intent: "LOGIN",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: false,
     });
     const response = await completeOAuth(request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`), "GOOGLE");
@@ -404,7 +426,7 @@ describe("completeOAuth — connexion", () => {
 
     expect(createOrGetOAuthUser).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "DISCORD", subject: "123456789012345678", handle: "nova" }),
-      { termsAccepted: true },
+      { termsAccepted: true, acceptedNow: false },
     );
   });
 
@@ -418,7 +440,7 @@ describe("completeOAuth — connexion", () => {
 
     expect(createOrGetOAuthUser).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "BLIZZARD", subject: "blizz-1", handle: "Nova#2143" }),
-      { termsAccepted: true },
+      { termsAccepted: true, acceptedNow: false },
     );
   });
 
@@ -477,6 +499,7 @@ describe("completeOAuth — connexion", () => {
       redirectTo: "https://exemple.invalid/phishing",
       intent: "LOGIN",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
 
@@ -509,6 +532,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/tournois",
       intent: "LINK",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
     return completeOAuth(
@@ -558,6 +582,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/en/tournois",
       intent: "LINK",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
     const response = await completeOAuth(
@@ -572,6 +597,7 @@ describe("completeOAuth — rattachement", () => {
       redirectTo: "/en/tournois",
       intent: "LINK",
       termsAccepted: true,
+      termsAcceptedNow: false,
       localeFromPage: true,
     });
     const cancelled = await completeOAuth(
@@ -661,7 +687,7 @@ describe("aller-retour OAuth — la langue du départ", () => {
   const callback = (provider: OAuthProvider, query = `?code=abc&state=${STATE}`) =>
     completeOAuth(request(`http://localhost:3000/api/auth/x/callback${query}`), provider);
   const sealed = (redirectTo: string, provider: OAuthProvider = "GOOGLE") =>
-    jest.mocked(consumeOAuthState).mockResolvedValue({ provider, state: STATE, redirectTo, intent: "LOGIN", termsAccepted: true, localeFromPage: true });
+    jest.mocked(consumeOAuthState).mockResolvedValue({ provider, state: STATE, redirectTo, intent: "LOGIN", termsAccepted: true, termsAcceptedNow: false, localeFromPage: true });
 
   it("scelle la destination dans la langue du départ, même vers une route pas encore traduite", async () => {
     await startOAuth(request("http://localhost:3000/api/auth/x/start?redirect=%2Ftournois%2F4&lang=en"), "DISCORD");
@@ -682,7 +708,7 @@ describe("aller-retour OAuth — la langue du départ", () => {
   it("n'ajoute au cookie d'état que la provenance du départ, jamais la langue à part", async () => {
     await startOAuth(request("http://localhost:3000/api/auth/x/start?lang=en"), "GOOGLE");
     expect(Object.keys(jest.mocked(saveOAuthState).mock.calls[0][0]).sort()).toEqual(
-      ["intent", "localeFromPage", "provider", "redirectTo", "state", "termsAccepted"],
+      ["intent", "localeFromPage", "provider", "redirectTo", "state", "termsAccepted", "termsAcceptedNow"],
     );
   });
 

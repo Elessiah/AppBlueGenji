@@ -13,7 +13,7 @@ const NOTICE = loginEnvironmentNotice("IOS_INSTALLED_APP") ?? "";
 
 function render(environmentNotice?: string | null): string {
   return renderToStaticMarkup(
-    <OAuthButtons redirect="/tournois" termsAccepted environmentNotice={environmentNotice} />,
+    <OAuthButtons redirect="/tournois" terms={{ version: 4, acceptedNow: false }} environmentNotice={environmentNotice} />,
   );
 }
 
