@@ -513,7 +513,9 @@ coup d'envoi sur Discord — <invitation> ». L'invitation est **une** constante
 message privé et le push (`matchReminder.checkIn`, paramètre `{minutes}`)
 lisent tous deux. À moins de 15 minutes du coup d'envoi (manche programmée au
 dernier moment, balayage tardif), « ouvre 15 minutes avant » désignerait un
-instant passé : `isCheckInOpen` (instant de l'envoi, `PlannedSend.now`) fait
+instant passé : `isCheckInOpen` (instant **de l'envoi** : `PlannedSend.now`
+avancé du temps écoulé depuis la préparation, `sentAt` — un lot d'une ronde
+suisse qui sort après l'ouverture du salon le dit ouvert) fait
 dire « le salon de check-in est déjà ouvert sur Discord » au message privé
 (`checkInLine(true)`) et « Check-in déjà ouvert sur Discord » / « Check-in
 already open on Discord » au push (`matchReminder.checkInOpen`). Le rappel
@@ -552,11 +554,14 @@ l'envoi pour son horaire et son affiche : citée une fois par horaire ;
 reprogrammée ou d'affiche changée, elle est citée de nouveau. Si aucune manche
 **due** n'a été prise (déplacée entre la lecture et la réservation, réservation
 en échec), la marge ne part pas seule : ses marques sont rendues
-(`releaseDatedMarks`), et elle attend le programme que la prochaine manche due
+(`releaseDigestMarks`, une seule instruction `(match_id, start_at) IN …`),
+et elle attend le programme que la prochaine manche due
 ouvrira — sinon elle serait citée en avance et la manche due en ouvrirait un
 second. Les réservations
 partent quatre à la fois (`inBatches`, comme le balayage) — une ronde suisse en
-compte des dizaines ; une réservation en échec ne retient pas les autres.
+compte des dizaines ; une réservation en échec ne retient pas les autres. La
+réservation est celle des paliers (`claimDatedMark`, `reminder-marks.ts`,
+partagée par le balayage et le programme).
 Canaux :
 
 - push `REFEREE_DIGEST` (« Programme d'arbitrage », audience `tournaments`,
