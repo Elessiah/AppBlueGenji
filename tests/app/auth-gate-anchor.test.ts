@@ -39,4 +39,22 @@ describe("AuthGate — l'ancre de la page demandée suit la connexion", () => {
     expect(gate).toContain("}, [pathname, query]);");
     expect(gate).toContain("authGateLoginHref(pathname, query, hash)");
   });
+
+  it("au clic, l'ancre du moment l'emporte : une navigation client qui ne change que l'ancre ne déclenche pas hashchange", () => {
+    const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
+    expect(gate).toContain("const fresh = authGateLoginHref(pathname, query, globalThis.location.hash);");
+    expect(gate).toContain("if (fresh === loginHref) return;");
+    expect(gate).toContain("router.push(fresh);");
+    expect(gate).toContain("<LocaleLink href={loginHref} onClick={goToLogin}>{text.login}</LocaleLink>");
+    // Un clic qui ouvre un nouvel onglet garde le href rendu.
+    expect(gate).toContain("if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;");
+  });
+
+  it("la documentation d'AuthGate reste collée au composant", () => {
+    const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
+    const component = gate.indexOf("export function AuthGate(");
+    // Rien entre la fin de sa documentation et sa déclaration.
+    const before = gate.slice(0, component).trimEnd();
+    expect(before.endsWith("Sans prop (tests), le français.\n */") || before.endsWith("Sans prop (tests), le français.\r\n */")).toBe(true);
+  });
 });

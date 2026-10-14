@@ -165,7 +165,7 @@ describe("liste blanche — la connexion est traduite", () => {
 
   it("la carte « Connexion requise » mène à la connexion de la langue lue, destination préfixe compris", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
-    expect(gate).toContain("<LocaleLink href={loginHref}>{text.login}</LocaleLink>");
+    expect(gate).toContain("<LocaleLink href={loginHref} onClick={goToLogin}>{text.login}</LocaleLink>");
     expect(gate).toContain("const loginHref = authGateLoginHref(pathname, query, hash);");
     expect(gate).toContain("const destination = pathname + search + anchor;");
     expect(gate).toContain("const pathname = usePathname();");
