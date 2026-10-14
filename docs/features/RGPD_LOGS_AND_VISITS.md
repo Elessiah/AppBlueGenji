@@ -58,7 +58,9 @@ intérêt légitime (retransmission, registre T16), sans case à cocher ; la men
 d'inscription l'annonce, `/rgpd` et `PRIVACY_CHANGES` le déclarent. Journaux,
 alertes, programme d'arbitrage et tout autre message Discord gardent « un joueur » —
 y compris la citation d'une annonce échouée au canal de logs du bot, faite sur
-la version sans pseudo que le site joint (`logMessage`).
+la version sans pseudo que le site joint (`logMessage`) — dès que le bot déployé
+la lit ; avant, la citation porte les pseudos (annonces #live coupées en
+production tant que `LIVE_ANNOUNCEMENTS_ENABLED` n'est pas posée).
 
 - **Un rédacteur ne reçoit jamais un nom nu** : les formateurs prennent un
   `LogEntrant` (`{ name, participantType }`) et le rendent par `entrantLabel`.
