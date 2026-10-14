@@ -272,7 +272,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Players and caster of the same match, from its launch to its end",
       "Discord, which delivers the messages",
       "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
-      "The push service of the browser of each subscribed recipient — player (match announcements and reminders), referee or administrator (refereeing schedule); processing activity T12 — which delivers an encrypted message it cannot read",
+      "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule; processing activity T12), which delivers an encrypted message it cannot read",
     ],
     transfers: [
       `United States: Discord (delivery of direct messages and of the log channel) — ${transferBasisEn(["DISCORD"])}`,

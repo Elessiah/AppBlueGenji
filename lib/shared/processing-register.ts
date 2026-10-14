@@ -449,7 +449,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et caster d'un même match, de son lancement à sa fin",
       "Discord, qui achemine les messages",
       "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)",
-      "Service de push du navigateur de chaque destinataire abonné — joueur (annonces et rappels de match), arbitre ou administrateur (programme d'arbitrage) ; traitement T12 —, qui achemine un message chiffré qu'il ne peut pas lire",
+      "Service de push du navigateur de chaque destinataire abonné (joueur : annonces et rappels de match ; arbitre ou administrateur : programme d'arbitrage ; traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
     transfers: [
       `États-Unis : Discord (acheminement des messages privés et du canal de logs) — ${transferBasis(["DISCORD"])}`,
