@@ -10,6 +10,7 @@ import {
   announceEntrantsWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
+  pendingRefereeDigest,
   resetMatchReminderThrottle,
   type MatchNotice,
 } from "@/lib/server/tournaments/match-reminders";
@@ -1303,6 +1304,34 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     expect(dispatchRefereeDigest).toHaveBeenCalledWith(FIVE_HOURS_BEFORE);
     release();
     await sweep;
+  });
+
+  it("ne retient pas le balayage sur le programme : son propre verrou, un seul à la fois", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    // Les appareils du staff tardent : le programme ne revient qu'au signal.
+    let release: (count: number) => void = () => undefined;
+    jest.mocked(dispatchRefereeDigest).mockImplementation(
+      () =>
+        new Promise<number>((resolve) => {
+          release = resolve;
+        }),
+    );
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    // Le balayage des joueurs rend la main sans attendre le programme.
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+    expect(pendingRefereeDigest()).not.toBeNull();
+
+    // Balayage suivant, programme toujours en cours : pas de second programme.
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 31, offset_key: "PT10H" }] });
+    const later = jest.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    later.mockRestore();
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
+
+    release(0);
+    await pendingRefereeDigest();
+    expect(pendingRefereeDigest()).toBeNull();
   });
 
   it("tait l'absence de table au programme d'arbitrage, comme au balayage", async () => {

@@ -209,6 +209,17 @@ describe("dispatchRefereeDigest", () => {
     errors.mockRestore();
   });
 
+  it("ne part pas avec la marge seule quand la manche due n'a pas été prise, et rend ses marques", async () => {
+    // M1 (due) déplacée entre la lecture et la réservation ; M2 n'est que dans la marge.
+    const { execute } = mockDb([row(1, 9), row(2, 11.5)], [1]);
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(0);
+
+    expect(notifyStaff).not.toHaveBeenCalled();
+    const release = execute.mock.calls.find(([sql]) => /DELETE FROM bg_match_reminders/.test(sql));
+    expect(release?.[1]).toEqual([2, "REFS", row(2, 11.5).start_at]);
+  });
+
   it("n'envoie rien quand toutes les réservations sont refusées", async () => {
     mockDb([row(1, 9)], [1]);
 
