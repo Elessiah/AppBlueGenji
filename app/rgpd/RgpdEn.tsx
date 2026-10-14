@@ -884,8 +884,9 @@ export function RgpdEn({
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
             server, with an @everyone mention: the names of both teams (never their players&apos; usernames) or, in a
-            solo tournament, the <strong>public BlueGenji username</strong> of both players (a username, never a first
-            name or a Discord identifier; “a player” for an entry without an account, a deleted account or a
+            solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile: unless changed, the Discord username or BattleTag
+            taken when the account was created, or even the Google account name for a Google account created before
+            September 30, 2026; never the numeric Discord identifier; “a player” for an entry without an account, a deleted account or a
             registration made before 16 October 2026), the tournament&apos;s name and the stream link. The neutral name applies to
             the stream only: a player who does not want their username in that announcement does not register for
             the solo tournament. These announcements stay in

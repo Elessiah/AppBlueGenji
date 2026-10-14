@@ -10,7 +10,9 @@
  * nom d'équipe puisse partir, un joueur jamais. L'annonce #live en est la
  * **seule exception**, décidée par l'utilisateur (2026-10-14) : l'engagé d'une
  * entrée individuelle y est nommé par son **pseudo public BlueGenji** — un
- * pseudo, jamais un prénom ni un identifiant Discord —, comme un diffuseur
+ * pseudo de sa fiche (repris de Discord, de Blizzard, voire de Google pour un
+ * compte Google d'avant le 30 septembre 2026, s'il ne l'a pas changé), jamais
+ * l'identifiant Discord numérique —, comme un diffuseur
  * nomme les joueurs à l'antenne. Une affiche d'équipes ne nomme que les
  * équipes, jamais leurs joueurs. Un joueur dont le pseudo manque (compte
  * supprimé) s'écrit « un joueur ». Tous les noms passent par `discordInline` :
