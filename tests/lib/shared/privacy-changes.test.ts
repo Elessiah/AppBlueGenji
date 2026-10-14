@@ -886,7 +886,7 @@ describe("PRIVACY_CHANGES — matchs diffusés annoncés sur Discord (#442)", ()
   it("est la dernière entrée, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
     expect(entry).toBeDefined();
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
-    expect(entry.publishedAt).toBe("2026-10-16");
+    expect(entry.publishedAt).toBe("2026-10-15");
     expect(entry.audience).toBeUndefined();
   });
 
