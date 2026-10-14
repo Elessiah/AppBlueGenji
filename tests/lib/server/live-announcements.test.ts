@@ -77,7 +77,12 @@ function releasesOf(execute: Db["execute"]): unknown[] {
 beforeEach(() => {
   jest.clearAllMocks();
   resetLiveAnnouncementThrottle();
-  jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production", APP_URL: "https://site-public.fr" });
+  jest.replaceProperty(process, "env", {
+    ...process.env,
+    NODE_ENV: "production",
+    APP_URL: "https://site-public.fr",
+    LIVE_ANNOUNCEMENTS_ENABLED: "1",
+  });
   jest.mocked(isBotCircuitOpen).mockReturnValue(false);
   jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
   jest.spyOn(console, "info").mockImplementation(() => undefined);
@@ -519,6 +524,28 @@ describe("dispatchLiveAnnouncements", () => {
 
   it("part en production sur le site public", () => {
     expect(liveAnnouncementsEnabled()).toBe(true);
+  });
+
+  it.each([
+    ["absente", undefined],
+    ["vide", ""],
+    ["à une autre valeur", "true"],
+  ])("ne fait rien sans activation explicite (LIVE_ANNOUNCEMENTS_ENABLED %s), même via un tunnel https", async (_label, flag) => {
+    // Un tunnel (ngrok…) donne un vrai nom de domaine en https à un poste de développement.
+    jest.replaceProperty(process, "env", {
+      ...process.env,
+      NODE_ENV: "production",
+      APP_URL: "https://abcd.ngrok-free.app",
+      LIVE_ANNOUNCEMENTS_ENABLED: flag,
+    });
+    const { query } = mockDb([AUTO_LIVE]);
+    expect(liveAnnouncementsEnabled()).toBe(false);
+    expect(await dispatchLiveAnnouncements()).toBe(0);
+    expect(query).not.toHaveBeenCalled();
+    // Une variable oubliée au déploiement se lit dans pm2, une fois.
+    await dispatchLiveAnnouncements();
+    const notices = jest.mocked(console.info).mock.calls.filter(([line]) => String(line).includes("désactivées"));
+    expect(notices).toHaveLength(1);
   });
 
   it("est étranglé : un second appel immédiat ne relit pas la base", async () => {
