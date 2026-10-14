@@ -27,6 +27,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
 import { formatRefereeDigestLog } from "@/lib/shared/bot-logs";
@@ -92,7 +93,9 @@ const DIGEST_SELECT = `SELECT m.id, m.tournament_id, m.start_at, m.team1_id, m.t
 const CLAIM_CONCURRENCY = 4;
 
 /**
- * Rend, en une instruction, les citations réservées par ce programme qui ne
+ * Rend, en une instruction (par la clé unique `(match_id, offset_key)` : la
+ * liste de manches en tête, un `IN` de lignes seul ne s'appuyant sur aucun
+ * index), les citations réservées par ce programme qui ne
  * partira pas — chacune **pour l'horaire lu** (une manche reprogrammée
  * entre-temps garde la marque de son nouvel horaire). Ne lève jamais : une
  * marque non rendue attend le changement d'horaire suivant, pm2 le dit.
@@ -102,8 +105,13 @@ async function releaseDigestMarks(rows: readonly DigestRow[]): Promise<void> {
     const db = await getDatabase();
     await db.execute(
       `DELETE FROM bg_match_reminders
-        WHERE offset_key = ? AND (match_id, start_at) IN (${rows.map(() => "(?, ?)").join(", ")})`,
-      [REFEREE_DIGEST_KEY, ...rows.flatMap((row) => [Number(row.id), new Date(row.start_at)])],
+        WHERE match_id IN (${sqlPlaceholders(rows.length)}) AND offset_key = ?
+          AND (match_id, start_at) IN (${rows.map(() => "(?, ?)").join(", ")})`,
+      [
+        ...rows.map((row) => Number(row.id)),
+        REFEREE_DIGEST_KEY,
+        ...rows.flatMap((row) => [Number(row.id), new Date(row.start_at)]),
+      ],
     );
   } catch (error) {
     if (!isMissingTableError(error)) console.error("[referee-digest] marques non rendues", error);

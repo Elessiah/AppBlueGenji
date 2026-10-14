@@ -439,20 +439,41 @@ function digestTime(startAt: string | Date, locale: Locale): string {
  */
 export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
-  // Une ligne par match ; en solo, une par créneau, tournoi et manche (suites).
+  const tournaments = new Set(matches.map((match) => match.tournamentId));
+  const [onlyTournament] = tournaments;
+  return {
+    title: text.t("refereeDigest.title", { count: matches.length }),
+    body: fitDigestBody(digestLines(matches, text, locale), matches.length, text),
+    url: localeHref(tournaments.size === 1 ? tournamentHref(onlyTournament) : "/tournois", locale),
+    tag: `referee-digest-${matches[0]?.matchId ?? 0}-${matches.length}-${idsFingerprint(matches.map((match) => match.matchId))}`,
+  };
+}
+
+/** Une ligne du programme mise en forme, et le nombre de matchs qu'elle dit. */
+type DigestLine = { text: string; count: number };
+
+/**
+ * Lignes du programme : une par match ; en solo, une par créneau, tournoi et
+ * manche (suites). Au-delà des lignes affichables, rien n'est mis en forme : le
+ * reste ne se dit qu'en nombre (« … et N autres »), compté sur les matchs.
+ */
+function digestLines(matches: readonly RefereeDigestMatch[], text: PushText, locale: Locale): DigestLine[] {
   const lines: { start: string; tournament: string; round: string; pairing: string | null; count: number }[] = [];
   for (const match of matches) {
     const start = digestTime(match.startAt, locale);
     const round = pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss);
     const last = lines.at(-1);
-    if (match.solo && last?.pairing === null && last.start === start && last.tournament === match.tournamentName && last.round === round) {
+    const sameSlot =
+      match.solo && last?.pairing === null && last.start === start && last.tournament === match.tournamentName && last.round === round;
+    if (sameSlot) {
       last.count += 1;
       continue;
     }
+    if (lines.length === REFEREE_DIGEST_PUSH_LINES) break;
     const pairing = match.solo ? null : text.t("pairing", { team: match.team1Name, opponent: match.team2Name });
     lines.push({ start, tournament: match.tournamentName, round, pairing, count: 1 });
   }
-  const rendered = lines.map((line) => ({
+  return lines.map((line) => ({
     count: line.count,
     // Une ligne par match : un nom ne doit pas en ouvrir une autre.
     text: text
@@ -464,34 +485,30 @@ export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale
       })
       .replace(/\s+/g, " "),
   }));
-  // Lignes gardées tant que le tout — « … et N autres » et « Heure de Paris »
-  // compris — tient dans la borne du corps (`PUSH_BODY_MAX`) : coupé au-delà,
-  // le push perdrait ces deux lignes, et l'arbitre croirait la liste complète.
+}
+
+/**
+ * Corps du programme : lignes gardées tant que le tout — « … et N autres » et
+ * « Heure de Paris » compris — tient dans la borne du corps (`PUSH_BODY_MAX`) :
+ * coupé au-delà, le push perdrait ces deux lignes, et l'arbitre croirait la
+ * liste complète. La première ligne reste, raccourcie s'il le faut.
+ */
+function fitDigestBody(lines: readonly DigestLine[], total: number, text: PushText): string {
   const timeZone = text.t("refereeDigest.timeZone");
   const footer = (hidden: number) =>
     hidden > 0 ? [text.t("refereeDigest.more", { count: hidden }), timeZone] : [timeZone];
   const shown: string[] = [];
   let listed = 0;
-  for (const line of rendered) {
-    if (shown.length >= REFEREE_DIGEST_PUSH_LINES) break;
-    const next = [...shown, line.text, ...footer(matches.length - listed - line.count)];
+  for (const line of lines) {
+    const next = [...shown, line.text, ...footer(total - listed - line.count)];
     if (shown.length > 0 && charCount(next.join("\n")) > PUSH_BODY_MAX) break;
     shown.push(line.text);
     listed += line.count;
   }
-  const tail = footer(matches.length - listed);
-  // La première ligne reste, raccourcie s'il le faut : le pied doit arriver.
+  const tail = footer(total - listed);
   const room = PUSH_BODY_MAX - charCount(tail.join("\n")) - 1;
   if (shown.length === 1 && charCount(shown[0]) > room) shown[0] = clipPushText(shown[0], Math.max(room, 1));
-  shown.push(...tail);
-  const tournaments = new Set(matches.map((match) => match.tournamentId));
-  const [onlyTournament] = tournaments;
-  return {
-    title: text.t("refereeDigest.title", { count: matches.length }),
-    body: shown.join("\n"),
-    url: localeHref(tournaments.size === 1 ? tournamentHref(onlyTournament) : "/tournois", locale),
-    tag: `referee-digest-${matches[0]?.matchId ?? 0}-${matches.length}-${idsFingerprint(matches.map((match) => match.matchId))}`,
-  };
+  return [...shown, ...tail].join("\n");
 }
 
 /** L'adversaire a saisi un score : à confirmer, ou à contester. */
