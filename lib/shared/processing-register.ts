@@ -448,6 +448,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Administrateurs et arbitres de l'association",
       "Joueurs et caster d'un même match, de son lancement à sa fin",
       "Discord, qui achemine les messages",
+      "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)",
       "Service de push du navigateur de chaque arbitre ou administrateur abonné (programme d'arbitrage, traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
     transfers: [
@@ -472,7 +473,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     legalBasis: "Intérêt légitime (administration et contrôle de l'arbitrage)",
     dataSubjects: ["Staff", "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)"],
     dataCategories: [
-      "Sur Discord : noms d'équipe, scores, noms des tournois — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
+      "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
       "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage",
     ],
     sensitiveData: "Aucune",

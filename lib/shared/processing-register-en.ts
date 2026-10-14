@@ -271,6 +271,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "The association's administrators and referees",
       "Players and caster of the same match, from its launch to its end",
       "Discord, which delivers the messages",
+      "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
       "The push service of the browser of each subscribed referee or administrator (refereeing schedule, processing activity T12), which delivers an encrypted message it cannot read",
     ],
     transfers: [
@@ -295,7 +296,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     legalBasis: "Legitimate interest (administration and oversight of refereeing)",
     dataSubjects: ["Staff", "Players and teams taking part in a tournament (referred to by team name, never by their username)"],
     dataCategories: [
-      "On Discord: team names, scores, tournament names — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
+      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
       "In the server logs: username and identifier of the staff member who carried out a refereeing action",
     ],
     sensitiveData: "None",
