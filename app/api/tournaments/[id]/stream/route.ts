@@ -33,6 +33,9 @@ import {
 } from "@/lib/server/stream-backpressure";
 import { acceptsGzip, GZIP_STREAM_HEADER } from "@/lib/server/sse-gzip";
 import { snapshotFrameOf } from "@/lib/server/tournaments/snapshot";
+import { dispatchLiveAnnouncements } from "@/lib/server/tournaments/live-announcements";
+import { computeTournamentState } from "@/lib/shared/tournament-state";
+import type { TournamentSnapshot } from "@/lib/shared/types";
 import {
   connectedFrameBytes,
   pingFrameBytes,
@@ -48,6 +51,16 @@ export const dynamic = "force-dynamic";
  * n'est pas remise à `onmessage`.
  */
 const HEARTBEAT_MS = 25_000;
+
+/**
+ * Le battement doit-il relancer le balayage des annonces de live ? En
+ * production, et pour un tournoi en cours seulement — d'après ses dates, car
+ * l'instantané d'ouverture a pu être lu avant le départ.
+ */
+function liveAnnouncementsDue(card: TournamentSnapshot["card"]): boolean {
+  if (process.env.NODE_ENV !== "production") return false;
+  return card.state === "RUNNING" || computeTournamentState(card) === "RUNNING";
+}
 
 /** Le client demande-t-il le palier spectateur (onglet caché, hors match) ? */
 function wantsQuietStream(req: Request): boolean {
@@ -312,14 +325,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
               cleanup();
             }
             // Un match `START_TIME` passe à l'antenne à l'heure dite, sans
-            // aucune écriture : tant qu'un spectateur suit un tournoi, son
-            // annonce dans #live part à l'heure, pas au prochain évènement.
-            // Étranglé à dix secondes pour tout le processus ; hors production,
-            // pas même chargé (les annonces n'y partent jamais).
-            if (process.env.NODE_ENV === "production") {
-              void import("@/lib/server/tournaments/live-announcements")
-                .then(({ dispatchLiveAnnouncements }) => dispatchLiveAnnouncements())
-                .catch(() => undefined);
+            // aucune écriture : tant qu'un spectateur suit un tournoi en
+            // cours, son annonce dans #live part à l'heure, pas au prochain
+            // évènement. Étranglé à dix secondes pour tout le processus ; un
+            // onglet resté sur un tournoi terminé ou à venir ne relit rien.
+            if (liveAnnouncementsDue(snapshot.card)) {
+              void dispatchLiveAnnouncements().catch(() => undefined);
             }
           }, HEARTBEAT_MS);
           heartbeat.unref?.();

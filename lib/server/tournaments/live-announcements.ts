@@ -14,7 +14,8 @@
  * aucune écriture**. Le balayage suit donc les mêmes déclencheurs que les
  * notifications de départ (`./player-pushes`) : chaque évènement de tournoi
  * publié, l'entretien de l'instantané qui ouvre un lancement, et la lecture de
- * la liste des tournois. Étranglé à dix secondes, avec relève.
+ * la liste des tournois. Étranglé à dix secondes, avec relève ; une minute
+ * de pause après une annonce reportée.
  *
  * **Une annonce par match et par affiche** (`bg_live_announcements`, clé
  * unique `(match_id, pairing)`), réservée avant l'appel au bot : un balayage
@@ -81,10 +82,12 @@ export const LIVE_ANNOUNCE_MAX_AGE_MINUTES = 120;
  * Passage à l'antenne récent, selon le mode : lancement (`AUTO`), heure dite
  * — ou, pour un match devenu jouable après son heure, son lancement — en
  * `START_TIME`, ouverture d'antenne en `MANUAL`. Une colonne vide ne passe pas.
+ * Un `START_TIME` dont l'heure n'est pas venue n'est pas lu : il n'est pas à
+ * l'antenne, et un plateau programmé d'avance le relirait à chaque passage.
  */
 const FRESH_ON_AIR_SQL = `(
         (m.live_trigger = 'AUTO' AND m.launched_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE)
-        OR (m.live_trigger = 'START_TIME'
+        OR (m.live_trigger = 'START_TIME' AND m.start_at <= NOW()
             AND (m.start_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE
                  OR (m.launched_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE
                      AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id))))
@@ -182,6 +185,20 @@ const LIVE_WARN_COOLDOWN_MS = 60 * 60 * 1000;
 
 const lastWarnAt = new Map<string, number>();
 
+/** Taille au-delà de laquelle les avertissements échus sont oubliés. */
+const LIVE_WARN_PRUNE_SIZE = 200;
+
+/**
+ * Oublie les avertissements dont le délai est passé : une clé par match ou par
+ * groupe en échec, et le processus pm2 tourne des semaines.
+ */
+function pruneWarnings(now: number): void {
+  if (lastWarnAt.size < LIVE_WARN_PRUNE_SIZE) return;
+  for (const [kind, at] of lastWarnAt) {
+    if (now - at >= LIVE_WARN_COOLDOWN_MS) lastWarnAt.delete(kind);
+  }
+}
+
 /**
  * Avertit pm2, au plus une fois par heure et par clé : la cause **et** les
  * matchs, pour que chaque match reporté laisse sa trace sans que le balayage,
@@ -193,6 +210,7 @@ function warnOnce(kind: string, message: string, error?: unknown): void {
   const now = Date.now();
   const last = lastWarnAt.get(kind);
   if (last !== undefined && now - last < LIVE_WARN_COOLDOWN_MS) return;
+  pruneWarnings(now);
   lastWarnAt.set(kind, now);
   const text = `${message} (avertissement répété au plus une fois par heure)`;
   if (error === undefined) console.warn(text);
@@ -285,6 +303,9 @@ async function announce(group: AnnouncementGroup): Promise<number> {
     console.error(`[live-announce] ${label} : ${abandoned}`);
     return 0;
   }
+  // Le bot ou le salon n'en veulent pas pour l'instant : les passages suivants
+  // attendent une minute au lieu de redemander toutes les dix secondes.
+  postponeRetries();
   if (!(await releaseAnnouncements(group.rows, label))) return 0;
   const retry = plural
     ? "annonces reportées, réessayées tant que les matchs ont commencé depuis moins de deux heures"
@@ -295,6 +316,24 @@ async function announce(group: AnnouncementGroup): Promise<number> {
 }
 
 /**
+ * Réserve l'affiche d'un match ; `false` si un autre passage l'a prise ou si
+ * la base a refusé. Une réservation refusée (verrou, panne) ne doit pas
+ * emporter les affiches déjà réservées de ce passage : elles partent.
+ */
+async function tryClaim(row: LiveCandidateRow): Promise<boolean> {
+  try {
+    return await claimAnnouncement(Number(row.id), String(row.pairing));
+  } catch (error) {
+    warnOnce(
+      `claim ${Number(row.id)}`,
+      `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) : réservation impossible, réessayée à chaque passage pendant les deux heures qui suivent le début du direct`,
+      error,
+    );
+    return false;
+  }
+}
+
+/**
  * Un passage : réserve puis annonce chaque match passé à l'antenne, groupés
  * par tournoi et par lien.
  *
@@ -302,6 +341,8 @@ async function announce(group: AnnouncementGroup): Promise<number> {
  * @returns Le nombre de matchs annoncés.
  */
 export async function runLiveAnnouncementSweep(now: number = Date.now()): Promise<number> {
+  // Bot en panne : rien ne pourrait partir, inutile de relire la base.
+  if (isBotCircuitOpen()) return 0;
   const rows = await loadCandidates();
   const groups = new Map<string, AnnouncementGroup>();
   for (const row of rows) {
@@ -317,20 +358,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
     }
     // Bot en panne : ne rien réserver qu'on sait ne pas pouvoir envoyer.
     if (isBotCircuitOpen()) break;
-    let claimed: boolean;
-    try {
-      claimed = await claimAnnouncement(Number(row.id), String(row.pairing));
-    } catch (error) {
-      // Une réservation refusée par la base (verrou, panne) ne doit pas
-      // emporter les affiches déjà réservées de ce passage : elles partent.
-      warnOnce(
-        `claim ${Number(row.id)}`,
-        `[live-announce] match ${Number(row.id)} (tournoi ${Number(row.tournament_id)}) : réservation impossible, réessayée à chaque passage pendant les deux heures qui suivent le début du direct`,
-        error,
-      );
-      continue;
-    }
-    if (!claimed) continue;
+    if (!(await tryClaim(row))) continue;
     const key = `${Number(row.tournament_id)} ${url}`;
     const group = groups.get(key);
     if (group) group.rows.push(row);
@@ -343,6 +371,21 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
 
 /** Étranglement : le balayage suit chaque évènement de tournoi. */
 const LIVE_ANNOUNCE_THROTTLE_MS = 10_000;
+
+/**
+ * Pause après une annonce reportée (bot injoignable ou d'une version sans
+ * annonces, salon #live fermé, Discord réticent) : la même cause renverrait le
+ * même refus toutes les dix secondes, pendant deux heures — réservation, appel
+ * au bot et lecture du salon chez Discord à chaque fois.
+ */
+export const LIVE_ANNOUNCE_RETRY_DELAY_MS = 60_000;
+
+let retryNotBefore = 0;
+
+/** Reporte le prochain balayage d'une {@link LIVE_ANNOUNCE_RETRY_DELAY_MS}. */
+function postponeRetries(): void {
+  retryNotBefore = Date.now() + LIVE_ANNOUNCE_RETRY_DELAY_MS;
+}
 
 let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
@@ -373,7 +416,13 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
     scheduleTrailingSweep(LIVE_ANNOUNCE_THROTTLE_MS);
     return pendingSweep;
   }
-  const sinceLast = Date.now() - lastSweepAt;
+  const now = Date.now();
+  // Pause après un report : la relève tombe à son terme.
+  if (now < retryNotBefore) {
+    scheduleTrailingSweep(retryNotBefore - now);
+    return 0;
+  }
+  const sinceLast = now - lastSweepAt;
   if (sinceLast < LIVE_ANNOUNCE_THROTTLE_MS) {
     scheduleTrailingSweep(LIVE_ANNOUNCE_THROTTLE_MS - sinceLast);
     return 0;
@@ -393,6 +442,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetLiveAnnouncementThrottle(): void {
   lastSweepAt = 0;
+  retryNotBefore = 0;
   lastWarnAt.clear();
   pendingSweep = null;
   if (trailingTimer) clearTimeout(trailingTimer);
