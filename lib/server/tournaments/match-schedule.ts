@@ -21,7 +21,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
-import { MATCH_SEEN_KEY, MATCH_STAFF_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notifications";
+import { MATCH_SEEN_KEY, MATCH_STAFF_KEY, MATCH_TOLD_KEY, REFEREE_DIGEST_KEY } from "@/lib/shared/discord-notifications";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { isMatchOver, normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import type { MatchStatus } from "@/lib/shared/types";
@@ -152,8 +152,11 @@ async function lockScheduleRow(connection: PoolConnection, matchId: number): Pro
  *   l'annonce (`announceMatchSchedule`) est la nôtre, aucun balayage ne la
  *   prend à sa place. Une engagée manquante : tout part sauf `TOLD`, et le
  *   balayage annoncera la manche quand elle sera connue.
- * - Une date **effacée** garde toutes ses marques (inertes : le balayage ne
- *   lit que les manches datées).
+ * - Une date **effacée** garde ses marques (inertes : le balayage ne lit que
+ *   les manches datées) — sauf la citation au programme d'arbitrage
+ *   (`REFS`) : les arbitres ont reçu le retrait, et une date reposée à
+ *   l'identique (rendue à l'horaire que les joueurs tiennent, marques
+ *   gardées) doit reparaître au programme.
  *
  * Table absente tolérée (sa création est avalée au démarrage) : rien à lire
  * ni à effacer. Toute autre erreur défait l'écriture de la date — mieux vaut un
@@ -195,7 +198,14 @@ async function resetReminderMarks(
     await restoreHeldMarks(connection, matchId, startAt, poster.bothEntrants);
     return result;
   }
-  if (startAt === null || new Date(startAt).getTime() <= Date.now()) return result;
+  if (startAt === null) {
+    await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ?`, [
+      matchId,
+      REFEREE_DIGEST_KEY,
+    ]);
+    return result;
+  }
+  if (new Date(startAt).getTime() <= Date.now()) return result;
   if (poster.bothEntrants && !poster.played) {
     await upsertSeenMark(connection, matchId, startAt);
     await connection.execute(
