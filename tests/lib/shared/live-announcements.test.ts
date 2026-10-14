@@ -153,6 +153,13 @@ describe("liveAnnouncementUrl — redirections", () => {
       "https://www.youtube.com/redirect?q=https%3A%2F%2Fpiege.example",
       "https://www.youtube.com/attribution_link?u=/watch%3Fv%3Dabc",
       "https://www.twitch.tv/bluegenji?r=https://piege.example",
+      // Page de redirection encodée ou derrière une barre doublée.
+      "https://www.youtube.com/%72edirect?q=piege.example",
+      "https://www.youtube.com//redirect?q=piege.example",
+      // Adresse sans schéma, à barres inverses, ou encodée deux fois.
+      "https://www.twitch.tv/bluegenji?next=https:%5C%5Cpiege.example",
+      "https://www.twitch.tv/bluegenji?continue=%2F%2Fpiege.example",
+      "https://www.twitch.tv/bluegenji?next=https%253A%252F%252Fpiege.example",
     ]) {
       expect(liveAnnouncementUrl(url, null)).toBeNull();
     }
@@ -166,6 +173,8 @@ describe("liveAnnouncementUrl — redirections", () => {
 
   it("garde une diffusion ordinaire, requête comprise", () => {
     expect(liveAnnouncementUrl("https://www.youtube.com/watch?v=abc&t=60", null)).toBe("https://www.youtube.com/watch?v=abc&t=60");
+    expect(liveAnnouncementUrl("https://www.twitch.tv/videos/123?t=1h2m3s", null)).toBe("https://www.twitch.tv/videos/123?t=1h2m3s");
+    expect(liveAnnouncementUrl("https://www.youtube.com/@BlueGenji/live", null)).toBe("https://www.youtube.com/@BlueGenji/live");
   });
 });
 
