@@ -27,9 +27,10 @@ describe("refereeDigestPush", () => {
   it("liste les matchs, heure de Paris, en français et en anglais", () => {
     const fr = refereeDigestPush([match(1), match(2)], "fr");
     expect(fr.title).toBe("Programme d'arbitrage : 2 matchs à venir");
-    // Première ligne : le fuseau — un arbitre à l'étranger lirait sinon son heure locale.
+    // Dernière ligne : le fuseau — un arbitre à l'étranger lirait sinon son heure
+    // locale ; la première reste un match, seule visible sur une notification repliée.
     expect(fr.body).toBe(
-      "Heure de Paris\njeu. 20:00 · Renards 1 contre Nova 1 (Coupe, Manche 1)\njeu. 20:00 · Renards 2 contre Nova 2 (Coupe, Manche 1)",
+      "jeu. 20:00 · Renards 1 contre Nova 1 (Coupe, Manche 1)\njeu. 20:00 · Renards 2 contre Nova 2 (Coupe, Manche 1)\nHeure de Paris",
     );
     expect(fr.url).toBe("/tournois/7");
     expect(fr.tag).toBe("referee-digest-1-2");
@@ -38,7 +39,7 @@ describe("refereeDigestPush", () => {
     expect(en.title).toBe("Refereeing schedule: 1 upcoming match");
     expect(refereeDigestPush([match(1)], "fr").title).toBe("Programme d'arbitrage : 1 match à venir");
     expect(refereeDigestPush([match(1), match(2)], "en").title).toBe("Refereeing schedule: 2 upcoming matches");
-    expect(en.body).toBe("Paris time\nThu 20:00 · Renards 1 vs Nova 1 (Coupe, Round 1)");
+    expect(en.body).toBe("Thu 20:00 · Renards 1 vs Nova 1 (Coupe, Round 1)\nParis time");
     expect(en.url).toBe("/en/tournois/7");
   });
 
@@ -59,27 +60,28 @@ describe("refereeDigestPush", () => {
     const many = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 3 }, (_, index) => match(index + 1));
     const lines = refereeDigestPush(many).body.split("\n");
     expect(lines).toHaveLength(REFEREE_DIGEST_PUSH_LINES + 2);
-    expect(lines.at(-1)).toBe("… et 3 autres");
-    expect(refereeDigestPush(many, "en").body.split("\n").at(-1)).toBe("… and 3 more");
+    expect(lines.at(-2)).toBe("… et 3 autres");
+    expect(lines.at(-1)).toBe("Heure de Paris");
+    expect(refereeDigestPush(many, "en").body.split("\n").at(-2)).toBe("… and 3 more");
     // Un seul match au-delà de la borne : singulier (« 1 autre », pas « 1 autres »).
     const oneMore = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 1 }, (_, index) => match(index + 1));
-    expect(refereeDigestPush(oneMore).body.split("\n").at(-1)).toBe("… et 1 autre");
-    expect(refereeDigestPush(oneMore, "en").body.split("\n").at(-1)).toBe("… and 1 more");
+    expect(refereeDigestPush(oneMore).body.split("\n").at(-2)).toBe("… et 1 autre");
+    expect(refereeDigestPush(oneMore, "en").body.split("\n").at(-2)).toBe("… and 1 more");
   });
 
   it("ne nomme aucun joueur en tournoi individuel, et regroupe les matchs d'un même créneau et d'une même manche", () => {
     const solo = { solo: true, team1Name: "Kiro", team2Name: "Ayla" };
     const body = refereeDigestPush([match(1, solo), match(2, { ...solo, roundNumber: 2 })]).body;
-    expect(body).toBe("Heure de Paris\njeu. 20:00 · Un match (Coupe, Manche 1)\njeu. 20:00 · Un match (Coupe, Manche 2)");
+    expect(body).toBe("jeu. 20:00 · Un match (Coupe, Manche 1)\njeu. 20:00 · Un match (Coupe, Manche 2)\nHeure de Paris");
     expect(body).not.toMatch(/Kiro|Ayla/);
-    expect(refereeDigestPush([match(1, solo)], "en").body).toBe("Paris time\nThu 20:00 · A match (Coupe, Round 1)");
+    expect(refereeDigestPush([match(1, solo)], "en").body).toBe("Thu 20:00 · A match (Coupe, Round 1)\nParis time");
 
     // Huit matchs d'une ronde solo à 20:00 : une ligne « 8 matchs », pas cinq lignes identiques et « … et 3 autres ».
     const round = Array.from({ length: 8 }, (_, index) => match(index + 1, solo));
     const grouped = refereeDigestPush([...round, match(9, { ...solo, roundNumber: 2 })]);
     expect(grouped.title).toBe("Programme d'arbitrage : 9 matchs à venir");
-    expect(grouped.body).toBe("Heure de Paris\njeu. 20:00 · 8 matchs (Coupe, Manche 1)\njeu. 20:00 · Un match (Coupe, Manche 2)");
-    expect(refereeDigestPush(round, "en").body).toBe("Paris time\nThu 20:00 · 8 matches (Coupe, Round 1)");
+    expect(grouped.body).toBe("jeu. 20:00 · 8 matchs (Coupe, Manche 1)\njeu. 20:00 · Un match (Coupe, Manche 2)\nHeure de Paris");
+    expect(refereeDigestPush(round, "en").body).toBe("Thu 20:00 · 8 matches (Coupe, Round 1)\nParis time");
     // Les équipes, elles, restent une ligne par match.
     expect(refereeDigestPush([match(1), match(2)]).body.split("\n")).toHaveLength(3);
   });
@@ -92,7 +94,7 @@ describe("refereeDigestPush", () => {
     ]).flat();
     const lines = refereeDigestPush(slots).body.split("\n");
     expect(lines).toHaveLength(REFEREE_DIGEST_PUSH_LINES + 2);
-    expect(lines.at(-1)).toBe("… et 2 autres");
+    expect(lines.at(-2)).toBe("… et 2 autres");
   });
 });
 
@@ -122,6 +124,13 @@ describe("matchReminderPush — check-in", () => {
     expect(matchReminderPush({ ...SIDE, checkIn: true }, null).body).toContain("discord.gg");
   });
 
+  it("dit le check-in déjà ouvert à moins de 15 minutes du coup d'envoi, dans les deux langues", () => {
+    const open = { ...SIDE, checkIn: true, checkInOpen: true };
+    expect(matchReminderPush(open, null, "fr").body).toMatch(/Check-in déjà ouvert sur Discord : https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    expect(matchReminderPush(open, null, "en").body).toMatch(/Check-in already open on Discord: https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    expect(matchReminderPush(open, null, "fr").body).not.toContain("15 min avant");
+  });
+
   it("ouvre l'invitation au toucher quand il porte le check-in, la fiche du match sinon", () => {
     // Une notification n'ouvre que des adresses du site : `/check-in` renvoie à l'invitation.
     expect(matchReminderPush(SIDE, "PT10H", "fr").url).toBe("/check-in");
@@ -139,6 +148,8 @@ describe("formatRefereeDigestLog", () => {
     team1: { name: `Renards ${id}`, participantType },
     team2: { name: `Nova ${id}`, participantType },
     startAt: START,
+    bracket: "UPPER",
+    roundNumber: 1,
   });
 
   it("tient en une ligne, sans auteur", () => {
@@ -146,7 +157,8 @@ describe("formatRefereeDigestLog", () => {
     expect(line).not.toContain("\n");
     expect(line).toBe(
       "📋 Programme d'arbitrage — 2 matchs à venir (heure de Paris) : " +
-        "jeu. 20:00 Renards 1 vs Nova 1 (« Coupe » (#7), match #1) ; jeu. 20:00 Renards 2 vs Nova 2 (« Coupe » (#7), match #2).",
+        "jeu. 20:00 Renards 1 vs Nova 1 (« Coupe » (#7), Manche 1, match #1) ; " +
+        "jeu. 20:00 Renards 2 vs Nova 2 (« Coupe » (#7), Manche 1, match #2).",
     );
     expect(line).not.toContain("staff");
   });
@@ -182,6 +194,25 @@ describe("formatRefereeDigestLog", () => {
     const line = formatRefereeDigestLog([entry(1, "SOLO")]);
     expect(line).toContain("un joueur vs un joueur");
     expect(line).not.toMatch(/Renards|Nova/);
+  });
+
+  it("regroupe les matchs solo d'un même créneau et d'une même manche, et laisse la place aux autres", () => {
+    // 8 matchs solo à 20:00, puis 4 matchs d'équipe : tous tiennent dans la ligne.
+    const solo = Array.from({ length: 8 }, (_, index) => entry(index + 1, "SOLO"));
+    const teams = Array.from({ length: 4 }, (_, index) => ({
+      ...entry(20 + index),
+      tournament: { id: 9, name: "Ligue" },
+      bracket: "LOWER",
+      roundNumber: 2,
+    }));
+    const line = formatRefereeDigestLog([...solo, ...teams]);
+    expect(line).toContain("12 matchs à venir");
+    expect(line).toContain("jeu. 20:00 8 matchs (« Coupe » (#7), Manche 1)");
+    expect(line).not.toContain("un joueur");
+    expect(line).toContain("Renards 23 vs Nova 23 (« Ligue » (#9), Tableau perdants · manche 2, match #23)");
+    expect(line).not.toContain("autre");
+    // Ronde suisse nommée comme sur le site.
+    expect(formatRefereeDigestLog([{ ...entry(1), swiss: true }])).toContain("Ronde 1, match #1");
   });
 });
 

@@ -17,6 +17,7 @@ import {
   dueMatchReminders,
   formatMatchStart,
   matchRoundLabel,
+  isCheckInOpen,
   normalizeIssueReportMessage,
   openedMatchReminders,
 } from "@/lib/shared/discord-notifications";
@@ -429,6 +430,18 @@ describe("rappel de check-in", () => {
     expect(buildMatchScheduleAnnouncement(CONTEXT, [TEN_HOURS])).toContain("Prochain rappel : 10 heures avant");
     expect(buildMatchScheduleAnnouncement(CONTEXT, [TEN_HOURS])).not.toContain(CHECK_IN_INVITE_URL);
     expect(buildMatchScheduleClearedNotice({ ...CONTEXT, checkIn: true })).not.toContain(CHECK_IN_INVITE_URL);
+  });
+
+  it("dit le salon déjà ouvert quand le coup d'envoi est à moins de 15 minutes", () => {
+    const open = buildMatchScheduleAnnouncement({ ...CONTEXT, checkIn: true, checkInOpen: true });
+    expect(open).toContain("le salon de check-in est déjà ouvert sur Discord");
+    expect(open).not.toContain("ouvre 15 minutes avant");
+    expect(open).toContain(CHECK_IN_INVITE_URL);
+    expect(buildMatchReminderMessage(TEN_HOURS, { ...CONTEXT, checkInOpen: true })).toContain("déjà ouvert");
+    const start = new Date("2026-09-10T18:00:00Z");
+    expect(isCheckInOpen(start, new Date("2026-09-10T17:45:00Z"))).toBe(true);
+    expect(isCheckInOpen(start, new Date("2026-09-10T17:50:00Z"))).toBe(true);
+    expect(isCheckInOpen(start, new Date("2026-09-10T17:44:59Z"))).toBe(false);
   });
 
   it("ne nomme personne en tournoi individuel", () => {

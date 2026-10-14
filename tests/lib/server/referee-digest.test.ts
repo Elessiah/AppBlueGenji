@@ -101,7 +101,7 @@ describe("dispatchRefereeDigest", () => {
     const push = resolvePush(notification.push);
     expect(push.title).toBe("Programme d'arbitrage : 3 matchs à venir");
     expect(push.body.split("\n")).toHaveLength(4);
-    expect(push.body.split("\n")[0]).toBe("Heure de Paris");
+    expect(push.body.split("\n").at(-1)).toBe("Heure de Paris");
     expect(push.body).toContain("Renards 1 contre Nova 1 (Coupe BlueGenji, Manche 1)");
     // Un seul tournoi cité : le lien mène à sa fiche.
     expect(push.url).toBe("/tournois/7");

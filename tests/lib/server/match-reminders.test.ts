@@ -755,6 +755,28 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("match-scheduled");
   });
 
+  it("dit le check-in déjà ouvert à une manche programmée moins de 15 minutes avant", async () => {
+    await mockAnnounceDb();
+
+    expect(await announceMatchSchedule(notice(), { rescheduled: false }, new Date("2026-09-10T17:50:00Z"))).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("le salon de check-in est déjà ouvert sur Discord");
+      expect(message).not.toContain("ouvre 15 minutes avant");
+    }
+    const pushes = jest.mocked(pushToUsers).mock.calls;
+    expect(resolvePush(pushes[0][2]).body).toContain("Check-in déjà ouvert sur Discord");
+    expect(resolvePush(pushes[0][2], "en").body).toContain("Check-in already open on Discord");
+  });
+
+  it("dit l'ouverture du check-in à venir à une manche programmée 5 h avant", async () => {
+    await mockAnnounceDb();
+
+    expect(await announceMatchSchedule(notice(), { rescheduled: false }, FIVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) expect(message).toContain("le salon de check-in ouvre 15 minutes avant");
+  });
+
   it("dit « reprogrammé » aux deux engagées, par Discord et par push, dans la langue de chacun", async () => {
     const { execute } = await mockAnnounceDb();
 
