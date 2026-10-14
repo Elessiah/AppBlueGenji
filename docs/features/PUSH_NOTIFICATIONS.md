@@ -38,13 +38,14 @@ ait un producteur côté serveur.
 | `MATCH_START` | Match entré en lancement (« déclare-toi prêt »), ou lancé sans être passé par là (lancement forcé) | Non |
 | `SCORE_TO_CONFIRM` | L'adversaire a saisi un score | Non |
 | `TOURNAMENT_START` | Coup d'envoi d'un tournoi où l'on est engagé | Non |
-| `MATCH_REMINDER` (« Horaires et rappels de match ») | Annonce de l'horaire posé, changé ou retiré par l'arbitrage (« Match programmé / reprogrammé », avec l'ancienne date ; « Horaire du match retiré »), « Match retiré de ton programme » quand une mise à jour du tournoi (correction de score, retour en arrière, ronde réappariée, plateau refait avant le départ, finales BG Survie réécrites) sort l'engagée de la manche, puis rappel J-1 (les rappels J-7 et H-1 sont retirés) | Oui |
+| `MATCH_REMINDER` (« Horaires et rappels de match ») | Annonce de l'horaire posé, changé ou retiré par l'arbitrage (« Match programmé / reprogrammé », avec l'ancienne date ; « Horaire du match retiré »), « Match retiré de ton programme » quand une mise à jour du tournoi (correction de score, retour en arrière, ronde réappariée, plateau refait avant le départ, finales BG Survie réécrites) sort l'engagée de la manche, puis rappels H-24 et H-10 — ce dernier avec le lien du check-in, porté par l'annonce quand la manche est programmée moins de 10 h avant (les rappels J-7 et H-1 sont retirés) ; le push qui porte le check-in ouvre l'invitation au toucher (`/check-in`, redirection vers `CHECK_IN_INVITE_URL`). Un seul sujet pour les deux rappels : le check-in fait partie des rappels de match | Oui |
 | `TEAM_JOIN_REQUEST` | Demande d'adhésion (gestion de l'équipe) | Oui |
 | `CONTENT_REPORT` | Signalement qui vise le compte ou son équipe | Oui |
 | `MODERATION` | Avatar ou logo masqué, supprimé, rétabli | Oui |
 | `PRIVACY_CHANGE` | Changement du traitement des données | Oui |
 | `REFEREE_ALERT` | Conflit de score, score resté trop longtemps sans confirmation, problème signalé (`tournaments`) | Oui (rôle arbitre) |
 | `MATCH_SCHEDULED` (« Matchs planifiés ») | Un autre arbitre planifie un match, ou en change ou en retire l'horaire — l'auteur du geste n'est pas prévenu ; un retrait d'un horaire encore devant donne « Horaire du match retiré » ; une manche planifiée supprimée par le moteur (ronde réappariée, retour en arrière) donne aussi « Horaire du match retiré », à **tout** le staff (personne n'est exclu : c'est le moteur qui l'a retirée) ; étiquette distincte de l'annonce aux joueurs (un arbitre qui joue reçoit les deux) (`tournaments`) | Ligne au journal Discord (`publishStaffAction`) pour un geste d'arbitre, aucune pour une suppression par le moteur ; pas de message privé |
+| `REFEREE_DIGEST` (« Programme d'arbitrage ») | Environ 10 h avant, la liste des matchs à venir non encore cités (horaire, affiche, tournoi et manche ; « Un match » en solo), lien vers le tournoi s'il n'y en a qu'un, un message par balayage (`referee-digest.ts`) (`tournaments`) | Ligne au journal Discord (`sendBotLog`), sans auteur ; pas de message privé |
 | `STAFF_REPORT` | Signalement ou contestation reçu (`moderation`) | Oui (direction) |
 
 Un compte **sans** moyen Discord est désormais un destinataire : il peut avoir
@@ -88,6 +89,21 @@ qui n'a pas atteint le bot mais a atteint l'appareil d'un arbitre n'est pas anno
 « injoignable » au joueur (qui le renverrait). Les sujets coupés s'écrivent en
 série (`lib/shared/latest-value-writer.ts`) : deux cases cochées coup sur coup
 ne peuvent plus laisser au serveur la liste la plus ancienne.
+
+Bornes du contenu (`buildPushPayload`) : titre 80, corps 240 (`PUSH_BODY_MAX`),
+étiquette 64 caractères, coupés par caractère (`clipPushText`). Le titre est
+replié sur une ligne ; le **corps garde ses retours à la ligne** (programme
+d'arbitrage), chaque ligne repliée, les lignes vides ôtées. Un rédacteur dont la
+fin compte la protège lui-même : le programme d'arbitrage ne garde que les
+lignes qui tiennent (« … et N autres » et le fuseau compris), le rappel du
+check-in raccourcit son début plutôt que l'invitation ; une étiquette qui
+nommerait une liste en porte une empreinte.
+
+Une notification de même étiquette remplace la précédente **sans sonner** —
+sauf `renotify` (`PushContent.renotify`, porté par la charge seulement quand il
+est vrai, appliqué par `public/push-sw.js` à une notification étiquetée) : les
+rappels de match (24 h, puis 10 h avec le check-in) remplacent l'annonce du
+même match en sonnant, sans quoi le lien du check-in passerait inaperçu.
 
 ## Protocole
 

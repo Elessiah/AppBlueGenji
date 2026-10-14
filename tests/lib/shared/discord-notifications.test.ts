@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
+  CHECK_IN_INVITE_URL,
+  CHECK_IN_REMINDER_KEY,
   ISSUE_REPORT_MAX_LENGTH,
   ISSUE_REPORT_MIN_LENGTH,
   MATCH_REMINDER_HORIZON_MS,
@@ -15,6 +17,7 @@ import {
   dueMatchReminders,
   formatMatchStart,
   matchRoundLabel,
+  isCheckInOpen,
   normalizeIssueReportMessage,
   openedMatchReminders,
 } from "@/lib/shared/discord-notifications";
@@ -33,26 +36,29 @@ describe("dueMatchReminders", () => {
     expect(dueMatchReminders(START, before(7 * 24 * 60))).toEqual([]);
   });
 
-  it("déclenche le palier 24 h à son ouverture", () => {
+  it("déclenche le palier 24 h à son ouverture, jusqu'à l'ouverture du palier 10 h", () => {
     expect(dueMatchReminders(START, before(24 * 60)).map((o) => o.key)).toEqual(["P1D"]);
-    expect(dueMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P1D"]);
+    expect(dueMatchReminders(START, before(10 * 60 + 1)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
-  it("n'a plus de rappel « une semaine » ni « 1 h avant » : le palier 24 h court jusqu'au coup d'envoi", () => {
-    expect(MATCH_REMINDER_OFFSETS.map((o) => o.key)).toEqual(["P1D"]);
-    expect(MATCH_REMINDER_OFFSETS.some((o) => o.minutesBefore < 24 * 60)).toBe(false);
-    expect(dueMatchReminders(START, before(60)).map((o) => o.key)).toEqual(["P1D"]);
-    expect(dueMatchReminders(START, before(1)).map((o) => o.key)).toEqual(["P1D"]);
+  it("a deux paliers, 24 h puis 10 h (check-in) : plus de rappel « une semaine » ni « 1 h avant »", () => {
+    expect(MATCH_REMINDER_OFFSETS.map((o) => o.key)).toEqual(["P1D", "PT10H"]);
+    expect(MATCH_REMINDER_OFFSETS.map((o) => o.minutesBefore)).toEqual([24 * 60, 10 * 60]);
+    expect(CHECK_IN_REMINDER_KEY).toBe("PT10H");
+    expect(dueMatchReminders(START, before(10 * 60)).map((o) => o.key)).toEqual(["PT10H"]);
+    expect(dueMatchReminders(START, before(60)).map((o) => o.key)).toEqual(["PT10H"]);
+    expect(dueMatchReminders(START, before(1)).map((o) => o.key)).toEqual(["PT10H"]);
   });
 
-  it("ne renvoie rien dans la dernière heure une fois les 24 h envoyées", () => {
-    expect(dueMatchReminders(START, before(60), ["P1D"])).toEqual([]);
-    expect(dueMatchReminders(START, before(30), ["P1D"])).toEqual([]);
+  it("envoie le palier 10 h même quand les 24 h sont déjà parties, et rien une fois les deux envoyés", () => {
+    expect(dueMatchReminders(START, before(5 * 60), ["P1D"]).map((o) => o.key)).toEqual(["PT10H"]);
+    expect(dueMatchReminders(START, before(60), ["P1D", "PT10H"])).toEqual([]);
+    expect(dueMatchReminders(START, before(30), ["PT10H"])).toEqual([]);
   });
 
   it("n'envoie qu'un seul rappel pour un match programmé à la dernière minute", () => {
     // Le piège : sans fenêtres, les deux paliers seraient dus d'un coup.
-    expect(dueMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["P1D"]);
+    expect(dueMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["PT10H"]);
   });
 
   it("ne déclenche plus rien une fois le match commencé", () => {
@@ -65,7 +71,7 @@ describe("dueMatchReminders", () => {
   });
 
   it("accepte une date sous forme de chaîne", () => {
-    expect(dueMatchReminders(START.toISOString(), before(60)).map((o) => o.key)).toEqual(["P1D"]);
+    expect(dueMatchReminders(START.toISOString(), before(60)).map((o) => o.key)).toEqual(["PT10H"]);
   });
 
   it("ne déclenche rien sans horaire ni sur une date illisible", () => {
@@ -99,9 +105,10 @@ describe("openedMatchReminders", () => {
     expect(openedMatchReminders(START, before(24 * 60)).map((o) => o.key)).toEqual(["P1D"]);
   });
 
-  it("retient le palier 24 h pour une date posée à cinq heures ou trente minutes", () => {
-    expect(openedMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P1D"]);
-    expect(openedMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["P1D"]);
+  it("retient les deux paliers pour une date posée à cinq heures ou trente minutes, le seul 24 h à douze heures", () => {
+    expect(openedMatchReminders(START, before(12 * 60)).map((o) => o.key)).toEqual(["P1D"]);
+    expect(openedMatchReminders(START, before(5 * 60)).map((o) => o.key)).toEqual(["P1D", "PT10H"]);
+    expect(openedMatchReminders(START, before(30)).map((o) => o.key)).toEqual(["P1D", "PT10H"]);
   });
 
   it("ne retient rien une fois le match commencé", () => {
@@ -392,5 +399,54 @@ describe("buildIssueReportMessage", () => {
 
   it("omet le lien sans URL publique", () => {
     expect(buildIssueReportMessage({ ...context, tournamentUrl: null })).not.toContain("http");
+  });
+});
+
+describe("rappel de check-in", () => {
+  const [DAY, TEN_HOURS] = MATCH_REMINDER_OFFSETS;
+  const CONTEXT = {
+    tournamentName: "Coupe",
+    tournamentUrl: null,
+    teamName: "Renards",
+    opponentName: "Nova",
+    roundLabel: "Manche 1",
+    startAt: START,
+  };
+
+  it("garde l'invitation de l'association dans une seule constante", () => {
+    expect(CHECK_IN_INVITE_URL).toBe("https://discord.gg/Sgdh3p4VhC");
+  });
+
+  it("porte le lien et l'ouverture du salon dans le rappel 10 h, pas dans celui de 24 h", () => {
+    const ten = buildMatchReminderMessage(TEN_HOURS, CONTEXT);
+    expect(ten).toContain("dans moins de 10 heures");
+    expect(ten).toContain("le salon de check-in ouvre 15 minutes avant le coup d'envoi");
+    expect(ten).toContain(CHECK_IN_INVITE_URL);
+    expect(buildMatchReminderMessage(DAY, CONTEXT)).not.toContain(CHECK_IN_INVITE_URL);
+  });
+
+  it("porte le lien dans une annonce qui a consommé le palier 10 h, et jamais dans un avis de retrait", () => {
+    expect(buildMatchScheduleAnnouncement({ ...CONTEXT, checkIn: true })).toContain(CHECK_IN_INVITE_URL);
+    expect(buildMatchScheduleAnnouncement(CONTEXT, [TEN_HOURS])).toContain("Prochain rappel : 10 heures avant");
+    expect(buildMatchScheduleAnnouncement(CONTEXT, [TEN_HOURS])).not.toContain(CHECK_IN_INVITE_URL);
+    expect(buildMatchScheduleClearedNotice({ ...CONTEXT, checkIn: true })).not.toContain(CHECK_IN_INVITE_URL);
+  });
+
+  it("dit le salon déjà ouvert quand le coup d'envoi est à moins de 15 minutes", () => {
+    const open = buildMatchScheduleAnnouncement({ ...CONTEXT, checkIn: true, checkInOpen: true });
+    expect(open).toContain("le salon de check-in est déjà ouvert sur Discord");
+    expect(open).not.toContain("ouvre 15 minutes avant");
+    expect(open).toContain(CHECK_IN_INVITE_URL);
+    expect(buildMatchReminderMessage(TEN_HOURS, { ...CONTEXT, checkInOpen: true })).toContain("déjà ouvert");
+    const start = new Date("2026-09-10T18:00:00Z");
+    expect(isCheckInOpen(start, new Date("2026-09-10T17:45:00Z"))).toBe(true);
+    expect(isCheckInOpen(start, new Date("2026-09-10T17:50:00Z"))).toBe(true);
+    expect(isCheckInOpen(start, new Date("2026-09-10T17:44:59Z"))).toBe(false);
+  });
+
+  it("ne nomme personne en tournoi individuel", () => {
+    const message = buildMatchReminderMessage(TEN_HOURS, { ...CONTEXT, solo: true });
+    expect(message).toContain("**Ton match**");
+    expect(message).not.toMatch(/Renards|Nova/);
   });
 });

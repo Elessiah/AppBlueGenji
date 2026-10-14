@@ -24,12 +24,14 @@
  * l'insertion qui gagne envoie. Deux requêtes concurrentes déclenchent le même
  * balayage — sans ce verrou, le joueur recevrait son rappel en double. Le prix
  * est symétrique et assumé : un bot injoignable au moment précis de l'envoi
- * consomme le palier — et il n'en reste qu'un (24 h) : ce rappel-là est perdu.
+ * consomme le palier — ce rappel-là est perdu (il en reste deux : 24 h, puis
+ * 10 h, qui porte le check-in).
  * C'est le bon sens du risque — un rappel manqué ne s'excuse qu'une fois, un
  * rappel envoyé en boucle ne se rattrape pas.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import {
   loadEntrantPlayerIds,
@@ -40,12 +42,14 @@ import {
 import { usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush } from "@/lib/shared/push-messages";
 import {
+  CHECK_IN_REMINDER_KEY,
   FIRST_SCHEDULE,
   MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
   MATCH_SEEN_KEY,
   MATCH_TOLD_KEY,
   buildMatchReminderMessage,
+  isCheckInOpen,
   buildMatchScheduleAnnouncement,
   buildMatchScheduleClearedNotice,
   buildMatchWithdrawnNotice,
@@ -59,7 +63,8 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { PLAYED_MATCH_STATUSES, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { tournamentPageUrl } from "./app-url";
 import { onPoster, toPoster, type PosterRow } from "./match-poster";
-import { releaseDatedMarks } from "./reminder-marks";
+import { dispatchRefereeDigest } from "./referee-digest";
+import { claimDatedMark, releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 /** Un horaire tel que la base le rend (`dateStrings`) ou que le code le passe ; `null` : aucun. */
@@ -124,6 +129,19 @@ const SWEEP_THROTTLE_MS = 60_000;
 /** Le palier le plus proche du coup d'envoi : pris, le cycle de rappels est fini. */
 const LAST_REMINDER_KEY = [...MATCH_REMINDER_OFFSETS].sort((a, b) => a.minutesBefore - b.minutesBefore)[0].key;
 
+/**
+ * Paliers suivis d'un autre, avec l'ouverture du suivant (secondes avant le
+ * coup d'envoi) : tant que le suivant n'est pas ouvert, une manche dont ce
+ * palier est déjà pris n'a rien à recevoir — le balayage ne la relit pas
+ * (sans quoi chaque manche entre 24 h et 10 h serait relue, et sa marque
+ * « 24 h » re-tentée, à chaque passage pendant 14 heures).
+ */
+const WAITING_OFFSETS = [...MATCH_REMINDER_OFFSETS]
+  .sort((a, b) => b.minutesBefore - a.minutesBefore)
+  .flatMap((offset, index, sorted) =>
+    index + 1 < sorted.length ? [{ key: offset.key, nextOpensSeconds: sorted[index + 1].minutesBefore * 60 }] : [],
+  );
+
 /** Avance du premier palier (le plus lointain) : avant, une manche observée n'a rien de dû. */
 const FIRST_REMINDER_LEAD_SECONDS = Math.max(...MATCH_REMINDER_OFFSETS.map((offset) => offset.minutesBefore)) * 60;
 
@@ -132,6 +150,32 @@ const SWEEP_CONCURRENCY = 4;
 
 let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
+/** Programme d'arbitrage en cours : son propre verrou, distinct du balayage. */
+let pendingDigest: Promise<void> | null = null;
+/** Fin du dernier programme : son propre étranglement (une minute aussi). */
+let lastDigestAt = 0;
+
+/**
+ * Lance le programme d'arbitrage s'il n'est ni en cours ni passé depuis moins
+ * d'une minute — **avant** le verrou du balayage : un balayage long (ronde
+ * suisse annoncée d'un coup, bot lent) ne le retient pas, ni l'inverse (les
+ * appareils du staff ne retardent pas les rappels des joueurs). Indépendant :
+ * son échec ne retient pas les rappels.
+ */
+function startRefereeDigest(now: Date): void {
+  if (pendingDigest || Date.now() - lastDigestAt < SWEEP_THROTTLE_MS) return;
+  pendingDigest = (async () => {
+    try {
+      await dispatchRefereeDigest(now);
+    } catch (error) {
+      // Table absente (création avalée au démarrage) : rien à dire à chaque passage.
+      if (!isMissingTableError(error)) console.error("[match-reminders] programme d'arbitrage en échec", error);
+    } finally {
+      lastDigestAt = Date.now();
+      pendingDigest = null;
+    }
+  })();
+}
 
 /**
  * Destinataires d'un match, par engagée.
@@ -189,35 +233,6 @@ function sentKeysOf(row: SweepMatchRow): Set<string> {
   if (Number(row.seen_mark) === 1) keys.add(MATCH_SEEN_KEY);
   if (Number(row.told_mark) === 1) keys.add(MATCH_TOLD_KEY);
   return keys;
-}
-
-/**
- * Réserve une marque (observation, palier, horaire reçu) pour une manche —
- * **pour l'horaire lu** : la réservation
- * échoue si l'horaire a changé depuis la lecture (un arbitre l'a déplacé entre
- * la lecture du balayage et son envoi). Sans cette condition, le balayage
- * enverrait l'ancien horaire et prendrait le palier que l'annonce du nouveau
- * attend — qui se tairait. L'`INSERT … SELECT` lit la ligne du match sous
- * verrou partagé : une programmation en cours est attendue, puis relue.
- *
- * @returns `true` si la réservation est acquise (c'est à nous d'envoyer),
- *          `false` si une autre requête l'a prise entre-temps, ou si
- *          l'horaire n'est plus celui-là.
- */
-async function claimDatedMark(match: ScheduledMatch, offsetKey: string): Promise<boolean> {
-  const db = await getDatabase();
-  const matchId = Number(match.id);
-  // La ligne retient l'horaire pour lequel elle est prise : seul l'envoi de cet
-  // horaire peut la rendre (`releaseClaims`). Les engagées aussi sont
-  // vérifiées : une affiche changée a vu ses marques effacées, et ses nouvelles
-  // engagées attendent leur annonce.
-  const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
-       SELECT ?, ?, start_at FROM bg_matches
-        WHERE id = ? AND start_at = ? AND team1_id = ? AND team2_id = ?`,
-    [matchId, offsetKey, matchId, match.start_at, Number(match.team1_id), Number(match.team2_id)],
-  );
-  return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
 /**
@@ -391,7 +406,21 @@ type PlannedSend = {
    * message et jamais retenté).
    */
   claimed?: string[];
+  /** Instant de référence de l'envoi (check-in déjà ouvert ?) ; absent : maintenant. */
+  now?: Date;
+  /** Horloge murale à la préparation : `now` avancé du temps écoulé depuis (`sentAt`). */
+  plannedAt?: number;
 };
+
+/**
+ * Instant d'un envoi : `now` (injecté par les tests) avancé du temps passé
+ * depuis la préparation — une ronde suisse annoncée d'un coup part par lots,
+ * et les derniers messages sortent parfois minutes après le début du passage.
+ */
+function sentAt({ now, plannedAt }: Pick<PlannedSend, "now" | "plannedAt">): Date {
+  if (!now) return new Date();
+  return new Date(now.getTime() + Math.max(0, Date.now() - (plannedAt ?? Date.now())));
+}
 
 /** Rend les marques d'un envoi qui n'a pu partir. Ne lève jamais. */
 async function releaseClaims(send: PlannedSend): Promise<void> {
@@ -445,7 +474,7 @@ async function planMatchSends(
     // Les joueurs avaient déjà reçu un horaire (manche programmée avant la
     // marque d'observation, par exemple) : la date découverte en remplace une.
     const announcement = { rescheduled: alreadySent.has(MATCH_TOLD_KEY) };
-    return [{ match, offset: null, remaining: [...remaining], announcement, claimed }];
+    return [{ match, offset: null, remaining: [...remaining], announcement, claimed, now, plannedAt: Date.now() }];
   }
 
   // `alreadySent` porte aussi la marque d'observation, qui n'est pas un palier :
@@ -458,7 +487,7 @@ async function planMatchSends(
   const planned: PlannedSend[] = [];
   for (const offset of due) {
     if (await claimDatedMark(match, offset.key)) {
-      planned.push({ match, offset, remaining: [], claimed: [offset.key] });
+      planned.push({ match, offset, remaining: [], claimed: [offset.key], now, plannedAt: Date.now() });
     }
   }
   return planned;
@@ -474,7 +503,7 @@ type MatchSide = ReturnType<typeof matchSides>[number];
  * @returns L'envoi a-t-il atteint quelqu'un (message privé remis, ou appareil) ?
  */
 async function sendToSide(
-  { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt }: PlannedSend,
+  { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt, now, plannedAt }: PlannedSend,
   side: MatchSide,
   recipients: NotificationRecipient[],
 ): Promise<boolean> {
@@ -482,6 +511,17 @@ async function sendToSide(
   const solo = match.participant_type === "SOLO";
   // Un avis de retrait porte l'horaire qui ne vaut plus.
   const startAt = clearedStartAt ?? match.start_at;
+  // Le check-in : le rappel de 10 h, ou l'annonce qui a consommé son palier
+  // (manche programmée moins de 10 h avant) — jamais un avis de retrait.
+  let checkIn = false;
+  if (!clearedStartAt) {
+    checkIn = offset
+      ? offset.key === CHECK_IN_REMINDER_KEY
+      : !remaining.some((pending) => pending.key === CHECK_IN_REMINDER_KEY);
+  }
+  // À l'instant de l'envoi, pas du début du passage : un lot parti après
+  // l'ouverture du salon ne doit plus dire qu'il « ouvre 15 minutes avant ».
+  const checkInOpen = checkIn && isCheckInOpen(startAt, sentAt({ now, plannedAt }));
   const context = {
     tournamentName: String(match.tournament_name),
     tournamentUrl: tournamentPageUrl(Number(match.tournament_id)),
@@ -490,6 +530,8 @@ async function sendToSide(
     roundLabel: matchRoundLabel(String(match.bracket), Number(match.round_number), swiss),
     startAt,
     solo,
+    checkIn,
+    checkInOpen,
   };
   const pushSide = {
     tournamentId: Number(match.tournament_id),
@@ -502,6 +544,8 @@ async function sendToSide(
     swiss,
     startAt,
     solo,
+    checkIn,
+    checkInOpen,
   };
 
   // Le contexte dit au bot (et à ses journaux) de quel message il s'agit.
@@ -589,7 +633,13 @@ async function dispatchPlannedSend(
  * `AWAITING_CONFIRMATION`, dit que la rencontre a eu lieu), aux deux engagées
  * connues, avec leurs marques d'observation et d'horaire reçu (clé unique).
  * Le balayage y ajoute sa fenêtre de lecture (index `idx_bg_matches_start_at`).
- * Paramètres : clé d'observation, clé d'horaire reçu.
+ * Paramètres : clé d'observation, clé d'horaire reçu, instant présent.
+ *
+ * Toutes les bornes sont des instants **calculés ici** (`now`), jamais
+ * `NOW()` : les horaires sont écrits à l'heure du processus (`mysql2`, sans
+ * fuseau de connexion), et une base réglée sur un autre fuseau décalerait
+ * d'autant l'ouverture des paliers — le rappel 10 h partirait 6 h avant avec
+ * une base en UTC, quand le programme d'arbitrage, lui, partirait à 10 h.
  */
 const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
@@ -604,7 +654,7 @@ const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_num
       WHERE m.status NOT IN (${PLAYED_MATCH_STATUSES.map((status) => `'${status}'`).join(", ")})
         AND t.state <> 'FINISHED'
         AND m.start_at IS NOT NULL
-        AND m.start_at > NOW()`;
+        AND m.start_at > ?`;
 
 /**
  * Annonce aux joueurs des deux engagées l'horaire qu'un arbitre vient de poser
@@ -642,7 +692,15 @@ export async function announceMatchSchedule(
   const opened = openedMatchReminders(match.start_at, now);
   // En cas d'échec avant les joueurs, l'observation posée par `setMatchStartAt`
   // est rendue avec les paliers : le balayage annoncera la manche.
-  const send: PlannedSend = { match, offset: null, remaining: [], announcement, claimed: [MATCH_SEEN_KEY] };
+  const send: PlannedSend = {
+    match,
+    offset: null,
+    remaining: [],
+    announcement,
+    claimed: [MATCH_SEEN_KEY],
+    now,
+    plannedAt: Date.now(),
+  };
   try {
     for (const offset of opened) {
       if (!(await claimDatedMark(match, offset.key))) return 0;
@@ -913,6 +971,11 @@ async function recipientsOrRelease(sends: PlannedSend[]): Promise<Map<number, No
   }
 }
 
+/** L'instant `seconds` secondes après `now`. */
+function inSeconds(now: Date, seconds: number): Date {
+  return new Date(now.getTime() + seconds * 1000);
+}
+
 async function runSweep(now: Date): Promise<number> {
   const db = await getDatabase();
 
@@ -929,18 +992,28 @@ async function runSweep(now: Date): Promise<number> {
   // de ce cycle : elle n'est plus relue à chaque passage (clé unique).
   // Une manche déjà observée n'a rien à recevoir avant l'ouverture de son
   // premier palier : au-delà, seule une manche jamais vue (à annoncer) est lue.
+  // Une manche dont le palier ouvert est déjà pris attend l'ouverture du
+  // suivant sans être relue (`WAITING_OFFSETS`).
+  const waiting = WAITING_OFFSETS.map(
+    () => `
+        AND NOT EXISTS (SELECT 1 FROM bg_match_reminders sent
+                         WHERE sent.match_id = m.id AND sent.offset_key = ?
+                           AND m.start_at > ?)`,
+  ).join("");
   const [matches] = await db.query<SweepMatchRow[]>(
     `${SWEEP_MATCH_SELECT}
-        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
+        AND m.start_at <= ?
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
-                         WHERE done.match_id = m.id AND done.offset_key = ?)
-     HAVING m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND) OR seen_mark = 0`,
+                         WHERE done.match_id = m.id AND done.offset_key = ?)${waiting}
+     HAVING m.start_at <= ? OR seen_mark = 0`,
     [
       MATCH_SEEN_KEY,
       MATCH_TOLD_KEY,
-      Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000),
+      now,
+      inSeconds(now, Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000)),
       LAST_REMINDER_KEY,
-      FIRST_REMINDER_LEAD_SECONDS,
+      ...WAITING_OFFSETS.flatMap(({ key, nextOpensSeconds }) => [key, inSeconds(now, nextOpensSeconds)]),
+      inSeconds(now, FIRST_REMINDER_LEAD_SECONDS),
     ],
   );
   if (matches.length === 0) return 0;
@@ -994,6 +1067,7 @@ async function runSweep(now: Date): Promise<number> {
  * @returns Le nombre d'envois déclenchés (0 si le balayage a été étranglé).
  */
 export async function dispatchDueMatchReminders(now: Date = new Date()): Promise<number> {
+  startRefereeDigest(now);
   if (pendingSweep) return pendingSweep;
   if (Date.now() - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
 
@@ -1010,4 +1084,11 @@ export async function dispatchDueMatchReminders(now: Date = new Date()): Promise
 export function resetMatchReminderThrottle(): void {
   lastSweepAt = 0;
   pendingSweep = null;
+  pendingDigest = null;
+  lastDigestAt = 0;
+}
+
+/** Programme d'arbitrage en cours, à attendre. Réservé aux tests. */
+export function pendingRefereeDigest(): Promise<void> | null {
+  return pendingDigest;
 }

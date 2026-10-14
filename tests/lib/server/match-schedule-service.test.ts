@@ -338,7 +338,12 @@ describe("setMatchStartAt", () => {
       refereeScheduling: true,
     });
     await setMatchStartAt(42, null);
-    expect(cleared.writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"))).toBe(false);
+    // Seule la citation au programme d'arbitrage part : les arbitres ont reçu
+    // le retrait, une date reposée à l'identique doit y reparaître.
+    const deletes = cleared.writes.filter((w) => w.sql.startsWith("DELETE FROM bg_match_reminders"));
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].sql).toBe("DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ?");
+    expect(deletes[0].params).toEqual([42, "REFS"]);
     expect(notifyMatchScheduleChange).toHaveBeenLastCalledWith({
       matchId: 42,
       startAt: null,

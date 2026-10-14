@@ -247,11 +247,12 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
-      "Sending by Discord direct message the announcement of a match's time (set, changed or removed) and a match reminder within the 24 h before kickoff",
+      "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed) and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server)",
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
+      "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, match reminders and referee alerts",
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, match reminders, referee alerts and the refereeing schedule",
     dataSubjects: ["Players taking part in a tournament", "Other members of the teams taking part (coaches, managers, owners)", "Referees", "Casters registered on a match"],
     dataCategories: [
       "Discord username and identifier",
@@ -263,15 +264,20 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     sensitiveData: "None",
     retention: [
       "Certified username: until it is changed or the account is deleted",
-      "Records of reminders and alerts sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
+      "Records of reminders, alerts and refereeing schedules sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
       "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played",
     ],
     recipients: [
       "The association's administrators and referees",
       "Players and caster of the same match, from its launch to its end",
       "Discord, which delivers the messages",
+      "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
+      "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule; processing activity T12), which delivers an encrypted message it cannot read",
     ],
-    transfers: [`United States: Discord (delivery of direct messages) — ${transferBasisEn(["DISCORD"])}`],
+    transfers: [
+      `United States: Discord (delivery of direct messages and of the log channel) — ${transferBasisEn(["DISCORD"])}`,
+      `United States: push service of the browser of the subscribed recipient (player, referee or administrator), which only receives end-to-end encrypted messages (RFC 8291) — ${transferBasisEn(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+    ],
     security: [
       ...COMMON_SECURITY_EN,
       "Uncertified username invisible to everyone, administrators included; certified username never shown to a visitor without an account",
@@ -285,11 +291,12 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
       "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed), for moderation",
+      "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
     legalBasis: "Legitimate interest (administration and oversight of refereeing)",
-    dataSubjects: ["Staff"],
+    dataSubjects: ["Staff", "Players and teams taking part in a tournament (referred to by team name, never by their username)"],
     dataCategories: [
-      "On Discord: team names, scores, tournament names — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
+      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
       "In the server logs: username and identifier of the staff member who carried out a refereeing action",
     ],
     sensitiveData: "None",
@@ -535,7 +542,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Start of their matches, score to confirm, tournament kickoff, match times (set, changed or removed) and match reminders",
       "Requests to join a team they manage, reports and moderation decisions concerning them, changes to the data policy",
-      "Referee alerts, scheduled matches and moderation alerts for the staff holding these roles",
+      "Referee alerts, scheduled matches, refereeing schedule and moderation alerts for the staff holding these roles",
     ],
     legalBasis: "Consent (activation on each device, withdrawable at any time, topic by topic)",
     dataSubjects: ["Registered players who turn on notifications on a device"],

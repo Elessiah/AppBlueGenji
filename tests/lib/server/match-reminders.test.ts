@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/push-subscriptions");
+jest.mock("@/lib/server/tournaments/referee-digest");
 
 import {
   announceMatchSchedule,
   announceEntrantsWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
+  pendingRefereeDigest,
   resetMatchReminderThrottle,
   type MatchNotice,
 } from "@/lib/server/tournaments/match-reminders";
@@ -18,7 +20,7 @@ import { fakePool } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
 const START = new Date("2026-09-10T18:00:00Z");
-const ONE_HOUR_BEFORE = new Date("2026-09-10T17:00:00Z");
+const TWELVE_HOURS_BEFORE = new Date("2026-09-10T06:00:00Z");
 const FIVE_HOURS_BEFORE = new Date("2026-09-10T13:00:00Z");
 const THREE_DAYS_BEFORE = new Date("2026-09-07T18:00:00Z");
 const TEN_DAYS_BEFORE = new Date("2026-08-31T18:00:00Z");
@@ -76,9 +78,9 @@ async function mockDb(options: {
   // Les marques posées arrivent avec chaque manche (colonnes de la requête du balayage).
   const sent = (options.sent ?? SEEN) as { match_id: number; offset_key: string }[];
   const has = (matchId: number, key: string) => (sent.some((r) => r.match_id === matchId && r.offset_key === key) ? 1 : 0);
-  // Une manche dont le dernier palier (`P1D`) est pris n'est pas lue (`NOT EXISTS`).
+  // Une manche dont le dernier palier (`PT10H`) est pris n'est pas lue (`NOT EXISTS`).
   const matches = ((options.matches ?? [MATCH]) as { id: number }[])
-    .filter((match) => has(match.id, "P1D") === 0)
+    .filter((match) => has(match.id, "PT10H") === 0)
     .map((match) => ({
     ...match,
     seen_mark: has(match.id, "SEEN"),
@@ -169,7 +171,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("envoie un message par engagée, chacune vue de son côté", async () => {
     await mockDb({});
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(2);
 
     const [messageA, recipientsA, context] = jest.mocked(pushDiscordDirectMessages).mock
@@ -186,7 +188,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("réserve le palier avant d'envoyer, puis marque l'horaire comme reçu", async () => {
     const { execute } = await mockDb({});
 
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
 
     const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_reminders/);
@@ -204,7 +206,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
     const { execute } = await mockDb({});
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
     // Réservée avant l'envoi, la marque est rendue : rien n'a abouti.
     expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
     const release = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) => sql.startsWith("DELETE"));
@@ -219,7 +221,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const before = new Date("2026-09-09T18:00:00Z");
     const { execute } = await mockDb({ told: before });
 
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
 
     const updates = (execute.mock.calls as unknown as [string, unknown[]][])
       .filter(([sql]) => sql.startsWith("UPDATE bg_match_reminders") || sql.includes("ON DUPLICATE KEY UPDATE"))
@@ -239,7 +241,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
     const { execute } = await mockDb({ told: START });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
 
     const writes = (execute.mock.calls as unknown as [string, unknown[]][]).filter(
       ([sql]) => sql.startsWith("UPDATE") || sql.startsWith("DELETE"),
@@ -265,7 +267,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       return { sent: 1, unresolved: [], failed: [] };
     });
 
-    const sweep = dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    const sweep = dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
     for (let tick = 0; tick < 100 && calls < 4; tick += 1) {
       await new Promise((resolve) => setImmediate(resolve));
     }
@@ -291,7 +293,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     // La manche 31 échoue ; la 32 part quand même.
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
     expect(error).toHaveBeenCalled();
     // La marque réservée pour la 31 est rendue : rien n'y est arrivé.
     const releases = (execute.mock.calls as unknown as [string, unknown[]][])
@@ -309,7 +311,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     jest.mocked(pushToUsers).mockResolvedValue(0);
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
 
     expect(error).toHaveBeenCalled();
     expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
@@ -322,7 +324,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("n'envoie rien quand l'horaire a changé depuis la lecture du balayage", async () => {
     const { execute } = await mockDb({ current: new Date("2026-09-11T18:00:00Z") });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
     // Aucune marque d'horaire reçu posée pour un horaire périmé.
@@ -332,7 +334,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("n'envoie rien quand une engagée a été remplacée depuis la lecture du balayage", async () => {
     const { execute } = await mockDb({ poster: [101, 999] });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
     expect(claimedKeys(execute)).toEqual(["P1D"]);
@@ -343,7 +345,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // la lecture (la condition est dans l'écriture).
     const { execute } = await mockDb({ toldClaimed: false });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     const told = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql, params]) =>
       sql.includes("(match_id, offset_key, start_at)") && params[1] === "TOLD",
@@ -373,7 +375,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     });
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
     expect(error).toHaveBeenCalled();
     for (const message of sentMessages()) expect(message).toContain("Les Loups");
   });
@@ -387,7 +389,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     });
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
 
     const release = (execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) => sql.startsWith("DELETE"));
     // Seulement l'observation prise pour cet horaire (un changement plus récent garde la sienne).
@@ -406,7 +408,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     });
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
 
     const releases = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("DELETE"));
     // Rendu seulement s'il porte encore l'horaire de cet envoi.
@@ -421,7 +423,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       .mockResolvedValueOnce([[{ ...MATCH, seen_mark: 0, told_mark: 0 }]])
       .mockRejectedValueOnce(new Error("Too many connections"));
 
-    await expect(dispatchDueMatchReminders(ONE_HOUR_BEFORE)).rejects.toThrow("Too many connections");
+    await expect(dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).rejects.toThrow("Too many connections");
 
     const releases = (execute.mock.calls as unknown as [string, unknown[]][]).filter(([sql]) => sql.startsWith("DELETE"));
     // L'observation et le palier consommé : l'annonce repartira au passage suivant.
@@ -441,7 +443,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     });
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
 
     const messages = error.mock.calls.map((call) => String(call[0]));
     expect(messages).toContain("[match-reminders] marque d'horaire reçu non rendue");
@@ -455,7 +457,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     await mockDb({});
 
     // Les messages privés et les push partent comme avant le filtre.
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
     expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2], [3]]);
     expect(error).toHaveBeenCalled();
   });
@@ -467,7 +469,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     jest.mocked(usersReachableByPush).mockResolvedValue(new Set());
     const { execute } = await mockDb({ recipients: unreachable });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
 
     expect(claimedKeys(execute)).toEqual(["P1D"]);
     expect(pushToUsers).not.toHaveBeenCalled();
@@ -482,14 +484,14 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       return { sent: 1, unresolved: [], failed: [] };
     });
 
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
     expect(toldBeforeSend).toBe(true);
   });
 
   it("retient dans la marque l'horaire envoyé, et le met à jour quand elle existait", async () => {
     // Marque absente : posée avec l'horaire envoyé.
     const fresh = await mockDb({});
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
     const reserve = (fresh.execute.mock.calls as unknown as [string, unknown[]][]).find(([sql, params]) =>
       sql.startsWith("INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)") && params[1] === "TOLD",
     );
@@ -498,7 +500,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // Marque déjà là (un horaire reçu avant) : mise à jour avant l'envoi.
     resetMatchReminderThrottle();
     const held = await mockDb({ told: new Date("2026-09-09T18:00:00Z") });
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
     const update = (held.execute.mock.calls as unknown as [string, unknown[]][]).find(([sql]) =>
       sql.includes("ON DUPLICATE KEY UPDATE"),
     );
@@ -513,30 +515,30 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
     const { execute } = await mockDb({});
 
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
     expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
   });
 
   it("ne marque rien comme reçu quand aucune engagée n'a de destinataire", async () => {
     const { execute } = await mockDb({ recipients: [] });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(claimedKeys(execute)).toEqual(["P1D"]);
   });
 
   it("n'envoie rien quand une autre requête a déjà pris le palier", async () => {
     await mockDb({ claimed: false });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
   it("saute un palier déjà envoyé sans même le réserver", async () => {
     const { execute } = await mockDb({
-      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 31, offset_key: "PT10H" }],
     });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -547,10 +549,11 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
         ...SEEN,
         { match_id: 31, offset_key: "P7D" },
         { match_id: 31, offset_key: "P1D" },
+        { match_id: 31, offset_key: "PT10H" },
       ],
     });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(new Date("2026-09-10T17:30:00Z"))).toBe(0);
     expect(execute).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
@@ -567,7 +570,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("ne fait rien quand aucune manche n'est dans l'horizon", async () => {
     await mockDb({ matches: [] });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
@@ -579,7 +582,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       ],
     });
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
     // Une seule engagée joignable sur Discord : un seul appel au bot.
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     const [, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
@@ -591,7 +594,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("pousse le rappel sous le sujet des rappels, vers le match", async () => {
     await mockDb({});
 
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
 
     const [userIds, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
     expect(userIds).toEqual([1, 2]);
@@ -604,22 +607,32 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("ne borne le calendrier qu'aux manches programmées et non jouées", async () => {
     const { query } = await mockDb({});
 
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
 
     const [sql] = query.mock.calls[0] as unknown as [string];
-    expect(sql).toMatch(/m\.start_at > NOW\(\)/);
+    // Bornes calculées par le processus, jamais `NOW()` : une base sur un autre
+    // fuseau que l'application décalerait l'ouverture des paliers.
+    expect(sql).not.toMatch(/NOW\(\)/);
+    expect(sql).toMatch(/m\.start_at > \?/);
     // Un tournoi clos ne se joue plus : aucun rappel pour ses manches restées ouvertes.
     expect(sql).toMatch(/AND t\.state <> 'FINISHED'/);
     // Fenêtre de lecture = horizon + une journée de marge, pour que la manche
     // soit observée avant que le palier 24 h ne s'ouvre.
-    expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
+    expect(sql).toMatch(/AND m\.start_at <= \?/);
     const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     // Marques lues dans la requête ; au-delà de 24 h, seule une manche jamais
     // observée est lue (`SEEN` absent, relu par sa colonne).
-    expect(params).toEqual(["SEEN", "TOLD", 2 * 24 * 60 * 60, "P1D", 24 * 60 * 60]);
-    expect(sql).toMatch(/HAVING m\.start_at <= DATE_ADD\(NOW\(\), INTERVAL \? SECOND\) OR seen_mark = 0/);
+    // Une manche dont le rappel 24 h est pris n'est pas relue avant l'ouverture
+    // du rappel 10 h (36 000 s) : sans cela, chaque passage la relirait et
+    // re-tenterait sa marque « 24 h » pendant 14 heures.
+    const at = (hours: number) => new Date(TWELVE_HOURS_BEFORE.getTime() + hours * 60 * 60 * 1000);
+    expect(params).toEqual(["SEEN", "TOLD", TWELVE_HOURS_BEFORE, at(48), "PT10H", "P1D", at(10), at(24)]);
+    expect(sql).toMatch(
+      /NOT EXISTS \(SELECT 1 FROM bg_match_reminders sent\s+WHERE sent\.match_id = m\.id AND sent\.offset_key = \?\s+AND m\.start_at > \?\)/,
+    );
+    expect(sql).toMatch(/HAVING m\.start_at <= \? OR seen_mark = 0/);
     expect(sql).toMatch(/EXISTS \(SELECT 1 FROM bg_match_reminders sm WHERE sm\.match_id = m\.id AND sm\.offset_key = \?\) AS seen_mark/);
-    // Une manche dont le rappel 24 h est déjà pris n'est plus relue.
+    // Une manche dont le rappel 10 h (le dernier) est déjà pris n'est plus relue.
     expect(sql).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_match_reminders done\s+WHERE done\.match_id = m\.id AND done\.offset_key = \?\)/);
     expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
     // Jointure interne sur les deux engagées : un bye n'est pas un match.
@@ -629,10 +642,10 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
   it("s'étrangle : un second passage immédiat ne relit pas la base", async () => {
     await mockDb({});
-    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
     jest.mocked(pushDiscordDirectMessages).mockClear();
 
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 });
@@ -664,8 +677,8 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
     await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
 
     // La marque d'observation d'abord — c'est elle qui fait verrou —, puis le
-    // palier déjà ouvert, puis la marque d'un horaire reçu.
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "TOLD"]);
+    // paliers déjà ouverts, puis la marque d'un horaire reçu.
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "PT10H", "TOLD"]);
   });
 
   it("consomme le palier pour une date posée à moins d'une heure", async () => {
@@ -673,7 +686,7 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
 
     expect(await dispatchDueMatchReminders(new Date("2026-09-10T17:30:00Z"))).toBe(2);
 
-    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "TOLD"]);
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "PT10H", "TOLD"]);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match programmé**");
       expect(message).not.toContain("Prochain rappel");
@@ -753,6 +766,44 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("match-scheduled");
   });
 
+  it("dit le check-in déjà ouvert à une manche programmée moins de 15 minutes avant", async () => {
+    await mockAnnounceDb();
+
+    expect(await announceMatchSchedule(notice(), { rescheduled: false }, new Date("2026-09-10T17:50:00Z"))).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("le salon de check-in est déjà ouvert sur Discord");
+      expect(message).not.toContain("ouvre 15 minutes avant");
+    }
+    const pushes = jest.mocked(pushToUsers).mock.calls;
+    expect(resolvePush(pushes[0][2]).body).toContain("Check-in déjà ouvert sur Discord");
+    expect(resolvePush(pushes[0][2], "en").body).toContain("Check-in already open on Discord");
+  });
+
+  it("juge l'ouverture du check-in à l'envoi, pas au début du passage", async () => {
+    await mockAnnounceDb();
+    // Passage commencé 15 min 30 s avant le coup d'envoi ; le message sort une
+    // minute plus tard (bot lent, lots d'une ronde suisse) : le salon est ouvert.
+    const base = Date.now();
+    let calls = 0;
+    const clock = jest.spyOn(Date, "now").mockImplementation(() => (calls++ === 0 ? base : base + 60_000));
+
+    await announceMatchSchedule(notice(), { rescheduled: false }, new Date("2026-09-10T17:44:30Z"));
+    clock.mockRestore();
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("le salon de check-in est déjà ouvert sur Discord");
+    }
+  });
+
+  it("dit l'ouverture du check-in à venir à une manche programmée 5 h avant", async () => {
+    await mockAnnounceDb();
+
+    expect(await announceMatchSchedule(notice(), { rescheduled: false }, FIVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) expect(message).toContain("le salon de check-in ouvre 15 minutes avant");
+  });
+
   it("dit « reprogrammé » aux deux engagées, par Discord et par push, dans la langue de chacun", async () => {
     const { execute } = await mockAnnounceDb();
 
@@ -764,7 +815,7 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
       ),
     ).toBe(2);
 
-    expect(claimedKeys(execute)).toEqual(["P1D", "TOLD"]);
+    expect(claimedKeys(execute)).toEqual(["P1D", "PT10H", "TOLD"]);
     expect(sentMessages()).toHaveLength(2);
     for (const message of sentMessages()) {
       expect(message).toContain("**Match reprogrammé**");
@@ -779,7 +830,11 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(resolvePush(pushes[0][2]).body).toContain("au lieu du mardi 8 septembre à 20:00");
     expect(resolvePush(pushes[0][2], "en").title).toBe("Match rescheduled");
     expect(resolvePush(pushes[0][2], "en").body).toContain("instead of Tuesday, September 8 at 20:00");
-    expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
+    // À 5 h du coup d'envoi, l'annonce porte le check-in : toucher le push
+    // ouvre l'invitation (l'adresse écrite dans le texte ne se touche pas).
+    expect(resolvePush(pushes[0][2], "en").body).toContain("Check-in on Discord");
+    expect(resolvePush(pushes[0][2]).url).toBe("/check-in");
+    expect(resolvePush(pushes[0][2], "en").url).toBe("/check-in");
   });
 
   it("nomme une ronde suisse « Ronde N » dans le message privé et le push, \"Round N\" en anglais", async () => {
@@ -1159,5 +1214,185 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     expect(await announceEntrantsWithdrawn([DEPARTED])).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
+  });
+});
+
+describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
+  const INVITE = "https://discord.gg/Sgdh3p4VhC";
+
+  it("envoie le rappel 10 h avec le lien du check-in, les 24 h déjà parties", async () => {
+    const { execute } = await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(claimedKeys(execute)).toEqual(["PT10H", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Rappel de match — dans moins de 10 heures**");
+      expect(message).toContain("le salon de check-in ouvre 15 minutes avant le coup d'envoi");
+      expect(message).toContain(INVITE);
+    }
+    const [, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
+    expect(topic).toBe("MATCH_REMINDER");
+    expect(resolvePush(content).title).toBe("Match dans moins de 10 heures");
+    expect(resolvePush(content).body).toContain(`Check-in sur Discord 15 min avant le match : ${INVITE}`);
+    expect(resolvePush(content, "en").title).toBe("Match in less than 10 hours");
+    expect(resolvePush(content, "en").body).toContain(`Check-in on Discord 15 min before the match: ${INVITE}`);
+  });
+
+  it("garde le rappel 24 h sans lien de check-in", async () => {
+    await mockDb({});
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("dans moins de 24 heures");
+      expect(message).not.toContain(INVITE);
+    }
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toContain(INVITE);
+  });
+
+  it("ne nomme aucun joueur d'un tournoi individuel dans le rappel 10 h", async () => {
+    await mockDb({
+      matches: [{ ...MATCH, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" }],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+    });
+
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Ton match**");
+      expect(message).not.toMatch(/Kiro|Nova/);
+      expect(message).toContain(INVITE);
+    }
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toMatch(/Kiro|Nova/);
+  });
+
+  it("une manche découverte moins de 10 h avant reçoit le check-in dans son annonce", async () => {
+    const { execute } = await mockDb({ sent: [] });
+
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "PT10H", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).toContain(INVITE);
+    }
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).toContain(INVITE);
+  });
+
+  it("une manche découverte à vingt heures annonce le rappel 10 h, sans lien encore", async () => {
+    const { execute } = await mockDb({ sent: [] });
+
+    await dispatchDueMatchReminders(new Date("2026-09-09T22:00:00Z"));
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("Prochain rappel : 10 heures avant le coup d'envoi.");
+      expect(message).not.toContain(INVITE);
+    }
+  });
+
+  /** Bot lent : les messages privés ne reviennent qu'à l'appel de la fonction rendue. */
+  function holdDirectMessages(): () => void {
+    let release: () => void = () => undefined;
+    const slowBot = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      await slowBot;
+      return { sent: 0, unresolved: [], failed: [] };
+    });
+    return () => release();
+  }
+
+  it("lance le programme d'arbitrage au même balayage, sans que son échec retienne les rappels", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    jest.mocked(dispatchRefereeDigest).mockRejectedValue(new Error("bot"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(dispatchRefereeDigest).toHaveBeenCalledWith(FIVE_HOURS_BEFORE);
+    expect(error).toHaveBeenCalledWith("[match-reminders] programme d'arbitrage en échec", expect.any(Error));
+  });
+
+  it("lance le programme d'arbitrage de front : il n'attend pas les envois aux joueurs", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    jest.mocked(dispatchRefereeDigest).mockResolvedValue(0);
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    // Un bot lent : les messages privés ne reviennent qu'au signal.
+    const release = holdDirectMessages();
+
+    const sweep = dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(dispatchRefereeDigest).toHaveBeenCalledWith(FIVE_HOURS_BEFORE);
+    release();
+    await sweep;
+  });
+
+  it("ne retient pas le balayage sur le programme : son propre verrou, un seul à la fois", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    // Les appareils du staff tardent : le programme ne revient qu'au signal.
+    let release: ((count: number) => void) | undefined;
+    jest.mocked(dispatchRefereeDigest).mockImplementation(
+      () =>
+        new Promise<number>((resolve) => {
+          release = resolve;
+        }),
+    );
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    // Le balayage des joueurs rend la main sans attendre le programme.
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+    expect(pendingRefereeDigest()).not.toBeNull();
+
+    // Balayage suivant, programme toujours en cours : pas de second programme.
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 31, offset_key: "PT10H" }] });
+    const later = jest.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    later.mockRestore();
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
+
+    release?.(0);
+    await pendingRefereeDigest();
+    expect(pendingRefereeDigest()).toBeNull();
+  });
+
+  it("lance le programme même pendant un balayage long, sous son propre étranglement", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    jest.mocked(dispatchRefereeDigest).mockResolvedValue(0);
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    // Le balayage des joueurs reste pendu sur le bot.
+    const release = holdDirectMessages();
+    const sweep = dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    await pendingRefereeDigest();
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
+
+    // Dans la minute : étranglé, même si le balayage tient encore son verrou.
+    void dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
+
+    // Une minute plus tard, balayage toujours en cours : le programme repart.
+    const later = jest.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
+    void dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    later.mockRestore();
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(2);
+
+    await pendingRefereeDigest();
+    release();
+    await sweep;
+  });
+
+  it("tait l'absence de table au programme d'arbitrage, comme au balayage", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    jest.mocked(dispatchRefereeDigest).mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE" }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+
+    expect(error).not.toHaveBeenCalledWith("[match-reminders] programme d'arbitrage en échec", expect.anything());
   });
 });

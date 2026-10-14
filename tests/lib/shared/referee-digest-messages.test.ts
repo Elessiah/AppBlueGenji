@@ -1,0 +1,305 @@
+import { describe, expect, it } from "@jest/globals";
+import { formatRefereeDigestLog, REFEREE_DIGEST_LOG_ENTRIES, REFEREE_DIGEST_LOG_MAX_LENGTH } from "@/lib/shared/bot-logs";
+import { matchReminderPush, refereeDigestPush, REFEREE_DIGEST_PUSH_LINES } from "@/lib/shared/push-messages";
+import { buildPushPayload, PUSH_BODY_MAX, PUSH_TAG_MAX, PUSH_TOPICS } from "@/lib/shared/push-notifications";
+import { CHECK_IN_OPENS_MINUTES_BEFORE } from "@/lib/shared/discord-notifications";
+import enPush from "@/messages/en/push.json";
+import frPush from "@/messages/fr/push.json";
+
+const START = new Date("2026-09-10T18:00:00Z");
+
+function match(id: number, overrides: Partial<Parameters<typeof refereeDigestPush>[0][number]> = {}) {
+  return {
+    matchId: id,
+    tournamentId: 7,
+    tournamentName: "Coupe",
+    bracket: "UPPER",
+    roundNumber: 1,
+    team1Name: `Renards ${id}`,
+    team2Name: `Nova ${id}`,
+    solo: false,
+    startAt: START,
+    ...overrides,
+  };
+}
+
+describe("refereeDigestPush", () => {
+  it("liste les matchs, heure de Paris, en français et en anglais", () => {
+    const fr = refereeDigestPush([match(1), match(2)], "fr");
+    expect(fr.title).toBe("Programme d'arbitrage : 2 matchs à venir");
+    // Dernière ligne : le fuseau — un arbitre à l'étranger lirait sinon son heure
+    // locale ; la première reste un match, seule visible sur une notification repliée.
+    expect(fr.body).toBe(
+      "jeu. 20:00 · Renards 1 contre Nova 1 (Coupe, Manche 1)\njeu. 20:00 · Renards 2 contre Nova 2 (Coupe, Manche 1)\nHeure de Paris",
+    );
+    expect(fr.url).toBe("/tournois/7");
+    expect(fr.tag).toMatch(/^referee-digest-1-2-[0-9a-z]+$/);
+
+    const en = refereeDigestPush([match(1)], "en");
+    expect(en.title).toBe("Refereeing schedule: 1 upcoming match");
+    expect(refereeDigestPush([match(1)], "fr").title).toBe("Programme d'arbitrage : 1 match à venir");
+    expect(refereeDigestPush([match(1), match(2)], "en").title).toBe("Refereeing schedule: 2 upcoming matches");
+    expect(en.body).toBe("Thu 20:00 · Renards 1 vs Nova 1 (Coupe, Round 1)\nParis time");
+    expect(en.url).toBe("/en/tournois/7");
+  });
+
+  it("mène à la liste des tournois quand le programme en cite plusieurs", () => {
+    const push = refereeDigestPush([match(1), match(2, { tournamentId: 8 })], "en");
+    expect(push.url).toBe("/en/tournois");
+    expect(refereeDigestPush([match(1), match(2, { tournamentId: 8 })]).url).toBe("/tournois");
+  });
+
+  it("étiquette chaque programme par toutes ses manches : un programme suivant ne remplace pas le précédent", () => {
+    // A cite 5, 6, 7 ; 5 reprogrammée repart seule dans B — B ne doit pas effacer A.
+    const first = refereeDigestPush([match(5), match(6), match(7)]);
+    const second = refereeDigestPush([match(5)]);
+    expect(first.tag).not.toBe(second.tag);
+  });
+
+  it("borne la liste et dit combien restent", () => {
+    // Noms courts : les cinq lignes tiennent dans la borne du corps.
+    const short = (id: number) => match(id, { team1Name: "A", team2Name: "B", tournamentName: "C" });
+    const many = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 3 }, (_, index) => short(index + 1));
+    const lines = refereeDigestPush(many).body.split("\n");
+    expect(lines).toHaveLength(REFEREE_DIGEST_PUSH_LINES + 2);
+    expect(lines.at(-2)).toBe("… et 3 autres");
+    expect(lines.at(-1)).toBe("Heure de Paris");
+    expect(refereeDigestPush(many, "en").body.split("\n").at(-2)).toBe("… and 3 more");
+    // Une soirée chargée : seules les lignes affichables sont mises en forme, le reste est compté.
+    const evening = Array.from({ length: 60 }, (_, index) => short(index + 1));
+    expect(refereeDigestPush(evening).body.split("\n").at(-2)).toBe("… et 55 autres");
+    // Un seul match au-delà de la borne : singulier (« 1 autre », pas « 1 autres »).
+    const oneMore = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 1 }, (_, index) => short(index + 1));
+    expect(refereeDigestPush(oneMore).body.split("\n").at(-2)).toBe("… et 1 autre");
+    expect(refereeDigestPush(oneMore, "en").body.split("\n").at(-2)).toBe("… and 1 more");
+  });
+
+  it("ne nomme aucun joueur en tournoi individuel, et regroupe les matchs d'un même créneau et d'une même manche", () => {
+    const solo = { solo: true, team1Name: "Kiro", team2Name: "Ayla" };
+    const body = refereeDigestPush([match(1, solo), match(2, { ...solo, roundNumber: 2 })]).body;
+    expect(body).toBe("jeu. 20:00 · Un match (Coupe, Manche 1)\njeu. 20:00 · Un match (Coupe, Manche 2)\nHeure de Paris");
+    expect(body).not.toMatch(/Kiro|Ayla/);
+    expect(refereeDigestPush([match(1, solo)], "en").body).toBe("Thu 20:00 · A match (Coupe, Round 1)\nParis time");
+
+    // Huit matchs d'une ronde solo à 20:00 : une ligne « 8 matchs », pas cinq lignes identiques et « … et 3 autres ».
+    const round = Array.from({ length: 8 }, (_, index) => match(index + 1, solo));
+    const grouped = refereeDigestPush([...round, match(9, { ...solo, roundNumber: 2 })]);
+    expect(grouped.title).toBe("Programme d'arbitrage : 9 matchs à venir");
+    expect(grouped.body).toBe("jeu. 20:00 · 8 matchs (Coupe, Manche 1)\njeu. 20:00 · Un match (Coupe, Manche 2)\nHeure de Paris");
+    expect(refereeDigestPush(round, "en").body).toBe("Thu 20:00 · 8 matches (Coupe, Round 1)\nParis time");
+    // Les équipes, elles, restent une ligne par match.
+    expect(refereeDigestPush([match(1), match(2)]).body.split("\n")).toHaveLength(3);
+  });
+
+  it("écrit son corps en lignes, seul push à les garder", () => {
+    expect(refereeDigestPush([match(1)]).multiline).toBe(true);
+  });
+
+  it("ne fond pas en une ligne deux tournois individuels homonymes au même créneau", () => {
+    const solo = { solo: true, tournamentName: "Coupe du soir" };
+    const body = refereeDigestPush([match(1, { ...solo, tournamentId: 7 }), match(2, { ...solo, tournamentId: 8 })]).body;
+    expect(body).toBe(
+      "jeu. 20:00 · Un match (Coupe du soir, Manche 1)\njeu. 20:00 · Un match (Coupe du soir, Manche 1)\nHeure de Paris",
+    );
+  });
+
+  it("tient dans la borne du corps d'un push : « … et N autres » et le fuseau arrivent toujours", () => {
+    const long = (id: number) =>
+      match(id, {
+        team1Name: `Les Renards Argentés du Nord ${id}`,
+        team2Name: `Nova Esport Académie ${id}`,
+        tournamentName: "Coupe d'automne BlueGenji",
+      });
+    for (const locale of ["fr", "en"] as const) {
+      const many = Array.from({ length: 8 }, (_, index) => long(index + 1));
+      const payload = buildPushPayload("REFEREE_DIGEST", refereeDigestPush(many, locale), null, locale);
+      // Le corps arrive tel quel : ni coupé (« … » final), ni replié en un paragraphe.
+      expect(Array.from(payload.body).length).toBeLessThanOrEqual(PUSH_BODY_MAX);
+      expect(payload.body).toBe(refereeDigestPush(many, locale).body);
+      const lines = payload.body.split("\n");
+      expect(lines.at(-1)).toBe(locale === "fr" ? "Heure de Paris" : "Paris time");
+      const listed = lines.length - 2;
+      expect(listed).toBeGreaterThanOrEqual(1);
+      expect(lines.at(-2)).toBe(locale === "fr" ? `… et ${8 - listed} autres` : `… and ${8 - listed} more`);
+    }
+
+    // Une seule ligne trop longue : raccourcie, le pied reste.
+    const huge = match(1, { tournamentName: "T".repeat(300) });
+    const body = refereeDigestPush([huge, match(2)]).body;
+    expect(Array.from(body).length).toBeLessThanOrEqual(PUSH_BODY_MAX);
+    expect(body.split("\n").slice(-2)).toEqual(["… et 1 autre", "Heure de Paris"]);
+  });
+
+  it("borne l'étiquette sans confondre deux programmes au même début", () => {
+    const ids = Array.from({ length: 20 }, (_, index) => 1000 + index);
+    const first = refereeDigestPush(ids.map((id) => match(id)));
+    const second = refereeDigestPush([...ids.slice(0, 19), 2000].map((id) => match(id)));
+    expect(first.tag?.length).toBeLessThanOrEqual(PUSH_TAG_MAX);
+    expect(second.tag?.length).toBeLessThanOrEqual(PUSH_TAG_MAX);
+    expect(first.tag).not.toBe(second.tag);
+    expect(first.tag).toBe(refereeDigestPush(ids.map((id) => match(id))).tag);
+  });
+
+  it("compte dans « … et N autres » les matchs des lignes regroupées qui ne tiennent pas", () => {
+    const solo = { solo: true };
+    const slots = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 1 }, (_, index) => [
+      match(index * 2 + 1, { ...solo, roundNumber: index + 1 }),
+      match(index * 2 + 2, { ...solo, roundNumber: index + 1 }),
+    ]).flat();
+    const lines = refereeDigestPush(slots).body.split("\n");
+    expect(lines).toHaveLength(REFEREE_DIGEST_PUSH_LINES + 2);
+    expect(lines.at(-2)).toBe("… et 2 autres");
+  });
+});
+
+describe("matchReminderPush — check-in", () => {
+  const SIDE = {
+    tournamentId: 7,
+    tournamentName: "Coupe",
+    matchId: 31,
+    teamName: "Renards",
+    opponentName: "Nova",
+    bracket: "UPPER",
+    roundNumber: 1,
+    startAt: START,
+  };
+
+  it("ajoute le lien au rappel 10 h, dans les deux langues", () => {
+    // Les minutes viennent de CHECK_IN_OPENS_MINUTES_BEFORE, comme le message privé.
+    expect(CHECK_IN_OPENS_MINUTES_BEFORE).toBe(15);
+    expect(matchReminderPush(SIDE, "PT10H", "fr").body).toMatch(/Check-in sur Discord 15 min avant le match : https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    expect(matchReminderPush(SIDE, "PT10H", "en").body).toMatch(/Check-in on Discord 15 min before the match: https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    expect(matchReminderPush(SIDE, "PT10H", "en").title).toBe("Match in less than 10 hours");
+  });
+
+  it("ne l'ajoute ni au rappel 24 h ni à une annonce qui ne l'a pas consommé", () => {
+    expect(matchReminderPush(SIDE, "P1D").body).not.toContain("discord.gg");
+    expect(matchReminderPush(SIDE, null).body).not.toContain("discord.gg");
+    expect(matchReminderPush({ ...SIDE, checkIn: true }, null).body).toContain("discord.gg");
+  });
+
+  it("dit le check-in déjà ouvert à moins de 15 minutes du coup d'envoi, dans les deux langues", () => {
+    const open = { ...SIDE, checkIn: true, checkInOpen: true };
+    expect(matchReminderPush(open, null, "fr").body).toMatch(/Check-in déjà ouvert sur Discord : https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    expect(matchReminderPush(open, null, "en").body).toMatch(/Check-in already open on Discord: https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    expect(matchReminderPush(open, null, "fr").body).not.toContain("15 min avant");
+  });
+
+  it("garde l'invitation entière quand le corps est long (reprogrammation, noms longs)", () => {
+    const long = {
+      ...SIDE,
+      checkIn: true,
+      teamName: "Les Renards Argentés du Nord",
+      opponentName: "Nova Esport Académie de Lyon",
+      tournamentName: "Coupe d'automne BlueGenji — édition spéciale",
+    };
+    const announcement = { rescheduled: true, previousStartAt: new Date("2026-09-09T18:00:00Z") };
+    for (const locale of ["fr", "en"] as const) {
+      const content = matchReminderPush(long, null, locale, announcement);
+      const payload = buildPushPayload("MATCH_REMINDER", content, null, locale);
+      expect(Array.from(payload.body).length).toBeLessThanOrEqual(PUSH_BODY_MAX);
+      expect(payload.body).toMatch(/https:\/\/discord\.gg\/Sgdh3p4VhC$/);
+    }
+  });
+
+  it("fait sonner les rappels qui remplacent l'annonce, pas l'annonce elle-même", () => {
+    // Même étiquette que l'annonce : sans renotify, le rappel 10 h (check-in) la remplacerait en silence.
+    expect(matchReminderPush(SIDE, "PT10H").renotify).toBe(true);
+    expect(matchReminderPush(SIDE, "P1D", "en").renotify).toBe(true);
+    expect(matchReminderPush(SIDE, "PT10H").tag).toBe(matchReminderPush(SIDE, null).tag);
+    expect(matchReminderPush({ ...SIDE, checkIn: true }, null)).not.toHaveProperty("renotify");
+  });
+
+  it("ouvre l'invitation au toucher quand il porte le check-in, la fiche du match sinon", () => {
+    // Une notification n'ouvre que des adresses du site : `/check-in` renvoie à l'invitation.
+    expect(matchReminderPush(SIDE, "PT10H", "fr").url).toBe("/check-in");
+    expect(matchReminderPush(SIDE, "PT10H", "en").url).toBe("/check-in");
+    expect(matchReminderPush({ ...SIDE, checkIn: true }, null, "en").url).toBe("/check-in");
+    expect(matchReminderPush(SIDE, "P1D", "fr").url).toBe("/tournois/7#match-31");
+    expect(matchReminderPush(SIDE, "P1D", "en").url).toBe("/en/tournois/7#match-31");
+  });
+});
+
+describe("formatRefereeDigestLog", () => {
+  const entry = (id: number, participantType: "TEAM" | "SOLO" = "TEAM") => ({
+    matchId: id,
+    tournament: { id: 7, name: "Coupe" },
+    team1: { name: `Renards ${id}`, participantType },
+    team2: { name: `Nova ${id}`, participantType },
+    startAt: START,
+    bracket: "UPPER",
+    roundNumber: 1,
+  });
+
+  it("tient en une ligne, sans auteur", () => {
+    const line = formatRefereeDigestLog([entry(1), entry(2)]);
+    expect(line).not.toContain("\n");
+    expect(line).toBe(
+      "📋 Programme d'arbitrage — 2 matchs à venir (heure de Paris) : " +
+        "jeu. 20:00 Renards 1 vs Nova 1 (« Coupe » (#7), Manche 1, match #1) ; " +
+        "jeu. 20:00 Renards 2 vs Nova 2 (« Coupe » (#7), Manche 1, match #2).",
+    );
+    expect(line).not.toContain("staff");
+  });
+
+  it("ne dépasse jamais la longueur d'un message Discord, noms longs compris", () => {
+    const long = (id: number) => ({
+      ...entry(id),
+      tournament: { id: 7, name: "T".repeat(120) },
+      team1: { name: `${"R".repeat(56)} ${id}`, participantType: "TEAM" as const },
+      team2: { name: `${"N".repeat(56)} ${id}`, participantType: "TEAM" as const },
+    });
+    const many = Array.from({ length: REFEREE_DIGEST_LOG_ENTRIES }, (_, index) => long(index + 1));
+    const line = formatRefereeDigestLog(many);
+    expect(line.length).toBeLessThanOrEqual(REFEREE_DIGEST_LOG_MAX_LENGTH);
+    // Les manches qui ne tiennent pas sont comptées, pas perdues en silence.
+    expect(line).toMatch(/… et \d+ autres\.$/);
+    expect(line).toContain("12 matchs à venir");
+    // Une seule manche plus longue que la borne : coupée, jamais refusée.
+    const huge = { ...long(1), team1: { name: "😀".repeat(1500), participantType: "TEAM" as const } };
+    const cut = formatRefereeDigestLog([huge]);
+    expect(cut.length).toBeLessThanOrEqual(REFEREE_DIGEST_LOG_MAX_LENGTH);
+    expect(cut.endsWith("…")).toBe(true);
+    expect(cut).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  });
+
+  it("borne les manches citées", () => {
+    const many = Array.from({ length: REFEREE_DIGEST_LOG_ENTRIES + 2 }, (_, index) => entry(index + 1));
+    expect(formatRefereeDigestLog(many)).toContain("… et 2 autres.");
+    expect(formatRefereeDigestLog([entry(1)])).toContain("1 match à venir");
+  });
+
+  it("écrit « un joueur » en tournoi individuel", () => {
+    const line = formatRefereeDigestLog([entry(1, "SOLO")]);
+    expect(line).toContain("un joueur vs un joueur");
+    expect(line).not.toMatch(/Renards|Nova/);
+  });
+
+  it("regroupe les matchs solo d'un même créneau et d'une même manche, et laisse la place aux autres", () => {
+    // 8 matchs solo à 20:00, puis 4 matchs d'équipe : tous tiennent dans la ligne.
+    const solo = Array.from({ length: 8 }, (_, index) => entry(index + 1, "SOLO"));
+    const teams = Array.from({ length: 4 }, (_, index) => ({
+      ...entry(20 + index),
+      tournament: { id: 9, name: "Ligue" },
+      bracket: "LOWER",
+      roundNumber: 2,
+    }));
+    const line = formatRefereeDigestLog([...solo, ...teams]);
+    expect(line).toContain("12 matchs à venir");
+    expect(line).toContain("jeu. 20:00 8 matchs (« Coupe » (#7), Manche 1)");
+    expect(line).not.toContain("un joueur");
+    expect(line).toContain("Renards 23 vs Nova 23 (« Ligue » (#9), Tableau perdants · manche 2, match #23)");
+    expect(line).not.toContain("autre");
+    // Ronde suisse nommée comme sur le site.
+    expect(formatRefereeDigestLog([{ ...entry(1), swiss: true }])).toContain("Ronde 1, match #1");
+  });
+});
+
+describe("sujet REFEREE_DIGEST", () => {
+  it("est libellé en français et en anglais sur /profil", () => {
+    expect(PUSH_TOPICS.REFEREE_DIGEST.label).toBe(frPush.topics.REFEREE_DIGEST.label);
+    expect(enPush.topics.REFEREE_DIGEST.label).toBe("Refereeing schedule");
+    expect(PUSH_TOPICS.MATCH_REMINDER.description).toBe(frPush.topics.MATCH_REMINDER.description);
+    expect(enPush.topics.MATCH_REMINDER.description).toContain("10 h");
+  });
+});

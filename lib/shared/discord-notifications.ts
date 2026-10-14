@@ -5,9 +5,11 @@
  * des appels reste app → bot (comme l'auth, les logs et la fréquentation), le
  * bot n'appelant jamais le site en retour.
  *
- * 1. **Rappels de match** — 24 h avant le coup d'envoi d'une manche programmée
- *    (`bg_matches.start_at`), en message privé à chaque joueur des deux
- *    engagées. Poser ou changer la date donne d'abord une **annonce** unique
+ * 1. **Rappels de match** — 24 h puis 10 h avant le coup d'envoi d'une manche
+ *    programmée (`bg_matches.start_at`), en message privé à chaque joueur des
+ *    deux engagées ; celui de 10 h porte le lien du serveur Discord où le
+ *    salon de check-in ouvre un quart d'heure avant le match (demande de
+ *    l'association, 2026-10-09). Poser ou changer la date donne d'abord une **annonce** unique
  *    qui la porte (« Match programmé » / « Match reprogrammé »), puis le rappel
  *    s'il reste devant ; la retirer prévient aussi (« Horaire du match
  *    retiré »). Les rappels « une semaine » et « 1 heure avant » ont été
@@ -24,6 +26,7 @@
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { discordInline, discordQuote } from "./discord-text";
+import { CHECK_IN_INVITE_URL } from "./discord";
 
 /**
  * Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`).
@@ -32,7 +35,7 @@ import { discordInline, discordQuote } from "./discord-text";
  * lignes déjà posées sous ces clés restent en base, inertes — le balayage ne
  * lit que les clés de {@link MATCH_REMINDER_OFFSETS}.
  */
-export type MatchReminderOffsetKey = "P1D";
+export type MatchReminderOffsetKey = "P1D" | "PT10H";
 
 /** Palier de rappel : combien de temps avant le match, et comment le dire. */
 export interface MatchReminderOffset {
@@ -58,7 +61,26 @@ export interface MatchReminderOffset {
  */
 export const MATCH_REMINDER_OFFSETS: readonly MatchReminderOffset[] = [
   { key: "P1D", minutesBefore: 24 * 60, label: "24 heures", dueLabel: "moins de 24 heures" },
+  { key: "PT10H", minutesBefore: 10 * 60, label: "10 heures", dueLabel: "moins de 10 heures" },
 ];
+
+/**
+ * Palier qui porte le **check-in** : son rappel donne le lien du serveur
+ * Discord où le salon de check-in ouvre {@link CHECK_IN_OPENS_MINUTES_BEFORE}
+ * minutes avant le coup d'envoi. Une manche annoncée moins de 10 h avant son
+ * coup d'envoi consomme ce palier sans message : c'est alors l'annonce qui
+ * porte le lien (`MatchReminderContext.checkIn`).
+ */
+export const CHECK_IN_REMINDER_KEY: MatchReminderOffsetKey = "PT10H";
+
+/**
+ * Invitation du serveur où s'ouvre le salon de check-in — écrite une seule
+ * fois, avec les autres invitations (`./discord`).
+ */
+export { CHECK_IN_INVITE_URL };
+
+/** Le salon de check-in ouvre un quart d'heure avant le coup d'envoi. */
+export const CHECK_IN_OPENS_MINUTES_BEFORE = 15;
 
 const MINUTE_MS = 60_000;
 
@@ -68,8 +90,8 @@ const MINUTE_MS = 60_000;
  * Chaque palier ne vaut que dans **sa propre fenêtre** : `[début − palier,
  * début − palier suivant)`, le dernier s'arrêtant au coup d'envoi. Sans ce
  * découpage, plusieurs paliers s'ouvriraient d'un coup pour une manche
- * programmée tard, dans la même seconde. Il n'en reste qu'un (24 heures), mais
- * la règle tient pour tout palier qu'on rajouterait.
+ * programmée tard, dans la même seconde : le palier « 24 heures » court jusqu'à
+ * l'ouverture du palier « 10 heures », qui court jusqu'au coup d'envoi.
  *
  * Rien ne part une fois le match commencé : un rappel en retard n'est plus un
  * rappel, et un match reprogrammé vers le passé (correction d'archive) ne doit
@@ -162,6 +184,24 @@ export const MATCH_TOLD_KEY = "TOLD";
  */
 export const MATCH_STAFF_KEY = "STAFF";
 
+/**
+ * Marque d'une manche **citée au programme d'arbitrage** (`REFEREE_DIGEST`,
+ * `lib/server/tournaments/referee-digest.ts`), datée de l'horaire cité.
+ * Comme un palier, elle part avec l'horaire : une manche reprogrammée (ou dont
+ * l'affiche change) est citée de nouveau au programme suivant.
+ */
+export const REFEREE_DIGEST_KEY = "REFS";
+
+/** Le programme d'arbitrage part quand une manche entre dans ses 10 dernières heures. */
+export const REFEREE_DIGEST_LEAD_MS = 10 * 60 * MINUTE_MS;
+
+/**
+ * Marge de regroupement : le programme cite aussi les manches qui entreront
+ * dans la fenêtre dans les 2 heures suivantes — une soirée échelonnée tient
+ * ainsi en un message plutôt qu'en un par créneau.
+ */
+export const REFEREE_DIGEST_GROUPING_MS = 2 * 60 * MINUTE_MS;
+
 
 /**
  * Paliers dont la fenêtre est **déjà ouverte** à `now`.
@@ -236,6 +276,32 @@ export interface MatchReminderContext {
    * match », comme le push.
    */
   solo?: boolean;
+  /**
+   * Le message porte le check-in ({@link CHECK_IN_INVITE_URL}) : rappel de
+   * 10 h, ou annonce qui l'a consommé (manche programmée moins de 10 h avant).
+   */
+  checkIn?: boolean;
+  /**
+   * Le salon de check-in est **déjà ouvert** : la manche part dans moins de
+   * {@link CHECK_IN_OPENS_MINUTES_BEFORE} minutes (programmée au dernier
+   * moment, ou balayage tardif). « Ouvre 15 minutes avant » désignerait un
+   * instant passé.
+   */
+  checkInOpen?: boolean;
+}
+
+/** Ligne du check-in : où et quand (texte fixe, aucun nom). */
+export function checkInLine(open = false): string {
+  if (open) return `Check-in : le salon de check-in est déjà ouvert sur Discord — ${CHECK_IN_INVITE_URL}`;
+  return (
+    `Check-in : le salon de check-in ouvre ${CHECK_IN_OPENS_MINUTES_BEFORE} minutes avant le coup d'envoi ` +
+    `sur Discord — ${CHECK_IN_INVITE_URL}`
+  );
+}
+
+/** Le salon de check-in est-il déjà ouvert à `now` pour un coup d'envoi à `startAt` ? */
+export function isCheckInOpen(startAt: string | Date, now: Date): boolean {
+  return new Date(startAt).getTime() - now.getTime() <= CHECK_IN_OPENS_MINUTES_BEFORE * MINUTE_MS;
 }
 
 /**
@@ -277,6 +343,7 @@ export function buildMatchReminderMessage(
     pairingLine(context),
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
+  if (context.checkIn ?? offset.key === CHECK_IN_REMINDER_KEY) lines.push(checkInLine(context.checkInOpen));
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
   return lines.join("\n");
 }
@@ -317,6 +384,7 @@ export function buildMatchScheduleAnnouncement(
     // est ordonnée du plus lointain au plus proche, c'est donc le premier.
     lines.push(`Prochain rappel : ${remaining[0].label} avant le coup d'envoi.`);
   }
+  if (context.checkIn) lines.push(checkInLine(context.checkInOpen));
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
   return lines.join("\n");
 }

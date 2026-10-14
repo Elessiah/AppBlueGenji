@@ -133,10 +133,23 @@ describe("buildPushPayload", () => {
   });
 
   it("replie les espaces et retombe sur le nom du site sans titre", () => {
-    const payload = buildPushPayload("MATCH_START", { title: "   ", body: "a\n\n b", url: "/", tag: "x" }, null, "fr");
+    const payload = buildPushPayload("MATCH_START", { title: "   ", body: "a  \n\n b\tc", url: "/", tag: "x" }, null, "fr");
     expect(payload.title).toBe("BlueGenji Esport");
-    expect(payload.body).toBe("a b");
+    // Un nom porteur d'un retour à la ligne n'ouvre pas de fausse ligne.
+    expect(payload.body).toBe("a b c");
+    // Seul un corps écrit en lignes (programme d'arbitrage) les garde, sans ligne vide ; le titre, jamais.
+    const lines = { title: "t", body: "a  \n\n b\tc", url: "/", multiline: true };
+    expect(buildPushPayload("REFEREE_DIGEST", lines, null, "fr").body).toBe("a\nb c");
+    expect(buildPushPayload("REFEREE_DIGEST", lines, null, "fr")).not.toHaveProperty("multiline");
+    expect(buildPushPayload("MATCH_START", { title: "a\nb", body: "", url: "/" }, null, "fr").title).toBe("a b");
     expect(payload.tag).toBe("x");
+  });
+
+  it("ne porte renotify que lorsqu'il est demandé", () => {
+    const base = { title: "t", body: "b", url: "/", tag: "x" };
+    expect(buildPushPayload("MATCH_REMINDER", { ...base, renotify: true }, null, "fr").renotify).toBe(true);
+    expect(buildPushPayload("MATCH_REMINDER", base, null, "fr")).not.toHaveProperty("renotify");
+    expect(buildPushPayload("MATCH_REMINDER", { ...base, renotify: false }, null, "fr")).not.toHaveProperty("renotify");
   });
 
   it("filtre le lien", () => {

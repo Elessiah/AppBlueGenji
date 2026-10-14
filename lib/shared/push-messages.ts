@@ -28,18 +28,22 @@ import frPush from "@/messages/fr/pushMessages.json";
 import enReports from "@/messages/en/reports.json";
 import frReports from "@/messages/fr/reports.json";
 import {
+  CHECK_IN_INVITE_URL,
+  CHECK_IN_OPENS_MINUTES_BEFORE,
+  CHECK_IN_REMINDER_KEY,
   FIRST_SCHEDULE,
   formatMatchStart,
   type MatchReminderOffsetKey,
   type ScheduleAnnouncement,
 } from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
-import { tournamentMatchHref } from "./match-anchor";
+import { CHECK_IN_PATH } from "./discord";
+import { tournamentHref, tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
 import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
-import type { PushContent } from "./push-notifications";
+import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -145,6 +149,13 @@ type ScheduledMatchSide = MatchSide & {
   swiss?: boolean;
   startAt: string | Date;
   /**
+   * Le rappel porte le check-in (`CHECK_IN_INVITE_URL`) : par défaut, le
+   * rappel de 10 h ; aussi l'annonce qui a consommé son palier.
+   */
+  checkIn?: boolean;
+  /** Le salon de check-in est déjà ouvert (coup d'envoi à moins de 15 min) : « déjà ouvert ». */
+  checkInOpen?: boolean;
+  /**
    * Rencontre vers laquelle mène le lien, quand ce n'est pas `matchId` (qui
    * reste l'étiquette) : la nouvelle rencontre d'une ronde réappariée, ou
    * `null` — la page du tournoi — pour une rencontre supprimée.
@@ -198,20 +209,27 @@ export function matchReminderPush(
 ): PushContent {
   const text = TEXT[locale];
   const change = offset ? FIRST_SCHEDULE : announcement;
+  const body = scheduleBody(
+    {
+      pairing: pairing(side, text),
+      tournament: side.tournamentName,
+      round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
+      startAt: side.startAt,
+    },
+    change,
+    locale,
+  );
+  const checkIn = side.checkIn ?? offset === CHECK_IN_REMINDER_KEY;
   return {
     title: announcementTitle(offset, change.rescheduled, text),
-    body: scheduleBody(
-      {
-        pairing: pairing(side, text),
-        tournament: side.tournamentName,
-        round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
-        startAt: side.startAt,
-      },
-      change,
-      locale,
-    ),
-    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
+    body: checkIn ? withTail(body, checkInText(text, side.checkInOpen === true)) : body,
+    // L'adresse écrite dans le texte ne se touche pas : le push du check-in
+    // ouvre l'invitation (par le site, seule origine qu'une notification ouvre).
+    url: checkIn ? CHECK_IN_PATH : localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-reminder`,
+    // Un rappel remplace l'annonce (ou le rappel 24 h) **en sonnant** : le
+    // rappel 10 h porte le check-in, il ne doit pas passer inaperçu.
+    ...(offset ? { renotify: true } : {}),
   };
 }
 
@@ -334,6 +352,179 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
     ),
     tag: `${matchTag(input.matchId)}-schedule`,
   };
+}
+
+/** Longueur affichée (par caractère, comme la borne du push). */
+function charCount(text: string): number {
+  return Array.from(text).length;
+}
+
+/**
+ * `body` suivi de `tail`, dans la borne du corps d'un push : c'est `body` qui
+ * se raccourcit — une reprogrammation aux noms longs, suivie de la phrase du
+ * check-in, dépasse la borne, et la coupe finale tronquerait l'invitation.
+ */
+function withTail(body: string, tail: string): string {
+  const room = PUSH_BODY_MAX - charCount(tail) - 1;
+  return `${clipPushText(body, Math.max(room, 1))} ${tail}`;
+}
+
+/**
+ * Empreinte courte (FNV-1a 32 bits, base 36) d'une liste d'identifiants :
+ * l'étiquette d'un push est bornée à 64 caractères, une liste écrite en
+ * entier y serait coupée — et deux programmes au même début confondus.
+ */
+function idsFingerprint(ids: readonly number[]): string {
+  let hash = 0x811c9dc5;
+  for (const char of ids.join(",")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+/** Phrase du check-in : quand le salon ouvre, ou qu'il l'est déjà. */
+function checkInText(text: PushText, open: boolean): string {
+  return open
+    ? text.t("matchReminder.checkInOpen", { invite: CHECK_IN_INVITE_URL })
+    : text.t("matchReminder.checkIn", { invite: CHECK_IN_INVITE_URL, minutes: CHECK_IN_OPENS_MINUTES_BEFORE });
+}
+
+/** Une manche du programme d'arbitrage (`REFEREE_DIGEST`). */
+export type RefereeDigestMatch = {
+  matchId: number;
+  tournamentId: number;
+  tournamentName: string;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  team1Name: string;
+  team2Name: string;
+  solo: boolean;
+  startAt: string | Date;
+};
+
+/** Lignes du programme poussées au plus : le reste se dit « … et N autres ». */
+export const REFEREE_DIGEST_PUSH_LINES = 5;
+
+const DIGEST_TIME_FORMATS = new Map<Locale, Intl.DateTimeFormat>();
+
+/** « mer. 20:00 » / « Wed 20:00 », heure de Paris : le programme tient sur une demi-journée. */
+function digestTime(startAt: string | Date, locale: Locale): string {
+  const date = startAt instanceof Date ? startAt : new Date(startAt);
+  return cached(DIGEST_TIME_FORMATS, locale, (code) =>
+    new Intl.DateTimeFormat(INTL_LOCALE[code], {
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "Europe/Paris",
+    }),
+  ).format(date);
+}
+
+/**
+ * Programme d'arbitrage (`REFEREE_DIGEST`) : les matchs à venir (ceux des
+ * 10 prochaines heures et la marge de regroupement), un par ligne (heure de
+ * Paris, affiche, tournoi et manche), dans l'ordre du coup d'envoi, puis une
+ * dernière ligne « Heure de Paris » (un arbitre à l'étranger lirait sinon son
+ * heure locale ; en dernier, parce qu'une notification repliée ne montre que
+ * la première ligne, qui doit être un match). Équipes nommées ; en tournoi individuel, aucun pseudo de
+ * joueur (comme partout) : les matchs d'un même créneau, tournoi et manche
+ * tiennent en une ligne « 5 matchs » plutôt qu'en cinq lignes identiques
+ * « Un match ». Le lien mène au tournoi
+ * quand le programme n'en cite qu'un, à la liste des tournois sinon.
+ * Le corps garde ses lignes (`clipPushText`) et tient dans `PUSH_BODY_MAX` :
+ * les matchs qui n'y entrent pas se disent « … et N autres ».
+ * L'étiquette porte une empreinte de toutes les manches citées (bornée à
+ * 64 caractères) : un programme suivant, qui en cite d'autres, ne remplace
+ * jamais le précédent sur l'appareil.
+ */
+export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const tournaments = new Set(matches.map((match) => match.tournamentId));
+  const [onlyTournament] = tournaments;
+  return {
+    title: text.t("refereeDigest.title", { count: matches.length }),
+    body: fitDigestBody(digestLines(matches, text, locale), matches.length, text),
+    multiline: true,
+    url: localeHref(tournaments.size === 1 ? tournamentHref(onlyTournament) : "/tournois", locale),
+    tag: `referee-digest-${matches[0]?.matchId ?? 0}-${matches.length}-${idsFingerprint(matches.map((match) => match.matchId))}`,
+  };
+}
+
+/** Une ligne du programme mise en forme, et le nombre de matchs qu'elle dit. */
+type DigestLine = { text: string; count: number };
+
+/**
+ * Lignes du programme : une par match ; en solo, une par créneau, tournoi et
+ * manche (suites). Au-delà des lignes affichables, rien n'est mis en forme : le
+ * reste ne se dit qu'en nombre (« … et N autres »), compté sur les matchs.
+ */
+function digestLines(matches: readonly RefereeDigestMatch[], text: PushText, locale: Locale): DigestLine[] {
+  const lines: {
+    start: string;
+    tournamentId: number;
+    tournament: string;
+    round: string;
+    pairing: string | null;
+    count: number;
+  }[] = [];
+  for (const match of matches) {
+    const start = digestTime(match.startAt, locale);
+    const round = pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss);
+    const last = lines.at(-1);
+    const sameSlot =
+      // Par identifiant : deux tournois homonymes ne se fondent pas en une ligne.
+      match.solo &&
+      last?.pairing === null &&
+      last.start === start &&
+      last.tournamentId === match.tournamentId &&
+      last.round === round;
+    if (sameSlot) {
+      last.count += 1;
+      continue;
+    }
+    if (lines.length === REFEREE_DIGEST_PUSH_LINES) break;
+    const pairing = match.solo ? null : text.t("pairing", { team: match.team1Name, opponent: match.team2Name });
+    lines.push({ start, tournamentId: match.tournamentId, tournament: match.tournamentName, round, pairing, count: 1 });
+  }
+  return lines.map((line) => ({
+    count: line.count,
+    // Une ligne par match : un nom ne doit pas en ouvrir une autre.
+    text: text
+      .t("refereeDigest.line", {
+        start: line.start,
+        pairing: line.pairing ?? text.t("refereeDigest.pairingSolo", { count: line.count }),
+        tournament: line.tournament,
+        round: line.round,
+      })
+      .replace(/\s+/g, " "),
+  }));
+}
+
+/**
+ * Corps du programme : lignes gardées tant que le tout — « … et N autres » et
+ * « Heure de Paris » compris — tient dans la borne du corps (`PUSH_BODY_MAX`) :
+ * coupé au-delà, le push perdrait ces deux lignes, et l'arbitre croirait la
+ * liste complète. La première ligne reste, raccourcie s'il le faut.
+ */
+function fitDigestBody(lines: readonly DigestLine[], total: number, text: PushText): string {
+  const timeZone = text.t("refereeDigest.timeZone");
+  const footer = (hidden: number) =>
+    hidden > 0 ? [text.t("refereeDigest.more", { count: hidden }), timeZone] : [timeZone];
+  const shown: string[] = [];
+  let listed = 0;
+  for (const line of lines) {
+    const next = [...shown, line.text, ...footer(total - listed - line.count)];
+    if (shown.length > 0 && charCount(next.join("\n")) > PUSH_BODY_MAX) break;
+    shown.push(line.text);
+    listed += line.count;
+  }
+  const tail = footer(total - listed);
+  const room = PUSH_BODY_MAX - charCount(tail.join("\n")) - 1;
+  if (shown.length === 1 && charCount(shown[0]) > room) shown[0] = clipPushText(shown[0], Math.max(room, 1));
+  return [...shown, ...tail].join("\n");
 }
 
 /** L'adversaire a saisi un score : à confirmer, ou à contester. */

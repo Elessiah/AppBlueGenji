@@ -57,7 +57,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_REMINDER: {
     label: "Horaires et rappels de match",
-    description: "L'horaire d'un match quand il est posé, changé ou retiré, puis un rappel dans les 24 h qui précèdent le coup d'envoi.",
+    description: "L'horaire d'un match quand il est posé, changé ou retiré, puis des rappels 24 h et 10 h avant le coup d'envoi (avec le lien du check-in).",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {
@@ -88,6 +88,11 @@ export const PUSH_TOPICS = {
   MATCH_SCHEDULED: {
     label: "Matchs planifiés",
     description: "Un autre arbitre planifie un match, ou en change ou en retire l'horaire — ou une mise à jour du tournoi supprime un match planifié.",
+    audience: "tournaments",
+  },
+  REFEREE_DIGEST: {
+    label: "Programme d'arbitrage",
+    description: "Environ 10 h à l'avance, la liste des matchs à venir : horaires, tournois et équipes.",
     audience: "tournaments",
   },
   STAFF_REPORT: {
@@ -144,6 +149,21 @@ export type PushContent = {
    * match). Défaut : le sujet.
    */
   tag?: string;
+  /**
+   * Remplace la notification de même étiquette **en sonnant** : un rappel
+   * (24 h, puis 10 h avec le check-in) remplace l'annonce ou le rappel
+   * précédent — sans ce drapeau, il le ferait en silence, et le joueur ne
+   * verrait jamais le lien du check-in.
+   */
+  renotify?: boolean;
+  /**
+   * Corps écrit **en lignes** par son rédacteur (le programme d'arbitrage, qui
+   * replie lui-même chaque ligne) : ses retours à la ligne sont gardés. Sans
+   * ce drapeau, ils sont repliés en espaces — un nom (tournoi, équipe) qui en
+   * porterait un ne doit pas ouvrir une fausse ligne dans un autre push
+   * (« Match reprogrammé : … » imité sous « Score à confirmer »).
+   */
+  multiline?: boolean;
 };
 
 /**
@@ -164,14 +184,27 @@ export type PushPayload = {
   tag: string;
   /** Langue du texte : le service worker la déclare à la notification (lecteur d'écran, traduction). */
   lang: Locale;
+  /** Présent (et vrai) seulement quand le remplacement doit sonner (`PushContent.renotify`). */
+  renotify?: true;
 };
 
 export const PUSH_TITLE_MAX = 80;
 export const PUSH_BODY_MAX = 240;
 export const PUSH_TAG_MAX = 64;
 
-function clip(text: string, max: number): string {
-  const clean = text.replace(/\s+/g, " ").trim();
+/**
+ * Replie les espaces et borne le texte (par caractère : un emoji n'est jamais
+ * coupé). `keepLines` garde les retours à la ligne d'un corps écrit en lignes
+ * (le programme d'arbitrage) — chaque ligne repliée, les lignes vides ôtées.
+ */
+export function clipPushText(text: string, max: number, keepLines = false): string {
+  const clean = keepLines
+    ? text
+        .split("\n")
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join("\n")
+    : text.replace(/\s+/g, " ").trim();
   const chars = Array.from(clean);
   return chars.length <= max ? clean : `${chars.slice(0, max - 1).join("")}…`;
 }
@@ -206,11 +239,12 @@ export function buildPushPayload(
 ): PushPayload {
   return {
     topic,
-    title: clip(content.title, PUSH_TITLE_MAX) || "BlueGenji Esport",
-    body: clip(content.body, PUSH_BODY_MAX),
+    title: clipPushText(content.title, PUSH_TITLE_MAX) || "BlueGenji Esport",
+    body: clipPushText(content.body, PUSH_BODY_MAX, content.multiline === true),
     url: pushTargetPath(content.url, siteOrigin),
-    tag: clip(content.tag ?? topic, PUSH_TAG_MAX) || topic,
+    tag: clipPushText(content.tag ?? topic, PUSH_TAG_MAX) || topic,
     lang,
+    ...(content.renotify === true ? { renotify: true as const } : {}),
   };
 }
 

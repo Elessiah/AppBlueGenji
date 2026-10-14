@@ -294,6 +294,103 @@ export function formatMatchScheduleClearedLog(context: {
   );
 }
 
+/** Une manche du programme d'arbitrage, telle que le journal la cite. */
+export type RefereeDigestLogMatch = {
+  matchId: number;
+  tournament: BotLogTournament;
+  team1: LogEntrant;
+  team2: LogEntrant;
+  startAt: string | Date;
+  bracket: string;
+  roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
+};
+
+/** Manches citées au plus par la ligne du programme. */
+export const REFEREE_DIGEST_LOG_ENTRIES = 12;
+
+/**
+ * Longueur que la ligne du programme ne dépasse jamais. Discord refuse un
+ * message de plus de 2 000 caractères — et le bot l'envoie tel quel, préfixé
+ * (`[AppBlueGenji] `) : refusé, le programme serait perdu, ses marques déjà
+ * posées. La marge couvre le préfixe.
+ */
+export const REFEREE_DIGEST_LOG_MAX_LENGTH = 1900;
+
+let digestTimeFormat: Intl.DateTimeFormat | null = null;
+
+/** « mer. 20:00 », heure de Paris : le programme tient sur une demi-journée. */
+function digestTime(startAt: string | Date): string {
+  digestTimeFormat ??= new Intl.DateTimeFormat("fr-FR", {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/Paris",
+  });
+  return digestTimeFormat.format(startAt instanceof Date ? startAt : new Date(startAt));
+}
+
+/**
+ * Programme d'arbitrage (`lib/server/tournaments/referee-digest.ts`) : les
+ * matchs à venir (10 prochaines heures et marge de regroupement), **en une ligne** (règle 1), dans l'ordre du
+ * coup d'envoi, bornée à {@link REFEREE_DIGEST_LOG_ENTRIES} manches et à
+ * {@link REFEREE_DIGEST_LOG_MAX_LENGTH} caractères (« … et N autres »).
+ * Engagées par `entrantLabel` (« un joueur » en tournoi individuel), tournoi
+ * par son nom et son identifiant. Aucun auteur : c'est le site qui l'envoie,
+ * pas un geste du staff.
+ */
+export function formatRefereeDigestLog(matches: readonly RefereeDigestLogMatch[]): string {
+  const subject = `${matches.length} match${matches.length > 1 ? "s" : ""} à venir`;
+  const head = `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) : `;
+  const line = (shown: readonly string[], cited: number): string => {
+    const hidden = matches.length - cited;
+    const rest = hidden > 0 ? [`… et ${hidden} autre${hidden > 1 ? "s" : ""}`] : [];
+    return `${head}${[...shown, ...rest].join(" ; ")}.`;
+  };
+  // Autant de manches que la borne et la longueur le permettent, mention du
+  // reste comprise ; la première toujours, coupée s'il le faut.
+  // Une entrée par match ; en solo (aucun nom à citer), une par créneau,
+  // tournoi et manche quand ils se suivent : « 8 matchs », pas huit entrées
+  // « un joueur vs un joueur » qui pousseraient les autres hors de la ligne.
+  const groups: { first: RefereeDigestLogMatch; time: string; round: string; count: number }[] = [];
+  for (const match of matches) {
+    const time = digestTime(match.startAt);
+    const round = matchRoundLabel(match.bracket, match.roundNumber, match.swiss);
+    const last = groups.at(-1);
+    const solo = match.team1.participantType === "SOLO";
+    if (
+      solo &&
+      last?.first.team1.participantType === "SOLO" &&
+      last.time === time &&
+      last.round === round &&
+      last.first.tournament.id === match.tournament.id
+    ) {
+      last.count += 1;
+      continue;
+    }
+    groups.push({ first: match, time, round, count: 1 });
+  }
+  const entryOf = ({ first, time, round, count }: (typeof groups)[number]): string =>
+    count > 1
+      ? `${time} ${count} matchs (${tournamentLabel(first.tournament)}, ${round})`
+      : `${time} ${entrantLabel(first.team1)} vs ${entrantLabel(first.team2)} ` +
+        `(${tournamentLabel(first.tournament)}, ${round}, match #${first.matchId})`;
+  const shown: string[] = [];
+  let cited = 0;
+  for (const group of groups.slice(0, REFEREE_DIGEST_LOG_ENTRIES)) {
+    const entry = entryOf(group);
+    if (shown.length > 0 && line([...shown, entry], cited + group.count).length > REFEREE_DIGEST_LOG_MAX_LENGTH) break;
+    shown.push(entry);
+    cited += group.count;
+  }
+  const result = line(shown, cited);
+  if (result.length <= REFEREE_DIGEST_LOG_MAX_LENGTH) return result;
+  // Coupe sans séparer une paire de substitution (émoji d'un nom).
+  return `${result.slice(0, REFEREE_DIGEST_LOG_MAX_LENGTH - 1).replace(/[\uD800-\uDBFF]$/, "")}…`;
+}
+
 /**
  * Retrait d'une inscription par le staff, avant le coup d'envoi
  * (`lib/shared/entrant-removal.ts`).

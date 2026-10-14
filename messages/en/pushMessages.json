@@ -18,8 +18,11 @@
     "titleWithdrawn": "Match removed from your schedule",
     "bodyWithdrawn": "The tournament has been updated and you no longer play this match: the time set for {previous} (Paris time) no longer applies to you. {pairing} · {tournament}, {round}.",
     "offset": {
-      "P1D": "less than 24 hours"
-    }
+      "P1D": "less than 24 hours",
+      "PT10H": "less than 10 hours"
+    },
+    "checkIn": "Check-in on Discord {minutes} min before the match: {invite}",
+    "checkInOpen": "Check-in already open on Discord: {invite}"
   },
   "matchScheduled": {
     "pairingSolo": "A match",
@@ -99,5 +102,12 @@
     "bodyContest": "A moderation decision is being appealed.",
     "titleSaturated": "Surge of reports",
     "bodySaturated": "The next reports reach the panel without an alert."
+  },
+  "refereeDigest": {
+    "title": "Refereeing schedule: {count, plural, one {# upcoming match} other {# upcoming matches}}",
+    "line": "{start} · {pairing} ({tournament}, {round})",
+    "more": "… and {count} more",
+    "pairingSolo": "{count, plural, one {A match} other {# matches}}",
+    "timeZone": "Paris time"
   }
 }

@@ -4,8 +4,10 @@ Le site écrit aux joueurs sur Discord, par le canal interne du bot. Trois usage
 une seule mécanique : **le site rédige, le bot distribue**.
 
 - **Rappels de match** — l'annonce de l'horaire dès qu'un arbitre le pose, le
-  change ou le retire, puis un rappel 24 h avant le coup d'envoi, en message
-  privé à chaque joueur des deux engagées. Les rappels « une semaine » et
+  change ou le retire, puis un rappel 24 h et un rappel 10 h avant le coup
+  d'envoi (ce dernier avec le lien du check-in), en message privé à chaque
+  joueur des deux engagées ; en même temps, un **programme d'arbitrage** aux
+  arbitres (voir « Rappel de check-in et programme d'arbitrage »). Les rappels « une semaine » et
   « 1 h avant » ont été retirés (demande de l'association, 2026-10 : trop de
   notifications) — l'annonce immédiate tient lieu du premier, le départ du
   match (push `MATCH_START`) du second.
@@ -57,11 +59,12 @@ dupliqué à chaque worker.
 
 ### Le palier, et pourquoi c'est une fenêtre
 
-`MATCH_REMINDER_OFFSETS` ne déclare plus qu'un palier : `P1D` (24 h avant). Il
-ne vaut que dans **sa propre fenêtre** — `[début − palier, début − palier
-suivant)`, le dernier s'arrêtant au coup d'envoi. La règle tient pour tout
-palier qu'on rajouterait : sans ce découpage, plusieurs rappels partiraient
-d'un coup pour une manche programmée tard, dans la même seconde.
+`MATCH_REMINDER_OFFSETS` déclare deux paliers : `P1D` (24 h avant) et `PT10H`
+(10 h avant, le rappel de check-in). Chacun ne vaut que dans **sa propre
+fenêtre** — `[début − palier, début − palier suivant)`, le dernier s'arrêtant
+au coup d'envoi : `P1D` court de H-24 à H-10, `PT10H` de H-10 au coup d'envoi.
+Sans ce découpage, plusieurs rappels partiraient d'un coup pour une manche
+programmée tard, dans la même seconde.
 
 Le rappel dit « dans **moins de** 24 heures » (`dueLabel`) et non « dans
 24 heures » : le balayage n'est entraîné que par le trafic, il peut partir
@@ -84,9 +87,10 @@ remplacé par une **annonce unique** portant la date
 
 | Date posée par l'arbitrage | Ce que reçoit le joueur |
 | --- | --- |
-| à J-10 ou J-3 | annonce tout de suite (« Match programmé » + « Coup d'envoi : … »), puis P1D |
+| à J-10 ou J-3 | annonce tout de suite (« Match programmé » + « Coup d'envoi : … »), puis P1D, puis PT10H (check-in) |
+| à H-20 | annonce (« Prochain rappel : 10 heures avant »), puis PT10H (check-in) |
 | changée | « Match reprogrammé » + « Nouveau coup d'envoi : …, au lieu du … », s'il avait reçu l'ancienne |
-| à H-5 | annonce, et rien après |
+| à H-5 | annonce **avec la ligne de check-in** (elle consomme `PT10H`), et rien après |
 | retirée | « Horaire du match retiré », s'il l'avait reçue, qu'elle était encore devant (ou passée depuis moins de 12 h) et que le tournoi est planifié par l'arbitrage |
 | posée quand une place était vide | rien tant qu'elle l'est ; annonce par le balayage dès que les deux engagées sont connues, au plus tard 48 h avant (une journée avant le rappel) |
 
@@ -291,8 +295,11 @@ posée :
 - une engagée manquante, efface tout sauf `TOLD` : le balayage annoncera la
   manche quand elle sera connue.
 
-Une date **effacée** garde toutes ses marques (inertes : le balayage ne lit que
-les manches datées). Puis `notifyMatchScheduleChange`
+Une date **effacée** garde ses marques (inertes : le balayage ne lit que
+les manches datées), sauf la citation au programme d'arbitrage (`REFS`) : les
+arbitres ont reçu le retrait, et une date reposée à l'identique — rendue à
+l'horaire que les joueurs tiennent, marques gardées — doit reparaître au
+programme. Puis `notifyMatchScheduleChange`
 (`lib/server/tournaments/schedule-notices.ts`) prévient **sans attendre le
 balayage**, la manche lue **une fois** pour le journal, les arbitres et les
 joueurs (`announceMatchSchedule` / `announceMatchScheduleCleared` la reçoivent,
@@ -491,6 +498,143 @@ réappariement d'une ronde suisse, correction de score en survie — efface ses
 matchs, donc ses rappels ; les engagées qui en tenaient l'horaire sont
 prévenues (`noteDeletedMatches`, ci-dessus).
 
+### Rappel de check-in et programme d'arbitrage
+
+Demande de l'association (2026-10-09) : 10 h avant le match, rappeler le
+check-in avec le lien du serveur où le salon de check-in ouvre un quart d'heure
+avant le coup d'envoi ; et, en même temps, rappeler aux arbitres les matchs,
+les heures et les équipes.
+
+**Joueurs — palier `PT10H`.** Mêmes destinataires et canaux que le rappel 24 h
+(message privé Discord en français, push `MATCH_REMINDER` dans la langue de
+chacun, engagées solo comprises — « Ton match »). Le message ajoute
+`checkInLine()` : « Check-in : le salon de check-in ouvre 15 minutes avant le
+coup d'envoi sur Discord — <invitation> ». L'invitation est **une** constante,
+`CHECK_IN_INVITE_URL` dans `lib/shared/discord.ts` (seul fichier autorisé à
+écrire une invitation, `discord-invite-single-source.test.ts`), réexportée par
+`discord-notifications.ts`. Elle mène au même serveur que `DISCORD_INVITE_URL`
+mais ouvre directement le salon de check-in (confirmé le 2026-10-14) : les deux
+constantes restent ; `CHECK_IN_OPENS_MINUTES_BEFORE = 15`, que le
+message privé et le push (`matchReminder.checkIn`, paramètre `{minutes}`)
+lisent tous deux. À moins de 15 minutes du coup d'envoi (manche programmée au
+dernier moment, balayage tardif), « ouvre 15 minutes avant » désignerait un
+instant passé : `isCheckInOpen` (instant **de l'envoi** : `PlannedSend.now`
+avancé du temps écoulé depuis la préparation, `sentAt` — un lot d'une ronde
+suisse qui sort après l'ouverture du salon le dit ouvert) fait
+dire « le salon de check-in est déjà ouvert sur Discord » au message privé
+(`checkInLine(true)`) et « Check-in déjà ouvert sur Discord » / « Check-in
+already open on Discord » au push (`matchReminder.checkInOpen`). Le rappel
+24 h est gardé (deux rappels). Une manche annoncée moins de 10 h avant consomme
+`PT10H` sans message : c'est **l'annonce** qui porte la ligne de check-in
+(`MatchReminderContext.checkIn`, `checkIn` du push). Un avis de retrait ne la
+porte jamais. Le push qui porte le check-in **ouvre l'invitation** au toucher :
+une notification n'ouvre que des adresses du site (`public/push-sw.js`) et une
+adresse écrite dans son texte ne se touche pas — il mène donc à `/check-in`
+(`CHECK_IN_PATH`, `app/check-in/route.ts`, redirection 307 vers
+`CHECK_IN_INVITE_URL`, figée au build par `force-static` — sans lui, Next 15
+exécuterait la route à chaque clic) au lieu de la fiche du match. Idempotence : la mécanique des paliers (#441) — réservé avant
+l'envoi, daté de l'horaire ; reprogrammer l'efface (`setMatchStartAt`), retirer
+l'horaire laisse les marques inertes, une manche jouée ou d'un tournoi clos
+n'est pas lue. Le dernier palier étant désormais `PT10H`, c'est lui qui sort une
+manche du balayage ; entre-temps, une manche dont le rappel 24 h est pris n'est
+**pas relue** avant l'ouverture du palier 10 h (`WAITING_OFFSETS` : un `NOT
+EXISTS` par palier suivi d'un autre) — sans quoi chaque manche entre H-24 et
+H-10 serait relue, et sa marque `P1D` re-tentée, à chaque passage pendant
+14 heures. Toutes les bornes de cette lecture sont des instants calculés par le
+processus (`now`, `inSeconds`), jamais `NOW()` : les horaires sont écrits à
+l'heure du processus (`mysql2` sans fuseau de connexion), et une base réglée
+sur un autre fuseau (UTC face à Paris) ouvrirait le palier 10 h six heures
+avant le match, quand le programme d'arbitrage partirait, lui, à 10 h.
+
+**Arbitres — `lib/server/tournaments/referee-digest.ts`.** Lancé par le même
+balayage (`dispatchDueMatchReminders`), **de front** avec les rappels, sous
+**son propre verrou et son propre étranglement** d'une minute (`pendingDigest`,
+`lastDigestAt`, lancé avant le verrou du balayage) : un balayage long (ronde
+suisse annoncée d'un coup, bot lent) ne le retient pas, et le balayage suivant
+n'attend pas les appareils du staff ; un seul programme à la fois. Échec indépendant — une table
+absente se tait, comme au balayage. Chaque passage n'exécute d'abord qu'une **sonde** d'une ligne
+(`DIGEST_DUE_PROBE`, `LIMIT 1`) : la marge n'est lue et jointe que si une
+manche est due.
+Dès qu'une manche non encore citée entre dans ses 10 dernières heures
+(`REFEREE_DIGEST_LEAD_MS`), **un** message cite toutes les manches non citées
+des 12 prochaines heures (marge `REFEREE_DIGEST_GROUPING_MS` de 2 h : une
+soirée échelonnée tient en un message), dans l'ordre du coup d'envoi. Chaque
+manche citée reçoit la marque `REFS` (`REFEREE_DIGEST_KEY`), réservée avant
+l'envoi pour son horaire et son affiche : citée une fois par horaire ;
+reprogrammée ou d'affiche changée, elle est citée de nouveau. Si aucune manche
+**due** n'a été prise (déplacée entre la lecture et la réservation, réservation
+en échec), la marge ne part pas seule : ses marques sont rendues
+(`releaseDigestMarks`, une seule instruction, `match_id IN …` en tête pour la
+clé unique, puis `(match_id, start_at) IN …`),
+et elle attend le programme que la prochaine manche due
+ouvrira — sinon elle serait citée en avance et la manche due en ouvrirait un
+second. Juste avant l'envoi, les manches réservées sont **relues** en une
+instruction (`stillAsRead`, manche, état du tournoi et présence de sa marque) :
+une manche reprogrammée, retirée, d'affiche changée, jouée (score saisi) ou
+d'un tournoi clos **après** sa réservation sort du programme — il ne
+renverrait pas l'ancienne heure après le nouvel horaire poussé aux arbitres.
+Une marque qui tient encore l'horaire lu (jouée, tournoi clos, manche déplacée
+dans le passé — une date passée n'efface rien) est rendue pour cet horaire
+(`releaseDigestMarks`) ; une marque déjà effacée (reprogrammation, retrait,
+affiche changée — même revenue depuis à l'horaire lu) sort aussi la manche :
+le programme suivant la citera, la citer ici la dirait deux fois. La règle
+« pas de marge seule » s'applique ensuite. Une
+relecture en échec n'empêche pas l'envoi (les marques sont prises). Fenêtre
+résiduelle acceptée : une reprogrammation pendant l'envoi lui-même (quelques
+secondes : appareils, bot) peut encore croiser le programme ; le push
+`MATCH_SCHEDULED` du nouvel horaire, distinct, le dit aux arbitres. Les réservations
+partent quatre à la fois (`inBatches`, comme le balayage) — une ronde suisse en
+compte des dizaines ; une réservation en échec ne retient pas les autres. La
+réservation est celle des paliers (`claimDatedMark`, `reminder-marks.ts`,
+partagée par le balayage et le programme).
+Canaux :
+
+- push `REFEREE_DIGEST` (« Programme d'arbitrage », audience `tournaments`,
+  `notifyStaff`, langue de chacun) — `refereeDigestPush`, titre « Programme
+  d'arbitrage : N matchs à venir » (pas « des 10 prochaines heures » : la
+  marge en cite jusqu'à 12 h), cinq lignes au plus **et dans la borne du corps
+  d'un push** (`PUSH_BODY_MAX`, 240 caractères, « … et N autres » et fuseau
+  compris : coupé au-delà, le push perdrait ces deux lignes et l'arbitre
+  croirait la liste complète ; une seule ligne trop longue est raccourcie ; au-delà
+  des lignes affichables, rien n'est mis en forme, le reste est compté), et
+  le corps garde ses retours à la ligne (`multiline: true` → `clipPushText(…, keepLines)` ; seul ce push les garde, les autres les replient : un nom porteur d'un retour à la ligne n'y ouvre pas de fausse ligne), puis « … et N autre(s) »
+  (pluriel ICU), puis une dernière ligne « Heure de Paris » / « Paris time »
+  (un arbitre à l'étranger lirait sinon son heure locale ; en dernier, car une
+  notification repliée ne montre que la première ligne, qui reste un match) ; chaque ligne nomme
+  le tournoi **et la manche** (`pushRoundLabel`, « Ronde N » en suisse). En
+  solo, aucun pseudo : les matchs consécutifs d'un même créneau, tournoi (par
+  identifiant : deux tournois homonymes restent deux lignes) et
+  manche tiennent en une ligne (« 8 matchs (Coupe, Manche 1) », pluriel ICU)
+  au lieu de lignes « Un match » identiques ; « … et N autres » compte les
+  matchs. Le lien mène à la fiche du tournoi quand le programme
+  n'en cite qu'un, à `/tournois` sinon ; l'étiquette porte la première
+  manche, le nombre et une **empreinte** de toutes les manches citées
+  (`referee-digest-<id>-<n>-<FNV-1a>`, bornée à `PUSH_TAG_MAX` = 64 : une
+  liste écrite en entier y serait coupée et deux programmes au même début
+  confondus), pour qu'un programme suivant ne remplace jamais sur l'appareil
+  un précédent qui en cite d'autres ;
+- une **ligne** au canal de logs Discord (`sendBotLog`), là où les arbitres
+  suivent déjà les horaires posés — `formatRefereeDigestLog` : engagées par
+  `entrantLabel` (« un joueur » en solo — et pour toute entrée solo,
+  `bg_teams.solo_user_id`, même si le type du tournoi est illisible, comme
+  #live), tournoi `« nom » (#id)`, aucun auteur
+  (c'est le site qui l'envoie), chaque entrée avec sa manche
+  (`matchRoundLabel`) ; en solo, les matchs consécutifs d'un même créneau,
+  tournoi et manche en une entrée « 8 matchs (« Coupe » (#7), Manche 1) » ;
+  douze entrées au plus **et 1 900 caractères**
+  (`REFEREE_DIGEST_LOG_MAX_LENGTH`) : Discord refuse un message de plus de
+  2 000 caractères, que le bot envoie sans le découper — le programme, ses
+  marques déjà posées, serait perdu. Les manches qui ne tiennent pas sont
+  comptées dans « … et N autres ».
+
+RGPD : entrée `2026-10-rappel-de-check-in` de `PRIVACY_CHANGES` (FR/EN) —
+l'entrée #441 disait qu'un seul rappel restait — ; registre T04 (rappels,
+programme en push) et T05 (programme au journal du staff).
+
+Pas de message privé au rôle arbitre (`pushRefereeAlert`) : il sert aux
+alertes qui appellent une intervention. Le programme manqué (bot injoignable,
+aucun appareil) n'est pas retenté.
+
 ### Qui reçoit
 
 Les joueurs des **deux** engagées : membres actifs d'une équipe, ou le joueur
@@ -628,4 +772,4 @@ désigne le rôle arbitre, serveur par serveur.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : 24 h avant `bg_matches.start_at` (les paliers « une semaine » et « 1 h avant » sont retirés), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`). Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser ou changer la date (`setMatchStartAt`) efface ses paliers (un retrait garde toutes les marques), et poser, changer ou retirer l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé / Horaire du match retiré », marque `TOLD` = horaire reçu), aux arbitres (push `MATCH_SCHEDULED`) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.
+- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : 24 h puis 10 h avant `bg_matches.start_at` (le second avec le lien du check-in ; les paliers « une semaine » et « 1 h avant » sont retirés), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`). Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser ou changer la date (`setMatchStartAt`) efface ses paliers (un retrait garde toutes les marques), et poser, changer ou retirer l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé / Horaire du match retiré », marque `TOLD` = horaire reçu), aux arbitres (push `MATCH_SCHEDULED`) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.

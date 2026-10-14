@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-15";
+export const REGISTER_UPDATED_AT = "2026-10-16";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -424,11 +424,12 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
-      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et un rappel de match dans les 24 h qui précèdent le coup d'envoi",
+      "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in)",
       "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
+      "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
-      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match et les alertes d'arbitrage",
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match, les alertes d'arbitrage et le programme d'arbitrage",
     dataSubjects: ["Joueurs engagés dans un tournoi", "Autres membres des équipes engagées (coachs, managers, propriétaires)", "Arbitres", "Casters inscrits sur un match"],
     dataCategories: [
       "Pseudo et identifiant Discord",
@@ -440,15 +441,20 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
-      "Traces d'envoi des rappels et alertes (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
+      "Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
       "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués",
     ],
     recipients: [
       "Administrateurs et arbitres de l'association",
       "Joueurs et caster d'un même match, de son lancement à sa fin",
       "Discord, qui achemine les messages",
+      "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)",
+      "Service de push du navigateur de chaque destinataire abonné (joueur : annonces et rappels de match ; arbitre ou administrateur : programme d'arbitrage ; traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
-    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
+    transfers: [
+      `États-Unis : Discord (acheminement des messages privés et du canal de logs) — ${transferBasis(["DISCORD"])}`,
+      `États-Unis : service de push du navigateur du destinataire abonné (joueur, arbitre ou administrateur), qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+    ],
     security: [
       ...COMMON_SECURITY,
       "Pseudo non certifié invisible de tous, administrateurs compris ; pseudo certifié jamais montré à un visiteur sans compte",
@@ -462,11 +468,12 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
       "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés), pour la modération",
+      "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
     ],
     legalBasis: "Intérêt légitime (administration et contrôle de l'arbitrage)",
-    dataSubjects: ["Staff"],
+    dataSubjects: ["Staff", "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)"],
     dataCategories: [
-      "Sur Discord : noms d'équipe, scores, noms des tournois — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
+      "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
       "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage",
     ],
     sensitiveData: "Aucune",
@@ -714,7 +721,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match",
       "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
-      "Alertes d'arbitrage, matchs planifiés et alertes de modération pour le staff qui détient ces rôles",
+      "Alertes d'arbitrage, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles",
     ],
     legalBasis: "Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)",
     dataSubjects: ["Joueurs inscrits qui activent les notifications sur un appareil"],
