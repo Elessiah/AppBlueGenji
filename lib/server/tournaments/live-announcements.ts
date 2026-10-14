@@ -274,45 +274,71 @@ const POSTPONED_CAUSES: Partial<Record<LiveAnnouncementOutcome, string>> & { una
   unavailable: "bot injoignable, en panne ou d'une version sans annonces",
 };
 
-/** Annonce un groupe réservé. @returns Le nombre de matchs publiés. */
-async function announce(group: AnnouncementGroup): Promise<number> {
+/** Ce que les traces pm2 et le bot disent d'un groupe : ses matchs et son tournoi. */
+function describeGroup(group: AnnouncementGroup): { label: string; context: string; plural: boolean } {
+  const [first] = group.rows;
+  const ids = matchIdsOf(group);
+  const plural = ids.length > 1;
+  const noun = plural ? "matchs" : "match";
+  return {
+    label: `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`,
+    // Le tournoi en tête : le staff ouvre `/tournois/<id>` depuis le canal de logs.
+    context: `live-announce tournoi-${Number(first.tournament_id)} match-${contextIds(ids)}`,
+    plural,
+  };
+}
+
+/** Issues qui reportent l'annonce. */
+type PostponedOutcome = keyof typeof POSTPONED_CAUSES;
+
+/**
+ * Reporte un groupe : rend ses réservations et le dit dans pm2. La pause
+ * ({@link LIVE_ANNOUNCE_RETRY_DELAY_MS}) vaut pour tout le processus : le bot
+ * ou le salon n'en veulent pas pour l'instant, et redemander toutes les dix
+ * secondes renverrait le même refus.
+ */
+async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Promise<void> {
+  postponeRetries();
+  const { label, context, plural } = describeGroup(group);
+  if (!(await releaseAnnouncements(group.rows, label))) return;
+  const retry = plural
+    ? "annonces reportées, réessayées tant que les matchs ont commencé depuis moins de deux heures"
+    : "annonce reportée, réessayée tant que le match a commencé depuis moins de deux heures";
+  const cause = POSTPONED_CAUSES[outcome] ?? POSTPONED_CAUSES.unavailable;
+  warnOnce(`${outcome} ${context}`, `[live-announce] ${label} : ${cause}, ${retry}`);
+}
+
+/**
+ * Annonce un groupe réservé.
+ *
+ * @returns Le nombre de matchs publiés, et l'issue si l'annonce est reportée.
+ */
+async function announce(group: AnnouncementGroup): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
   const [first] = group.rows;
   const message = formatLiveAnnouncementGroup({
     tournamentName: String(first.tournament_name),
     participantType: groupParticipantType(group.rows),
     pairings: group.rows.map((row) => ({ team1Name: String(row.team1_name), team2Name: String(row.team2_name) })),
   });
-  const ids = matchIdsOf(group);
-  const plural = ids.length > 1;
-  const noun = plural ? "matchs" : "match";
-  const label = `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`;
-  // Le tournoi en tête : le staff ouvre `/tournois/<id>` depuis le canal de logs.
-  const context = `live-announce tournoi-${Number(first.tournament_id)} match-${contextIds(ids)}`;
+  const { label, context, plural } = describeGroup(group);
   const outcome = await pushLiveAnnouncement(message, group.url, context);
   if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner @everyone absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
     console.info(`[live-announce] ${label} ${announced} dans #live${silent}`);
-    return group.rows.length;
+    return { posted: group.rows.length, postponed: null };
   }
   const abandoned = ABANDONED_OUTCOMES[outcome];
   if (abandoned) {
     // Rien à renvoyer : refusé tel quel, ou peut-être déjà publié (un second
     // `@everyone` serait pire qu'une annonce perdue). Réservations gardées.
     console.error(`[live-announce] ${label} : ${abandoned}`);
-    return 0;
+    return { posted: 0, postponed: null };
   }
-  // Le bot ou le salon n'en veulent pas pour l'instant : les passages suivants
-  // attendent une minute au lieu de redemander toutes les dix secondes.
-  postponeRetries();
-  if (!(await releaseAnnouncements(group.rows, label))) return 0;
-  const retry = plural
-    ? "annonces reportées, réessayées tant que les matchs ont commencé depuis moins de deux heures"
-    : "annonce reportée, réessayée tant que le match a commencé depuis moins de deux heures";
-  const cause = POSTPONED_CAUSES[outcome] ?? POSTPONED_CAUSES.unavailable;
-  warnOnce(`${outcome} ${context}`, `[live-announce] ${label} : ${cause}, ${retry}`);
-  return 0;
+  const postponed: PostponedOutcome = outcome in POSTPONED_CAUSES ? (outcome as PostponedOutcome) : "unavailable";
+  await postpone(group, postponed);
+  return { posted: 0, postponed };
 }
 
 /**
@@ -364,8 +390,28 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
     if (group) group.rows.push(row);
     else groups.set(key, { url, rows: [row] });
   }
+  return announceGroups(groups.values());
+}
+
+/**
+ * Annonce les groupes l'un après l'autre. Un report vaut pour les suivants du
+ * passage — même bot, même salon : ils sont rendus sans appel, au lieu
+ * d'essuyer le même refus.
+ *
+ * @returns Le nombre de matchs publiés.
+ */
+async function announceGroups(groups: Iterable<AnnouncementGroup>): Promise<number> {
   let posted = 0;
-  for (const group of groups.values()) posted += await announce(group);
+  let postponed: PostponedOutcome | null = null;
+  for (const group of groups) {
+    if (postponed) {
+      await postpone(group, postponed);
+      continue;
+    }
+    const result = await announce(group);
+    posted += result.posted;
+    postponed = result.postponed;
+  }
   return posted;
 }
 

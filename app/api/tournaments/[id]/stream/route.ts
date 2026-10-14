@@ -20,6 +20,7 @@ import { enforceRateLimit, STREAM_OPEN_RULE } from "@/lib/server/api-guard";
 import {
   acquireStreamSlot,
   joinTournamentRoom,
+  tournamentRoomCard,
 } from "@/lib/server/tournament-broadcast";
 import {
   getVisibleTournamentSnapshot,
@@ -54,8 +55,10 @@ const HEARTBEAT_MS = 25_000;
 
 /**
  * Le battement doit-il relancer le balayage des annonces de live ? En
- * production, et pour un tournoi en cours seulement — d'après ses dates, car
- * l'instantané d'ouverture a pu être lu avant le départ.
+ * production, et pour un tournoi en cours seulement. La fiche est celle de la
+ * salle, tenue à jour par chaque diffusion (un tournoi terminé depuis
+ * l'ouverture du flux ne relit plus rien), et l'état se lit aussi d'après
+ * ses dates : un départ par l'horloge n'a pas toujours encore été diffusé.
  */
 function liveAnnouncementsDue(card: TournamentSnapshot["card"]): boolean {
   if (process.env.NODE_ENV !== "production") return false;
@@ -329,7 +332,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
             // cours, son annonce dans #live part à l'heure, pas au prochain
             // évènement. Étranglé à dix secondes pour tout le processus ; un
             // onglet resté sur un tournoi terminé ou à venir ne relit rien.
-            if (liveAnnouncementsDue(snapshot.card)) {
+            if (liveAnnouncementsDue(tournamentRoomCard(tournamentId) ?? snapshot.card)) {
               void dispatchLiveAnnouncements().catch(() => undefined);
             }
           }, HEARTBEAT_MS);

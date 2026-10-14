@@ -415,6 +415,11 @@ type Room = {
    * alors au pas lent, jamais en boucle serrée.
    */
   overdueSince: number | null;
+  /**
+   * Fiche du dernier instantané connu de la salle (ouverture ou diffusion) :
+   * l'état du tournoi que suivent ses abonnés, sans relecture.
+   */
+  card: TournamentSnapshot["card"] | null;
 };
 
 const rooms = new Map<number, Room>();
@@ -632,6 +637,7 @@ function deliverFrame(tournamentId: number, room: Room, frame: TournamentSnapsho
     return;
   }
 
+  room.card = frame.snapshot.card;
   scheduleRoomWake(tournamentId, room, frame.snapshot, now);
   if (Number.isFinite(nextDelay)) scheduleFlush(tournamentId, room, nextDelay);
 }
@@ -741,6 +747,7 @@ function openRoom(tournamentId: number, known?: TournamentSnapshot): Room {
     flushing: false,
     dirtyAgain: false,
     overdueSince: null,
+    card: known?.card ?? null,
   };
 
   // L'événement lui-même ne sert qu'à réveiller la salle : ce qui part aux
@@ -820,6 +827,15 @@ export function acquireStreamSlot(userId: number): (() => void) | null {
     if (current <= 1) streamsPerUser.delete(userId);
     else streamsPerUser.set(userId, current - 1);
   };
+}
+
+/**
+ * Fiche du dernier instantané qu'a lu la salle d'un tournoi, ou `null` sans
+ * salle : l'état courant pour qui la suit, quand l'instantané d'ouverture d'un
+ * flux a vieilli (tournoi terminé depuis).
+ */
+export function tournamentRoomCard(tournamentId: number): TournamentSnapshot["card"] | null {
+  return rooms.get(tournamentId)?.card ?? null;
 }
 
 /** Nombre d'abonnés d'un tournoi (diagnostic, page d'accueil). */
