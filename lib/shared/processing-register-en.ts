@@ -247,7 +247,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
-      "Sending by Discord direct message the announcement of a match's time (set, changed or removed) and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server)",
+      "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed) and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server)",
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
@@ -272,11 +272,11 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Players and caster of the same match, from its launch to its end",
       "Discord, which delivers the messages",
       "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
-      "The push service of the browser of each subscribed referee or administrator (refereeing schedule, processing activity T12), which delivers an encrypted message it cannot read",
+      "The push service of the browser of each subscribed recipient — player (match announcements and reminders), referee or administrator (refereeing schedule); processing activity T12 — which delivers an encrypted message it cannot read",
     ],
     transfers: [
       `United States: Discord (delivery of direct messages and of the log channel) — ${transferBasisEn(["DISCORD"])}`,
-      `United States: push service of the browser of the subscribed referee or administrator, which only receives end-to-end encrypted messages (RFC 8291) — ${transferBasisEn(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+      `United States: push service of the browser of the subscribed recipient (player, referee or administrator), which only receives end-to-end encrypted messages (RFC 8291) — ${transferBasisEn(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
     ],
     security: [
       ...COMMON_SECURITY_EN,

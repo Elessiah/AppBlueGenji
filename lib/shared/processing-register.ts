@@ -424,7 +424,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
-      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in)",
+      "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in)",
       "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
@@ -449,11 +449,11 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et caster d'un même match, de son lancement à sa fin",
       "Discord, qui achemine les messages",
       "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)",
-      "Service de push du navigateur de chaque arbitre ou administrateur abonné (programme d'arbitrage, traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
+      "Service de push du navigateur de chaque destinataire abonné — joueur (annonces et rappels de match), arbitre ou administrateur (programme d'arbitrage) ; traitement T12 —, qui achemine un message chiffré qu'il ne peut pas lire",
     ],
     transfers: [
       `États-Unis : Discord (acheminement des messages privés et du canal de logs) — ${transferBasis(["DISCORD"])}`,
-      `États-Unis : service de push du navigateur de l'arbitre ou de l'administrateur abonné, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+      `États-Unis : service de push du navigateur du destinataire abonné (joueur, arbitre ou administrateur), qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
     ],
     security: [
       ...COMMON_SECURITY,
