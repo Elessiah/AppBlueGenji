@@ -52,7 +52,9 @@ entrée individuelle par son **pseudo public BlueGenji** (`bg_users.pseudo`, lu
 par `solo_user_id`, compte supprimé, invité sans compte d'un tournoi `SOLO` ou
 inscription antérieure à la publication du changement qui l'annonce →
 « un joueur »), passé par
-`discordInline` — jamais un prénom ni un `#id`, comme un diffuseur nomme les
+`discordInline` — le pseudo de la fiche tel quel (pseudo Discord, BattleTag,
+voire nom Google d'un compte Google d'avant le 30 septembre 2026 s'il n'a pas
+été changé, ce que les textes disent), jamais un `#id`, comme un diffuseur nomme les
 joueurs à l'antenne. Un match d'équipes n'y nomme que les équipes. Base :
 intérêt légitime (retransmission, registre T16), sans case à cocher ; la mention
 d'inscription l'annonce, `/rgpd` et `PRIVACY_CHANGES` le déclarent. Journaux,
