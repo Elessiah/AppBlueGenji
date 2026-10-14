@@ -54,6 +54,7 @@ import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import type { MatchStatus } from "@/lib/shared/types";
 
 type LiveCandidateRow = RowDataPacket & {
@@ -147,6 +148,21 @@ export function liveAnnouncementsEnabled(): boolean {
   );
 }
 
+/** Changement de confidentialité qui annonce le pseudo des entrées individuelles dans #live. */
+const SOLO_PSEUDO_PRIVACY_CHANGE_ID = "2026-10-pseudo-live-et-messages-de-match";
+
+/**
+ * Première date d'inscription dont le pseudo peut partir dans #live : celle de
+ * la publication du changement qui l'annonce. Un joueur inscrit avant a lu
+ * « un joueur, jamais un pseudo » et ne peut plus « ne pas s'inscrire » : son
+ * entrée reste « un joueur » jusqu'au bout du tournoi. Changement introuvable :
+ * aucun pseudo ne part.
+ */
+export function soloPseudoRegisteredSince(): string | null {
+  const change = PRIVACY_CHANGES.find((entry) => entry.id === SOLO_PSEUDO_PRIVACY_CHANGE_ID);
+  return change ? `${change.publishedAt} 00:00:00` : null;
+}
+
 /**
  * Matchs castés, jouables, d'un tournoi en cours, passés à l'antenne depuis
  * moins de deux heures, dont l'affiche courante n'a pas encore été annoncée. Le passage à l'antenne se décide ensuite **en
@@ -155,6 +171,12 @@ export function liveAnnouncementsEnabled(): boolean {
  */
 async function loadCandidates(): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
+  // Le pseudo n'est lu que pour une inscription faite sous la mention qui
+  // l'annonce (`soloPseudoRegisteredSince`) ; sinon `NULL`, « un joueur ».
+  const since = soloPseudoRegisteredSince() ?? "9999-12-31 00:00:00";
+  const registeredSince = (alias: string) =>
+    `EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.tournament_id = m.tournament_id
+               AND r.team_id = ${alias}.id AND r.registered_at >= ?)`;
   const [rows] = await db.query<LiveCandidateRow[]>(
     `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
             t.live_url AS tournament_live_url, m.status, m.start_at, m.live_trigger,
@@ -168,14 +190,15 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
                             AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-       LEFT JOIN bg_users u1 ON u1.id = t1.solo_user_id AND u1.is_deleted = 0
-       LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0
+       LEFT JOIN bg_users u1 ON u1.id = t1.solo_user_id AND u1.is_deleted = 0 AND ${registeredSince("t1")}
+       LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0 AND ${registeredSince("t2")}
       WHERE m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
         AND ${FRESH_ON_AIR_SQL}
         AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
                          WHERE a.match_id = m.id
                            AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
       ORDER BY m.id`,
+    [since, since],
   );
   return rows;
 }

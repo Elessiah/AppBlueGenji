@@ -1,5 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { ignoreMissingTable, isDuplicateEntryError } from "@/lib/server/mysql-errors";
+import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
@@ -99,8 +99,6 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
              -- celui de la colonne) : un compte qui ne recevra plus rien n'a
              -- plus de langue à retenir.
              locale = ?,
-             -- L'opposition aux messages privés de match revient au défaut.
-             match_dm_enabled = 1,
              is_deleted = 1
          WHERE id = ?`,
         [pseudo, DEFAULT_LOCALE, userId],
@@ -112,6 +110,14 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
     }
   }
   await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+  // L'opposition aux messages privés de match revient au défaut. À part, et
+  // colonne tolérée : une migration en échec (`reportSchemaFailure`) ne doit
+  // pas empêcher l'effacement d'un compte.
+  try {
+    await connection.execute(`UPDATE bg_users SET match_dm_enabled = 1 WHERE id = ? AND is_deleted = 1`, [userId]);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+  }
   // Les consentements aux changements de traitement et la trace des messages
   // privés envoyés : ils ne concernent plus personne, et le compte ne sera plus
   // jamais sollicité (`is_deleted = 0` borne les deux lectures).
