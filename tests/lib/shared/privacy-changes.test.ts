@@ -919,7 +919,7 @@ describe("PRIVACY_CHANGES — rappel de check-in et programme d'arbitrage (#443)
 
   it("précède l'entrée du pseudo #live et des messages de match, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-16");
     expect(entry.audience).toBeUndefined();
   });
@@ -953,9 +953,9 @@ describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-pseudo-live-et-messages-de-match")!;
   const english = PRIVACY_CHANGES_EN["2026-10-pseudo-live-et-messages-de-match"];
 
-  it("précède l'entrée de la base du pseudo #live : datée du 16 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
+  it("ferme la liste : datée du 16 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 2);
+    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 1);
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-16", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -994,11 +994,13 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
   const english = PRIVACY_CHANGES_EN["2026-10-base-pseudo-live-et-automod"];
   const declared = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("ferme la liste : datée du 17 octobre 2026, après l'entrée qu'elle précise, pour tous les comptes", () => {
+  it("datée du jour du déploiement (15 octobre 2026), placée à sa date avant les entrées du 16, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-17", undefined]);
-    expect(entry.publishedAt > PRIVACY_CHANGES.at(-2)!.publishedAt).toBe(true);
+    // Décision du 2026-10-15 : la date de publication est celle du déploiement.
+    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-15", undefined]);
+    const index = PRIVACY_CHANGES.indexOf(entry);
+    expect(PRIVACY_CHANGES[index - 1].publishedAt <= entry.publishedAt).toBe(true);
+    expect(PRIVACY_CHANGES[index + 1].publishedAt > entry.publishedAt).toBe(true);
   });
 
   it("dit la nouvelle base du pseudo solo, sans rien changer dans les faits", () => {

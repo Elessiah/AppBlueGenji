@@ -704,6 +704,34 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
     ],
   },
+  // LEGAL-FOLLOWUP-444 : base légale du pseudo solo dans #live (exécution du
+  // service, décision du 2026-10-14), alerte AutoMod (T16), conservation du
+  // choix des messages de match (intérêt légitime du joueur) et ligne de fin
+  // de ces messages. Datée du jour de la mise en ligne (décision du 2026-10-15 :
+  // la date de déploiement), d'où sa place avant les entrées du 16 octobre. Elle porte
+  // aussi l'annonce des conditions d'utilisation en version 4 (même règle) :
+  // la modale et le message privé de ce registre sont le seul canal qui touche
+  // **chaque** compte une fois — la modale des conditions ne s'ouvre d'elle-même
+  // qu'aux gérants d'équipe, et celle de `/connexion` qu'à un navigateur qui ne les a
+  // pas encore acceptées.
+  {
+    id: "2026-10-base-pseudo-live-et-automod",
+    title: "Ton pseudo dans #live : base légale précisée, conditions d'utilisation mises à jour",
+    publishedAt: "2026-10-15",
+    summary:
+      "En tournoi individuel, ton pseudo dans l'annonce #live repose sur l'exécution du service auquel tu t'inscris, et non sur l'intérêt légitime ; un blocage ou un signalement AutoMod peut en faire parvenir le texte aux modérateurs du serveur Discord. Les conditions d'utilisation passent en version 4 pour le dire.",
+    details: [
+      "Annonce #live d'un tournoi individuel : ton pseudo public y figure au titre de l'exécution du service — l'annonce fait partie du tournoi auquel tu t'inscris —, et non plus de l'intérêt légitime. Rien ne change dans les faits : pas de nom neutre pour cette annonce, ne pas t'inscrire reste le moyen de ne pas y être nommé, et une annonce passée est supprimée sur demande (« Signaler un problème », catégorie RGPD).",
+      "Si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte (ton pseudo compris en tournoi individuel) peut parvenir au salon d'alertes des modérateurs du serveur Discord de l'association, où il reste jusqu'à sa suppression par les modérateurs ou sur demande (« Signaler un problème », catégorie RGPD).",
+      "Messages privés de match : chacun se termine désormais par une ligne qui dit où les couper (« Mon profil », section Notifications). Le site garde ton choix dans ton intérêt légitime : c'est ce qui lui permet de l'honorer.",
+      "Conditions d'utilisation : la version 4, en vigueur depuis le 14 octobre 2026, reprend cette règle de l'annonce #live. Relis-les : la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur et, si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion. À la connexion, ton compte n'enregistre plus une acceptation seulement gardée par ton navigateur (peut-être celle d'une autre personne) : seule compte celle que tu viens de faire sur la page de connexion, si tu lances la connexion depuis cette page (ou y saisis le code Discord) dans les dix minutes.",
+    ],
+    links: [
+      { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
+      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
+      { href: "/conditions-utilisation", label: "Lire les conditions d'utilisation" },
+    ],
+  },
   // PR #443 : un second rappel de match 10 h avant le coup d'envoi, avec
   // l'invitation au serveur Discord du check-in, et le programme d'arbitrage
   // (journal Discord du staff, push) — l'entrée « 2026-10-horaires-de-match »
@@ -742,33 +770,6 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [
       { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
-    ],
-  },
-  // LEGAL-FOLLOWUP-444 : base légale du pseudo solo dans #live (exécution du
-  // service, décision du 2026-10-14), alerte AutoMod (T16), conservation du
-  // choix des messages de match (intérêt légitime du joueur) et ligne de fin
-  // de ces messages. Datée du lendemain de la mise en ligne prévue. Elle porte
-  // aussi l'annonce des conditions d'utilisation en version 4 (même règle) :
-  // la modale et le message privé de ce registre sont le seul canal qui touche
-  // **chaque** compte une fois — la modale des conditions ne s'ouvre d'elle-même
-  // qu'aux gérants d'équipe, et celle de `/connexion` qu'à un navigateur qui ne les a
-  // pas encore acceptées.
-  {
-    id: "2026-10-base-pseudo-live-et-automod",
-    title: "Ton pseudo dans #live : base légale précisée, conditions d'utilisation mises à jour",
-    publishedAt: "2026-10-17",
-    summary:
-      "En tournoi individuel, ton pseudo dans l'annonce #live repose sur l'exécution du service auquel tu t'inscris, et non sur l'intérêt légitime ; un blocage ou un signalement AutoMod peut en faire parvenir le texte aux modérateurs du serveur Discord. Les conditions d'utilisation passent en version 4 pour le dire.",
-    details: [
-      "Annonce #live d'un tournoi individuel : ton pseudo public y figure au titre de l'exécution du service — l'annonce fait partie du tournoi auquel tu t'inscris —, et non plus de l'intérêt légitime. Rien ne change dans les faits : pas de nom neutre pour cette annonce, ne pas t'inscrire reste le moyen de ne pas y être nommé, et une annonce passée est supprimée sur demande (« Signaler un problème », catégorie RGPD).",
-      "Si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte (ton pseudo compris en tournoi individuel) peut parvenir au salon d'alertes des modérateurs du serveur Discord de l'association, où il reste jusqu'à sa suppression par les modérateurs ou sur demande (« Signaler un problème », catégorie RGPD).",
-      "Messages privés de match : chacun se termine désormais par une ligne qui dit où les couper (« Mon profil », section Notifications). Le site garde ton choix dans ton intérêt légitime : c'est ce qui lui permet de l'honorer.",
-      "Conditions d'utilisation : la version 4, en vigueur depuis le 14 octobre 2026, reprend cette règle de l'annonce #live. Relis-les : la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur et, si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion. À la connexion, ton compte n'enregistre plus une acceptation seulement gardée par ton navigateur (peut-être celle d'une autre personne) : seule compte celle que tu viens de faire sur la page de connexion, si tu lances la connexion depuis cette page (ou y saisis le code Discord) dans les dix minutes.",
-    ],
-    links: [
-      { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
-      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
-      { href: "/conditions-utilisation", label: "Lire les conditions d'utilisation" },
     ],
   },
 ];

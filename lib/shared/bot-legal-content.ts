@@ -79,8 +79,8 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "14 octobre 2026";
-const LAST_UPDATED_EN = "14 October 2026";
+const LAST_UPDATED_FR = "15 octobre 2026";
+const LAST_UPDATED_EN = "15 October 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
@@ -88,8 +88,8 @@ const LAST_UPDATED_EN = "14 October 2026";
 // l'interrupteur des messages de match (RGPD-DM-SWITCH), la politique seule ;
 // base du pseudo solo, AutoMod et avis « Match retiré » (LEGAL-FOLLOWUP-444),
 // les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions).
-const PRIVACY_LAST_UPDATED_FR = "17 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "17 October 2026";
+const PRIVACY_LAST_UPDATED_FR = "15 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "15 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
