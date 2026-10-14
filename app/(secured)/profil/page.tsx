@@ -1024,7 +1024,7 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
         {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
-        {typeof data?.matchDmEnabled === "boolean" ? <MatchDmField initial={data.matchDmEnabled} /> : null}
+        <MatchDmField initial={data?.matchDmEnabled} />
       </ProfileSection>
 
       {invitations.length > 0 && (

@@ -16,17 +16,24 @@ const HINT_ID = "profile-match-dms-hint";
  * (`lib/server/users/match-dm-preference.ts`). Les notifications push gardent
  * leurs réglages par sujet, juste au-dessus.
  *
- * Enregistré au clic, sans bouton : un seul geste, réversible. Pendant
- * l'envoi, la case reste focalisable (`aria-busy`) ; un second clic attend la
- * réponse du premier.
+ * Absent tant que la fiche du titulaire n'est pas lue. Enregistré au clic,
+ * sans bouton : un seul geste, réversible. Pendant l'envoi, la case reste
+ * focalisable (`aria-busy`) ; un second clic attend la réponse du premier.
  */
-export function MatchDmField({ initial }: Readonly<{ initial: boolean }>): React.ReactElement {
+export function MatchDmField({ initial }: Readonly<{ initial: boolean | undefined }>): React.ReactElement | null {
   const text = useProfileText();
   const { t } = text;
   const { showError, showSuccess } = useToast();
-  const [enabled, setEnabled] = useState(initial);
+  const [enabled, setEnabled] = useState(initial ?? true);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  // La fiche arrive après le premier rendu, ou est relue : la case reprend la
+  // valeur lue tant qu'aucun envoi n'est en cours.
+  const [shown, setShown] = useState(initial);
+  if (initial !== shown && !busy) {
+    setShown(initial);
+    if (initial !== undefined) setEnabled(initial);
+  }
 
   const toggle = async () => {
     if (busyRef.current) return;
@@ -52,6 +59,9 @@ export function MatchDmField({ initial }: Readonly<{ initial: boolean }>): React
       setBusy(false);
     }
   };
+
+  // Fiche pas encore lue (ou d'un autre compte) : rien à régler.
+  if (initial === undefined) return null;
 
   return (
     <div className={`field ${s.matchDms}`}>

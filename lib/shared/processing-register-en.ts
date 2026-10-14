@@ -260,10 +260,12 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Date and opponent of the match",
       "Time at which each party declared itself ready, registered caster",
       "Reason for a report",
+      "The player's choice to receive or not the Discord direct messages about their matches",
     ],
     sensitiveData: "None",
     retention: [
       "Certified username: until it is changed or the account is deleted",
+      "Choice of match direct messages: until it is changed; reset to the default when the account is deleted",
       "Records of reminders, alerts and refereeing schedules sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
       "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played",
     ],
