@@ -268,6 +268,18 @@ describe("dispatchRefereeDigest", () => {
     expect(line).toContain("un joueur vs un joueur");
   });
 
+  it("ne nomme aucun joueur d'une entrée solo, même si le type du tournoi est illisible", async () => {
+    mockDb([row(1, 9, { participant_type: null, team1_name: "Kiro", team2_name: "Ayla", team1_solo_user_id: 11, team2_solo_user_id: 12 })]);
+
+    await dispatchRefereeDigest(NOW);
+
+    const push = resolvePush(jest.mocked(notifyStaff).mock.calls[0][0].push);
+    expect(push.body).not.toMatch(/Kiro|Ayla/);
+    const line = await publishedLine();
+    expect(line).not.toMatch(/Kiro|Ayla/);
+    expect(line).toContain("un joueur vs un joueur");
+  });
+
   it("protège les noms d'équipe du balisage Discord", async () => {
     mockDb([row(1, 9, { team1_name: "**Gras**" })]);
 
