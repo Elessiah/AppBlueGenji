@@ -220,8 +220,9 @@ describe("dispatchRefereeDigest", () => {
     const releases = execute.mock.calls.filter(([sql]) => /DELETE FROM bg_match_reminders/.test(sql));
     expect(releases).toHaveLength(1);
     const [sql, params] = releases[0] as [string, unknown[]];
-    expect(sql).toMatch(/WHERE offset_key = \? AND \(match_id, start_at\) IN \(\(\?, \?\), \(\?, \?\)\)/);
-    expect(params).toEqual(["REFS", 2, row(2, 11.5).start_at, 3, row(3, 11.8).start_at]);
+    // La liste de manches en tête : la clé unique (match_id, offset_key) sert l'effacement.
+    expect(sql).toMatch(/WHERE match_id IN \(\?, \?\) AND offset_key = \?\s+AND \(match_id, start_at\) IN \(\(\?, \?\), \(\?, \?\)\)/);
+    expect(params).toEqual([2, 3, "REFS", 2, row(2, 11.5).start_at, 3, row(3, 11.8).start_at]);
   });
 
   it("n'envoie rien quand toutes les réservations sont refusées", async () => {

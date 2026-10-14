@@ -65,6 +65,9 @@ describe("refereeDigestPush", () => {
     expect(lines.at(-2)).toBe("… et 3 autres");
     expect(lines.at(-1)).toBe("Heure de Paris");
     expect(refereeDigestPush(many, "en").body.split("\n").at(-2)).toBe("… and 3 more");
+    // Une soirée chargée : seules les lignes affichables sont mises en forme, le reste est compté.
+    const evening = Array.from({ length: 60 }, (_, index) => short(index + 1));
+    expect(refereeDigestPush(evening).body.split("\n").at(-2)).toBe("… et 55 autres");
     // Un seul match au-delà de la borne : singulier (« 1 autre », pas « 1 autres »).
     const oneMore = Array.from({ length: REFEREE_DIGEST_PUSH_LINES + 1 }, (_, index) => short(index + 1));
     expect(refereeDigestPush(oneMore).body.split("\n").at(-2)).toBe("… et 1 autre");
