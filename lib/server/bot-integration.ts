@@ -598,8 +598,10 @@ export async function pushLeadershipAlert(
  *   le message. Il serait bloqué de nouveau (et chaque essai alerterait la
  *   modération) : l'appelant **garde** sa réservation, comme sur un `400` ;
  * - `discord-held` — le bot a répondu `503` : Discord a refusé le message pour
- *   une raison qui peut se régler (état du salon) ou n'a pas répondu en
- *   lisant le salon, rien n'est parti ;
+ *   une raison qui peut se régler (état du salon), rien n'est parti ;
+ * - `discord-unreachable` — le bot a répondu `503` : Discord n'a pas répondu
+ *   en lisant le salon (panne passagère, qui touche tout envoi), rien n'est
+ *   parti ;
  * - `uncertain` — le bot a répondu que Discord a lâché pendant l'envoi
  *   (`503`, `reason` `discord-down`) : l'annonce a pu partir, l'envoi est
  *   terminé ;
@@ -611,7 +613,7 @@ export async function pushLeadershipAlert(
  * - `unavailable` — rien n'est parti pour une autre raison (bot injoignable,
  *   coupe-circuit ouvert, bot d'une version antérieure, panne).
  *
- * Sur `channel-closed`, `discord-held` et `unavailable`, l'appelant
+ * Sur `channel-closed`, `discord-held`, `discord-unreachable` et `unavailable`, l'appelant
  * rend sa réservation et réessaiera.
  */
 export type LiveAnnouncementOutcome =
@@ -620,6 +622,7 @@ export type LiveAnnouncementOutcome =
   | "rejected"
   | "channel-closed"
   | "discord-held"
+  | "discord-unreachable"
   | "discord-refused"
   | "uncertain"
   | "timed-out"
@@ -638,7 +641,7 @@ const DISCORD_REFUSED_REASONS = new Set(["automod"]);
  */
 async function classifyUnavailable(
   response: Response,
-): Promise<"channel-closed" | "discord-held" | "discord-refused" | "uncertain" | "unavailable"> {
+): Promise<"channel-closed" | "discord-held" | "discord-unreachable" | "discord-refused" | "uncertain" | "unavailable"> {
   let body: { error?: unknown; reason?: unknown } | null = null;
   try {
     body = (await response.json()) as { error?: unknown; reason?: unknown } | null;
@@ -654,6 +657,8 @@ async function classifyUnavailable(
   // Bloqué par AutoMod : le renvoyer tel quel serait bloqué de nouveau, et
   // chaque essai alerterait la modération.
   if (DISCORD_REFUSED_REASONS.has(reason)) return "discord-refused";
+  // Discord muet en lisant le salon : la panne vaut pour tout envoi.
+  if (reason === "discord-unreachable") return "discord-unreachable";
   return "discord-held";
 }
 

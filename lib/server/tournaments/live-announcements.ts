@@ -267,12 +267,33 @@ const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
     "bot sans réponse à temps, son envoi peut encore aboutir (Discord lent, limite de débit), annonce non réessayée",
 };
 
+/** Cause pm2 d'un refus ou d'un silence de Discord rapporté par le bot. */
+const DISCORD_HELD_CAUSE =
+  "Discord a refusé l'annonce (état du salon) ou n'a pas répondu au bot — cause au canal de logs ou dans les journaux du bot";
+
 /** Issues qui reportent l'annonce (réservation rendue), et leur cause dans pm2. */
 const POSTPONED_CAUSES: Partial<Record<LiveAnnouncementOutcome, string>> & { unavailable: string } = {
   "channel-closed": "salon #live fermé au bot (introuvable ou sans permission d'écrire)",
-  "discord-held": "Discord a refusé l'annonce (état du salon) ou n'a pas répondu au bot — cause au canal de logs ou dans les journaux du bot",
+  "discord-held": DISCORD_HELD_CAUSE,
+  // Même phrase : le staff lit la cause exacte au canal de logs du bot.
+  "discord-unreachable": DISCORD_HELD_CAUSE,
   unavailable: "bot injoignable, en panne ou d'une version sans annonces",
 };
+
+/** Issues qui reportent l'annonce. */
+type PostponedOutcome = keyof typeof POSTPONED_CAUSES;
+
+/**
+ * Reports qui valent pour tout envoi : le bot (injoignable, ancien), le salon
+ * (fermé) ou Discord muet en lisant le salon. Un refus de Discord
+ * (`discord-held`) peut tenir au message lui-même : les autres groupes sont
+ * alors essayés quand même.
+ */
+const SHARED_POSTPONEMENTS: ReadonlySet<PostponedOutcome> = new Set<PostponedOutcome>([
+  "unavailable",
+  "channel-closed",
+  "discord-unreachable",
+]);
 
 /** Ce que les traces pm2 et le bot disent d'un groupe : ses matchs et son tournoi. */
 function describeGroup(group: AnnouncementGroup): { label: string; context: string; plural: boolean } {
@@ -288,17 +309,17 @@ function describeGroup(group: AnnouncementGroup): { label: string; context: stri
   };
 }
 
-/** Issues qui reportent l'annonce. */
-type PostponedOutcome = keyof typeof POSTPONED_CAUSES;
-
 /**
- * Reporte un groupe : rend ses réservations et le dit dans pm2. La pause
- * ({@link LIVE_ANNOUNCE_RETRY_DELAY_MS}) vaut pour tout le processus : le bot
- * ou le salon n'en veulent pas pour l'instant, et redemander toutes les dix
- * secondes renverrait le même refus.
+ * Reporte un groupe : rend ses réservations et le dit dans pm2, puis attend
+ * {@link LIVE_ANNOUNCE_RETRY_DELAY_MS} avant de redemander — redemander toutes
+ * les dix secondes renverrait le même refus. La pause vaut pour tout le
+ * processus quand le bot ou le salon sont en cause ({@link SHARED_POSTPONEMENTS}),
+ * pour les seuls matchs du groupe sinon : un refus qui peut tenir au message ne
+ * retarde pas les autres tournois.
  */
 async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Promise<void> {
-  postponeRetries();
+  if (SHARED_POSTPONEMENTS.has(outcome)) postponeRetries();
+  else holdMatches(group.rows);
   const { label, context, plural } = describeGroup(group);
   if (!(await releaseAnnouncements(group.rows, label))) return;
   const retry = plural
@@ -372,7 +393,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
   const rows = await loadCandidates();
   const groups = new Map<string, AnnouncementGroup>();
   for (const row of rows) {
-    if (!isOnAir(row, now)) continue;
+    if (!isOnAir(row, now) || isHeld(Number(row.id))) continue;
     // Pas de lien exploitable, pas d'annonce : il n'y aurait rien à regarder.
     const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
     if (!url) {
@@ -393,12 +414,6 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
   return announceGroups(groups.values());
 }
 
-/**
- * Reports qui valent pour tout envoi : le bot (injoignable, ancien) ou le
- * salon (fermé). Un refus de Discord (`discord-held`) peut tenir au message
- * lui-même : les autres groupes sont alors essayés quand même.
- */
-const SHARED_POSTPONEMENTS: ReadonlySet<PostponedOutcome> = new Set<PostponedOutcome>(["unavailable", "channel-closed"]);
 
 /**
  * Annonce les groupes l'un après l'autre. Un report qui tient au bot ou au
@@ -434,6 +449,27 @@ const LIVE_ANNOUNCE_THROTTLE_MS = 10_000;
 export const LIVE_ANNOUNCE_RETRY_DELAY_MS = 60_000;
 
 let retryNotBefore = 0;
+
+/** Matchs dont l'annonce a été refusée par Discord, et l'instant de leur prochain essai. */
+const heldUntil = new Map<number, number>();
+
+/** Met en pause les seuls matchs d'un groupe refusé. */
+function holdMatches(rows: readonly LiveCandidateRow[]): void {
+  const now = Date.now();
+  // Un match sorti de l'antenne n'est plus relu : sa pause échue s'oublie ici.
+  for (const [matchId, at] of heldUntil) if (at <= now) heldUntil.delete(matchId);
+  const until = now + LIVE_ANNOUNCE_RETRY_DELAY_MS;
+  for (const row of rows) heldUntil.set(Number(row.id), until);
+}
+
+/** Vrai si le match attend encore son prochain essai ; oublie les pauses échues. */
+function isHeld(matchId: number): boolean {
+  const until = heldUntil.get(matchId);
+  if (until === undefined) return false;
+  if (Date.now() < until) return true;
+  heldUntil.delete(matchId);
+  return false;
+}
 
 /** Reporte le prochain balayage d'une {@link LIVE_ANNOUNCE_RETRY_DELAY_MS}. */
 function postponeRetries(): void {
@@ -496,6 +532,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
 export function resetLiveAnnouncementThrottle(): void {
   lastSweepAt = 0;
   retryNotBefore = 0;
+  heldUntil.clear();
   lastWarnAt.clear();
   pendingSweep = null;
   if (trailingTimer) clearTimeout(trailingTimer);
