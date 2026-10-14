@@ -103,10 +103,9 @@
     "bodySaturated": "Les signalements suivants arrivent au panneau sans alerte."
   },
   "refereeDigest": {
-    "title": "Matchs des 10 prochaines heures",
-    "titleOne": "Match dans les 10 prochaines heures",
+    "title": "Programme d'arbitrage : {count, plural, one {# match à venir} other {# matchs à venir}}",
     "line": "{start} · {pairing} ({tournament})",
-    "more": "… et {count} autres",
+    "more": "… et {count, plural, one {# autre} other {# autres}}",
     "pairingSolo": "Un match"
   }
 }

@@ -321,7 +321,7 @@ function digestTime(startAt: string | Date): string {
 
 /**
  * Programme d'arbitrage (`lib/server/tournaments/referee-digest.ts`) : les
- * matchs des 10 prochaines heures, **en une ligne** (règle 1), dans l'ordre du
+ * matchs à venir (10 prochaines heures et marge de regroupement), **en une ligne** (règle 1), dans l'ordre du
  * coup d'envoi. Engagées par `entrantLabel` (« un joueur » en tournoi
  * individuel), tournoi par son nom et son identifiant. Aucun auteur : c'est le
  * site qui l'envoie, pas un geste du staff.
@@ -335,7 +335,7 @@ export function formatRefereeDigestLog(matches: readonly RefereeDigestLogMatch[]
   const hidden = matches.length - shown.length;
   if (hidden > 0) shown.push(`… et ${hidden} autre${hidden > 1 ? "s" : ""}`);
   const count = `${matches.length} match${matches.length > 1 ? "s" : ""}`;
-  const subject = `${count} dans les 10 prochaines heures`;
+  const subject = `${count} à venir`;
   return `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) : ${shown.join(" ; ")}.`;
 }
 

@@ -103,8 +103,7 @@
     "bodySaturated": "The next reports reach the panel without an alert."
   },
   "refereeDigest": {
-    "title": "Matches in the next 10 hours",
-    "titleOne": "Match in the next 10 hours",
+    "title": "Refereeing schedule: {count, plural, one {# upcoming match} other {# upcoming matches}}",
     "line": "{start} · {pairing} ({tournament})",
     "more": "… and {count} more",
     "pairingSolo": "A match"

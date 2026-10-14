@@ -375,8 +375,8 @@ function digestTime(startAt: string | Date, locale: Locale): string {
 }
 
 /**
- * Programme d'arbitrage (`REFEREE_DIGEST`) : les matchs qui se jouent dans les
- * 10 prochaines heures, un par ligne (heure de Paris, affiche, tournoi), dans
+ * Programme d'arbitrage (`REFEREE_DIGEST`) : les matchs à venir (ceux des
+ * 10 prochaines heures et la marge de regroupement), un par ligne (heure de Paris, affiche, tournoi), dans
  * l'ordre du coup d'envoi. Équipes nommées ; en tournoi individuel, « Un
  * match » (aucun pseudo de joueur, comme partout). Le lien mène à la liste des
  * tournois ; l'étiquette est propre au programme (un programme suivant ne
@@ -396,7 +396,7 @@ export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale
   const hidden = matches.length - shown.length;
   if (hidden > 0) shown.push(text.t("refereeDigest.more", { count: hidden }));
   return {
-    title: matches.length === 1 ? text.t("refereeDigest.titleOne") : text.t("refereeDigest.title"),
+    title: text.t("refereeDigest.title", { count: matches.length }),
     body: shown.join("\n"),
     url: localeHref("/tournois", locale),
     tag: `referee-digest-${matches[0]?.matchId ?? 0}`,
