@@ -975,7 +975,7 @@ describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de
     ]) {
       expect(declared).toMatch(pattern);
     }
-    expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/rgpd#retransmission", "/rgpd#notifications"]);
+    expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/rgpd#retransmission", "/rgpd#messages-de-match"]);
   });
 
   it("se traduit détail pour détail et lien pour lien", () => {

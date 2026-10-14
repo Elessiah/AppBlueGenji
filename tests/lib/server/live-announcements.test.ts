@@ -13,6 +13,7 @@ import {
   LIVE_ANNOUNCE_RETRY_DELAY_MS,
   dispatchLiveAnnouncements,
   liveAnnouncementsEnabled,
+  liveEntrantName,
   resetLiveAnnouncementThrottle,
   runLiveAnnouncementSweep,
 } from "@/lib/server/tournaments/live-announcements";
@@ -139,6 +140,25 @@ describe("runLiveAnnouncementSweep", () => {
     mockDb([{ ...AUTO_LIVE, team1_name: "Anonyme-1", team2_name: "Bravo", team1_solo_user_id: 7, team2_solo_user_id: 8, team2_pseudo: "Bravo" }]);
     await runLiveAnnouncementSweep(NOW);
     expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+  });
+
+  it("tournoi individuel : un invité sans compte (fantôme nommé par le staff) s'écrit « un joueur », jamais son nom", async () => {
+    mockDb([
+      { ...AUTO_LIVE, participant_type: "SOLO", team1_name: "Lucas Martin", team2_name: "Bravo (2)", team2_solo_user_id: 8, team2_pseudo: "Bravo" },
+    ]);
+    await runLiveAnnouncementSweep(NOW);
+    const message = jest.mocked(pushLiveAnnouncement).mock.calls[0][0];
+    expect(message).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+    expect(message).not.toContain("Lucas");
+  });
+
+  it("liveEntrantName : équipe par son nom, entrée solo par son pseudo, sinon « un joueur » (null)", () => {
+    expect(liveEntrantName(null, "Renards", null, "TEAM")).toBe("Renards");
+    expect(liveEntrantName(null, "Renards", null, "inconnu")).toBe("Renards");
+    expect(liveEntrantName(null, "Lucas Martin", null, "SOLO")).toBeNull();
+    expect(liveEntrantName(7, "Alpha (2)", "Alpha", "SOLO")).toBe("Alpha");
+    expect(liveEntrantName(7, "Alpha (2)", "  ", "TEAM")).toBeNull();
+    expect(liveEntrantName(7, "Alpha (2)", null, null)).toBeNull();
   });
 
   it("n'annonce pas un match `AUTO` pas encore lancé, ni lancé pour une autre affiche", async () => {
