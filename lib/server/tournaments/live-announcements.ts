@@ -41,9 +41,10 @@
  * **Production seulement** : une base de développement (seed `Test_`) ne doit
  * jamais faire écrire `@everyone` à 1 200 personnes, même devant un bot local
  * branché par erreur sur le vrai serveur. `NODE_ENV=production` ne suffit pas
- * à le dire — `npm start` le pose aussi sur un poste de développement —, le
- * site doit en plus être servi sous son nom public (`APP_URL` en `https`, hors
- * `localhost`).
+ * à le dire — `npm start` le pose aussi sur un poste de développement, et un
+ * tunnel (ngrok, Cloudflare) donne à ce poste un vrai nom de domaine en
+ * `https` : il faut en plus `LIVE_ANNOUNCEMENTS_ENABLED=1`, que seul le `.env`
+ * de production pose, et un `APP_URL` en `https` sur un nom de domaine.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -98,6 +99,9 @@ const FRESH_ON_AIR_SQL = `(
         OR (m.live_trigger = 'MANUAL' AND m.live_started_at > NOW() - INTERVAL ${LIVE_ANNOUNCE_MAX_AGE_MINUTES} MINUTE)
       )`;
 
+/** Vrai une fois la désactivation signalée dans pm2 (une ligne par processus). */
+let disabledNoticeShown = false;
+
 /** Suffixes réservés aux réseaux locaux et aux tests, jamais au site public. */
 const LOCAL_SUFFIX = /\.(localhost|test|local|internal|lan|home\.arpa|invalid|example)$/i;
 
@@ -126,12 +130,18 @@ function servedUnderPublicName(): boolean {
 }
 
 /**
- * Vrai si les annonces peuvent partir : en production, sur le site public.
- * Une compilation lancée par `npm start` sur un poste (`APP_URL` locale) ne
- * poste rien, même devant la base du seed et un bot branché sur le vrai serveur.
+ * Vrai si les annonces peuvent partir : en production, sur le site public, et
+ * **activées explicitement** (`LIVE_ANNOUNCEMENTS_ENABLED=1`, posée par le seul
+ * `.env` de production). Une compilation lancée par `npm start` sur un poste —
+ * `APP_URL` locale ou tunnel en `https` — ne poste rien, même devant la base
+ * du seed et un bot branché sur le vrai serveur.
  */
 export function liveAnnouncementsEnabled(): boolean {
-  return process.env.NODE_ENV === "production" && servedUnderPublicName();
+  return (
+    process.env.NODE_ENV === "production" &&
+    process.env.LIVE_ANNOUNCEMENTS_ENABLED?.trim() === "1" &&
+    servedUnderPublicName()
+  );
 }
 
 /**
@@ -583,7 +593,16 @@ function rearmPendingRetries(): void {
  * @returns Le nombre d'annonces publiées (0 si étranglé ou désactivé).
  */
 export async function dispatchLiveAnnouncements(): Promise<number> {
-  if (!liveAnnouncementsEnabled()) return 0;
+  if (!liveAnnouncementsEnabled()) {
+    // En production, une variable oubliée au déploiement se lit dans pm2.
+    if (process.env.NODE_ENV === "production" && !disabledNoticeShown) {
+      disabledNoticeShown = true;
+      console.info(
+        "[live-announce] annonces de live désactivées : LIVE_ANNOUNCEMENTS_ENABLED=1 et un APP_URL https public sont requis",
+      );
+    }
+    return 0;
+  }
   if (pendingSweep) {
     scheduleTrailingSweep(LIVE_ANNOUNCE_THROTTLE_MS);
     return pendingSweep;
@@ -615,6 +634,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
 export function resetLiveAnnouncementThrottle(): void {
   lastSweepAt = 0;
   retryNotBefore = 0;
+  disabledNoticeShown = false;
   heldUntil.clear();
   lastWarnAt.clear();
   pendingSweep = null;
