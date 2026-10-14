@@ -214,11 +214,15 @@ describe("POST /api/teams — mêmes bornes qu'au renommage", () => {
   it("refuse une acceptation d'une autre version que celle en vigueur (formulaire chargé avant la nouvelle)", async () => {
     // `createTeam` enregistre `TERMS_VERSION` : un formulaire qui en a montré une
     // autre — ou un client d'avant le champ — n'accepte pas un texte non présenté.
-    for (const termsVersion of [undefined, TERMS_VERSION - 1, String(TERMS_VERSION)]) {
+    for (const termsVersion of [TERMS_VERSION - 1, String(TERMS_VERSION), null]) {
       const res = await teamCreate(req("POST", { name: "Rolex", acceptTerms: true, termsVersion }));
       expect(res.status).toBe(409);
       expect(await res.json()).toEqual({ error: "TERMS_VERSION_MISMATCH" });
     }
+    // Sans version du tout (page d'avant le champ) : le refus que ces pages savent traduire.
+    const res = await teamCreate(req("POST", { name: "Rolex", acceptTerms: true }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "TERMS_REQUIRED" });
     expect(createTeam).not.toHaveBeenCalled();
   });
 });

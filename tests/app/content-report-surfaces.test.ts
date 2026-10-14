@@ -61,13 +61,18 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(login).toContain("terms={terms}");
     expect(login).toContain("const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow } : null;");
     // Suivie de la langue de la page, devenue celle du compte (lot 9-3).
-    expect(login).toMatch(/termsVersion: TERMS_VERSION,\s*termsAcceptedNow: acceptedNow,/);
-    expect(login).toMatch(/termsAcceptedNow: acceptedNow,[^}]*locale: text\.locale,/);
+    expect(login).toMatch(/termsVersion: TERMS_VERSION,\s*termsAcceptedNow: isAcceptedNow\(\),/);
+    expect(login).toMatch(/termsAcceptedNow: isAcceptedNow\(\),[^}]*locale: text\.locale,/);
     expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, terms, locale })");
     // L'acceptation « dans la page » ne vaut que le temps d'un aller-retour OAuth : un onglet
     // resté ouvert sur un ordinateur partagé ne la prête pas à la personne suivante.
     expect(login).toContain("const ACCEPTED_NOW_TTL_MS = 10 * 60 * 1000;");
-    expect(login).toMatch(/setTimeout\(\(\) => setAcceptedNow\(false\), ACCEPTED_NOW_TTL_MS\)/);
+    // Lue à l'horloge au moment de partir, pas au minuteur (arrêté pendant une mise en veille).
+    expect(login).toContain("Date.now() - acceptedAt.current < ACCEPTED_NOW_TTL_MS");
+    expect(login).toContain("termsAtClick={termsAtClick}");
+    expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain(
+      "event.currentTarget.href = oauthStartPath(provider, { redirect, terms: termsAtClick(), locale });",
+    );
     // La création d'équipe envoie la version montrée.
     expect(read("app/(secured)/equipes/creer/CreateTeamForm.tsx")).toContain("termsVersion: TERMS_VERSION,");
   });
