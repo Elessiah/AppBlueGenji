@@ -45,6 +45,17 @@ ses messages qu'au bout d'un an (`BOT_STAFF_LOG_RETENTION_DAYS`). Règle, écrit
 | Un engagé de **tournoi individuel** | « un joueur » : son nom *est* un pseudo | — |
 | Un membre du **staff** | « le staff » | `[staff-audit] <ligne Discord> — auteur : <pseudo> (#<id>)` |
 
+**Seule exception — l'annonce #live d'un tournoi individuel** (décision de
+l'utilisateur, 2026-10-14) : l'annonce publique d'un match diffusé
+(`lib/shared/live-announcements.ts`, `LIVE_STREAMS.md`) nomme le joueur d'une
+entrée individuelle par son **pseudo public BlueGenji** (`bg_users.pseudo`, lu
+par `solo_user_id`, compte supprimé → « un joueur »), passé par
+`discordInline` — jamais un prénom ni un `#id`, comme un diffuseur nomme les
+joueurs à l'antenne. Un match d'équipes n'y nomme que les équipes. Base :
+intérêt légitime (retransmission, registre T16), sans case à cocher ; la mention
+d'inscription l'annonce, `/rgpd` et `PRIVACY_CHANGES` le déclarent. Journaux,
+alertes, programme d'arbitrage et tout autre message Discord gardent « un joueur ».
+
 - **Un rédacteur ne reçoit jamais un nom nu** : les formateurs prennent un
   `LogEntrant` (`{ name, participantType }`) et le rendent par `entrantLabel`.
   C'est ce qui empêche une ligne ajoutée demain de publier un pseudo par mégarde
@@ -79,4 +90,4 @@ nouvelle règle.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Journaux Discord et visites sans données nominatives** (`lib/shared/log-privacy.ts` pur + `lib/server/staff-audit.ts`) : **règle pour toute feature future** — un message Discord (journal, alerte arbitre, signalement) ne porte **aucun pseudo de joueur** ni `#id` de joueur (« un joueur », y compris en tournoi individuel, où le nom d'un engagé *est* un pseudo), les **noms d'équipe** restent, et un **membre du staff** y est « le staff » tandis que son geste part nominatif dans pm2 (`publishStaffAction` → `[staff-audit] … — auteur : <pseudo> (#id)`). Les formateurs ne prennent jamais un nom nu mais un `LogEntrant` rendu par `entrantLabel`. Côté audience, `bg_site_visits` ne garde plus `user_id` (remplacée par `authenticated`) : l'empreinte salée rend un visiteur unique sans remonter à lui, et sans secret en production on ne compte pas. Voir `docs/features/RGPD_LOGS_AND_VISITS.md`.
+- **Journaux Discord et visites sans données nominatives** (`lib/shared/log-privacy.ts` pur + `lib/server/staff-audit.ts`) : **règle pour toute feature future** — un message Discord (journal, alerte arbitre, signalement) ne porte **aucun pseudo de joueur** ni `#id` de joueur (« un joueur », y compris en tournoi individuel, où le nom d'un engagé *est* un pseudo — seule exception : l'annonce publique #live d'un tournoi individuel, qui porte le pseudo public), les **noms d'équipe** restent, et un **membre du staff** y est « le staff » tandis que son geste part nominatif dans pm2 (`publishStaffAction` → `[staff-audit] … — auteur : <pseudo> (#id)`). Les formateurs ne prennent jamais un nom nu mais un `LogEntrant` rendu par `entrantLabel`. Côté audience, `bg_site_visits` ne garde plus `user_id` (remplacée par `authenticated`) : l'empreinte salée rend un visiteur unique sans remonter à lui, et sans secret en production on ne compte pas. Voir `docs/features/RGPD_LOGS_AND_VISITS.md`.
