@@ -140,9 +140,13 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   départ (`PUSH_NOTIFICATIONS.md`) : chaque évènement de tournoi publié,
   l'entretien de l'instantané qui ouvre un lancement, la lecture de la liste
   des tournois — et, pour qu'un `START_TIME` parte **à l'heure**, le
-  battement (25 s) de chaque flux SSE de tournoi ouvert, en production
+  battement (25 s) de chaque flux SSE ouvert sur un tournoi **en cours** (un
+  onglet oublié sur un tournoi terminé ne réveille rien), en production
   seulement. Étranglé à dix secondes pour tout le processus, avec relève ;
-  jamais attendu.
+  jamais attendu. Coût : une lecture indexée (`idx_bg_matches_live`) toutes
+  les dix secondes au plus, quel que soit le nombre de spectateurs ; aucune
+  tant que le coupe-circuit du bot est ouvert. Un `START_TIME` dont l'heure
+  n'est pas venue n'est pas lu.
 - **Un message par diffusion, pas par match** : les matchs d'un même tournoi
   qu'un même balayage trouve à l'antenne sur le **même lien** (une ronde
   lancée d'un coup, repliée sur la chaîne officielle) partent en un seul
@@ -161,8 +165,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   pour une cause passagère — bot injoignable ou d'une version antérieure,
   salon fermé, refus lié à l'état du salon ou Discord sans réponse en lisant
   le salon (`503` `send-rejected`, `discord-unreachable`), panne (`500`) — et
-  le balayage suivant
-  réessaie tant que le match a commencé depuis moins de deux heures ; un
+  le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS`,
+  pour tout le processus : la même cause renverrait le même refus) tant que
+  le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un blocage par
   AutoMod (`503` `automod` : le même message serait bloqué de nouveau, et
   chaque essai alerterait la modération) la
