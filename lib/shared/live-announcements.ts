@@ -58,6 +58,9 @@ function entrantName(name: string | null): string {
   return inline === "" ? ANONYMOUS_PLAYER_LABEL : inline;
 }
 
+/** Affiche dont aucun engagé n'a de nom publiable. */
+const ANONYMOUS_PAIRING = `${ANONYMOUS_PLAYER_LABEL} contre ${ANONYMOUS_PLAYER_LABEL}`;
+
 /** Affiche « A contre B », noms neutralisés. */
 function pairingLine(pairing: LiveAnnouncementPairing): string {
   return `${entrantName(pairing.team1Name)} contre ${entrantName(pairing.team2Name)}`;
@@ -83,6 +86,11 @@ export function formatLiveAnnouncementGroup(group: LiveAnnouncementGroup): strin
   const count = group.pairings.length;
   if (count === 1) {
     return `🔴 En direct : ${pairingLine(group.pairings[0])} — ${tournament}`;
+  }
+  // Aucun nom publiable (invités, comptes supprimés) : « un joueur contre un
+  // joueur » répété ne dirait rien, le texte compte les matchs.
+  if (group.pairings.every((pairing) => pairingLine(pairing) === ANONYMOUS_PAIRING)) {
+    return `🔴 En direct : ${count} matchs — ${tournament}`;
   }
   const header = `🔴 En direct — ${tournament} :`;
   const lines = group.pairings.map((pairing) => `\n• ${pairingLine(pairing)}`);

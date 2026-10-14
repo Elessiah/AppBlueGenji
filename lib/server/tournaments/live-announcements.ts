@@ -415,11 +415,16 @@ async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Pr
  */
 async function announce(group: AnnouncementGroup): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
   const [first] = group.rows;
+  // Un groupe qui compte une entrée individuelle est un tournoi individuel,
+  // même au type illisible : son invité sans compte ne part pas sous son nom.
+  const participantType = group.rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
+    ? "SOLO"
+    : first.participant_type;
   const message = formatLiveAnnouncementGroup({
     tournamentName: String(first.tournament_name),
     pairings: group.rows.map((row) => ({
-      team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, row.team1_pseudo, row.participant_type),
-      team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, row.team2_pseudo, row.participant_type),
+      team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, row.team1_pseudo, participantType),
+      team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, row.team2_pseudo, participantType),
     })),
   });
   const { label, context, plural } = describeGroup(group);

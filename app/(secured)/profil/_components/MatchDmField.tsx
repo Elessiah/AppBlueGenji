@@ -46,9 +46,12 @@ export function MatchDmField({
   /** Choix fait pendant un envoi : affiché tout de suite, envoyé juste après. */
   const queued = useRef<boolean | null>(null);
   // La fiche arrive après le premier rendu, ou est relue : la case reprend la
-  // valeur lue tant qu'aucun envoi n'est en cours.
+  // valeur lue tant qu'aucun envoi n'est en cours — et tant que le joueur n'a
+  // rien enregistré ici. Après, son choix sur cette page est le plus récent :
+  // une relecture commencée avant son envoi ne doit pas le recouvrir.
   const [shown, setShown] = useState(initial);
-  if (initial !== shown && !busy) {
+  const [chosenHere, setChosenHere] = useState(false);
+  if (initial !== shown && !busy && (!chosenHere || initial === undefined)) {
     setShown(initial);
     if (initial !== undefined) setEnabled(initial);
   }
@@ -90,6 +93,7 @@ export function MatchDmField({
       },
       show: setEnabled,
     });
+    if (outcome.stored) setChosenHere(true);
     // « Activés » / « désactivés » une fois, et seulement si le dernier choix
     // est enregistré : sinon la case reprend l'état gardé en base.
     if (outcome.confirmed) showSuccess(t(outcome.saved ? "matchDms.enabled" : "matchDms.disabled"));
