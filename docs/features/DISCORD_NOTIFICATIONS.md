@@ -788,6 +788,10 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   enregistré. Un compte sans Discord rattaché ni tag renseigné voit une ligne
   de plus (`matchDms.noDiscord`, liée par `aria-describedby`) : aucun de ces
   messages ne peut lui parvenir.
+- **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
+  `schedule.noticePlanning`, FR + EN) précise qu'un joueur qui a coupé ces
+  messages ne reçoit pas le message privé, pour qu'un arbitre ne le tienne pas
+  pour prévenu.
 
 ## Configuration
 
