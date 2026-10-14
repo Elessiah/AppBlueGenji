@@ -12,6 +12,7 @@ import { listOwnSuspensions } from "@/lib/server/account-suspensions";
 import type { PersonalDataExport } from "@/lib/shared/types";
 import { getFullProfile } from "./full-profile";
 import { accountLocaleFromRow } from "./account-locale";
+import { listOwnLiveAnnouncements } from "./live-announcement-export";
 import { matchDmEnabled } from "./match-dm-preference";
 
 /**
@@ -115,6 +116,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     pushNotifications: await exportPushData(userId),
     connectionLogs: await listOwnConnectionLogs(userId),
     mapEntries: await listOwnMapEntries(userId),
+    liveAnnouncements: await listOwnLiveAnnouncements(userId),
     suspensions: (await listOwnSuspensions(userId)).map((suspension) => ({
       reason: suspension.reason,
       ground: suspension.ground,

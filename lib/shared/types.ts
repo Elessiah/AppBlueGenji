@@ -1027,6 +1027,11 @@ export type PersonalDataExport = {
     submittedAt: string | null;
   }[];
   /**
+   * Annonces #live d'un match de ses entrées en tournoi individuel
+   * (`bg_live_announcements`, T16) : match, tournoi, date de l'annonce.
+   */
+  liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null }[];
+  /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.
    */
