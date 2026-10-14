@@ -386,7 +386,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
   },
   "2026-10-pseudo-live-et-messages-de-match": {
-    title: "Your username in #live announcements, and match direct messages your choice",
+    title: "Your username in #live announcements, and match direct messages up to you",
     summary:
       "In a solo tournament, the announcement of a streamed match in the #live channel now names the players by their username; you can turn off the Discord direct messages about your matches from “My profile”.",
     details: [
