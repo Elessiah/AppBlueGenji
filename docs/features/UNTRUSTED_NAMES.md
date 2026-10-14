@@ -37,7 +37,10 @@ deux fonctions :
 - `discordInline(value)` — fragment de phrase (nom d'équipe, de tournoi, motif
   de pénalité) : une ligne, balisage échappé (`\ * _ ~ `` ` `` | [ ] ( ) < > # -`),
   `@` suivi d'un espace de largeur nulle (`@everyone`, `@here` ne notifient plus),
-  `<` échappé (les mentions `<@…>`, `<@&…>`, `<#…>` ne sont plus reconnues) ;
+  `<` échappé (les mentions `<@…>`, `<@&…>`, `<#…>` ne sont plus reconnues),
+  adresse nue désamorcée (espace de largeur nulle dans `://` et après un point
+  suivi d'une lettre ou d'un chiffre : une équipe `https://faux-site.gg` ne
+  devient ni lien cliquable ni aperçu) ;
 - `discordQuote(value)` — texte libre sur plusieurs lignes (signalement d'un
   problème) : mêmes neutralisations, chaque ligne **citée** (`> `) pour qu'aucune
   ne se fasse passer pour une ligne rédigée par le site.

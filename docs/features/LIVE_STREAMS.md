@@ -165,7 +165,7 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   repostent jamais. La réservation n'est **rendue** que si rien n'est parti
   pour une cause passagère — bot injoignable ou d'une version antérieure,
   salon fermé, refus lié à l'état du salon ou Discord sans réponse en lisant
-  le salon (`503` `send-rejected`, `discord-unreachable`), panne (`500`) — et
+  le salon (`503` `send-rejected`, `discord-unreachable`) — et
   le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS` :
   la même cause renverrait le même refus). Après un bot indisponible, un salon
   fermé ou Discord muet en lisant le salon (`discord-unreachable`), la pause
@@ -184,7 +184,11 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   pu publier quand même, et une annonce perdue vaut mieux qu'un second
   `@everyone` à tout le serveur (`timed-out`, `console.error` dans pm2 :
   « son envoi peut encore aboutir », sans consigne d'action) ; il
-  n'est pas compté comme une panne du bot. Le bot
+  n'est pas compté comme une panne du bot. Un bot **tombé en route** la garde
+  de même (`interrupted` : connexion coupée après l'envoi de la requête —
+  `ECONNRESET`, redémarrage pm2 d'un déploiement —, ou erreur `5xx` autre que
+  `503`) : il a pu publier avant ; seule une connexion qui n'a pas abouti
+  (`ECONNREFUSED`, hôte inconnu) rend la réservation. Le bot
   répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
   croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
   du bot : un salon fermé ne doit pas suspendre les rappels de fond. Côté
@@ -226,9 +230,16 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
-- **Production seulement** (`NODE_ENV=production`) : une base de
-  développement ne fait jamais écrire `@everyone` au serveur, même devant un
-  bot local branché par erreur sur le vrai serveur.
+- **Production seulement, sur le site public** (`NODE_ENV=production` **et**
+  `APP_URL` en `https` hors hôte local — `localhost`, `127.0.0.1`, `.localhost`,
+  `.test`, `.local`) : une base de développement ne fait jamais écrire
+  `@everyone` au serveur, même devant un bot local branché par erreur sur le
+  vrai serveur — `npm start` sur un poste pose aussi `NODE_ENV=production`.
+- **Adresses dans les noms** : un nom d'équipe ou de tournoi qui ressemble à
+  une adresse (`https://…`, `exemple.gg/…`) ne devient ni lien ni aperçu sous
+  l'annonce — `discordInline` glisse une espace de largeur nulle dans `://` et
+  après un point suivi d'une lettre ou d'un chiffre. Le seul lien est celui du
+  bot, validé par la liste blanche.
 - **Traces** : pm2 `[live-announce] match N (tournoi T) annoncé dans #live`
   (`matchs N, M (tournoi T) annoncés` pour un groupe ; « sans notifier » quand
   la mention n'a pas pu partir — identifiants seuls, tournoi compris sur toutes
