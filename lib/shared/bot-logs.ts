@@ -301,6 +301,10 @@ export type RefereeDigestLogMatch = {
   team1: LogEntrant;
   team2: LogEntrant;
   startAt: string | Date;
+  bracket: string;
+  roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
 };
 
 /** Manches citées au plus par la ligne du programme. */
@@ -340,22 +344,48 @@ function digestTime(startAt: string | Date): string {
 export function formatRefereeDigestLog(matches: readonly RefereeDigestLogMatch[]): string {
   const subject = `${matches.length} match${matches.length > 1 ? "s" : ""} à venir`;
   const head = `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) : `;
-  const line = (shown: readonly string[]): string => {
-    const hidden = matches.length - shown.length;
+  const line = (shown: readonly string[], cited: number): string => {
+    const hidden = matches.length - cited;
     const rest = hidden > 0 ? [`… et ${hidden} autre${hidden > 1 ? "s" : ""}`] : [];
     return `${head}${[...shown, ...rest].join(" ; ")}.`;
   };
   // Autant de manches que la borne et la longueur le permettent, mention du
   // reste comprise ; la première toujours, coupée s'il le faut.
-  const shown: string[] = [];
-  for (const match of matches.slice(0, REFEREE_DIGEST_LOG_ENTRIES)) {
-    const entry =
-      `${digestTime(match.startAt)} ${entrantLabel(match.team1)} vs ${entrantLabel(match.team2)} ` +
-      `(${tournamentLabel(match.tournament)}, match #${match.matchId})`;
-    if (shown.length > 0 && line([...shown, entry]).length > REFEREE_DIGEST_LOG_MAX_LENGTH) break;
-    shown.push(entry);
+  // Une entrée par match ; en solo (aucun nom à citer), une par créneau,
+  // tournoi et manche quand ils se suivent : « 8 matchs », pas huit entrées
+  // « un joueur vs un joueur » qui pousseraient les autres hors de la ligne.
+  const groups: { first: RefereeDigestLogMatch; time: string; round: string; count: number }[] = [];
+  for (const match of matches) {
+    const time = digestTime(match.startAt);
+    const round = matchRoundLabel(match.bracket, match.roundNumber, match.swiss);
+    const last = groups.at(-1);
+    const solo = match.team1.participantType === "SOLO";
+    if (
+      solo &&
+      last?.first.team1.participantType === "SOLO" &&
+      last.time === time &&
+      last.round === round &&
+      last.first.tournament.id === match.tournament.id
+    ) {
+      last.count += 1;
+      continue;
+    }
+    groups.push({ first: match, time, round, count: 1 });
   }
-  const result = line(shown);
+  const entryOf = ({ first, time, round, count }: (typeof groups)[number]): string =>
+    count > 1
+      ? `${time} ${count} matchs (${tournamentLabel(first.tournament)}, ${round})`
+      : `${time} ${entrantLabel(first.team1)} vs ${entrantLabel(first.team2)} ` +
+        `(${tournamentLabel(first.tournament)}, ${round}, match #${first.matchId})`;
+  const shown: string[] = [];
+  let cited = 0;
+  for (const group of groups.slice(0, REFEREE_DIGEST_LOG_ENTRIES)) {
+    const entry = entryOf(group);
+    if (shown.length > 0 && line([...shown, entry], cited + group.count).length > REFEREE_DIGEST_LOG_MAX_LENGTH) break;
+    shown.push(entry);
+    cited += group.count;
+  }
+  const result = line(shown, cited);
   if (result.length <= REFEREE_DIGEST_LOG_MAX_LENGTH) return result;
   // Coupe sans séparer une paire de substitution (émoji d'un nom).
   return `${result.slice(0, REFEREE_DIGEST_LOG_MAX_LENGTH - 1).replace(/[\uD800-\uDBFF]$/, "")}…`;

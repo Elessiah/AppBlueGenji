@@ -21,7 +21,8 @@
       "P1D": "moins de 24 heures",
       "PT10H": "moins de 10 heures"
     },
-    "checkIn": "Check-in sur Discord {minutes} min avant le match : {invite}"
+    "checkIn": "Check-in sur Discord {minutes} min avant le match : {invite}",
+    "checkInOpen": "Check-in déjà ouvert sur Discord : {invite}"
   },
   "matchScheduled": {
     "pairingSolo": "Un match",

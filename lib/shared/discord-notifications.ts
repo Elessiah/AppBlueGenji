@@ -281,14 +281,27 @@ export interface MatchReminderContext {
    * 10 h, ou annonce qui l'a consommé (manche programmée moins de 10 h avant).
    */
   checkIn?: boolean;
+  /**
+   * Le salon de check-in est **déjà ouvert** : la manche part dans moins de
+   * {@link CHECK_IN_OPENS_MINUTES_BEFORE} minutes (programmée au dernier
+   * moment, ou balayage tardif). « Ouvre 15 minutes avant » désignerait un
+   * instant passé.
+   */
+  checkInOpen?: boolean;
 }
 
 /** Ligne du check-in : où et quand (texte fixe, aucun nom). */
-export function checkInLine(): string {
+export function checkInLine(open = false): string {
+  if (open) return `Check-in : le salon de check-in est déjà ouvert sur Discord — ${CHECK_IN_INVITE_URL}`;
   return (
     `Check-in : le salon de check-in ouvre ${CHECK_IN_OPENS_MINUTES_BEFORE} minutes avant le coup d'envoi ` +
     `sur Discord — ${CHECK_IN_INVITE_URL}`
   );
+}
+
+/** Le salon de check-in est-il déjà ouvert à `now` pour un coup d'envoi à `startAt` ? */
+export function isCheckInOpen(startAt: string | Date, now: Date): boolean {
+  return new Date(startAt).getTime() - now.getTime() <= CHECK_IN_OPENS_MINUTES_BEFORE * MINUTE_MS;
 }
 
 /**
@@ -330,7 +343,7 @@ export function buildMatchReminderMessage(
     pairingLine(context),
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
-  if (context.checkIn ?? offset.key === CHECK_IN_REMINDER_KEY) lines.push(checkInLine());
+  if (context.checkIn ?? offset.key === CHECK_IN_REMINDER_KEY) lines.push(checkInLine(context.checkInOpen));
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
   return lines.join("\n");
 }
@@ -371,7 +384,7 @@ export function buildMatchScheduleAnnouncement(
     // est ordonnée du plus lointain au plus proche, c'est donc le premier.
     lines.push(`Prochain rappel : ${remaining[0].label} avant le coup d'envoi.`);
   }
-  if (context.checkIn) lines.push(checkInLine());
+  if (context.checkIn) lines.push(checkInLine(context.checkInOpen));
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
   return lines.join("\n");
 }

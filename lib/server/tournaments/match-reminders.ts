@@ -48,6 +48,7 @@ import {
   MATCH_SEEN_KEY,
   MATCH_TOLD_KEY,
   buildMatchReminderMessage,
+  isCheckInOpen,
   buildMatchScheduleAnnouncement,
   buildMatchScheduleClearedNotice,
   buildMatchWithdrawnNotice,
@@ -394,6 +395,8 @@ type PlannedSend = {
    * message et jamais retenté).
    */
   claimed?: string[];
+  /** Instant de référence de l'envoi (check-in déjà ouvert ?) ; absent : maintenant. */
+  now?: Date;
 };
 
 /** Rend les marques d'un envoi qui n'a pu partir. Ne lève jamais. */
@@ -448,7 +451,7 @@ async function planMatchSends(
     // Les joueurs avaient déjà reçu un horaire (manche programmée avant la
     // marque d'observation, par exemple) : la date découverte en remplace une.
     const announcement = { rescheduled: alreadySent.has(MATCH_TOLD_KEY) };
-    return [{ match, offset: null, remaining: [...remaining], announcement, claimed }];
+    return [{ match, offset: null, remaining: [...remaining], announcement, claimed, now }];
   }
 
   // `alreadySent` porte aussi la marque d'observation, qui n'est pas un palier :
@@ -461,7 +464,7 @@ async function planMatchSends(
   const planned: PlannedSend[] = [];
   for (const offset of due) {
     if (await claimDatedMark(match, offset.key)) {
-      planned.push({ match, offset, remaining: [], claimed: [offset.key] });
+      planned.push({ match, offset, remaining: [], claimed: [offset.key], now });
     }
   }
   return planned;
@@ -477,7 +480,7 @@ type MatchSide = ReturnType<typeof matchSides>[number];
  * @returns L'envoi a-t-il atteint quelqu'un (message privé remis, ou appareil) ?
  */
 async function sendToSide(
-  { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt }: PlannedSend,
+  { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt, now }: PlannedSend,
   side: MatchSide,
   recipients: NotificationRecipient[],
 ): Promise<boolean> {
@@ -493,6 +496,7 @@ async function sendToSide(
       ? offset.key === CHECK_IN_REMINDER_KEY
       : !remaining.some((pending) => pending.key === CHECK_IN_REMINDER_KEY);
   }
+  const checkInOpen = checkIn && isCheckInOpen(startAt, now ?? new Date());
   const context = {
     tournamentName: String(match.tournament_name),
     tournamentUrl: tournamentPageUrl(Number(match.tournament_id)),
@@ -502,6 +506,7 @@ async function sendToSide(
     startAt,
     solo,
     checkIn,
+    checkInOpen,
   };
   const pushSide = {
     tournamentId: Number(match.tournament_id),
@@ -515,6 +520,7 @@ async function sendToSide(
     startAt,
     solo,
     checkIn,
+    checkInOpen,
   };
 
   // Le contexte dit au bot (et à ses journaux) de quel message il s'agit.
@@ -655,7 +661,7 @@ export async function announceMatchSchedule(
   const opened = openedMatchReminders(match.start_at, now);
   // En cas d'échec avant les joueurs, l'observation posée par `setMatchStartAt`
   // est rendue avec les paliers : le balayage annoncera la manche.
-  const send: PlannedSend = { match, offset: null, remaining: [], announcement, claimed: [MATCH_SEEN_KEY] };
+  const send: PlannedSend = { match, offset: null, remaining: [], announcement, claimed: [MATCH_SEEN_KEY], now };
   try {
     for (const offset of opened) {
       if (!(await claimDatedMark(match, offset.key))) return 0;

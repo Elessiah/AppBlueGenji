@@ -153,6 +153,8 @@ type ScheduledMatchSide = MatchSide & {
    * rappel de 10 h ; aussi l'annonce qui a consommé son palier.
    */
   checkIn?: boolean;
+  /** Le salon de check-in est déjà ouvert (coup d'envoi à moins de 15 min) : « déjà ouvert ». */
+  checkInOpen?: boolean;
   /**
    * Rencontre vers laquelle mène le lien, quand ce n'est pas `matchId` (qui
    * reste l'étiquette) : la nouvelle rencontre d'une ronde réappariée, ou
@@ -220,7 +222,7 @@ export function matchReminderPush(
   const checkIn = side.checkIn ?? offset === CHECK_IN_REMINDER_KEY;
   return {
     title: announcementTitle(offset, change.rescheduled, text),
-    body: checkIn ? `${body} ${text.t("matchReminder.checkIn", { invite: CHECK_IN_INVITE_URL, minutes: CHECK_IN_OPENS_MINUTES_BEFORE })}` : body,
+    body: checkIn ? `${body} ${checkInText(text, side.checkInOpen === true)}` : body,
     // L'adresse écrite dans le texte ne se touche pas : le push du check-in
     // ouvre l'invitation (par le site, seule origine qu'une notification ouvre).
     url: checkIn ? CHECK_IN_PATH : localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
@@ -349,6 +351,13 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
   };
 }
 
+/** Phrase du check-in : quand le salon ouvre, ou qu'il l'est déjà. */
+function checkInText(text: PushText, open: boolean): string {
+  return open
+    ? text.t("matchReminder.checkInOpen", { invite: CHECK_IN_INVITE_URL })
+    : text.t("matchReminder.checkIn", { invite: CHECK_IN_INVITE_URL, minutes: CHECK_IN_OPENS_MINUTES_BEFORE });
+}
+
 /** Une manche du programme d'arbitrage (`REFEREE_DIGEST`). */
 export type RefereeDigestMatch = {
   matchId: number;
@@ -385,9 +394,10 @@ function digestTime(startAt: string | Date, locale: Locale): string {
 /**
  * Programme d'arbitrage (`REFEREE_DIGEST`) : les matchs à venir (ceux des
  * 10 prochaines heures et la marge de regroupement), un par ligne (heure de
- * Paris, affiche, tournoi et manche), dans l'ordre du coup d'envoi, sous une
- * première ligne « Heure de Paris » (un arbitre à l'étranger lirait sinon son
- * heure locale). Équipes nommées ; en tournoi individuel, aucun pseudo de
+ * Paris, affiche, tournoi et manche), dans l'ordre du coup d'envoi, puis une
+ * dernière ligne « Heure de Paris » (un arbitre à l'étranger lirait sinon son
+ * heure locale ; en dernier, parce qu'une notification repliée ne montre que
+ * la première ligne, qui doit être un match). Équipes nommées ; en tournoi individuel, aucun pseudo de
  * joueur (comme partout) : les matchs d'un même créneau, tournoi et manche
  * tiennent en une ligne « 5 matchs » plutôt qu'en cinq lignes identiques
  * « Un match ». Le lien mène au tournoi
@@ -412,7 +422,6 @@ export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale
   }
   const kept = lines.slice(0, REFEREE_DIGEST_PUSH_LINES);
   const shown = [
-    text.t("refereeDigest.timeZone"),
     ...kept.map((line) =>
       text.t("refereeDigest.line", {
         start: line.start,
@@ -424,6 +433,7 @@ export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale
   ];
   const hidden = matches.length - kept.reduce((sum, line) => sum + line.count, 0);
   if (hidden > 0) shown.push(text.t("refereeDigest.more", { count: hidden }));
+  shown.push(text.t("refereeDigest.timeZone"));
   const tournaments = new Set(matches.map((match) => match.tournamentId));
   const [onlyTournament] = tournaments;
   return {

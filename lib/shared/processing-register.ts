@@ -424,7 +424,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
-      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second avec le lien du salon de check-in)",
+      "Envoyer en message privé Discord l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in)",
       "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
