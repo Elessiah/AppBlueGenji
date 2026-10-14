@@ -108,13 +108,17 @@ describe("notifications push — français inchangé", () => {
         // (« Tableau perdants »), plus l'anglicisme « Loser bracket ».
         .map(([name, content]): [string, PushContent] => {
           const renamed = { ...content, body: content.body.replace("Loser bracket", "Tableau perdants") };
-          return [name, name.endsWith(".P1D") ? { ...renamed, title: "Match dans moins de 24 heures" } : renamed];
+          // Un rappel remplace l'annonce en sonnant (`renotify`, revue performance #443) : texte inchangé.
+          return [
+            name,
+            name.endsWith(".P1D") ? { ...renamed, title: "Match dans moins de 24 heures", renotify: true } : renamed,
+          ];
         }),
     );
     const before = {
       ...kept,
       "refereeAlert.url": { ...FR_BEFORE["refereeAlert.url"], url: "/tournois" },
-      "reminder.solo": { ...FR_BEFORE["reminder.solo"], title: "Match dans moins de 24 heures" },
+      "reminder.solo": { ...FR_BEFORE["reminder.solo"], title: "Match dans moins de 24 heures", renotify: true },
     };
     expect(allCases("fr")).toEqual(before);
   });

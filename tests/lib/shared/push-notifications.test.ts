@@ -141,6 +141,13 @@ describe("buildPushPayload", () => {
     expect(payload.tag).toBe("x");
   });
 
+  it("ne porte renotify que lorsqu'il est demandé", () => {
+    const base = { title: "t", body: "b", url: "/", tag: "x" };
+    expect(buildPushPayload("MATCH_REMINDER", { ...base, renotify: true }, null, "fr").renotify).toBe(true);
+    expect(buildPushPayload("MATCH_REMINDER", base, null, "fr")).not.toHaveProperty("renotify");
+    expect(buildPushPayload("MATCH_REMINDER", { ...base, renotify: false }, null, "fr")).not.toHaveProperty("renotify");
+  });
+
   it("filtre le lien", () => {
     expect(buildPushPayload("MATCH_START", { title: "t", body: "b", url: "https://evil.test" }, null, "fr").url).toBe("/");
   });

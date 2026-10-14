@@ -190,6 +190,14 @@ describe("matchReminderPush — check-in", () => {
     }
   });
 
+  it("fait sonner les rappels qui remplacent l'annonce, pas l'annonce elle-même", () => {
+    // Même étiquette que l'annonce : sans renotify, le rappel 10 h (check-in) la remplacerait en silence.
+    expect(matchReminderPush(SIDE, "PT10H").renotify).toBe(true);
+    expect(matchReminderPush(SIDE, "P1D", "en").renotify).toBe(true);
+    expect(matchReminderPush(SIDE, "PT10H").tag).toBe(matchReminderPush(SIDE, null).tag);
+    expect(matchReminderPush({ ...SIDE, checkIn: true }, null)).not.toHaveProperty("renotify");
+  });
+
   it("ouvre l'invitation au toucher quand il porte le check-in, la fiche du match sinon", () => {
     // Une notification n'ouvre que des adresses du site : `/check-in` renvoie à l'invitation.
     expect(matchReminderPush(SIDE, "PT10H", "fr").url).toBe("/check-in");

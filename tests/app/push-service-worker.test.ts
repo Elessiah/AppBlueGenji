@@ -183,6 +183,17 @@ describe("service worker du site", () => {
     expect(options).toMatchObject({ body: "Déclare-toi prêt.", tag: "t", data: { url: "/tournois/4#match-9" } });
   });
 
+  it("fait sonner le remplacement d'un rappel (renotify), jamais sans étiquette ni sans drapeau", async () => {
+    const worker = loadWorker();
+    worker.fire("push", { data: { json: () => ({ title: "Match dans moins de 10 heures", tag: "r", renotify: true }) } });
+    worker.fire("push", { data: { json: () => ({ title: "Match programmé", tag: "r" }) } });
+    worker.fire("push", { data: { json: () => ({ title: "x", renotify: true }) } });
+    worker.fire("push", { data: { json: () => ({ title: "y", tag: "r", renotify: "true" }) } });
+    await Promise.all(worker.waited);
+    const calls = worker.showNotification.mock.calls as unknown as [string, { renotify?: boolean }][];
+    expect(calls.map(([, options]) => options.renotify)).toEqual([true, undefined, undefined, undefined]);
+  });
+
   it("déclare la langue de la charge, le français sans langue ou pour une valeur inconnue (lot 9-3)", async () => {
     const worker = loadWorker();
     worker.fire("push", { data: { json: () => ({ title: "Your match is starting", lang: "en" }) } });

@@ -1350,6 +1350,38 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     expect(pendingRefereeDigest()).toBeNull();
   });
 
+  it("lance le programme même pendant un balayage long, sous son propre étranglement", async () => {
+    const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
+    jest.mocked(dispatchRefereeDigest).mockResolvedValue(0);
+    await mockDb({ sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    // Le balayage des joueurs reste pendu sur le bot.
+    let release: () => void = () => undefined;
+    const slowBot = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      await slowBot;
+      return { sent: 0, unresolved: [], failed: [] };
+    });
+    const sweep = dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    await pendingRefereeDigest();
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
+
+    // Dans la minute : étranglé, même si le balayage tient encore son verrou.
+    void dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
+
+    // Une minute plus tard, balayage toujours en cours : le programme repart.
+    const later = jest.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
+    void dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+    later.mockRestore();
+    expect(dispatchRefereeDigest).toHaveBeenCalledTimes(2);
+
+    await pendingRefereeDigest();
+    release();
+    await sweep;
+  });
+
   it("tait l'absence de table au programme d'arbitrage, comme au balayage", async () => {
     const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
     jest.mocked(dispatchRefereeDigest).mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE" }));
