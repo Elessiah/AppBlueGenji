@@ -71,9 +71,11 @@ affichées dans le tableau « Données collectées ») :
   Rassemble le compte et ses identifiants bruts (ID Discord et méthode de
   rattachement, tag et date de certification, identifiants Google et Blizzard,
   langue du compte `account.locale`, choix des messages privés de match
-  `account.matchDmEnabled`), les annonces #live des matchs de ses entrées en
-  tournoi individuel (`liveAnnouncements` : match, tournoi, date —
-  `live-announcement-export.ts`),
+  `account.matchDmEnabled`), les traces d'annonce #live des matchs de ses
+  entrées en tournoi individuel (`liveAnnouncements` : match, tournoi, date —
+  `live-announcement-export.ts` ; une trace = une annonce tentée, nommant le
+  joueur seulement pour une inscription faite depuis le 16 octobre 2026 ; la
+  trace part avec le match, le message Discord reste),
   le profil et ses réglages de visibilité, les statistiques, l'historique
   d'équipes, le palmarès, les changements de traitement dont le joueur a pris
   connaissance, ses **acceptations des conditions d'utilisation**, les
