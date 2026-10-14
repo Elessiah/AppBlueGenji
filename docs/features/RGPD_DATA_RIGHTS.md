@@ -70,7 +70,8 @@ affichées dans le tableau « Données collectées ») :
 - **Service** : `exportOwnData(userId)` dans `lib/server/users/data-export.ts`.
   Rassemble le compte et ses identifiants bruts (ID Discord et méthode de
   rattachement, tag et date de certification, identifiants Google et Blizzard,
-  langue du compte `account.locale`),
+  langue du compte `account.locale`, choix des messages privés de match
+  `account.matchDmEnabled`),
   le profil et ses réglages de visibilité, les statistiques, l'historique
   d'équipes, le palmarès, les changements de traitement dont le joueur a pris
   connaissance, ses **acceptations des conditions d'utilisation**, les
