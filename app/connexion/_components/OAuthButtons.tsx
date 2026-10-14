@@ -31,6 +31,7 @@ import {
   OAUTH_PROVIDER_SLUGS,
   oauthStartPath,
   type OAuthProvider,
+  type OAuthTermsConsent,
 } from "@/lib/shared/oauth-providers";
 
 /** Ordre d'affichage propre à cet écran, du plus complet au plus spécialisé. */
@@ -50,12 +51,12 @@ const ENVIRONMENT_NOTICE_ID = "oauth-environment-notice";
 
 export function OAuthButtons({
   redirect,
-  termsAccepted,
+  terms,
   environmentNotice = null,
 }: Readonly<{
   redirect: string;
-  /** Conditions d'utilisation acceptées dans la modale d'entrée de la page. */
-  termsAccepted: boolean;
+  /** Conditions d'utilisation acceptées dans la modale d'entrée de la page (`null` : pas encore). */
+  terms: OAuthTermsConsent | null;
   /**
    * Avertissement quand le navigateur risque de perdre l'aller-retour OAuth
    * (app installée sur iOS, navigateur intégré) — `loginEnvironmentNotice`.
@@ -111,7 +112,7 @@ export function OAuthButtons({
                 `aria-describedby`, qui complète le nom au lieu de l'écraser.
               */}
               <a
-                href={oauthStartPath(provider, { redirect, termsAccepted, locale })}
+                href={oauthStartPath(provider, { redirect, terms, locale })}
                 aria-describedby={describedBy || undefined}
               >
                 {t("oauth.continueWith", { provider: OAUTH_PROVIDER_LABELS[provider] })}

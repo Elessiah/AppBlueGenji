@@ -160,6 +160,7 @@ export async function createOrGetOAuthUser(identity: OAuthIdentity, consent: Ter
         avatarUrl: identity.avatarUrl,
         method: "OAUTH",
         termsAccepted: consent.termsAccepted,
+        acceptedNow: consent.acceptedNow,
       });
     case "BLIZZARD":
       return createOrGetBlizzardUser(identity.subject, identity.handle, consent);

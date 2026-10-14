@@ -17,7 +17,7 @@
  * - **`redirectTo`** — la destination d'après connexion, déjà filtrée à l'aller
  *   par `safeRedirectPath` et **refiltrée au retour** : ce cookie n'est pas
  *   signé, il ne fait pas foi (voir `lib/shared/safe-redirect.ts`) ;
- * - **`termsAccepted`**, **`localeFromPage`** — décidés à l'aller, comme
+ * - **`termsAccepted`**, **`termsAcceptedNow`**, **`localeFromPage`** — décidés à l'aller, comme
  *   l'intention : lus dans l'URL du rappel, ils seraient choisis par l'appelant.
  *
  * Un seul cookie, `bg_oauth`, qui remplace l'ancien `bg_google_oauth` : trois
@@ -39,6 +39,8 @@ export type OAuthStatePayload = {
   intent: OAuthIntent;
   /** Conditions d'utilisation acceptées à l'aller (case de `/connexion`). */
   termsAccepted: boolean;
+  /** Acceptées **dans la page** de départ, pas relues du navigateur (voir `OAuthTermsConsent`). */
+  termsAcceptedNow: boolean;
   /**
    * Départ prouvé cliqué **sur une page du site** (`startedOnSitePage`,
    * navigation de document `Sec-Fetch-Site: same-origin`, `Sec-Fetch-Mode:
@@ -94,6 +96,7 @@ export async function consumeOAuthState(): Promise<OAuthStatePayload | null> {
       redirectTo: parsed.redirectTo,
       intent,
       termsAccepted: parsed.termsAccepted === true,
+      termsAcceptedNow: parsed.termsAccepted === true && parsed.termsAcceptedNow === true,
       localeFromPage: parsed.localeFromPage === true,
     };
   } catch {

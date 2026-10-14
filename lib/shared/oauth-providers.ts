@@ -93,6 +93,23 @@ export function oauthProviderFromSlug(slug: string | null | undefined): OAuthPro
   return null;
 }
 
+/** Version des conditions d'utilisation montrée et acceptée sur `/connexion`. */
+export const OAUTH_TERMS_PARAM = "terms";
+/** Présent quand l'acceptation vient d'être donnée **sur cette page**, pas relue du navigateur. */
+export const OAUTH_TERMS_NOW_PARAM = "termsNow";
+
+/**
+ * Conditions d'utilisation acceptées à l'entrée de `/connexion`.
+ *
+ * - `version` : celle que la page a montrée — la route de départ ne retient
+ *   l'acceptation que si c'est la version en vigueur ;
+ * - `acceptedNow` : la case vient d'être acceptée dans cette page, par la
+ *   personne qui se connecte. Relue du stockage du navigateur, elle peut venir
+ *   d'une autre personne (ordinateur partagé) : elle suffit à créer un compte,
+ *   pas à mettre à jour l'acceptation d'un compte existant.
+ */
+export type OAuthTermsConsent = { version: number; acceptedNow: boolean };
+
 /**
  * Adresse à laquelle envoyer le navigateur pour démarrer un aller-retour.
  *
@@ -104,7 +121,7 @@ export function oauthProviderFromSlug(slug: string | null | undefined): OAuthPro
  */
 export function oauthStartPath(
   provider: OAuthProvider,
-  options: { redirect?: string; intent?: OAuthIntent; termsAccepted?: boolean; locale?: Locale } = {},
+  options: { redirect?: string; intent?: OAuthIntent; terms?: OAuthTermsConsent | null; locale?: Locale } = {},
 ): string {
   const params = new URLSearchParams();
   if (options.redirect) params.set("redirect", options.redirect);
@@ -114,9 +131,14 @@ export function oauthStartPath(
   // fournisseur — aucune langue n'y voyage. Le français, par défaut, ne s'écrit pas.
   if (options.locale && options.locale !== DEFAULT_LOCALE) params.set(OAUTH_LOCALE_PARAM, options.locale);
   if (options.intent === "LINK") params.set("intent", "link");
-  // Les conditions d'utilisation, cochées à l'entrée de `/connexion` : sans
-  // elles, la porte refuse de **créer** un compte (`TERMS_REQUIRED`).
-  if (options.termsAccepted) params.set("terms", "1");
+  // Les conditions d'utilisation, acceptées à l'entrée de `/connexion` : sans
+  // elles, la porte refuse de **créer** un compte (`TERMS_REQUIRED`). La
+  // **version** voyage, pas un simple « oui » : un onglet ouvert avant une
+  // nouvelle version n'en accepte pas une qu'il n'a jamais montrée.
+  if (options.terms) {
+    params.set(OAUTH_TERMS_PARAM, String(options.terms.version));
+    if (options.terms.acceptedNow) params.set(OAUTH_TERMS_NOW_PARAM, "1");
+  }
   const query = params.toString();
   const search = query ? `?${query}` : "";
   return `/api/auth/${OAUTH_PROVIDER_SLUGS[provider]}/start${search}`;

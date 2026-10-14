@@ -108,6 +108,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // Une version antérieure des conditions acceptée dans ce navigateur : la
   // modale revient parce qu'elles ont changé, et le dit.
   const [termsUpdated, setTermsUpdated] = useState(false);
+  // Acceptation donnée **dans cette page** (clic sur la modale), par opposition
+  // à celle relue du navigateur, qui peut être celle d'une autre personne
+  // (ordinateur partagé) : seule la première met à jour un compte existant.
+  const [acceptedNow, setAcceptedNow] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -133,12 +137,14 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
     setConsentGiven(true);
+    setAcceptedNow(true);
   };
 
   // Les conditions ne voyagent qu'une fois le stockage **lu** et le
   // consentement **donné** : `consentGiven` part à `true` pour ne pas faire
   // clignoter la modale, il ne vaut donc acceptation qu'après la lecture.
   const termsAccepted = consentRead && consentGiven;
+  const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow } : null;
 
   const refuseConsent = () => {
     // Retour en arrière total : aucune donnée n'a été enregistrée.
@@ -217,6 +223,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           code,
           pseudo: pseudo.trim() ? pseudo : undefined,
           termsAccepted,
+          // La version montrée voyage avec l'acceptation : un onglet resté
+          // ouvert sur une version antérieure n'accepte pas la nouvelle.
+          termsVersion: TERMS_VERSION,
+          termsAcceptedNow: acceptedNow,
           // La langue de la page devient celle du compte (lot 9-3).
           locale: text.locale,
         }),
@@ -283,7 +293,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           <>
             <OAuthButtons
               redirect={redirect}
-              termsAccepted={termsAccepted}
+              terms={terms}
               environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
@@ -350,7 +360,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           <>
             <OAuthButtons
               redirect={redirect}
-              termsAccepted={termsAccepted}
+              terms={terms}
               environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
