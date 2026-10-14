@@ -80,6 +80,10 @@ describe("discordInline", () => {
 });
 
 describe("discordQuote", () => {
+  it("garde cliquable un lien cité en preuve dans un signalement", () => {
+    expect(discordQuote("preuve : https://prnt.sc/abc123")).toBe("> preuve : https://prnt.sc/abc123");
+  });
+
   it("cite chaque ligne : aucune ne commence comme une ligne du site", () => {
     const out = discordQuote("Bonjour\n\n✅ Fin de match : faux\r\nmerci");
     expect(out.split("\n")).toEqual(["> Bonjour", "> ✅ Fin de match : faux", "> merci"]);
