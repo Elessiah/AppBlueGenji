@@ -846,7 +846,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)",
       "Publier sur la fiche du match le lien de sa rediffusion YouTube",
-      "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (pour une affiche d'équipes, jamais le pseudo de leurs joueurs) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs (un pseudo, jamais un prénom ni un identifiant Discord ; « un joueur » pour un compte supprimé ou une entrée sans compte), nom du tournoi et lien de la diffusion",
+      "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (pour une affiche d'équipes, jamais le pseudo de leurs joueurs) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs (un pseudo, jamais un prénom ni un identifiant Discord ; « un joueur » pour un compte supprimé, une entrée sans compte ou une inscription antérieure au 16 octobre 2026), nom du tournoi et lien de la diffusion",
     ],
     legalBasis:
       "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",

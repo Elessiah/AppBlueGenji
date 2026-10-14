@@ -667,7 +667,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Streaming a match live on the association's channel or a caster's (YouTube, Twitch or Kick)",
       "Publishing the link to its YouTube replay on the match page",
-      "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (a username, never a first name or a Discord identifier; “a player” for a deleted account or an entry without an account), tournament name and stream link",
+      "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (a username, never a first name or a Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
     ],
     legalBasis:
       "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws; right to object (art. 21) open to each player",
