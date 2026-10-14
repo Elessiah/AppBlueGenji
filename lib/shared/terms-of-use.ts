@@ -188,7 +188,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "acceptation",
     title: "Acceptation",
     paragraphs: [
-      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant). Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.",
+      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la **page de connexion**, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur. Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.",
       "L'association peut modifier ces conditions. Une modification de fond donne lieu à une **nouvelle version**, présentée à l'acceptation des utilisateurs concernés avant qu'ils puissent continuer à gérer une équipe.",
     ],
   },

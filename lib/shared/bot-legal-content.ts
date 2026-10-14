@@ -154,7 +154,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés) et rappels de match, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
+            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match et avis de retrait d'un match (« Match retiré »), alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
           },
         ],
       },
@@ -293,7 +293,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed) and match reminders, referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
+            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders and notices of removal from a match (“Match retiré”), referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
           },
         ],
       },
