@@ -80,8 +80,28 @@ describe("loadNotificationRecipients — option matchDm", () => {
   });
 
   it("n'en tient pas compte hors messages de match (modération, données, staff)", async () => {
-    mockQuery();
+    const query = mockQuery();
     const recipients = await loadNotificationRecipients([1, 2], "declared");
     expect(recipients[1]).toEqual({ userId: 2, discord: { discordId: null, handle: "ayla", label: "Ayla" } });
+    // Colonne non lue : une migration en échec ne coupe pas ces envois.
+    expect(String(query.mock.calls[0][0])).not.toMatch(/match_dm_enabled/);
+  });
+
+  it("relit sans la colonne quand la migration n'est pas passée : personne n'a pu s'opposer", async () => {
+    const missing = Object.assign(new Error("Unknown column 'match_dm_enabled'"), { code: "ER_BAD_FIELD_ERROR" });
+    const rows = ROWS.map(({ match_dm_enabled: _ignored, ...row }) => row);
+    const query = jest.fn<SqlQuery>().mockRejectedValueOnce(missing).mockResolvedValueOnce([rows, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+    const recipients = await loadNotificationRecipients([1, 2], "declared", { matchDm: true });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(String(query.mock.calls[1][0])).not.toMatch(/match_dm_enabled/);
+    expect(recipients[1]).toEqual({ userId: 2, discord: { discordId: null, handle: "ayla", label: "Ayla" } });
+  });
+
+  it("laisse passer toute autre erreur de lecture", async () => {
+    const query = jest.fn<SqlQuery>().mockRejectedValue(Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" }));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+    await expect(loadNotificationRecipients([1], "declared", { matchDm: true })).rejects.toThrow("lock");
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });

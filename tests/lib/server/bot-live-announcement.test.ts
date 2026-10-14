@@ -45,6 +45,17 @@ describe("pushLiveAnnouncement", () => {
     });
   });
 
+  it("joint la version sans pseudo à citer dans les logs du bot, quand elle est donnée", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ posted: true, mentionEveryone: true }));
+    await pushLiveAnnouncement("Kiro contre Ayla", "https://twitch.tv/bg", "c", "un joueur contre un joueur");
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      message: "Kiro contre Ayla",
+      streamUrl: "https://twitch.tv/bg",
+      context: "c",
+      logMessage: "un joueur contre un joueur",
+    });
+  });
+
   it("rend « posted-silent » quand le bot a publié sans pouvoir mentionner @everyone", async () => {
     jest
       .spyOn(global, "fetch")

@@ -136,6 +136,20 @@ describe("runLiveAnnouncementSweep", () => {
     expect(sql).toMatch(/LEFT JOIN bg_users u2 ON u2\.id = t2\.solo_user_id AND u2\.is_deleted = 0/);
   });
 
+  it("donne au bot une version sans pseudo à citer dans son canal de logs en cas d'échec", async () => {
+    mockDb([{ ...AUTO_LIVE, participant_type: "SOLO", team1_solo_user_id: 7, team2_solo_user_id: 8, team1_pseudo: "Kiro", team2_pseudo: "Ayla" }]);
+    await runLiveAnnouncementSweep(NOW);
+    const [message, , , logMessage] = jest.mocked(pushLiveAnnouncement).mock.calls[0];
+    expect(message).toBe("🔴 En direct : Kiro contre Ayla — Coupe d'hiver");
+    expect(logMessage).toBe("🔴 En direct : un joueur contre un joueur — Coupe d'hiver");
+  });
+
+  it("n'envoie pas de version de logs quand l'annonce ne nomme que des équipes", async () => {
+    mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0]).toHaveLength(3);
+  });
+
   it("écrit « un joueur » pour une entrée individuelle dont le compte est supprimé", async () => {
     mockDb([{ ...AUTO_LIVE, team1_name: "Anonyme-1", team2_name: "Bravo", team1_solo_user_id: 7, team2_solo_user_id: 8, team2_pseudo: "Bravo" }]);
     await runLiveAnnouncementSweep(NOW);
