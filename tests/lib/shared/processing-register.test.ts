@@ -123,6 +123,18 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(retention).toMatch(/sans limite/);
   });
 
+  it("couvre le programme d'arbitrage : base légale, trace gardée, push et canal de logs, personnes citées", () => {
+    const t04 = byRef("T04");
+    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*programme d'arbitrage/);
+    expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque arbitre ou administrateur abonné/);
+    expect(t04.transfers.join(" ")).toMatch(/Discord \(acheminement des messages privés et du canal de logs\)/);
+    expect(t04.transfers.join(" ")).toMatch(/service de push[^—]*— Google, Mozilla, Apple et Microsoft/);
+    expect(byRef("T05").dataSubjects).toContain(
+      "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)",
+    );
+  });
+
   it("déclare l'information sur les changements de politique et leur annonce Discord", () => {
     const t10 = byRef("T10");
     expect(t10.dataCategories.join(" ")).toMatch(/pris connaissance/i);
