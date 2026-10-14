@@ -227,6 +227,9 @@ export function matchReminderPush(
     // ouvre l'invitation (par le site, seule origine qu'une notification ouvre).
     url: checkIn ? CHECK_IN_PATH : localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-reminder`,
+    // Un rappel remplace l'annonce (ou le rappel 24 h) **en sonnant** : le
+    // rappel 10 h porte le check-in, il ne doit pas passer inaperçu.
+    ...(offset ? { renotify: true } : {}),
   };
 }
 

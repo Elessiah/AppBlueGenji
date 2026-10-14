@@ -149,6 +149,13 @@ export type PushContent = {
    * match). Défaut : le sujet.
    */
   tag?: string;
+  /**
+   * Remplace la notification de même étiquette **en sonnant** : un rappel
+   * (24 h, puis 10 h avec le check-in) remplace l'annonce ou le rappel
+   * précédent — sans ce drapeau, il le ferait en silence, et le joueur ne
+   * verrait jamais le lien du check-in.
+   */
+  renotify?: boolean;
 };
 
 /**
@@ -169,6 +176,8 @@ export type PushPayload = {
   tag: string;
   /** Langue du texte : le service worker la déclare à la notification (lecteur d'écran, traduction). */
   lang: Locale;
+  /** Présent (et vrai) seulement quand le remplacement doit sonner (`PushContent.renotify`). */
+  renotify?: true;
 };
 
 export const PUSH_TITLE_MAX = 80;
@@ -227,6 +236,7 @@ export function buildPushPayload(
     url: pushTargetPath(content.url, siteOrigin),
     tag: clipPushText(content.tag ?? topic, PUSH_TAG_MAX) || topic,
     lang,
+    ...(content.renotify === true ? { renotify: true as const } : {}),
   };
 }
 

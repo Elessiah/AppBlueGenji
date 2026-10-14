@@ -152,6 +152,30 @@ let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
 /** Programme d'arbitrage en cours : son propre verrou, distinct du balayage. */
 let pendingDigest: Promise<void> | null = null;
+/** Fin du dernier programme : son propre étranglement (une minute aussi). */
+let lastDigestAt = 0;
+
+/**
+ * Lance le programme d'arbitrage s'il n'est ni en cours ni passé depuis moins
+ * d'une minute — **avant** le verrou du balayage : un balayage long (ronde
+ * suisse annoncée d'un coup, bot lent) ne le retient pas, ni l'inverse (les
+ * appareils du staff ne retardent pas les rappels des joueurs). Indépendant :
+ * son échec ne retient pas les rappels.
+ */
+function startRefereeDigest(now: Date): void {
+  if (pendingDigest || Date.now() - lastDigestAt < SWEEP_THROTTLE_MS) return;
+  pendingDigest = (async () => {
+    try {
+      await dispatchRefereeDigest(now);
+    } catch (error) {
+      // Table absente (création avalée au démarrage) : rien à dire à chaque passage.
+      if (!isMissingTableError(error)) console.error("[match-reminders] programme d'arbitrage en échec", error);
+    } finally {
+      lastDigestAt = Date.now();
+      pendingDigest = null;
+    }
+  })();
+}
 
 /**
  * Destinataires d'un match, par engagée.
@@ -1031,24 +1055,10 @@ async function runSweep(now: Date): Promise<number> {
  * @returns Le nombre d'envois déclenchés (0 si le balayage a été étranglé).
  */
 export async function dispatchDueMatchReminders(now: Date = new Date()): Promise<number> {
+  startRefereeDigest(now);
   if (pendingSweep) return pendingSweep;
   if (Date.now() - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
 
-  // « En même temps » que les rappels aux joueurs, et **de front**, sous son
-  // propre verrou : ni l'un ni l'autre n'attend l'autre — un bot lent ou une
-  // ronde suisse ne retarde pas le programme, et les appareils du staff (un
-  // service de push lent) ne retiennent pas le balayage suivant des joueurs.
-  // Indépendant : son échec ne retient pas les rappels, ni l'inverse.
-  pendingDigest ??= (async () => {
-    try {
-      await dispatchRefereeDigest(now);
-    } catch (error) {
-      // Table absente (création avalée au démarrage) : rien à dire à chaque passage.
-      if (!isMissingTableError(error)) console.error("[match-reminders] programme d'arbitrage en échec", error);
-    } finally {
-      pendingDigest = null;
-    }
-  })();
   pendingSweep = runSweep(now);
   try {
     return await pendingSweep;
@@ -1063,6 +1073,7 @@ export function resetMatchReminderThrottle(): void {
   lastSweepAt = 0;
   pendingSweep = null;
   pendingDigest = null;
+  lastDigestAt = 0;
 }
 
 /** Programme d'arbitrage en cours, à attendre. Réservé aux tests. */

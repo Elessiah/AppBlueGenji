@@ -139,7 +139,12 @@ self.addEventListener("push", (event) => {
   };
   // Même étiquette = la notification remplace la précédente sans resonner
   // (lancement puis départ d'un même match).
-  if (typeof data.tag === "string" && data.tag) options.tag = data.tag;
+  if (typeof data.tag === "string" && data.tag) {
+    options.tag = data.tag;
+    // Un rappel remplace l'annonce du même match **en sonnant** (`renotify`,
+    // qui exige une étiquette) : le rappel 10 h porte le lien du check-in.
+    if (data.renotify === true) options.renotify = true;
+  }
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
