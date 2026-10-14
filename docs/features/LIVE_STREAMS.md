@@ -165,7 +165,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   repostent jamais. La réservation n'est **rendue** que si rien n'est parti
   pour une cause passagère — bot injoignable ou d'une version antérieure,
   salon fermé, refus lié à l'état du salon ou Discord sans réponse en lisant
-  le salon (`503` `send-rejected`, `discord-unreachable`) — et
+  le salon (`503` `send-rejected`, `discord-unreachable`), panne du bot avant
+  l'envoi (`500`) — et
   le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS` :
   la même cause renverrait le même refus). Après un bot indisponible, un salon
   fermé ou Discord muet en lisant le salon (`discord-unreachable`), la pause
@@ -186,9 +187,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   « son envoi peut encore aboutir », sans consigne d'action) ; il
   n'est pas compté comme une panne du bot. Un bot **tombé en route** la garde
   de même (`interrupted` : connexion coupée après l'envoi de la requête —
-  `ECONNRESET`, redémarrage pm2 d'un déploiement —, ou erreur `5xx` autre que
-  `503`) : il a pu publier avant ; seule une connexion qui n'a pas abouti
-  (`ECONNREFUSED`, hôte inconnu) rend la réservation. Le bot
+  `ECONNRESET`, redémarrage pm2 d'un déploiement) : il a pu publier avant ;
+  une connexion qui n'a pas abouti (`ECONNREFUSED`, hôte inconnu) rend la
+  réservation. Le bot
   répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
   croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
   du bot : un salon fermé ne doit pas suspendre les rappels de fond. Côté
