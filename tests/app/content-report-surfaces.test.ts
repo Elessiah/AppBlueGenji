@@ -64,6 +64,12 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(login).toMatch(/termsVersion: TERMS_VERSION,\s*termsAcceptedNow: acceptedNow,/);
     expect(login).toMatch(/termsAcceptedNow: acceptedNow,[^}]*locale: text\.locale,/);
     expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, terms, locale })");
+    // L'acceptation « dans la page » ne vaut que le temps d'un aller-retour OAuth : un onglet
+    // resté ouvert sur un ordinateur partagé ne la prête pas à la personne suivante.
+    expect(login).toContain("const ACCEPTED_NOW_TTL_MS = 10 * 60 * 1000;");
+    expect(login).toMatch(/setTimeout\(\(\) => setAcceptedNow\(false\), ACCEPTED_NOW_TTL_MS\)/);
+    // La création d'équipe envoie la version montrée.
+    expect(read("app/(secured)/equipes/creer/CreateTeamForm.tsx")).toContain("termsVersion: TERMS_VERSION,");
   });
 
   it("les gérants d'équipe les acceptent depuis n'importe quelle page", () => {

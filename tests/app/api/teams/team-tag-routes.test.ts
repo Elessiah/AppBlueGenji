@@ -17,6 +17,7 @@ import { createTeam, updateTeamMeta } from "@/lib/server/teams/identity";
 import { createGhostTeam } from "@/lib/server/ghost-teams-service";
 import { authUser } from "../../../helpers/auth-user";
 import { teamDetailResponse } from "../../../helpers/team-detail";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
 /**
  * Statuts HTTP du sigle.
@@ -60,7 +61,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockResolvedValue(11);
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: " drgn ", acceptTerms: true }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: " drgn ", acceptTerms: true, termsVersion: TERMS_VERSION }));
 
     expect(res.status).toBe(201);
     expect(createTeam).toHaveBeenCalledWith(2, "Dragon Squad", null, "DRGN");
@@ -70,7 +71,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockResolvedValue(11);
 
-    await createTeamRoute(postReq({ name: "Dragon Squad", tag: "", acceptTerms: true }));
+    await createTeamRoute(postReq({ name: "Dragon Squad", tag: "", acceptTerms: true, termsVersion: TERMS_VERSION }));
 
     expect(createTeam).toHaveBeenCalledWith(2, "Dragon Squad", null, null);
   });
@@ -82,7 +83,7 @@ describe("POST /api/teams — sigle", () => {
   ])("refuse %s en 400 avec le motif exact", async (tag, code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag, acceptTerms: true }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag, acceptTerms: true, termsVersion: TERMS_VERSION }));
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: code });
@@ -112,7 +113,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockRejectedValue(new Error("TEAM_TAG_ALREADY_USED"));
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true, termsVersion: TERMS_VERSION }));
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "TEAM_TAG_ALREADY_USED" });
@@ -122,7 +123,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockRejectedValue(new Error("TEAM_TAG_ALREADY_USED"));
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true, termsVersion: TERMS_VERSION }));
 
     expect((await res.json()).error).not.toBe("TEAM_NAME_ALREADY_USED");
   });
@@ -133,7 +134,7 @@ describe("POST /api/teams — sigle", () => {
       new Error("Duplicate entry 'Dragon Squad' for key 'bg_teams.name'"),
     );
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true, termsVersion: TERMS_VERSION }));
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "TEAM_NAME_ALREADY_USED" });

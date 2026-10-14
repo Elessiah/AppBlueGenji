@@ -23,6 +23,7 @@ import { cancelInvitation, inviteToTeam, listTeamPendingInvitations } from "@/li
 import { removeTeamMember, transferTeamOwnership } from "@/lib/server/teams/roster";
 import { authUser } from "../../../helpers/auth-user";
 import { teamDetailResponse } from "../../../helpers/team-detail";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
 /**
  * Routes de la fiche d'équipe en mode gestion : ce qu'elles transmettent au
@@ -196,7 +197,7 @@ describe("POST /api/teams — mêmes bornes qu'au renommage", () => {
   it("compte un emoji pour un caractère, comme la colonne", async () => {
     jest.mocked(createTeam).mockResolvedValue(11);
     const name = "🐉".repeat(60);
-    const res = await teamCreate(req("POST", { name, acceptTerms: true }));
+    const res = await teamCreate(req("POST", { name, acceptTerms: true, termsVersion: TERMS_VERSION }));
     expect(res.status).toBe(201);
     expect(createTeam).toHaveBeenCalledWith(2, name, null, null);
   });
@@ -206,6 +207,17 @@ describe("POST /api/teams — mêmes bornes qu'au renommage", () => {
       const res = await teamCreate(req("POST", body));
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "TERMS_REQUIRED" });
+    }
+    expect(createTeam).not.toHaveBeenCalled();
+  });
+
+  it("refuse une acceptation d'une autre version que celle en vigueur (formulaire chargé avant la nouvelle)", async () => {
+    // `createTeam` enregistre `TERMS_VERSION` : un formulaire qui en a montré une
+    // autre — ou un client d'avant le champ — n'accepte pas un texte non présenté.
+    for (const termsVersion of [undefined, TERMS_VERSION - 1, String(TERMS_VERSION)]) {
+      const res = await teamCreate(req("POST", { name: "Rolex", acceptTerms: true, termsVersion }));
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: "TERMS_VERSION_MISMATCH" });
     }
     expect(createTeam).not.toHaveBeenCalled();
   });
