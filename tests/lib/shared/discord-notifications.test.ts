@@ -478,7 +478,7 @@ describe("matchDmOptOutLine — dernière ligne de tout message privé de match 
   it("vise la section Notifications de « Mon profil »", () => {
     expect(MATCH_DM_SETTINGS_PATH).toBe("/profil#notifications");
     expect(matchDmOptOutLine(settingsUrl)).toBe(
-      "Tu peux couper ces messages privés dans ton profil, section Notifications : https://bluegenji.fr/profil#notifications",
+      "Tu peux couper ces messages privés dans ton profil, section Notifications : <https://bluegenji.fr/profil#notifications>",
     );
   });
 

@@ -1100,7 +1100,7 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
       await announceEntrantsWithdrawn([DEPARTED]);
       const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0];
       expect(message.split("\n").at(-1)).toBe(
-        "Tu peux couper ces messages privés dans ton profil, section Notifications : https://bluegenji.test/profil#notifications",
+        "Tu peux couper ces messages privés dans ton profil, section Notifications : <https://bluegenji.test/profil#notifications>",
       );
     } finally {
       if (previous === undefined) delete process.env.APP_URL;
