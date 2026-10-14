@@ -116,6 +116,11 @@ export const TERMS_ACCEPTANCE_REQUIRED = "TERMS_ACCEPTANCE_REQUIRED";
 
 /** Jeton de refus d'une création de compte sans acceptation. */
 export const TERMS_REQUIRED = "TERMS_REQUIRED";
+/**
+ * Acceptation d'une version qui n'est plus celle en vigueur (page chargée avant
+ * la nouvelle) : refusée, on n'enregistre pas l'acceptation d'un texte non montré.
+ */
+export const TERMS_VERSION_MISMATCH = "TERMS_VERSION_MISMATCH";
 
 /** Formulation de la case, commune à tous les écrans. */
 export const TERMS_CHECKBOX_LABEL = "J'ai lu et j'accepte les conditions d'utilisation";

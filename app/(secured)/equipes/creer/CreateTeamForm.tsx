@@ -12,7 +12,7 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
-import { LOGO_RIGHTS_FIELD, LOGO_RIGHTS_TERMS_ANCHOR, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { LOGO_RIGHTS_FIELD, LOGO_RIGHTS_TERMS_ANCHOR, TERMS_PATH, TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { CodedError, TEAM_IDENTITY_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -91,6 +91,9 @@ export default function CreateTeamForm() {
           description: description.trim() || null,
           tag: tag.trim() || null,
           acceptTerms,
+          // La version montrée : une page restée ouverte sur une version
+          // antérieure est refusée (`TERMS_VERSION_MISMATCH`), pas enregistrée.
+          termsVersion: TERMS_VERSION,
         }),
       });
       const payload = (await response.json()) as { error?: string; teamId?: number };

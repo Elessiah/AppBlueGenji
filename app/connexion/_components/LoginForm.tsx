@@ -48,6 +48,13 @@ const LEGACY_ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
  * modale, là où une simple case « déjà vu » l'aurait tue pour toujours.
  */
 const TERMS_STORAGE_KEY = "bg_terms_consent";
+/**
+ * Durée pendant laquelle une acceptation donnée dans la page vaut « acceptée
+ * maintenant » : celle d'un aller-retour OAuth (`bg_oauth`). Au-delà, l'onglet
+ * resté ouvert peut servir à une autre personne (ordinateur partagé) : son
+ * acceptation ne met plus à jour un compte existant.
+ */
+const ACCEPTED_NOW_TTL_MS = 10 * 60 * 1000;
 
 /** La version gardée par le navigateur est-elle une version antérieure des conditions ? */
 function isEarlierTermsVersion(stored: string | null): boolean {
@@ -112,6 +119,11 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // à celle relue du navigateur, qui peut être celle d'une autre personne
   // (ordinateur partagé) : seule la première met à jour un compte existant.
   const [acceptedNow, setAcceptedNow] = useState(false);
+  useEffect(() => {
+    if (!acceptedNow) return;
+    const timer = window.setTimeout(() => setAcceptedNow(false), ACCEPTED_NOW_TTL_MS);
+    return () => window.clearTimeout(timer);
+  }, [acceptedNow]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

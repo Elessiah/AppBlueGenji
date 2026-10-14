@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
-import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
+import { TERMS_VERSION, TERMS_VERSION_MISMATCH } from "@/lib/shared/terms-of-use";
 import { readJsonBody } from "@/lib/server/request-body";
 
 /**
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const body = (await readJsonBody(req).catch(() => ({}))) as { version?: unknown };
-  if (body.version !== TERMS_VERSION) return fail("TERMS_VERSION_MISMATCH", 409);
+  if (body.version !== TERMS_VERSION) return fail(TERMS_VERSION_MISMATCH, 409);
 
   if (!(await recordTermsAcceptance(user.id, "TEAM_MANAGEMENT"))) return fail("PROFILE_NOT_FOUND", 404);
   return ok({ version: TERMS_VERSION });
