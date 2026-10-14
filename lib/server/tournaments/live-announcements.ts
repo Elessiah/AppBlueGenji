@@ -189,7 +189,6 @@ function isOnAir(row: LiveCandidateRow, now: number): boolean {
   );
 }
 
-/** Réserve l'annonce d'une affiche ; `false` si un autre passage l'a prise. */
 /**
  * Clé de réservation d'une affiche : ses deux engagés **sans ordre**
  * (`5:7` pour `7:5`). Un plateau réécrit qui remet les deux mêmes engagés dans
@@ -201,6 +200,7 @@ function announceKey(pairing: string): string {
   return first <= second ? `${first}:${second}` : `${second}:${first}`;
 }
 
+/** Réserve l'annonce d'une affiche ; `false` si un autre passage l'a prise. */
 async function claimAnnouncement(matchId: number, pairing: string): Promise<boolean> {
   const db = await getDatabase();
   const [result] = await db.execute(

@@ -53,27 +53,31 @@ const BACKSLASH = String.fromCodePoint(92);
  * (`https://faux-nitro.gg`, `faux-nitro.gg/cadeau`) dans un nom, qui ne
  * devient donc ni un lien cliquable ni un aperçu affiché sous le message —
  * devant tout le serveur quand ce message est une annonce `@everyone`.
- * L'affichage reste identique.
+ * L'affichage reste identique. Réservé aux **fragments** (`discordInline`) :
+ * un texte libre cité (`discordQuote`, signalement d'un problème) garde ses
+ * liens cliquables — une capture citée en preuve doit s'ouvrir chez l'arbitre.
  */
 const URL_SCHEME = /:\/\//g;
 const DOMAIN_DOT = /\.(?=[\p{L}\p{N}])/gu;
 
 function neutralize(value: string): string {
-  return value
-    .replace(MARKDOWN, (char) => BACKSLASH + char)
-    .replace(/@/g, MENTION_BREAK)
-    .replace(URL_SCHEME, ":\u200B//")
-    .replace(DOMAIN_DOT, ".\u200B");
+  return value.replace(MARKDOWN, (char) => BACKSLASH + char).replace(/@/g, MENTION_BREAK);
+}
+
+/** Adresse nue désamorcée : ni lien, ni aperçu (fragments seulement). */
+function breakAddresses(value: string): string {
+  return value.replace(URL_SCHEME, ":\u200B//").replace(DOMAIN_DOT, ".\u200B");
 }
 
 /**
  * Fragment de phrase sûr : une ligne, sans balisage actif ni mention.
  *
  * `<` étant échappé, les mentions par identifiant (`<@…>`, `<@&…>`, `<#…>`) et
- * les horodatages dynamiques ne sont plus reconnus non plus.
+ * les horodatages dynamiques ne sont plus reconnus non plus ; une adresse nue
+ * n'est plus un lien.
  */
 export function discordInline(value: string): string {
-  return neutralize(visibleText(value.replace(LINE_BREAKS, " ")));
+  return breakAddresses(neutralize(visibleText(value.replace(LINE_BREAKS, " "))));
 }
 
 /**
