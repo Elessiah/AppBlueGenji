@@ -118,6 +118,48 @@ async function releaseDigestMarks(rows: readonly DigestRow[]): Promise<void> {
   }
 }
 
+type CurrentRow = RowDataPacket & {
+  id: number;
+  start_at: Date | string | null;
+  team1_id: number | null;
+  team2_id: number | null;
+};
+
+/**
+ * Relit, en une instruction, les manches réservées juste avant l'envoi : un
+ * arbitre qui en déplace une **après** la réservation efface sa marque
+ * (`setMatchStartAt`) et pousse le nouvel horaire — le programme, s'il citait
+ * encore l'ancien, pourrait arriver après lui et laisser l'arbitre sur une
+ * heure fausse. Une manche changée est retirée du programme (sa marque n'est
+ * plus la nôtre : rien à rendre) ; son nouvel horaire sera cité au programme
+ * suivant. Une relecture en échec n'arrête pas l'envoi (meilleur effort : les
+ * marques sont prises).
+ */
+async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
+  if (rows.length === 0) return [];
+  try {
+    const db = await getDatabase();
+    const [current] = await db.query<CurrentRow[]>(
+      `SELECT id, start_at, team1_id, team2_id FROM bg_matches WHERE id IN (${sqlPlaceholders(rows.length)})`,
+      rows.map((row) => Number(row.id)),
+    );
+    const byId = new Map(current.map((row) => [Number(row.id), row]));
+    return rows.filter((row) => {
+      const fresh = byId.get(Number(row.id));
+      return (
+        fresh !== undefined &&
+        fresh.start_at !== null &&
+        new Date(fresh.start_at).getTime() === new Date(row.start_at).getTime() &&
+        Number(fresh.team1_id) === Number(row.team1_id) &&
+        Number(fresh.team2_id) === Number(row.team2_id)
+      );
+    });
+  } catch (error) {
+    console.error("[referee-digest] relecture avant envoi en échec", error);
+    return [...rows];
+  }
+}
+
 /**
  * Envoie le programme d'arbitrage s'il est dû.
  *
@@ -155,8 +197,9 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
       console.error("[referee-digest] réservation en échec", error);
     }
   });
-  // L'ordre du coup d'envoi, quel que soit l'ordre des réservations.
-  const claimed = rows.filter((row) => won.has(Number(row.id)));
+  // L'ordre du coup d'envoi, quel que soit l'ordre des réservations ; puis
+  // seulement les manches qui tiennent encore l'horaire et l'affiche lus.
+  const claimed = await stillAsRead(rows.filter((row) => won.has(Number(row.id))));
   if (claimed.length === 0) return 0;
   // La manche due n'a pas été prise (déplacée entre-temps, réservation en
   // échec) : la marge seule ne part pas — elle attendrait sinon d'être citée

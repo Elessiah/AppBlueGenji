@@ -633,7 +633,13 @@ async function dispatchPlannedSend(
  * `AWAITING_CONFIRMATION`, dit que la rencontre a eu lieu), aux deux engagées
  * connues, avec leurs marques d'observation et d'horaire reçu (clé unique).
  * Le balayage y ajoute sa fenêtre de lecture (index `idx_bg_matches_start_at`).
- * Paramètres : clé d'observation, clé d'horaire reçu.
+ * Paramètres : clé d'observation, clé d'horaire reçu, instant présent.
+ *
+ * Toutes les bornes sont des instants **calculés ici** (`now`), jamais
+ * `NOW()` : les horaires sont écrits à l'heure du processus (`mysql2`, sans
+ * fuseau de connexion), et une base réglée sur un autre fuseau décalerait
+ * d'autant l'ouverture des paliers — le rappel 10 h partirait 6 h avant avec
+ * une base en UTC, quand le programme d'arbitrage, lui, partirait à 10 h.
  */
 const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
@@ -648,7 +654,7 @@ const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_num
       WHERE m.status NOT IN (${PLAYED_MATCH_STATUSES.map((status) => `'${status}'`).join(", ")})
         AND t.state <> 'FINISHED'
         AND m.start_at IS NOT NULL
-        AND m.start_at > NOW()`;
+        AND m.start_at > ?`;
 
 /**
  * Annonce aux joueurs des deux engagées l'horaire qu'un arbitre vient de poser
@@ -965,6 +971,11 @@ async function recipientsOrRelease(sends: PlannedSend[]): Promise<Map<number, No
   }
 }
 
+/** L'instant `seconds` secondes après `now`. */
+function inSeconds(now: Date, seconds: number): Date {
+  return new Date(now.getTime() + seconds * 1000);
+}
+
 async function runSweep(now: Date): Promise<number> {
   const db = await getDatabase();
 
@@ -987,21 +998,22 @@ async function runSweep(now: Date): Promise<number> {
     () => `
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders sent
                          WHERE sent.match_id = m.id AND sent.offset_key = ?
-                           AND m.start_at > DATE_ADD(NOW(), INTERVAL ? SECOND))`,
+                           AND m.start_at > ?)`,
   ).join("");
   const [matches] = await db.query<SweepMatchRow[]>(
     `${SWEEP_MATCH_SELECT}
-        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND)
+        AND m.start_at <= ?
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
                          WHERE done.match_id = m.id AND done.offset_key = ?)${waiting}
-     HAVING m.start_at <= DATE_ADD(NOW(), INTERVAL ? SECOND) OR seen_mark = 0`,
+     HAVING m.start_at <= ? OR seen_mark = 0`,
     [
       MATCH_SEEN_KEY,
       MATCH_TOLD_KEY,
-      Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000),
+      now,
+      inSeconds(now, Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000)),
       LAST_REMINDER_KEY,
-      ...WAITING_OFFSETS.flatMap(({ key, nextOpensSeconds }) => [key, nextOpensSeconds]),
-      FIRST_REMINDER_LEAD_SECONDS,
+      ...WAITING_OFFSETS.flatMap(({ key, nextOpensSeconds }) => [key, inSeconds(now, nextOpensSeconds)]),
+      inSeconds(now, FIRST_REMINDER_LEAD_SECONDS),
     ],
   );
   if (matches.length === 0) return 0;
