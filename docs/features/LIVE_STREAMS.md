@@ -246,7 +246,11 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   fantôme nommé par le staff) — seul un pseudo de compte part. Plusieurs affiches d'un tournoi individuel s'énumèrent comme
   celles d'équipes. Si aucune ne porte de nom publiable, le texte compte les
   matchs (« N matchs »). Une entrée individuelle dans le groupe fait lire le
-  tournoi comme individuel, même au type illisible. **Conservation** : le message reste dans #live tant que le
+  tournoi comme individuel, même au type illisible. L'exception s'arrête à
+  #live : quand le texte nomme un joueur, le site joint `logMessage`, le même
+  texte **sans pseudo** (« un joueur »), que le bot cite à la place de
+  `message` dans son canal de logs quand l'annonce échoue (version du bot qui
+  le lit requise : sans elle, la citation porterait les pseudos). **Conservation** : le message reste dans #live tant que le
   salon existe ; supprimé sur demande de l'équipe ou du joueur concerné
   (« Signaler un problème », catégorie RGPD) — registre T16, `/rgpd`. Le bot préfixe `@everyone` et n'autorise que cette mention
   (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la

@@ -55,7 +55,9 @@ par `solo_user_id`, compte supprimé ou invité sans compte d'un tournoi `SOLO` 
 joueurs à l'antenne. Un match d'équipes n'y nomme que les équipes. Base :
 intérêt légitime (retransmission, registre T16), sans case à cocher ; la mention
 d'inscription l'annonce, `/rgpd` et `PRIVACY_CHANGES` le déclarent. Journaux,
-alertes, programme d'arbitrage et tout autre message Discord gardent « un joueur ».
+alertes, programme d'arbitrage et tout autre message Discord gardent « un joueur » —
+y compris la citation d'une annonce échouée au canal de logs du bot, faite sur
+la version sans pseudo que le site joint (`logMessage`).
 
 - **Un rédacteur ne reçoit jamais un nom nu** : les formateurs prennent un
   `LogEntrant` (`{ name, participantType }`) et le rendent par `entrantLabel`.
