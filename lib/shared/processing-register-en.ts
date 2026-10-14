@@ -247,7 +247,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
       "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
-      "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed) and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
+      "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed), the notice that a match leaves their schedule and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
@@ -295,7 +295,8 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed), for moderation",
       "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
-    legalBasis: "Legitimate interest (administration and oversight of refereeing)",
+    legalBasis:
+      "Legitimate interest (administration and oversight of refereeing) with regard to the players and teams mentioned; sending the refereeing schedule to referees and administrators falls under performance of the service (T04)",
     dataSubjects: ["Staff", "Players and teams taking part in a tournament (referred to by team name, never by their username)"],
     dataCategories: [
       "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
@@ -676,6 +677,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "In-game and site usernames, team names, images of the game, in-game results and performance, as they appear on screen — neither webcam nor voice chat of the players",
       "Voice and username of the casters",
       "Link to the stream and replay of a match",
+      "Public BlueGenji username of the players of a solo tournament, posted in the #live announcement on Discord",
       "Record of a match's Discord announcement: the match, the identifiers of its two entrants (teams or solo entries) and the date of the announcement",
     ],
     sensitiveData: "None",

@@ -170,7 +170,7 @@
     "question": "Supprimer définitivement ton compte ?",
     "confirm": "Supprimer mon compte",
     "pending": "Suppression…",
-    "residual": "Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site ({backupDays} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins {journalDays} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité, tes données de connexion (adresse IP, date, moyen de connexion), que la loi impose de garder {logDays} jours, et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.",
+    "residual": "Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site ({backupDays} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins {journalDays} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité, tes données de connexion (adresse IP, date, moyen de connexion), que la loi impose de garder {logDays} jours, les annonces de tes matchs de tournoi individuel publiées dans le salon #live du Discord, qui gardent ton pseudo jusqu'à leur suppression sur demande, et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.",
     "irreversible": "Cette action est irréversible.",
     "consequences": {
       "TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées.",
