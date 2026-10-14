@@ -504,9 +504,9 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(en).toContain("(code, match time, reminder, removal from a match, moderation notice");
   });
 
-  it("donne une base à l'alerte AutoMod d'une annonce #live bloquée (FR et EN)", () => {
-    expect(fr).toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée, supprimée sur demande");
-    expect(en).toContain("the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked, deleted on request");
+  it("donne une base à l'alerte AutoMod d'une annonce #live bloquée ou signalée (FR et EN)", () => {
+    expect(fr).toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande");
+    expect(en).toContain("the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request");
   });
 
   it("les conditions du bot citent aussi l'avis « Match retiré » parmi les messages remis (FR et EN)", () => {
@@ -514,14 +514,14 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("match reminders and notices of removal from a match (“Match retiré”)");
   });
 
-  it("déclare qu'un blocage AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {
-    expect(fr).toContain("si une règle AutoMod de Discord bloque une annonce #live, son texte (pseudo public compris en tournoi individuel) peut parvenir au salon d'alertes de modération du serveur");
-    expect(en).toContain("if a Discord AutoMod rule blocks a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel");
+  it("déclare qu'un blocage ou un signalement AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {
+    expect(fr).toContain("si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte (pseudo public compris en tournoi individuel) peut parvenir au salon d'alertes de modération du serveur");
+    expect(en).toContain("if a Discord AutoMod rule blocks or flags a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel");
   });
 
   it("dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande (FR et EN)", () => {
-    expect(fr).toContain("Une annonce bloquée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.");
-    expect(en).toContain("An announcement blocked by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.");
+    expect(fr).toContain("Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.");
+    expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.");
   });
 
   it("dit la base des messages de match et du pseudo solo, sans obligation légale (FR et EN)", () => {

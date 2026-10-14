@@ -189,7 +189,7 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
     expect(sheet("T08").retention).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.retention.length);
     expect(sheet("T16").subPurposes.join(" ")).toMatch(/editable in My profile, with no effect on an announcement already posted/);
     expect(sheet("T16").legalBasis).toMatch(/performance of the service requested by the player \(GDPR, art\. 6\.1\.b — terms of use\) for their public username in the #live announcement of a solo tournament/);
-    expect(sheet("T16").recipients.join(" ")).toMatch(/if a Discord AutoMod rule blocks a #live announcement, its text \(including the public username in a solo tournament\) may reach the server's moderation alert channel/);
+    expect(sheet("T16").recipients.join(" ")).toMatch(/if a Discord AutoMod rule blocks or flags a #live announcement, its text \(including the public username in a solo tournament\) may reach the server's moderation alert channel/);
     expect(sheet("T16").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T16")!.recipients.length);
     expect(sheet("T04").legalBasis).toMatch(/legitimate interest, the player's own, for keeping their choice about match direct messages/);
     expect(sheet("T04").legalBasis).toMatch(/for match time notices, the notice that a match leaves their schedule and match reminders sent to players/);

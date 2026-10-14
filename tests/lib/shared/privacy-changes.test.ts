@@ -1009,13 +1009,13 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
   });
 
   it("déclare l'alerte AutoMod aux modérateurs, et la ligne de fin des messages de match", () => {
-    expect(declared()).toMatch(/règle AutoMod de Discord bloque une annonce #live/);
+    expect(declared()).toMatch(/règle AutoMod de Discord bloque ou signale une annonce #live/);
     expect(declared()).toMatch(/salon d'alertes des modérateurs/);
     // Revue légale #445 : la durée de cette copie est dite (suppression par les modérateurs ou sur demande).
     expect(declared()).toMatch(/où il reste jusqu'à sa suppression par les modérateurs ou sur demande/);
     // Revue légale #445 : une acceptation relue du navigateur n'est plus enregistrée pour un compte existant.
     expect(declared()).toMatch(/ton compte n'enregistre plus une acceptation seulement gardée par ton navigateur/);
-    expect(declared()).toMatch(/si la connexion part de cette page dans les dix minutes/);
+    expect(declared()).toMatch(/si tu lances la connexion depuis cette page \(ou y saisis le code Discord\) dans les dix minutes/);
     expect(declared()).toMatch(/« Mon profil », section Notifications/);
     expect(declared()).toMatch(/dans ton intérêt légitime/);
     expect(declared()).not.toMatch(/obligation légale/);
