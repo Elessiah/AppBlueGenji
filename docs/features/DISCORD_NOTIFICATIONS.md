@@ -781,6 +781,13 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   (`match-reminder`), « Match retiré » (`match-withdrawn`). Non couverts : les
   messages privés au compte hors match (modération, logo, données, demande
   d'adhésion), et tout envoi au staff (`notifyStaff`).
+- **Écran** : enregistré au clic, sans bouton. Pendant l'envoi la case reste
+  focalisable et utilisable (`aria-busy`, ni `disabled` ni `aria-disabled`) ; un
+  clic fait pendant l'envoi s'affiche et part à la suite (`runQueuedSaves`,
+  comme la langue du compte), le toast de succès ne dit que le dernier choix
+  enregistré. Un compte sans Discord rattaché ni tag renseigné voit une ligne
+  de plus (`matchDms.noDiscord`, liée par `aria-describedby`) : aucun de ces
+  messages ne peut lui parvenir.
 
 ## Configuration
 
