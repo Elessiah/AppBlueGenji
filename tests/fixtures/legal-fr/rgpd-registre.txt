@@ -590,7 +590,7 @@ Membres du serveur Discord de l'association, pour l'annonce publiée dans le sal
 Modérateurs du serveur Discord de l'association : si une règle AutoMod de Discord bloque une annonce #live, son texte (pseudo public compris en tournoi individuel) peut parvenir au salon d'alertes de modération du serveur
 Discord (hébergement du salon)
 Transferts hors UE
-États-Unis : Discord (annonce publiée dans le salon #live) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+États-Unis : Discord (annonce publiée dans le salon #live, et alerte AutoMod d'une annonce bloquée) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
 Sécurité
 Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
 Chiffrement des échanges (HTTPS)

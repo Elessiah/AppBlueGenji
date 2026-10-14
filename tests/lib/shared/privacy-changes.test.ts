@@ -1013,6 +1013,8 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
     expect(declared()).toMatch(/salon d'alertes des modérateurs/);
     // Revue légale #445 : la durée de cette copie est dite (suppression par les modérateurs ou sur demande).
     expect(declared()).toMatch(/où il reste jusqu'à sa suppression par les modérateurs ou sur demande/);
+    // Revue légale #445 : une acceptation relue du navigateur n'est plus enregistrée pour un compte existant.
+    expect(declared()).toMatch(/ton compte n'enregistre plus une acceptation seulement gardée par ton navigateur/);
     expect(declared()).toMatch(/« Mon profil », section Notifications/);
     expect(declared()).toMatch(/dans ton intérêt légitime/);
     expect(declared()).not.toMatch(/obligation légale/);
@@ -1049,7 +1051,7 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
   it("se traduit détail pour détail et lien pour lien", () => {
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
     const translated = [english.summary, ...english.details].join(" ");
-    for (const pattern of [/performance of the service/, /AutoMod/, /moderation alert channel/, /in your legitimate interest/, /where it stays until the moderators delete it or on request/]) {
+    for (const pattern of [/performance of the service/, /AutoMod/, /moderation alert channel/, /in your legitimate interest/, /where it stays until the moderators delete it or on request/, /your account no longer records an acceptance only kept by your browser/]) {
       expect(translated).toMatch(pattern);
     }
   });
