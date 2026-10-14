@@ -140,8 +140,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   départ (`PUSH_NOTIFICATIONS.md`) : chaque évènement de tournoi publié,
   l'entretien de l'instantané qui ouvre un lancement, la lecture de la liste
   des tournois — et, pour qu'un `START_TIME` parte **à l'heure**, le
-  battement (25 s) de chaque flux SSE ouvert sur un tournoi **en cours** (un
-  onglet oublié sur un tournoi terminé ne réveille rien), en production
+  battement (25 s) de chaque flux SSE ouvert sur un tournoi **en cours** — lu
+  sur la fiche que la salle tient à jour (`tournamentRoomCard`) et d'après
+  ses dates : un onglet oublié sur un tournoi terminé ne réveille rien —, en production
   seulement. Étranglé à dix secondes pour tout le processus, avec relève ;
   jamais attendu. Coût : une lecture indexée (`idx_bg_matches_live`) toutes
   les dix secondes au plus, quel que soit le nombre de spectateurs ; aucune
@@ -166,7 +167,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   salon fermé, refus lié à l'état du salon ou Discord sans réponse en lisant
   le salon (`503` `send-rejected`, `discord-unreachable`), panne (`500`) — et
   le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS`,
-  pour tout le processus : la même cause renverrait le même refus) tant que
+  pour tout le processus : la même cause renverrait le même refus ; les
+  groupes suivants du même passage sont rendus sans appel au bot) tant que
   le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un blocage par
   AutoMod (`503` `automod` : le même message serait bloqué de nouveau, et
