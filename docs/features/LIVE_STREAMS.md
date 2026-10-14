@@ -167,8 +167,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   salon fermé, refus lié à l'état du salon ou Discord sans réponse en lisant
   le salon (`503` `send-rejected`, `discord-unreachable`), panne (`500`) — et
   le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS`,
-  pour tout le processus : la même cause renverrait le même refus ; les
-  groupes suivants du même passage sont rendus sans appel au bot) tant que
+  pour tout le processus : la même cause renverrait le même refus ; après un
+  bot indisponible ou un salon fermé, les groupes suivants du même passage
+  sont rendus sans appel au bot — un refus de Discord, qui peut tenir au
+  message, n'arrête pas les autres) tant que
   le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un blocage par
   AutoMod (`503` `automod` : le même message serait bloqué de nouveau, et
