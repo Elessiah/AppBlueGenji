@@ -1024,7 +1024,14 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
         {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
-        <MatchDmField initial={data?.matchDmEnabled} />
+        {/* Un compte sans Discord rattaché ni tag ne reçoit aucun de ces
+            messages : la case le dit (`null` tant que l'état n'est pas lu). */}
+        <MatchDmField
+          initial={data?.matchDmEnabled}
+          discordReachable={
+            discordState.linked === null ? null : discordState.linked || savedDiscordPseudo.trim() !== ""
+          }
+        />
       </ProfileSection>
 
       {invitations.length > 0 && (

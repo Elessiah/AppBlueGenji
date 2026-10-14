@@ -138,7 +138,8 @@
   },
   "matchDms": {
     "label": "Messages privés Discord de mes matchs",
-    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, et pour ses rappels (veille, check-in). Décoche pour ne plus les recevoir : tes notifications push gardent leurs propres réglages, et les arbitres restent prévenus.",
+    "noDiscord": "Aucun compte Discord rattaché ni tag Discord renseigné : ces messages ne peuvent pas te parvenir pour l'instant.",
+    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, et pour ses rappels (veille, check-in). Décoche pour ne plus les recevoir : tes notifications push gardent leurs propres réglages, et les arbitres reçoivent toujours les leurs.",
     "enabled": "Messages privés de match activés.",
     "disabled": "Messages privés de match coupés."
   },

@@ -5,10 +5,12 @@ import { Coche } from "@/components/Coche";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
 import { profileErrorMessage } from "../profile-errors";
+import { runQueuedSaves } from "../_lib/queued-saves";
 import s from "../profil.module.css";
 
 const FIELD_ID = "profile-match-dms";
 const HINT_ID = "profile-match-dms-hint";
+const UNREACHABLE_ID = "profile-match-dms-unreachable";
 
 /**
  * Messages privés Discord de match (`bg_users.match_dm_enabled`) : le droit
@@ -18,15 +20,31 @@ const HINT_ID = "profile-match-dms-hint";
  *
  * Absent tant que la fiche du titulaire n'est pas lue. Enregistré au clic,
  * sans bouton : un seul geste, réversible. Pendant l'envoi, la case reste
- * focalisable (`aria-busy`) ; un second clic attend la réponse du premier.
+ * focalisable et utilisable (`aria-busy`) : un clic fait pendant l'envoi
+ * s'affiche et part à la suite (`runQueuedSaves`), jamais perdu.
+ *
+ * `discordReachable` : le compte a un Discord rattaché ou un tag renseigné
+ * (`toNotificationRecipient`). À `false`, une ligne dit qu'aucun de ces
+ * messages ne peut partir pour l'instant ; `null` (état pas encore lu) : rien.
  */
-export function MatchDmField({ initial }: Readonly<{ initial: boolean | undefined }>): React.ReactElement | null {
+export function MatchDmField({
+  initial,
+  discordReachable = null,
+}: Readonly<{ initial: boolean | undefined; discordReachable?: boolean | null }>): React.ReactElement | null {
   const text = useProfileText();
   const { t } = text;
   const { showError, showSuccess } = useToast();
-  const [enabled, setEnabled] = useState(initial ?? true);
+  const [enabled, setEnabledState] = useState(initial ?? true);
+  /** Ce que montre la case, lu par un clic fait pendant l'envoi. */
+  const enabledRef = useRef(initial ?? true);
+  const setEnabled = (value: boolean) => {
+    enabledRef.current = value;
+    setEnabledState(value);
+  };
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  /** Choix fait pendant un envoi : affiché tout de suite, envoyé juste après. */
+  const queued = useRef<boolean | null>(null);
   // La fiche arrive après le premier rendu, ou est relue : la case reprend la
   // valeur lue tant qu'aucun envoi n'est en cours.
   const [shown, setShown] = useState(initial);
@@ -35,12 +53,8 @@ export function MatchDmField({ initial }: Readonly<{ initial: boolean | undefine
     if (initial !== undefined) setEnabled(initial);
   }
 
-  const toggle = async () => {
-    if (busyRef.current) return;
-    const next = !enabled;
-    busyRef.current = true;
-    setBusy(true);
-    setEnabled(next);
+  /** Un envoi : `true` si le choix est enregistré (toast d'erreur sinon). */
+  const put = async (next: boolean): Promise<boolean> => {
     try {
       const response = await fetch("/api/profile/match-dms", {
         method: "PUT",
@@ -49,20 +63,44 @@ export function MatchDmField({ initial }: Readonly<{ initial: boolean | undefine
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "PROFILE_UPDATE_FAILED");
-      showSuccess(t(next ? "matchDms.enabled" : "matchDms.disabled"));
+      return true;
     } catch (e) {
-      // Rien d'enregistré : la case reprend l'état que la base garde.
-      setEnabled(!next);
       showError(profileErrorMessage((e as Error).message, text));
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
+      return false;
     }
+  };
+
+  const toggle = async () => {
+    const next = !enabledRef.current;
+    if (busyRef.current) {
+      queued.current = next;
+      setEnabled(next);
+      return;
+    }
+    busyRef.current = true;
+    setBusy(true);
+    const outcome = await runQueuedSaves<boolean>({
+      start: enabledRef.current,
+      first: next,
+      put,
+      takeQueued: () => {
+        const choice = queued.current;
+        queued.current = null;
+        return choice;
+      },
+      show: setEnabled,
+    });
+    // « Activés » / « désactivés » une fois, et seulement si le dernier choix
+    // est enregistré : sinon la case reprend l'état gardé en base.
+    if (outcome.confirmed) showSuccess(t(outcome.saved ? "matchDms.enabled" : "matchDms.disabled"));
+    busyRef.current = false;
+    setBusy(false);
   };
 
   // Fiche pas encore lue (ou d'un autre compte) : rien à régler.
   if (initial === undefined) return null;
 
+  const unreachable = discordReachable === false;
   return (
     <div className={`field ${s.matchDms}`}>
       <div className={s.toggleRow}>
@@ -72,13 +110,18 @@ export function MatchDmField({ initial }: Readonly<{ initial: boolean | undefine
           checked={enabled}
           theme="joueur"
           aria-busy={busy || undefined}
-          aria-describedby={HINT_ID}
+          aria-describedby={unreachable ? `${HINT_ID} ${UNREACHABLE_ID}` : HINT_ID}
           onChange={() => void toggle()}
         />
       </div>
       <p id={HINT_ID} className={s.hint}>
         {t("matchDms.hint")}
       </p>
+      {unreachable ? (
+        <p id={UNREACHABLE_ID} className={s.hint}>
+          {t("matchDms.noDiscord")}
+        </p>
+      ) : null}
     </div>
   );
 }
