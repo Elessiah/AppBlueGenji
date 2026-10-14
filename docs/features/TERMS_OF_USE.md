@@ -10,17 +10,23 @@ règle de fond = avancer `TERMS_VERSION`**, ce qui redemande l'acceptation.
 | Moment | Où | Contexte enregistré |
 |---|---|---|
 | Création du compte | case de la modale d'entrée de `/connexion` (avec le consentement RGPD) | `SIGNUP` |
-| Connexion suivante, case cochée | idem, si la version courante n'était pas encore acceptée | `LOGIN` |
+| Connexion suivante, modale acceptée **dans la page** | idem, si la version courante n'était pas encore acceptée — une acceptation seulement relue du navigateur (`bg_terms_consent`, peut-être celle d'une autre personne sur un ordinateur partagé) n'est pas attribuée à un compte existant | `LOGIN` |
 | Création d'une équipe | case du formulaire `/equipes/creer`, exigée par `POST /api/teams` | `TEAM_CREATION` |
 | Réception de la gestion d'une équipe | modale `TermsAcceptanceModal` (mise en page racine) | `TEAM_MANAGEMENT` |
 
 Le site n'a pas de formulaire d'inscription : un compte naît à la première
-connexion. L'acceptation voyage donc avec la connexion — `terms=1` scellé dans le
+connexion. L'acceptation voyage donc avec la connexion — `terms=<version>` scellé dans le
 cookie d'état OAuth (comme l'intention, jamais relu dans l'URL du rappel)
 **seulement** si le départ est prouvé cliqué sur une page du site
 (`startedOnSitePage` : `Sec-Fetch-Site: same-origin`, `Sec-Fetch-Mode: navigate`,
 `Sec-Fetch-Dest: document`) — sinon ni `SIGNUP` ni `LOGIN` n'est enregistré —,
-`termsAccepted` dans le corps du code Discord. Un lien saisi sur le site et
+`termsAccepted` + `termsVersion` dans le corps du code Discord. Seule la
+**version en vigueur** vaut acceptation : un onglet de `/connexion` chargé avant
+une nouvelle version (ancien paquet : `terms=1`, ou l'ancien numéro) n'accepte pas
+celle qu'il n'a pas montrée. `termsNow=1` / `termsAcceptedNow` disent que la
+modale vient d'être acceptée dans la page : sans eux, l'acceptation relue du
+navigateur suffit à créer un compte mais n'écrit pas de preuve `LOGIN` pour un
+compte existant (revue sécurité de #445). Un lien saisi sur le site et
 rendu cliquable (lien « Postuler » d'une annonce, site d'un partenaire, page
 d'origine d'un signalement) ne peut pas viser une route d'API (`leadsToApi`, à
 l'enregistrement et à l'affichage) — le contact Discord d'une annonce ne devient
@@ -171,4 +177,4 @@ renommer ces citations dans le même changement.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Conditions d'utilisation** (`lib/shared/terms-of-use.ts` pur + `lib/server/terms-acceptance.ts`, page `/conditions-utilisation`) : texte et **version** au même endroit ; avancer `TERMS_VERSION` redemande l'acceptation. Acceptées à la **création du compte** (case de la modale d'entrée de `/connexion` ; `terms=1` scellé dans le cookie d'état OAuth comme l'intention — seulement pour un départ prouvé cliqué sur une page du site (`startedOnSitePage`) —, `termsAccepted` pour le code Discord — un compte **neuf** sans acceptation est refusé, `TERMS_REQUIRED`), à la **création d'une équipe** (`acceptTerms`, exigé par `POST /api/teams`), avant d'**inscrire** l'équipe à un tournoi, et en **recevant la gestion** d'une équipe — geste que le receveur ne fait pas : la mise en page racine présente les conditions (`TermsAcceptanceModal`) et les gestes de gestion sont refusés en 409 `TERMS_ACCEPTANCE_REQUIRED` tant qu'il ne les a pas acceptées (jamais pour retirer un logo, ni pour le staff sur une fantôme). L'envoi d'un logo exige en plus la case « je détiens les droits » (`LOGO_RIGHTS_NOT_CERTIFIED`). Preuve dans `bg_terms_acceptances`. Voir `docs/features/TERMS_OF_USE.md`.
+- **Conditions d'utilisation** (`lib/shared/terms-of-use.ts` pur + `lib/server/terms-acceptance.ts`, page `/conditions-utilisation`) : texte et **version** au même endroit ; avancer `TERMS_VERSION` redemande l'acceptation. Acceptées à la **création du compte** (case de la modale d'entrée de `/connexion` ; `terms=<version en vigueur>` scellé dans le cookie d'état OAuth comme l'intention — seulement pour un départ prouvé cliqué sur une page du site (`startedOnSitePage`) —, `termsAccepted` pour le code Discord — un compte **neuf** sans acceptation est refusé, `TERMS_REQUIRED`), à la **création d'une équipe** (`acceptTerms`, exigé par `POST /api/teams`), avant d'**inscrire** l'équipe à un tournoi, et en **recevant la gestion** d'une équipe — geste que le receveur ne fait pas : la mise en page racine présente les conditions (`TermsAcceptanceModal`) et les gestes de gestion sont refusés en 409 `TERMS_ACCEPTANCE_REQUIRED` tant qu'il ne les a pas acceptées (jamais pour retirer un logo, ni pour le staff sur une fantôme). L'envoi d'un logo exige en plus la case « je détiens les droits » (`LOGO_RIGHTS_NOT_CERTIFIED`). Preuve dans `bg_terms_acceptances`. Voir `docs/features/TERMS_OF_USE.md`.
