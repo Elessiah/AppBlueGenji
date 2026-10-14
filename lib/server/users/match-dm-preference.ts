@@ -22,8 +22,10 @@ import { getDatabase } from "@/lib/server/database";
 export const INVALID_MATCH_DM_PREFERENCE = "INVALID_MATCH_DM_PREFERENCE";
 
 /**
- * Une valeur lue en base ramenée à un booléen. Absente ou illisible : activé —
- * une base qui n'a pas encore joué l'`ALTER` garde le comportement d'avant.
+ * Une valeur lue en base ramenée à un booléen. Absente (`null`, colonne non
+ * lue) : activé, le comportement d'avant le réglage. Seul l'envoi des messages
+ * de match (`loadNotificationRecipients`) survit à une colonne manquante ;
+ * « Mon profil » et l'export la lisent comme `locale`, sans repli.
  */
 export function matchDmEnabled(value: unknown): boolean {
   if (value === null || value === undefined) return true;

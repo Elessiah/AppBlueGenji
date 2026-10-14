@@ -26,6 +26,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { parseRoles } from "@/lib/server/serialization";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import {
@@ -177,11 +178,23 @@ export async function loadNotificationRecipients(
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];
   const db = await getDatabase();
-  const [rows] = await db.query<(RecipientRow & { match_dm_enabled?: number | null })[]>(
-    `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at, match_dm_enabled
-     FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})`,
-    ids,
-  );
+  const select = (withMatchDm: boolean) =>
+    db.query<(RecipientRow & { match_dm_enabled?: number | null })[]>(
+      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}
+       FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})`,
+      ids,
+    );
+  // La colonne n'est lue que pour un message de match : une migration en échec
+  // (`reportSchemaFailure`, rejouée au démarrage suivant) ne coupe pas les
+  // autres envois. Sans elle, personne n'a pu s'opposer (la route d'écriture
+  // échoue aussi) : la relecture sans colonne garde le comportement d'avant.
+  let rows: Awaited<ReturnType<typeof select>>[0];
+  try {
+    [rows] = await select(options.matchDm === true);
+  } catch (error) {
+    if (options.matchDm !== true || !isUnknownColumnError(error)) throw error;
+    [rows] = await select(false);
+  }
   return rows.map((row) => {
     const recipient = toNotificationRecipient(row, reach);
     return options.matchDm && !matchDmEnabled(row.match_dm_enabled) ? { ...recipient, discord: null } : recipient;
