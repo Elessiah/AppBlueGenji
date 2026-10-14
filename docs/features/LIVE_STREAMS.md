@@ -253,7 +253,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   un joueur inscrit sous l'ancienne mention reste « un joueur ». Le seuil vaut
   ce que vaut `publishedAt` (lendemain de la mise en ligne, `PRIVACY_CHANGES_CONSENT.md`) :
   si le déploiement glisse, avancer `publishedAt` **et** la date « 16 octobre 2026 »
-  du registre T16 et de la politique du bot (FR + EN, test `live-announcements.test.ts`).
+  du registre T16, de `/rgpd` et de la politique du bot (FR + EN, test `live-announcements.test.ts`).
+  Seuil à minuit, heure de Paris, comparé à `UNIX_TIMESTAMP(registered_at)` : il
+  ne dépend pas du fuseau du serveur de base.
   L'exception s'arrête à
   #live : quand le texte nomme un joueur, le site joint `logMessage`, le même
   texte **sans pseudo** (« un joueur »), que le bot cite à la place de
