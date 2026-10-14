@@ -85,8 +85,8 @@ const LAST_UPDATED_EN = "14 October 2026";
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
 // matchs diffusés dans #live, la politique seule.
-const PRIVACY_LAST_UPDATED_FR = "16 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "16 October 2026";
+const PRIVACY_LAST_UPDATED_FR = "15 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "15 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,

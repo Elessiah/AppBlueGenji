@@ -690,7 +690,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // lendemain de la mise en ligne prévue.
   {
     id: "2026-10-annonce-des-matchs-diffuses",
-    publishedAt: "2026-10-16",
+    publishedAt: "2026-10-15",
     title: "Matchs diffusés annoncés sur Discord",
     summary:
       "Au début d'un match diffusé en direct, le bot l'annonce à tout le serveur Discord de l'association, avec le nom des deux équipes.",
