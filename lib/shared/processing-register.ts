@@ -888,7 +888,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     // chaîne qui la produit, chaque plateforme traitant ses spectateurs en
     // responsable de son propre traitement. Seule l'annonce du match dans le
     // salon #live passe par Discord.
-    transfers: [`États-Unis : Discord (annonce publiée dans le salon #live) — ${transferBasis(["DISCORD"])}`],
+    transfers: [`États-Unis : Discord (annonce publiée dans le salon #live, et alerte AutoMod d'une annonce bloquée) — ${transferBasis(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY,
       "Liens de diffusion limités à une liste de plateformes, aucun lecteur intégré ; aucune donnée de contact affichée à l'écran par le site",

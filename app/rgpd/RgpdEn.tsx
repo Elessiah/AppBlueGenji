@@ -493,7 +493,9 @@ export function RgpdEn({
               set on the login page <strong>when you continue</strong> after reading the information about your
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
-              on our servers, with its version number, as soon as your account exists.
+              on our servers, with its version number, when your account is created, then at a login where you have
+              just accepted them on the login page (an acceptance only kept by the browser, possibly another
+              person&apos;s, is not carried over to an existing account).
             </li>
             <li>
               <strong>Service worker and “bg-offline” cache</strong> — the site installs in your browser,{" "}
@@ -828,7 +830,8 @@ export function RgpdEn({
               <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match times and
               reminders, notifications), the staff-only channels and the announcement of streamed matches in the #live
               channel, which carry no player username — except that announcement in a solo tournament, which names
-              the players by their public username; and logging in through Discord, if you choose it.
+              the players by their public username, and the AutoMod alert it may send to the moderators&apos; alert
+              channel; and logging in through Discord, if you choose it.
             </li>
             <li>
               <strong>Google and Blizzard</strong> (United States): only if you log in through one of them, which

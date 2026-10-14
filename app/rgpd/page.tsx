@@ -634,7 +634,9 @@ function RgpdFr({
               d&apos;utilisation, pour ne pas vous les représenter. Elles ne contiennent qu&apos;un
               numéro de version : une nouvelle version vous les présente de nouveau.
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
-              numéro de version, dès que votre compte existe.
+              numéro de version, à la création de votre compte, puis à une connexion où vous venez de
+              les accepter sur la page de connexion (une acceptation seulement gardée par le navigateur,
+              peut-être celle d&apos;une autre personne, n&apos;est pas reportée sur un compte existant).
             </li>
             <li>
               <strong>Service worker et cache « bg-offline »</strong> — le site installe dans
@@ -1004,7 +1006,8 @@ function RgpdFr({
               <strong>Discord</strong> (États-Unis) : les messages privés du bot (code de
               connexion, horaires et rappels de match, notifications), les salons réservés au staff et
               l&apos;annonce des matchs diffusés dans le salon #live, qui ne portent aucun pseudo de joueur
-              — sauf cette annonce en tournoi individuel, qui nomme les joueurs par leur pseudo public ;
+              — sauf cette annonce en tournoi individuel, qui nomme les joueurs par leur pseudo public, et
+              l&apos;alerte AutoMod qu&apos;elle peut faire parvenir au salon d&apos;alertes des modérateurs ;
               et la connexion par Discord, si vous la choisissez.
             </li>
             <li>

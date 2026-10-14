@@ -705,7 +705,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Moderators of the association's Discord server: if a Discord AutoMod rule blocks a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel",
       "Discord (hosting of the channel)",
     ],
-    transfers: [`United States: Discord (announcement posted in the #live channel) — ${transferBasisEn(["DISCORD"])}`],
+    transfers: [`United States: Discord (announcement posted in the #live channel, and AutoMod alert for a blocked announcement) — ${transferBasisEn(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY_EN,
       "Stream links limited to a list of platforms, no embedded player; no contact data displayed on screen by the site",
