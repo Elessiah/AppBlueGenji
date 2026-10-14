@@ -249,6 +249,22 @@ describe("runLiveAnnouncementSweep", () => {
     expect(warnings[1]).toContain("salon #live fermé");
   });
 
+  it("réserve l'affiche sans ordre : les deux mêmes engagés remis dans l'autre ordre ne sont pas réannoncés", async () => {
+    const { query, execute } = mockDb([{ ...AUTO_LIVE, pairing: "7:5", launch_pairing: "7:5" }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(claimsOf(execute)).toEqual([[40, "5:7"]]);
+    expect(String(query.mock.calls[0][0])).toContain(
+      "a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
+    );
+  });
+
+  it("rend la réservation sous la même clé sans ordre", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("unavailable");
+    const { execute } = mockDb([{ ...AUTO_LIVE, pairing: "7:5", launch_pairing: "7:5" }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(releasesOf(execute)).toEqual([[40, "5:7"]]);
+  });
+
   it("délai dépassé : garde la réservation, et ne pousse pas à poster à la main tout de suite", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("timed-out");
     const { execute } = mockDb([AUTO_LIVE]);
