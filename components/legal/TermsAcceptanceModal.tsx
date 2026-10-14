@@ -193,11 +193,26 @@ export function TermsAcceptanceModal({
             </a>
           </p>
         )}
+        {/* Pendant la requête, `aria-disabled` + `aria-busy` plutôt que `disabled` :
+            le focus reste sur le bouton pressé (un échec se retente au clavier) ;
+            `later` et `accept` ignorent déjà un geste tant que `busy`. */}
         <div className={styles.actions}>
-          <CyberButton type="button" variant="ghost" onClick={later} disabled={busy}>
+          <CyberButton
+            type="button"
+            variant="ghost"
+            onClick={later}
+            aria-disabled={busy || undefined}
+          >
             {t("termsModal.later")}
           </CyberButton>
-          <CyberButton type="button" variant="primary" onClick={accept} disabled={busy || !checked}>
+          <CyberButton
+            type="button"
+            variant="primary"
+            onClick={accept}
+            disabled={!checked && !busy}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+          >
             {busy ? t("termsModal.saving") : t("termsModal.accept")}
           </CyberButton>
         </div>
