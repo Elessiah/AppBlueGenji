@@ -202,6 +202,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // choisit la langue des notifications push. Défaut `fr` : tout compte
     // existant garde le français jusqu'à sa prochaine connexion.
     `ALTER TABLE bg_users ADD COLUMN locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr' AFTER terms_accepted_at`,
+    // Messages privés de match (`lib/server/users/match-dm-preference.ts`) :
+    // l'opposition du joueur aux messages privés Discord de ses matchs. Défaut
+    // `1` : tout compte existant les reçoit comme avant.
+    `ALTER TABLE bg_users ADD COLUMN match_dm_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER locale`,
     // PR #441 — la marque `TOLD` retient l'horaire reçu par les joueurs : c'est
     // lui que cite « au lieu du … » et que retire « Horaire du match retiré ».
     `ALTER TABLE bg_match_reminders ADD COLUMN start_at DATETIME NULL AFTER sent_at`,

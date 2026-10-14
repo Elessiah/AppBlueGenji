@@ -910,6 +910,11 @@ export type FullProfileResponse = {
    * absente de toute autre fiche.
    */
   accountLocale?: Locale;
+  /**
+   * Messages privés Discord de match activés (`bg_users.match_dm_enabled`),
+   * pour son **seul titulaire** (`isSelf`) : absent de toute autre fiche.
+   */
+  matchDmEnabled?: boolean;
 };
 
 /**
@@ -946,6 +951,8 @@ export type PersonalDataExport = {
      * dans « Mon profil » — elle choisit la langue des notifications push.
      */
     locale: Locale;
+    /** Messages privés Discord de match activés (`bg_users.match_dm_enabled`). */
+    matchDmEnabled: boolean;
     createdAt: string;
   };
   profile: {
@@ -1019,6 +1026,13 @@ export type PersonalDataExport = {
     team2Score: number;
     submittedAt: string | null;
   }[];
+  /**
+   * Traces d'annonce #live d'un match de ses entrées en tournoi individuel
+   * (`bg_live_announcements`, T16) : match, tournoi, date. Une trace dit
+   * qu'une annonce a été tentée ; elle ne porte le pseudo que pour une
+   * inscription faite depuis le 16 octobre 2026. Effacée avec le match.
+   */
+  liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null }[];
   /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.

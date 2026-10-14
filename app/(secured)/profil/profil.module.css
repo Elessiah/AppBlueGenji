@@ -241,6 +241,11 @@
   cursor: progress;
 }
 
+/* Messages privés de match, sous la langue : même écart que celle-ci. */
+.matchDms {
+  margin-top: 14px;
+}
+
 /* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
    mention légale. 12 px et `--ink-soft`, contre 11 px et `--ink-quiet` partout
    avant. */

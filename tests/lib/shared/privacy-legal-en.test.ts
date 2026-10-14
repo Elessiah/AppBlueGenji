@@ -8,6 +8,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { AUDIENCE_OPT_OUT_TEXT_FR } from "@/components/privacy/AudienceOptOutControl";
 import { messagesFor } from "@/lib/server/i18n-messages";
+import { STREAM_NOTICE_LIVE_EN } from "@/lib/shared/legal-text-en";
 import {
   PRIVACY_CHANGES,
   formatPrivacyChangeDate,
@@ -25,6 +26,7 @@ import {
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN, registerControllerEn, transferBasisEn } from "@/lib/shared/processing-register-en";
+import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 import {
   DONNEES_PROFIL,
   DONNEE_CONNEXIONS,
@@ -170,5 +172,34 @@ describe("habillage des fenêtres et contrôles : le français d'avant, en messa
 
   it("le contrôle d'opposition embarque le même français que `legal.audience`", () => {
     expect(AUDIENCE_OPT_OUT_TEXT_FR).toEqual(messagesFor("fr").legal.audience);
+  });
+});
+
+describe("register (EN): #live username, match DMs, refereeing schedule basis", () => {
+  const sheet = (ref: string) => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref)!;
+
+  it("declares the same items as the French register", () => {
+    expect(sheet("T16").dataCategories.join(" ")).toMatch(/Public BlueGenji username of the players of a solo tournament, posted in the #live announcement/);
+    expect(sheet("T04").subPurposes.join(" ")).toMatch(/the notice that a match leaves their schedule/);
+    expect(sheet("T04").legalBasis).toMatch(/legitimate interest \(smooth running of tournaments\) remaining the basis with regard to the players and teams they mention/);
+    expect(sheet("T01").retention.join(" ")).toMatch(/#live announcements of a solo tournament keep the username in the Discord channel until they are deleted on request \(T16\)/);
+    expect(sheet("T08").subPurposes.join(" ")).toMatch(/#live channel of the association's server, with an @everyone mention \(team names or, in a solo tournament, the players' public BlueGenji username/);
+    expect(sheet("T16").subPurposes.join(" ")).toMatch(/or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier/);
+    expect(sheet("T08").retention.join(" ")).toMatch(/#live announcements: in the channel as long as it exists, even after the player's account is deleted/);
+    expect(sheet("T08").retention).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.retention.length);
+    expect(sheet("T16").subPurposes.join(" ")).toMatch(/editable in My profile, with no effect on an announcement already posted/);
+    expect(sheet("T16").legalBasis).toMatch(/except for the username in the #live announcement of a solo tournament, which one objects to by not registering/);
+    expect(sheet("T04").legalBasis).toMatch(/for match time notices, the notice that a match leaves their schedule and match reminders sent to players/);
+    expect(sheet("T04").dataSubjects).toContain("Any account holder, for their match direct messages choice");
+    expect(sheet("T08").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.recipients.length);
+    expect(sheet("T05").legalBasis).toMatch(/sending the refereeing schedule to referees and administrators falls under performance of the service \(T04\)/);
+  });
+});
+
+describe("terms of use (EN): #live announcement of a solo tournament", () => {
+  it("states that the neutral name does not cover it, like the French terms", () => {
+    const section = TERMS_SECTIONS_EN.find((s) => s.id === "retransmission")!;
+    expect(section.paragraphs.join(" ")).toContain(STREAM_NOTICE_LIVE_EN);
+    expect(STREAM_NOTICE_LIVE_EN).toMatch(/the neutral name does not apply to that announcement: a player who does not want to be named in it does not register/);
   });
 });

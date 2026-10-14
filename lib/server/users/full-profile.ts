@@ -11,6 +11,7 @@ import { getActiveSuspension } from "@/lib/server/account-suspensions";
 import type { FullProfileResponse, PublicUserProfile, UserTeamTimeline } from "@/lib/shared/types";
 import { applyVisibility, mapPublicUser, type UserRow } from "./players";
 import { accountLocaleFromRow } from "./account-locale";
+import { matchDmEnabled } from "./match-dm-preference";
 
 /*
  * Fiche complète d'un joueur telle que la voit son lecteur — lui-même, le
@@ -126,6 +127,14 @@ export type ProfileViewer = {
   roles?: readonly PlatformRole[];
 };
 
+/**
+ * Colonnes lues pour le seul titulaire de la fiche : une migration en échec ne
+ * casse pas la fiche publique d'un joueur (`/joueurs/[id]`), qui n'en a pas l'usage.
+ */
+function ownerOnlyColumns(isSelf: boolean): string {
+  return isSelf ? "match_dm_enabled," : "";
+}
+
 export async function getFullProfile(
   viewer: ProfileViewer,
   targetUserId: number,
@@ -134,8 +143,9 @@ export async function getFullProfile(
   const viewerIsAdmin = Boolean(viewer.isAdmin);
   const canModerate = can(viewer, "moderation");
   const db = await getDatabase();
+  const matchDmColumn = ownerOnlyColumns(viewerId === targetUserId);
 
-  const [userRows] = await db.execute<(UserRow & { locale: string })[]>(
+  const [userRows] = await db.execute<(UserRow & { locale: string; match_dm_enabled?: number | null })[]>(
     `SELECT
       id,
       pseudo,
@@ -155,6 +165,7 @@ export async function getFullProfile(
       platform_roles_json,
       is_deleted,
       locale,
+      ${matchDmColumn}
       created_at
     FROM bg_users
     WHERE id = ?
@@ -282,5 +293,7 @@ export async function getFullProfile(
     // La langue du compte ne regarde que son titulaire (lot 9-3) : « Mon
     // profil » l'affiche et la change, aucune autre fiche ne la porte.
     ...(isSelf ? { accountLocale: accountLocaleFromRow(userRows[0].locale) } : {}),
+    // L'opposition aux messages privés de match : même règle, son seul titulaire.
+    ...(isSelf ? { matchDmEnabled: matchDmEnabled(userRows[0].match_dm_enabled) } : {}),
   };
 }

@@ -325,7 +325,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seul le compte anonymisé reste, avec son historique de tournois et d'équipes ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours) ; les signalements envoyés par le compte en sont détachés et suivent leur propre durée (T11), et les gestes d'arbitrage d'un membre du staff restent nommés dans les journaux du serveur, selon leur rotation (T05)`,
+      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seul le compte anonymisé reste, avec son historique de tournois et d'équipes ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours) ; les signalements envoyés par le compte en sont détachés et suivent leur propre durée (T11), et les gestes d'arbitrage d'un membre du staff restent nommés dans les journaux du serveur, selon leur rotation (T05) ; les annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande (T16)`,
       `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
     recipients: [
@@ -424,23 +424,31 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
-      "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré) et des rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in)",
+      "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré), l'avis qu'un match quitte son programme et les rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages",
       "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
-      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, les rappels de match, les alertes d'arbitrage et le programme d'arbitrage",
-    dataSubjects: ["Joueurs engagés dans un tournoi", "Autres membres des équipes engagées (coachs, managers, propriétaires)", "Arbitres", "Casters inscrits sur un match"],
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, avec un droit d'opposition (art. 21) honoré par un interrupteur de « Mon profil » qui coupe tous leurs messages privés de match ; exécution du service (contrat — conditions d'utilisation, les arbitres et administrateurs agissant pour l'association) pour les alertes d'arbitrage et le programme d'arbitrage adressés au staff, l'intérêt légitime (bon déroulement des tournois) restant la base à l'égard des joueurs et équipes qu'ils citent",
+    dataSubjects: [
+      "Joueurs engagés dans un tournoi",
+      "Autres membres des équipes engagées (coachs, managers, propriétaires)",
+      "Arbitres",
+      "Casters inscrits sur un match",
+      "Tout titulaire de compte, pour son choix des messages privés de match",
+    ],
     dataCategories: [
       "Pseudo et identifiant Discord",
       "BattleTag",
       "Date et adversaire du match",
       "Heure à laquelle chaque partie s'est déclarée prête, caster inscrit",
       "Motif d'un signalement",
+      "Choix du joueur de recevoir ou non les messages privés Discord de ses matchs",
     ],
     sensitiveData: "Aucune",
     retention: [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
+      "Choix des messages privés de match : jusqu'à sa modification ; remis au défaut à la suppression du compte",
       "Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
       "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués",
     ],
@@ -470,7 +478,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés), pour la modération",
       "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
     ],
-    legalBasis: "Intérêt légitime (administration et contrôle de l'arbitrage)",
+    legalBasis:
+      "Intérêt légitime (administration et contrôle de l'arbitrage) à l'égard des joueurs et équipes cités ; l'envoi du programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service (T04)",
     dataSubjects: ["Staff", "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)"],
     dataCategories: [
       "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
@@ -550,7 +559,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur",
       "Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
       "Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
-      "Remise des messages rédigés par le site : codes, horaires et rappels de match, avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un",
+      "Remise des messages rédigés par le site : codes, horaires et rappels de match, avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce du début d'un match diffusé publiée dans le salon #live du serveur de l'association, avec une mention @everyone (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
     ],
     legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
     dataSubjects: [
@@ -565,7 +574,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list",
       "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
       "Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée",
-      "Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site) et le texte du message, transmis par le site et remis sans être enregistrés par le bot",
+      "Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site) et le texte du message, transmis par le site et remis sans être enregistrés par le bot ; l'annonce #live, elle, reste publiée dans le salon (traitement T16)",
       "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)",
     ],
     sensitiveData: "Aucune",
@@ -578,6 +587,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Fil d'activité : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, supprimé dans la nuit qui suit`,
       `Salon de journal privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), puis supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée`,
       "Journaux du serveur : selon leur rotation automatique",
+      "Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur, et supprimées sur demande de l'équipe ou du joueur concerné (traitement T16)",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
     recipients: [
@@ -587,6 +597,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Membres du salon où /scrim ou /recrute est utilisée (réponse publique de la commande)",
       "Membres du rôle d'arbitrage de chaque serveur qui en a défini un (/set-referee-role), pour les alertes d'arbitrage du site",
       "Membres des serveurs partenaires, qui lisent les annonces relayées",
+      "Membres du serveur Discord de l'association, qui lisent l'annonce des matchs diffusés dans le salon #live (traitement T16)",
       "Administrateurs de tout serveur où le bot est installé (y compris un serveur créé pour l'y inviter) et titulaires du rôle d'administration du bot (/set-bot-admin), pour la liste des exclusions du réseau (/ban-list, réponse visible du seul demandeur) — l'exclusion vaut pour tout le réseau, chaque serveur doit savoir qui ne peut plus y publier",
       "Discord (plateforme d'exécution)",
     ],
@@ -844,28 +855,29 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)",
       "Publier sur la fiche du match le lien de sa rediffusion YouTube",
-      "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (« un joueur » en tournoi individuel, jamais un pseudo), nom du tournoi et lien de la diffusion",
+      "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (pour une affiche d'équipes, jamais le pseudo de leurs joueurs) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais l'identifiant Discord numérique ; « un joueur » pour un compte supprimé, une entrée sans compte ou une inscription antérieure au 16 octobre 2026), nom du tournoi et lien de la diffusion",
     ],
     legalBasis:
-      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur, sauf pour le pseudo de l'annonce #live d'un tournoi individuel, à laquelle on s'oppose en ne s'inscrivant pas (une annonce passée est supprimée sur demande)",
     dataSubjects: ["Joueurs des matchs diffusés", "Casters"],
     dataCategories: [
       "Pseudos en jeu et du site, noms d'équipe, images de la partie, résultats et performances en jeu, tels qu'ils apparaissent à l'écran — ni webcam ni chat vocal des joueurs",
       "Voix et pseudo des casters",
       "Lien de la diffusion et de la rediffusion d'un match",
+      "Pseudo public BlueGenji des joueurs d'un tournoi individuel, publié dans l'annonce #live sur Discord",
       "Trace de l'annonce d'un match sur Discord : le match, les identifiants de ses deux engagés (équipes ou inscriptions individuelles) et la date de l'annonce",
     ],
     sensitiveData: "Aucune",
     retention: [
       "Direct : la diffusion n'est pas conservée par le site, qui n'en garde que le lien de la chaîne",
       "Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée",
-      "Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), posée avant l'envoi, retirée pour un nouvel essai quand le bot était indisponible, sinon effacée avec le match ; le message reste dans le salon jusqu'à sa suppression par l'association",
-      "Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée",
+      "Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), posée avant l'envoi, retirée pour un nouvel essai quand le bot était indisponible, sinon effacée avec le match ; le message est conservé dans le salon tant que le salon #live existe, même après la suppression du compte du joueur, et supprimé sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème », catégorie RGPD)",
+      "Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée ; l'annonce #live d'un tournoi individuel garde le pseudo public : s'y opposer revient à ne pas s'inscrire",
     ],
     recipients: [
       "Public des plateformes de diffusion et du site",
       "Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée",
-      "Membres du serveur Discord de l'association, pour l'annonce publiée dans le salon #live",
+      "Membres du serveur Discord de l'association, pour l'annonce publiée dans le salon #live (noms d'équipe, ou pseudo public BlueGenji des joueurs d'un tournoi individuel)",
       "Discord (hébergement du salon)",
     ],
     // Le site ne transmet rien aux plateformes : la diffusion est publiée par la

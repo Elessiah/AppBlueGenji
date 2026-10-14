@@ -58,6 +58,7 @@ import { generateMetadata as reportMetadata } from "@/app/(secured)/signalements
 import ProfilePage from "@/app/(secured)/profil/page";
 import { ProfileSection } from "@/app/(secured)/profil/_components/ProfileSection";
 import { AccountLocaleField } from "@/app/(secured)/profil/_components/AccountLocaleField";
+import { MatchDmField } from "@/app/(secured)/profil/_components/MatchDmField";
 import { ConnectedAppsSection } from "@/app/(secured)/profil/ConnectedAppsSection";
 import { OtherSessionsPanel } from "@/app/(secured)/profil/OtherSessionsPanel";
 import { BattletagVisibilityNotice } from "@/app/(secured)/profil/BattletagVisibilityNotice";
@@ -302,6 +303,11 @@ describe("français inchangé — profil", () => {
       expect(deletionConsequencesText(FR_PROFILE, subject)).toBe(accountDeletionConsequences(subject));
       expect(deletionOutcomeText(FR_PROFILE, subject)).toBe(accountDeletionOutcome(subject));
     }
+    // A solo player's #live announcements outlive the account (until deleted on request): every outcome says so.
+    for (const subject of ["TOURNAMENTS", "SOLO_REGISTRATIONS", null] as const) {
+      expect(accountDeletionConsequences(subject)).toMatch(/salon #live du Discord, qui gardent ton pseudo jusqu'à leur suppression sur demande/);
+      expect(deletionConsequencesText(EN_PROFILE, subject)).toMatch(/Discord #live channel, which keep your username until they are deleted on request/);
+    }
     for (const code of ["ACCOUNT_STILL_REFERENCED", "X", undefined]) {
       expect(deletionErrorText(FR_PROFILE, code)).toBe(accountDeletionErrorMessage(code));
     }
@@ -439,6 +445,68 @@ describe("langue du compte (lot 9-3)", () => {
     expect(html).toContain('aria-describedby="profile-account-locale-hint"');
     // Hors les noms de langue, rien de français.
     expectEnglish(html.replace(/<option[^>]*>[^<]*<\/option>/g, ""));
+  });
+
+  it("interrupteur des messages privés de match : libellé et aide en anglais, case liée à son aide", () => {
+    const on = inEnglish(<MatchDmField initial />);
+    expect(on).toContain("Discord direct messages about my matches");
+    expect(on).toContain("Untick to stop receiving them");
+    expect(on).toContain("referees still get theirs");
+    expect(on).toContain("when a match leaves your schedule");
+    expect(on).toContain('id="profile-match-dms"');
+    expect(on).toContain('aria-describedby="profile-match-dms-hint"');
+    expect(on).toMatch(/type="checkbox"[^>]*checked=""|checked=""[^>]*type="checkbox"/);
+    expectEnglish(on);
+    const off = inEnglish(<MatchDmField initial={false} />);
+    expect(off).not.toMatch(/checked=""/);
+  });
+
+  it("interrupteur des messages privés de match : le français dit l'opposition et les push à part", async () => {
+    const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
+    expect(fr.label).toBe("Messages privés Discord de mes matchs");
+    expect(fr.hint).toMatch(/Activés par défaut/);
+    expect(fr.hint).toMatch(/tes notifications push gardent leurs propres réglages, et les arbitres reçoivent toujours les leurs/);
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    expect(fr.hint).toMatch(/quand un match quitte ton programme/);
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toMatch(
+      /<MatchDmField\s+initial=\{data\?\.matchDmEnabled\}\s+discordReachable=/,
+    );
+  });
+
+  it("interrupteur des messages privés de match : sans Discord, une ligne le dit (FR et EN), liée à la case", async () => {
+    const en = inEnglish(<MatchDmField initial discordReachable={false} />);
+    expect(en).toContain("No Discord account linked and no Discord tag saved");
+    expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
+    expect(en).toContain('id="profile-match-dms-unreachable"');
+    expectEnglish(en);
+    for (const reachable of [true, null]) {
+      const html = inEnglish(<MatchDmField initial discordReachable={reachable} />);
+      expect(html).not.toContain("profile-match-dms-unreachable");
+    }
+    const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
+    expect(fr.noDiscord).toBe(
+      "Aucun compte Discord rattaché ni tag Discord renseigné : ces messages ne peuvent pas te parvenir pour l'instant.",
+    );
+  });
+
+  it("interrupteur des messages privés de match : un clic pendant l'envoi part à la suite, jamais ignoré", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/MatchDmField.tsx"), "utf8");
+    expect(source).toContain("runQueuedSaves<boolean>");
+    expect(source).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = next;\s*setEnabled\(next\);\s*return;/);
+    expect(source).not.toMatch(/disabled=/);
+    // Une relecture de la fiche commencée avant l'envoi ne recouvre pas le choix enregistré ici.
+    expect(source).toMatch(/if \(outcome\.stored\) setChosenHere\(true\);/);
+    expect(source).toMatch(/initial !== shown && !busy && \(!chosenHere \|\| initial === undefined\)/);
+  });
+
+  it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
+    const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
+    const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
+    expect(fr).toContain("pour tes matchs, la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
+    expect(en).toContain("for your matches, the “Discord direct messages about my matches” box (My profile, Notifications section)");
   });
 
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {

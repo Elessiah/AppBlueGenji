@@ -465,3 +465,30 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(TERMS_OF_SERVICE.en.sections.at(-1)?.meta).toBe("CONTACT");
   });
 });
+
+describe("politique du bot — pseudo solo dans #live et messages de match (RGPD-DM-SWITCH)", () => {
+  const fr = JSON.stringify(PRIVACY_POLICY.fr);
+  const en = JSON.stringify(PRIVACY_POLICY.en);
+
+  it("dit le pseudo public d'une entrée individuelle dans #live, plus « jamais un pseudo » (FR et EN)", () => {
+    expect(fr).toContain("en tournoi individuel, le pseudo public BlueGenji de chaque joueur");
+    expect(fr).not.toContain("« un joueur » en tournoi individuel, jamais un pseudo");
+    expect(en).toContain("in a solo tournament, each player's public BlueGenji username");
+    expect(en).not.toContain("“a player” in a solo tournament, never a username");
+  });
+
+  it("renvoie à « Mon profil » pour couper les messages de match, et avance sa date (FR et EN)", () => {
+    expect(fr).toContain("un joueur peut couper ceux de ses matchs (horaire, rappel, retrait d'un match) dans « Mon profil »");
+    expect(fr).toContain("(horaire, rappel, retrait d'un match)");
+    expect(en).toContain("(time, reminder, removal from a match)");
+    expect(fr).toContain("« un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026");
+    expect(en).toContain("a player can turn off those about their matches (time, reminder, removal from a match) in “My profile”");
+    // Objection to the solo #live username = not registering (user decision 2026-10-14).
+    expect(fr).toContain("Exception : le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire");
+    expect(en).toContain("Exception: a player's username in the #live announcement of a solo tournament — objecting to it means not registering");
+    // Retention of the #live post, as on the site (T16).
+    expect(fr).toContain("**Annonces #live** (début d'un match diffusé : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
+    expect(en).toContain("**#live announcements** (start of a streamed match: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["16 octobre 2026", "16 October 2026"]);
+  });
+});

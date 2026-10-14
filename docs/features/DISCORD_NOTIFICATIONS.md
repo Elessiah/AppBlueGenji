@@ -753,10 +753,50 @@ pseudo BlueGenji du destinataire (`label`, bilan d'envoi).
 Destinataires déclarés tels qu'ils sont : tous les membres actifs des équipes
 (coachs, managers, propriétaires compris — registre T04, personnes concernées).
 L'entrée ne fige pas la base légale des messages privés (elle dit seulement que
-le sujet push ne les règle pas) : `/rgpd` la porte et peut changer. **Limite
-connue** : aucun réglage ne permet d'honorer une opposition à ces messages
-privés (intérêt légitime) sans intervention technique — décision requise :
-un réglage par compte, ou leur requalification en exécution du service.
+le sujet push ne les règle pas) : `/rgpd` la porte et peut changer.
+
+### Interrupteur des messages privés de match (droit d'opposition)
+
+Décision de l'utilisateur (2026-10-14) : les messages privés de match d'un
+**joueur** reposent sur l'intérêt légitime, et son droit d'opposition est honoré
+par un interrupteur de `/profil` (section Notifications, « Messages privés
+Discord de mes matchs », `MatchDmField`) ; les envois au **staff** (alertes,
+programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
+
+- **Stockage** : `bg_users.match_dm_enabled TINYINT(1) NOT NULL DEFAULT 1`
+  (`CREATE TABLE` + `RECENT_SCHEMA_CHANGES`). Activé par défaut ; remis à `1` à
+  l'anonymisation ; rendu dans l'export (`account.matchDmEnabled`) et dans la
+  fiche de son seul titulaire (`matchDmEnabled`).
+- **Écriture** : `PUT /api/profile/match-dms` `{ "enabled": boolean }` →
+  `INVALID_MATCH_DM_PREFERENCE` (400) sinon, `ACCOUNT_DELETED` (409) pour un
+  compte supprimé (`lib/server/users/match-dm-preference.ts`).
+- **Lecture** : `loadNotificationRecipients(ids, "declared", { matchDm: true })`
+  (`lib/server/notify.ts`), appelé par `loadRecipientsByTeam`
+  (`match-reminders.ts`), seul chargeur des destinataires de match. Un joueur
+  opposé reste destinataire **sans canal Discord** : ses push (sujet
+  `MATCH_REMINDER`) partent comme avant ; sans appareil abonné, il ne compte pas
+  comme atteint (pas de marque d'horaire reçu).
+- **Messages couverts** : annonce d'horaire (`match-scheduled`), horaire retiré
+  (`match-schedule-cleared`), rappels 24 h et 10 h / check-in
+  (`match-reminder`), « Match retiré » (`match-withdrawn`). Non couverts : les
+  messages privés au compte hors match (modération, logo, données, demande
+  d'adhésion), et tout envoi au staff (`notifyStaff`).
+- **Écran** : enregistré au clic, sans bouton. Pendant l'envoi la case reste
+  focalisable et utilisable (`aria-busy`, ni `disabled` ni `aria-disabled`) ; un
+  clic fait pendant l'envoi s'affiche et part à la suite (`runQueuedSaves`,
+  comme la langue du compte), le toast de succès ne dit que le dernier choix
+  enregistré. Un compte sans Discord rattaché ni tag renseigné voit une ligne
+  de plus (`matchDms.noDiscord`, liée par `aria-describedby`) : aucun de ces
+  messages ne peut lui parvenir.
+- **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
+  `schedule.noticePlanning`, FR + EN) précise qu'un joueur qui a coupé ces
+  messages ne reçoit pas le message privé, pour qu'un arbitre ne le tienne pas
+  pour prévenu.
+- **Déclaration** : registre T04 (FR + EN), ligne « Choix des messages privés de
+  match » du tableau de `/rgpd` (`DONNEES_PROFIL`, intérêt légitime) et droit
+  d'opposition (`MATCH_TIME_DM_SCOPE`, qui nomme l'avis de retrait et la case).
+  Le pseudo du site porte en plus `LIVE_PSEUDO_SCOPE` (annonce #live), et T01 /
+  T08 citent l'annonce #live.
 
 ## Configuration
 

@@ -725,6 +725,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
     ],
   },
+  // RGPD-DM-SWITCH : pseudo solo dans #live (T16), interrupteur des messages
+  // privés de match et bases légales (T04). Publiée le lendemain de la mise en ligne.
+  {
+    id: "2026-10-pseudo-live-et-messages-de-match",
+    title: "Ton pseudo dans les annonces #live, et les messages privés de match à ton choix",
+    publishedAt: "2026-10-16",
+    summary:
+      "En tournoi individuel, l'annonce d'un match diffusé dans le salon #live nomme désormais les joueurs par leur pseudo ; tu peux couper les messages privés Discord de tes matchs depuis « Mon profil ».",
+    details: [
+      "Annonce #live, tournoi individuel : ton pseudo public BlueGenji remplace « un joueur » (le pseudo de ta fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, ton pseudo Discord ou ton BattleTag repris à la création du compte, voire le nom de ton compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais ton identifiant Discord numérique). Un match d'équipes ne nomme toujours que les équipes. Les autres messages Discord du site restent sans pseudo de joueur. Le nom neutre obtenu par opposition ne vaut que pour la diffusion : pour ne pas être nommé dans #live, ne t'inscris pas. Une inscription faite avant cette date reste « un joueur ».",
+      "Ces annonces restent dans le salon tant qu'il existe, même après la suppression de ton compte ; l'équipe ou le joueur concerné peut en demander la suppression (« Signaler un problème », catégorie RGPD).",
+      "Messages privés de match (horaire posé, changé ou retiré, rappels, « Match retiré ») : intérêt légitime, avec un droit d'opposition. Décoche « Messages privés Discord de mes matchs » dans « Mon profil », section Notifications, pour ne plus les recevoir ; tes notifications push gardent leurs propres réglages. Le site garde ce choix le temps du compte, dans l'export de tes données.",
+      "Les alertes et le programme d'arbitrage, adressés aux arbitres et administrateurs, relèvent de l'exécution du service et ne se coupent pas ainsi.",
+    ],
+    links: [
+      { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
+      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

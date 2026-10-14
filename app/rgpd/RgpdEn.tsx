@@ -274,7 +274,9 @@ export function RgpdEn({
           — subject to the encrypted backup copies (**), which erase themselves after {BACKUP_RETENTION_DAYS}{" "}
           days, to the record of the deletion in the log that replays it after a restoration (account number and
           creation date, {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days), and to the reports you sent, detached
-          from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>);
+          from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
+          the #live announcements of a solo tournament, which keep your username in the Discord channel until they
+          are deleted on request (<a href="#retransmission">“Match streaming”</a>);
           for a staff member, their refereeing actions remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
@@ -785,6 +787,18 @@ export function RgpdEn({
               account is anonymized. Discord messages, for their part, stay in French.
             </li>
           </ul>
+          <p id="messages-de-match">
+            <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in French, when
+            the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before) and
+            when you are removed from a match. These messages are based on the association&apos;s{" "}
+            <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
+            unticking “Discord direct messages about my matches” in{" "}
+            <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — your push notifications
+            keep their own settings. The site keeps this choice for the lifetime of the account; it appears in the
+            export of your data. Referee alerts and the refereeing schedule sent to referees and administrators fall
+            under <strong>performance of the service</strong> and are not turned off this way (
+            <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
+          </p>
         </div>
       </section>
 
@@ -809,7 +823,8 @@ export function RgpdEn({
             <li>
               <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match times and
               reminders, notifications), the staff-only channels and the announcement of streamed matches in the #live
-              channel, which carry no player username; and logging in through Discord, if you choose it.
+              channel, which carry no player username — except that announcement in a solo tournament, which names
+              the players by their public username; and logging in through Discord, if you choose it.
             </li>
             <li>
               <strong>Google and Blizzard</strong> (United States): only if you log in through one of them, which
@@ -868,8 +883,15 @@ export function RgpdEn({
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
-            server, with an @everyone mention: the names of both teams (“a player” in a solo tournament, never a
-            username), the tournament&apos;s name and the stream link.
+            server, with an @everyone mention: the names of both teams (never their players&apos; usernames) or, in a
+            solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile, with no effect on an announcement already posted: unless changed, the Discord username or BattleTag
+            taken when the account was created, or even the Google account name for a Google account created before
+            September 30, 2026; never the numeric Discord identifier; “a player” for an entry without an account, a deleted account or a
+            registration made before 16 October 2026), the tournament&apos;s name and the stream link. The neutral name applies to
+            the stream only: a player who does not want their username in that announcement does not register for
+            the solo tournament. These announcements stay in
+            the channel as long as the #live channel exists; the team or player concerned can ask for their deletion
+            through the “Report a problem” button, GDPR category.
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>
         </div>

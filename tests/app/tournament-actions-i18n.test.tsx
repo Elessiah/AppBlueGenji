@@ -43,6 +43,8 @@ import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
 import referenceErrors from "../fixtures/tournament-errors-fr-before-lot8b.json";
+import enActions from "@/messages/en/tournamentActions.json";
+import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import {
@@ -279,6 +281,13 @@ describe("table des refus (error-map)", () => {
 describe("français inchangé — les messages égalent les textes d'origine", () => {
   const fr = (source: string, values: Record<string, string | number> = {}) => formatMessage("fr", source, values);
 
+  it("horaire de match : le staff sait qu'un joueur peut avoir coupé les messages privés de ses matchs", () => {
+    for (const key of ["notice", "noticePlanning"] as const) {
+      expect(frDialogs.schedule[key]).toMatch(/message privé Discord, sauf pour un joueur qui a coupé ceux de ses matchs, et notification push/);
+      expect(enDialogs.schedule[key]).toMatch(/Discord direct message, except for a player who turned off those about their matches, and push notification/);
+    }
+  });
+
   it("libellés d'engagés, mention de retransmission, source de l'ordre", () => {
     for (const type of ["TEAM", "SOLO"] as const) {
       const wording = PARTICIPANT_WORDING[type];
@@ -288,6 +297,8 @@ describe("français inchangé — les messages égalent les textes d'origine", (
         forfeitSelfConfirm: wording.forfeitSelfConfirm,
       });
       expect(frActions.register.streamNotice[type]).toBe(registrationStreamNotice(type === "SOLO"));
+      // FR and EN state the same fate of a past #live post (user decision 2026-10-14).
+      expect(enActions.register.streamNotice[type].includes("deleted on request")).toBe(type === "SOLO");
       const ghost = frDialogs.ghost[type];
       expect([ghost.title, ghost.hint, ghost.selectMany, ghost.noneAvailable, ghost.newName]).toEqual([
         wording.guestTitle,

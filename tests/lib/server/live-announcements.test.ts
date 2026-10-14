@@ -13,9 +13,15 @@ import {
   LIVE_ANNOUNCE_RETRY_DELAY_MS,
   dispatchLiveAnnouncements,
   liveAnnouncementsEnabled,
+  liveEntrantName,
   resetLiveAnnouncementThrottle,
   runLiveAnnouncementSweep,
+  soloPseudoRegisteredSince,
 } from "@/lib/server/tournaments/live-announcements";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 const NOW = Date.parse("2026-10-14T20:00:00Z");
@@ -39,6 +45,8 @@ const AUTO_LIVE = {
   team2_name: "Nova",
   team1_solo_user_id: null,
   team2_solo_user_id: null,
+  team1_pseudo: null,
+  team2_pseudo: null,
 };
 
 type Db = { query: jest.Mock<SqlQuery>; execute: jest.Mock<SqlQuery> };
@@ -112,12 +120,99 @@ describe("runLiveAnnouncementSweep", () => {
     expect(console.info).toHaveBeenCalledWith("[live-announce] match 40 (tournoi 4) annoncé dans #live");
   });
 
-  it("écrit « un joueur » pour une entrée individuelle même si le type du tournoi est illisible", async () => {
-    mockDb([{ ...AUTO_LIVE, participant_type: null, team1_name: "PseudoA", team2_name: "PseudoB", team1_solo_user_id: 7, team2_solo_user_id: 8 }]);
+  it("nomme une entrée individuelle par le pseudo du compte, pas par le nom de l'entrée, même au type illisible", async () => {
+    const { query } = mockDb([
+      {
+        ...AUTO_LIVE,
+        participant_type: null,
+        team1_name: "Alpha (2)",
+        team2_name: "Bravo",
+        team1_solo_user_id: 7,
+        team2_solo_user_id: 8,
+        team1_pseudo: "Alpha",
+        team2_pseudo: "Bravo",
+      },
+    ]);
     await runLiveAnnouncementSweep(NOW);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe(
-      "🔴 En direct : un joueur contre un joueur — Coupe d'hiver",
-    );
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : Alpha contre Bravo — Coupe d'hiver");
+    // Le pseudo vient du compte vivant de l'entrée solo, jamais d'un compte supprimé.
+    const sql = String(query.mock.calls[0][0]);
+    expect(sql).toMatch(/LEFT JOIN bg_users u1 ON u1\.id = t1\.solo_user_id AND u1\.is_deleted = 0/);
+    expect(sql).toMatch(/LEFT JOIN bg_users u2 ON u2\.id = t2\.solo_user_id AND u2\.is_deleted = 0/);
+  });
+
+  it("ne lit le pseudo que d'une inscription faite depuis la publication du changement qui l'annonce", async () => {
+    const { query } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    const [sql, params] = query.mock.calls[0];
+    const since = soloPseudoRegisteredSince();
+    const publishedAt = PRIVACY_CHANGES.find((c) => c.id === "2026-10-pseudo-live-et-messages-de-match")?.publishedAt;
+    // Minuit à Paris du jour de publication (heure d'été : 22 h UTC la veille), en secondes Unix.
+    expect(publishedAt).toBe("2026-10-16");
+    expect(since).toBe(Date.UTC(2026, 9, 15, 22, 0) / 1000);
+    // Un joueur inscrit avant a lu « un joueur, jamais un pseudo » : son entrée le reste.
+    for (const alias of ["t1", "t2"]) {
+      expect(String(sql).replace(/\s+/g, " ")).toContain(
+        `EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.tournament_id = m.tournament_id AND r.team_id = ${alias}.id AND UNIX_TIMESTAMP(r.registered_at) >= ?)`,
+      );
+    }
+    expect(params).toEqual([since, since]);
+  });
+
+  it("les textes légaux datent le seuil comme le changement publié (FR et EN)", () => {
+    // Déplacer `publishedAt` déplace le seuil : ces textes doivent suivre.
+    expect(soloPseudoRegisteredSince()).toBe(Date.UTC(2026, 9, 15, 22, 0) / 1000);
+    const t16 = (list: typeof PROCESSING_ACTIVITIES) => JSON.stringify(list.find((sheet) => sheet.ref === "T16"));
+    expect(t16(PROCESSING_ACTIVITIES)).toContain("inscription antérieure au 16 octobre 2026");
+    expect(t16(PROCESSING_ACTIVITIES_EN)).toContain("registration made before 16 October 2026");
+    const policy = JSON.stringify(PRIVACY_POLICY);
+    expect(policy).toContain("inscription antérieure au 16 octobre 2026");
+    expect(policy).toContain("registration made before 16 October 2026");
+  });
+
+  it("donne au bot une version sans pseudo à citer dans son canal de logs en cas d'échec", async () => {
+    mockDb([{ ...AUTO_LIVE, participant_type: "SOLO", team1_solo_user_id: 7, team2_solo_user_id: 8, team1_pseudo: "Kiro", team2_pseudo: "Ayla" }]);
+    await runLiveAnnouncementSweep(NOW);
+    const [message, , , logMessage] = jest.mocked(pushLiveAnnouncement).mock.calls[0];
+    expect(message).toBe("🔴 En direct : Kiro contre Ayla — Coupe d'hiver");
+    expect(logMessage).toBe("🔴 En direct : un joueur contre un joueur — Coupe d'hiver");
+  });
+
+  it("n'envoie pas de version de logs quand l'annonce ne nomme que des équipes", async () => {
+    mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0]).toHaveLength(3);
+  });
+
+  it("écrit « un joueur » pour une entrée individuelle dont le compte est supprimé", async () => {
+    mockDb([{ ...AUTO_LIVE, team1_name: "Anonyme-1", team2_name: "Bravo", team1_solo_user_id: 7, team2_solo_user_id: 8, team2_pseudo: "Bravo" }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+  });
+
+  it("tournoi individuel : un invité sans compte (fantôme nommé par le staff) s'écrit « un joueur », jamais son nom", async () => {
+    mockDb([
+      { ...AUTO_LIVE, participant_type: "SOLO", team1_name: "Lucas Martin", team2_name: "Bravo (2)", team2_solo_user_id: 8, team2_pseudo: "Bravo" },
+    ]);
+    await runLiveAnnouncementSweep(NOW);
+    const message = jest.mocked(pushLiveAnnouncement).mock.calls[0][0];
+    expect(message).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+    expect(message).not.toContain("Lucas");
+  });
+
+  it("type illisible mais entrée individuelle dans le groupe : l'invité sans compte reste « un joueur »", async () => {
+    mockDb([{ ...AUTO_LIVE, participant_type: null, team1_name: "Lucas Martin", team2_solo_user_id: 8, team2_pseudo: "Bravo" }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+  });
+
+  it("liveEntrantName : équipe par son nom, entrée solo par son pseudo, sinon « un joueur » (null)", () => {
+    expect(liveEntrantName(null, "Renards", null, "TEAM")).toBe("Renards");
+    expect(liveEntrantName(null, "Renards", null, "inconnu")).toBe("Renards");
+    expect(liveEntrantName(null, "Lucas Martin", null, "SOLO")).toBeNull();
+    expect(liveEntrantName(7, "Alpha (2)", "Alpha", "SOLO")).toBe("Alpha");
+    expect(liveEntrantName(7, "Alpha (2)", "  ", "TEAM")).toBeNull();
+    expect(liveEntrantName(7, "Alpha (2)", null, null)).toBeNull();
   });
 
   it("n'annonce pas un match `AUTO` pas encore lancé, ni lancé pour une autre affiche", async () => {
@@ -484,12 +579,27 @@ describe("runLiveAnnouncementSweep", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("n'écrit jamais le pseudo d'un joueur en tournoi individuel", async () => {
-    mockDb([{ ...AUTO_LIVE, participant_type: "SOLO", team1_name: "PseudoA", team2_name: "PseudoB" }]);
+  it("neutralise le pseudo publié d'un joueur en tournoi individuel", async () => {
+    mockDb([
+      {
+        ...AUTO_LIVE,
+        participant_type: "SOLO",
+        team1_solo_user_id: 7,
+        team2_solo_user_id: 8,
+        team1_pseudo: "@everyone",
+        team2_pseudo: "[Nitro](https://piege.example)",
+      },
+    ]);
     await runLiveAnnouncementSweep(NOW);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe(
-      "🔴 En direct : un joueur contre un joueur — Coupe d'hiver",
-    );
+    const text = String(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]);
+    expect(text).not.toMatch(/@everyone|\]\(https:|https:\/\/piege/);
+    expect(text).toMatch(/^🔴 En direct : .+ contre .+ — Coupe d'hiver$/);
+  });
+
+  it("garde les seuls noms d'équipe pour un match d'équipes", async () => {
+    mockDb([{ ...AUTO_LIVE, team1_pseudo: "NePasPublier", team2_pseudo: "NonPlus" }]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : Renards contre Nova — Coupe d'hiver");
   });
 });
 

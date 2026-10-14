@@ -53,7 +53,9 @@ import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } 
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
-import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import { parisInstant } from "@/lib/shared/match-start-entry";
+import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import type { MatchStatus } from "@/lib/shared/types";
 
 type LiveCandidateRow = RowDataPacket & {
@@ -74,6 +76,9 @@ type LiveCandidateRow = RowDataPacket & {
   team2_name: string;
   team1_solo_user_id: number | null;
   team2_solo_user_id: number | null;
+  /** Pseudo public du joueur d'une entrée individuelle (`null` : équipe, ou compte supprimé). */
+  team1_pseudo: string | null;
+  team2_pseudo: string | null;
 };
 
 /**
@@ -144,6 +149,30 @@ export function liveAnnouncementsEnabled(): boolean {
   );
 }
 
+/** Changement de confidentialité qui annonce le pseudo des entrées individuelles dans #live. */
+const SOLO_PSEUDO_PRIVACY_CHANGE_ID = "2026-10-pseudo-live-et-messages-de-match";
+
+/**
+ * Première date d'inscription dont le pseudo peut partir dans #live : celle de
+ * la publication du changement qui l'annonce. Un joueur inscrit avant a lu
+ * « un joueur, jamais un pseudo » et ne peut plus « ne pas s'inscrire » : son
+ * entrée reste « un joueur » jusqu'au bout du tournoi. Changement introuvable :
+ * aucun pseudo ne part.
+ *
+ * @returns Minuit à Paris du jour de publication, en secondes Unix — comparé à
+ *   `UNIX_TIMESTAMP(registered_at)`, qui lit la date dans le fuseau de la
+ *   session : le seuil ne dépend pas du fuseau du serveur de base.
+ */
+export function soloPseudoRegisteredSince(): number | null {
+  const change = PRIVACY_CHANGES.find((entry) => entry.id === SOLO_PSEUDO_PRIVACY_CHANGE_ID);
+  if (!change) return null;
+  const [year, month, day] = change.publishedAt.split("-").map(Number);
+  return parisInstant(year, month, day, 0, 0) / 1000;
+}
+
+/** Seuil d'un changement introuvable : aucune inscription ne l'atteint (9999-12-31). */
+const NEVER_REGISTERED_SINCE = 253_402_300_799;
+
 /**
  * Matchs castés, jouables, d'un tournoi en cours, passés à l'antenne depuis
  * moins de deux heures, dont l'affiche courante n'a pas encore été annoncée. Le passage à l'antenne se décide ensuite **en
@@ -152,24 +181,34 @@ export function liveAnnouncementsEnabled(): boolean {
  */
 async function loadCandidates(): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
+  // Le pseudo n'est lu que pour une inscription faite sous la mention qui
+  // l'annonce (`soloPseudoRegisteredSince`) ; sinon `NULL`, « un joueur ».
+  const since = soloPseudoRegisteredSince() ?? NEVER_REGISTERED_SINCE;
+  const registeredSince = (alias: string) =>
+    `EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.tournament_id = m.tournament_id
+               AND r.team_id = ${alias}.id AND UNIX_TIMESTAMP(r.registered_at) >= ?)`;
   const [rows] = await db.query<LiveCandidateRow[]>(
     `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
             t.live_url AS tournament_live_url, m.status, m.start_at, m.live_trigger,
             m.live_started_at, m.live_url, m.launched_at, m.launch_pairing,
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
-            t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id
+            t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
+            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
                             AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
+       LEFT JOIN bg_users u1 ON u1.id = t1.solo_user_id AND u1.is_deleted = 0 AND ${registeredSince("t1")}
+       LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0 AND ${registeredSince("t2")}
       WHERE m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
         AND ${FRESH_ON_AIR_SQL}
         AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
                          WHERE a.match_id = m.id
                            AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
       ORDER BY m.id`,
+    [since, since],
   );
   return rows;
 }
@@ -298,13 +337,23 @@ function matchIdsOf(group: AnnouncementGroup): number[] {
 }
 
 /**
- * Type d'engagés d'un groupe. Une entrée individuelle (`solo_user_id`) porte le
- * nom de son joueur : elle s'écrit « un joueur » même si le type du tournoi
- * était illisible — un pseudo ne part jamais devant tout le serveur.
+ * Nom public d'un engagé dans l'annonce #live : le nom de l'équipe, ou, pour
+ * une entrée individuelle (`solo_user_id`), le **pseudo du compte** — seule
+ * exception à la règle « aucun pseudo sur Discord », décidée par l'utilisateur
+ * (2026-10-14, `RGPD_LOGS_AND_VISITS.md`). Jamais le nom de l'entrée solo
+ * (`bg_teams.name`, qui peut porter un suffixe de dédoublonnage) ; `null` pour
+ * un compte supprimé, écrit « un joueur ». En tournoi individuel, une entrée
+ * sans compte (invité fantôme, nommé par le staff — souvent un prénom) s'écrit
+ * aussi « un joueur » : seul un pseudo de compte peut partir.
  */
-function groupParticipantType(rows: readonly LiveCandidateRow[]): ParticipantType {
-  const solo = rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null);
-  return solo ? "SOLO" : toParticipantType(rows[0].participant_type);
+export function liveEntrantName(
+  soloUserId: number | null,
+  teamName: unknown,
+  pseudo: unknown,
+  participantType: unknown,
+): string | null {
+  if (soloUserId == null) return isSoloTournament(toParticipantType(participantType)) ? null : String(teamName);
+  return typeof pseudo === "string" && pseudo.trim() !== "" ? pseudo : null;
 }
 
 /**
@@ -399,13 +448,25 @@ async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Pr
  */
 async function announce(group: AnnouncementGroup): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
   const [first] = group.rows;
-  const message = formatLiveAnnouncementGroup({
-    tournamentName: String(first.tournament_name),
-    participantType: groupParticipantType(group.rows),
-    pairings: group.rows.map((row) => ({ team1Name: String(row.team1_name), team2Name: String(row.team2_name) })),
-  });
+  // Un groupe qui compte une entrée individuelle est un tournoi individuel,
+  // même au type illisible : son invité sans compte ne part pas sous son nom.
+  const participantType = group.rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
+    ? "SOLO"
+    : first.participant_type;
+  // `withPseudo: false` : ce que le bot cite à son canal de logs si l'annonce
+  // échoue — le même texte, pseudos ôtés : l'exception vaut pour #live seulement.
+  const text = (withPseudo: boolean) =>
+    formatLiveAnnouncementGroup({
+      tournamentName: String(first.tournament_name),
+      pairings: group.rows.map((row) => ({
+        team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, withPseudo ? row.team1_pseudo : null, participantType),
+        team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, withPseudo ? row.team2_pseudo : null, participantType),
+      })),
+    });
+  const message = text(true);
+  const logMessage = text(false);
   const { label, context, plural } = describeGroup(group);
-  const outcome = await pushLiveAnnouncement(message, group.url, context);
+  const outcome = await pushLiveAnnouncement(message, group.url, context, ...(logMessage === message ? [] : [logMessage]));
   if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner @everyone absente)" : "";

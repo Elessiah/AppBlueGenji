@@ -48,6 +48,7 @@ import { useAppLocale } from "@/components/i18n/locale-context";
 import { localeHref } from "@/lib/shared/locales";
 import { ProfileSection } from "./_components/ProfileSection";
 import { AccountLocaleField } from "./_components/AccountLocaleField";
+import { MatchDmField } from "./_components/MatchDmField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
@@ -85,6 +86,16 @@ interface DiscordState {
   linked: boolean | null;
   /** Tag nommé par Discord : certifiable d'un clic sur un compte rattaché. */
   attested: boolean;
+}
+
+/**
+ * Un message privé de match peut-il joindre ce compte ? Oui avec un Discord
+ * rattaché ou un tag enregistré (`toNotificationRecipient`) ; `null` tant que
+ * l'état Discord n'est pas lu.
+ */
+function matchDmReachable(discordState: DiscordState, savedTag: string): boolean | null {
+  if (discordState.linked === null) return null;
+  return discordState.linked || savedTag.trim() !== "";
 }
 
 /**
@@ -1023,6 +1034,12 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
         {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
+        {/* Un compte sans Discord rattaché ni tag ne reçoit aucun de ces
+            messages : la case le dit (`null` tant que l'état n'est pas lu). */}
+        <MatchDmField
+          initial={data?.matchDmEnabled}
+          discordReachable={matchDmReachable(discordState, savedDiscordPseudo)}
+        />
       </ProfileSection>
 
       {invitations.length > 0 && (

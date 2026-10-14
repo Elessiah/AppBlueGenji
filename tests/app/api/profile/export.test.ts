@@ -30,6 +30,7 @@ function sampleExport(): PersonalDataExport {
       isAdult: true,
       isAdmin: false,
       locale: "fr",
+      matchDmEnabled: true,
       createdAt: "2026-01-01T00:00:00.000Z",
     },
     profile: {
@@ -46,6 +47,7 @@ function sampleExport(): PersonalDataExport {
     pushNotifications: { devices: [], disabledTopics: [] },
     connectionLogs: [{ event: "LOGIN_GOOGLE", ip: "203.0.113.7", createdAt: "2026-07-01T10:00:00.000Z" }],
     mapEntries: [],
+    liveAnnouncements: [],
     suspensions: [],
     termsAcceptances: [],
     reports: [],

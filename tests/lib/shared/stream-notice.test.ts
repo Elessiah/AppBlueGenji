@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   REGISTRATION_STREAM_NOTICE_LINK_LABEL,
+  STREAM_NOTICE_LIVE,
   STREAM_NOTICE_OBJECTION,
   STREAM_NOTICE_PRIVACY_PATH,
   STREAM_NOTICE_SHOWN,
@@ -28,9 +29,12 @@ describe("information sur la retransmission des matchs", () => {
   it("ne prête pas d'équipe à un engagé en individuel", () => {
     expect(registrationStreamNotice(false)).toMatch(/le nom de ton équipe/);
     expect(registrationStreamNotice(true)).not.toMatch(/équipe/);
-    // L'annonce dans #live nomme l'équipe ; une entrée individuelle n'y est jamais nommée.
+    // L'annonce dans #live nomme l'équipe ; une entrée individuelle, son pseudo (2026-10-14).
     expect(registrationStreamNotice(false)).toMatch(/le nom de ton équipe est aussi annoncé sur le Discord de l'association/);
-    expect(registrationStreamNotice(true)).not.toMatch(/Discord/);
+    expect(registrationStreamNotice(true)).toMatch(/ton pseudo est aussi annoncé sur le Discord de l'association/);
+    // S'opposer au pseudo dans #live = ne pas s'inscrire ; une annonce passée reste supprimable (2026-10-14).
+    expect(registrationStreamNotice(true)).toMatch(/ne s'applique pas à cette annonce, qui est supprimée sur demande\./);
+    expect(registrationStreamNotice(false)).not.toMatch(/supprimée sur demande/);
     for (const solo of [true, false]) {
       expect(registrationStreamNotice(solo)).toMatch(/diffusés en direct et enregistrés/);
       expect(registrationStreamNotice(solo)).toMatch(/jamais de webcam ni de chat vocal/);
@@ -47,6 +51,9 @@ describe("conditions d'utilisation — retransmission des matchs", () => {
     const text = section!.paragraphs.join(" ");
     expect(text).toContain(STREAM_NOTICE_SHOWN);
     expect(text).toContain(STREAM_NOTICE_OBJECTION);
+    // Le nom neutre ne couvre pas l'annonce #live d'un tournoi individuel (2026-10-14).
+    expect(text).toContain(STREAM_NOTICE_LIVE);
+    expect(STREAM_NOTICE_LIVE).toMatch(/en tournoi individuel, les joueurs par leur pseudo public ; le nom neutre ne s'applique pas à cette annonce : un joueur qui ne veut pas y être nommé ne s'inscrit pas/);
     expect(section!.links?.map((l) => l.href)).toEqual([STREAM_NOTICE_PRIVACY_PATH]);
   });
 

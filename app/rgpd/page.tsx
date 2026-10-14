@@ -380,7 +380,9 @@ function RgpdFr({
           après une restauration (numéro et date de création du compte,{" "}
           {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), et des signalements que vous avez
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
-          <a href="#signalements">« Signalements »</a>) ; pour un membre du staff, ses gestes
+          <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
+          individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
+          demande (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
@@ -957,6 +959,18 @@ function RgpdFr({
               est anonymisé. Les messages Discord, eux, restent en français.
             </li>
           </ul>
+          <p id="messages-de-match">
+            <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, en
+            français, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
+            rappels (24 h et 10 h avant) et quand vous êtes retiré d&apos;un match. Ces messages reposent
+            sur l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
+            tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
+            mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
+            gardent leurs propres réglages. Le site garde ce choix le temps du compte ; il figure dans
+            l&apos;export de vos données. Les alertes et le programme d&apos;arbitrage adressés aux
+            arbitres et administrateurs relèvent de l&apos;<strong>exécution du service</strong> et ne
+            se coupent pas ainsi (<Link href="/rgpd/registre#t04">registre, T04</Link>).
+          </p>
         </div>
       </section>
 
@@ -984,7 +998,8 @@ function RgpdFr({
             <li>
               <strong>Discord</strong> (États-Unis) : les messages privés du bot (code de
               connexion, horaires et rappels de match, notifications), les salons réservés au staff et
-              l&apos;annonce des matchs diffusés dans le salon #live, qui ne portent aucun pseudo de joueur ;
+              l&apos;annonce des matchs diffusés dans le salon #live, qui ne portent aucun pseudo de joueur
+              — sauf cette annonce en tournoi individuel, qui nomme les joueurs par leur pseudo public ;
               et la connexion par Discord, si vous la choisissez.
             </li>
             <li>
@@ -1053,8 +1068,17 @@ function RgpdFr({
             ou supprimée. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
-            l&apos;association, avec une mention @everyone : le nom des deux équipes (« un joueur » en
-            tournoi individuel, jamais un pseudo), celui du tournoi et le lien de la diffusion.
+            l&apos;association, avec une mention @everyone : le nom des deux équipes (jamais le pseudo
+            de leurs joueurs) ou, en tournoi individuel, le <strong>pseudo public BlueGenji</strong> des
+            deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le
+            BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant
+            le 30 septembre 2026 ; jamais l&apos;identifiant Discord numérique ; « un joueur » pour une
+            entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le
+            lien de la diffusion. Le nom neutre ne vaut que pour la diffusion : un joueur qui ne veut pas
+            voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Ces annonces
+            restent dans le salon tant que le salon #live existe ;
+            l&apos;équipe ou le joueur concerné peut en demander la suppression par le bouton « Signaler
+            un problème », catégorie RGPD.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
         </div>

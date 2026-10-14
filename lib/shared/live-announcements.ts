@@ -6,10 +6,18 @@
  * la mention `@everyone` et en ajoutant le lien seul sur sa ligne. Le texte est
  * en français : Discord reste en français (décision D6 de l'i18n).
  *
- * Règles de vie privée de tout message Discord (`log-privacy.ts`) : un nom
- * d'équipe peut partir, un joueur jamais — une entrée individuelle s'écrit
- * « un joueur ». Les noms passent par `discordInline` : une équipe nommée
- * `@everyone` ne double pas la mention, un nom balisé ne devient pas un lien.
+ * Vie privée : la règle de tout message Discord (`log-privacy.ts`) veut qu'un
+ * nom d'équipe puisse partir, un joueur jamais. L'annonce #live en est la
+ * **seule exception**, décidée par l'utilisateur (2026-10-14) : l'engagé d'une
+ * entrée individuelle y est nommé par son **pseudo public BlueGenji** — un
+ * pseudo de sa fiche (repris de Discord, de Blizzard, voire de Google pour un
+ * compte Google d'avant le 30 septembre 2026, s'il ne l'a pas changé), jamais
+ * l'identifiant Discord numérique —, comme un diffuseur
+ * nomme les joueurs à l'antenne. Une affiche d'équipes ne nomme que les
+ * équipes, jamais leurs joueurs. Un joueur dont le pseudo manque (compte
+ * supprimé) s'écrit « un joueur ». Tous les noms passent par `discordInline` :
+ * un nom `@everyone` ne double pas la mention, un nom balisé ne devient pas un
+ * lien.
  *
  * Plusieurs matchs du même tournoi passés à l'antenne ensemble sur le **même**
  * lien (le cas d'une ronde lancée d'un coup, repliée sur la chaîne officielle)
@@ -19,20 +27,22 @@
  * ou une virgule.
  */
 import { discordInline } from "./discord-text";
-import { entrantLabel } from "./log-privacy";
+import { ANONYMOUS_PLAYER_LABEL } from "./log-privacy";
 import { normalizeStreamUrl } from "./live-streams";
-import type { ParticipantType } from "./participants";
 
-/** Les deux engagés d'une affiche. */
+/**
+ * Les deux engagés d'une affiche, par leur nom public : celui de l'équipe, ou
+ * le pseudo du joueur d'une entrée individuelle. `null` : joueur sans pseudo
+ * publiable (compte supprimé), écrit « un joueur ».
+ */
 export interface LiveAnnouncementPairing {
-  team1Name: string;
-  team2Name: string;
+  team1Name: string | null;
+  team2Name: string | null;
 }
 
 /** Plusieurs affiches d'un même tournoi, annoncées ensemble sur un même lien. */
 export interface LiveAnnouncementGroup {
   tournamentName: string;
-  participantType: ParticipantType;
   pairings: readonly LiveAnnouncementPairing[];
 }
 
@@ -43,11 +53,16 @@ export interface LiveAnnouncementGroup {
  */
 export const LIVE_ANNOUNCEMENT_MAX_LENGTH = 1500;
 
-/** Affiche « A contre B », noms neutralisés. */
-function pairingLine(pairing: LiveAnnouncementPairing, participantType: ParticipantType): string {
-  const first = entrantLabel({ name: pairing.team1Name, participantType });
-  const second = entrantLabel({ name: pairing.team2Name, participantType });
-  return `${first} contre ${second}`;
+/** Un engagé nommé, neutralisé ; `null` sans nom publiable (absent ou vide une fois neutralisé). */
+function publishableName(name: string | null): string | null {
+  if (name === null) return null;
+  const inline = discordInline(name);
+  return inline === "" ? null : inline;
+}
+
+/** Affiche « A contre B », noms neutralisés ; « un joueur » sans nom publiable. */
+function pairingLine(first: string | null, second: string | null): string {
+  return `${first ?? ANONYMOUS_PLAYER_LABEL} contre ${second ?? ANONYMOUS_PLAYER_LABEL}`;
 }
 
 /** « 1 autre match » / « 3 autres matchs ». */
@@ -61,8 +76,6 @@ function otherMatches(count: number): string {
  * - Une affiche : « 🔴 En direct : A contre B — Tournoi ».
  * - Plusieurs : le tournoi en tête, puis une affiche par ligne ; au-delà de
  *   {@link LIVE_ANNOUNCEMENT_MAX_LENGTH}, une dernière ligne compte le reste.
- * - Tournoi individuel, plusieurs affiches : « un joueur contre un joueur »
- *   répété ne dirait rien, le texte compte les matchs.
  *
  * @param group Le tournoi et ses affiches (au moins une).
  * @returns Le texte, prêt à partir.
@@ -70,14 +83,21 @@ function otherMatches(count: number): string {
 export function formatLiveAnnouncementGroup(group: LiveAnnouncementGroup): string {
   const tournament = discordInline(group.tournamentName);
   const count = group.pairings.length;
+  // Chaque nom neutralisé une seule fois ; l'anonymat se lit sur les noms, pas
+  // sur le texte : un pseudo public « un joueur » reste un nom publiable.
+  const names = group.pairings.map(
+    (pairing): [string | null, string | null] => [publishableName(pairing.team1Name), publishableName(pairing.team2Name)],
+  );
   if (count === 1) {
-    return `🔴 En direct : ${pairingLine(group.pairings[0], group.participantType)} — ${tournament}`;
+    return `🔴 En direct : ${pairingLine(names[0][0], names[0][1])} — ${tournament}`;
   }
-  if (group.participantType === "SOLO") {
+  // Aucun nom publiable (invités, comptes supprimés) : « un joueur contre un
+  // joueur » répété ne dirait rien, le texte compte les matchs.
+  if (names.every(([first, second]) => first === null && second === null)) {
     return `🔴 En direct : ${count} matchs — ${tournament}`;
   }
   const header = `🔴 En direct — ${tournament} :`;
-  const lines = group.pairings.map((pairing) => `\n• ${pairingLine(pairing, group.participantType)}`);
+  const lines = names.map(([first, second]) => `\n• ${pairingLine(first, second)}`);
   const full = header + lines.join("");
   if (full.length <= LIVE_ANNOUNCEMENT_MAX_LENGTH) return full;
   // Trop long : autant d'affiches que possible, puis une ligne qui compte le

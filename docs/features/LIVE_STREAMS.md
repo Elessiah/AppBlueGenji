@@ -155,8 +155,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   (« • A contre B ») — un nom d'équipe peut contenir « et » ou une virgule,
   jamais un saut de ligne ; passé 1 500 caractères
   (`LIVE_ANNOUNCEMENT_MAX_LENGTH`), une dernière ligne compte le reste
-  (« • et 3 autres matchs ») plutôt que de laisser le bot couper un nom. En
-  tournoi individuel, « 🔴 En direct : 2 matchs — Tournoi ». Chaque affiche
+  (« • et 3 autres matchs ») plutôt que de laisser le bot couper un nom. Un
+  tournoi individuel énumère ses affiches de pseudos de la même façon. Chaque affiche
   garde sa réservation. Deux matchs **à la suite** restent deux annonces.
 - **Une annonce par match et par affiche** : `bg_live_announcements`
   (clé unique `(match_id, pairing)`, `pairing` = les deux engagés **sans
@@ -235,10 +235,38 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   `//hôte` sans schéma ; chemin décodé et barres doublées fusionnées) est
   refusé : le lien d'un `@everyone` ne mène qu'à la diffusion. Sans lien exploitable, pas d'annonce.
 - **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
-  Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `entrantLabel`
-  (`discordInline` ; une entrée individuelle s'écrit « un joueur », jamais un
-  pseudo — décidé aussi par `bg_teams.solo_user_id`, pas seulement par le type
-  du tournoi). Le bot préfixe `@everyone` et n'autorise que cette mention
+  Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `discordInline`
+  (mentions, balisage et liens neutralisés). Une affiche d'équipes ne nomme que
+  les équipes ; une entrée individuelle (`bg_teams.solo_user_id`, pas le type du
+  tournoi) porte le **pseudo public** du compte (`bg_users.pseudo`, jamais le nom
+  de l'entrée solo, qui peut porter un suffixe ; `liveEntrantName`) — **seule
+  exception** à la règle « aucun pseudo sur Discord », décidée par l'utilisateur
+  le 2026-10-14 (`RGPD_LOGS_AND_VISITS.md`). Compte supprimé ou pseudo vide :
+  « un joueur » ; de même, en tournoi `SOLO`, une entrée sans compte (invité
+  fantôme nommé par le staff) — seul un pseudo de compte part. Plusieurs affiches d'un tournoi individuel s'énumèrent comme
+  celles d'équipes. Si aucune ne porte de nom publiable, le texte compte les
+  matchs (« N matchs »). Une entrée individuelle dans le groupe fait lire le
+  tournoi comme individuel, même au type illisible. **Inscriptions d'avant** :
+  le pseudo n'est lu que pour une inscription (`bg_tournament_registrations.registered_at`)
+  faite depuis la publication du changement de confidentialité qui l'annonce
+  (`soloPseudoRegisteredSince`, `publishedAt` de `2026-10-pseudo-live-et-messages-de-match`) :
+  un joueur inscrit sous l'ancienne mention reste « un joueur ». Le seuil vaut
+  ce que vaut `publishedAt` (lendemain de la mise en ligne, `PRIVACY_CHANGES_CONSENT.md`) :
+  si le déploiement glisse, avancer `publishedAt` **et** la date « 16 octobre 2026 »
+  du registre T16, de `/rgpd` et de la politique du bot (FR + EN, test `live-announcements.test.ts`).
+  Seuil à minuit, heure de Paris, comparé à `UNIX_TIMESTAMP(registered_at)` : il
+  ne dépend pas du fuseau du serveur de base.
+  L'exception s'arrête à
+  #live : quand le texte nomme un joueur, le site joint `logMessage`, le même
+  texte **sans pseudo** (« un joueur »), que le bot cite à la place de
+  `message` dans son canal de logs quand l'annonce échoue (version du bot qui
+  le lit requise : sans elle, la citation porterait les pseudos). **Conservation** : le message reste dans #live tant que le
+  salon existe ; supprimé sur demande de l'équipe ou du joueur concerné
+  (« Signaler un problème », catégorie RGPD) — registre T16 (pseudo publié déclaré
+  en catégorie de données), `/rgpd`, et la fenêtre de suppression du compte
+  (`deletion.residual`), qui le rappelle au joueur ; les conditions d'utilisation
+  (section « Retransmission des matchs », `STREAM_NOTICE_LIVE` / `_EN`) disent que
+  le nom neutre ne couvre pas cette annonce. Le bot préfixe `@everyone` et n'autorise que cette mention
   (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
@@ -291,8 +319,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   chaîne officielle, ou ne la fait pas partir sans chaîne officielle.
 - **Information à l'inscription** : la mention sous le bouton d'inscription
   (`register.streamNotice.TEAM`, `registrationStreamNotice`) dit aussi que le
-  nom de l'équipe est annoncé sur le Discord de l'association ; en individuel,
-  rien à ajouter — un joueur n'y est jamais nommé.
+  nom de l'équipe est annoncé sur le Discord de l'association ; en individuel
+  (`register.streamNotice.SOLO`), que le pseudo du joueur l'est.
 - **Production — permissions Discord** dans #live : « Voir le salon »,
   « Envoyer des messages », « Mentionner @everyone, @here et tous les rôles »
   et « Intégrer des liens ». Sans la mention, le message part sans notifier ;

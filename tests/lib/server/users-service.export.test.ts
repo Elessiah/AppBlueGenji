@@ -14,6 +14,9 @@ jest.mock("@/lib/server/connection-logs", () => ({
     { event: "LOGIN_DISCORD", ip: "203.0.113.7", createdAt: "2026-09-01T00:00:00.000Z" },
   ]),
 }));
+jest.mock("@/lib/server/users/live-announcement-export", () => ({
+  listOwnLiveAnnouncements: jest.fn(async () => [{ matchId: 5, tournamentId: 2, sentAt: "2026-10-20T18:00:00.000Z" }]),
+}));
 jest.mock("@/lib/server/match-map-entries", () => ({
   listOwnMapEntries: jest.fn(async () => [
     {
@@ -136,6 +139,7 @@ describe("exportOwnData", () => {
     ]);
 
     // Les maps saisies par le titulaire (codes de replay) font partie du droit d'accès.
+    expect(data.liveAnnouncements).toEqual([{ matchId: 5, tournamentId: 2, sentAt: "2026-10-20T18:00:00.000Z" }]);
     expect(data.mapEntries).toEqual([
       expect.objectContaining({ matchId: 5, source: "FINAL", replayCode: "ABC123" }),
     ]);

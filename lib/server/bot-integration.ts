@@ -737,11 +737,16 @@ async function announcedWithoutMention(response: Response): Promise<boolean> {
  * @param message Texte rédigé par `formatLiveAnnouncementGroup`, noms neutralisés.
  * @param streamUrl Lien déjà validé par la liste blanche.
  * @param context Étiquette de journalisation côté bot.
+ * @param logMessage Version **sans pseudo** du texte, que le bot cite à la
+ *   place de `message` dans son canal de logs quand l'annonce échoue : le
+ *   pseudo d'une entrée individuelle n'a sa place que dans #live
+ *   (`RGPD_LOGS_AND_VISITS.md`). Omise quand le texte ne nomme aucun joueur.
  */
 export async function pushLiveAnnouncement(
   message: string,
   streamUrl: string,
   context: string,
+  logMessage?: string,
 ): Promise<LiveAnnouncementOutcome> {
   if (isCircuitOpen()) return "unavailable";
 
@@ -753,7 +758,7 @@ export async function pushLiveAnnouncement(
         "content-type": "application/json",
         ...getInternalHeaders(),
       },
-      body: JSON.stringify({ message, streamUrl, context }),
+      body: JSON.stringify(logMessage === undefined ? { message, streamUrl, context } : { message, streamUrl, context, logMessage }),
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_NOTIFY_FETCH_TIMEOUT_MS),
     });

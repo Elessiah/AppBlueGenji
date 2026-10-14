@@ -32,7 +32,7 @@
     },
     "notifications": {
       "title": "Notifications",
-      "lead": "Get notified on your phone or computer, even with the site closed."
+      "lead": "Get notified on your phone or computer, even with the site closed, and choose whether the bot messages you privately about your matches."
     },
     "invitations": {
       "title": "Team invitations",
@@ -136,6 +136,13 @@
     "hint": "Push notifications reach you in this language. It follows the page's language each time you log in: your choice here holds until you next log in from a page in the other language.",
     "saved": "Notification language saved."
   },
+  "matchDms": {
+    "label": "Discord direct messages about my matches",
+    "noDiscord": "No Discord account linked and no Discord tag saved: these messages can't reach you for now.",
+    "hint": "On by default: the bot messages you privately when one of your matches is scheduled, rescheduled or unscheduled, when a match leaves your schedule, and for its reminders (day before, check-in). Untick to stop receiving them: your push notifications keep their own settings, and referees still get theirs.",
+    "enabled": "Match direct messages turned on.",
+    "disabled": "Match direct messages turned off."
+  },
   "avatarUpdated": "Avatar updated.",
   "avatarDeleted": "Avatar deleted.",
   "invitations": {
@@ -163,7 +170,7 @@
     "question": "Permanently delete your account?",
     "confirm": "Delete my account",
     "pending": "Deleting…",
-    "residual": "As with any deleted account, what remains is: the site's encrypted backups ({backupDays} days), the record of your deletion in the log used to replay it after a restore (at least {journalDays} days), the audience-measurement fingerprint described in the privacy policy, your connection data (IP address, date, login method), which the law requires us to keep for {logDays} days, and, if you're a staff member, the trace of your actions in the server logs.",
+    "residual": "As with any deleted account, what remains is: the site's encrypted backups ({backupDays} days), the record of your deletion in the log used to replay it after a restore (at least {journalDays} days), the audience-measurement fingerprint described in the privacy policy, your connection data (IP address, date, login method), which the law requires us to keep for {logDays} days, the announcements of your solo-tournament matches posted in the Discord #live channel, which keep your username until they are deleted on request, and, if you're a staff member, the trace of your actions in the server logs.",
     "irreversible": "This can't be undone.",
     "consequences": {
       "TOURNAMENTS": "Your personal information will be erased and your username replaced with a placeholder one, but your tournament statistics will be kept — they also belong to the teams you played against.",
@@ -197,7 +204,8 @@
       "DISCORD_TAG_LOCKED": "Your Discord account is linked: this tag comes from it. Rename yourself on Discord, then log in again to change it, or remove it.",
       "BATTLETAG_LOCKED": "Your Blizzard account is linked: this BattleTag comes from it. Remove Blizzard from “Connected apps” to change it, or untick “OW BattleTag” to stop publishing it.",
       "ACCOUNT_DELETED": "This account was just deleted: the change wasn't saved.",
-      "INVALID_LOCALE": "The language sent is invalid. Reload the page, then try again."
+      "INVALID_LOCALE": "The language sent is invalid. Reload the page, then try again.",
+      "INVALID_MATCH_DM_PREFERENCE": "The value sent is invalid. Reload the page, then try again."
     },
     "shared": {
       "UNAUTHORIZED": "Your session has expired. Log in again.",

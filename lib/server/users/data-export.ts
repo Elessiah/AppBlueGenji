@@ -12,6 +12,8 @@ import { listOwnSuspensions } from "@/lib/server/account-suspensions";
 import type { PersonalDataExport } from "@/lib/shared/types";
 import { getFullProfile } from "./full-profile";
 import { accountLocaleFromRow } from "./account-locale";
+import { listOwnLiveAnnouncements } from "./live-announcement-export";
+import { matchDmEnabled } from "./match-dm-preference";
 
 /**
  * Rassemble l'intégralité des données personnelles du propriétaire du compte
@@ -43,6 +45,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       visible_discord: 0 | 1;
       open_to_recruitment: 0 | 1;
       locale: string | null;
+      match_dm_enabled: number | null;
       created_at: Date;
     })[]
   >(
@@ -50,7 +53,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
             discord_pseudo, discord_verified_at, discord_id, discord_link_method,
             google_sub, blizzard_sub, is_adult, is_admin,
             visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
-            open_to_recruitment, locale, created_at
+            open_to_recruitment, locale, match_dm_enabled, created_at
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -87,6 +90,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       isAdmin: Boolean(row.is_admin),
       // La langue du compte est une donnée détenue (lot 9-3) : elle est rendue.
       locale: accountLocaleFromRow(row.locale),
+      // L'opposition aux messages privés de match est une donnée détenue : rendue.
+      matchDmEnabled: matchDmEnabled(row.match_dm_enabled),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {
@@ -111,6 +116,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     pushNotifications: await exportPushData(userId),
     connectionLogs: await listOwnConnectionLogs(userId),
     mapEntries: await listOwnMapEntries(userId),
+    liveAnnouncements: await listOwnLiveAnnouncements(userId),
     suspensions: (await listOwnSuspensions(userId)).map((suspension) => ({
       reason: suspension.reason,
       ground: suspension.ground,

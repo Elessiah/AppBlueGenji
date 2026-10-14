@@ -517,7 +517,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
     // Suivie de l'entrée du contact données, de celle des suspensions puis de
     // celle du registre complété, publiées le même jour.
-    expect(PRIVACY_CHANGES.at(-13)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-14)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -544,7 +544,7 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
 
   it("précède l'entrée des suspensions, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-12)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-13)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -578,7 +578,7 @@ describe("PRIVACY_CHANGES — suspension d'un compte", () => {
 
   it("précède l'entrée du registre complété, publiée le lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-11)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-12)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -603,7 +603,7 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
 
   it("précède l'entrée des sauvegardes chez Hetzner, datée du 1er octobre 2026, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-10)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-11)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -643,7 +643,7 @@ describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-trait
 
   it("précède l'entrée des durées du bot, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-9)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-10)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -677,7 +677,7 @@ describe("PRIVACY_CHANGES — durées du bot (fil d'activité, journal du staff,
 
   it("précède l'entrée des scores map par map, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-8)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-9)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -703,7 +703,7 @@ describe("PRIVACY_CHANGES — scores map par map (codes de replay)", () => {
 
   it("précède l'entrée du code de replay facultatif, datée de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-7)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-8)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-06");
     expect(entry.audience).toBeUndefined();
   });
@@ -726,7 +726,7 @@ describe("PRIVACY_CHANGES — code de replay facultatif pour l'arbitrage", () =>
 
   it("précède l'entrée du suivi sans compte, datée de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-7)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-08");
     expect(entry.audience).toBeUndefined();
   });
@@ -750,7 +750,7 @@ describe("PRIVACY_CHANGES — suivi d'un tournoi sans compte", () => {
 
   it("précède l'entrée de la langue du compte, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-09");
     expect(entry.audience).toBeUndefined();
   });
@@ -788,7 +788,7 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
 
   it("précède l'entrée des horaires de match, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-14");
     expect(entry.audience).toBeUndefined();
   });
@@ -823,7 +823,7 @@ describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés 
 
   it("précède l'entrée de l'annonce des matchs diffusés, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-15");
     expect(entry.audience).toBeUndefined();
   });
@@ -885,7 +885,7 @@ describe("PRIVACY_CHANGES — matchs diffusés annoncés sur Discord (#442)", ()
 
   it("précède l'entrée du rappel de check-in, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-15");
     expect(entry.audience).toBeUndefined();
   });
@@ -917,9 +917,9 @@ describe("PRIVACY_CHANGES — rappel de check-in et programme d'arbitrage (#443)
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-rappel-de-check-in")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
+  it("précède l'entrée du pseudo #live et des messages de match, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-16");
     expect(entry.audience).toBeUndefined();
   });
@@ -946,5 +946,45 @@ describe("PRIVACY_CHANGES — rappel de check-in et programme d'arbitrage (#443)
 
   it("tient dans un message privé à elle seule", () => {
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  });
+});
+
+describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de match (RGPD-DM-SWITCH)", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-pseudo-live-et-messages-de-match")!;
+  const english = PRIVACY_CHANGES_EN["2026-10-pseudo-live-et-messages-de-match"];
+
+  it("ferme la liste : datée du 16 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 1);
+    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-16", undefined]);
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  });
+
+  it("déclare le pseudo publié et sa limite, la durée, la suppression sur demande, les bases légales et l'interrupteur", () => {
+    const declared = [entry.title, entry.summary, ...entry.details].join(" ");
+    for (const pattern of [
+      /pseudo public BlueGenji remplace « un joueur »/,
+      /voire le nom de ton compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais ton identifiant Discord numérique/,
+      /modifiable dans Mon profil, sans effet sur une annonce déjà publiée/,
+      /Un match d'équipes ne nomme toujours que les équipes/,
+      /tant qu'il existe/,
+      /demander la suppression/,
+      /intérêt légitime, avec un droit d'opposition/,
+      /« Messages privés Discord de mes matchs »/,
+      /notifications push gardent leurs propres réglages/,
+      /exécution du service/,
+    ]) {
+      expect(declared).toMatch(pattern);
+    }
+    expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/rgpd#retransmission", "/rgpd#messages-de-match"]);
+  });
+
+  it("se traduit détail pour détail et lien pour lien", () => {
+    expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
+    expect(english.title).toBe("Your username in #live announcements, and match direct messages up to you");
+    const translated = english.details.join(" ");
+    for (const pattern of [/right to object/, /performance of the service/, /or even your Google account name for a Google account created before September 30, 2026; never your numeric Discord identifier/]) {
+      expect(translated).toMatch(pattern);
+    }
   });
 });
