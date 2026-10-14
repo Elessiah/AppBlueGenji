@@ -554,7 +554,8 @@ l'envoi pour son horaire et son affiche : citée une fois par horaire ;
 reprogrammée ou d'affiche changée, elle est citée de nouveau. Si aucune manche
 **due** n'a été prise (déplacée entre la lecture et la réservation, réservation
 en échec), la marge ne part pas seule : ses marques sont rendues
-(`releaseDigestMarks`, une seule instruction `(match_id, start_at) IN …`),
+(`releaseDigestMarks`, une seule instruction, `match_id IN …` en tête pour la
+clé unique, puis `(match_id, start_at) IN …`),
 et elle attend le programme que la prochaine manche due
 ouvrira — sinon elle serait citée en avance et la manche due en ouvrirait un
 second. Les réservations
@@ -570,7 +571,8 @@ Canaux :
   marge en cite jusqu'à 12 h), cinq lignes au plus **et dans la borne du corps
   d'un push** (`PUSH_BODY_MAX`, 240 caractères, « … et N autres » et fuseau
   compris : coupé au-delà, le push perdrait ces deux lignes et l'arbitre
-  croirait la liste complète ; une seule ligne trop longue est raccourcie), et
+  croirait la liste complète ; une seule ligne trop longue est raccourcie ; au-delà
+  des lignes affichables, rien n'est mis en forme, le reste est compté), et
   le corps garde ses retours à la ligne (`clipPushText(…, keepLines)`), puis « … et N autre(s) »
   (pluriel ICU), puis une dernière ligne « Heure de Paris » / « Paris time »
   (un arbitre à l'étranger lirait sinon son heure locale ; en dernier, car une
