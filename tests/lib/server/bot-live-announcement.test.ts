@@ -164,9 +164,9 @@ describe("pushLiveAnnouncement", () => {
     }
   });
 
-  it("rend « interrupted » sur une erreur interne du bot (500) : il a pu publier avant", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue(new Response("erreur", { status: 500 }));
-    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("interrupted");
+  it("rend « unavailable » sur une erreur interne du bot (500) : elle naît avant l'envoi", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ error: "LIVE_ANNOUNCEMENT_FAILED" }, { status: 500 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
     await succeedOnce();
   });
 
