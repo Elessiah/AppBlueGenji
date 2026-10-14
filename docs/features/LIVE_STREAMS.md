@@ -189,7 +189,12 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   de même (`interrupted` : connexion coupée après l'envoi de la requête —
   `ECONNRESET`, redémarrage pm2 d'un déploiement) : il a pu publier avant ;
   une connexion qui n'a pas abouti (`ECONNREFUSED`, hôte inconnu) rend la
-  réservation. Le bot
+  réservation. Un `503` au corps illisible la garde aussi (il pouvait dire
+  `discord-down`). Un jeton interne refusé (`401`) ou absent du bot (`503`
+  `INTERNAL_API_TOKEN_NOT_CONFIGURED` : la route exige le jeton même en boucle
+  locale) vaut `unauthorized` : réservation rendue, pause d'une minute pour tout
+  le processus, pm2 désigne `BOT_INTERNAL_TOKEN` / `INTERNAL_API_TOKEN`, sans
+  ouvrir le coupe-circuit. Le bot
   répond **avant** d'écrire au canal de logs : un canal lent ne fait pas
   croire au site que rien n'est parti. Ni le `404` ni le `503` n'ouvrent le coupe-circuit
   du bot : un salon fermé ne doit pas suspendre les rappels de fond. Côté
@@ -221,8 +226,11 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   sans lien, bouton « Regarder le live » de l'accueil) ; un caster
   indépendant renseigne donc son lien, sans quoi l'annonce renvoie à la
   chaîne officielle comme le reste du site. Chacun
-  repasse par `normalizeStreamUrl`, et le bot revalide la liste blanche. Sans
-  lien exploitable, pas d'annonce.
+  repasse par `normalizeStreamUrl`, et le bot revalide la liste blanche. Une
+  page de redirection d'un hôte autorisé (`youtube.com/redirect`,
+  `/attribution_link`) ou un lien qui porte une autre adresse dans son chemin
+  ou sa requête (en clair ou encodée) est refusé : le lien d'un `@everyone`
+  ne mène qu'à la diffusion. Sans lien exploitable, pas d'annonce.
 - **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
   Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `entrantLabel`
   (`discordInline` ; une entrée individuelle s'écrit « un joueur », jamais un
@@ -232,8 +240,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
 - **Production seulement, sur le site public** (`NODE_ENV=production` **et**
-  `APP_URL` en `https` hors hôte local — `localhost`, `127.0.0.1`, `.localhost`,
-  `.test`, `.local`) : une base de développement ne fait jamais écrire
+  `APP_URL` en `https` sur un nom de domaine — ni adresse IP, boucle locale ou
+  réseau privé, ni nom d'un seul mot, ni suffixe local ou de test : `.localhost`,
+  `.test`, `.local`, `.internal`, `.lan`, `.home.arpa`, `.invalid`, `.example`) : une base de développement ne fait jamais écrire
   `@everyone` au serveur, même devant un bot local branché par erreur sur le
   vrai serveur — `npm start` sur un poste pose aussi `NODE_ENV=production`.
 - **Adresses dans les noms** : un nom d'équipe ou de tournoi qui ressemble à
