@@ -31,6 +31,9 @@ describe("information sur la retransmission des matchs", () => {
     // L'annonce dans #live nomme l'équipe ; une entrée individuelle, son pseudo (2026-10-14).
     expect(registrationStreamNotice(false)).toMatch(/le nom de ton équipe est aussi annoncé sur le Discord de l'association/);
     expect(registrationStreamNotice(true)).toMatch(/ton pseudo est aussi annoncé sur le Discord de l'association/);
+    // S'opposer au pseudo dans #live = ne pas s'inscrire ; une annonce passée reste supprimable (2026-10-14).
+    expect(registrationStreamNotice(true)).toMatch(/ne s'applique pas à cette annonce, qui est supprimée sur demande\./);
+    expect(registrationStreamNotice(false)).not.toMatch(/supprimée sur demande/);
     for (const solo of [true, false]) {
       expect(registrationStreamNotice(solo)).toMatch(/diffusés en direct et enregistrés/);
       expect(registrationStreamNotice(solo)).toMatch(/jamais de webcam ni de chat vocal/);

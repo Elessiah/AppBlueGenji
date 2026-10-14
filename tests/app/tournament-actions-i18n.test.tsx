@@ -43,6 +43,7 @@ import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
 import referenceErrors from "../fixtures/tournament-errors-fr-before-lot8b.json";
+import enActions from "@/messages/en/tournamentActions.json";
 import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import {
@@ -288,6 +289,8 @@ describe("français inchangé — les messages égalent les textes d'origine", (
         forfeitSelfConfirm: wording.forfeitSelfConfirm,
       });
       expect(frActions.register.streamNotice[type]).toBe(registrationStreamNotice(type === "SOLO"));
+      // FR and EN state the same fate of a past #live post (user decision 2026-10-14).
+      expect(enActions.register.streamNotice[type].includes("deleted on request")).toBe(type === "SOLO");
       const ghost = frDialogs.ghost[type];
       expect([ghost.title, ghost.hint, ghost.selectMany, ghost.noneAvailable, ghost.newName]).toEqual([
         wording.guestTitle,
