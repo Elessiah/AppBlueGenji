@@ -229,8 +229,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   repasse par `normalizeStreamUrl`, et le bot revalide la liste blanche. Une
   page de redirection d'un hôte autorisé (`youtube.com/redirect`,
   `/attribution_link`) ou un lien qui porte une autre adresse dans son chemin
-  ou sa requête (en clair ou encodée) est refusé : le lien d'un `@everyone`
-  ne mène qu'à la diffusion. Sans lien exploitable, pas d'annonce.
+  ou sa requête (en clair, encodée une ou plusieurs fois, `https:\` ou
+  `//hôte` sans schéma ; chemin décodé et barres doublées fusionnées) est
+  refusé : le lien d'un `@everyone` ne mène qu'à la diffusion. Sans lien exploitable, pas d'annonce.
 - **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
   Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `entrantLabel`
   (`discordInline` ; une entrée individuelle s'écrit « un joueur », jamais un
