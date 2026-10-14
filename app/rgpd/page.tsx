@@ -385,7 +385,7 @@ function RgpdFr({
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
-          demande (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
+          demande, comme l&apos;alerte de modération d&apos;une telle annonce bloquée par AutoMod (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
@@ -554,7 +554,8 @@ function RgpdFr({
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
               anti-CSRF), le nom du fournisseur, la page où vous ramener, l&apos;objet de la
               connexion (se connecter ou rattacher un compte), si vous avez accepté les conditions
-              d&apos;utilisation et si la connexion a été lancée depuis une page du site (sans
+              d&apos;utilisation (avec la version acceptée, et si vous venez de les accepter sur la page de
+              connexion) et si la connexion a été lancée depuis une page du site (sans
               quoi ni la langue du compte ni l&apos;acceptation des conditions ne sont retenues).
               Aucun identifiant de personne.
             </li>

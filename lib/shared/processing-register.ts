@@ -588,6 +588,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Salon de journal privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), puis supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée`,
       "Journaux du serveur : selon leur rotation automatique",
       "Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur, et supprimées sur demande de l'équipe ou du joueur concerné (traitement T16)",
+      "Alerte AutoMod d'une annonce #live bloquée : dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, même après la suppression du compte du joueur, et supprimée sur demande de l'équipe ou du joueur concerné (traitement T16)",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
     recipients: [

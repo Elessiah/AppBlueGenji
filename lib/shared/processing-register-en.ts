@@ -411,6 +411,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       `Staff's private log channel, and the bot's direct messages to its owner: ${BOT_STAFF_LOG_RETENTION_DAYS} days (one year), then deleted by the nightly cleanup, in batches (several nights for a large backlog), except the reason posted in the channel for an ongoing exclusion — and, for an exclusion imposed from this rule onward, its notice and the copy of its reason by direct message —, deleted when it is lifted`,
       "Server logs: according to their automatic rotation",
       "#live announcements: in the channel as long as it exists, even after the player's account is deleted, and deleted at the request of the team or player concerned (processing activity T16)",
+      "AutoMod alert for a blocked #live announcement: in the moderation alert channel until the moderators delete it, even after the player's account is deleted, and deleted at the request of the team or player concerned (processing activity T16)",
       `Backups: ${BACKUP_RETENTION_DAYS} days at most (processing activity T09)`,
     ],
     recipients: [

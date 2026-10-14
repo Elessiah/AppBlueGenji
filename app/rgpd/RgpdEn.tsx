@@ -278,7 +278,7 @@ export function RgpdEn({
           creation date, {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days), and to the reports you sent, detached
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
-          are deleted on request (<a href="#retransmission">“Match streaming”</a>);
+          are deleted on request, as does the moderation alert for such an announcement blocked by AutoMod (<a href="#retransmission">“Match streaming”</a>);
           for a staff member, their refereeing actions remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
@@ -427,7 +427,8 @@ export function RgpdEn({
               <strong>bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
               or Blizzard, and deleted on return. It lasts ten minutes at most and only contains a single-use random
               token (anti-CSRF protection), the provider&apos;s name, the page to bring you back to, the purpose of
-              the login (logging in or linking an account), whether you accepted the terms of use and whether the
+              the login (logging in or linking an account), whether you accepted the terms of use (with the version
+              accepted, and whether you have just accepted them on the login page) and whether the
               login was started from a page of the site (otherwise neither the account language nor the acceptance of
               the terms is recorded). No personal identifier.
             </li>
