@@ -41,7 +41,7 @@ Pour une équipe, répondent aussi de ses contenus, en plus de leur auteur : le 
 ARTICLE 06
 Retransmission des matchs
 Un match de tournoi peut être diffusé en direct et enregistré (YouTube, Twitch ou Kick), par la chaîne de l'association ou d'un caster. Y apparaissent le pseudo des joueurs, le nom de leur équipe et leurs résultats et performances en jeu — jamais de webcam ni de chat vocal.
-Chaque joueur peut s'y opposer : il apparaît alors sous un nom neutre. La demande se fait par le bouton « Signaler un problème », catégorie RGPD. La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.
+Chaque joueur peut s'y opposer : il apparaît alors sous un nom neutre. La demande se fait par le bouton « Signaler un problème », catégorie RGPD. Au début d'un match diffusé, une annonce publiée dans le salon #live du Discord de l'association nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public ; le nom neutre ne s'applique pas à cette annonce : un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton. La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.
 Politique de confidentialité — retransmission des matchs
 ARTICLE 07
 Signalement et modération

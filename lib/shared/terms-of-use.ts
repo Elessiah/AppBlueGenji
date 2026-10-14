@@ -26,7 +26,7 @@ import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-repor
 import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 import { SUSPENSION_MAX_DAYS } from "./account-suspension";
 import { SITE_MINIMUM_AGE } from "./legal-durations";
-import { STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH, STREAM_NOTICE_SHOWN } from "./stream-notice";
+import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH, STREAM_NOTICE_SHOWN } from "./stream-notice";
 
 /**
  * Version en vigueur. L'avancer redemande l'acceptation.
@@ -219,7 +219,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "Retransmission des matchs",
     paragraphs: [
       `Un match de tournoi peut être **diffusé en direct et enregistré** (YouTube, Twitch ou Kick), par la chaîne de l'association ou d'un caster. ${STREAM_NOTICE_SHOWN}`,
-      `${STREAM_NOTICE_OBJECTION} La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.`,
+      `${STREAM_NOTICE_OBJECTION} ${STREAM_NOTICE_LIVE} La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.`,
     ],
     links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Politique de confidentialité — retransmission des matchs" }],
   },

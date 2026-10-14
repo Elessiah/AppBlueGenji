@@ -16,6 +16,7 @@ import { STREAM_NOTICE_PRIVACY_PATH } from "./stream-notice";
 import { ASSOCIATION_CONTACT_PATH, type TermsSection } from "./terms-of-use";
 import {
   NOTIFIER_FOLLOW_UP_EN,
+  STREAM_NOTICE_LIVE_EN,
   STREAM_NOTICE_OBJECTION_EN,
   STREAM_NOTICE_SHOWN_EN,
   copyrightNoticeElementsTextEn,
@@ -74,7 +75,7 @@ export const TERMS_SECTIONS_EN: readonly TermsSection[] = [
     title: "Match streaming",
     paragraphs: [
       `A tournament match may be **streamed live and recorded** (YouTube, Twitch or Kick), on the association's channel or a caster's. ${STREAM_NOTICE_SHOWN_EN}`,
-      `${STREAM_NOTICE_OBJECTION_EN} The stream is watched on the platform that publishes it: the site only links to the channel.`,
+      `${STREAM_NOTICE_OBJECTION_EN} ${STREAM_NOTICE_LIVE_EN} The stream is watched on the platform that publishes it: the site only links to the channel.`,
     ],
     links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Privacy policy — match streaming" }],
   },

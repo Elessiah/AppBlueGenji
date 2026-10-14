@@ -44,6 +44,10 @@ export const STREAM_NOTICE_SHOWN_EN =
 export const STREAM_NOTICE_OBJECTION_EN =
   "Any player can object: they then appear under a neutral name. The request is made through the “Report a problem” button, GDPR category.";
 
+/** `STREAM_NOTICE_LIVE` (`stream-notice.ts`). */
+export const STREAM_NOTICE_LIVE_EN =
+  "When a streamed match starts, an announcement posted in the #live channel of the association's Discord names the teams and, in a solo tournament, the players by their public username; the neutral name does not apply to that announcement: a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the same button.";
+
 /** `AUTHORITY_CONTACT_LANGUAGES` (`legal-contact.ts`), same order. */
 export const AUTHORITY_CONTACT_LANGUAGES_EN: readonly string[] = ["French", "English"];
 

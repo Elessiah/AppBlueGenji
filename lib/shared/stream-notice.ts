@@ -24,6 +24,13 @@ export const STREAM_NOTICE_OBJECTION =
   "Chaque joueur peut s'y opposer : il apparaît alors sous un nom neutre. La demande se fait par le bouton « Signaler un problème », catégorie RGPD.";
 
 /**
+ * L'annonce #live dans les conditions d'utilisation : le nom neutre ne la
+ * couvre pas (décision du 2026-10-14 : s'y opposer = ne pas s'inscrire).
+ */
+export const STREAM_NOTICE_LIVE =
+  "Au début d'un match diffusé, une annonce publiée dans le salon #live du Discord de l'association nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public ; le nom neutre ne s'applique pas à cette annonce : un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton.";
+
+/**
  * Mention courte affichée près de l'inscription à un tournoi, suivie d'un lien
  * vers `STREAM_NOTICE_PRIVACY_PATH`. En individuel, l'engagé n'a pas d'équipe :
  * la mention ne lui en prête pas.
