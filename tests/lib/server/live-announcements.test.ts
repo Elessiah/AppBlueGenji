@@ -554,6 +554,30 @@ describe("dispatchLiveAnnouncements", () => {
     }
   });
 
+  it("la fin d'une pause d'une minute ne repousse pas la relève à dix secondes d'un autre tournoi", async () => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const held = { ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() };
+      jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
+      const { query } = mockDb([held]);
+      await dispatchLiveAnnouncements();
+      // Trois secondes plus tard, un autre tournoi lance un match : appel étranglé.
+      jest.setSystemTime(NOW + 3_000);
+      expect(await dispatchLiveAnnouncements()).toBe(0);
+      const other = { ...held, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" };
+      query.mockResolvedValue([[held, other]]);
+      jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
+      // La relève tombe à dix secondes du premier passage, pas à la fin de la pause.
+      await jest.advanceTimersByTimeAsync(8_000);
+      expect(jest.mocked(pushLiveAnnouncement).mock.calls.map(([, , context]) => context)).toEqual([
+        "live-announce tournoi-4 match-40",
+        "live-announce tournoi-5 match-57",
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("une annonce publiée ne met aucune pause : le passage suivant suit l'étranglement seul", async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
     try {

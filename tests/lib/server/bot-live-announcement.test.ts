@@ -59,6 +59,17 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
+  it("relâche le corps d'une réponse qu'il ne lit pas (404, 500, 400) : la connexion revient au pool", async () => {
+    // Le 400 en dernier : il compte un succès, le 500 ne laisse pas le coupe-circuit entamé.
+    for (const status of [404, 500, 400]) {
+      const response = new Response("ignoré", { status });
+      const cancel = jest.spyOn(response.body!, "cancel");
+      jest.spyOn(global, "fetch").mockResolvedValue(response);
+      await pushLiveAnnouncement("x", "https://twitch.tv/bg", "c");
+      expect(cancel).toHaveBeenCalled();
+    }
+  });
+
   it("rend « unavailable » sur un bot antérieur (404) sans ouvrir le coupe-circuit", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 404 }));
     for (let i = 0; i < 4; i++) {
