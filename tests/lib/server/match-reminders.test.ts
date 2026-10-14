@@ -781,7 +781,11 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(resolvePush(pushes[0][2]).body).toContain("au lieu du mardi 8 septembre à 20:00");
     expect(resolvePush(pushes[0][2], "en").title).toBe("Match rescheduled");
     expect(resolvePush(pushes[0][2], "en").body).toContain("instead of Tuesday, September 8 at 20:00");
-    expect(resolvePush(pushes[0][2], "en").url).toBe("/en/tournois/7#match-31");
+    // À 5 h du coup d'envoi, l'annonce porte le check-in : toucher le push
+    // ouvre l'invitation (l'adresse écrite dans le texte ne se touche pas).
+    expect(resolvePush(pushes[0][2], "en").body).toContain("Check-in on Discord");
+    expect(resolvePush(pushes[0][2]).url).toBe("/check-in");
+    expect(resolvePush(pushes[0][2], "en").url).toBe("/check-in");
   });
 
   it("nomme une ronde suisse « Ronde N » dans le message privé et le push, \"Round N\" en anglais", async () => {

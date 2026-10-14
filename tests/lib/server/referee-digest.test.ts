@@ -22,6 +22,9 @@ function row(id: number, hoursAhead: number, overrides: Record<string, unknown> 
     tournament_name: "Coupe BlueGenji",
     participant_type: "TEAM",
     start_at: new Date(NOW.getTime() + hoursAhead * HOUR),
+    bracket: "UPPER",
+    round_number: 1,
+    swiss_round: 0,
     team1_id: 100 + id,
     team2_id: 200 + id,
     team1_name: `Renards ${id}`,
@@ -98,15 +101,36 @@ describe("dispatchRefereeDigest", () => {
     const push = resolvePush(notification.push);
     expect(push.title).toBe("Programme d'arbitrage : 3 matchs à venir");
     expect(push.body.split("\n")).toHaveLength(3);
-    expect(push.body).toContain("Renards 1 contre Nova 1 (Coupe BlueGenji)");
+    expect(push.body).toContain("Renards 1 contre Nova 1 (Coupe BlueGenji, Manche 1)");
+    // Un seul tournoi cité : le lien mène à sa fiche.
+    expect(push.url).toBe("/tournois/7");
+    expect(push.tag).toBe("referee-digest-1-2-3");
     expect(resolvePush(notification.push, "en").title).toBe("Refereeing schedule: 3 upcoming matches");
-    expect(resolvePush(notification.push, "en").body).toContain("Renards 1 vs Nova 1 (Coupe BlueGenji)");
+    expect(resolvePush(notification.push, "en").body).toContain("Renards 1 vs Nova 1 (Coupe BlueGenji, Round 1)");
+    expect(resolvePush(notification.push, "en").url).toBe("/en/tournois/7");
 
     const line = await publishedLine();
     expect(line).toContain("Programme d'arbitrage");
     expect(line).toContain("3 matchs");
     expect(line.match(/match #1\)/g)).toHaveLength(1);
     expect(line).toContain("Renards 3 vs Nova 3");
+  });
+
+  it("nomme la manche (ronde suisse comprise) et mène à la liste quand plusieurs tournois sont cités", async () => {
+    const { query } = mockDb([
+      row(1, 9, { swiss_round: 1, round_number: 3 }),
+      row(2, 9.5, { tournament_id: 8, tournament_name: "Ligue", bracket: "LOWER", round_number: 2 }),
+    ]);
+
+    await dispatchRefereeDigest(NOW);
+
+    expect(query.mock.calls[0][0]).toMatch(/AS swiss_round/);
+    const notification = jest.mocked(notifyStaff).mock.calls[0][0];
+    const push = resolvePush(notification.push);
+    expect(push.body).toContain("(Coupe BlueGenji, Ronde 3)");
+    expect(push.body).toContain("(Ligue, Tableau perdants · manche 2)");
+    expect(push.url).toBe("/tournois");
+    expect(resolvePush(notification.push, "en").url).toBe("/en/tournois");
   });
 
   it("ne cite pas une manche dont la réservation a été prise ailleurs (ou déplacée depuis)", async () => {
