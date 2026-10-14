@@ -530,8 +530,10 @@ l'envoi pour son horaire et son affiche : citée une fois par horaire ;
 reprogrammée ou d'affiche changée, elle est citée de nouveau. Canaux :
 
 - push `REFEREE_DIGEST` (« Programme d'arbitrage », audience `tournaments`,
-  `notifyStaff`, langue de chacun) — `refereeDigestPush`, cinq lignes au plus
-  puis « … et N autres » ; « Un match » en solo ;
+  `notifyStaff`, langue de chacun) — `refereeDigestPush`, titre « Programme
+  d'arbitrage : N matchs à venir » (pas « des 10 prochaines heures » : la
+  marge en cite jusqu'à 12 h), cinq lignes au plus puis « … et N autre(s) »
+  (pluriel ICU) ; « Un match » en solo ;
 - une **ligne** au canal de logs Discord (`sendBotLog`), là où les arbitres
   suivent déjà les horaires posés — `formatRefereeDigestLog` : engagées par
   `entrantLabel` (« un joueur » en solo), tournoi `« nom » (#id)`, aucun auteur
