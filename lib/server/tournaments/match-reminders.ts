@@ -150,6 +150,8 @@ const SWEEP_CONCURRENCY = 4;
 
 let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
+/** Programme d'arbitrage en cours : son propre verrou, distinct du balayage. */
+let pendingDigest: Promise<void> | null = null;
 
 /**
  * Destinataires d'un match, par engagée.
@@ -1039,22 +1041,22 @@ export async function dispatchDueMatchReminders(now: Date = new Date()): Promise
   if (pendingSweep) return pendingSweep;
   if (Date.now() - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
 
-  // « En même temps » que les rappels aux joueurs, et **de front** : le
-  // programme d'arbitrage n'attend pas les envois aux joueurs (un bot lent, une
-  // ronde suisse annoncée d'un coup le retarderaient de plusieurs minutes).
+  // « En même temps » que les rappels aux joueurs, et **de front**, sous son
+  // propre verrou : ni l'un ni l'autre n'attend l'autre — un bot lent ou une
+  // ronde suisse ne retarde pas le programme, et les appareils du staff (un
+  // service de push lent) ne retiennent pas le balayage suivant des joueurs.
   // Indépendant : son échec ne retient pas les rappels, ni l'inverse.
-  const digest = (async () => {
+  pendingDigest ??= (async () => {
     try {
       await dispatchRefereeDigest(now);
     } catch (error) {
       // Table absente (création avalée au démarrage) : rien à dire à chaque passage.
       if (!isMissingTableError(error)) console.error("[match-reminders] programme d'arbitrage en échec", error);
+    } finally {
+      pendingDigest = null;
     }
   })();
-  pendingSweep = Promise.allSettled([runSweep(now), digest]).then(([sweep]) => {
-    if (sweep.status === "rejected") throw sweep.reason;
-    return sweep.value;
-  });
+  pendingSweep = runSweep(now);
   try {
     return await pendingSweep;
   } finally {
@@ -1067,4 +1069,10 @@ export async function dispatchDueMatchReminders(now: Date = new Date()): Promise
 export function resetMatchReminderThrottle(): void {
   lastSweepAt = 0;
   pendingSweep = null;
+  pendingDigest = null;
+}
+
+/** Programme d'arbitrage en cours, à attendre. Réservé aux tests. */
+export function pendingRefereeDigest(): Promise<void> | null {
+  return pendingDigest;
 }

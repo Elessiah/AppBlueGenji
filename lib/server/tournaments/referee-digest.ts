@@ -38,6 +38,7 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { PLAYED_MATCH_STATUSES } from "@/lib/shared/match-schedule";
 import { toParticipantType } from "@/lib/shared/participants";
 import { refereeDigestPush } from "@/lib/shared/push-messages";
+import { releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 type DigestRow = RowDataPacket & {
@@ -143,6 +144,14 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
   // L'ordre du coup d'envoi, quel que soit l'ordre des réservations.
   const claimed = rows.filter((row) => won.has(Number(row.id)));
   if (claimed.length === 0) return 0;
+  // La manche due n'a pas été prise (déplacée entre-temps, réservation en
+  // échec) : la marge seule ne part pas — elle attendrait sinon d'être citée
+  // en avance, et la manche due ouvrirait un second programme. Rendues, ses
+  // marques la laissent au programme que la prochaine manche due ouvrira.
+  if (!claimed.some((row) => new Date(row.start_at).getTime() <= triggerAt)) {
+    await Promise.all(claimed.map((row) => releaseDatedMarks(Number(row.id), [REFEREE_DIGEST_KEY], row.start_at)));
+    return 0;
+  }
 
   const matches = claimed.map((row) => {
     const participantType = toParticipantType(row.participant_type);
