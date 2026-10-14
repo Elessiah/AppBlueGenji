@@ -329,8 +329,11 @@ export const MATCH_DM_SETTINGS_PATH = "/profil#notifications";
  * comme tout message Discord ; jamais dans un message au staff.
  */
 export function matchDmOptOutLine(settingsUrl?: string | null): string {
+  // `<…>` : Discord garde le lien cliquable sans en déplier l'aperçu — une
+  // seconde carte (celle de « Mon profil ») sous celle du tournoi, à chaque
+  // message, repousserait l'horaire hors de l'écran d'un téléphone.
   return settingsUrl
-    ? `Tu peux couper ces messages privés dans ton profil, section Notifications : ${settingsUrl}`
+    ? `Tu peux couper ces messages privés dans ton profil, section Notifications : <${settingsUrl}>`
     : "Tu peux couper ces messages privés dans « Mon profil », section Notifications, sur le site.";
 }
 

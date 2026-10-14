@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { usePathname, useSearchParams } from "next/navigation";
 import { splitLocalePrefix } from "@/lib/shared/locales";
@@ -39,6 +39,20 @@ export type AuthGateText = typeof frLogin.authGate;
  * pour une route traduite (`/en/tournois`), les autres restent françaises.
  * Sans prop (tests), le français.
  */
+/**
+ * Lien du bouton « Se connecter » : la page demandée — chemin, requête **et
+ * ancre** — repassée à `/connexion?redirect=`. L'ancre compte : le lien de fin
+ * des messages privés de match mène à `/profil#notifications`, et sans elle le
+ * joueur, une fois connecté, retombait en haut de son profil, loin de
+ * l'interrupteur. Elle ne se lit qu'au navigateur (jamais envoyée au serveur).
+ */
+export function authGateLoginHref(pathname: string, query: string, hash: string): string {
+  const search = query ? `?${query}` : "";
+  const anchor = hash.length > 1 && hash.startsWith("#") ? hash : "";
+  const destination = pathname + search + anchor;
+  return `/connexion?redirect=${encodeURIComponent(destination)}`;
+}
+
 export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGateText }>) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -50,6 +64,14 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
   // (`x-pathname`) et réutilise à la navigation. Requête et ancre `#match-…`
   // suivent.
   const spectatorId = tournamentIdFromMemberPath(splitLocalePrefix(pathname).path);
+  // Ancre lue après hydratation : le rendu serveur ne la connaît pas.
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    const read = () => setHash(globalThis.location.hash);
+    read();
+    globalThis.addEventListener("hashchange", read);
+    return () => globalThis.removeEventListener("hashchange", read);
+  }, []);
   useEffect(() => {
     if (spectatorId === null) return;
     const { search, hash } = globalThis.location;
@@ -68,13 +90,10 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
 
   // On ne reconstitue qu'un chemin **du site** : il vient de `usePathname`, pas
   // d'un paramètre d'URL, donc il ne peut pas désigner un autre domaine.
-  const query = searchParams.toString();
-  const search = query ? `?${query}` : "";
-  const destination = `${pathname}${search}`;
   // `pathname` garde le préfixe de langue (`/en/…`) : la destination revient
   // dans la langue lue, et `LocaleLink` mène à la page de connexion de cette
   // même langue (`/en/connexion` depuis une page anglaise, lot 6).
-  const loginHref = `/connexion?redirect=${encodeURIComponent(destination)}`;
+  const loginHref = authGateLoginHref(pathname, searchParams.toString(), hash);
 
   return (
     <div className={styles.shell}>
