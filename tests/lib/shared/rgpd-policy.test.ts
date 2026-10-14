@@ -7,6 +7,7 @@ import {
   DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
+  LIVE_PSEUDO_SCOPE,
   MATCH_TIME_DM_SCOPE,
 } from "@/lib/shared/rgpd-policy";
 import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
@@ -57,8 +58,8 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 11 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(11);
+  it("has exactly 12 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(12);
   });
 
   it("déclare la langue du compte (lot 9-3) : exécution du contrat, durée du compte, remise au français", () => {
@@ -175,6 +176,9 @@ describe("DONNEES_PROFIL", () => {
 
   it("réserve le consentement à ce que le joueur choisit en plus", () => {
     for (const entry of DONNEES_PROFIL) {
+      // Seule exception : le choix des messages privés de match, opposition à un
+      // traitement d'intérêt légitime (registre T04).
+      if (entry.donnee === "Choix des messages privés de match") continue;
       expect(["Exécution du contrat", "Consentement"]).toContain(entry.base);
     }
     // Données facultatives, renseignées et publiées au choix du joueur : un
@@ -298,8 +302,24 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("le droit d'opposition les nomme, en français et en anglais", () => {
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toContain(MATCH_TIME_DM_SCOPE);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(
-      "match time notices and reminders by direct message",
+      "match time notices, reminders and match removal notices by direct message",
     );
+    // L'avis « Match retiré » et la case de Mon profil (revue juridique #444).
+    expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels et avis de retrait de match en message privé");
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/case « Messages privés Discord de mes matchs » de Mon profil/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/“Discord direct messages about my matches” box in My profile/);
+  });
+
+  it("déclare le pseudo #live et le choix des messages privés de match (revue juridique #444)", () => {
+    const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
+    expect(pseudo?.extraBases).toEqual([{ base: "Intérêt légitime", scope: LIVE_PSEUDO_SCOPE }]);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
+      { base: "Intérêt légitime", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
+    ]);
+    const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
+    expect(choice?.base).toBe("Intérêt légitime");
+    expect(choice?.finalite).toMatch(/Figure dans l'export de tes données, remis au défaut si le compte est anonymisé/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/reset to the default if the account is anonymized/);
   });
 
   it("le registre du bot (T08) déclare ce que le site lui transmet, comme sa politique", () => {
@@ -315,7 +335,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("la portée est traduite en anglais", () => {
     const entry = DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID");
     expect(entry?.extraBases).toEqual([
-      { base: "Intérêt légitime", scope: "match time notices and reminders by direct message" },
+      { base: "Intérêt légitime", scope: "match time notices, reminders and match removal notices by direct message" },
     ]);
   });
 });
