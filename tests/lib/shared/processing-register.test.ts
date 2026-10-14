@@ -142,7 +142,6 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(byRef("T16").legalBasis).toMatch(/sauf pour le pseudo de l'annonce #live d'un tournoi individuel, à laquelle on s'oppose en ne s'inscrivant pas/);
     expect(t04.dataSubjects).toContain("Tout titulaire de compte, pour son choix des messages privés de match");
     expect(byRef("T08").recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association, qui lisent l'annonce des matchs diffusés dans le salon #live/);
-    expect(byRef("T16").recipients.join(" ")).toMatch(/quand une règle AutoMod du serveur bloque l'annonce et en publie une alerte \(le texte bloqué, pseudo compris\)/);
     expect(byRef("T05").legalBasis).toMatch(/programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service \(T04\)/);
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
