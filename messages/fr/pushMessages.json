@@ -21,7 +21,7 @@
       "P1D": "moins de 24 heures",
       "PT10H": "moins de 10 heures"
     },
-    "checkIn": "Check-in sur Discord 15 min avant le match : {invite}"
+    "checkIn": "Check-in sur Discord {minutes} min avant le match : {invite}"
   },
   "matchScheduled": {
     "pairingSolo": "Un match",
@@ -106,6 +106,7 @@
     "title": "Programme d'arbitrage : {count, plural, one {# match à venir} other {# matchs à venir}}",
     "line": "{start} · {pairing} ({tournament}, {round})",
     "more": "… et {count, plural, one {# autre} other {# autres}}",
-    "pairingSolo": "Un match"
+    "pairingSolo": "{count, plural, one {Un match} other {# matchs}}",
+    "timeZone": "Heure de Paris"
   }
 }

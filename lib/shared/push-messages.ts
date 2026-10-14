@@ -29,6 +29,7 @@ import enReports from "@/messages/en/reports.json";
 import frReports from "@/messages/fr/reports.json";
 import {
   CHECK_IN_INVITE_URL,
+  CHECK_IN_OPENS_MINUTES_BEFORE,
   CHECK_IN_REMINDER_KEY,
   FIRST_SCHEDULE,
   formatMatchStart,
@@ -219,7 +220,7 @@ export function matchReminderPush(
   const checkIn = side.checkIn ?? offset === CHECK_IN_REMINDER_KEY;
   return {
     title: announcementTitle(offset, change.rescheduled, text),
-    body: checkIn ? `${body} ${text.t("matchReminder.checkIn", { invite: CHECK_IN_INVITE_URL })}` : body,
+    body: checkIn ? `${body} ${text.t("matchReminder.checkIn", { invite: CHECK_IN_INVITE_URL, minutes: CHECK_IN_OPENS_MINUTES_BEFORE })}` : body,
     // L'adresse écrite dans le texte ne se touche pas : le push du check-in
     // ouvre l'invitation (par le site, seule origine qu'une notification ouvre).
     url: checkIn ? CHECK_IN_PATH : localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
@@ -384,26 +385,44 @@ function digestTime(startAt: string | Date, locale: Locale): string {
 /**
  * Programme d'arbitrage (`REFEREE_DIGEST`) : les matchs à venir (ceux des
  * 10 prochaines heures et la marge de regroupement), un par ligne (heure de
- * Paris, affiche, tournoi et manche), dans l'ordre du coup d'envoi. Équipes
- * nommées ; en tournoi individuel, « Un match » (aucun pseudo de joueur, comme
- * partout) — la manche distingue alors les lignes. Le lien mène au tournoi
+ * Paris, affiche, tournoi et manche), dans l'ordre du coup d'envoi, sous une
+ * première ligne « Heure de Paris » (un arbitre à l'étranger lirait sinon son
+ * heure locale). Équipes nommées ; en tournoi individuel, aucun pseudo de
+ * joueur (comme partout) : les matchs d'un même créneau, tournoi et manche
+ * tiennent en une ligne « 5 matchs » plutôt qu'en cinq lignes identiques
+ * « Un match ». Le lien mène au tournoi
  * quand le programme n'en cite qu'un, à la liste des tournois sinon.
  * L'étiquette nomme toutes les manches citées : un programme suivant, qui en
  * cite d'autres, ne remplace jamais le précédent sur l'appareil.
  */
 export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
-  const shown = matches.slice(0, REFEREE_DIGEST_PUSH_LINES).map((match) =>
-    text.t("refereeDigest.line", {
-      start: digestTime(match.startAt, locale),
-      pairing: match.solo
-        ? text.t("refereeDigest.pairingSolo")
-        : text.t("pairing", { team: match.team1Name, opponent: match.team2Name }),
-      tournament: match.tournamentName,
-      round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
-    }),
-  );
-  const hidden = matches.length - shown.length;
+  // Une ligne par match ; en solo, une par créneau, tournoi et manche (suites).
+  const lines: { start: string; tournament: string; round: string; pairing: string | null; count: number }[] = [];
+  for (const match of matches) {
+    const start = digestTime(match.startAt, locale);
+    const round = pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss);
+    const last = lines.at(-1);
+    if (match.solo && last?.pairing === null && last.start === start && last.tournament === match.tournamentName && last.round === round) {
+      last.count += 1;
+      continue;
+    }
+    const pairing = match.solo ? null : text.t("pairing", { team: match.team1Name, opponent: match.team2Name });
+    lines.push({ start, tournament: match.tournamentName, round, pairing, count: 1 });
+  }
+  const kept = lines.slice(0, REFEREE_DIGEST_PUSH_LINES);
+  const shown = [
+    text.t("refereeDigest.timeZone"),
+    ...kept.map((line) =>
+      text.t("refereeDigest.line", {
+        start: line.start,
+        pairing: line.pairing ?? text.t("refereeDigest.pairingSolo", { count: line.count }),
+        tournament: line.tournament,
+        round: line.round,
+      }),
+    ),
+  ];
+  const hidden = matches.length - kept.reduce((sum, line) => sum + line.count, 0);
   if (hidden > 0) shown.push(text.t("refereeDigest.more", { count: hidden }));
   const tournaments = new Set(matches.map((match) => match.tournamentId));
   const [onlyTournament] = tournaments;

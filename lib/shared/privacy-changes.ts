@@ -704,6 +704,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
     ],
   },
+  // PR #443 : un second rappel de match 10 h avant le coup d'envoi, avec
+  // l'invitation au serveur Discord du check-in, et le programme d'arbitrage
+  // (journal Discord du staff, push) — l'entrée « 2026-10-horaires-de-match »
+  // disait qu'un seul rappel restait. `publishedAt` : lendemain de la mise en
+  // ligne prévue.
+  {
+    id: "2026-10-rappel-de-check-in",
+    publishedAt: "2026-10-16",
+    title: "Rappel de check-in 10 h avant le match",
+    summary:
+      "Un second rappel de match part 10 h avant le coup d'envoi, avec le lien du serveur Discord où le check-in ouvre 15 minutes avant le match ; les arbitres reçoivent le programme des matchs à venir.",
+    details: [
+      "Le rappel des 24 h reste. Celui de 10 h — ou, pour un match programmé moins de 10 h avant, l'annonce de son horaire — ajoute le lien d'invitation au serveur Discord du check-in. Il part aux mêmes personnes et par les mêmes canaux (message privé Discord, notification push du sujet « Horaires et rappels de match »), sans pseudo de joueur.",
+      "Si tu fais partie du staff des tournois, un programme d'arbitrage liste environ 10 h à l'avance les matchs à venir (horaires, tournois, manches et noms d'équipe ; « un joueur » en tournoi individuel) : au journal d'activité du staff sur Discord, et en notification push si tu les as activées (sujet « Programme d'arbitrage », que tu peux couper dans « Mon profil »).",
+      "Aucune donnée nouvelle n'est collectée : le site garde seulement, avec le match, la trace du rappel et du programme envoyés pour son horaire.",
+    ],
+    links: [
+      { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" },
+      { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

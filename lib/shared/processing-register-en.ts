@@ -286,6 +286,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
       "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed), for moderation",
+      "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
     legalBasis: "Legitimate interest (administration and oversight of refereeing)",
     dataSubjects: ["Staff"],

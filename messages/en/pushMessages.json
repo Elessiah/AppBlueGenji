@@ -21,7 +21,7 @@
       "P1D": "less than 24 hours",
       "PT10H": "less than 10 hours"
     },
-    "checkIn": "Check-in on Discord 15 min before the match: {invite}"
+    "checkIn": "Check-in on Discord {minutes} min before the match: {invite}"
   },
   "matchScheduled": {
     "pairingSolo": "A match",
@@ -106,6 +106,7 @@
     "title": "Refereeing schedule: {count, plural, one {# upcoming match} other {# upcoming matches}}",
     "line": "{start} · {pairing} ({tournament}, {round})",
     "more": "… and {count} more",
-    "pairingSolo": "A match"
+    "pairingSolo": "{count, plural, one {A match} other {# matches}}",
+    "timeZone": "Paris time"
   }
 }

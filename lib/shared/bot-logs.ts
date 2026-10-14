@@ -322,6 +322,7 @@ function digestTime(startAt: string | Date): string {
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
     timeZone: "Europe/Paris",
   });
   return digestTimeFormat.format(startAt instanceof Date ? startAt : new Date(startAt));

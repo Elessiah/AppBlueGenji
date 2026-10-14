@@ -374,6 +374,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the “Match streaming” paragraph", READ_RECIPIENTS],
   },
+  "2026-10-rappel-de-check-in": {
+    title: "Check-in reminder 10 h before the match",
+    summary:
+      "A second match reminder goes out 10 h before kickoff, with the link to the Discord server where check-in opens 15 minutes before the match; referees receive the schedule of upcoming matches.",
+    details: [
+      "The 24 h reminder stays. The 10 h one — or, for a match scheduled less than 10 h ahead, the announcement of its time — adds the invite link to the check-in Discord server. It goes to the same people through the same channels (Discord direct message, push notification of the “Match times and reminders” topic), with no player username.",
+      "If you are on the tournament staff, a refereeing schedule lists the upcoming matches about 10 hours ahead (times, tournaments, rounds and team names; “a player” in a solo tournament): in the staff activity log on Discord, and by push notification if you turned them on (topic “Refereeing schedule”, which you can turn off in “My profile”).",
+      "No new data is collected: the site only keeps, with the match, a record of the reminder and the schedule sent for its time.",
+    ],
+    linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
+  },
 };
 
 /**
