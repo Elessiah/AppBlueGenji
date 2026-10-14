@@ -14,7 +14,7 @@
     },
     "MATCH_REMINDER": {
       "label": "Match times and reminders",
-      "description": "A match time when it is set, changed or removed, then a reminder 24 h and 10 h before kickoff (with the check-in link)."
+      "description": "A match time when it is set, changed or removed, then reminders 24 h and 10 h before kickoff (with the check-in link)."
     },
     "TEAM_JOIN_REQUEST": {
       "label": "Join requests",
