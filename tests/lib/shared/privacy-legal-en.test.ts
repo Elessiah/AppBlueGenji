@@ -188,7 +188,10 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
     expect(sheet("T08").retention.join(" ")).toMatch(/#live announcements: in the channel as long as it exists, even after the player's account is deleted/);
     expect(sheet("T08").retention).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.retention.length);
     expect(sheet("T16").subPurposes.join(" ")).toMatch(/editable in My profile, with no effect on an announcement already posted/);
-    expect(sheet("T16").legalBasis).toMatch(/except for the username in the #live announcement of a solo tournament, which one objects to by not registering/);
+    expect(sheet("T16").legalBasis).toMatch(/performance of the service requested by the player \(GDPR, art\. 6\.1\.b — terms of use\) for their public username in the #live announcement of a solo tournament/);
+    expect(sheet("T16").recipients.join(" ")).toMatch(/if a Discord AutoMod rule blocks a #live announcement, its text \(including the public username in a solo tournament\) may reach the server's moderation alert channel/);
+    expect(sheet("T16").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T16")!.recipients.length);
+    expect(sheet("T04").legalBasis).toMatch(/legitimate interest, the player's own, for keeping their choice about match direct messages/);
     expect(sheet("T04").legalBasis).toMatch(/for match time notices, the notice that a match leaves their schedule and match reminders sent to players/);
     expect(sheet("T04").dataSubjects).toContain("Any account holder, for their match direct messages choice");
     expect(sheet("T08").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.recipients.length);
@@ -200,6 +203,6 @@ describe("terms of use (EN): #live announcement of a solo tournament", () => {
   it("states that the neutral name does not cover it, like the French terms", () => {
     const section = TERMS_SECTIONS_EN.find((s) => s.id === "retransmission")!;
     expect(section.paragraphs.join(" ")).toContain(STREAM_NOTICE_LIVE_EN);
-    expect(STREAM_NOTICE_LIVE_EN).toMatch(/the neutral name does not apply to that announcement: a player who does not want to be named in it does not register/);
+    expect(STREAM_NOTICE_LIVE_EN).toMatch(/That announcement is part of the solo tournament the player registers for \(performance of the service, not legitimate interest\): the neutral name does not apply to it, and a player who does not want to be named in it does not register/);
   });
 });

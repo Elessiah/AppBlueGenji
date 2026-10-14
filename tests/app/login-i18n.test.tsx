@@ -74,7 +74,13 @@ import { LOCALES, SITE_TIME_ZONE, isMigratedRoute, localeHref, type Locale } fro
 import { formatMessage, formatMessageParts } from "@/lib/shared/message-format";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
-import { SITE_MINIMUM_AGE, TERMS_AGE_DECLARATION, TERMS_CHECKBOX_LABEL } from "@/lib/shared/terms-of-use";
+import {
+  SITE_MINIMUM_AGE,
+  TERMS_AGE_DECLARATION,
+  TERMS_CHECKBOX_LABEL,
+  TERMS_VERSION,
+  formatTermsDateIn,
+} from "@/lib/shared/terms-of-use";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { readSource } from "../helpers/read-source";
 
@@ -448,7 +454,7 @@ describe("messages `login`", () => {
   it.each(LOCALES.map((locale) => [locale]))("%s : même texte que next-intl, message par message", (locale) => {
     const tags = ["strong", "join", "terms", "policy", "fr"];
     for (const { key, source } of leaves(messagesFor(locale).login)) {
-      const values = { audience: "A", provider: "P", time: "T", end: "E", reference: "S-1", day: "D", clause: "C", age: 15 };
+      const values = { audience: "A", provider: "P", time: "T", end: "E", reference: "S-1", day: "D", clause: "C", age: 15, version: 4, date: "DT" };
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
       const expected = reference.markup("m", {
         ...values,
@@ -461,6 +467,31 @@ describe("messages `login`", () => {
         Object.fromEntries(tags.map((tag) => [tag, (children: Array<string>) => `<${tag}>${children.join("")}</${tag}>`])),
       ).join("");
       expect(`${key}: ${actual}`).toBe(`${key}: ${expected}`);
+    }
+  });
+});
+
+describe("modale d'entrée — conditions mises à jour (LEGAL-FOLLOWUP-444)", () => {
+  it("dit en français que les conditions ont changé, avec leur version et leur date", () => {
+    const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "fr"));
+    expect(text).toContain(
+      `Les conditions d'utilisation ont changé (version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDateIn("fr")}) : relis-les avant de les accepter de nouveau.`,
+    );
+    expect(formatTermsDateIn("fr")).toBe("14 octobre 2026");
+  });
+
+  it("le dit en anglais sous /en", () => {
+    const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "en"));
+    expect(text).toContain(
+      `The terms of use have changed (version ${TERMS_VERSION}, in force since ${formatTermsDateIn("en")}): read them again before accepting them anew.`,
+    );
+    expect(formatTermsDateIn("en")).toBe("October 14, 2026");
+  });
+
+  it("se tait à une première acceptation", () => {
+    for (const locale of ["fr", "en"] as const) {
+      const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} />, locale));
+      expect(text).not.toMatch(/ont changé|have changed/);
     }
   });
 });

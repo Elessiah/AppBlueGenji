@@ -483,12 +483,37 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(en).toContain("(time, reminder, removal from a match)");
     expect(fr).toContain("« un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026");
     expect(en).toContain("a player can turn off those about their matches (time, reminder, removal from a match) in “My profile”");
-    // Objection to the solo #live username = not registering (user decision 2026-10-14).
-    expect(fr).toContain("Exception : le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire");
-    expect(en).toContain("Exception: a player's username in the #live announcement of a solo tournament — objecting to it means not registering");
+    // The solo #live username rests on performance of the service, not legitimate interest (user decision 2026-10-14).
+    expect(fr).toContain("Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel n'en relève pas : il repose sur l'exécution du service auquel il s'inscrit — ne pas y être nommé revient à ne pas s'inscrire");
+    expect(en).toContain("A player's username in the #live announcement of a solo tournament is not covered: it rests on performance of the service they register for — not being named in it means not registering");
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (début d'un match diffusé : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (start of a streamed match: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["16 octobre 2026", "16 October 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["17 octobre 2026", "17 October 2026"]);
+  });
+});
+
+describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL-FOLLOWUP-444)", () => {
+  const fr = JSON.stringify(PRIVACY_POLICY.fr);
+  const en = JSON.stringify(PRIVACY_POLICY.en);
+
+  it("déclare l'avis de retrait d'un match parmi les messages remis (FR et EN)", () => {
+    expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), alerte d'arbitrage");
+    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, avis de modération");
+    expect(en).toContain("match time or reminder, notice of removal from a match (“Match retiré”), referee alert");
+    expect(en).toContain("(code, match time, reminder, removal from a match, moderation notice");
+  });
+
+  it("déclare qu'un blocage AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {
+    expect(fr).toContain("si une règle AutoMod de Discord bloque une annonce #live, son texte (pseudo public compris en tournoi individuel) peut parvenir au salon d'alertes de modération du serveur");
+    expect(en).toContain("if a Discord AutoMod rule blocks a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel");
+  });
+
+  it("dit la base des messages de match et du pseudo solo, sans obligation légale (FR et EN)", () => {
+    expect(fr).toContain("le site garde ce choix dans son intérêt légitime, pour l'honorer");
+    expect(fr).toContain("exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel");
+    expect(en).toContain("the website keeps that choice in their legitimate interest, to honour it");
+    expect(en).toContain("performance of the service the player registers for, for their public username in the #live announcement of a solo tournament");
+    expect(fr).not.toMatch(/obligation légale[^"]*messages privés de match/);
   });
 });

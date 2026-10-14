@@ -313,13 +313,14 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("déclare le pseudo #live et le choix des messages privés de match (revue juridique #444)", () => {
     expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toMatch(/annonces #live d'un tournoi individuel qui ont publié votre pseudo restent dans le salon Discord jusqu'à leur suppression, sur une demande distincte/);
     expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toMatch(/#live announcements of a solo tournament that posted your username stay in the Discord channel until they are deleted, on a separate request/);
-    // S'opposer au pseudo #live = ne pas s'inscrire (décision du 2026-10-14) : le droit d'opposition le dit.
-    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Exception : le pseudo publié dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire/);
-    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/Exception: the username posted in the #live announcement of a solo tournament — objecting to it means not registering/);
+    // Le pseudo #live repose sur l'exécution du service, pas l'intérêt légitime (décision du 2026-10-14) :
+    // le droit d'opposition l'exclut, ne pas y être nommé = ne pas s'inscrire.
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering/);
     const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
-    expect(pseudo?.extraBases).toEqual([{ base: "Intérêt légitime", scope: LIVE_PSEUDO_SCOPE }]);
+    expect(pseudo?.extraBases).toEqual([{ base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE }]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
-      { base: "Intérêt légitime", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
+      { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
     ]);
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
     expect(choice?.base).toBe("Intérêt légitime");
