@@ -411,7 +411,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       `Staff's private log channel, and the bot's direct messages to its owner: ${BOT_STAFF_LOG_RETENTION_DAYS} days (one year), then deleted by the nightly cleanup, in batches (several nights for a large backlog), except the reason posted in the channel for an ongoing exclusion — and, for an exclusion imposed from this rule onward, its notice and the copy of its reason by direct message —, deleted when it is lifted`,
       "Server logs: according to their automatic rotation",
       "#live announcements: in the channel as long as it exists, even after the player's account is deleted, and deleted at the request of the team or player concerned (processing activity T16)",
-      "AutoMod alert for a blocked #live announcement: in the moderation alert channel until the moderators delete it, even after the player's account is deleted, and deleted at the request of the team or player concerned (processing activity T16)",
+      "AutoMod alert for a blocked or flagged #live announcement: in the moderation alert channel until the moderators delete it, even after the player's account is deleted, and deleted at the request of the team or player concerned (processing activity T16)",
       `Backups: ${BACKUP_RETENTION_DAYS} days at most (processing activity T09)`,
     ],
     recipients: [
@@ -422,7 +422,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Members of the refereeing role of each server that has set one (/set-referee-role), for the site's refereeing alerts",
       "Members of partner servers, who read the relayed announcements",
       "Members of the association's Discord server, who read the announcement of streamed matches in the #live channel (processing activity T16)",
-      "Moderators of the association's Discord server, if a Discord AutoMod rule blocks a #live announcement (processing activity T16)",
+      "Moderators of the association's Discord server, if a Discord AutoMod rule blocks or flags a #live announcement (processing activity T16)",
       "Administrators of any server where the bot is installed (including a server created to invite it there) and holders of the bot administration role (/set-bot-admin), for the network's list of exclusions (/ban-list, reply visible only to the requester) — the exclusion applies to the whole network, each server must know who can no longer post there",
       "Discord (execution platform)",
     ],
@@ -590,7 +590,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Acceptance of the terms of use",
     purpose: "Keeping proof that the site's terms of use have been accepted, and which version of them",
     subPurposes: [
-      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received and at a login started from the login page within ten minutes of accepting the terms there (an acceptance only kept by the browser is not carried over to an existing account)",
+      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received and at a login started from the login page (click on Google, Discord or Blizzard, or submission of the code received on Discord) within ten minutes of accepting the terms there (an acceptance only kept by the browser is not carried over to an existing account)",
       "Asking for acceptance again when the terms change version",
     ],
     legalBasis: "Performance of the service requested by the player (contract)",
@@ -681,7 +681,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (the username on their page, editable in My profile, with no effect on an announcement already posted: unless changed, the Discord username or BattleTag taken when the account was created, or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
     ],
     legalBasis:
-      "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws, with a right to object (art. 21) open to each player; performance of the service requested by the player (GDPR, art. 6.1.b — terms of use) for their public username in the #live announcement of a solo tournament, which is part of the tournament they register for: not being named in it means not registering (a past announcement is deleted on request); legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked #live announcement, kept in the moderators' alert channel, with a right to object (art. 21): the alert is deleted on request",
+      "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws, with a right to object (art. 21) open to each player; performance of the service requested by the player (GDPR, art. 6.1.b — terms of use) for their public username in the #live announcement of a solo tournament, which is part of the tournament they register for: not being named in it means not registering (a past announcement is deleted on request); legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked or flagged #live announcement, kept in the moderators' alert channel, with a right to object (art. 21): the alert is deleted on request",
     dataSubjects: ["Players of the streamed matches", "Casters"],
     dataCategories: [
       "In-game and site usernames, team names, images of the game, in-game results and performance, as they appear on screen — neither webcam nor voice chat of the players",
@@ -695,17 +695,17 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Live: the stream is not kept by the site, which only keeps the link to the channel",
       "Replay link: kept with the match, like its results (T03); the video stays on the platform until it is deleted by the channel that published it",
       `Discord announcement: the site only keeps a record of the announcement (the match, the identifiers of its two entrants and its date), made before sending, removed for a new attempt when the bot was unavailable, otherwise deleted with the match; the message is kept in the channel as long as the #live channel exists, even after the player's account is deleted, and deleted at the request of the team or player concerned (“${REPORT_FORM_NAME_EN}” form, “GDPR” category)`,
-      `AutoMod alert (blocked #live announcement): kept in the server's moderation alert channel until the moderators delete it, and deleted at the request of the team or player concerned (“${REPORT_FORM_NAME_EN}” form, “GDPR” category)`,
+      `AutoMod alert (blocked or flagged #live announcement): kept in the server's moderation alert channel until the moderators delete it, and deleted at the request of the team or player concerned (“${REPORT_FORM_NAME_EN}” form, “GDPR” category)`,
       `Right to object: on request (“${REPORT_FORM_NAME_EN}” form, “GDPR” category), the player appears under a neutral name in subsequent streams, the replay link is removed from the site, and a video published by the association's channel is hidden or deleted; the #live announcement of a solo tournament keeps the public username, which falls under performance of the service and not legitimate interest: not being named in it means not registering`,
     ],
     recipients: [
       "Public of the streaming platforms and of the site",
       "Streaming platforms (YouTube, Twitch, Kick), controllers of their own processing, including of their viewers' data; the site only links to the channels and embeds no player, it sends them no data",
       "Members of the association's Discord server, for the announcement posted in the #live channel (team names, or the public BlueGenji username of the players of a solo tournament)",
-      "Moderators of the association's Discord server: if a Discord AutoMod rule blocks a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel",
+      "Moderators of the association's Discord server: if a Discord AutoMod rule blocks or flags a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel",
       "Discord (hosting of the channel)",
     ],
-    transfers: [`United States: Discord (announcement posted in the #live channel, and AutoMod alert for a blocked announcement) — ${transferBasisEn(["DISCORD"])}`],
+    transfers: [`United States: Discord (announcement posted in the #live channel, and AutoMod alert for a blocked or flagged announcement) — ${transferBasisEn(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY_EN,
       "Stream links limited to a list of platforms, no embedded player; no contact data displayed on screen by the site",

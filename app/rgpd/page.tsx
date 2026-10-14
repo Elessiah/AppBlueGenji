@@ -385,7 +385,7 @@ function RgpdFr({
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
-          demande, comme l&apos;alerte de modération d&apos;une telle annonce bloquée par AutoMod (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
+          demande, comme l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
@@ -636,7 +636,8 @@ function RgpdFr({
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
               numéro de version, quand vous les acceptez : à la création de votre compte ou d&apos;une
               équipe, pour gérer une équipe, ou à une connexion lancée depuis la page de connexion
-              dans les dix minutes où vous les y avez acceptées (une acceptation seulement gardée par le navigateur,
+              (clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord) dans les dix
+              minutes où vous les y avez acceptées (une acceptation seulement gardée par le navigateur,
               peut-être celle d&apos;une autre personne, n&apos;est pas reportée sur un compte existant).
             </li>
             <li>
@@ -1087,7 +1088,7 @@ function RgpdFr({
             l&apos;<strong>exécution du service</strong> : l&apos;annonce fait partie du tournoi individuel
             auquel le joueur s&apos;inscrit, et le nom neutre ne vaut que pour la diffusion — un joueur qui
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
-            une règle AutoMod de Discord bloque une annonce, son texte (pseudo compris en tournoi
+            une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
             reste jusqu&apos;à sa suppression par les modérateurs, au titre de l&apos;intérêt légitime de
             l&apos;association à modérer son serveur (s&apos;y opposer : demander sa suppression). Ces annonces restent dans le salon tant

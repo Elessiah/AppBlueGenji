@@ -14,7 +14,14 @@ export const MATCH_TIME_DM_SCOPE = "annonces d'horaire, rappels et avis de retra
  * service auquel il s'inscrit (décision du 2026-10-14), pas l'intérêt légitime
  * — d'où aucune opposition autre que ne pas s'inscrire.
  */
-export const LIVE_PSEUDO_SCOPE = "annonce #live d'un tournoi individuel, gardée dans le salon Discord jusqu'à sa suppression sur demande, et alerte AutoMod d'une telle annonce bloquée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande";
+export const LIVE_PSEUDO_SCOPE = "annonce #live d'un tournoi individuel, gardée dans le salon Discord jusqu'à sa suppression sur demande";
+
+/**
+ * Copie du même pseudo dans l'alerte AutoMod d'une annonce #live bloquée ou
+ * signalée (registre T16) : intérêt légitime de l'association à modérer son
+ * serveur, opposition = suppression sur demande — pas l'exécution du service.
+ */
+export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande";
 
 /**
  * Bases légales citées par la politique — les mêmes que le registre
@@ -60,7 +67,10 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil. Un compte créé par Google avant le 30 septembre 2026 a pu recevoir le nom de ton compte Google : si c'est le cas, remplace-le dans Mon profil",
     base: "Exécution du contrat",
-    extraBases: [{ base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE }],
+    extraBases: [
+      { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
+      { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
+    ],
     duree: "Durée du compte",
   },
   {
@@ -231,7 +241,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit à l'effacement",
-    text: "Vous pouvez demander la suppression de votre compte et de vos données de profil. Voir ci-dessus pour les données de palmarès, et pour les données de connexion, que la loi impose de garder un an (RGPD, art. 17.3.b). Les annonces #live d'un tournoi individuel qui ont publié votre pseudo restent dans le salon Discord jusqu'à leur suppression, sur une demande distincte (« Signaler un problème », catégorie RGPD), comme l'alerte de modération d'une telle annonce bloquée par AutoMod.",
+    text: "Vous pouvez demander la suppression de votre compte et de vos données de profil. Voir ci-dessus pour les données de palmarès, et pour les données de connexion, que la loi impose de garder un an (RGPD, art. 17.3.b). Les annonces #live d'un tournoi individuel qui ont publié votre pseudo restent dans le salon Discord jusqu'à leur suppression, sur une demande distincte (« Signaler un problème », catégorie RGPD), comme l'alerte de modération d'une telle annonce bloquée ou signalée par AutoMod.",
   },
   {
     title: "Droit à la limitation",

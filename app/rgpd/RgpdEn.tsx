@@ -278,7 +278,7 @@ export function RgpdEn({
           creation date, {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days), and to the reports you sent, detached
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
-          are deleted on request, as does the moderation alert for such an announcement blocked by AutoMod (<a href="#retransmission">“Match streaming”</a>);
+          are deleted on request, as does the moderation alert for such an announcement blocked or flagged by AutoMod (<a href="#retransmission">“Match streaming”</a>);
           for a staff member, their refereeing actions remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
@@ -494,7 +494,8 @@ export function RgpdEn({
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
               on our servers, with its version number, when you accept them: when your account or a team is created,
-              to manage a team, or at a login started from the login page within ten minutes of accepting them
+              to manage a team, or at a login started from the login page (click on Google, Discord or Blizzard, or
+              submission of the code received on Discord) within ten minutes of accepting them
               there (an acceptance only kept by the browser, possibly another person&apos;s, is not carried
               over to an existing account).
             </li>
@@ -899,7 +900,7 @@ export function RgpdEn({
             interest but on <strong>performance of the service</strong>: the announcement is part of the solo
             tournament the player registers for, and the neutral name applies to the stream only — a player who does
             not want their username in that announcement does not register for the solo tournament. If a Discord
-            AutoMod rule blocks an announcement, its text (including the username in a solo tournament) may reach the
+            AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
             server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
             association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). These
             announcements stay in the channel as long as the #live channel exists; the team or player concerned can

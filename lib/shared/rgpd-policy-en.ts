@@ -9,7 +9,7 @@
 
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
-import { DONNEES_PROFIL, LIVE_PSEUDO_SCOPE, MATCH_TIME_DM_SCOPE } from "@/lib/shared/rgpd-policy";
+import { AUTOMOD_ALERT_SCOPE, DONNEES_PROFIL, LIVE_PSEUDO_SCOPE, MATCH_TIME_DM_SCOPE } from "@/lib/shared/rgpd-policy";
 import type { DonneEntry, DroitEntry, LegalBase } from "@/lib/shared/rgpd-policy";
 
 /** The four legal bases (GDPR, art. 6.1), in English. */
@@ -32,7 +32,9 @@ const SCOPE_EN: Record<string, string> = {
   "présentation aux joueurs et au caster de ton match, à son lancement":
     "presentation to the players and caster of your match, at its launch",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
-  [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request, and AutoMod alert for such an announcement when blocked, kept in the moderators' alert channel until they delete it or on request",
+  [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request",
+  [AUTOMOD_ALERT_SCOPE]:
+    "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request",
 };
 
 /** Data and purpose of each `DONNEES_PROFIL` row, same order. */
@@ -139,7 +141,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to erasure",
-    text: "You can request the deletion of your account and your profile data. See above for achievement data, and for connection data, which the law requires to be kept for one year (GDPR, art. 17.3.b). The #live announcements of a solo tournament that posted your username stay in the Discord channel until they are deleted, on a separate request (“Report a problem”, GDPR category), as does the moderation alert for such an announcement blocked by AutoMod.",
+    text: "You can request the deletion of your account and your profile data. See above for achievement data, and for connection data, which the law requires to be kept for one year (GDPR, art. 17.3.b). The #live announcements of a solo tournament that posted your username stay in the Discord channel until they are deleted, on a separate request (“Report a problem”, GDPR category), as does the moderation alert for such an announcement blocked or flagged by AutoMod.",
   },
   {
     title: "Right to restriction",
