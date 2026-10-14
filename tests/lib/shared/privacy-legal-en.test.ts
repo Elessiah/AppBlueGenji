@@ -172,3 +172,13 @@ describe("habillage des fenêtres et contrôles : le français d'avant, en messa
     expect(AUDIENCE_OPT_OUT_TEXT_FR).toEqual(messagesFor("fr").legal.audience);
   });
 });
+
+describe("register (EN): #live username, match DMs, refereeing schedule basis", () => {
+  const sheet = (ref: string) => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref)!;
+
+  it("declares the same items as the French register", () => {
+    expect(sheet("T16").dataCategories.join(" ")).toMatch(/Public BlueGenji username of the players of a solo tournament, posted in the #live announcement/);
+    expect(sheet("T04").subPurposes.join(" ")).toMatch(/the notice that a match leaves their schedule/);
+    expect(sheet("T05").legalBasis).toMatch(/sending the refereeing schedule to referees and administrators falls under performance of the service \(T04\)/);
+  });
+});

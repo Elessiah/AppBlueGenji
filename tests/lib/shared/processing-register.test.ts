@@ -130,6 +130,10 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.legalBasis).toMatch(/exécution du service[^;]*programme d'arbitrage adressés au staff/);
     expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
     expect(t04.subPurposes.join(" ")).toMatch(/couper ces messages privés depuis « Mon profil »/);
+    // L'avis « Match retiré de ton programme » est l'un des messages coupés par l'interrupteur.
+    expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
+    // T05 ne contredit pas T04 sur la base du programme d'arbitrage envoyé au staff.
+    expect(byRef("T05").legalBasis).toMatch(/programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service \(T04\)/);
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
@@ -465,6 +469,8 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*jamais le pseudo de leurs joueurs\) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs \(un pseudo, jamais un prénom ni un identifiant Discord/);
     expect(sheet.retention.join(" ")).toMatch(/conservé dans le salon tant que le salon #live existe, même après la suppression du compte du joueur, et supprimé sur demande de l'équipe ou du joueur concerné/);
     expect(sheet.recipients.join(" ")).toMatch(/pseudo public BlueGenji des joueurs d'un tournoi individuel/);
+    // Le pseudo publié dans #live est une catégorie de données de T16.
+    expect(sheet.dataCategories.join(" ")).toMatch(/Pseudo public BlueGenji des joueurs d'un tournoi individuel, publié dans l'annonce #live/);
     expect(sheet.recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association/);
     expect(sheet.retention.join(" ")).toMatch(/Annonce sur Discord : .* effacée avec le match/);
     expect(sheet.recipients.join(" ")).toMatch(/n'intègre aucun lecteur/);
