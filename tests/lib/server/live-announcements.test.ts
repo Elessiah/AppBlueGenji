@@ -401,6 +401,14 @@ describe("runLiveAnnouncementSweep", () => {
     for (const text of warned) expect(text).toContain("salon #live fermé au bot");
   });
 
+  it("un refus de Discord propre au message n'empêche pas les autres groupes de partir", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held").mockResolvedValueOnce("posted");
+    const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" }]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    expect(pushLiveAnnouncement).toHaveBeenCalledTimes(2);
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+  });
+
   it("un groupe reporté s'accorde au pluriel", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
     mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" }]);
