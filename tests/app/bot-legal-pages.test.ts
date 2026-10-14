@@ -510,7 +510,9 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   });
 
   it("dit la base des messages de match et du pseudo solo, sans obligation légale (FR et EN)", () => {
-    expect(fr).toContain("le site garde ce choix dans son intérêt légitime, pour l'honorer");
+    expect(fr).toContain("le site garde ce choix dans l'intérêt légitime du joueur, pour l'honorer");
+    // Revue UI/UX #445 : « son » désignait le site ; l'intérêt est celui du joueur (registre T04, /rgpd).
+    expect(fr).not.toContain("dans son intérêt légitime");
     expect(fr).toContain("exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel");
     expect(en).toContain("the website keeps that choice in their legitimate interest, to honour it");
     expect(en).toContain("performance of the service the player registers for, for their public username in the #live announcement of a solo tournament");
