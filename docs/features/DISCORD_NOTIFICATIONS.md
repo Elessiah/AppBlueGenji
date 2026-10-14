@@ -615,7 +615,9 @@ Canaux :
   un précédent qui en cite d'autres ;
 - une **ligne** au canal de logs Discord (`sendBotLog`), là où les arbitres
   suivent déjà les horaires posés — `formatRefereeDigestLog` : engagées par
-  `entrantLabel` (« un joueur » en solo), tournoi `« nom » (#id)`, aucun auteur
+  `entrantLabel` (« un joueur » en solo — et pour toute entrée solo,
+  `bg_teams.solo_user_id`, même si le type du tournoi est illisible, comme
+  #live), tournoi `« nom » (#id)`, aucun auteur
   (c'est le site qui l'envoie), chaque entrée avec sa manche
   (`matchRoundLabel`) ; en solo, les matchs consécutifs d'un même créneau,
   tournoi et manche en une entrée « 8 matchs (« Coupe » (#7), Manche 1) » ;
