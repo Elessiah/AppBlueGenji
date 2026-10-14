@@ -250,7 +250,11 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   le pseudo n'est lu que pour une inscription (`bg_tournament_registrations.registered_at`)
   faite depuis la publication du changement de confidentialité qui l'annonce
   (`soloPseudoRegisteredSince`, `publishedAt` de `2026-10-pseudo-live-et-messages-de-match`) :
-  un joueur inscrit sous l'ancienne mention reste « un joueur ». L'exception s'arrête à
+  un joueur inscrit sous l'ancienne mention reste « un joueur ». Le seuil vaut
+  ce que vaut `publishedAt` (lendemain de la mise en ligne, `PRIVACY_CHANGES_CONSENT.md`) :
+  si le déploiement glisse, avancer `publishedAt` **et** la date « 16 octobre 2026 »
+  du registre T16 et de la politique du bot (FR + EN, test `live-announcements.test.ts`).
+  L'exception s'arrête à
   #live : quand le texte nomme un joueur, le site joint `logMessage`, le même
   texte **sans pseudo** (« un joueur »), que le bot cite à la place de
   `message` dans son canal de logs quand l'annonce échoue (version du bot qui
