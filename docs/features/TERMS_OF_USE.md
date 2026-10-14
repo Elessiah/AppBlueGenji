@@ -83,6 +83,18 @@ la mise en page, elle garde le texte d'une première acceptation.
 |---|---|---|
 | 1 | 24 septembre 2026 | Première version. |
 | 2 | 1er octobre 2026 | Changements de fond : âge minimum, licence, responsabilité des gérants, juridiction. Tout compte qui avait accepté la version 1 la réaccepte — à la connexion par la case de `/connexion`, ou par la modale s'il gère une équipe ; ses gestes de gestion sont refusés en 409 d'ici là. |
+| 3 | 1er octobre 2026 | Suspension d'un compte, voies de recours, base légale de la modération, absence de médiateur. |
+| 4 | 14 octobre 2026 | Annonce #live d'un tournoi individuel : le pseudo public du joueur y figure au titre de l'exécution du service (pas de nom neutre ; ne pas y être nommé = ne pas s'inscrire). Date d'entrée en vigueur fixée par l'association (décision du 2026-10-14), non le lendemain de la mise en ligne. |
+
+**Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
+revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
+plus la courante ; si c'était une version **antérieure**, elle l'annonce en tête
+(`login.consent.termsUpdated` : « Les conditions d'utilisation ont changé
+(version N, en vigueur depuis le …) », FR et EN). Le gérant d'une équipe voit en
+plus la modale `TermsAcceptanceModal` titrée « Les conditions d'utilisation ont
+changé » (`UPDATED`). Un compte qui ne gère rien n'est pas bloqué : ses gestes
+n'exigent pas les conditions — **décision requise** si l'association veut une
+réacceptation imposée à tout compte, hors gestion d'équipe.
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.

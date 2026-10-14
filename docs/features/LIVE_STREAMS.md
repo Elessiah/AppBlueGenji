@@ -334,7 +334,19 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
 ## Information des joueurs (RGPD)
 
 La retransmission est un traitement (registre, **T16**) : intérêt légitime de
-l'association, droit d'opposition. Elle ne montre que le **pseudo**, le **nom
+l'association, droit d'opposition. **Exception** (décision du 2026-10-14) : le
+pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose sur
+l'**exécution du service** (art. 6.1.b — l'annonce fait partie du tournoi auquel
+il s'inscrit), pas sur l'intérêt légitime : pas de nom neutre, ne pas y être
+nommé = ne pas s'inscrire, une annonce passée est supprimée sur demande. Dit par
+T16, `/rgpd#retransmission`, `DONNEES_PROFIL` (« Pseudo site »), le droit
+d'opposition, la mention d'inscription solo, `STREAM_NOTICE_LIVE` (conditions,
+version 4) et la politique du bot. **AutoMod** : si une règle AutoMod de Discord
+bloque une annonce, son texte (pseudo compris en individuel) peut parvenir au
+salon d'alertes des modérateurs du serveur — déclaré en destinataire de T16, sur
+`/rgpd` et dans la politique du bot. La configuration réelle d'AutoMod sur le
+serveur (salon d'alertes posé ou non) n'est pas connue du code : **décision
+requise** pour la préciser, la déclaration dit « peut ». Elle ne montre que le **pseudo**, le **nom
 d'équipe** et les **résultats et performances en jeu** — ni webcam ni chat
 vocal des joueurs. Le site ne fait que **lier** les chaînes, sans lecteur
 intégré : il ne transmet rien aux plateformes, qui traitent leurs spectateurs en
