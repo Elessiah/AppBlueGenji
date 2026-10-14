@@ -394,9 +394,16 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
 }
 
 /**
- * Annonce les groupes l'un après l'autre. Un report vaut pour les suivants du
- * passage — même bot, même salon : ils sont rendus sans appel, au lieu
- * d'essuyer le même refus.
+ * Reports qui valent pour tout envoi : le bot (injoignable, ancien) ou le
+ * salon (fermé). Un refus de Discord (`discord-held`) peut tenir au message
+ * lui-même : les autres groupes sont alors essayés quand même.
+ */
+const SHARED_POSTPONEMENTS: ReadonlySet<PostponedOutcome> = new Set<PostponedOutcome>(["unavailable", "channel-closed"]);
+
+/**
+ * Annonce les groupes l'un après l'autre. Un report qui tient au bot ou au
+ * salon vaut pour les suivants du passage : ils sont rendus sans appel, au
+ * lieu d'essuyer le même refus.
  *
  * @returns Le nombre de matchs publiés.
  */
@@ -410,7 +417,7 @@ async function announceGroups(groups: Iterable<AnnouncementGroup>): Promise<numb
     }
     const result = await announce(group);
     posted += result.posted;
-    postponed = result.postponed;
+    if (result.postponed && SHARED_POSTPONEMENTS.has(result.postponed)) postponed = result.postponed;
   }
   return posted;
 }
