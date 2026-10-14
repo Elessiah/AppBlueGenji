@@ -312,8 +312,9 @@ function RgpdFr({
                   <span className={styles.badge}>{d.base}</span>
                   {d.extraBases?.map((extra) => (
                     <span key={extra.base} className={styles.extraBase}>
-                      {/* Même base que la principale (pseudo dans #live) : la portée seule, sans second badge identique. */}
-                      {extra.base === d.base ? null : <><span className={styles.badge}>{extra.base}</span> </>}
+                      {/* Même base que la principale (pseudo dans #live) : pas de second badge identique, mais
+                          « y compris » — seule sous le badge, la portée semblerait restreindre la base principale. */}
+                      {extra.base === d.base ? "y compris : " : <><span className={styles.badge}>{extra.base}</span> </>}
                       {extra.scope}
                     </span>
                   ))}
