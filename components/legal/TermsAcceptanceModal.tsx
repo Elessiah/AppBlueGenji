@@ -175,12 +175,12 @@ export function TermsAcceptanceModal({
           <input
             type="checkbox"
             checked={checked}
-            // Figée pendant l'envoi (sans `disabled`, qui ôterait le focus) : décocher en
-            // cours de route rendrait « J'accepte » nativement désactivé au retour.
-            onChange={(event) => {
-              if (!busy) setChecked(event.target.checked);
-            }}
-            aria-disabled={busy || undefined}
+            // Figée pendant l'envoi : décocher en cours de route rendrait « J'accepte »
+            // nativement désactivé au retour. `disabled` natif ici ne coûte aucun
+            // focus — il est sur « J'accepte », pressé pour lancer l'envoi — et
+            // donne à la case son aspect éteint (`globals.css`, `:disabled`).
+            disabled={busy}
+            onChange={(event) => setChecked(event.target.checked)}
           />
           <span>
             {richNodes(
