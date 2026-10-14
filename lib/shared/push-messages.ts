@@ -461,20 +461,32 @@ type DigestLine = { text: string; count: number };
  * reste ne se dit qu'en nombre (« … et N autres »), compté sur les matchs.
  */
 function digestLines(matches: readonly RefereeDigestMatch[], text: PushText, locale: Locale): DigestLine[] {
-  const lines: { start: string; tournament: string; round: string; pairing: string | null; count: number }[] = [];
+  const lines: {
+    start: string;
+    tournamentId: number;
+    tournament: string;
+    round: string;
+    pairing: string | null;
+    count: number;
+  }[] = [];
   for (const match of matches) {
     const start = digestTime(match.startAt, locale);
     const round = pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss);
     const last = lines.at(-1);
     const sameSlot =
-      match.solo && last?.pairing === null && last.start === start && last.tournament === match.tournamentName && last.round === round;
+      // Par identifiant : deux tournois homonymes ne se fondent pas en une ligne.
+      match.solo &&
+      last?.pairing === null &&
+      last.start === start &&
+      last.tournamentId === match.tournamentId &&
+      last.round === round;
     if (sameSlot) {
       last.count += 1;
       continue;
     }
     if (lines.length === REFEREE_DIGEST_PUSH_LINES) break;
     const pairing = match.solo ? null : text.t("pairing", { team: match.team1Name, opponent: match.team2Name });
-    lines.push({ start, tournament: match.tournamentName, round, pairing, count: 1 });
+    lines.push({ start, tournamentId: match.tournamentId, tournament: match.tournamentName, round, pairing, count: 1 });
   }
   return lines.map((line) => ({
     count: line.count,

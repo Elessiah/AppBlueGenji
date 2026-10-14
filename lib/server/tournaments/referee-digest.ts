@@ -123,41 +123,55 @@ type CurrentRow = RowDataPacket & {
   start_at: Date | string | null;
   team1_id: number | null;
   team2_id: number | null;
+  status: string;
+  tournament_state: string;
 };
+
+const PLAYED = new Set<string>(PLAYED_MATCH_STATUSES);
 
 /**
  * Relit, en une instruction, les manches réservées juste avant l'envoi : un
- * arbitre qui en déplace une **après** la réservation efface sa marque
- * (`setMatchStartAt`) et pousse le nouvel horaire — le programme, s'il citait
- * encore l'ancien, pourrait arriver après lui et laisser l'arbitre sur une
- * heure fausse. Une manche changée est retirée du programme (sa marque n'est
- * plus la nôtre : rien à rendre) ; son nouvel horaire sera cité au programme
- * suivant. Une relecture en échec n'arrête pas l'envoi (meilleur effort : les
- * marques sont prises).
+ * arbitre qui en déplace une **après** la réservation pousse le nouvel horaire
+ * — le programme, s'il citait encore l'ancien, pourrait arriver après lui et
+ * laisser l'arbitre sur une heure fausse. Une manche reprogrammée, retirée,
+ * d'affiche changée, jouée entre-temps (score saisi) ou d'un tournoi clos sort
+ * du programme, et sa marque est rendue (`releaseDigestMarks`, pour l'horaire
+ * lu seulement) : un retrait n'efface aucune marque, et sans ce rendu une
+ * manche reposée au même horaire ne serait plus jamais citée. Une relecture
+ * en échec n'arrête pas l'envoi (meilleur effort : les marques sont prises).
  */
 async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
   if (rows.length === 0) return [];
+  let byId: Map<number, CurrentRow>;
   try {
     const db = await getDatabase();
     const [current] = await db.query<CurrentRow[]>(
-      `SELECT id, start_at, team1_id, team2_id FROM bg_matches WHERE id IN (${sqlPlaceholders(rows.length)})`,
+      `SELECT m.id, m.start_at, m.team1_id, m.team2_id, m.status, t.state AS tournament_state
+         FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
+        WHERE m.id IN (${sqlPlaceholders(rows.length)})`,
       rows.map((row) => Number(row.id)),
     );
-    const byId = new Map(current.map((row) => [Number(row.id), row]));
-    return rows.filter((row) => {
-      const fresh = byId.get(Number(row.id));
-      return (
-        fresh !== undefined &&
-        fresh.start_at !== null &&
-        new Date(fresh.start_at).getTime() === new Date(row.start_at).getTime() &&
-        Number(fresh.team1_id) === Number(row.team1_id) &&
-        Number(fresh.team2_id) === Number(row.team2_id)
-      );
-    });
+    byId = new Map(current.map((row) => [Number(row.id), row]));
   } catch (error) {
     console.error("[referee-digest] relecture avant envoi en échec", error);
     return [...rows];
   }
+  const kept: DigestRow[] = [];
+  const dropped: DigestRow[] = [];
+  for (const row of rows) {
+    const fresh = byId.get(Number(row.id));
+    const unchanged =
+      fresh !== undefined &&
+      fresh.start_at !== null &&
+      new Date(fresh.start_at).getTime() === new Date(row.start_at).getTime() &&
+      Number(fresh.team1_id) === Number(row.team1_id) &&
+      Number(fresh.team2_id) === Number(row.team2_id) &&
+      !PLAYED.has(String(fresh.status)) &&
+      fresh.tournament_state !== "FINISHED";
+    (unchanged ? kept : dropped).push(row);
+  }
+  if (dropped.length > 0) await releaseDigestMarks(dropped);
+  return kept;
 }
 
 /**

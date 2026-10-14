@@ -228,11 +228,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     //    retiré) : sans elle, la manche sera annoncée par le nouveau balayage.
     //    Bornée par la date (un `DELETE` ne peut relire sa table) : jusque-là,
     //    une marque seule du nouveau code (annonce partie vers personne) est
-    //    effacée au redémarrage, et l'annonce simplement retentée. La marque
-    //    des arbitres (`STAFF`) ne dit rien des joueurs : elle ne compte pas.
+    //    effacée au redémarrage, et l'annonce simplement retentée. Les marques
+    //    des arbitres (`STAFF`, horaire poussé ; `REFS`, citation au programme
+    //    d'arbitrage) ne disent rien des joueurs : elles ne comptent pas.
     `DELETE r FROM bg_match_reminders r
        JOIN bg_matches m ON m.id = r.match_id
-       LEFT JOIN bg_match_reminders o ON o.match_id = r.match_id AND o.offset_key NOT IN ('SEEN', 'STAFF')
+       LEFT JOIN bg_match_reminders o ON o.match_id = r.match_id AND o.offset_key NOT IN ('SEEN', 'STAFF', 'REFS')
       WHERE r.offset_key = 'SEEN' AND o.id IS NULL
         AND r.sent_at < '2026-10-31' AND m.start_at > NOW()`,
   ];
