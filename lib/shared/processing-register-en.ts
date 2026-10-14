@@ -590,7 +590,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Acceptance of the terms of use",
     purpose: "Keeping proof that the site's terms of use have been accepted, and which version of them",
     subPurposes: [
-      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received and at a login where the terms have just been accepted on the login page (an acceptance only kept by the browser is not carried over to an existing account)",
+      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received and at a login started from the login page within ten minutes of accepting the terms there (an acceptance only kept by the browser is not carried over to an existing account)",
       "Asking for acceptance again when the terms change version",
     ],
     legalBasis: "Performance of the service requested by the player (contract)",
@@ -681,7 +681,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (the username on their page, editable in My profile, with no effect on an announcement already posted: unless changed, the Discord username or BattleTag taken when the account was created, or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
     ],
     legalBasis:
-      "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws, with a right to object (art. 21) open to each player; performance of the service requested by the player (GDPR, art. 6.1.b — terms of use) for their public username in the #live announcement of a solo tournament, which is part of the tournament they register for: not being named in it means not registering (a past announcement is deleted on request)",
+      "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws, with a right to object (art. 21) open to each player; performance of the service requested by the player (GDPR, art. 6.1.b — terms of use) for their public username in the #live announcement of a solo tournament, which is part of the tournament they register for: not being named in it means not registering (a past announcement is deleted on request); legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked #live announcement, kept in the moderators' alert channel, with a right to object (art. 21): the alert is deleted on request",
     dataSubjects: ["Players of the streamed matches", "Casters"],
     dataCategories: [
       "In-game and site usernames, team names, images of the game, in-game results and performance, as they appear on screen — neither webcam nor voice chat of the players",

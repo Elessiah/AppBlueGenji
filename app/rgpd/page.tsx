@@ -635,8 +635,8 @@ function RgpdFr({
               numéro de version : une nouvelle version vous les présente de nouveau.
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
               numéro de version, quand vous les acceptez : à la création de votre compte ou d&apos;une
-              équipe, pour gérer une équipe, ou à une connexion où vous venez de les
-              accepter sur la page de connexion (une acceptation seulement gardée par le navigateur,
+              équipe, pour gérer une équipe, ou à une connexion lancée depuis la page de connexion
+              dans les dix minutes où vous les y avez acceptées (une acceptation seulement gardée par le navigateur,
               peut-être celle d&apos;une autre personne, n&apos;est pas reportée sur un compte existant).
             </li>
             <li>
@@ -1089,7 +1089,8 @@ function RgpdFr({
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
             une règle AutoMod de Discord bloque une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
-            reste jusqu&apos;à sa suppression par les modérateurs. Ces annonces restent dans le salon tant
+            reste jusqu&apos;à sa suppression par les modérateurs, au titre de l&apos;intérêt légitime de
+            l&apos;association à modérer son serveur (s&apos;y opposer : demander sa suppression). Ces annonces restent dans le salon tant
             que le salon #live existe ; l&apos;équipe ou le joueur concerné peut en demander la
             suppression, comme celle de ces alertes, par le bouton « Signaler
             un problème », catégorie RGPD.

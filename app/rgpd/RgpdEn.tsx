@@ -494,8 +494,8 @@ export function RgpdEn({
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
               on our servers, with its version number, when you accept them: when your account or a team is created,
-              to manage a team, or at a login where you have just accepted them on the
-              login page (an acceptance only kept by the browser, possibly another person&apos;s, is not carried
+              to manage a team, or at a login started from the login page within ten minutes of accepting them
+              there (an acceptance only kept by the browser, possibly another person&apos;s, is not carried
               over to an existing account).
             </li>
             <li>
@@ -900,7 +900,8 @@ export function RgpdEn({
             tournament the player registers for, and the neutral name applies to the stream only — a player who does
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks an announcement, its text (including the username in a solo tournament) may reach the
-            server moderators&apos; alert channel, where the alert stays until the moderators delete it. These
+            server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
+            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). These
             announcements stay in the channel as long as the #live channel exists; the team or player concerned can
             ask for their deletion, and for that of these alerts,
             through the “Report a problem” button, GDPR category.
