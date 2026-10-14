@@ -189,6 +189,7 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
     expect(sheet("T08").retention).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.retention.length);
     expect(sheet("T16").subPurposes.join(" ")).toMatch(/editable in My profile, with no effect on an announcement already posted/);
     expect(sheet("T16").legalBasis).toMatch(/except for the username in the #live announcement of a solo tournament, which one objects to by not registering/);
+    expect(sheet("T04").legalBasis).toMatch(/for match time notices, the notice that a match leaves their schedule and match reminders sent to players/);
     expect(sheet("T05").legalBasis).toMatch(/sending the refereeing schedule to referees and administrators falls under performance of the service \(T04\)/);
   });
 });
