@@ -52,11 +52,17 @@ const ENVIRONMENT_NOTICE_ID = "oauth-environment-notice";
 export function OAuthButtons({
   redirect,
   terms,
+  termsAtClick,
   environmentNotice = null,
 }: Readonly<{
   redirect: string;
   /** Conditions d'utilisation acceptées dans la modale d'entrée de la page (`null` : pas encore). */
   terms: OAuthTermsConsent | null;
+  /**
+   * Les mêmes, relues **au clic** : l'acceptation « dans la page » expire à
+   * l'horloge, et l'adresse rendue peut dater d'avant une mise en veille.
+   */
+  termsAtClick?: () => OAuthTermsConsent | null;
   /**
    * Avertissement quand le navigateur risque de perdre l'aller-retour OAuth
    * (app installée sur iOS, navigateur intégré) — `loginEnvironmentNotice`.
@@ -113,6 +119,13 @@ export function OAuthButtons({
               */}
               <a
                 href={oauthStartPath(provider, { redirect, terms, locale })}
+                onClick={
+                  termsAtClick
+                    ? (event) => {
+                        event.currentTarget.href = oauthStartPath(provider, { redirect, terms: termsAtClick(), locale });
+                      }
+                    : undefined
+                }
                 aria-describedby={describedBy || undefined}
               >
                 {t("oauth.continueWith", { provider: OAUTH_PROVIDER_LABELS[provider] })}

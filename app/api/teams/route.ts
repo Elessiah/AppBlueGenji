@@ -39,7 +39,8 @@ export async function GET() {
  * n'a pas présenté — `createTeam` enregistre `TERMS_VERSION`.
  */
 function refuseTermsAcceptance(body: { acceptTerms?: boolean; termsVersion?: unknown }) {
-  if (body.acceptTerms !== true) return fail(TERMS_REQUIRED, 400);
+  // Sans version (page d'avant ce champ) : le refus que ces pages savent dire.
+  if (body.acceptTerms !== true || body.termsVersion === undefined) return fail(TERMS_REQUIRED, 400);
   if (body.termsVersion !== TERMS_VERSION) return fail(TERMS_VERSION_MISMATCH, 409);
   return null;
 }

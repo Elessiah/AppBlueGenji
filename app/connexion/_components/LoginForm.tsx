@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { richNodes } from "@/components/i18n/shell-text";
@@ -118,12 +118,21 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // Acceptation donnée **dans cette page** (clic sur la modale), par opposition
   // à celle relue du navigateur, qui peut être celle d'une autre personne
   // (ordinateur partagé) : seule la première met à jour un compte existant.
+  // L'instant de l'acceptation fait foi, relu à l'horloge **au moment de
+  // partir** (`isAcceptedNow`) : un minuteur s'arrête quand la page est
+  // suspendue (ordinateur en veille, onglet gelé, retour arrière). Le minuteur
+  // ne sert qu'à rafraîchir les liens affichés.
+  const acceptedAt = useRef<number | null>(null);
   const [acceptedNow, setAcceptedNow] = useState(false);
   useEffect(() => {
     if (!acceptedNow) return;
     const timer = window.setTimeout(() => setAcceptedNow(false), ACCEPTED_NOW_TTL_MS);
     return () => window.clearTimeout(timer);
   }, [acceptedNow]);
+  const isAcceptedNow = useCallback(
+    () => acceptedAt.current !== null && Date.now() - acceptedAt.current < ACCEPTED_NOW_TTL_MS,
+    [],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -149,6 +158,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
     setConsentGiven(true);
+    acceptedAt.current = Date.now();
     setAcceptedNow(true);
   };
 
@@ -157,6 +167,11 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // clignoter la modale, il ne vaut donc acceptation qu'après la lecture.
   const termsAccepted = consentRead && consentGiven;
   const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow } : null;
+  // Relu au clic : l'adresse affichée peut dater d'avant une mise en veille.
+  const termsAtClick = useCallback(
+    () => (termsAccepted ? { version: TERMS_VERSION, acceptedNow: isAcceptedNow() } : null),
+    [termsAccepted, isAcceptedNow],
+  );
 
   const refuseConsent = () => {
     // Retour en arrière total : aucune donnée n'a été enregistrée.
@@ -238,7 +253,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           // La version montrée voyage avec l'acceptation : un onglet resté
           // ouvert sur une version antérieure n'accepte pas la nouvelle.
           termsVersion: TERMS_VERSION,
-          termsAcceptedNow: acceptedNow,
+          termsAcceptedNow: isAcceptedNow(),
           // La langue de la page devient celle du compte (lot 9-3).
           locale: text.locale,
         }),
@@ -306,6 +321,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             <OAuthButtons
               redirect={redirect}
               terms={terms}
+              termsAtClick={termsAtClick}
               environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
@@ -373,6 +389,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             <OAuthButtons
               redirect={redirect}
               terms={terms}
+              termsAtClick={termsAtClick}
               environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
