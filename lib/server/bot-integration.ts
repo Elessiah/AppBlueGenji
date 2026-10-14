@@ -669,6 +669,15 @@ function isTimeoutError(error: unknown): boolean {
   return name === "TimeoutError" || name === "AbortError";
 }
 
+/** Relâche un corps de réponse qu'on ne lira pas. Ne lève jamais. */
+async function discardBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // Flux déjà fermé : rien à relâcher.
+  }
+}
+
 /** Lit `mentionEveryone` du bilan du bot ; un corps illisible vaut une mention faite. */
 async function announcedWithoutMention(response: Response): Promise<boolean> {
   try {
@@ -716,6 +725,7 @@ export async function pushLiveAnnouncement(
     // Un refus du corps n'est pas une panne du bot : il a répondu.
     if (response.status === 400) {
       recordSuccess();
+      await discardBody(response);
       return "rejected";
     }
     // Un bot d'une version antérieure ne connaît pas la route, ou le salon
@@ -723,6 +733,9 @@ export async function pushLiveAnnouncement(
     // coupe-circuit n'a pas à s'ouvrir — il suspendrait les rappels et alertes
     // de fond pour un réglage de salon ; l'annonce attendra.
     if (response.status === 503) return classifyUnavailable(response);
+    // Corps non lu : le relâcher rend la connexion au pool, au lieu de la
+    // laisser occupée jusqu'au ramasse-miettes à chaque nouvel essai.
+    await discardBody(response);
     if (response.status === 404) return "unavailable";
     recordFailure();
     return "unavailable";

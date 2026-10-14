@@ -502,13 +502,22 @@ function postponeRetries(): void {
 let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
 let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+/** Instant visé par `trailingTimer`. */
+let trailingAt = 0;
 
 /**
  * Relève : un appel étranglé, ou arrivé pendant un passage dont la lecture a
- * pu précéder le passage à l'antenne, ne doit pas être perdu.
+ * pu précéder le passage à l'antenne, ne doit pas être perdu. Une seule
+ * relève, à l'échéance **la plus proche** : la fin d'une pause d'une minute ne
+ * repousse pas celle, à dix secondes, d'un autre tournoi.
  */
 function scheduleTrailingSweep(delayMs: number): void {
-  if (trailingTimer) return;
+  const at = Date.now() + Math.max(0, delayMs);
+  if (trailingTimer) {
+    if (trailingAt <= at) return;
+    clearTimeout(trailingTimer);
+  }
+  trailingAt = at;
   trailingTimer = setTimeout(() => {
     trailingTimer = null;
     void dispatchLiveAnnouncements();
