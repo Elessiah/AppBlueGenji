@@ -13,11 +13,11 @@ import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 import { LOGO_RIGHTS_FIELD, LOGO_RIGHTS_TERMS_ANCHOR, TERMS_PATH, TERMS_VERSION } from "@/lib/shared/terms-of-use";
-import { CodedError, TEAM_IDENTITY_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
+import { CodedError, TEAM_CREATION_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 
-const FIELD_IDS = { name: "team-name", tag: "team-tag" } as const;
+const FIELD_IDS = { name: "team-name", tag: "team-tag", terms: "team-terms" } as const;
 
 export default function CreateTeamForm() {
   const router = useLocaleRouter();
@@ -37,7 +37,7 @@ export default function CreateTeamForm() {
   const [logoRights, setLogoRights] = useState(false);
   const [loading, setLoading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
-  const fieldErrors = useFieldErrors(TEAM_IDENTITY_FIELD_ERRORS, FIELD_IDS);
+  const fieldErrors = useFieldErrors(TEAM_CREATION_FIELD_ERRORS, FIELD_IDS);
 
   const onLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -78,7 +78,9 @@ export default function CreateTeamForm() {
       return;
     }
     if (!acceptTerms) {
-      showError(teamErrorMessage("TERMS_REQUIRED"));
+      const message = teamErrorMessage("TERMS_REQUIRED");
+      fieldErrors.flag("terms", message);
+      showError(message);
       return;
     }
     setLoading(true);
@@ -271,7 +273,16 @@ export default function CreateTeamForm() {
           </div>
 
           <label className="consent-check">
-            <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
+            <input
+              id={FIELD_IDS.terms}
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => {
+                setAcceptTerms(e.target.checked);
+                fieldErrors.clear("terms");
+              }}
+              {...fieldErrors.aria("terms")}
+            />
             <span>
               {richNodes(
                 text.rich("create.terms", {}, {
@@ -284,6 +295,7 @@ export default function CreateTeamForm() {
               )}
             </span>
           </label>
+          <FieldErrorText fieldId={FIELD_IDS.terms} message={fieldErrors.message("terms")} />
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
             <CyberButton variant="ghost" asChild>
