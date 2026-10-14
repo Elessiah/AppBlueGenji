@@ -1309,7 +1309,7 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
   it("ne retient pas le balayage sur le programme : son propre verrou, un seul à la fois", async () => {
     const { dispatchRefereeDigest } = await import("@/lib/server/tournaments/referee-digest");
     // Les appareils du staff tardent : le programme ne revient qu'au signal.
-    let release: (count: number) => void = () => undefined;
+    let release: ((count: number) => void) | undefined;
     jest.mocked(dispatchRefereeDigest).mockImplementation(
       () =>
         new Promise<number>((resolve) => {
@@ -1329,7 +1329,7 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     later.mockRestore();
     expect(dispatchRefereeDigest).toHaveBeenCalledTimes(1);
 
-    release(0);
+    release?.(0);
     await pendingRefereeDigest();
     expect(pendingRefereeDigest()).toBeNull();
   });
