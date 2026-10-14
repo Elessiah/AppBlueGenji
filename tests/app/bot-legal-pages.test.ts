@@ -478,8 +478,11 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
   });
 
   it("renvoie à « Mon profil » pour couper les messages de match, et avance sa date (FR et EN)", () => {
-    expect(fr).toContain("un joueur peut couper ceux de ses matchs (horaire, rappel) dans « Mon profil »");
-    expect(en).toContain("a player can turn off those about their matches (time, reminder) in “My profile”");
+    expect(fr).toContain("un joueur peut couper ceux de ses matchs (horaire, rappel, retrait d'un match) dans « Mon profil »");
+    expect(fr).toContain("(horaire, rappel, retrait d'un match)");
+    expect(en).toContain("(time, reminder, removal from a match)");
+    expect(fr).toContain("« un joueur » pour une entrée sans compte ou un compte supprimé");
+    expect(en).toContain("a player can turn off those about their matches (time, reminder, removal from a match) in “My profile”");
     expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["16 octobre 2026", "16 October 2026"]);
   });
 });
