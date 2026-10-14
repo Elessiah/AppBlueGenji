@@ -964,7 +964,7 @@ describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de
     const declared = [entry.title, entry.summary, ...entry.details].join(" ");
     for (const pattern of [
       /pseudo public BlueGenji remplace « un joueur »/,
-      /jamais ton prénom ni ton identifiant Discord/,
+      /voire le nom de ton compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais ton identifiant Discord numérique/,
       /Un match d'équipes ne nomme toujours que les équipes/,
       /tant qu'il existe/,
       /demander la suppression/,
@@ -982,7 +982,7 @@ describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
     expect(english.title).toBe("Your username in #live announcements, and match direct messages up to you");
     const translated = english.details.join(" ");
-    for (const pattern of [/right to object/, /performance of the service/, /never your first name or Discord identifier/]) {
+    for (const pattern of [/right to object/, /performance of the service/, /or even your Google account name for a Google account created before September 30, 2026; never your numeric Discord identifier/]) {
       expect(translated).toMatch(pattern);
     }
   });
