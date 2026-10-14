@@ -776,6 +776,22 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     expect(resolvePush(pushes[0][2], "en").body).toContain("Check-in already open on Discord");
   });
 
+  it("juge l'ouverture du check-in à l'envoi, pas au début du passage", async () => {
+    await mockAnnounceDb();
+    // Passage commencé 15 min 30 s avant le coup d'envoi ; le message sort une
+    // minute plus tard (bot lent, lots d'une ronde suisse) : le salon est ouvert.
+    const base = Date.now();
+    let calls = 0;
+    const clock = jest.spyOn(Date, "now").mockImplementation(() => (calls++ === 0 ? base : base + 60_000));
+
+    await announceMatchSchedule(notice(), { rescheduled: false }, new Date("2026-09-10T17:44:30Z"));
+    clock.mockRestore();
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("le salon de check-in est déjà ouvert sur Discord");
+    }
+  });
+
   it("dit l'ouverture du check-in à venir à une manche programmée 5 h avant", async () => {
     await mockAnnounceDb();
 

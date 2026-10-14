@@ -210,14 +210,18 @@ describe("dispatchRefereeDigest", () => {
   });
 
   it("ne part pas avec la marge seule quand la manche due n'a pas été prise, et rend ses marques", async () => {
-    // M1 (due) déplacée entre la lecture et la réservation ; M2 n'est que dans la marge.
-    const { execute } = mockDb([row(1, 9), row(2, 11.5)], [1]);
+    // M1 (due) déplacée entre la lecture et la réservation ; M2 et M3 ne sont que dans la marge.
+    const { execute } = mockDb([row(1, 9), row(2, 11.5), row(3, 11.8)], [1]);
 
     expect(await dispatchRefereeDigest(NOW)).toBe(0);
 
     expect(notifyStaff).not.toHaveBeenCalled();
-    const release = execute.mock.calls.find(([sql]) => /DELETE FROM bg_match_reminders/.test(sql));
-    expect(release?.[1]).toEqual([2, "REFS", row(2, 11.5).start_at]);
+    // Une seule instruction rend toutes les marques prises, chacune pour l'horaire lu.
+    const releases = execute.mock.calls.filter(([sql]) => /DELETE FROM bg_match_reminders/.test(sql));
+    expect(releases).toHaveLength(1);
+    const [sql, params] = releases[0] as [string, unknown[]];
+    expect(sql).toMatch(/WHERE offset_key = \? AND \(match_id, start_at\) IN \(\(\?, \?\), \(\?, \?\)\)/);
+    expect(params).toEqual(["REFS", 2, row(2, 11.5).start_at, 3, row(3, 11.8).start_at]);
   });
 
   it("n'envoie rien quand toutes les réservations sont refusées", async () => {
