@@ -45,15 +45,16 @@ function mockDb(
   current: ReturnType<typeof row>[] | Error = rows,
 ) {
   const query = jest.fn<SqlQuery>(async (sql, params) => {
-    if (/SELECT id, start_at, team1_id, team2_id FROM bg_matches/.test(sql)) {
+    if (/AS tournament_state/.test(sql)) {
       if (current instanceof Error) throw current;
-      return [current];
+      return [current.map((match) => ({ status: "READY", tournament_state: "RUNNING", ...match }))];
     }
     if (!/LIMIT 1/.test(sql)) return [rows];
     const until = ((params as unknown[])[1] as Date).getTime();
     return [rows.filter((candidate) => candidate.start_at.getTime() <= until).slice(0, 1).map(() => ({ due: 1 }))];
   });
-  const execute = jest.fn<SqlQuery>(async (_sql, params) => {
+  const execute = jest.fn<SqlQuery>(async (sql, params) => {
+    if (sql.startsWith("DELETE")) return [{ affectedRows: 1 }];
     const matchId = (params as unknown[])[0] as number;
     return [{ affectedRows: refused.includes(matchId) ? 0 : 1 }];
   });
@@ -273,7 +274,8 @@ describe("dispatchRefereeDigest", () => {
     expect(await dispatchRefereeDigest(NOW)).toBe(2);
 
     const [sql, params] = query.mock.calls[2] as [string, unknown[]];
-    expect(sql).toBe("SELECT id, start_at, team1_id, team2_id FROM bg_matches WHERE id IN (?, ?)");
+    expect(sql).toMatch(/FROM bg_matches m JOIN bg_tournaments t ON t\.id = m\.tournament_id\s+WHERE m\.id IN \(\?, \?\)$/);
+    expect(sql).toMatch(/m\.status, t\.state AS tournament_state/);
     expect(params).toEqual([1, 2]);
   });
 
@@ -290,14 +292,29 @@ describe("dispatchRefereeDigest", () => {
     expect(line).not.toContain("Renards 2");
   });
 
-  it("ne cite pas une manche dont l'affiche a changé ou l'horaire a été retiré après sa réservation", async () => {
-    mockDb(
-      [row(1, 9), row(2, 9.5), row(3, 9.8)],
+  it("ne cite pas une manche changée, retirée, jouée ou d'un tournoi clos après sa réservation, et rend sa marque", async () => {
+    const { execute } = mockDb(
+      [row(1, 9), row(2, 9.5), row(3, 9.8), row(4, 9.9), row(5, 9.95)],
       [],
-      [row(1, 9), row(2, 9.5, { team2_id: 999 }), row(3, 9.8, { start_at: null })] as ReturnType<typeof row>[],
+      [
+        row(1, 9),
+        row(2, 9.5, { team2_id: 999 }),
+        row(3, 9.8, { start_at: null }),
+        row(4, 9.9, { status: "AWAITING_CONFIRMATION" }),
+        row(5, 9.95, { tournament_state: "FINISHED" }),
+      ] as ReturnType<typeof row>[],
     );
 
     expect(await dispatchRefereeDigest(NOW)).toBe(1);
+
+    // Un retrait n'efface aucune marque : rendue ici (pour l'horaire lu), une
+    // manche reposée au même horaire sera citée de nouveau.
+    const release = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE")) as [string, unknown[]];
+    expect(release[1]).toEqual([
+      ...[2, 3, 4, 5],
+      "REFS",
+      ...[2, 9.5, 3, 9.8, 4, 9.9, 5, 9.95].map((value, index) => (index % 2 === 0 ? value : row(0, value).start_at)),
+    ]);
   });
 
   it("rend les marques de la marge quand la manche due a été déplacée après sa réservation", async () => {
@@ -306,11 +323,13 @@ describe("dispatchRefereeDigest", () => {
     expect(await dispatchRefereeDigest(NOW)).toBe(0);
 
     expect(notifyStaff).not.toHaveBeenCalled();
-    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
-    expect(sql).toMatch(/DELETE FROM bg_match_reminders/);
-    // Seule la marge (manche 2) est rendue : la marque de la manche 1 a déjà
-    // été effacée par sa reprogrammation.
-    expect(params).toEqual([2, "REFS", 2, row(2, 11).start_at]);
+    // La manche déplacée, pour son ancien horaire (sans effet si sa
+    // reprogrammation l'a déjà effacée), puis la marge laissée seule.
+    const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE")) as [string, unknown[]][];
+    expect(releases.map(([, params]) => params)).toEqual([
+      [1, "REFS", 1, row(1, 9).start_at],
+      [2, "REFS", 2, row(2, 11).start_at],
+    ]);
   });
 
   it("envoie quand même si la relecture échoue : les marques sont prises", async () => {

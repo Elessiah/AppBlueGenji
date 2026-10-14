@@ -91,6 +91,14 @@ describe("refereeDigestPush", () => {
     expect(refereeDigestPush([match(1), match(2)]).body.split("\n")).toHaveLength(3);
   });
 
+  it("ne fond pas en une ligne deux tournois individuels homonymes au même créneau", () => {
+    const solo = { solo: true, tournamentName: "Coupe du soir" };
+    const body = refereeDigestPush([match(1, { ...solo, tournamentId: 7 }), match(2, { ...solo, tournamentId: 8 })]).body;
+    expect(body).toBe(
+      "jeu. 20:00 · Un match (Coupe du soir, Manche 1)\njeu. 20:00 · Un match (Coupe du soir, Manche 1)\nHeure de Paris",
+    );
+  });
+
   it("tient dans la borne du corps d'un push : « … et N autres » et le fuseau arrivent toujours", () => {
     const long = (id: number) =>
       match(id, {
