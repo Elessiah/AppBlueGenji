@@ -127,6 +127,14 @@ export type ProfileViewer = {
   roles?: readonly PlatformRole[];
 };
 
+/**
+ * Colonnes lues pour le seul titulaire de la fiche : une migration en échec ne
+ * casse pas la fiche publique d'un joueur (`/joueurs/[id]`), qui n'en a pas l'usage.
+ */
+function ownerOnlyColumns(isSelf: boolean): string {
+  return isSelf ? "match_dm_enabled," : "";
+}
+
 export async function getFullProfile(
   viewer: ProfileViewer,
   targetUserId: number,
@@ -135,9 +143,7 @@ export async function getFullProfile(
   const viewerIsAdmin = Boolean(viewer.isAdmin);
   const canModerate = can(viewer, "moderation");
   const db = await getDatabase();
-  // Lue pour son seul titulaire : une migration en échec ne casse pas la fiche
-  // publique d'un joueur (`/joueurs/[id]`), qui n'en a pas l'usage.
-  const matchDmColumn = viewerId === targetUserId ? "match_dm_enabled," : "";
+  const matchDmColumn = ownerOnlyColumns(viewerId === targetUserId);
 
   const [userRows] = await db.execute<(UserRow & { locale: string; match_dm_enabled?: number | null })[]>(
     `SELECT
