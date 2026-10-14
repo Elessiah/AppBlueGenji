@@ -159,7 +159,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   tournoi individuel, « 🔴 En direct : 2 matchs — Tournoi ». Chaque affiche
   garde sa réservation. Deux matchs **à la suite** restent deux annonces.
 - **Une annonce par match et par affiche** : `bg_live_announcements`
-  (clé unique `(match_id, pairing)`) est réservée **avant** l'appel au bot.
+  (clé unique `(match_id, pairing)`, `pairing` = les deux engagés **sans
+  ordre**, `5:7` pour `7:5` : un plateau réécrit qui inverse les deux mêmes
+  engagés ne réannonce pas) est réservée **avant** l'appel au bot.
   Un balayage concurrent, un rafraîchissement, une relecture du flux, un direct
   coupé puis relancé, un lancement annulé puis refait (horaire changé) ne
   repostent jamais. La réservation n'est **rendue** que si rien n'est parti
@@ -264,8 +266,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   « salon #live fermé au bot » (`503` de salon ou de permission), « Discord a
   refusé l'annonce (état du salon) ou n'a pas répondu au bot » ou « bot
   injoignable, en panne ou d'une version sans
-  annonces » ; passé deux heures, le match n'est plus réessayé. Un `503` qui
-  ne concerne pas l'annonce (jeton interne du bot absent…) se lit « bot
+  annonces » ou « jeton interne refusé ou absent » (`401`, ou `503`
+  `INTERNAL_API_TOKEN_NOT_CONFIGURED`) ; passé deux heures, le match n'est
+  plus réessayé. Un autre `503` qui ne concerne pas l'annonce se lit « bot
   injoignable ». Les annonces abandonnées sont tracées en `console.error` :
   refus du corps (`400`), blocage par AutoMod (« une règle AutoMod du serveur
   a bloqué l'annonce … abandonnée »), « publication non confirmée » (`503`
