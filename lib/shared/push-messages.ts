@@ -447,6 +447,7 @@ export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale
   return {
     title: text.t("refereeDigest.title", { count: matches.length }),
     body: fitDigestBody(digestLines(matches, text, locale), matches.length, text),
+    multiline: true,
     url: localeHref(tournaments.size === 1 ? tournamentHref(onlyTournament) : "/tournois", locale),
     tag: `referee-digest-${matches[0]?.matchId ?? 0}-${matches.length}-${idsFingerprint(matches.map((match) => match.matchId))}`,
   };

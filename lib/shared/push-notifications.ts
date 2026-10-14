@@ -156,6 +156,14 @@ export type PushContent = {
    * verrait jamais le lien du check-in.
    */
   renotify?: boolean;
+  /**
+   * Corps écrit **en lignes** par son rédacteur (le programme d'arbitrage, qui
+   * replie lui-même chaque ligne) : ses retours à la ligne sont gardés. Sans
+   * ce drapeau, ils sont repliés en espaces — un nom (tournoi, équipe) qui en
+   * porterait un ne doit pas ouvrir une fausse ligne dans un autre push
+   * (« Match reprogrammé : … » imité sous « Score à confirmer »).
+   */
+  multiline?: boolean;
 };
 
 /**
@@ -232,7 +240,7 @@ export function buildPushPayload(
   return {
     topic,
     title: clipPushText(content.title, PUSH_TITLE_MAX) || "BlueGenji Esport",
-    body: clipPushText(content.body, PUSH_BODY_MAX, true),
+    body: clipPushText(content.body, PUSH_BODY_MAX, content.multiline === true),
     url: pushTargetPath(content.url, siteOrigin),
     tag: clipPushText(content.tag ?? topic, PUSH_TAG_MAX) || topic,
     lang,
