@@ -110,4 +110,20 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(legalPageText(render("en"))).toContain("You now manage a team");
     expect(legalPageText(render("fr"))).toContain("Tu gères désormais une équipe");
   });
+
+  it("pendant l'enregistrement, les boutons gardent le focus : aria-disabled + aria-busy, jamais disabled natif", () => {
+    const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
+    expect(modal).not.toMatch(/[^-]disabled=\{busy/);
+    expect(modal).not.toContain("disabled={busy || !checked}");
+    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(2);
+    expect(modal).toContain("aria-busy={busy || undefined}");
+    // Case décochée hors requête seulement : décocher pendant l'envoi ne fait pas perdre le focus.
+    expect(modal).toContain("disabled={!checked && !busy}");
+  });
+
+  it("au repos, « J'accepte » reste désactivé tant que la case n'est pas cochée", () => {
+    const html = render("fr");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>J(?:'|&#x27;)accepte<\/button>/);
+    expect(html).not.toContain('aria-busy="true"');
+  });
 });
