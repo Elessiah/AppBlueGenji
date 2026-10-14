@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   REGISTRATION_STREAM_NOTICE_LINK_LABEL,
+  STREAM_NOTICE_LIVE,
   STREAM_NOTICE_OBJECTION,
   STREAM_NOTICE_PRIVACY_PATH,
   STREAM_NOTICE_SHOWN,
@@ -50,6 +51,9 @@ describe("conditions d'utilisation — retransmission des matchs", () => {
     const text = section!.paragraphs.join(" ");
     expect(text).toContain(STREAM_NOTICE_SHOWN);
     expect(text).toContain(STREAM_NOTICE_OBJECTION);
+    // Le nom neutre ne couvre pas l'annonce #live d'un tournoi individuel (2026-10-14).
+    expect(text).toContain(STREAM_NOTICE_LIVE);
+    expect(STREAM_NOTICE_LIVE).toMatch(/en tournoi individuel, les joueurs par leur pseudo public ; le nom neutre ne s'applique pas à cette annonce : un joueur qui ne veut pas y être nommé ne s'inscrit pas/);
     expect(section!.links?.map((l) => l.href)).toEqual([STREAM_NOTICE_PRIVACY_PATH]);
   });
 

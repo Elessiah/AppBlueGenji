@@ -133,6 +133,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     // L'avis « Match retiré de ton programme » est l'un des messages coupés par l'interrupteur.
     expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
     // T05 ne contredit pas T04 sur la base du programme d'arbitrage envoyé au staff.
+    expect(t04.legalBasis).toMatch(/l'intérêt légitime \(bon déroulement des tournois\) restant la base à l'égard des joueurs et équipes qu'ils citent/);
     expect(byRef("T05").legalBasis).toMatch(/programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service \(T04\)/);
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);

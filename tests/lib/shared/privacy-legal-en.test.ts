@@ -8,6 +8,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { AUDIENCE_OPT_OUT_TEXT_FR } from "@/components/privacy/AudienceOptOutControl";
 import { messagesFor } from "@/lib/server/i18n-messages";
+import { STREAM_NOTICE_LIVE_EN } from "@/lib/shared/legal-text-en";
 import {
   PRIVACY_CHANGES,
   formatPrivacyChangeDate,
@@ -25,6 +26,7 @@ import {
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN, registerControllerEn, transferBasisEn } from "@/lib/shared/processing-register-en";
+import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 import {
   DONNEES_PROFIL,
   DONNEE_CONNEXIONS,
@@ -179,6 +181,15 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
   it("declares the same items as the French register", () => {
     expect(sheet("T16").dataCategories.join(" ")).toMatch(/Public BlueGenji username of the players of a solo tournament, posted in the #live announcement/);
     expect(sheet("T04").subPurposes.join(" ")).toMatch(/the notice that a match leaves their schedule/);
+    expect(sheet("T04").legalBasis).toMatch(/legitimate interest \(smooth running of tournaments\) remaining the basis with regard to the players and teams they mention/);
     expect(sheet("T05").legalBasis).toMatch(/sending the refereeing schedule to referees and administrators falls under performance of the service \(T04\)/);
+  });
+});
+
+describe("terms of use (EN): #live announcement of a solo tournament", () => {
+  it("states that the neutral name does not cover it, like the French terms", () => {
+    const section = TERMS_SECTIONS_EN.find((s) => s.id === "retransmission")!;
+    expect(section.paragraphs.join(" ")).toContain(STREAM_NOTICE_LIVE_EN);
+    expect(STREAM_NOTICE_LIVE_EN).toMatch(/the neutral name does not apply to that announcement: a player who does not want to be named in it does not register/);
   });
 });
