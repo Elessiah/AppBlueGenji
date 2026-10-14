@@ -610,23 +610,27 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
 
     const [sql] = query.mock.calls[0] as unknown as [string];
-    expect(sql).toMatch(/m\.start_at > NOW\(\)/);
+    // Bornes calculées par le processus, jamais `NOW()` : une base sur un autre
+    // fuseau que l'application décalerait l'ouverture des paliers.
+    expect(sql).not.toMatch(/NOW\(\)/);
+    expect(sql).toMatch(/m\.start_at > \?/);
     // Un tournoi clos ne se joue plus : aucun rappel pour ses manches restées ouvertes.
     expect(sql).toMatch(/AND t\.state <> 'FINISHED'/);
     // Fenêtre de lecture = horizon + une journée de marge, pour que la manche
     // soit observée avant que le palier 24 h ne s'ouvre.
-    expect(sql).toMatch(/DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)/);
+    expect(sql).toMatch(/AND m\.start_at <= \?/);
     const [, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     // Marques lues dans la requête ; au-delà de 24 h, seule une manche jamais
     // observée est lue (`SEEN` absent, relu par sa colonne).
     // Une manche dont le rappel 24 h est pris n'est pas relue avant l'ouverture
     // du rappel 10 h (36 000 s) : sans cela, chaque passage la relirait et
     // re-tenterait sa marque « 24 h » pendant 14 heures.
-    expect(params).toEqual(["SEEN", "TOLD", 2 * 24 * 60 * 60, "PT10H", "P1D", 10 * 60 * 60, 24 * 60 * 60]);
+    const at = (hours: number) => new Date(TWELVE_HOURS_BEFORE.getTime() + hours * 60 * 60 * 1000);
+    expect(params).toEqual(["SEEN", "TOLD", TWELVE_HOURS_BEFORE, at(48), "PT10H", "P1D", at(10), at(24)]);
     expect(sql).toMatch(
-      /NOT EXISTS \(SELECT 1 FROM bg_match_reminders sent\s+WHERE sent\.match_id = m\.id AND sent\.offset_key = \?\s+AND m\.start_at > DATE_ADD\(NOW\(\), INTERVAL \? SECOND\)\)/,
+      /NOT EXISTS \(SELECT 1 FROM bg_match_reminders sent\s+WHERE sent\.match_id = m\.id AND sent\.offset_key = \?\s+AND m\.start_at > \?\)/,
     );
-    expect(sql).toMatch(/HAVING m\.start_at <= DATE_ADD\(NOW\(\), INTERVAL \? SECOND\) OR seen_mark = 0/);
+    expect(sql).toMatch(/HAVING m\.start_at <= \? OR seen_mark = 0/);
     expect(sql).toMatch(/EXISTS \(SELECT 1 FROM bg_match_reminders sm WHERE sm\.match_id = m\.id AND sm\.offset_key = \?\) AS seen_mark/);
     // Une manche dont le rappel 10 h (le dernier) est déjà pris n'est plus relue.
     expect(sql).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_match_reminders done\s+WHERE done\.match_id = m\.id AND done\.offset_key = \?\)/);

@@ -34,11 +34,21 @@ function row(id: number, hoursAhead: number, overrides: Record<string, unknown> 
 }
 
 /**
- * Base : `query` sert la sonde (`LIMIT 1` : une manche à ≤ sa borne haute ?) et
- * la lecture du programme, `execute` les réservations (refusées pour `refused`).
+ * Base : `query` sert la sonde (`LIMIT 1` : une manche à ≤ sa borne haute ?),
+ * la lecture du programme et la relecture avant envoi (`current`, les lignes
+ * telles qu'elles sont alors en base — par défaut inchangées), `execute` les
+ * réservations (refusées pour `refused`).
  */
-function mockDb(rows: ReturnType<typeof row>[], refused: number[] = []) {
+function mockDb(
+  rows: ReturnType<typeof row>[],
+  refused: number[] = [],
+  current: ReturnType<typeof row>[] | Error = rows,
+) {
   const query = jest.fn<SqlQuery>(async (sql, params) => {
+    if (/SELECT id, start_at, team1_id, team2_id FROM bg_matches/.test(sql)) {
+      if (current instanceof Error) throw current;
+      return [current];
+    }
     if (!/LIMIT 1/.test(sql)) return [rows];
     const until = ((params as unknown[])[1] as Date).getTime();
     return [rows.filter((candidate) => candidate.start_at.getTime() <= until).slice(0, 1).map(() => ({ due: 1 }))];
@@ -84,7 +94,8 @@ describe("dispatchRefereeDigest", () => {
 
     await dispatchRefereeDigest(NOW);
 
-    expect(query).toHaveBeenCalledTimes(2);
+    // Sonde, lecture, relecture avant envoi.
+    expect(query).toHaveBeenCalledTimes(3);
     const [sql, params] = query.mock.calls[1] as [string, unknown[]];
     expect(params).toEqual([NOW, new Date(NOW.getTime() + 12 * HOUR), "REFS"]);
     expect(sql).toMatch(/m\.status NOT IN \('COMPLETED', 'AWAITING_CONFIRMATION'\)/);
@@ -254,6 +265,62 @@ describe("dispatchRefereeDigest", () => {
     await dispatchRefereeDigest(NOW);
 
     expect(await publishedLine()).not.toContain("**Gras**");
+  });
+
+  it("relit les manches réservées en une instruction juste avant l'envoi", async () => {
+    const { query } = mockDb([row(1, 9), row(2, 11)]);
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(2);
+
+    const [sql, params] = query.mock.calls[2] as [string, unknown[]];
+    expect(sql).toBe("SELECT id, start_at, team1_id, team2_id FROM bg_matches WHERE id IN (?, ?)");
+    expect(params).toEqual([1, 2]);
+  });
+
+  it("ne cite pas une manche reprogrammée après sa réservation", async () => {
+    // L'arbitre déplace la manche 2 de 9 h 30 à 10 h 30 juste après la
+    // réservation : son nouvel horaire lui est poussé, le programme ne doit
+    // pas lui renvoyer l'ancien.
+    mockDb([row(1, 9), row(2, 9.5)], [], [row(1, 9), row(2, 10.5)]);
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(1);
+
+    const line = await publishedLine();
+    expect(line).toContain("Renards 1");
+    expect(line).not.toContain("Renards 2");
+  });
+
+  it("ne cite pas une manche dont l'affiche a changé ou l'horaire a été retiré après sa réservation", async () => {
+    mockDb(
+      [row(1, 9), row(2, 9.5), row(3, 9.8)],
+      [],
+      [row(1, 9), row(2, 9.5, { team2_id: 999 }), row(3, 9.8, { start_at: null })] as ReturnType<typeof row>[],
+    );
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(1);
+  });
+
+  it("rend les marques de la marge quand la manche due a été déplacée après sa réservation", async () => {
+    const { execute } = mockDb([row(1, 9), row(2, 11)], [], [row(1, 13), row(2, 11)]);
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(0);
+
+    expect(notifyStaff).not.toHaveBeenCalled();
+    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
+    expect(sql).toMatch(/DELETE FROM bg_match_reminders/);
+    // Seule la marge (manche 2) est rendue : la marque de la manche 1 a déjà
+    // été effacée par sa reprogrammation.
+    expect(params).toEqual([2, "REFS", 2, row(2, 11).start_at]);
+  });
+
+  it("envoie quand même si la relecture échoue : les marques sont prises", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockDb([row(1, 9)], [], new Error("connexion perdue"));
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(1);
+    expect(notifyStaff).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith("[referee-digest] relecture avant envoi en échec", expect.any(Error));
+    error.mockRestore();
   });
 
   it("est réservé au staff qui détient la permission des tournois", () => {
