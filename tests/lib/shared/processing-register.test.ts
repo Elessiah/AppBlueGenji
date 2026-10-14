@@ -205,8 +205,13 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
   });
 
   it("T13 recueille aussi l'acceptation à une connexion, seulement si elle vient d'être donnée sur la page (FR et EN)", () => {
-    expect(fr("T13").subPurposes.join(" ")).toMatch(/à une connexion où les conditions viennent d'être acceptées sur la page de connexion \(une acceptation seulement gardée par le navigateur n'est pas reportée sur un compte existant\)/);
-    expect(en("T13").subPurposes.join(" ")).toMatch(/at a login where the terms have just been accepted on the login page \(an acceptance only kept by the browser is not carried over to an existing account\)/);
+    expect(fr("T13").subPurposes.join(" ")).toMatch(/à une connexion lancée depuis la page de connexion dans les dix minutes où les conditions y ont été acceptées \(une acceptation seulement gardée par le navigateur n'est pas reportée sur un compte existant\)/);
+    expect(en("T13").subPurposes.join(" ")).toMatch(/at a login started from the login page within ten minutes of accepting the terms there \(an acceptance only kept by the browser is not carried over to an existing account\)/);
+  });
+
+  it("T16 donne une base à l'alerte AutoMod : intérêt légitime de modérer le serveur, opposition = suppression (FR et EN)", () => {
+    expect(fr("T16").legalBasis).toMatch(/intérêt légitime de l'association à modérer son serveur Discord pour l'alerte AutoMod d'une annonce #live bloquée[^;]*droit d'opposition \(art\. 21\) : l'alerte est supprimée sur demande/);
+    expect(en("T16").legalBasis).toMatch(/legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked #live announcement[^;]*right to object \(art\. 21\): the alert is deleted on request/);
   });
 
   it("T08 garde la même durée de l'alerte AutoMod que T16 et la politique du bot, compte supprimé compris", () => {

@@ -1015,6 +1015,7 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
     expect(declared()).toMatch(/où il reste jusqu'à sa suppression par les modérateurs ou sur demande/);
     // Revue légale #445 : une acceptation relue du navigateur n'est plus enregistrée pour un compte existant.
     expect(declared()).toMatch(/ton compte n'enregistre plus une acceptation seulement gardée par ton navigateur/);
+    expect(declared()).toMatch(/si la connexion part de cette page dans les dix minutes/);
     expect(declared()).toMatch(/« Mon profil », section Notifications/);
     expect(declared()).toMatch(/dans ton intérêt légitime/);
     expect(declared()).not.toMatch(/obligation légale/);
