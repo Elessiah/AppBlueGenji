@@ -69,16 +69,26 @@ function announcePlayerSignup(provider: PlayerSignupProvider): void {
  * que la porte Discord : un défaut ferait créer silencieusement des comptes
  * sans acceptation par la prochaine porte ajoutée.
  */
-export type TermsConsent = { termsAccepted: boolean };
+export type TermsConsent = {
+  /** La version en vigueur, acceptée à l'entrée (dans la page ou relue du navigateur). */
+  termsAccepted: boolean;
+  /**
+   * Acceptée **dans la page**, par la personne qui se connecte. Relue du
+   * navigateur, l'acceptation peut être celle d'une autre personne (ordinateur
+   * partagé) : elle ne met donc pas à jour un compte existant. Absent = non.
+   */
+  acceptedNow?: boolean;
+};
 
 /**
  * Suite commune des trois portes, une fois le compte retrouvé ou créé.
  *
  * - compte **neuf** : l'acceptation est sa condition de naissance, vérifiée
  *   avant l'`INSERT` par {@link assertSignupConsent} ; ici elle est écrite ;
- * - compte **existant**, case cochée : l'acceptation est enregistrée si la
- *   version courante ne l'était pas encore ;
- * - compte existant, case absente : rien — on ne ferme pas la porte à un
+ * - compte **existant**, conditions acceptées **dans la page** : l'acceptation
+ *   est enregistrée si la version courante ne l'était pas encore ;
+ * - compte existant, acceptation seulement relue du navigateur (peut-être celle
+ *   d'une autre personne) ou absente : rien — on ne ferme pas la porte à un
  *   membre existant, les conditions lui seront demandées là où elles comptent.
  */
 async function settleTermsAfterLogin(userId: number, created: boolean, consent: TermsConsent): Promise<void> {
@@ -86,7 +96,7 @@ async function settleTermsAfterLogin(userId: number, created: boolean, consent: 
     await recordTermsAcceptance(userId, "SIGNUP");
     return;
   }
-  if (consent.termsAccepted) await recordTermsAcceptanceIfBehind(userId, "LOGIN");
+  if (consent.termsAccepted && consent.acceptedNow === true) await recordTermsAcceptanceIfBehind(userId, "LOGIN");
 }
 
 /** @throws TERMS_REQUIRED Création d'un compte sans les conditions acceptées. */
@@ -256,8 +266,10 @@ export async function createOrGetDiscordUser(
      * avoir.
      */
     method: ConnectionMethod;
-    /** Conditions d'utilisation cochées à l'entrée (voir {@link TermsConsent}). */
+    /** Conditions d'utilisation acceptées à l'entrée (voir {@link TermsConsent}). */
     termsAccepted: boolean;
+    /** Acceptées dans la page, pas relues du navigateur (voir {@link TermsConsent}). */
+    acceptedNow?: boolean;
   },
 ): Promise<number> {
   const db = await getDatabase();

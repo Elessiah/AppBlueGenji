@@ -169,6 +169,8 @@ describe("création d'un compte — les conditions, condition de naissance", () 
   const insert: Route = [/INSERT INTO bg_users/, () => [{ insertId: 77 }]];
   const refusedConsent = { termsAccepted: false };
   const consent = { termsAccepted: true };
+  /** Acceptées dans la page de connexion, par la personne qui se connecte. */
+  const consentNow = { termsAccepted: true, acceptedNow: true };
 
   it.each<[string, () => Promise<number>]>([
     ["Google", () => createOrGetGoogleUser({ sub: "g-1" }, refusedConsent)],
@@ -198,8 +200,20 @@ describe("création d'un compte — les conditions, condition de naissance", () 
 
   it("enregistre l'acceptation d'un compte existant qui coche la case, s'il était en retard", async () => {
     install([[/WHERE blizzard_sub = \?/, () => [[{ id: 12 }]]], [/UPDATE bg_users SET overwatch_battletag/, () => [{}]]]);
-    await createOrGetBlizzardUser("bz-1", "Nova#2143", consent);
+    await createOrGetBlizzardUser("bz-1", "Nova#2143", consentNow);
     expect(recordTermsAcceptanceIfBehind).toHaveBeenCalledWith(12, "LOGIN");
+    expect(recordTermsAcceptance).not.toHaveBeenCalled();
+  });
+
+  it("n'attribue pas à un compte existant l'acceptation relue du navigateur (ordinateur partagé)", async () => {
+    // Le navigateur garde l'acceptation de la personne précédente : elle suffit
+    // à créer un compte, pas à mettre à jour celle d'un compte qui ne l'a pas vue.
+    install([[/WHERE blizzard_sub = \?/, () => [[{ id: 12 }]]], [/UPDATE bg_users SET overwatch_battletag/, () => [{}]]]);
+    await createOrGetBlizzardUser("bz-1", "Nova#2143", consent);
+    await createOrGetBlizzardUser("bz-1", "Nova#2143", { termsAccepted: true, acceptedNow: false });
+    // « Acceptées dans la page » sans l'acceptation elle-même ne vaut rien.
+    await createOrGetBlizzardUser("bz-1", "Nova#2143", { termsAccepted: false, acceptedNow: true });
+    expect(recordTermsAcceptanceIfBehind).not.toHaveBeenCalled();
     expect(recordTermsAcceptance).not.toHaveBeenCalled();
   });
 });

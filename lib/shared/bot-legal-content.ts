@@ -79,15 +79,17 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "14 octobre 2026";
-const LAST_UPDATED_EN = "14 October 2026";
+const LAST_UPDATED_FR = "15 octobre 2026";
+const LAST_UPDATED_EN = "15 October 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
 // matchs diffusés dans #live, la politique seule ; le pseudo solo dans #live et
-// l'interrupteur des messages de match (RGPD-DM-SWITCH), la politique seule.
-const PRIVACY_LAST_UPDATED_FR = "16 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "16 October 2026";
+// l'interrupteur des messages de match (RGPD-DM-SWITCH), la politique seule ;
+// base du pseudo solo, AutoMod et avis « Match retiré » (LEGAL-FOLLOWUP-444),
+// les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions).
+const PRIVACY_LAST_UPDATED_FR = "15 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "15 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
@@ -152,7 +154,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés) et rappels de match, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
+            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match et avis de retrait d'un match (« Match retiré »), alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
           },
         ],
       },
@@ -291,7 +293,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed) and match reminders, referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
+            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders and notices of removal from a match (“Match retiré”), referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
           },
         ],
       },
@@ -477,7 +479,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages du site BlueGenji" },
           {
             kind: "p",
-            text: `Le site transmet au Bot un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire et le message à remettre (code de connexion, horaire ou rappel de match, alerte d'arbitrage, signalement ; avis de modération — signalement vous désignant, logo d'équipe masqué, retiré ou supprimé — ; demande d'adhésion à une équipe que vous gérez ; information sur les données) ; le Bot remet les messages personnels (code, horaire, rappel, avis de modération, demande d'adhésion, information) en message privé **sans les enregistrer** ; un joueur peut couper ceux de ses matchs (horaire, rappel, retrait d'un match) dans « Mon profil » sur le site. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Au début d'un match diffusé, le site transmet aussi au Bot une annonce (noms des deux équipes — en tournoi individuel, le pseudo public BlueGenji de chaque joueur, « un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026 —, nom du tournoi et lien de la diffusion), que le Bot publie dans le salon #live du serveur Discord de l'association avec une mention @everyone. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
+            text: `Le site transmet au Bot un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire et le message à remettre (code de connexion, horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), alerte d'arbitrage, signalement ; avis de modération — signalement vous désignant, logo d'équipe masqué, retiré ou supprimé — ; demande d'adhésion à une équipe que vous gérez ; information sur les données) ; le Bot remet les messages personnels (code, horaire, rappel, retrait d'un match, avis de modération, demande d'adhésion, information) en message privé **sans les enregistrer** ; un joueur peut couper ceux de ses matchs (horaire, rappel, retrait d'un match) dans « Mon profil » sur le site. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Au début d'un match diffusé, le site transmet aussi au Bot une annonce (noms des deux équipes — en tournoi individuel, le pseudo public BlueGenji de chaque joueur, « un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026 —, nom du tournoi et lien de la diffusion), que le Bot publie dans le salon #live du serveur Discord de l'association avec une mention @everyone. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
           },
           { kind: "subhead", text: "Journaux" },
           {
@@ -487,7 +489,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Base légale" },
           {
             kind: "p",
-            text: "Ces traitements reposent sur l'**intérêt légitime** de l'association (article 6.1.f du RGPD) : faire fonctionner le relais entre serveurs partenaires, le modérer et en mesurer l'activité. Les messages du site reposent sur la base légale de leur traitement d'origine, indiquée dans le registre du site.",
+            text: "Ces traitements reposent sur l'**intérêt légitime** de l'association (article 6.1.f du RGPD) : faire fonctionner le relais entre serveurs partenaires, le modérer et en mesurer l'activité. Les messages du site reposent sur la base légale de leur traitement d'origine, indiquée dans le registre du site : intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), auxquels il s'oppose par l'interrupteur de « Mon profil » — le site garde ce choix dans l'intérêt légitime du joueur, pour l'honorer ; exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel ; intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande.",
           },
         ],
       },
@@ -507,7 +509,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés, qui les efface — départ survenu pendant une interruption compris, rattrapé au redémarrage.",
               `**Salon de journal privé du staff** (et messages privés du Bot à son titulaire) : un an (${BOT_STAFF_LOG_RETENTION_DAYS} jours) ; les messages du Bot plus anciens sont supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée.`,
               "**Journaux du serveur** : selon leur rotation automatique.",
-              "**Annonces #live** (début d'un match diffusé : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur ; supprimées sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème » du site, catégorie RGPD).",
+              "**Annonces #live** (début d'un match diffusé : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur ; supprimées sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème » du site, catégorie RGPD). Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.",
               // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
               // (`rclone delete --min-age`) est refaite **chaque heure** par
               // `blueGenjiBot/scripts/sync-uploads-onedrive.sh` (nom historique), et pas seulement
@@ -532,6 +534,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
               "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
               "Les membres du serveur Discord de l'association, qui lisent dans le salon #live l'annonce des matchs diffusés.",
+              "Les modérateurs du serveur Discord de l'association : si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte (pseudo public compris en tournoi individuel) peut parvenir au salon d'alertes de modération du serveur.",
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
               `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
@@ -571,7 +574,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Rectification** : faire corriger une donnée inexacte.",
               "**Effacement** : faire supprimer vos données ; certaines fonctions du Bot peuvent alors ne plus vous être rendues.",
               "**Limitation** : faire geler l'utilisation d'une donnée le temps d'examiner une contestation.",
-              "**Opposition** : vous opposer, pour des raisons tenant à votre situation particulière, à un traitement fondé sur l'intérêt légitime. Exception : le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande (formulaire « Signaler un problème » du site, catégorie RGPD).",
+              "**Opposition** : vous opposer, pour des raisons tenant à votre situation particulière, à un traitement fondé sur l'intérêt légitime. Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel n'en relève pas : il repose sur l'exécution du service auquel il s'inscrit — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande (formulaire « Signaler un problème » du site, catégorie RGPD).",
             ],
           },
           {
@@ -688,7 +691,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages from the BlueGenji website" },
           {
             kind: "p",
-            text: `The website sends the Bot a Discord ID or username, the recipient's BlueGenji username and the message to deliver (login code, match time or reminder, referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, match time, reminder, moderation notice, join request, data-protection notice) by direct message **without storing them**; a player can turn off those about their matches (time, reminder, removal from a match) in “My profile” on the website. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. When a streamed match starts, the website also sends the Bot an announcement (names of both teams — in a solo tournament, each player's public BlueGenji username, “a player” for an entry without an account, a deleted account or a registration made before 16 October 2026 —, tournament name and stream link), which the Bot posts in the #live channel of the association's Discord server with an @everyone mention. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}).`,
+            text: `The website sends the Bot a Discord ID or username, the recipient's BlueGenji username and the message to deliver (login code, match time or reminder, notice of removal from a match (“Match retiré”), referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, match time, reminder, removal from a match, moderation notice, join request, data-protection notice) by direct message **without storing them**; a player can turn off those about their matches (time, reminder, removal from a match) in “My profile” on the website. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. When a streamed match starts, the website also sends the Bot an announcement (names of both teams — in a solo tournament, each player's public BlueGenji username, “a player” for an entry without an account, a deleted account or a registration made before 16 October 2026 —, tournament name and stream link), which the Bot posts in the #live channel of the association's Discord server with an @everyone mention. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}).`,
           },
           { kind: "subhead", text: "Logs" },
           {
@@ -698,7 +701,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Legal basis" },
           {
             kind: "p",
-            text: "This processing is based on the association's **legitimate interest** (Article 6(1)(f) GDPR): running the relay between partner servers, moderating it and measuring its activity. Messages from the website rely on the legal basis of their original processing, set out in the website's register.",
+            text: "This processing is based on the association's **legitimate interest** (Article 6(1)(f) GDPR): running the relay between partner servers, moderating it and measuring its activity. Messages from the website rely on the legal basis of their original processing, set out in the website's register: legitimate interest for a player's match direct messages (time, reminders, “Match retiré”), which they object to with the switch in “My profile” — the website keeps that choice in their legitimate interest, to honour it; performance of the service the player registers for, for their public username in the #live announcement of a solo tournament; the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request.",
           },
         ],
       },
@@ -718,7 +721,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them — including a departure while the Bot is down, caught up when it restarts.",
               `**Staff private log channel** (and the Bot's direct messages to its owner): one year (${BOT_STAFF_LOG_RETENTION_DAYS} days); older messages from the Bot are deleted by the nightly clean-up, in batches (several nights for a large backlog), except the reason posted in the channel for an exclusion still in force — and, for an exclusion issued from this rule on, its notice and the copy of its reason by direct message —, deleted when it is lifted.`,
               "**Server logs**: according to their automatic rotation.",
-              "**#live announcements** (start of a streamed match: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted; deleted at the request of the team or player concerned (the website's “Report a problem” form, GDPR category).",
+              "**#live announcements** (start of a streamed match: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted; deleted at the request of the team or player concerned (the website's “Report a problem” form, GDPR category). An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most. A restore is made from these archives, decrypted on the Bot's machine: the database no longer travels through Discord; the copy of the previous database it leaves alongside is deleted at the next successful restore, and at the latest during the night after it turns ${BACKUP_RETENTION_DAYS} days old.`,
             ],
           },
@@ -739,6 +742,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Members of partner servers, who read the relayed advertisements.",
               "Members of the referee role of every server that has set one, for the website's referee alerts.",
               "Members of the association's Discord server, who read the announcement of streamed matches in the #live channel.",
+              "Moderators of the association's Discord server: if a Discord AutoMod rule blocks or flags a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel.",
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
               `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",
@@ -778,7 +782,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Rectification**: have inaccurate data corrected.",
               "**Erasure**: have your data deleted; some Bot features may then no longer be available to you.",
               "**Restriction**: have the use of data frozen while a dispute is examined.",
-              "**Objection**: object, on grounds relating to your particular situation, to processing based on legitimate interest. Exception: a player's username in the #live announcement of a solo tournament — objecting to it means not registering; a past announcement is deleted on request (the website's “Report a problem” form, GDPR category).",
+              "**Objection**: object, on grounds relating to your particular situation, to processing based on legitimate interest. A player's username in the #live announcement of a solo tournament is not covered: it rests on performance of the service they register for — not being named in it means not registering; a past announcement is deleted on request (the website's “Report a problem” form, GDPR category).",
             ],
           },
           {

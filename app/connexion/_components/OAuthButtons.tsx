@@ -31,6 +31,7 @@ import {
   OAUTH_PROVIDER_SLUGS,
   oauthStartPath,
   type OAuthProvider,
+  type OAuthTermsConsent,
 } from "@/lib/shared/oauth-providers";
 
 /** Ordre d'affichage propre à cet écran, du plus complet au plus spécialisé. */
@@ -50,12 +51,19 @@ const ENVIRONMENT_NOTICE_ID = "oauth-environment-notice";
 
 export function OAuthButtons({
   redirect,
-  termsAccepted,
+  terms,
+  termsAtClick,
   environmentNotice = null,
 }: Readonly<{
   redirect: string;
-  /** Conditions d'utilisation acceptées dans la modale d'entrée de la page. */
-  termsAccepted: boolean;
+  /** Conditions d'utilisation acceptées dans la modale d'entrée de la page (`null` : pas encore). */
+  terms: OAuthTermsConsent | null;
+  /**
+   * Les mêmes, relues **au clic** : l'acceptation « dans la page » expire à
+   * l'horloge. L'adresse rendue (`terms`) ne la porte jamais ; un clic simple
+   * part vers l'adresse relue, toute autre ouverture vers l'adresse rendue.
+   */
+  termsAtClick?: () => OAuthTermsConsent | null;
   /**
    * Avertissement quand le navigateur risque de perdre l'aller-retour OAuth
    * (app installée sur iOS, navigateur intégré) — `loginEnvironmentNotice`.
@@ -111,7 +119,23 @@ export function OAuthButtons({
                 `aria-describedby`, qui complète le nom au lieu de l'écraser.
               */}
               <a
-                href={oauthStartPath(provider, { redirect, termsAccepted, locale })}
+                href={oauthStartPath(provider, { redirect, terms, locale })}
+                onClick={
+                  termsAtClick
+                    ? (event) => {
+                        // Clic simple seulement : le clic du milieu, une touche
+                        // de modification ou « Ouvrir dans un nouvel onglet »
+                        // gardent l'adresse rendue, sans « dans la page ».
+                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                        const fresh = termsAtClick();
+                        if (!fresh?.acceptedNow) return;
+                        // Rien n'est réécrit dans le lien : revenu par « Précédent »,
+                        // il ne garde pas une acceptation que l'horloge a périmée.
+                        event.preventDefault();
+                        window.location.assign(oauthStartPath(provider, { redirect, terms: fresh, locale }));
+                      }
+                    : undefined
+                }
                 aria-describedby={describedBy || undefined}
               >
                 {t("oauth.continueWith", { provider: OAUTH_PROVIDER_LABELS[provider] })}

@@ -7,6 +7,7 @@ import {
   LOGIN_FIELD_ERRORS,
   PLAYER_PSEUDO_FIELD_ERRORS,
   PROFILE_FIELD_ERRORS,
+  TEAM_CREATION_FIELD_ERRORS,
   TEAM_IDENTITY_FIELD_ERRORS,
   TOURNAMENT_FIELD_ERRORS,
   clearFlag,
@@ -30,6 +31,14 @@ describe("fieldForError", () => {
   it("rend le champ désigné par un code connu", () => {
     expect(fieldForError("PSEUDO_ALREADY_USED", PROFILE_FIELD_ERRORS)).toBe("pseudo");
     expect(fieldForError("TEAM_TAG_ALREADY_USED", TEAM_IDENTITY_FIELD_ERRORS)).toBe("tag");
+  });
+
+  it("création d'équipe : les refus des conditions désignent leur case, l'identité garde ses champs", () => {
+    expect(fieldForError("TERMS_REQUIRED", TEAM_CREATION_FIELD_ERRORS)).toBe("terms");
+    expect(fieldForError("TERMS_VERSION_MISMATCH", TEAM_CREATION_FIELD_ERRORS)).toBe("terms");
+    expect(fieldForError("TEAM_TAG_ALREADY_USED", TEAM_CREATION_FIELD_ERRORS)).toBe("tag");
+    // Le renommage (`TEAM_IDENTITY_FIELD_ERRORS`) n'a pas de case : rien n'y est rattaché.
+    expect(fieldForError("TERMS_REQUIRED", TEAM_IDENTITY_FIELD_ERRORS)).toBeNull();
   });
 
   it("ne rattache à rien un code qui ne tient pas à une saisie", () => {

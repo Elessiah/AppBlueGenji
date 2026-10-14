@@ -264,6 +264,11 @@ export interface MatchReminderContext {
   tournamentName: string;
   /** URL publique de la page du tournoi (`null` si `APP_URL` n'est pas réglée). */
   tournamentUrl: string | null;
+  /**
+   * URL de la section Notifications de « Mon profil », où le joueur coupe ces
+   * messages ({@link matchDmOptOutLine}) — absente ou `null` sans `APP_URL`.
+   */
+  matchDmSettingsUrl?: string | null;
   /** Engagée du destinataire. */
   teamName: string;
   /** Adversaire. Toujours connue : un rappel sans adversaire n'a rien à dire. */
@@ -314,6 +319,24 @@ export type ScheduleAnnouncement = {
   previousStartAt?: string | Date | null;
 };
 
+/** Chemin de la section de « Mon profil » qui porte l'interrupteur des messages privés de match. */
+export const MATCH_DM_SETTINGS_PATH = "/profil#notifications";
+
+/**
+ * Dernière ligne de **tout** message privé de match d'un joueur (annonce,
+ * rappels, horaire retiré, « Match retiré ») : où couper ces messages — le
+ * droit d'opposition rappelé là où il s'exerce (registre T04). En français,
+ * comme tout message Discord ; jamais dans un message au staff.
+ */
+export function matchDmOptOutLine(settingsUrl?: string | null): string {
+  // `<…>` : Discord garde le lien cliquable sans en déplier l'aperçu — une
+  // seconde carte (celle de « Mon profil ») sous celle du tournoi, à chaque
+  // message, repousserait l'horaire hors de l'écran d'un téléphone.
+  return settingsUrl
+    ? `Tu peux couper ces messages privés dans ton profil, section Notifications : <${settingsUrl}>`
+    : "Tu peux couper ces messages privés dans « Mon profil », section Notifications, sur le site.";
+}
+
 /** Première annonce d'un horaire : rien à remplacer. */
 export const FIRST_SCHEDULE: ScheduleAnnouncement = { rescheduled: false };
 
@@ -345,6 +368,7 @@ export function buildMatchReminderMessage(
   ];
   if (context.checkIn ?? offset.key === CHECK_IN_REMINDER_KEY) lines.push(checkInLine(context.checkInOpen));
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
+  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
   return lines.join("\n");
 }
 
@@ -386,6 +410,7 @@ export function buildMatchScheduleAnnouncement(
   }
   if (context.checkIn) lines.push(checkInLine(context.checkInOpen));
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
+  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
   return lines.join("\n");
 }
 
@@ -404,6 +429,7 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
     `L'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) est retiré : un nouvel horaire te sera annoncé.`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
+  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
   return lines.join("\n");
 }
 
@@ -422,6 +448,7 @@ export function buildMatchWithdrawnNotice(context: MatchReminderContext): string
     `Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) ne te concerne plus.`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
+  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
   return lines.join("\n");
 }
 

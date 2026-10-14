@@ -110,4 +110,23 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(legalPageText(render("en"))).toContain("You now manage a team");
     expect(legalPageText(render("fr"))).toContain("Tu gères désormais une équipe");
   });
+
+  it("pendant l'enregistrement, les boutons gardent le focus : aria-disabled + aria-busy, jamais disabled natif", () => {
+    const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
+    // Aucun bouton nativement désactivé pendant l'envoi (la case, elle, peut l'être).
+    expect(modal).not.toMatch(/<CyberButton[^>]*[^-]disabled=\{busy/);
+    expect(modal).not.toContain("disabled={busy || !checked}");
+    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(2);
+    expect(modal).toContain("aria-busy={busy || undefined}");
+    // La case (sans le focus, qui est sur « J'accepte ») est figée pendant l'envoi, avec l'aspect éteint
+    // de `:disabled` : « J'accepte » ne peut pas devenir nativement désactivé sous le focus.
+    expect(modal).toMatch(/type="checkbox"\s+checked=\{checked\}[\s\S]*?disabled=\{busy\}/);
+    expect(modal).toContain("disabled={!checked}");
+  });
+
+  it("au repos, « J'accepte » reste désactivé tant que la case n'est pas cochée", () => {
+    const html = render("fr");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>J(?:'|&#x27;)accepte<\/button>/);
+    expect(html).not.toContain('aria-busy="true"');
+  });
 });

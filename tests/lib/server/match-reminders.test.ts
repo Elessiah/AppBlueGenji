@@ -187,6 +187,16 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(recipientsB.map((r) => r.label)).toEqual(["Nova"]);
   });
 
+  it("termine chaque message privé de match par la ligne qui dit où les couper (LEGAL-FOLLOWUP-444)", async () => {
+    await mockDb({});
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    const messages = sentMessages();
+    expect(messages.length).toBeGreaterThan(0);
+    for (const message of messages) {
+      expect(message.split("\n").at(-1)).toMatch(/^Tu peux couper ces messages privés dans /);
+    }
+  });
+
   it("réserve le palier avant d'envoyer, puis marque l'horaire comme reçu", async () => {
     const { execute } = await mockDb({});
 
@@ -1080,6 +1090,22 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     expect(calls[0][2]).toBe("match-withdrawn");
     expect((calls[0][1] as { label: string }[]).map((r) => r.label)).toEqual(["Kiro"]);
     expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2]]);
+  });
+
+  it("« Match retiré » se termine par la ligne qui dit où couper ces messages (LEGAL-FOLLOWUP-444)", async () => {
+    const previous = process.env.APP_URL;
+    process.env.APP_URL = "https://bluegenji.test/";
+    try {
+      await mockWithdrawnDb();
+      await announceEntrantsWithdrawn([DEPARTED]);
+      const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0];
+      expect(message.split("\n").at(-1)).toBe(
+        "Tu peux couper ces messages privés dans ton profil, section Notifications : <https://bluegenji.test/profil#notifications>",
+      );
+    } finally {
+      if (previous === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = previous;
+    }
   });
 
   it("prévient les seuls joueurs de l'engagée retirée, par Discord et par push, dans la langue de chacun", async () => {

@@ -14,6 +14,7 @@ import { createTeam } from "@/lib/server/teams/identity";
 import { claimGhostTeam, createGhostTeam } from "@/lib/server/ghost-teams-service";
 import { getUserIdByPseudo } from "@/lib/server/users/roles";
 import { authUser } from "../../../helpers/auth-user";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
 const player = authUser({ id: 2, isAdmin: false, roles: [] });
 const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
@@ -65,7 +66,7 @@ describe("POST /api/teams — création d'équipe fantôme", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockResolvedValue(11);
 
-    const res = await createTeamRoute(jsonReq({ name: "Vraie équipe", acceptTerms: true }));
+    const res = await createTeamRoute(jsonReq({ name: "Vraie équipe", acceptTerms: true, termsVersion: TERMS_VERSION }));
 
     expect(res.status).toBe(201);
     expect(createTeam).toHaveBeenCalledWith(2, "Vraie équipe", null, null);

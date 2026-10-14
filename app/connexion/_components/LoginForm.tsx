@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { richNodes } from "@/components/i18n/shell-text";
@@ -48,6 +48,20 @@ const LEGACY_ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
  * modale, là où une simple case « déjà vu » l'aurait tue pour toujours.
  */
 const TERMS_STORAGE_KEY = "bg_terms_consent";
+/**
+ * Durée pendant laquelle une acceptation donnée dans la page vaut « acceptée
+ * maintenant » : celle d'un aller-retour OAuth (`bg_oauth`). Au-delà, l'onglet
+ * resté ouvert peut servir à une autre personne (ordinateur partagé) : son
+ * acceptation ne met plus à jour un compte existant.
+ */
+const ACCEPTED_NOW_TTL_MS = 10 * 60 * 1000;
+
+/** La version gardée par le navigateur est-elle une version antérieure des conditions ? */
+function isEarlierTermsVersion(stored: string | null): boolean {
+  if (stored === null || !/^\d+$/.test(stored)) return false;
+  const version = Number(stored);
+  return version > 0 && version < TERMS_VERSION;
+}
 
 /**
  * Contrôles de la connexion par code. Le compte Discord garde le même `id` sur
@@ -98,6 +112,20 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // `consentGiven` part à `true` pour ne pas faire clignoter la modale au
   // premier rendu : il ne dit donc rien tant que le stockage n'a pas été lu.
   const [consentRead, setConsentRead] = useState(false);
+  // Une version antérieure des conditions acceptée dans ce navigateur : la
+  // modale revient parce qu'elles ont changé, et le dit.
+  const [termsUpdated, setTermsUpdated] = useState(false);
+  // Acceptation donnée **dans cette page** (clic sur la modale), par opposition
+  // à celle relue du navigateur, qui peut être celle d'une autre personne
+  // (ordinateur partagé) : seule la première met à jour un compte existant.
+  // L'instant de l'acceptation fait foi, relu à l'horloge **au moment de
+  // partir** (`isAcceptedNow`) — jamais un minuteur, qui s'arrête quand la page
+  // est suspendue (ordinateur en veille, onglet gelé, retour arrière).
+  const acceptedAt = useRef<number | null>(null);
+  const isAcceptedNow = useCallback(
+    () => acceptedAt.current !== null && Date.now() - acceptedAt.current < ACCEPTED_NOW_TTL_MS,
+    [],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -111,6 +139,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       // localStorage indisponible (mode privé) : la modale redemande.
     }
     setConsentGiven(stored === NOTICE_VERSION && terms === String(TERMS_VERSION));
+    setTermsUpdated(isEarlierTermsVersion(terms));
     setConsentRead(true);
   }, []);
 
@@ -122,12 +151,23 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
     setConsentGiven(true);
+    acceptedAt.current = Date.now();
   };
 
   // Les conditions ne voyagent qu'une fois le stockage **lu** et le
   // consentement **donné** : `consentGiven` part à `true` pour ne pas faire
   // clignoter la modale, il ne vaut donc acceptation qu'après la lecture.
   const termsAccepted = consentRead && consentGiven;
+  // Les adresses **affichées** ne portent jamais « acceptées dans la page » :
+  // un lien ouvert autrement que d'un clic simple (clic du milieu, nouvel
+  // onglet, glisser) ne passe pas par `termsAtClick`, et l'adresse rendue peut
+  // dater d'avant une mise en veille. Seul le clic simple, relu à l'horloge,
+  // l'ajoute (`OAuthButtons`).
+  const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow: false } : null;
+  const termsAtClick = useCallback(
+    () => (termsAccepted ? { version: TERMS_VERSION, acceptedNow: isAcceptedNow() } : null),
+    [termsAccepted, isAcceptedNow],
+  );
 
   const refuseConsent = () => {
     // Retour en arrière total : aucune donnée n'a été enregistrée.
@@ -206,6 +246,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           code,
           pseudo: pseudo.trim() ? pseudo : undefined,
           termsAccepted,
+          // La version montrée voyage avec l'acceptation : un onglet resté
+          // ouvert sur une version antérieure n'accepte pas la nouvelle.
+          termsVersion: TERMS_VERSION,
+          termsAcceptedNow: isAcceptedNow(),
           // La langue de la page devient celle du compte (lot 9-3).
           locale: text.locale,
         }),
@@ -272,7 +316,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           <>
             <OAuthButtons
               redirect={redirect}
-              termsAccepted={termsAccepted}
+              terms={terms}
+              termsAtClick={termsAtClick}
               environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
@@ -339,7 +384,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           <>
             <OAuthButtons
               redirect={redirect}
-              termsAccepted={termsAccepted}
+              terms={terms}
+              termsAtClick={termsAtClick}
               environmentNotice={loginEnvironmentNotice(environment, text)}
             />
 
@@ -473,6 +519,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         <RgpdConsentModal
           onAccept={acceptConsent}
           onRefuse={refuseConsent}
+          termsUpdated={termsUpdated}
         />
       )}
       {suspension && <SuspensionNoticeDialog notice={suspension} onClose={() => setSuspension(null)} />}

@@ -6,7 +6,7 @@ import { createTeam } from "@/lib/server/teams/identity";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { createGhostTeam } from "@/lib/server/ghost-teams-service";
 import { can } from "@/lib/shared/permissions";
-import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
+import { TERMS_REQUIRED, TERMS_VERSION, TERMS_VERSION_MISMATCH } from "@/lib/shared/terms-of-use";
 import { TEAM_TAG_ALREADY_USED, checkTeamTag } from "@/lib/shared/team-tag";
 import {
   INVALID_TEAM_FIELDS,
@@ -32,6 +32,19 @@ export async function GET() {
   return ok({ teams, activeTeam, canManageGhostTeams: can(user, "tournaments") });
 }
 
+/**
+ * Refus de la case des conditions d'utilisation, ou `null` si elle est valable.
+ * La version montrée doit être celle en vigueur : un formulaire chargé avant une
+ * nouvelle version (ou un client d'avant ce champ) n'accepte pas un texte qu'il
+ * n'a pas présenté — `createTeam` enregistre `TERMS_VERSION`.
+ */
+function refuseTermsAcceptance(body: { acceptTerms?: boolean; termsVersion?: unknown }) {
+  // Sans version (page d'avant ce champ) : le refus que ces pages savent dire.
+  if (body.acceptTerms !== true || body.termsVersion === undefined) return fail(TERMS_REQUIRED, 400);
+  if (body.termsVersion !== TERMS_VERSION) return fail(TERMS_VERSION_MISMATCH, 409);
+  return null;
+}
+
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -43,6 +56,8 @@ export async function POST(req: Request) {
       tag?: string | null;
       ghost?: boolean;
       acceptTerms?: boolean;
+      /** Version des conditions que le formulaire a montrée. */
+      termsVersion?: unknown;
     };
     if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
     // Mêmes bornes qu'au renommage (`updateTeamMeta`) : une seule règle.
@@ -65,7 +80,8 @@ export async function POST(req: Request) {
 
     // Créer une équipe, c'est accepter les conditions d'utilisation — la case
     // du formulaire. Refusé avant toute écriture, pas après.
-    if (body.acceptTerms !== true) return fail(TERMS_REQUIRED, 400);
+    const termsRefusal = refuseTermsAcceptance(body);
+    if (termsRefusal) return termsRefusal;
     const teamId = await createTeam(user.id, name, body.description ?? null, tagCheck.tag);
     return ok({ teamId }, 201);
   } catch (error) {

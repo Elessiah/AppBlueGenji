@@ -74,7 +74,13 @@ import { LOCALES, SITE_TIME_ZONE, isMigratedRoute, localeHref, type Locale } fro
 import { formatMessage, formatMessageParts } from "@/lib/shared/message-format";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
-import { SITE_MINIMUM_AGE, TERMS_AGE_DECLARATION, TERMS_CHECKBOX_LABEL } from "@/lib/shared/terms-of-use";
+import {
+  SITE_MINIMUM_AGE,
+  TERMS_AGE_DECLARATION,
+  TERMS_CHECKBOX_LABEL,
+  TERMS_VERSION,
+  formatTermsDateIn,
+} from "@/lib/shared/terms-of-use";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { readSource } from "../helpers/read-source";
 
@@ -159,8 +165,9 @@ describe("liste blanche — la connexion est traduite", () => {
 
   it("la carte « Connexion requise » mène à la connexion de la langue lue, destination préfixe compris", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
-    expect(gate).toContain("<LocaleLink href={loginHref}>{text.login}</LocaleLink>");
-    expect(gate).toMatch(/const destination = `\$\{pathname\}\$\{search\}`/);
+    expect(gate).toContain("<LocaleLink href={loginHref} onClick={goToLogin}>{text.login}</LocaleLink>");
+    expect(gate).toContain("const loginHref = authGateLoginHref(pathname, query, hash);");
+    expect(gate).toContain("const destination = pathname + search + anchor;");
     expect(gate).toContain("const pathname = usePathname();");
   });
 
@@ -292,9 +299,9 @@ describe("formulaire — /en/connexion sans un mot de français", () => {
   it("avertissement de contexte (app iOS, navigateur intégré) en anglais", () => {
     for (const environment of ["IOS_INSTALLED_APP", "IN_APP_BROWSER"] as const) {
       const notice = loginEnvironmentNotice(environment, EN_TEXT);
-      const html = render(<OAuthButtons redirect="/en/regles" termsAccepted environmentNotice={notice} />, "en");
+      const html = render(<OAuthButtons redirect="/en/regles" terms={{ version: 4, acceptedNow: true }} environmentNotice={notice} />, "en");
       expectNoFrench(visibleText(html));
-      expect(html).toContain("/api/auth/google/start?redirect=%2Fen%2Fregles&amp;lang=en&amp;terms=1");
+      expect(html).toContain("/api/auth/google/start?redirect=%2Fen%2Fregles&amp;lang=en&amp;terms=4&amp;termsNow=1");
     }
   });
 
@@ -448,7 +455,7 @@ describe("messages `login`", () => {
   it.each(LOCALES.map((locale) => [locale]))("%s : même texte que next-intl, message par message", (locale) => {
     const tags = ["strong", "join", "terms", "policy", "fr"];
     for (const { key, source } of leaves(messagesFor(locale).login)) {
-      const values = { audience: "A", provider: "P", time: "T", end: "E", reference: "S-1", day: "D", clause: "C", age: 15 };
+      const values = { audience: "A", provider: "P", time: "T", end: "E", reference: "S-1", day: "D", clause: "C", age: 15, version: 4, date: "DT" };
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
       const expected = reference.markup("m", {
         ...values,
@@ -461,6 +468,38 @@ describe("messages `login`", () => {
         Object.fromEntries(tags.map((tag) => [tag, (children: Array<string>) => `<${tag}>${children.join("")}</${tag}>`])),
       ).join("");
       expect(`${key}: ${actual}`).toBe(`${key}: ${expected}`);
+    }
+  });
+});
+
+describe("modale d'entrée — conditions mises à jour (LEGAL-FOLLOWUP-444)", () => {
+  it("dit en français que les conditions ont changé, avec leur version et leur date", () => {
+    const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "fr"));
+    expect(text.replace(/\s+/g, " ")).toContain(
+      `Les conditions d'utilisation ont changé (version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDateIn("fr")}) : relis-les avant de les accepter de nouveau.`,
+    );
+    expect(formatTermsDateIn("fr")).toBe("14 octobre 2026");
+  });
+
+  it("le dit en anglais sous /en", () => {
+    const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "en"));
+    expect(text.replace(/\s+/g, " ")).toContain(
+      `The terms of use have changed (version ${TERMS_VERSION}, in force since ${formatTermsDateIn("en")}): read them again before accepting them anew.`,
+    );
+    expect(formatTermsDateIn("en")).toBe("October 14, 2026");
+  });
+
+  it("« relis-les » / « read them again » mène aux conditions de la langue lue (revue UI/UX #445)", () => {
+    const fr = render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "fr");
+    expect(fr).toMatch(/<a [^>]*href="\/conditions-utilisation"[^>]*>relis-les<\/a>/);
+    const en = render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "en");
+    expect(en).toMatch(/<a [^>]*href="\/en\/conditions-utilisation"[^>]*>read them again<\/a>/);
+  });
+
+  it("se tait à une première acceptation", () => {
+    for (const locale of ["fr", "en"] as const) {
+      const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} />, locale));
+      expect(text).not.toMatch(/ont changé|have changed/);
     }
   });
 });

@@ -40,8 +40,14 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * (réexamen par l'association, puis le juge), base légale de la modération
  * et absence de médiateur de la consommation — la suspension et le recours
  * sont des règles de fond pour qui les subit, d'où une nouvelle acceptation.
+ *
+ * Version 4 : l'annonce #live d'un tournoi individuel nomme le joueur par son
+ * pseudo public au titre de l'exécution du service (pas de nom neutre, ne pas
+ * y être nommé = ne pas s'inscrire) — une règle de fond du tournoi auquel on
+ * s'inscrit ; mise en vigueur au 14 octobre 2026 sur décision de
+ * l'association, la version 3 datant du 1er octobre.
  */
-export const TERMS_VERSION = 3;
+export const TERMS_VERSION = 4;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -54,7 +60,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-10-01";
+export const TERMS_UPDATED_AT = "2026-10-14";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";
@@ -110,6 +116,11 @@ export const TERMS_ACCEPTANCE_REQUIRED = "TERMS_ACCEPTANCE_REQUIRED";
 
 /** Jeton de refus d'une création de compte sans acceptation. */
 export const TERMS_REQUIRED = "TERMS_REQUIRED";
+/**
+ * Acceptation d'une version qui n'est plus celle en vigueur (page chargée avant
+ * la nouvelle) : refusée, on n'enregistre pas l'acceptation d'un texte non montré.
+ */
+export const TERMS_VERSION_MISMATCH = "TERMS_VERSION_MISMATCH";
 
 /** Formulation de la case, commune à tous les écrans. */
 export const TERMS_CHECKBOX_LABEL = "J'ai lu et j'accepte les conditions d'utilisation";
@@ -177,7 +188,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "acceptation",
     title: "Acceptation",
     paragraphs: [
-      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant). Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.",
+      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la **page de connexion**, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur. Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.",
       "L'association peut modifier ces conditions. Une modification de fond donne lieu à une **nouvelle version**, présentée à l'acceptation des utilisateurs concernés avant qu'ils puissent continuer à gérer une équipe.",
     ],
   },
@@ -211,9 +222,11 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       "Pour une équipe, répondent aussi de ses contenus, en plus de leur auteur : le **propriétaire** du nom, du sigle et de la description de l'équipe, qu'il est seul à pouvoir modifier ; le propriétaire et les **gérants** de son logo, qu'ils peuvent l'un et l'autre changer. Une **équipe fantôme**, créée et gérée par le staff de l'association pour un tournoi, n'a pas de propriétaire : l'association répond de ses contenus.",
     ],
   },
-  // Précision, et non règle de fond nouvelle : la retransmission figurait déjà
-  // à la licence ci-dessus et à la politique de confidentialité. Elle ne change
-  // donc pas `TERMS_VERSION` (aucune nouvelle acceptation demandée).
+  // Née comme précision (la retransmission figurait déjà à la licence ci-dessus
+  // et à la politique de confidentialité), sans changer `TERMS_VERSION`. La règle
+  // de l'annonce #live d'un tournoi individuel (`STREAM_NOTICE_LIVE`), elle, a
+  // fait passer les conditions en version 4 (décision du 2026-10-14) : une
+  // modification de fond de cet article demande une nouvelle version.
   {
     id: "retransmission",
     title: "Retransmission des matchs",

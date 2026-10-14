@@ -52,6 +52,7 @@
     "LOGO_DELETE_FAILED": "The logo couldn't be deleted.",
     "TERMS_ACCEPTANCE_REQUIRED": "To manage your team, first accept the terms of use (window just opened).",
     "TERMS_REQUIRED": "Tick the terms of use acceptance box to create your team.",
+    "TERMS_VERSION_MISMATCH": "The terms of use have changed since this page was opened: reload it to read the new version, then tick the box again.",
     "LOGO_RIGHTS_NOT_CERTIFIED": "Certify that you hold the rights to this logo to upload it.",
     "TEAM_HAS_NO_LOGO": "This team already has no logo.",
     "TEAM_LOGO_REMOVE_FAILED": "The logo couldn't be removed.",

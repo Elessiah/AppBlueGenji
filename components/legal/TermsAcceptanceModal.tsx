@@ -172,7 +172,16 @@ export function TermsAcceptanceModal({
           </p>
         </ScrollArea>
         <label className={styles.check}>
-          <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={checked}
+            // Figée pendant l'envoi : décocher en cours de route rendrait « J'accepte »
+            // nativement désactivé au retour. `disabled` natif ici ne coûte aucun
+            // focus — il est sur « J'accepte », pressé pour lancer l'envoi — et
+            // donne à la case son aspect éteint (`globals.css`, `:disabled`).
+            disabled={busy}
+            onChange={(event) => setChecked(event.target.checked)}
+          />
           <span>
             {richNodes(
               rich("termsModal.checkbox", {}, {
@@ -193,11 +202,26 @@ export function TermsAcceptanceModal({
             </a>
           </p>
         )}
+        {/* Pendant la requête, `aria-disabled` + `aria-busy` plutôt que `disabled` :
+            le focus reste sur le bouton pressé (un échec se retente au clavier) ;
+            `later` et `accept` ignorent déjà un geste tant que `busy`. */}
         <div className={styles.actions}>
-          <CyberButton type="button" variant="ghost" onClick={later} disabled={busy}>
+          <CyberButton
+            type="button"
+            variant="ghost"
+            onClick={later}
+            aria-disabled={busy || undefined}
+          >
             {t("termsModal.later")}
           </CyberButton>
-          <CyberButton type="button" variant="primary" onClick={accept} disabled={busy || !checked}>
+          <CyberButton
+            type="button"
+            variant="primary"
+            onClick={accept}
+            disabled={!checked}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+          >
             {busy ? t("termsModal.saving") : t("termsModal.accept")}
           </CyberButton>
         </div>

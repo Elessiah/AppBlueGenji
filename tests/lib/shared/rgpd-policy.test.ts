@@ -7,6 +7,7 @@ import {
   DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
+  AUTOMOD_ALERT_SCOPE,
   LIVE_PSEUDO_SCOPE,
   MATCH_TIME_DM_SCOPE,
 } from "@/lib/shared/rgpd-policy";
@@ -233,6 +234,13 @@ describe("DROITS", () => {
     expect(DROITS).toHaveLength(8);
   });
 
+  it("dit que l'alerte AutoMod d'une annonce #live survit au compte comme l'annonce, supprimée sur demande (FR et EN)", () => {
+    const erasureFr = DROITS.map((d) => d.text).find((t) => t.includes("Les annonces #live d'un tournoi individuel"));
+    const erasureEn = DROITS_EN.map((d) => d.text).find((t) => t.includes("The #live announcements of a solo tournament"));
+    expect(erasureFr).toMatch(/sur une demande distincte \(« Signaler un problème », catégorie RGPD\), comme l'alerte de modération d'une telle annonce bloquée ou signalée par AutoMod/);
+    expect(erasureEn).toMatch(/on a separate request \(“Report a problem”, GDPR category\), as does the moderation alert for such an announcement blocked or flagged by AutoMod/);
+  });
+
   it("couvre le droit à la limitation (art. 18)", () => {
     const limitation = DROITS.find((d) => d.title.toLowerCase().includes("limitation"));
     expect(limitation?.text).toMatch(/art\. 18/);
@@ -313,17 +321,30 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("déclare le pseudo #live et le choix des messages privés de match (revue juridique #444)", () => {
     expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toMatch(/annonces #live d'un tournoi individuel qui ont publié votre pseudo restent dans le salon Discord jusqu'à leur suppression, sur une demande distincte/);
     expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toMatch(/#live announcements of a solo tournament that posted your username stay in the Discord channel until they are deleted, on a separate request/);
-    // S'opposer au pseudo #live = ne pas s'inscrire (décision du 2026-10-14) : le droit d'opposition le dit.
-    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Exception : le pseudo publié dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire/);
-    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/Exception: the username posted in the #live announcement of a solo tournament — objecting to it means not registering/);
+    // Le pseudo #live repose sur l'exécution du service, pas l'intérêt légitime (décision du 2026-10-14) :
+    // le droit d'opposition l'exclut, ne pas y être nommé = ne pas s'inscrire.
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering/);
     const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
-    expect(pseudo?.extraBases).toEqual([{ base: "Intérêt légitime", scope: LIVE_PSEUDO_SCOPE }]);
+    // Revue légale #445 : l'alerte AutoMod repose sur l'intérêt légitime (modérer le serveur), pas sur le contrat.
+    expect(pseudo?.extraBases).toEqual([
+      { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
+      { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
+    ]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
-      { base: "Intérêt légitime", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
+      { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
+      { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
     ]);
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
     expect(choice?.base).toBe("Intérêt légitime");
     expect(choice?.finalite).toMatch(/Figure dans l'export de tes données, remis au défaut si le compte est anonymisé/);
+    // Revue légale #445 : la ligne dit à qui profite l'intérêt légitime (le joueur), comme T04.
+    expect(choice?.finalite).toMatch(/Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/Kept in your legitimate interest: that is what allows your objection to be honoured/);
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord \(intérêt légitime\), est supprimée sur demande/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server \(legitimate interest\), is deleted on request/);
+    expect(AUTOMOD_ALERT_SCOPE).toMatch(/alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs/);
+    expect(LIVE_PSEUDO_SCOPE).not.toMatch(/AutoMod/);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/reset to the default if the account is anonymized/);
   });
 

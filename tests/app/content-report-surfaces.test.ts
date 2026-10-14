@@ -56,11 +56,28 @@ describe("conditions d'utilisation à la création du compte", () => {
   it("la version acceptée est retenue, pour redemander à la suivante", () => {
     const login = read("app/connexion/_components/LoginForm.tsx");
     expect(login).toContain("String(TERMS_VERSION)");
-    // Les trois portes transmettent l'acceptation.
-    expect(login).toContain("termsAccepted={termsAccepted}");
+    // Les trois portes transmettent l'acceptation, avec la version montrée et
+    // le fait qu'elle vient d'être donnée dans la page (pas relue du navigateur).
+    expect(login).toContain("terms={terms}");
     // Suivie de la langue de la page, devenue celle du compte (lot 9-3).
-    expect(login).toMatch(/termsAccepted,\s*(?:\/\/[^\n]*\s*)?locale: text\.locale,\s*\}\)/);
-    expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, termsAccepted, locale })");
+    expect(login).toMatch(/termsVersion: TERMS_VERSION,\s*termsAcceptedNow: isAcceptedNow\(\),/);
+    expect(login).toMatch(/termsAcceptedNow: isAcceptedNow\(\),[^}]*locale: text\.locale,/);
+    expect(read("app/connexion/_components/OAuthButtons.tsx")).toContain("oauthStartPath(provider, { redirect, terms, locale })");
+    // L'acceptation « dans la page » ne vaut que le temps d'un aller-retour OAuth : un onglet
+    // resté ouvert sur un ordinateur partagé ne la prête pas à la personne suivante.
+    expect(login).toContain("const ACCEPTED_NOW_TTL_MS = 10 * 60 * 1000;");
+    // Lue à l'horloge au moment de partir, pas au minuteur (arrêté pendant une mise en veille).
+    expect(login).toContain("Date.now() - acceptedAt.current < ACCEPTED_NOW_TTL_MS");
+    expect(login).toContain("termsAtClick={termsAtClick}");
+    // Les adresses affichées ne portent jamais « dans la page » ; seul un clic simple l'ajoute.
+    expect(login).toContain("const terms = termsAccepted ? { version: TERMS_VERSION, acceptedNow: false } : null;");
+    expect(login).not.toContain("setAcceptedNow");
+    const buttons = read("app/connexion/_components/OAuthButtons.tsx");
+    expect(buttons).toContain("if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;");
+    expect(buttons).toContain("window.location.assign(oauthStartPath(provider, { redirect, terms: fresh, locale }));");
+    expect(buttons).not.toContain("event.currentTarget.href =");
+    // La création d'équipe envoie la version montrée.
+    expect(read("app/(secured)/equipes/creer/CreateTeamForm.tsx")).toContain("termsVersion: TERMS_VERSION,");
   });
 
   it("les gérants d'équipe les acceptent depuis n'importe quelle page", () => {

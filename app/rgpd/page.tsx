@@ -312,7 +312,10 @@ function RgpdFr({
                   <span className={styles.badge}>{d.base}</span>
                   {d.extraBases?.map((extra) => (
                     <span key={extra.base} className={styles.extraBase}>
-                      <span className={styles.badge}>{extra.base}</span> {extra.scope}
+                      {/* Même base que la principale (pseudo dans #live) : pas de second badge identique, mais
+                          « y compris » — seule sous le badge, la portée semblerait restreindre la base principale. */}
+                      {extra.base === d.base ? "y compris : " : <><span className={styles.badge}>{extra.base}</span> </>}
+                      {extra.scope}
                     </span>
                   ))}
                 </DataCell>
@@ -382,7 +385,7 @@ function RgpdFr({
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
-          demande (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
+          demande, comme l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
@@ -551,7 +554,8 @@ function RgpdFr({
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
               anti-CSRF), le nom du fournisseur, la page où vous ramener, l&apos;objet de la
               connexion (se connecter ou rattacher un compte), si vous avez accepté les conditions
-              d&apos;utilisation et si la connexion a été lancée depuis une page du site (sans
+              d&apos;utilisation (avec la version acceptée, et si vous venez de les accepter sur la page de
+              connexion) et si la connexion a été lancée depuis une page du site (sans
               quoi ni la langue du compte ni l&apos;acceptation des conditions ne sont retenues).
               Aucun identifiant de personne.
             </li>
@@ -630,7 +634,11 @@ function RgpdFr({
               d&apos;utilisation, pour ne pas vous les représenter. Elles ne contiennent qu&apos;un
               numéro de version : une nouvelle version vous les présente de nouveau.
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
-              numéro de version, dès que votre compte existe.
+              numéro de version, quand vous les acceptez : à la création de votre compte ou d&apos;une
+              équipe, pour gérer une équipe, ou à une connexion lancée depuis la page de connexion
+              (clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord) dans les dix
+              minutes où vous les y avez acceptées (une acceptation seulement gardée par le navigateur,
+              peut-être celle d&apos;une autre personne, n&apos;est pas reportée sur un compte existant).
             </li>
             <li>
               <strong>Service worker et cache « bg-offline »</strong> — le site installe dans
@@ -966,7 +974,8 @@ function RgpdFr({
             sur l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
             tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
             mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
-            gardent leurs propres réglages. Le site garde ce choix le temps du compte ; il figure dans
+            gardent leurs propres réglages. Le site garde ce choix le temps du compte, dans votre intérêt
+            légitime (c&apos;est ce qui lui permet de l&apos;honorer) ; il figure dans
             l&apos;export de vos données. Les alertes et le programme d&apos;arbitrage adressés aux
             arbitres et administrateurs relèvent de l&apos;<strong>exécution du service</strong> et ne
             se coupent pas ainsi (<Link href="/rgpd/registre#t04">registre, T04</Link>).
@@ -999,7 +1008,8 @@ function RgpdFr({
               <strong>Discord</strong> (États-Unis) : les messages privés du bot (code de
               connexion, horaires et rappels de match, notifications), les salons réservés au staff et
               l&apos;annonce des matchs diffusés dans le salon #live, qui ne portent aucun pseudo de joueur
-              — sauf cette annonce en tournoi individuel, qui nomme les joueurs par leur pseudo public ;
+              — sauf cette annonce en tournoi individuel, qui nomme les joueurs par leur pseudo public, et
+              l&apos;alerte AutoMod qu&apos;elle peut faire parvenir au salon d&apos;alertes des modérateurs ;
               et la connexion par Discord, si vous la choisissez.
             </li>
             <li>
@@ -1074,10 +1084,16 @@ function RgpdFr({
             BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant
             le 30 septembre 2026 ; jamais l&apos;identifiant Discord numérique ; « un joueur » pour une
             entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le
-            lien de la diffusion. Le nom neutre ne vaut que pour la diffusion : un joueur qui ne veut pas
-            voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Ces annonces
-            restent dans le salon tant que le salon #live existe ;
-            l&apos;équipe ou le joueur concerné peut en demander la suppression par le bouton « Signaler
+            lien de la diffusion. Ce pseudo ne repose pas sur l&apos;intérêt légitime mais sur
+            l&apos;<strong>exécution du service</strong> : l&apos;annonce fait partie du tournoi individuel
+            auquel le joueur s&apos;inscrit, et le nom neutre ne vaut que pour la diffusion — un joueur qui
+            ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
+            une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
+            individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
+            reste jusqu&apos;à sa suppression par les modérateurs, au titre de l&apos;intérêt légitime de
+            l&apos;association à modérer son serveur (s&apos;y opposer : demander sa suppression). Ces annonces restent dans le salon tant
+            que le salon #live existe ; l&apos;équipe ou le joueur concerné peut en demander la
+            suppression, comme celle de ces alertes, par le bouton « Signaler
             un problème », catégorie RGPD.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>

@@ -52,6 +52,7 @@
     "LOGO_DELETE_FAILED": "Le logo n'a pas pu être supprimé.",
     "TERMS_ACCEPTANCE_REQUIRED": "Pour gérer ton équipe, accepte d'abord les conditions d'utilisation (fenêtre ouverte à l'instant).",
     "TERMS_REQUIRED": "Coche l'acceptation des conditions d'utilisation pour créer ton équipe.",
+    "TERMS_VERSION_MISMATCH": "Les conditions d'utilisation ont changé depuis l'ouverture de la page : recharge-la pour lire la nouvelle version, puis coche de nouveau la case.",
     "LOGO_RIGHTS_NOT_CERTIFIED": "Certifie détenir les droits sur ce logo pour l'envoyer.",
     "TEAM_HAS_NO_LOGO": "Cette équipe n'a déjà plus de logo.",
     "TEAM_LOGO_REMOVE_FAILED": "Le logo n'a pas pu être retiré.",

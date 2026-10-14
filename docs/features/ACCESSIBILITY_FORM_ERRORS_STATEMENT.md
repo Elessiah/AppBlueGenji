@@ -34,7 +34,8 @@ notification et le liseré.
 
 ### Formulaires câblés
 
-Création d'équipe, équipe fantôme, identité d'une équipe (mode gestion), profil
+Création d'équipe (nom, sigle, case des conditions d'utilisation — `TERMS_REQUIRED`,
+`TERMS_VERSION_MISMATCH`, `TEAM_CREATION_FIELD_ERRORS`), équipe fantôme, identité d'une équipe (mode gestion), profil
 (pseudo, BattleTag, tag Discord), connexion par code Discord (tag, code),
 formulaire de tournoi (nom, effectif, format de match, quatre dates).
 

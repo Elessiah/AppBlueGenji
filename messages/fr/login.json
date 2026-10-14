@@ -94,6 +94,7 @@
   "consent": {
     "eyebrow": "PROTECTION DES DONNÉES · RGPD",
     "title": "Avant de continuer",
+    "termsUpdated": "Les conditions d'utilisation ont changé (version {version}, en vigueur depuis le {date}) : <terms>relis-les</terms> avant de les accepter de nouveau.",
     "intro": "Pour faire fonctionner ton compte, BlueGenji traite les données strictement nécessaires au service que tu demandes :",
     "pseudonyms": "Uniquement des <strong>pseudonymes</strong> (pseudo site, Discord, jeux) et un avatar — aucun nom réel, téléphone ni adresse : un compte créé par Google reçoit désormais un pseudo neutre, jamais ton nom, et la photo copiée depuis Google ou Discord reste masquée tant que tu ne l'affiches pas. <strong>L'identifiant</strong> du fournisseur par lequel tu te connectes (Google, Discord ou Blizzard) est aussi conservé pour l'authentification, ainsi que la <strong>langue</strong> de la page d'où tu te connectes (français ou anglais), pour t'écrire tes notifications push dans cette langue.",
     "gameNames": "Tes pseudos <strong>Overwatch</strong> et <strong>Marvel Rivals</strong> servent seulement à permettre aux autres joueurs de t'ajouter en jeu, jamais à établir des statistiques.",

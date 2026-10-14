@@ -53,6 +53,8 @@ import {
 } from "@/lib/server/account-identities";
 import {
   OAUTH_LOCALE_PARAM,
+  OAUTH_TERMS_NOW_PARAM,
+  OAUTH_TERMS_PARAM,
   OAUTH_PROVIDER_SLUGS,
   type OAuthIntent,
   type OAuthProvider,
@@ -65,7 +67,7 @@ import {
   sealedReturnPath,
 } from "@/lib/shared/safe-redirect";
 import { DEFAULT_LOCALE, isLocale, localeHref, type Locale } from "@/lib/shared/locales";
-import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
+import { TERMS_REQUIRED, TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
 import { startedOnSitePage } from "@/lib/server/request-origin";
 
@@ -184,7 +186,14 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
   // ne choisit ni l'un ni l'autre. Sans preuve, la langue reste telle qu'elle
   // est, et une inscription se voit redemander les conditions (« terms »).
   const localeFromPage = startedOnSitePage(req);
-  const termsAccepted = localeFromPage && req.nextUrl.searchParams.get("terms") === "1";
+  // La version **en vigueur**, pas un simple « oui » : un onglet de
+  // `/connexion` chargé avant une nouvelle version porte l'ancienne, qu'il a
+  // seule montrée — elle ne vaut pas acceptation de celle-ci.
+  const termsAccepted =
+    localeFromPage && req.nextUrl.searchParams.get(OAUTH_TERMS_PARAM) === String(TERMS_VERSION);
+  // Acceptée **dans la page**, pas relue du navigateur : seule celle-ci met à
+  // jour l'acceptation d'un compte existant (`settleTermsAfterLogin`).
+  const termsAcceptedNow = termsAccepted && req.nextUrl.searchParams.get(OAUTH_TERMS_NOW_PARAM) === "1";
 
   if (intent === "LINK") {
     const user = await getCurrentUser();
@@ -195,7 +204,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
 
   try {
     const authorizationUrl = OAUTH_CLIENTS[provider].authorizationUrl(state);
-    await saveOAuthState({ provider, state, redirectTo, intent, termsAccepted, localeFromPage });
+    await saveOAuthState({ provider, state, redirectTo, intent, termsAccepted, termsAcceptedNow, localeFromPage });
     return NextResponse.redirect(authorizationUrl);
   } catch (error) {
     const missing = isMissingConfiguration(error);
@@ -324,7 +333,10 @@ async function completeLogin(
     // L'acceptation voyage dans le cookie d'état, scellée à l'aller comme
     // l'intention : lue dans l'URL du rappel, elle serait choisie par
     // l'appelant.
-    const userId = await createOrGetOAuthUser(identity, { termsAccepted: saved.termsAccepted });
+    const userId = await createOrGetOAuthUser(identity, {
+      termsAccepted: saved.termsAccepted,
+      acceptedNow: saved.termsAcceptedNow,
+    });
     await createSession(userId, `LOGIN_${provider}`);
     // La langue du compte suit celle de la page d'où l'on s'est connecté
     // (lot 9-3, `lib/server/users/account-locale.ts`) ; jamais bloquant. Un

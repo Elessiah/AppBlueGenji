@@ -9,7 +9,9 @@
  * données différentes.
  *
  * Aucune case à cocher : la base est l'intérêt légitime de l'association, pas
- * un consentement — le joueur est informé et garde son droit d'opposition.
+ * un consentement — le joueur est informé et garde son droit d'opposition. Seul
+ * le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose sur
+ * l'exécution du service (décision du 2026-10-14) : il n'a pas de nom neutre.
  */
 
 /** Ancre de la politique de confidentialité qui détaille la retransmission. */
@@ -28,7 +30,7 @@ export const STREAM_NOTICE_OBJECTION =
  * couvre pas (décision du 2026-10-14 : s'y opposer = ne pas s'inscrire).
  */
 export const STREAM_NOTICE_LIVE =
-  "Au début d'un match diffusé, une annonce publiée dans le salon #live du Discord de l'association nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public ; le nom neutre ne s'applique pas à cette annonce : un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton.";
+  "Au début d'un match diffusé, une annonce publiée dans le salon #live du Discord de l'association nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public. Cette annonce fait partie du tournoi individuel auquel le joueur s'inscrit (exécution du service, et non intérêt légitime) : le nom neutre ne s'y applique pas, et un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton.";
 
 /**
  * Mention courte affichée près de l'inscription à un tournoi, suivie d'un lien
@@ -41,7 +43,7 @@ export function registrationStreamNotice(solo: boolean): string {
   // individuelle par son pseudo public (exception décidée le 2026-10-14) :
   // chacun lit ce qui, de lui, part sur le Discord.
   const discord = solo
-    ? " Au début d'un match diffusé, ton pseudo est aussi annoncé sur le Discord de l'association ; le nom neutre ne s'applique pas à cette annonce, qui est supprimée sur demande."
+    ? " Au début d'un match diffusé, ton pseudo est aussi annoncé sur le Discord de l'association : cette annonce fait partie du tournoi auquel tu t'inscris, le nom neutre ne s'y applique pas, et elle est supprimée sur demande."
     : " Au début d'un match diffusé, le nom de ton équipe est aussi annoncé sur le Discord de l'association.";
   return `Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ${shown} — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre.${discord}`;
 }

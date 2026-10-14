@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { usePathname, useSearchParams } from "next/navigation";
 import { splitLocalePrefix } from "@/lib/shared/locales";
@@ -11,6 +11,20 @@ import styles from "./AuthGate.module.css";
 
 /** Textes de la carte (`login.authGate`), posés par la mise en page dans la langue de la page. */
 export type AuthGateText = typeof frLogin.authGate;
+
+/**
+ * Lien du bouton « Se connecter » : la page demandée — chemin, requête **et
+ * ancre** — repassée à `/connexion?redirect=`. L'ancre compte : le lien de fin
+ * des messages privés de match mène à `/profil#notifications`, et sans elle le
+ * joueur, une fois connecté, retombait en haut de son profil, loin de
+ * l'interrupteur. Elle ne se lit qu'au navigateur (jamais envoyée au serveur).
+ */
+export function authGateLoginHref(pathname: string, query: string, hash: string): string {
+  const search = query ? `?${query}` : "";
+  const anchor = hash.length > 1 && hash.startsWith("#") ? hash : "";
+  const destination = pathname + search + anchor;
+  return `/connexion?redirect=${encodeURIComponent(destination)}`;
+}
 
 /**
  * Ce qu'un visiteur non connecté voit à la place d'une page sécurisée.
@@ -50,10 +64,24 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
   // (`x-pathname`) et réutilise à la navigation. Requête et ancre `#match-…`
   // suivent.
   const spectatorId = tournamentIdFromMemberPath(splitLocalePrefix(pathname).path);
+  // Ancre lue après hydratation (le rendu serveur ne la connaît pas), relue à
+  // chaque changement de page ou d'ancre native — elle pose le `href` du lien
+  // (clic du milieu, copie). Une navigation client qui ne change que l'ancre ne
+  // déclenche ni l'un ni l'autre (`pushState`) : le clic relit donc l'ancre du
+  // moment ({@link goToLogin}).
+  const query = searchParams.toString();
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    const read = () => setHash(globalThis.location.hash);
+    read();
+    globalThis.addEventListener("hashchange", read);
+    return () => globalThis.removeEventListener("hashchange", read);
+  }, [pathname, query]);
   useEffect(() => {
     if (spectatorId === null) return;
-    const { search, hash } = globalThis.location;
-    router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);
+    // Lu à l'instant du relais : l'état `hash` n'est pas encore posé au premier effet.
+    const { search, hash: anchor } = globalThis.location;
+    router.replace(`${spectatorTournamentPath(spectatorId)}${search}${anchor}`);
   }, [spectatorId, router]);
   // Pendant le relais, aucune carte « Connexion requise » : la fiche se lit
   // sans compte, l'annoncer fermée le temps d'un rendu serait faux. Un état
@@ -68,13 +96,18 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
 
   // On ne reconstitue qu'un chemin **du site** : il vient de `usePathname`, pas
   // d'un paramètre d'URL, donc il ne peut pas désigner un autre domaine.
-  const query = searchParams.toString();
-  const search = query ? `?${query}` : "";
-  const destination = `${pathname}${search}`;
   // `pathname` garde le préfixe de langue (`/en/…`) : la destination revient
   // dans la langue lue, et `LocaleLink` mène à la page de connexion de cette
   // même langue (`/en/connexion` depuis une page anglaise, lot 6).
-  const loginHref = `/connexion?redirect=${encodeURIComponent(destination)}`;
+  const loginHref = authGateLoginHref(pathname, query, hash);
+  const goToLogin = (event: MouseEvent<HTMLAnchorElement>) => {
+    // Ctrl/Cmd/Maj-clic (nouvel onglet) : le navigateur garde la main sur le `href`.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const fresh = authGateLoginHref(pathname, query, globalThis.location.hash);
+    if (fresh === loginHref) return;
+    event.preventDefault();
+    router.push(fresh);
+  };
 
   return (
     <div className={styles.shell}>
@@ -84,7 +117,7 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
         <p className={styles.body}>{text.body}</p>
         <div className={styles.actions}>
           <CyberButton asChild>
-            <LocaleLink href={loginHref}>{text.login}</LocaleLink>
+            <LocaleLink href={loginHref} onClick={goToLogin}>{text.login}</LocaleLink>
           </CyberButton>
           <CyberButton variant="ghost" asChild>
             <LocaleLink href="/">{text.home}</LocaleLink>

@@ -7,7 +7,7 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
-import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_VERSION, formatTermsDateIn } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 
 /** Ce que la modale annonce, dans l'ordre (messages `login.consent`). */
@@ -22,6 +22,11 @@ const CONSENT_ITEMS = [
 interface RgpdConsentModalProps {
   onAccept: () => void;
   onRefuse: () => void;
+  /**
+   * Le navigateur avait accepté une version antérieure des conditions : la
+   * modale revient parce qu'elles ont changé, et le dit (`consent.termsUpdated`).
+   */
+  termsUpdated?: boolean;
 }
 
 /**
@@ -47,7 +52,7 @@ interface RgpdConsentModalProps {
  * accepte (`TERMS_TRANSLATION_NOTE`). La politique de confidentialité est
  * traduite depuis le lot 7b-2 : son lien mène aussi à l'anglais.
  */
-export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentModalProps>) {
+export function RgpdConsentModal({ onAccept, onRefuse, termsUpdated = false }: Readonly<RgpdConsentModalProps>) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
   // données : le site n'a pas de formulaire d'inscription, un compte naît à la
   // première connexion — l'entrée de cette page est donc le seul endroit où les
@@ -65,6 +70,16 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
   const { t } = text;
   const frenchDocumentLang = text.locale === DEFAULT_LOCALE ? undefined : DEFAULT_LOCALE;
   const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
+  const termsLink = (children: ReadonlyArray<ReactNode>) => (
+    <LocaleLink
+      href={TERMS_PATH}
+      target="_blank"
+      rel="noreferrer"
+      style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+    >
+      {richNodes(children)}
+    </LocaleLink>
+  );
 
   return (
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
@@ -104,6 +119,18 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
         >
           {t("consent.title")}
         </h2>
+
+        {termsUpdated && (
+          // « relis-les » mène aux conditions : à 375 px, le lien de la case est
+          // plusieurs écrans plus bas.
+          <p style={{ color: "var(--ink)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
+            {richNodes(
+              text.rich("consent.termsUpdated", { version: TERMS_VERSION, date: formatTermsDateIn(text.locale) }, {
+                terms: termsLink,
+              }),
+            )}
+          </p>
+        )}
 
         <p style={{ color: "var(--ink-mute)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
           {t("consent.intro")}
@@ -163,18 +190,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
           />
           <span>
             {richNodes(
-              text.rich("consent.terms", { age: SITE_MINIMUM_AGE }, {
-                terms: (children) => (
-                  <LocaleLink
-                    href={TERMS_PATH}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-                  >
-                    {richNodes(children)}
-                  </LocaleLink>
-                ),
-              }),
+              text.rich("consent.terms", { age: SITE_MINIMUM_AGE }, { terms: termsLink }),
             )}
           </span>
         </label>

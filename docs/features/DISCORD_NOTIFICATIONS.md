@@ -781,6 +781,21 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   (`match-reminder`), « Match retiré » (`match-withdrawn`). Non couverts : les
   messages privés au compte hors match (modération, logo, données, demande
   d'adhésion), et tout envoi au staff (`notifyStaff`).
+- **Ligne de fin** (LEGAL-FOLLOWUP-444) : chacun de ces messages se termine par
+  `matchDmOptOutLine` (`lib/shared/discord-notifications.ts`) — « Tu peux couper
+  ces messages privés dans ton profil, section Notifications : <<site>/profil#notifications> »
+  — lien entre chevrons, que Discord laisse cliquable sans en déplier l'aperçu
+  (une seconde carte sous celle du tournoi, à chaque message) —
+  (`MATCH_DM_SETTINGS_PATH`, URL par `siteUrl`, posée dans le contexte
+  `matchDmSettingsUrl` par `match-reminders.ts`) ; sans `APP_URL`, la même phrase
+  sans lien. Ouvert sans session, la carte « Connexion requise » (`AuthGate`,
+  `authGateLoginHref`) repasse l'ancre `#notifications` à `/connexion` : le
+  joueur connecté arrive sur l'interrupteur, pas en haut du profil. En français,
+  comme tout message Discord ; jamais dans un message au staff. Un message au nom de tournoi et aux noms d'équipe les plus longs reste
+  sous la limite de 2 000 caractères de Discord (testé).
+- **Conservation du choix** : intérêt légitime **du joueur lui-même** (le garder
+  est ce qui permet d'honorer son opposition), pas une obligation légale —
+  registre T04, `/rgpd#messages-de-match`, politique du bot.
 - **Écran** : enregistré au clic, sans bouton. Pendant l'envoi la case reste
   focalisable et utilisable (`aria-busy`, ni `disabled` ni `aria-disabled`) ; un
   clic fait pendant l'envoi s'affiche et part à la suite (`runQueuedSaves`,

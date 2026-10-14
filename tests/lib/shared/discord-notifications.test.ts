@@ -14,12 +14,15 @@ import {
   buildMatchScheduleAnnouncement,
   buildMatchScheduleClearedNotice,
   buildMatchWithdrawnNotice,
+  MATCH_DM_SETTINGS_PATH,
+  matchDmOptOutLine,
   dueMatchReminders,
   formatMatchStart,
   matchRoundLabel,
   isCheckInOpen,
   normalizeIssueReportMessage,
   openedMatchReminders,
+  type MatchReminderContext,
 } from "@/lib/shared/discord-notifications";
 
 const START = new Date("2026-09-10T18:00:00Z");
@@ -448,5 +451,53 @@ describe("rappel de check-in", () => {
     const message = buildMatchReminderMessage(TEN_HOURS, { ...CONTEXT, solo: true });
     expect(message).toContain("**Ton match**");
     expect(message).not.toMatch(/Renards|Nova/);
+  });
+});
+
+describe("matchDmOptOutLine — dernière ligne de tout message privé de match (LEGAL-FOLLOWUP-444)", () => {
+  const settingsUrl = `https://bluegenji.fr${MATCH_DM_SETTINGS_PATH}`;
+  const context: MatchReminderContext = {
+    tournamentName: "Coupe BlueGenji",
+    tournamentUrl: "https://bluegenji.fr/tournois/7",
+    matchDmSettingsUrl: settingsUrl,
+    teamName: "Les Renards",
+    opponentName: "Team Nova",
+    roundLabel: "Manche 2",
+    startAt: START,
+  };
+  const builders: ReadonlyArray<[string, (ctx: MatchReminderContext) => string]> = [
+    ["annonce d'horaire", (ctx) => buildMatchScheduleAnnouncement(ctx)],
+    ["horaire reprogrammé", (ctx) => buildMatchScheduleAnnouncement(ctx, [], { rescheduled: true, previousStartAt: START })],
+    ["horaire retiré", (ctx) => buildMatchScheduleClearedNotice(ctx)],
+    ["Match retiré", (ctx) => buildMatchWithdrawnNotice(ctx)],
+    ...MATCH_REMINDER_OFFSETS.map(
+      (offset): [string, (ctx: MatchReminderContext) => string] => [`rappel ${offset.key}`, (ctx) => buildMatchReminderMessage(offset, ctx)],
+    ),
+  ];
+
+  it("vise la section Notifications de « Mon profil »", () => {
+    expect(MATCH_DM_SETTINGS_PATH).toBe("/profil#notifications");
+    expect(matchDmOptOutLine(settingsUrl)).toBe(
+      "Tu peux couper ces messages privés dans ton profil, section Notifications : <https://bluegenji.fr/profil#notifications>",
+    );
+  });
+
+  it("sans adresse du site (APP_URL absente), le dit sans lien inventé", () => {
+    expect(matchDmOptOutLine(null)).toBe("Tu peux couper ces messages privés dans « Mon profil », section Notifications, sur le site.");
+    expect(matchDmOptOutLine()).toBe(matchDmOptOutLine(null));
+    expect(matchDmOptOutLine(null)).not.toMatch(/https?:/);
+  });
+
+  it.each(builders)("termine le message « %s » par la ligne, après le lien du tournoi", (_label, build) => {
+    const lines = build(context).split("\n");
+    expect(lines.at(-1)).toBe(matchDmOptOutLine(settingsUrl));
+    expect(lines.at(-2)).toBe("https://bluegenji.fr/tournois/7");
+    const withoutUrl = build({ ...context, matchDmSettingsUrl: null, tournamentUrl: null }).split("\n");
+    expect(withoutUrl.at(-1)).toBe(matchDmOptOutLine(null));
+  });
+
+  it.each(builders)("garde le message « %s » sous la limite de Discord, même au nom de tournoi le plus long", (_label, build) => {
+    const longest = build({ ...context, tournamentName: "T".repeat(120), teamName: "E".repeat(64), opponentName: "N".repeat(64) });
+    expect(longest.length).toBeLessThan(2000);
   });
 });

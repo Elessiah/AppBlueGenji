@@ -29,6 +29,7 @@ import {
   WEB_ACCESS_LOG_RETENTION_DAYS,
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
@@ -134,12 +135,20 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
     // T05 ne contredit pas T04 sur la base du programme d'arbitrage envoyé au staff.
     expect(t04.legalBasis).toMatch(/l'intérêt légitime \(bon déroulement des tournois\) restant la base à l'égard des joueurs et équipes qu'ils citent/);
-    expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande \(T16\)/);
+    expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande, et l'alerte AutoMod d'une telle annonce bloquée ou signalée le garde dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande \(T16\)/);
     expect(byRef("T08").subPurposes.join(" ")).toMatch(/salon #live du serveur de l'association, avec une mention @everyone \(noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs/);
     expect(byRef("T08").retention.join(" ")).toMatch(/Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur/);
     expect(byRef("T08").dataCategories.join(" ")).toMatch(/l'annonce #live, elle, reste publiée dans le salon \(traitement T16\)/);
     expect(byRef("T16").subPurposes.join(" ")).toMatch(/modifiable dans Mon profil, sans effet sur une annonce déjà publiée/);
-    expect(byRef("T16").legalBasis).toMatch(/sauf pour le pseudo de l'annonce #live d'un tournoi individuel, à laquelle on s'oppose en ne s'inscrivant pas/);
+    // Pseudo solo dans #live : exécution du service, pas intérêt légitime (décision du 2026-10-14).
+    expect(byRef("T16").legalBasis).toMatch(/exécution du service demandé par le joueur \(RGPD, art\. 6\.1\.b — conditions d'utilisation\) pour son pseudo public dans l'annonce #live d'un tournoi individuel/);
+    expect(byRef("T16").legalBasis).toMatch(/ne pas y être nommé revient à ne pas s'inscrire/);
+    expect(byRef("T16").retention.join(" ")).toMatch(/relève de l'exécution du service et non de l'intérêt légitime/);
+    // Un blocage AutoMod peut porter le texte de l'annonce au salon d'alertes des modérateurs.
+    expect(byRef("T16").recipients.join(" ")).toMatch(/si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte \(pseudo public compris en tournoi individuel\) peut parvenir au salon d'alertes de modération du serveur/);
+    // Garder le choix des messages de match : intérêt légitime du joueur, pas une obligation légale.
+    expect(t04.legalBasis).toMatch(/intérêt légitime, celui du joueur lui-même, pour la conservation de son choix des messages privés de match/);
+    expect(t04.legalBasis).not.toMatch(/obligation légale/i);
     expect(t04.dataSubjects).toContain("Tout titulaire de compte, pour son choix des messages privés de match");
     expect(byRef("T08").recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association, qui lisent l'annonce des matchs diffusés dans le salon #live/);
     expect(byRef("T05").legalBasis).toMatch(/programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service \(T04\)/);
@@ -175,6 +184,45 @@ describe("PROCESSING_ACTIVITIES", () => {
 
   it("ne déclare aucune adresse e-mail collectée", () => {
     expect(byRef("T01").dataCategories.join(" ")).toMatch(/aucune adresse e-mail/i);
+  });
+});
+
+describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
+  const fr = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref)!;
+  const en = (ref: string) => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref)!;
+
+  it("T08 remet l'avis « Match retiré » et nomme les modérateurs destinataires d'une alerte AutoMod", () => {
+    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match, avis de retrait d'un match \(« Match retiré »\), avis de modération/);
+    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders, notices of removal from a match \(“Match retiré”\), moderation notices/);
+    expect(fr("T08").recipients).toContain("Modérateurs du serveur Discord de l'association, si une règle AutoMod de Discord bloque ou signale une annonce #live (traitement T16)");
+    expect(en("T08").recipients).toContain("Moderators of the association's Discord server, if a Discord AutoMod rule blocks or flags a #live announcement (processing activity T16)");
+  });
+
+  it("T16 dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande", () => {
+    expect(fr("T16").retention.join(" ")).toMatch(/Alerte AutoMod \(annonce #live bloquée ou signalée\) : gardée dans le salon d'alertes de modération du serveur jusqu'à sa suppression par les modérateurs, et supprimée sur demande/);
+    expect(en("T16").retention.join(" ")).toMatch(/AutoMod alert \(blocked or flagged #live announcement\): kept in the server's moderation alert channel until the moderators delete it, and deleted at the request/);
+    expect(fr("T16").retention).toHaveLength(en("T16").retention.length);
+  });
+
+  it("T13 recueille aussi l'acceptation à une connexion, seulement si elle vient d'être donnée sur la page (FR et EN)", () => {
+    expect(fr("T13").subPurposes.join(" ")).toMatch(/à une connexion lancée depuis la page de connexion \(clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord\) dans les dix minutes où les conditions y ont été acceptées \(une acceptation seulement gardée par le navigateur n'est pas reportée sur un compte existant\)/);
+    expect(en("T13").subPurposes.join(" ")).toMatch(/at a login started from the login page \(click on Google, Discord or Blizzard, or submission of the code received on Discord\) within ten minutes of accepting the terms there \(an acceptance only kept by the browser is not carried over to an existing account\)/);
+  });
+
+  it("T16 donne une base à l'alerte AutoMod : intérêt légitime de modérer le serveur, opposition = suppression (FR et EN)", () => {
+    expect(fr("T16").legalBasis).toMatch(/intérêt légitime de l'association à modérer son serveur Discord pour l'alerte AutoMod d'une annonce #live bloquée ou signalée[^;]*droit d'opposition \(art\. 21\) : l'alerte est supprimée sur demande/);
+    expect(en("T16").legalBasis).toMatch(/legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked or flagged #live announcement[^;]*right to object \(art\. 21\): the alert is deleted on request/);
+  });
+
+  it("T16 dit la finalité de modération de l'alerte AutoMod (FR et EN)", () => {
+    expect(fr("T16").subPurposes.join(" ")).toMatch(/Modérer le serveur Discord de l'association : une règle AutoMod de Discord qui bloque ou signale une annonce #live en copie le texte/);
+    expect(en("T16").subPurposes.join(" ")).toMatch(/Moderating the association's Discord server: a Discord AutoMod rule that blocks or flags a #live announcement copies its text/);
+  });
+
+  it("T08 garde la même durée de l'alerte AutoMod que T16 et la politique du bot, compte supprimé compris", () => {
+    expect(fr("T08").retention.join(" ")).toMatch(/Alerte AutoMod d'une annonce #live bloquée ou signalée : dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, même après la suppression du compte du joueur, et supprimée sur demande/);
+    expect(en("T08").retention.join(" ")).toMatch(/AutoMod alert for a blocked or flagged #live announcement: in the moderation alert channel until the moderators delete it, even after the player's account is deleted, and deleted at the request/);
+    expect(fr("T08").retention).toHaveLength(en("T08").retention.length);
   });
 });
 
@@ -473,7 +521,7 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
     // Le site ne fait que lier les chaînes : seule l'annonce #live passe par Discord.
     expect(sheet.transfers).toHaveLength(1);
-    expect(sheet.transfers[0]).toMatch(/^États-Unis : Discord \(annonce publiée dans le salon #live\)/);
+    expect(sheet.transfers[0]).toMatch(/^États-Unis : Discord \(annonce publiée dans le salon #live, et alerte AutoMod d'une annonce bloquée ou signalée\)/);
     // Décision du 2026-10-14 : pseudo public des joueurs d'un tournoi individuel.
     expect(sheet.subPurposes.join(" ")).toMatch(/salon #live .* @everyone .*jamais le pseudo de leurs joueurs\) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs \(le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais l'identifiant Discord numérique/);
     expect(sheet.retention.join(" ")).toMatch(/conservé dans le salon tant que le salon #live existe, même après la suppression du compte du joueur, et supprimé sur demande de l'équipe ou du joueur concerné/);

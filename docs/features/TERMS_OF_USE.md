@@ -10,17 +10,29 @@ règle de fond = avancer `TERMS_VERSION`**, ce qui redemande l'acceptation.
 | Moment | Où | Contexte enregistré |
 |---|---|---|
 | Création du compte | case de la modale d'entrée de `/connexion` (avec le consentement RGPD) | `SIGNUP` |
-| Connexion suivante, case cochée | idem, si la version courante n'était pas encore acceptée | `LOGIN` |
+| Connexion suivante, modale acceptée **dans la page** | idem, si la version courante n'était pas encore acceptée — une acceptation seulement relue du navigateur (`bg_terms_consent`, peut-être celle d'une autre personne sur un ordinateur partagé) n'est pas attribuée à un compte existant | `LOGIN` |
 | Création d'une équipe | case du formulaire `/equipes/creer`, exigée par `POST /api/teams` | `TEAM_CREATION` |
 | Réception de la gestion d'une équipe | modale `TermsAcceptanceModal` (mise en page racine) | `TEAM_MANAGEMENT` |
 
 Le site n'a pas de formulaire d'inscription : un compte naît à la première
-connexion. L'acceptation voyage donc avec la connexion — `terms=1` scellé dans le
+connexion. L'acceptation voyage donc avec la connexion — `terms=<version>` scellé dans le
 cookie d'état OAuth (comme l'intention, jamais relu dans l'URL du rappel)
 **seulement** si le départ est prouvé cliqué sur une page du site
 (`startedOnSitePage` : `Sec-Fetch-Site: same-origin`, `Sec-Fetch-Mode: navigate`,
 `Sec-Fetch-Dest: document`) — sinon ni `SIGNUP` ni `LOGIN` n'est enregistré —,
-`termsAccepted` dans le corps du code Discord. Un lien saisi sur le site et
+`termsAccepted` + `termsVersion` dans le corps du code Discord. Seule la
+**version en vigueur** vaut acceptation : un onglet de `/connexion` chargé avant
+une nouvelle version (ancien paquet : `terms=1`, ou l'ancien numéro) n'accepte pas
+celle qu'il n'a pas montrée. `termsNow=1` / `termsAcceptedNow` disent que la
+modale vient d'être acceptée dans la page : sans eux, l'acceptation relue du
+navigateur suffit à créer un compte mais n'écrit pas de preuve `LOGIN` pour un
+compte existant (revue sécurité de #445), et ne vaut « dans la page » que dix
+minutes (`ACCEPTED_NOW_TTL_MS`, durée d'un aller-retour OAuth), lues à l'horloge
+au moment du départ (un minuteur s'arrête pendant une mise en veille). Les liens
+affichés ne portent jamais `termsNow` : seul un clic simple l'ajoute
+(`termsAtClick`, `window.location.assign`) ; clic du milieu, nouvel onglet ou
+glisser partent sans. Un onglet resté ouvert sur un ordinateur partagé ne prête
+donc pas l'acceptation à la personne suivante. Un lien saisi sur le site et
 rendu cliquable (lien « Postuler » d'une annonce, site d'un partenaire, page
 d'origine d'un signalement) ne peut pas viser une route d'API (`leadsToApi`, à
 l'enregistrement et à l'affichage) — le contact Discord d'une annonce ne devient
@@ -83,6 +95,28 @@ la mise en page, elle garde le texte d'une première acceptation.
 |---|---|---|
 | 1 | 24 septembre 2026 | Première version. |
 | 2 | 1er octobre 2026 | Changements de fond : âge minimum, licence, responsabilité des gérants, juridiction. Tout compte qui avait accepté la version 1 la réaccepte — à la connexion par la case de `/connexion`, ou par la modale s'il gère une équipe ; ses gestes de gestion sont refusés en 409 d'ici là. |
+| 3 | 1er octobre 2026 | Suspension d'un compte, voies de recours, base légale de la modération, absence de médiateur. |
+| 4 | 14 octobre 2026 | Annonce #live d'un tournoi individuel : le pseudo public du joueur y figure au titre de l'exécution du service (pas de nom neutre ; ne pas y être nommé = ne pas s'inscrire). Date d'entrée en vigueur fixée par l'association (décision du 2026-10-14), non le lendemain de la mise en ligne. |
+
+**Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
+revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
+plus la courante ; si c'était une version **antérieure**, elle l'annonce en tête
+(`login.consent.termsUpdated` : « Les conditions d'utilisation ont changé
+(version N, en vigueur depuis le …) », FR et EN). Le gérant d'une équipe voit en
+plus la modale `TermsAcceptanceModal` titrée « Les conditions d'utilisation ont
+changé » (`UPDATED`). Un compte qui ne gère rien n'est pas bloqué : ses gestes
+n'exigent pas les conditions.
+
+**Prévenir tout le monde** (version 4, demande de l'association) : ni l'une ni
+l'autre modale n'atteint un compte connecté qui ne gère rien — sa session dure
+30 jours sans repasser par `/connexion`. L'annonce passe donc par le registre
+`PRIVACY_CHANGES` (`PRIVACY_CHANGES_CONSENT.md`), le seul canal qui touche
+**chaque** compte une fois et le garde par compte : l'entrée
+`2026-10-base-pseudo-live-et-automod`, qui porte la même règle (#live), dit la
+version, sa date d'entrée en vigueur et lie `/conditions-utilisation` (FR et EN)
+— modale à la page suivante, message privé Discord à qui ne l'a pas lue. Elle
+informe sans faire accepter : l'acceptation reste celle du tableau ci-dessus. À
+refaire à chaque version qui change une règle de fond pour tous les comptes.
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.
@@ -149,4 +183,4 @@ renommer ces citations dans le même changement.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Conditions d'utilisation** (`lib/shared/terms-of-use.ts` pur + `lib/server/terms-acceptance.ts`, page `/conditions-utilisation`) : texte et **version** au même endroit ; avancer `TERMS_VERSION` redemande l'acceptation. Acceptées à la **création du compte** (case de la modale d'entrée de `/connexion` ; `terms=1` scellé dans le cookie d'état OAuth comme l'intention — seulement pour un départ prouvé cliqué sur une page du site (`startedOnSitePage`) —, `termsAccepted` pour le code Discord — un compte **neuf** sans acceptation est refusé, `TERMS_REQUIRED`), à la **création d'une équipe** (`acceptTerms`, exigé par `POST /api/teams`), avant d'**inscrire** l'équipe à un tournoi, et en **recevant la gestion** d'une équipe — geste que le receveur ne fait pas : la mise en page racine présente les conditions (`TermsAcceptanceModal`) et les gestes de gestion sont refusés en 409 `TERMS_ACCEPTANCE_REQUIRED` tant qu'il ne les a pas acceptées (jamais pour retirer un logo, ni pour le staff sur une fantôme). L'envoi d'un logo exige en plus la case « je détiens les droits » (`LOGO_RIGHTS_NOT_CERTIFIED`). Preuve dans `bg_terms_acceptances`. Voir `docs/features/TERMS_OF_USE.md`.
+- **Conditions d'utilisation** (`lib/shared/terms-of-use.ts` pur + `lib/server/terms-acceptance.ts`, page `/conditions-utilisation`) : texte et **version** au même endroit ; avancer `TERMS_VERSION` redemande l'acceptation. Acceptées à la **création du compte** (case de la modale d'entrée de `/connexion` ; `terms=<version en vigueur>` scellé dans le cookie d'état OAuth comme l'intention — seulement pour un départ prouvé cliqué sur une page du site (`startedOnSitePage`) —, `termsAccepted` pour le code Discord — un compte **neuf** sans acceptation est refusé, `TERMS_REQUIRED`), à la **création d'une équipe** (`acceptTerms` + `termsVersion`, exigés par `POST /api/teams` — une autre version que celle en vigueur est refusée en 409 `TERMS_VERSION_MISMATCH`, comme par `/api/profile/terms` ; sans version, page d'avant le champ, en 400 `TERMS_REQUIRED`, que ces pages savent dire), avant d'**inscrire** l'équipe à un tournoi, et en **recevant la gestion** d'une équipe — geste que le receveur ne fait pas : la mise en page racine présente les conditions (`TermsAcceptanceModal`) et les gestes de gestion sont refusés en 409 `TERMS_ACCEPTANCE_REQUIRED` tant qu'il ne les a pas acceptées (jamais pour retirer un logo, ni pour le staff sur une fantôme). L'envoi d'un logo exige en plus la case « je détiens les droits » (`LOGO_RIGHTS_NOT_CERTIFIED`). Preuve dans `bg_terms_acceptances`. Voir `docs/features/TERMS_OF_USE.md`.

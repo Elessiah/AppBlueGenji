@@ -92,7 +92,9 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
         {entry.extraBases?.map((extra) => (
           <span key={extra.base} className={styles.extraBase}>
-            <span className={styles.badge}>{LEGAL_BASE_EN[extra.base]}</span> {extra.scope}
+            {/* Même base que la principale : pas de second badge identique, mais « including » (cf. page FR). */}
+            {extra.base === entry.base ? "including: " : <><span className={styles.badge}>{LEGAL_BASE_EN[extra.base]}</span> </>}
+            {extra.scope}
           </span>
         ))}
       </DataCell>
@@ -276,7 +278,7 @@ export function RgpdEn({
           creation date, {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days), and to the reports you sent, detached
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
-          are deleted on request (<a href="#retransmission">“Match streaming”</a>);
+          are deleted on request, as does the moderation alert for such an announcement blocked or flagged by AutoMod (<a href="#retransmission">“Match streaming”</a>);
           for a staff member, their refereeing actions remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
@@ -425,7 +427,8 @@ export function RgpdEn({
               <strong>bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
               or Blizzard, and deleted on return. It lasts ten minutes at most and only contains a single-use random
               token (anti-CSRF protection), the provider&apos;s name, the page to bring you back to, the purpose of
-              the login (logging in or linking an account), whether you accepted the terms of use and whether the
+              the login (logging in or linking an account), whether you accepted the terms of use (with the version
+              accepted, and whether you have just accepted them on the login page) and whether the
               login was started from a page of the site (otherwise neither the account language nor the acceptance of
               the terms is recorded). No personal identifier.
             </li>
@@ -490,7 +493,11 @@ export function RgpdEn({
               set on the login page <strong>when you continue</strong> after reading the information about your
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
-              on our servers, with its version number, as soon as your account exists.
+              on our servers, with its version number, when you accept them: when your account or a team is created,
+              to manage a team, or at a login started from the login page (click on Google, Discord or Blizzard, or
+              submission of the code received on Discord) within ten minutes of accepting them
+              there (an acceptance only kept by the browser, possibly another person&apos;s, is not carried
+              over to an existing account).
             </li>
             <li>
               <strong>Service worker and “bg-offline” cache</strong> — the site installs in your browser,{" "}
@@ -794,7 +801,8 @@ export function RgpdEn({
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
             unticking “Discord direct messages about my matches” in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — your push notifications
-            keep their own settings. The site keeps this choice for the lifetime of the account; it appears in the
+            keep their own settings. The site keeps this choice for the lifetime of the account, in your legitimate
+            interest (that is what lets it honour the choice); it appears in the
             export of your data. Referee alerts and the refereeing schedule sent to referees and administrators fall
             under <strong>performance of the service</strong> and are not turned off this way (
             <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
@@ -824,7 +832,8 @@ export function RgpdEn({
               <strong>Discord</strong> (United States): the bot&apos;s direct messages (login code, match times and
               reminders, notifications), the staff-only channels and the announcement of streamed matches in the #live
               channel, which carry no player username — except that announcement in a solo tournament, which names
-              the players by their public username; and logging in through Discord, if you choose it.
+              the players by their public username, and the AutoMod alert it may send to the moderators&apos; alert
+              channel; and logging in through Discord, if you choose it.
             </li>
             <li>
               <strong>Google and Blizzard</strong> (United States): only if you log in through one of them, which
@@ -887,10 +896,15 @@ export function RgpdEn({
             solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile, with no effect on an announcement already posted: unless changed, the Discord username or BattleTag
             taken when the account was created, or even the Google account name for a Google account created before
             September 30, 2026; never the numeric Discord identifier; “a player” for an entry without an account, a deleted account or a
-            registration made before 16 October 2026), the tournament&apos;s name and the stream link. The neutral name applies to
-            the stream only: a player who does not want their username in that announcement does not register for
-            the solo tournament. These announcements stay in
-            the channel as long as the #live channel exists; the team or player concerned can ask for their deletion
+            registration made before 16 October 2026), the tournament&apos;s name and the stream link. This username is not based on legitimate
+            interest but on <strong>performance of the service</strong>: the announcement is part of the solo
+            tournament the player registers for, and the neutral name applies to the stream only — a player who does
+            not want their username in that announcement does not register for the solo tournament. If a Discord
+            AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
+            server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
+            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). These
+            announcements stay in the channel as long as the #live channel exists; the team or player concerned can
+            ask for their deletion, and for that of these alerts,
             through the “Report a problem” button, GDPR category.
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>

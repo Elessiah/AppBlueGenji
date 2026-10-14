@@ -133,7 +133,7 @@ describe("espace sécurisé — visiteur sans session", () => {
   it("relaie côté client la carte servie par un préchargement, ancre comprise", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
     expect(gate).toContain("tournamentIdFromMemberPath(splitLocalePrefix(pathname).path)");
-    expect(gate).toContain("router.replace(`${spectatorTournamentPath(spectatorId)}${search}${hash}`);");
+    expect(gate).toContain("router.replace(`${spectatorTournamentPath(spectatorId)}${search}${anchor}`);");
     // Pas de carte « Connexion requise » le temps du relais, mais un état annoncé.
     expect(gate).toMatch(/if \(spectatorId !== null\) \{\s*return \(\s*<output className=\{styles.shell\}>/);
     expect(gate).toContain("{text.redirecting}");

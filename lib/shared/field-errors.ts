@@ -190,6 +190,16 @@ export const TEAM_IDENTITY_FIELD_ERRORS: FieldErrorMap<TeamIdentityField> = {
   [TEAM_TAG_ALREADY_USED]: "tag",
 };
 
+/** Création d'une équipe (`/equipes/creer`) : l'identité, plus la case des conditions. */
+export type TeamCreationField = TeamIdentityField | "terms";
+
+export const TEAM_CREATION_FIELD_ERRORS: FieldErrorMap<TeamCreationField> = {
+  ...TEAM_IDENTITY_FIELD_ERRORS,
+  TERMS_REQUIRED: "terms",
+  // Page chargée avant une nouvelle version : la case est à recocher après rechargement.
+  TERMS_VERSION_MISMATCH: "terms",
+};
+
 /** Profil du joueur (`/profil`). */
 export type ProfileField = "pseudo" | "battletag" | "discord";
 

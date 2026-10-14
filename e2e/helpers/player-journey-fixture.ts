@@ -125,7 +125,7 @@ export async function setUpJourney(baseURL: string): Promise<JourneyFixture> {
     const teamName = `E2E ${side.toUpperCase()} ${stamp}`;
     const api = await apiAs(baseURL, user.token);
     const created = await expectOk<{ id?: number; teamId?: number }>(
-      await api.post("/api/teams", { data: { name: teamName, acceptTerms: true } }),
+      await api.post("/api/teams", { data: { name: teamName, acceptTerms: true, termsVersion: TERMS_VERSION } }),
       `création de l'équipe ${side}`,
     );
     await api.dispose();

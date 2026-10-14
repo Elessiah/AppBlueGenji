@@ -8,7 +8,7 @@ import { consumeDiscordLoginChallenge, isDiscordChallengeToken } from "@/lib/ser
 import { createOrGetDiscordUser } from "@/lib/server/users/sign-in";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
 import { isLocale } from "@/lib/shared/locales";
-import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
+import { TERMS_REQUIRED, TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request) {
@@ -23,6 +23,10 @@ export async function POST(req: Request) {
       code?: string;
       pseudo?: string;
       termsAccepted?: boolean;
+      /** Version des conditions que la page a montrée. */
+      termsVersion?: unknown;
+      /** Acceptées dans la page, pas relues du navigateur. */
+      termsAcceptedNow?: unknown;
       /** Langue de la page de connexion (lot 9-3) : celle du compte. */
       locale?: unknown;
     };
@@ -78,9 +82,13 @@ export async function POST(req: Request) {
     // sans oracle — si le compte existe.
     // Un compte suspendu est refusé avant que la porte n'écrive son tag.
     await assertIdentityNotSuspended("DISCORD", proof.discordId);
+    // La version montrée doit être celle en vigueur : une page chargée avant
+    // une nouvelle version n'accepte pas celle-ci (elle ne l'a pas montrée).
+    const termsAccepted = body.termsAccepted === true && body.termsVersion === TERMS_VERSION;
     const userId = await createOrGetDiscordUser(proof.discordId, body.pseudo, proof.handle, {
       method: "DM_CODE",
-      termsAccepted: body.termsAccepted === true,
+      termsAccepted,
+      acceptedNow: termsAccepted && body.termsAcceptedNow === true,
     });
     await createSession(userId, "LOGIN_DISCORD_CODE");
     // La langue du compte suit celle de la page de connexion (lot 9-3), jamais
@@ -92,8 +100,10 @@ export async function POST(req: Request) {
     return ok({ success: true });
   } catch (error) {
     // Le code vient d'être consommé : un compte neuf refusé faute de conditions
-    // acceptées devra en redemander un. Le cas ne se présente qu'à un client qui
-    // contourne la case de `/connexion`.
+    // acceptées devra en redemander un. Le cas se présente à un client qui
+    // contourne la case de `/connexion`, ou à un onglet chargé avant une
+    // nouvelle version des conditions (`termsVersion` absent ou ancien) : le
+    // refus (`TERMS_REQUIRED`) dit de recharger la page, qui les présente.
     if ((error as Error).message === TERMS_REQUIRED) return fail(TERMS_REQUIRED, 400);
     // Compte suspendu : l'exposé de la décision part dans le corps, que la page
     // de connexion affiche — c'est le seul canal qui joigne un compte sans

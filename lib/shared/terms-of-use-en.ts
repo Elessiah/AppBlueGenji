@@ -36,7 +36,7 @@ export const TERMS_SECTIONS_EN: readonly TermsSection[] = [
     id: "acceptation",
     title: "Acceptance",
     paragraphs: [
-      "The terms are accepted when **creating an account**, when **creating a team** and when **being given the management of a team** (ownership transferred or manager role). Without this acceptance, the account cannot be created and the team cannot be managed.",
+      "The terms are accepted when **creating an account**, when **creating a team** and when **being given the management of a team** (ownership transferred or manager role), as well as by accepting them on the **login page**, which presents them as long as they have not been accepted in the browser. Without this acceptance, the account cannot be created and the team cannot be managed.",
       "The association may amend these terms. A substantive change gives rise to a **new version**, presented for acceptance to the users concerned before they can continue to manage a team.",
     ],
   },

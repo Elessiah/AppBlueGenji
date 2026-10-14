@@ -1,7 +1,7 @@
 LÉGAL · CONDITIONS GÉNÉRALES
 Conditions d'utilisation
 Ce que chacun s'engage à respecter en utilisant le site, en y créant une équipe et en y publiant un logo ou un avatar. Le traitement des données personnelles est décrit dans la politique de confidentialité. Les règles des tournois, que ces conditions complètent, sont publiées sur la page Règles des tournois.
-VERSION 3EN VIGUEUR DEPUIS LE 1 OCTOBRE 2026
+VERSION 4EN VIGUEUR DEPUIS LE 14 OCTOBRE 2026
 SOMMAIRE
 1. Objet
 2. Acceptation
@@ -18,7 +18,7 @@ Les présentes conditions encadrent l'utilisation du site BlueGenji Esport, édi
 Elles complètent le règlement de chaque tournoi et la politique de confidentialité, qui décrit le traitement des données personnelles. En cas de contradiction sur le déroulement d'un tournoi, son règlement prévaut.
 ARTICLE 02
 Acceptation
-Les conditions s'acceptent en créant un compte, en créant une équipe et en recevant la gestion d'une équipe (propriété transférée ou rôle de gérant). Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.
+Les conditions s'acceptent en créant un compte, en créant une équipe et en recevant la gestion d'une équipe (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la page de connexion, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur. Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.
 L'association peut modifier ces conditions. Une modification de fond donne lieu à une nouvelle version, présentée à l'acceptation des utilisateurs concernés avant qu'ils puissent continuer à gérer une équipe.
 ARTICLE 03
 Compte
@@ -41,7 +41,7 @@ Pour une équipe, répondent aussi de ses contenus, en plus de leur auteur : le 
 ARTICLE 06
 Retransmission des matchs
 Un match de tournoi peut être diffusé en direct et enregistré (YouTube, Twitch ou Kick), par la chaîne de l'association ou d'un caster. Y apparaissent le pseudo des joueurs, le nom de leur équipe et leurs résultats et performances en jeu — jamais de webcam ni de chat vocal.
-Chaque joueur peut s'y opposer : il apparaît alors sous un nom neutre. La demande se fait par le bouton « Signaler un problème », catégorie RGPD. Au début d'un match diffusé, une annonce publiée dans le salon #live du Discord de l'association nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public ; le nom neutre ne s'applique pas à cette annonce : un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton. La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.
+Chaque joueur peut s'y opposer : il apparaît alors sous un nom neutre. La demande se fait par le bouton « Signaler un problème », catégorie RGPD. Au début d'un match diffusé, une annonce publiée dans le salon #live du Discord de l'association nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public. Cette annonce fait partie du tournoi individuel auquel le joueur s'inscrit (exécution du service, et non intérêt légitime) : le nom neutre ne s'y applique pas, et un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton. La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.
 Politique de confidentialité — retransmission des matchs
 ARTICLE 07
 Signalement et modération
