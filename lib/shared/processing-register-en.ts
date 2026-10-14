@@ -391,7 +391,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exclusions: identifiers of the excluded user and the moderator, date; identifiers and reason posted in the staff's private log channel, reason copied by direct message to the bot's owner, usernames and reason displayed by /ban-list",
       "Configuration: identifiers of servers, channels and roles, invitation, identifier of the administrator who set it",
       "Memberships and scheduled reminders: identifier of the member or role targeted and of the author, message, date of the next sending (for a membership: its expiry date, hence membership status), frequency; membership certificate delivered by direct message without being kept",
-      "Site messages: the recipient's Discord ID or username, their BlueGenji username (returned in the delivery report sent back to the site) and the message text, sent by the site and delivered without being stored by the bot",
+      "Site messages: the recipient's Discord ID or username, their BlueGenji username (returned in the delivery report sent back to the site) and the message text, sent by the site and delivered without being stored by the bot; the #live announcement, however, stays posted in the channel (processing activity T16)",
       "Technical log (staff's private channel, server logs): name of the servers that add or remove the bot, errors that may quote an identifier; the bot no longer writes a username there of its own accord, messages prior to this rule excepted (the free-text reason for an exclusion or an error delivering a direct message may quote one)",
     ],
     sensitiveData: "None",
@@ -404,6 +404,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       `Activity feed: ${BOT_FEED_EVENT_RETENTION_DAYS} days, deleted during the following night`,
       `Staff's private log channel, and the bot's direct messages to its owner: ${BOT_STAFF_LOG_RETENTION_DAYS} days (one year), then deleted by the nightly cleanup, in batches (several nights for a large backlog), except the reason posted in the channel for an ongoing exclusion — and, for an exclusion imposed from this rule onward, its notice and the copy of its reason by direct message —, deleted when it is lifted`,
       "Server logs: according to their automatic rotation",
+      "#live announcements: in the channel as long as it exists, even after the player's account is deleted, and deleted at the request of the team or player concerned (processing activity T16)",
       `Backups: ${BACKUP_RETENTION_DAYS} days at most (processing activity T09)`,
     ],
     recipients: [
@@ -668,7 +669,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Streaming a match live on the association's channel or a caster's (YouTube, Twitch or Kick)",
       "Publishing the link to its YouTube replay on the match page",
-      "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (the username on their page, editable in My profile: unless changed, the Discord username or BattleTag taken when the account was created, or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
+      "Announcing the start of a streamed match in the #live channel of the association's Discord server, with an @everyone mention: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (the username on their page, editable in My profile, with no effect on an announcement already posted: unless changed, the Discord username or BattleTag taken when the account was created, or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
     ],
     legalBasis:
       "Legitimate interest (GDPR, art. 6.1.f) of the association in promoting its competitions, the purpose set out in its bylaws; right to object (art. 21) open to each player",

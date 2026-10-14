@@ -1070,7 +1070,7 @@ function RgpdFr({
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
             l&apos;association, avec une mention @everyone : le nom des deux équipes (jamais le pseudo
             de leurs joueurs) ou, en tournoi individuel, le <strong>pseudo public BlueGenji</strong> des
-            deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil : sans changement, le pseudo Discord ou le
+            deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le
             BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant
             le 30 septembre 2026 ; jamais l&apos;identifiant Discord numérique ; « un joueur » pour une
             entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le

@@ -568,7 +568,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list",
       "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
       "Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée",
-      "Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site) et le texte du message, transmis par le site et remis sans être enregistrés par le bot",
+      "Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site) et le texte du message, transmis par le site et remis sans être enregistrés par le bot ; l'annonce #live, elle, reste publiée dans le salon (traitement T16)",
       "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)",
     ],
     sensitiveData: "Aucune",
@@ -581,6 +581,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Fil d'activité : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, supprimé dans la nuit qui suit`,
       `Salon de journal privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), puis supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée`,
       "Journaux du serveur : selon leur rotation automatique",
+      "Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur, et supprimées sur demande de l'équipe ou du joueur concerné (traitement T16)",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
     recipients: [
@@ -847,7 +848,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)",
       "Publier sur la fiche du match le lien de sa rediffusion YouTube",
-      "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (pour une affiche d'équipes, jamais le pseudo de leurs joueurs) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil : sans changement, le pseudo Discord ou le BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais l'identifiant Discord numérique ; « un joueur » pour un compte supprimé, une entrée sans compte ou une inscription antérieure au 16 octobre 2026), nom du tournoi et lien de la diffusion",
+      "Annoncer le début d'un match diffusé dans le salon #live du serveur Discord de l'association, avec une mention @everyone : noms des deux équipes (pour une affiche d'équipes, jamais le pseudo de leurs joueurs) ou, en tournoi individuel, pseudo public BlueGenji des deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant le 30 septembre 2026 ; jamais l'identifiant Discord numérique ; « un joueur » pour un compte supprimé, une entrée sans compte ou une inscription antérieure au 16 octobre 2026), nom du tournoi et lien de la diffusion",
     ],
     legalBasis:
       "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",
