@@ -49,7 +49,8 @@ ses messages qu'au bout d'un an (`BOT_STAFF_LOG_RETENTION_DAYS`). Règle, écrit
 l'utilisateur, 2026-10-14) : l'annonce publique d'un match diffusé
 (`lib/shared/live-announcements.ts`, `LIVE_STREAMS.md`) nomme le joueur d'une
 entrée individuelle par son **pseudo public BlueGenji** (`bg_users.pseudo`, lu
-par `solo_user_id`, compte supprimé → « un joueur »), passé par
+par `solo_user_id`, compte supprimé ou invité sans compte d'un tournoi `SOLO` →
+« un joueur »), passé par
 `discordInline` — jamais un prénom ni un `#id`, comme un diffuseur nomme les
 joueurs à l'antenne. Un match d'équipes n'y nomme que les équipes. Base :
 intérêt légitime (retransmission, registre T16), sans case à cocher ; la mention

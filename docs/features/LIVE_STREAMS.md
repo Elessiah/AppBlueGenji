@@ -242,7 +242,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   de l'entrée solo, qui peut porter un suffixe ; `liveEntrantName`) — **seule
   exception** à la règle « aucun pseudo sur Discord », décidée par l'utilisateur
   le 2026-10-14 (`RGPD_LOGS_AND_VISITS.md`). Compte supprimé ou pseudo vide :
-  « un joueur ». Plusieurs affiches d'un tournoi individuel s'énumèrent comme
+  « un joueur » ; de même, en tournoi `SOLO`, une entrée sans compte (invité
+  fantôme nommé par le staff) — seul un pseudo de compte part. Plusieurs affiches d'un tournoi individuel s'énumèrent comme
   celles d'équipes. **Conservation** : le message reste dans #live tant que le
   salon existe ; supprimé sur demande de l'équipe ou du joueur concerné
   (« Signaler un problème », catégorie RGPD) — registre T16, `/rgpd`. Le bot préfixe `@everyone` et n'autorise que cette mention
