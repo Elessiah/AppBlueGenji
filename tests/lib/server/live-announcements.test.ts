@@ -578,6 +578,30 @@ describe("dispatchLiveAnnouncements", () => {
     }
   });
 
+  it("une fin de pause remplacée par une relève plus proche revient, même si ce passage n'a rien lu", async () => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const held = { ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() };
+      jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
+      const { query } = mockDb([held]);
+      await dispatchLiveAnnouncements();
+      // Un appel étranglé arme une relève plus proche…
+      jest.setSystemTime(NOW + 3_000);
+      await dispatchLiveAnnouncements();
+      // …dont le passage ne lit rien : coupe-circuit du bot ouvert.
+      jest.mocked(isBotCircuitOpen).mockReturnValue(true);
+      await jest.advanceTimersByTimeAsync(8_000);
+      expect(query).toHaveBeenCalledTimes(1);
+      // La fin de la pause est reprogrammée : le match part sans nouvel évènement.
+      jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+      jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
+      await jest.advanceTimersByTimeAsync(LIVE_ANNOUNCE_RETRY_DELAY_MS);
+      expect(pushLiveAnnouncement).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("une annonce publiée ne met aucune pause : le passage suivant suit l'étranglement seul", async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
     try {
