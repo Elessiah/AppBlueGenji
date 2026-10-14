@@ -980,6 +980,7 @@ describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de
 
   it("se traduit détail pour détail et lien pour lien", () => {
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
+    expect(english.title).toBe("Your username in #live announcements, and match direct messages up to you");
     const translated = english.details.join(" ");
     for (const pattern of [/right to object/, /performance of the service/, /never your first name or Discord identifier/]) {
       expect(translated).toMatch(pattern);
