@@ -311,6 +311,9 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   });
 
   it("déclare le pseudo #live et le choix des messages privés de match (revue juridique #444)", () => {
+    // S'opposer au pseudo #live = ne pas s'inscrire (décision du 2026-10-14) : le droit d'opposition le dit.
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Exception : le pseudo publié dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/Exception: the username posted in the #live announcement of a solo tournament — objecting to it means not registering/);
     const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
     expect(pseudo?.extraBases).toEqual([{ base: "Intérêt légitime", scope: LIVE_PSEUDO_SCOPE }]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
