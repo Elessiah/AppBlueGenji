@@ -72,7 +72,8 @@ describe("pushLiveAnnouncement", () => {
       ["automod", "discord-refused"],
       // Refus lié à l'état du salon : il peut se régler, le site réessaie.
       ["send-rejected", "discord-held"],
-      ["discord-unreachable", "discord-held"],
+      // Discord muet en lisant le salon : panne qui touche tout envoi.
+      ["discord-unreachable", "discord-unreachable"],
       // Discord a lâché pendant l'envoi : le message a pu partir, pas de nouvel essai.
       ["discord-down", "uncertain"],
     ];
@@ -85,12 +86,12 @@ describe("pushLiveAnnouncement", () => {
     expect(isBotCircuitOpen()).toBe(false);
   });
 
-  it("rend « discord-held » sur une panne de Discord en lisant le salon, sans ouvrir le coupe-circuit", async () => {
+  it("rend « discord-unreachable » sur une panne de Discord en lisant le salon, sans ouvrir le coupe-circuit", async () => {
     for (const reason of ["discord-unreachable"]) {
       jest
         .spyOn(global, "fetch")
         .mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason }, { status: 503 }));
-      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("discord-held");
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("discord-unreachable");
     }
     expect(isBotCircuitOpen()).toBe(false);
   });

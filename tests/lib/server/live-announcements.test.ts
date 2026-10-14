@@ -205,7 +205,7 @@ describe("runLiveAnnouncementSweep", () => {
   });
 
   it("Discord n'a pas répondu en lisant le salon : rend la réservation, sans accuser les permissions du bot", async () => {
-    jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-held");
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-unreachable");
     const { execute } = mockDb([AUTO_LIVE]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
@@ -401,6 +401,17 @@ describe("runLiveAnnouncementSweep", () => {
     for (const text of warned) expect(text).toContain("salon #live fermé au bot");
   });
 
+  it("Discord muet en lisant le salon vaut pour tout le passage : les groupes suivants sont rendus sans appel", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-unreachable");
+    const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" }]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
+    expect(releasesOf(execute)).toEqual([
+      [40, "1:2"],
+      [57, "5:6"],
+    ]);
+  });
+
   it("un refus de Discord propre au message n'empêche pas les autres groupes de partir", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held").mockResolvedValueOnce("posted");
     const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" }]);
@@ -487,6 +498,32 @@ describe("dispatchLiveAnnouncements", () => {
       await jest.advanceTimersByTimeAsync(LIVE_ANNOUNCE_RETRY_DELAY_MS);
       expect(query).toHaveBeenCalledTimes(2);
       expect(pushLiveAnnouncement).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("un refus de Discord ne met en pause que ses matchs : un autre tournoi part au passage suivant", async () => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const held = { ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() };
+      const other = { ...held, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" };
+      jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
+      const { query } = mockDb([held]);
+      await dispatchLiveAnnouncements();
+      // Dix secondes plus tard, un autre tournoi passe à l'antenne : rien ne le retient.
+      jest.setSystemTime(NOW + 11_000);
+      query.mockResolvedValue([[held, other]]);
+      jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
+      expect(await dispatchLiveAnnouncements()).toBe(1);
+      expect(jest.mocked(pushLiveAnnouncement).mock.calls.map(([, , context]) => context)).toEqual([
+        "live-announce tournoi-4 match-40",
+        "live-announce tournoi-5 match-57",
+      ]);
+      // Sa pause échue, le match refusé est réessayé.
+      jest.setSystemTime(NOW + LIVE_ANNOUNCE_RETRY_DELAY_MS + 1_000);
+      query.mockResolvedValue([[held]]);
+      expect(await dispatchLiveAnnouncements()).toBe(1);
     } finally {
       jest.useRealTimers();
     }
