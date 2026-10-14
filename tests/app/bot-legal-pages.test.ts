@@ -483,6 +483,9 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(en).toContain("(time, reminder, removal from a match)");
     expect(fr).toContain("« un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026");
     expect(en).toContain("a player can turn off those about their matches (time, reminder, removal from a match) in “My profile”");
+    // Objection to the solo #live username = not registering (user decision 2026-10-14).
+    expect(fr).toContain("Exception : le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire");
+    expect(en).toContain("Exception: a player's username in the #live announcement of a solo tournament — objecting to it means not registering");
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (début d'un match diffusé : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (start of a streamed match: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
