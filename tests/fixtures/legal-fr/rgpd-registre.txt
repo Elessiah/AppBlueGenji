@@ -309,6 +309,7 @@ Utilisateur exclu, qui reçoit le motif de son exclusion en message privé quand
 Membres du salon où /scrim ou /recrute est utilisée (réponse publique de la commande)
 Membres du rôle d'arbitrage de chaque serveur qui en a défini un (/set-referee-role), pour les alertes d'arbitrage du site
 Membres des serveurs partenaires, qui lisent les annonces relayées
+Membres du serveur Discord de l'association, qui lisent l'annonce des matchs diffusés dans le salon #live (traitement T16)
 Administrateurs de tout serveur où le bot est installé (y compris un serveur créé pour l'y inviter) et titulaires du rôle d'administration du bot (/set-bot-admin), pour la liste des exclusions du réseau (/ban-list, réponse visible du seul demandeur) — l'exclusion vaut pour tout le réseau, chaque serveur doit savoir qui ne peut plus y publier
 Discord (plateforme d'exécution)
 Transferts hors UE

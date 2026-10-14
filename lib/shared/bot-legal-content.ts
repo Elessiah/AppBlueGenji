@@ -571,7 +571,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Rectification** : faire corriger une donnée inexacte.",
               "**Effacement** : faire supprimer vos données ; certaines fonctions du Bot peuvent alors ne plus vous être rendues.",
               "**Limitation** : faire geler l'utilisation d'une donnée le temps d'examiner une contestation.",
-              "**Opposition** : vous opposer, pour des raisons tenant à votre situation particulière, à un traitement fondé sur l'intérêt légitime.",
+              "**Opposition** : vous opposer, pour des raisons tenant à votre situation particulière, à un traitement fondé sur l'intérêt légitime. Exception : le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande (formulaire « Signaler un problème » du site, catégorie RGPD).",
             ],
           },
           {
@@ -778,7 +778,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Rectification**: have inaccurate data corrected.",
               "**Erasure**: have your data deleted; some Bot features may then no longer be available to you.",
               "**Restriction**: have the use of data frozen while a dispute is examined.",
-              "**Objection**: object, on grounds relating to your particular situation, to processing based on legitimate interest.",
+              "**Objection**: object, on grounds relating to your particular situation, to processing based on legitimate interest. Exception: a player's username in the #live announcement of a solo tournament — objecting to it means not registering; a past announcement is deleted on request (the website's “Report a problem” form, GDPR category).",
             ],
           },
           {

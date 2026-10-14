@@ -420,6 +420,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Members of the channel where /scrim or /recrute is used (public reply of the command)",
       "Members of the refereeing role of each server that has set one (/set-referee-role), for the site's refereeing alerts",
       "Members of partner servers, who read the relayed announcements",
+      "Members of the association's Discord server, who read the announcement of streamed matches in the #live channel (processing activity T16)",
       "Administrators of any server where the bot is installed (including a server created to invite it there) and holders of the bot administration role (/set-bot-admin), for the network's list of exclusions (/ban-list, reply visible only to the requester) — the exclusion applies to the whole network, each server must know who can no longer post there",
       "Discord (execution platform)",
     ],
