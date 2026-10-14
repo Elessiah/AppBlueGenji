@@ -520,9 +520,19 @@ function scheduleTrailingSweep(delayMs: number): void {
   trailingAt = at;
   trailingTimer = setTimeout(() => {
     trailingTimer = null;
-    void dispatchLiveAnnouncements();
+    // Une échéance plus lointaine a pu céder la place à celle-ci : elle est
+    // reprogrammée, même si ce passage n'a rien lu (coupe-circuit, panne).
+    void dispatchLiveAnnouncements().finally(rearmPendingRetries);
   }, Math.max(0, delayMs));
   trailingTimer.unref?.();
+}
+
+/** Reprogramme la relève sur la prochaine fin de pause à venir (processus ou diffusion). */
+function rearmPendingRetries(): void {
+  const now = Date.now();
+  let next = retryNotBefore > now ? retryNotBefore : Number.POSITIVE_INFINITY;
+  for (const at of heldUntil.values()) if (at > now && at < next) next = at;
+  if (Number.isFinite(next)) scheduleTrailingSweep(next - now);
 }
 
 /**
