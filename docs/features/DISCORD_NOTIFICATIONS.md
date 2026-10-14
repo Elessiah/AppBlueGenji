@@ -537,7 +537,11 @@ manche du balayage ; entre-temps, une manche dont le rappel 24 h est pris n'est
 **pas relue** avant l'ouverture du palier 10 h (`WAITING_OFFSETS` : un `NOT
 EXISTS` par palier suivi d'un autre) — sans quoi chaque manche entre H-24 et
 H-10 serait relue, et sa marque `P1D` re-tentée, à chaque passage pendant
-14 heures.
+14 heures. Toutes les bornes de cette lecture sont des instants calculés par le
+processus (`now`, `inSeconds`), jamais `NOW()` : les horaires sont écrits à
+l'heure du processus (`mysql2` sans fuseau de connexion), et une base réglée
+sur un autre fuseau (UTC face à Paris) ouvrirait le palier 10 h six heures
+avant le match, quand le programme d'arbitrage partirait, lui, à 10 h.
 
 **Arbitres — `lib/server/tournaments/referee-digest.ts`.** Lancé par le même
 balayage (`dispatchDueMatchReminders`), **de front** avec les rappels, sous
@@ -561,7 +565,12 @@ en échec), la marge ne part pas seule : ses marques sont rendues
 clé unique, puis `(match_id, start_at) IN …`),
 et elle attend le programme que la prochaine manche due
 ouvrira — sinon elle serait citée en avance et la manche due en ouvrirait un
-second. Les réservations
+second. Juste avant l'envoi, les manches réservées sont **relues** en une
+instruction (`stillAsRead`) : une manche reprogrammée, retirée ou d'affiche
+changée **après** sa réservation (sa marque est alors effacée, et le nouvel
+horaire poussé aux arbitres) sort du programme — il ne lui renverrait pas
+l'ancienne heure ; la règle « pas de marge seule » s'applique ensuite. Une
+relecture en échec n'empêche pas l'envoi (les marques sont prises). Les réservations
 partent quatre à la fois (`inBatches`, comme le balayage) — une ronde suisse en
 compte des dizaines ; une réservation en échec ne retient pas les autres. La
 réservation est celle des paliers (`claimDatedMark`, `reminder-marks.ts`,
