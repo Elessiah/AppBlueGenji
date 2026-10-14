@@ -22,6 +22,7 @@ import {
   isCheckInOpen,
   normalizeIssueReportMessage,
   openedMatchReminders,
+  type MatchReminderContext,
 } from "@/lib/shared/discord-notifications";
 
 const START = new Date("2026-09-10T18:00:00Z");
@@ -455,7 +456,7 @@ describe("rappel de check-in", () => {
 
 describe("matchDmOptOutLine — dernière ligne de tout message privé de match (LEGAL-FOLLOWUP-444)", () => {
   const settingsUrl = `https://bluegenji.fr${MATCH_DM_SETTINGS_PATH}`;
-  const context = {
+  const context: MatchReminderContext = {
     tournamentName: "Coupe BlueGenji",
     tournamentUrl: "https://bluegenji.fr/tournois/7",
     matchDmSettingsUrl: settingsUrl,
@@ -464,13 +465,13 @@ describe("matchDmOptOutLine — dernière ligne de tout message privé de match 
     roundLabel: "Manche 2",
     startAt: START,
   };
-  const builders: ReadonlyArray<[string, (ctx: typeof context) => string]> = [
+  const builders: ReadonlyArray<[string, (ctx: MatchReminderContext) => string]> = [
     ["annonce d'horaire", (ctx) => buildMatchScheduleAnnouncement(ctx)],
     ["horaire reprogrammé", (ctx) => buildMatchScheduleAnnouncement(ctx, [], { rescheduled: true, previousStartAt: START })],
     ["horaire retiré", (ctx) => buildMatchScheduleClearedNotice(ctx)],
     ["Match retiré", (ctx) => buildMatchWithdrawnNotice(ctx)],
     ...MATCH_REMINDER_OFFSETS.map(
-      (offset): [string, (ctx: typeof context) => string] => [`rappel ${offset.key}`, (ctx) => buildMatchReminderMessage(offset, ctx)],
+      (offset): [string, (ctx: MatchReminderContext) => string] => [`rappel ${offset.key}`, (ctx) => buildMatchReminderMessage(offset, ctx)],
     ),
   ];
 
