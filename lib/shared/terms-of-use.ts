@@ -217,9 +217,11 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       "Pour une équipe, répondent aussi de ses contenus, en plus de leur auteur : le **propriétaire** du nom, du sigle et de la description de l'équipe, qu'il est seul à pouvoir modifier ; le propriétaire et les **gérants** de son logo, qu'ils peuvent l'un et l'autre changer. Une **équipe fantôme**, créée et gérée par le staff de l'association pour un tournoi, n'a pas de propriétaire : l'association répond de ses contenus.",
     ],
   },
-  // Précision, et non règle de fond nouvelle : la retransmission figurait déjà
-  // à la licence ci-dessus et à la politique de confidentialité. Elle ne change
-  // donc pas `TERMS_VERSION` (aucune nouvelle acceptation demandée).
+  // Née comme précision (la retransmission figurait déjà à la licence ci-dessus
+  // et à la politique de confidentialité), sans changer `TERMS_VERSION`. La règle
+  // de l'annonce #live d'un tournoi individuel (`STREAM_NOTICE_LIVE`), elle, a
+  // fait passer les conditions en version 4 (décision du 2026-10-14) : une
+  // modification de fond de cet article demande une nouvelle version.
   {
     id: "retransmission",
     title: "Retransmission des matchs",
