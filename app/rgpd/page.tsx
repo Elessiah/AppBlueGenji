@@ -634,8 +634,9 @@ function RgpdFr({
               d&apos;utilisation, pour ne pas vous les représenter. Elles ne contiennent qu&apos;un
               numéro de version : une nouvelle version vous les présente de nouveau.
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
-              numéro de version, à la création de votre compte, puis à une connexion où vous venez de
-              les accepter sur la page de connexion (une acceptation seulement gardée par le navigateur,
+              numéro de version, quand vous les acceptez : à la création de votre compte ou d&apos;une
+              équipe, pour gérer une équipe, ou à une connexion où vous venez de les
+              accepter sur la page de connexion (une acceptation seulement gardée par le navigateur,
               peut-être celle d&apos;une autre personne, n&apos;est pas reportée sur un compte existant).
             </li>
             <li>

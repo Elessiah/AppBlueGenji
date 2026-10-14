@@ -590,7 +590,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Acceptance of the terms of use",
     purpose: "Keeping proof that the site's terms of use have been accepted, and which version of them",
     subPurposes: [
-      "Collecting acceptance when the account is created, when a team is created and when the management of a team is received",
+      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received and at a login where the terms have just been accepted on the login page (an acceptance only kept by the browser is not carried over to an existing account)",
       "Asking for acceptance again when the terms change version",
     ],
     legalBasis: "Performance of the service requested by the player (contract)",

@@ -493,9 +493,10 @@ export function RgpdEn({
               set on the login page <strong>when you continue</strong> after reading the information about your
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
-              on our servers, with its version number, when your account is created, then at a login where you have
-              just accepted them on the login page (an acceptance only kept by the browser, possibly another
-              person&apos;s, is not carried over to an existing account).
+              on our servers, with its version number, when you accept them: when your account or a team is created,
+              to manage a team, or at a login where you have just accepted them on the
+              login page (an acceptance only kept by the browser, possibly another person&apos;s, is not carried
+              over to an existing account).
             </li>
             <li>
               <strong>Service worker and “bg-offline” cache</strong> — the site installs in your browser,{" "}
