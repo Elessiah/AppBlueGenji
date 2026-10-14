@@ -32,7 +32,7 @@ const SCOPE_EN: Record<string, string> = {
   "présentation aux joueurs et au caster de ton match, à son lancement":
     "presentation to the players and caster of your match, at its launch",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
-  [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request",
+  [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request, and AutoMod alert for such an announcement when blocked, kept in the moderators' alert channel until they delete it or on request",
 };
 
 /** Data and purpose of each `DONNEES_PROFIL` row, same order. */
@@ -83,7 +83,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Match direct messages choice",
-    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches; unticked in My profile (your objection), it no longer does. Included in the export of your data, reset to the default if the account is anonymized",
+    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches; unticked in My profile (your objection), it no longer does. Kept in your legitimate interest: that is what allows your objection to be honoured. Included in the export of your data, reset to the default if the account is anonymized",
   ],
 ];
 

@@ -14,7 +14,7 @@ export const MATCH_TIME_DM_SCOPE = "annonces d'horaire, rappels et avis de retra
  * service auquel il s'inscrit (décision du 2026-10-14), pas l'intérêt légitime
  * — d'où aucune opposition autre que ne pas s'inscrire.
  */
-export const LIVE_PSEUDO_SCOPE = "annonce #live d'un tournoi individuel, gardée dans le salon Discord jusqu'à sa suppression sur demande";
+export const LIVE_PSEUDO_SCOPE = "annonce #live d'un tournoi individuel, gardée dans le salon Discord jusqu'à sa suppression sur demande, et alerte AutoMod d'une telle annonce bloquée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande";
 
 /**
  * Bases légales citées par la politique — les mêmes que le registre
@@ -172,7 +172,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // `bg_users.match_dm_enabled` : l'opposition aux messages privés de match
     // (registre T04), exportée et remise au défaut à l'anonymisation.
     finalite:
-      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs ; décoché dans Mon profil (ton opposition), il ne le fait plus. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
     base: "Intérêt légitime",
     duree: "Durée du compte",
   },
