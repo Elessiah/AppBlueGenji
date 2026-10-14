@@ -246,7 +246,11 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   fantôme nommé par le staff) — seul un pseudo de compte part. Plusieurs affiches d'un tournoi individuel s'énumèrent comme
   celles d'équipes. Si aucune ne porte de nom publiable, le texte compte les
   matchs (« N matchs »). Une entrée individuelle dans le groupe fait lire le
-  tournoi comme individuel, même au type illisible. L'exception s'arrête à
+  tournoi comme individuel, même au type illisible. **Inscriptions d'avant** :
+  le pseudo n'est lu que pour une inscription (`bg_tournament_registrations.registered_at`)
+  faite depuis la publication du changement de confidentialité qui l'annonce
+  (`soloPseudoRegisteredSince`, `publishedAt` de `2026-10-pseudo-live-et-messages-de-match`) :
+  un joueur inscrit sous l'ancienne mention reste « un joueur ». L'exception s'arrête à
   #live : quand le texte nomme un joueur, le site joint `logMessage`, le même
   texte **sans pseudo** (« un joueur »), que le bot cite à la place de
   `message` dans son canal de logs quand l'annonce échoue (version du bot qui
