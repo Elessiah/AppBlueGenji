@@ -43,7 +43,8 @@ deux fonctions :
   suivi d'une lettre ou d'un chiffre : une équipe `https://faux-site.gg` ne
   devient ni lien cliquable ni aperçu) ;
 - `discordQuote(value)` — texte libre sur plusieurs lignes (signalement d'un
-  problème) : mêmes neutralisations (`visibleText` ligne à ligne), chaque ligne **citée** (`> `) pour qu'aucune
+  problème) : mêmes neutralisations (`visibleText` ligne à ligne) sauf les
+  adresses, qui restent cliquables (une capture citée en preuve), chaque ligne **citée** (`> `) pour qu'aucune
   ne se fasse passer pour une ligne rédigée par le site.
 
 Points d'application : `entrantLabel` (toutes les lignes de journal, alertes
