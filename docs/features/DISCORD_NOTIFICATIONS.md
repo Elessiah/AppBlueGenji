@@ -536,10 +536,11 @@ H-10 serait relue, et sa marque `P1D` re-tentée, à chaque passage pendant
 14 heures.
 
 **Arbitres — `lib/server/tournaments/referee-digest.ts`.** Lancé par le même
-balayage (`dispatchDueMatchReminders`), **de front** avec les rappels
-(`Promise.allSettled` : il n'attend pas les envois aux joueurs, un bot lent ne
-le retarde pas), échec indépendant — une table absente se tait, comme au
-balayage. Chaque passage n'exécute d'abord qu'une **sonde** d'une ligne
+balayage (`dispatchDueMatchReminders`), **de front** avec les rappels et sous
+**son propre verrou** (`pendingDigest`) : il n'attend pas les envois aux joueurs
+(un bot lent ne le retarde pas), et le balayage suivant n'attend pas les
+appareils du staff ; un seul programme à la fois. Échec indépendant — une table
+absente se tait, comme au balayage. Chaque passage n'exécute d'abord qu'une **sonde** d'une ligne
 (`DIGEST_DUE_PROBE`, `LIMIT 1`) : la marge n'est lue et jointe que si une
 manche est due.
 Dès qu'une manche non encore citée entre dans ses 10 dernières heures
@@ -548,7 +549,12 @@ des 12 prochaines heures (marge `REFEREE_DIGEST_GROUPING_MS` de 2 h : une
 soirée échelonnée tient en un message), dans l'ordre du coup d'envoi. Chaque
 manche citée reçoit la marque `REFS` (`REFEREE_DIGEST_KEY`), réservée avant
 l'envoi pour son horaire et son affiche : citée une fois par horaire ;
-reprogrammée ou d'affiche changée, elle est citée de nouveau. Les réservations
+reprogrammée ou d'affiche changée, elle est citée de nouveau. Si aucune manche
+**due** n'a été prise (déplacée entre la lecture et la réservation, réservation
+en échec), la marge ne part pas seule : ses marques sont rendues
+(`releaseDatedMarks`), et elle attend le programme que la prochaine manche due
+ouvrira — sinon elle serait citée en avance et la manche due en ouvrirait un
+second. Les réservations
 partent quatre à la fois (`inBatches`, comme le balayage) — une ronde suisse en
 compte des dizaines ; une réservation en échec ne retient pas les autres.
 Canaux :
