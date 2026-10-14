@@ -274,7 +274,9 @@ export function RgpdEn({
           — subject to the encrypted backup copies (**), which erase themselves after {BACKUP_RETENTION_DAYS}{" "}
           days, to the record of the deletion in the log that replays it after a restoration (account number and
           creation date, {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days), and to the reports you sent, detached
-          from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>);
+          from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
+          the #live announcements of a solo tournament, which keep your username in the Discord channel until they
+          are deleted on request (<a href="#retransmission">“Match streaming”</a>);
           for a staff member, their refereeing actions remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (

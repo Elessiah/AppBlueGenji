@@ -861,7 +861,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     retention: [
       "Direct : la diffusion n'est pas conservée par le site, qui n'en garde que le lien de la chaîne",
       "Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée",
-      "Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), posée avant l'envoi, retirée pour un nouvel essai quand le bot était indisponible, sinon effacée avec le match ; le message est conservé dans le salon tant que le salon #live existe, et supprimé sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème », catégorie RGPD)",
+      "Annonce sur Discord : le site ne garde qu'une trace de l'annonce (le match, les identifiants de ses deux engagés et sa date), posée avant l'envoi, retirée pour un nouvel essai quand le bot était indisponible, sinon effacée avec le match ; le message est conservé dans le salon tant que le salon #live existe, même après la suppression du compte du joueur, et supprimé sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème », catégorie RGPD)",
       "Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée ; l'annonce #live d'un tournoi individuel garde le pseudo public : s'y opposer revient à ne pas s'inscrire",
     ],
     recipients: [

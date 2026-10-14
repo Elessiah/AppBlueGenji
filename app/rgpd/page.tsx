@@ -380,7 +380,9 @@ function RgpdFr({
           après une restauration (numéro et date de création du compte,{" "}
           {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), et des signalements que vous avez
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
-          <a href="#signalements">« Signalements »</a>) ; pour un membre du staff, ses gestes
+          <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
+          individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
+          demande (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de

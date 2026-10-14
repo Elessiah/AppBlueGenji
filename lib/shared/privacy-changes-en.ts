@@ -391,7 +391,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "In a solo tournament, the announcement of a streamed match in the #live channel now names the players by their username; you can turn off the Discord direct messages about your matches from “My profile”.",
     details: [
       "#live announcement, solo tournament: your public BlueGenji username replaces “a player” (a username, never your first name or Discord identifier). A team match still names only the teams. The site's other Discord messages still carry no player username. The neutral name obtained by objecting applies to the stream only: to stay unnamed in #live, don't register.",
-      "These announcements stay in the channel as long as it exists; the team or player concerned can ask for their deletion (“Report a problem”, “GDPR” category).",
+      "These announcements stay in the channel as long as it exists, even after your account is deleted; the team or player concerned can ask for their deletion (“Report a problem”, “GDPR” category).",
       "Match direct messages (time set, changed or removed, reminders, the “Match retiré” notice): legitimate interest, with a right to object. Untick “Discord direct messages about my matches” in “My profile”, Notifications section, to stop receiving them; your push notifications keep their own settings. The site keeps this choice for the life of the account, in your data export.",
       "Referee alerts and the refereeing schedule, sent to referees and administrators, fall under performance of the service and are not turned off this way.",
     ],
