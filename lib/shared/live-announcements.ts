@@ -51,19 +51,16 @@ export interface LiveAnnouncementGroup {
  */
 export const LIVE_ANNOUNCEMENT_MAX_LENGTH = 1500;
 
-/** Un engagé nommé, neutralisé ; « un joueur » sans nom publiable. */
-function entrantName(name: string | null): string {
-  if (name === null) return ANONYMOUS_PLAYER_LABEL;
+/** Un engagé nommé, neutralisé ; `null` sans nom publiable (absent ou vide une fois neutralisé). */
+function publishableName(name: string | null): string | null {
+  if (name === null) return null;
   const inline = discordInline(name);
-  return inline === "" ? ANONYMOUS_PLAYER_LABEL : inline;
+  return inline === "" ? null : inline;
 }
 
-/** Affiche dont aucun engagé n'a de nom publiable. */
-const ANONYMOUS_PAIRING = `${ANONYMOUS_PLAYER_LABEL} contre ${ANONYMOUS_PLAYER_LABEL}`;
-
-/** Affiche « A contre B », noms neutralisés. */
-function pairingLine(pairing: LiveAnnouncementPairing): string {
-  return `${entrantName(pairing.team1Name)} contre ${entrantName(pairing.team2Name)}`;
+/** Affiche « A contre B », noms neutralisés ; « un joueur » sans nom publiable. */
+function pairingLine(first: string | null, second: string | null): string {
+  return `${first ?? ANONYMOUS_PLAYER_LABEL} contre ${second ?? ANONYMOUS_PLAYER_LABEL}`;
 }
 
 /** « 1 autre match » / « 3 autres matchs ». */
@@ -84,16 +81,21 @@ function otherMatches(count: number): string {
 export function formatLiveAnnouncementGroup(group: LiveAnnouncementGroup): string {
   const tournament = discordInline(group.tournamentName);
   const count = group.pairings.length;
+  // Chaque nom neutralisé une seule fois ; l'anonymat se lit sur les noms, pas
+  // sur le texte : un pseudo public « un joueur » reste un nom publiable.
+  const names = group.pairings.map(
+    (pairing): [string | null, string | null] => [publishableName(pairing.team1Name), publishableName(pairing.team2Name)],
+  );
   if (count === 1) {
-    return `🔴 En direct : ${pairingLine(group.pairings[0])} — ${tournament}`;
+    return `🔴 En direct : ${pairingLine(names[0][0], names[0][1])} — ${tournament}`;
   }
   // Aucun nom publiable (invités, comptes supprimés) : « un joueur contre un
   // joueur » répété ne dirait rien, le texte compte les matchs.
-  if (group.pairings.every((pairing) => pairingLine(pairing) === ANONYMOUS_PAIRING)) {
+  if (names.every(([first, second]) => first === null && second === null)) {
     return `🔴 En direct : ${count} matchs — ${tournament}`;
   }
   const header = `🔴 En direct — ${tournament} :`;
-  const lines = group.pairings.map((pairing) => `\n• ${pairingLine(pairing)}`);
+  const lines = names.map(([first, second]) => `\n• ${pairingLine(first, second)}`);
   const full = header + lines.join("");
   if (full.length <= LIVE_ANNOUNCEMENT_MAX_LENGTH) return full;
   // Trop long : autant d'affiches que possible, puis une ligne qui compte le
