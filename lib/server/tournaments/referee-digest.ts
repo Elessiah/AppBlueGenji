@@ -56,6 +56,8 @@ type DigestRow = RowDataPacket & {
   team2_id: number;
   team1_name: string;
   team2_name: string;
+  team1_solo_user_id: number | null;
+  team2_solo_user_id: number | null;
 };
 
 /**
@@ -85,7 +87,8 @@ const DIGEST_DUE_PROBE = `SELECT 1 AS due ${DIGEST_FROM} LIMIT 1`;
 const DIGEST_SELECT = `SELECT m.id, m.tournament_id, m.start_at, m.team1_id, m.team2_id,
             m.bracket, m.round_number, ${swissRoundSql("m", "t")},
             t.name AS tournament_name, t.participant_type,
-            t1.name AS team1_name, t2.name AS team2_name
+            t1.name AS team1_name, t2.name AS team2_name,
+            t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id
        ${DIGEST_FROM}
       ORDER BY m.start_at, m.id`;
 
@@ -240,7 +243,13 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
   }
 
   const matches = claimed.map((row) => {
-    const participantType = toParticipantType(row.participant_type);
+    // Une entrée solo porte le nom de son joueur : « un joueur » même si le
+    // type du tournoi était illisible (`toParticipantType` retombe sur TEAM) —
+    // un pseudo ne part jamais au canal de logs (même règle que #live).
+    const participantType =
+      row.team1_solo_user_id != null || row.team2_solo_user_id != null
+        ? "SOLO"
+        : toParticipantType(row.participant_type);
     return {
       matchId: Number(row.id),
       tournament: { id: Number(row.tournament_id), name: String(row.tournament_name) },
