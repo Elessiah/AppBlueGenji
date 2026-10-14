@@ -240,7 +240,10 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
-- **Production seulement, sur le site public** (`NODE_ENV=production` **et**
+- **Production seulement, activée explicitement, sur le site public**
+  (`NODE_ENV=production`, **`LIVE_ANNOUNCEMENTS_ENABLED=1`** — posée par le
+  seul `.env` de production, un tunnel https donnant un vrai nom de domaine à
+  un poste —, **et**
   `APP_URL` en `https` sur un nom de domaine — ni adresse IP, boucle locale ou
   réseau privé, ni nom d'un seul mot, ni suffixe local ou de test : `.localhost`,
   `.test`, `.local`, `.internal`, `.lan`, `.home.arpa`, `.invalid`, `.example`) : une base de développement ne fait jamais écrire

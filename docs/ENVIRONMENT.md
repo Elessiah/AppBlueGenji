@@ -28,4 +28,5 @@ TRUSTED_PROXY_REAL_IP=false  # optional — n'accepter `X-Real-IP` que si le pro
 VAPID_PUBLIC_KEY=  # optional — notifications push (`npm run push:keys`) ; absent = push éteint
 VAPID_PRIVATE_KEY=  # à ne jamais changer une fois en production (clé gravée dans chaque abonnement)
 VAPID_SUBJECT=  # optional — `mailto:` ou `https:` ; défaut : APP_URL si elle est en https
+LIVE_ANNOUNCEMENTS_ENABLED=  # production seulement — `1` : annonces @everyone des matchs diffusés dans #live (docs/features/LIVE_STREAMS.md) ; jamais sur un poste
 ```
