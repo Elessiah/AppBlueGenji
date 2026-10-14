@@ -53,6 +53,7 @@ import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } 
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { parisInstant } from "@/lib/shared/match-start-entry";
 import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import type { MatchStatus } from "@/lib/shared/types";
@@ -157,11 +158,20 @@ const SOLO_PSEUDO_PRIVACY_CHANGE_ID = "2026-10-pseudo-live-et-messages-de-match"
  * « un joueur, jamais un pseudo » et ne peut plus « ne pas s'inscrire » : son
  * entrée reste « un joueur » jusqu'au bout du tournoi. Changement introuvable :
  * aucun pseudo ne part.
+ *
+ * @returns Minuit à Paris du jour de publication, en secondes Unix — comparé à
+ *   `UNIX_TIMESTAMP(registered_at)`, qui lit la date dans le fuseau de la
+ *   session : le seuil ne dépend pas du fuseau du serveur de base.
  */
-export function soloPseudoRegisteredSince(): string | null {
+export function soloPseudoRegisteredSince(): number | null {
   const change = PRIVACY_CHANGES.find((entry) => entry.id === SOLO_PSEUDO_PRIVACY_CHANGE_ID);
-  return change ? `${change.publishedAt} 00:00:00` : null;
+  if (!change) return null;
+  const [year, month, day] = change.publishedAt.split("-").map(Number);
+  return parisInstant(year, month, day, 0, 0) / 1000;
 }
+
+/** Seuil d'un changement introuvable : aucune inscription ne l'atteint (9999-12-31). */
+const NEVER_REGISTERED_SINCE = 253_402_300_799;
 
 /**
  * Matchs castés, jouables, d'un tournoi en cours, passés à l'antenne depuis
@@ -173,10 +183,10 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
   // Le pseudo n'est lu que pour une inscription faite sous la mention qui
   // l'annonce (`soloPseudoRegisteredSince`) ; sinon `NULL`, « un joueur ».
-  const since = soloPseudoRegisteredSince() ?? "9999-12-31 00:00:00";
+  const since = soloPseudoRegisteredSince() ?? NEVER_REGISTERED_SINCE;
   const registeredSince = (alias: string) =>
     `EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.tournament_id = m.tournament_id
-               AND r.team_id = ${alias}.id AND r.registered_at >= ?)`;
+               AND r.team_id = ${alias}.id AND UNIX_TIMESTAMP(r.registered_at) >= ?)`;
   const [rows] = await db.query<LiveCandidateRow[]>(
     `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
             t.live_url AS tournament_live_url, m.status, m.start_at, m.live_trigger,
