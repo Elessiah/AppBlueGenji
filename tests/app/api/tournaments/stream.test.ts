@@ -556,9 +556,38 @@ describe("GET /api/tournaments/[id]/stream — annonce des lives au battement", 
     expect(dispatchLiveAnnouncements).toHaveBeenCalled();
   });
 
-  it("ne le charge même pas hors production", async () => {
+  it("ne le relance pas hors production", async () => {
     await oneHeartbeat();
     expect(dispatchLiveAnnouncements).not.toHaveBeenCalled();
+  });
+
+  /** Instantané d'un tournoi dans l'état et aux dates donnés. */
+  function cardSnapshot(card: Record<string, unknown>): TournamentSnapshot {
+    const snapshot = snapshotWith([]);
+    return { ...snapshot, card: { ...snapshot.card, ...card } } as TournamentSnapshot;
+  }
+
+  it("un onglet resté sur un tournoi terminé ou à venir ne relit rien", async () => {
+    jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    for (const card of [
+      { state: "FINISHED" },
+      { state: "UPCOMING", registrationOpenAt: future, registrationCloseAt: future, startAt: future },
+    ]) {
+      jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(cardSnapshot(card));
+      await oneHeartbeat();
+    }
+    expect(dispatchLiveAnnouncements).not.toHaveBeenCalled();
+  });
+
+  it("relance le balayage d'un tournoi parti depuis l'ouverture du flux, d'après ses dates", async () => {
+    jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
+    const past = new Date(Date.now() - 3_600_000).toISOString();
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(
+      cardSnapshot({ state: "REGISTRATION", registrationOpenAt: past, registrationCloseAt: past, startAt: past }),
+    );
+    await oneHeartbeat();
+    expect(dispatchLiveAnnouncements).toHaveBeenCalled();
   });
 });
 

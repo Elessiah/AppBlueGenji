@@ -10,6 +10,7 @@ import { getDatabase } from "@/lib/server/database";
 import { isBotCircuitOpen, pushLiveAnnouncement } from "@/lib/server/bot-integration";
 import {
   LIVE_ANNOUNCE_MAX_AGE_MINUTES,
+  LIVE_ANNOUNCE_RETRY_DELAY_MS,
   dispatchLiveAnnouncements,
   liveAnnouncementsEnabled,
   resetLiveAnnouncementThrottle,
@@ -171,7 +172,10 @@ describe("runLiveAnnouncementSweep", () => {
     expect(LIVE_ANNOUNCE_MAX_AGE_MINUTES).toBe(120);
     // Chaque mode lit sa propre colonne de passage à l'antenne.
     expect(sql).toContain("m.live_trigger = 'AUTO' AND m.launched_at > NOW() - INTERVAL 120 MINUTE");
-    expect(sql).toContain("m.live_trigger = 'START_TIME' AND (m.start_at > NOW() - INTERVAL 120 MINUTE");
+    // Un `START_TIME` à venir n'est pas lu : il n'est pas à l'antenne.
+    expect(sql).toContain(
+      "m.live_trigger = 'START_TIME' AND m.start_at <= NOW() AND (m.start_at > NOW() - INTERVAL 120 MINUTE",
+    );
     expect(sql).toContain("m.live_trigger = 'MANUAL' AND m.live_started_at > NOW() - INTERVAL 120 MINUTE");
     // `START_TIME` devenu jouable après son heure : son lancement, pour l'affiche courante, compte.
     expect(sql).toContain(
@@ -406,10 +410,11 @@ describe("runLiveAnnouncementSweep", () => {
     expect(releasesOf(execute)).toEqual([]);
   });
 
-  it("ne réserve rien tant que le coupe-circuit du bot est ouvert", async () => {
+  it("ne lit ni ne réserve rien tant que le coupe-circuit du bot est ouvert", async () => {
     jest.mocked(isBotCircuitOpen).mockReturnValue(true);
-    const { execute } = mockDb([AUTO_LIVE]);
+    const { query, execute } = mockDb([AUTO_LIVE]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(query).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -436,6 +441,40 @@ describe("dispatchLiveAnnouncements", () => {
     await dispatchLiveAnnouncements();
     await dispatchLiveAnnouncements();
     expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("après une annonce reportée, attend une minute avant de redemander au bot", async () => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
+      const { query } = mockDb([{ ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() }]);
+      await dispatchLiveAnnouncements();
+      expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
+      // Passé l'étranglement de dix secondes, la pause tient encore.
+      jest.setSystemTime(NOW + 30_000);
+      expect(await dispatchLiveAnnouncements()).toBe(0);
+      expect(query).toHaveBeenCalledTimes(1);
+      // À son terme, la relève reprend seule, sans nouvel appel.
+      jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
+      await jest.advanceTimersByTimeAsync(LIVE_ANNOUNCE_RETRY_DELAY_MS);
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(pushLiveAnnouncement).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("une annonce publiée ne met aucune pause : le passage suivant suit l'étranglement seul", async () => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const { query } = mockDb([]);
+      await dispatchLiveAnnouncements();
+      jest.setSystemTime(NOW + 11_000);
+      await dispatchLiveAnnouncements();
+      expect(query).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("n'échoue jamais : une panne de lecture rend 0", async () => {
