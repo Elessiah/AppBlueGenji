@@ -48,6 +48,15 @@ describe("discordInline", () => {
     }
   });
 
+  it("retire commandes de direction et invisibles d'un nom ancien avant de neutraliser", () => {
+    // U+202E retournerait le reste de la ligne ; U+200C glissé dans « :// »
+    // contournerait la neutralisation des adresses.
+    expect(discordInline("Equipe\u202E A")).toBe("Equipe A");
+    const out = discordInline("https:/\u200C/fauxnitro.gg");
+    expect(out).not.toMatch(/[a-z]+:\/\//i);
+    expect(out.replace(/\u200B/g, "")).toBe("https://fauxnitro.gg");
+  });
+
   it("garde un nom ordinaire tel quel, ponctuation comprise", () => {
     expect(discordInline("Team 2. Les Bleus : saison 1")).toBe("Team 2. Les Bleus : saison 1");
   });

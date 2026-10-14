@@ -77,7 +77,7 @@ function releasesOf(execute: Db["execute"]): unknown[] {
 beforeEach(() => {
   jest.clearAllMocks();
   resetLiveAnnouncementThrottle();
-  jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production", APP_URL: "https://site.example" });
+  jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production", APP_URL: "https://site-public.fr" });
   jest.mocked(isBotCircuitOpen).mockReturnValue(false);
   jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
   jest.spyOn(console, "info").mockImplementation(() => undefined);
@@ -253,6 +253,16 @@ describe("runLiveAnnouncementSweep", () => {
     expect(line).toContain("son envoi peut encore aboutir");
     // Aucune consigne de la poster à la main : l'envoi du bot peut encore partir.
     expect(line).not.toContain("à la main");
+  });
+
+  it("jeton interne refusé : rend la réservation, et pm2 désigne la configuration, pas le bot", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("unauthorized");
+    const { execute } = mockDb([AUTO_LIVE]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+    const line = String(jest.mocked(console.warn).mock.calls[0][0]);
+    expect(line).toContain("jeton interne refusé ou absent");
+    expect(line).not.toContain("injoignable");
   });
 
   it("bot tombé avant sa réponse (redémarrage) : garde la réservation, pas de second @everyone", async () => {
@@ -494,6 +504,11 @@ describe("dispatchLiveAnnouncements", () => {
     ["sur un nom .test", "https://bluegenji.test"],
     ["en http", "http://site.example"],
     ["illisible", "site.example"],
+    ["sur un réseau privé", "https://192.168.1.20"],
+    ["sur une adresse IPv6", "https://[fd00::1]"],
+    ["un nom de machine d'un seul mot", "https://poste-dev"],
+    ["localhost. avec un point final", "https://localhost."],
+    ["sur un nom .lan", "https://bluegenji.lan"],
   ])("ne fait rien en production si APP_URL est %s", async (_label, appUrl) => {
     jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production", APP_URL: appUrl });
     const { query } = mockDb([AUTO_LIVE]);

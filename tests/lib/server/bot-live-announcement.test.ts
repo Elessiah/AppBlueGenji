@@ -114,15 +114,34 @@ describe("pushLiveAnnouncement", () => {
   });
 
   it("un autre 503 du bot (configuration) n'accuse pas le salon #live", async () => {
-    jest
-      .spyOn(global, "fetch")
-      .mockResolvedValue(Response.json({ error: "INTERNAL_API_TOKEN_NOT_CONFIGURED" }, { status: 503 }));
-    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
-    jest.spyOn(global, "fetch").mockResolvedValue(new Response("panne", { status: 503 }));
+    jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ error: "PANNE" }, { status: 503 }));
     await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unavailable");
     // Un bot antérieur, sans raison : salon fermé, comme avant.
     jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE" }, { status: 503 }));
     await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("channel-closed");
+  });
+
+  it("rend « unauthorized » sur un jeton refusé (401) ou absent du bot, sans ouvrir le coupe-circuit", async () => {
+    for (let i = 0; i < 4; i++) {
+      jest.spyOn(global, "fetch").mockResolvedValueOnce(Response.json({ error: "UNAUTHORIZED" }, { status: 401 }));
+      await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unauthorized");
+    }
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValueOnce(Response.json({ error: "INTERNAL_API_TOKEN_NOT_CONFIGURED" }, { status: 503 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("unauthorized");
+    // Une configuration fausse ne suspend pas les rappels et alertes de fond.
+    expect(isBotCircuitOpen()).toBe(false);
+  });
+
+  it("un 503 au corps illisible garde la réservation : il pouvait dire « discord-down »", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValueOnce(new Response("{\"error\":\"LIVE_CHAN", { status: 503 }));
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("uncertain");
+    // Délai écoulé en lisant le corps : le bot a pu publier, ou publie encore.
+    const timedOut = new Response("{}", { status: 503 });
+    jest.spyOn(timedOut, "json").mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
+    jest.spyOn(global, "fetch").mockResolvedValueOnce(timedOut);
+    await expect(pushLiveAnnouncement("x", "https://twitch.tv/bg", "c")).resolves.toBe("timed-out");
   });
 
   it("rend « channel-closed » pour une raison de salon ou de permission", async () => {

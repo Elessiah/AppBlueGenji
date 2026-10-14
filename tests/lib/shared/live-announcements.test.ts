@@ -146,6 +146,29 @@ describe("formatLiveAnnouncementGroup", () => {
   });
 });
 
+describe("liveAnnouncementUrl — redirections", () => {
+  it("refuse une page de redirection ou une adresse glissée dans le lien, même sur un hôte autorisé", () => {
+    for (const url of [
+      "https://www.youtube.com/redirect?q=https://piege.example",
+      "https://www.youtube.com/redirect?q=https%3A%2F%2Fpiege.example",
+      "https://www.youtube.com/attribution_link?u=/watch%3Fv%3Dabc",
+      "https://www.twitch.tv/bluegenji?r=https://piege.example",
+    ]) {
+      expect(liveAnnouncementUrl(url, null)).toBeNull();
+    }
+  });
+
+  it("se replie sur la chaîne officielle quand le lien du match est refusé", () => {
+    expect(
+      liveAnnouncementUrl("https://www.youtube.com/redirect?q=https://piege.example", "https://www.twitch.tv/bluegenji"),
+    ).toBe("https://www.twitch.tv/bluegenji");
+  });
+
+  it("garde une diffusion ordinaire, requête comprise", () => {
+    expect(liveAnnouncementUrl("https://www.youtube.com/watch?v=abc&t=60", null)).toBe("https://www.youtube.com/watch?v=abc&t=60");
+  });
+});
+
 describe("liveAnnouncementUrl", () => {
   it("préfère la diffusion du match", () => {
     expect(liveAnnouncementUrl("https://twitch.tv/caster", "https://twitch.tv/bluegenji")).toBe("https://twitch.tv/caster");
