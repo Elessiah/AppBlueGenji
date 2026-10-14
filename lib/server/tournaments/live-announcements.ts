@@ -420,28 +420,20 @@ async function announce(group: AnnouncementGroup): Promise<{ posted: number; pos
   const participantType = group.rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
     ? "SOLO"
     : first.participant_type;
-  const tournamentName = String(first.tournament_name);
-  const message = formatLiveAnnouncementGroup({
-    tournamentName,
-    pairings: group.rows.map((row) => ({
-      team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, row.team1_pseudo, participantType),
-      team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, row.team2_pseudo, participantType),
-    })),
-  });
-  // Ce que le bot cite à son canal de logs si l'annonce échoue : le même texte,
-  // pseudos ôtés — l'exception du pseudo vaut pour #live seulement.
-  const logMessage = formatLiveAnnouncementGroup({
-    tournamentName,
-    pairings: group.rows.map((row) => ({
-      team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, null, participantType),
-      team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, null, participantType),
-    })),
-  });
+  // `withPseudo: false` : ce que le bot cite à son canal de logs si l'annonce
+  // échoue — le même texte, pseudos ôtés : l'exception vaut pour #live seulement.
+  const text = (withPseudo: boolean) =>
+    formatLiveAnnouncementGroup({
+      tournamentName: String(first.tournament_name),
+      pairings: group.rows.map((row) => ({
+        team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, withPseudo ? row.team1_pseudo : null, participantType),
+        team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, withPseudo ? row.team2_pseudo : null, participantType),
+      })),
+    });
+  const message = text(true);
+  const logMessage = text(false);
   const { label, context, plural } = describeGroup(group);
-  const outcome =
-    logMessage === message
-      ? await pushLiveAnnouncement(message, group.url, context)
-      : await pushLiveAnnouncement(message, group.url, context, logMessage);
+  const outcome = await pushLiveAnnouncement(message, group.url, context, ...(logMessage === message ? [] : [logMessage]));
   if (outcome === "posted" || outcome === "posted-silent") {
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner @everyone absente)" : "";

@@ -135,6 +135,9 @@ export async function getFullProfile(
   const viewerIsAdmin = Boolean(viewer.isAdmin);
   const canModerate = can(viewer, "moderation");
   const db = await getDatabase();
+  // Lue pour son seul titulaire : une migration en échec ne casse pas la fiche
+  // publique d'un joueur (`/joueurs/[id]`), qui n'en a pas l'usage.
+  const matchDmColumn = viewerId === targetUserId ? "match_dm_enabled," : "";
 
   const [userRows] = await db.execute<(UserRow & { locale: string; match_dm_enabled?: number | null })[]>(
     `SELECT
@@ -156,7 +159,7 @@ export async function getFullProfile(
       platform_roles_json,
       is_deleted,
       locale,
-      match_dm_enabled,
+      ${matchDmColumn}
       created_at
     FROM bg_users
     WHERE id = ?
