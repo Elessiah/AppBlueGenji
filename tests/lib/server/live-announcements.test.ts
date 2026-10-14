@@ -381,6 +381,26 @@ describe("runLiveAnnouncementSweep", () => {
     expect(shown.length + Number(match![2])).toBe(60);
   });
 
+  it("un report vaut pour les groupes suivants du passage : rendus sans appeler le bot", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
+    const { execute } = mockDb([
+      AUTO_LIVE,
+      { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4", live_url: "https://www.twitch.tv/autre" },
+      { ...AUTO_LIVE, id: 42, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" },
+    ]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
+    expect(releasesOf(execute)).toEqual([
+      [40, "1:2"],
+      [41, "3:4"],
+      [42, "5:6"],
+    ]);
+    // Chaque match reporté garde sa trace pm2, avec la cause constatée.
+    const warned = jest.mocked(console.warn).mock.calls.map(([text]) => String(text));
+    expect(warned).toHaveLength(3);
+    for (const text of warned) expect(text).toContain("salon #live fermé au bot");
+  });
+
   it("un groupe reporté s'accorde au pluriel", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
     mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" }]);

@@ -22,6 +22,7 @@ import {
   joinTournamentRoom,
   resetTournamentBroadcast,
   tournamentAudience,
+  tournamentRoomCard,
 } from "@/lib/server/tournament-broadcast";
 import { publishTournamentEvent } from "@/lib/server/live";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
@@ -178,6 +179,21 @@ describe("tournament-broadcast — diffusion", () => {
     await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs + 10);
 
     expect(viewer.received).toEqual(["data: v1", "data: v2"]);
+  });
+
+  it("tient la fiche du dernier instantané : un tournoi terminé depuis l'ouverture se lit terminé", async () => {
+    expect(tournamentRoomCard(1)).toBeNull();
+    const viewer = subscriber();
+    const leave = joinTournamentRoom(1, viewer.handle, frameOf("v1").snapshot);
+    expect(tournamentRoomCard(1)?.state).toBe("RUNNING");
+
+    getFrame.mockResolvedValue(frameOf("v2", 32, { state: "FINISHED" }));
+    publish();
+    await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs + 10);
+    expect(tournamentRoomCard(1)?.state).toBe("FINISHED");
+
+    leave();
+    expect(tournamentRoomCard(1)).toBeNull();
   });
 
   it("ne diffuse rien à une salle vide", async () => {
