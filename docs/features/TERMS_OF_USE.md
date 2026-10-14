@@ -28,8 +28,11 @@ modale vient d'être acceptée dans la page : sans eux, l'acceptation relue du
 navigateur suffit à créer un compte mais n'écrit pas de preuve `LOGIN` pour un
 compte existant (revue sécurité de #445), et ne vaut « dans la page » que dix
 minutes (`ACCEPTED_NOW_TTL_MS`, durée d'un aller-retour OAuth), lues à l'horloge
-au moment du clic (un minuteur s'arrête pendant une mise en veille) : un onglet
-resté ouvert sur un ordinateur partagé ne la prête pas à la personne suivante. Un lien saisi sur le site et
+au moment du départ (un minuteur s'arrête pendant une mise en veille). Les liens
+affichés ne portent jamais `termsNow` : seul un clic simple l'ajoute
+(`termsAtClick`, `window.location.assign`) ; clic du milieu, nouvel onglet ou
+glisser partent sans. Un onglet resté ouvert sur un ordinateur partagé ne prête
+donc pas l'acceptation à la personne suivante. Un lien saisi sur le site et
 rendu cliquable (lien « Postuler » d'une annonce, site d'un partenaire, page
 d'origine d'un signalement) ne peut pas viser une route d'API (`leadsToApi`, à
 l'enregistrement et à l'affichage) — le contact Discord d'une annonce ne devient
