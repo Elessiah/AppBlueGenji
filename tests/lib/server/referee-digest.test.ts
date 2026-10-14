@@ -47,7 +47,7 @@ function mockDb(
   const query = jest.fn<SqlQuery>(async (sql, params) => {
     if (/AS tournament_state/.test(sql)) {
       if (current instanceof Error) throw current;
-      return [current.map((match) => ({ status: "READY", tournament_state: "RUNNING", ...match }))];
+      return [current.map((match) => ({ status: "READY", tournament_state: "RUNNING", marked: 1, ...match }))];
     }
     if (!/LIMIT 1/.test(sql)) return [rows];
     const until = ((params as unknown[])[1] as Date).getTime();
@@ -276,7 +276,8 @@ describe("dispatchRefereeDigest", () => {
     const [sql, params] = query.mock.calls[2] as [string, unknown[]];
     expect(sql).toMatch(/FROM bg_matches m JOIN bg_tournaments t ON t\.id = m\.tournament_id\s+WHERE m\.id IN \(\?, \?\)$/);
     expect(sql).toMatch(/m\.status, t\.state AS tournament_state/);
-    expect(params).toEqual([1, 2]);
+    expect(sql).toMatch(/r\.offset_key = \? AND r\.start_at = m\.start_at\) AS marked/);
+    expect(params).toEqual(["REFS", 1, 2]);
   });
 
   it("ne cite pas une manche reprogrammée après sa réservation", async () => {
@@ -298,8 +299,10 @@ describe("dispatchRefereeDigest", () => {
       [],
       [
         row(1, 9),
-        row(2, 9.5, { team2_id: 999 }),
-        row(3, 9.8, { start_at: null }),
+        // Affiche changée, horaire retiré : leur marque est déjà effacée.
+        row(2, 9.5, { team2_id: 999, marked: 0 }),
+        row(3, 9.8, { start_at: null, marked: 0 }),
+        // Jouée, tournoi clos : la marque reste, elle est rendue.
         row(4, 9.9, { status: "AWAITING_CONFIRMATION" }),
         row(5, 9.95, { tournament_state: "FINISHED" }),
       ] as ReturnType<typeof row>[],
@@ -307,29 +310,33 @@ describe("dispatchRefereeDigest", () => {
 
     expect(await dispatchRefereeDigest(NOW)).toBe(1);
 
-    // Un retrait n'efface aucune marque : rendue ici (pour l'horaire lu), une
-    // manche reposée au même horaire sera citée de nouveau.
     const release = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE")) as [string, unknown[]];
-    expect(release[1]).toEqual([
-      ...[2, 3, 4, 5],
-      "REFS",
-      ...[2, 9.5, 3, 9.8, 4, 9.9, 5, 9.95].map((value, index) => (index % 2 === 0 ? value : row(0, value).start_at)),
-    ]);
+    expect(release[1]).toEqual([4, 5, "REFS", 4, row(4, 9.9).start_at, 5, row(5, 9.95).start_at]);
   });
 
   it("rend les marques de la marge quand la manche due a été déplacée après sa réservation", async () => {
-    const { execute } = mockDb([row(1, 9), row(2, 11)], [], [row(1, 13), row(2, 11)]);
+    // Reprogrammée : sa marque est effacée par la reprogrammation.
+    const { execute } = mockDb([row(1, 9), row(2, 11)], [], [row(1, 13, { marked: 0 }), row(2, 11)]);
 
     expect(await dispatchRefereeDigest(NOW)).toBe(0);
 
     expect(notifyStaff).not.toHaveBeenCalled();
-    // La manche déplacée, pour son ancien horaire (sans effet si sa
-    // reprogrammation l'a déjà effacée), puis la marge laissée seule.
+    // Seule la marge laissée seule est rendue : la marque de la manche
+    // déplacée n'est plus là.
     const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE")) as [string, unknown[]][];
-    expect(releases.map(([, params]) => params)).toEqual([
-      [1, "REFS", 1, row(1, 9).start_at],
-      [2, "REFS", 2, row(2, 11).start_at],
-    ]);
+    expect(releases.map(([, params]) => params)).toEqual([[2, "REFS", 2, row(2, 11).start_at]]);
+  });
+
+  it("ne cite pas une manche dont la marque a été effacée pendant le programme, même revenue à son horaire", async () => {
+    // Horaire retiré puis reposé à l'identique pendant les réservations : la
+    // marque n'est plus là, le programme suivant citera la manche — une fois.
+    const { execute } = mockDb([row(1, 9), row(2, 9.5)], [], [row(1, 9), row(2, 9.5, { marked: 0 })]);
+
+    expect(await dispatchRefereeDigest(NOW)).toBe(1);
+
+    expect(await publishedLine()).not.toContain("Renards 2");
+    // Rien à rendre : la marque n'est plus là.
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
   });
 
   it("envoie quand même si la relecture échoue : les marques sont prises", async () => {
