@@ -166,11 +166,13 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   pour une cause passagère — bot injoignable ou d'une version antérieure,
   salon fermé, refus lié à l'état du salon ou Discord sans réponse en lisant
   le salon (`503` `send-rejected`, `discord-unreachable`), panne (`500`) — et
-  le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS`,
-  pour tout le processus : la même cause renverrait le même refus ; après un
-  bot indisponible ou un salon fermé, les groupes suivants du même passage
-  sont rendus sans appel au bot — un refus de Discord, qui peut tenir au
-  message, n'arrête pas les autres) tant que
+  le balayage réessaie **une minute plus tard** (`LIVE_ANNOUNCE_RETRY_DELAY_MS` :
+  la même cause renverrait le même refus). Après un bot indisponible, un salon
+  fermé ou Discord muet en lisant le salon (`discord-unreachable`), la pause
+  vaut pour tout le processus et les groupes suivants du même passage sont
+  rendus sans appel au bot ; après un refus de Discord (`discord-held`, qui
+  peut tenir au message), elle ne vaut que pour les matchs du groupe, et les
+  autres tournois partent sans attendre. Le tout tant que
   le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un blocage par
   AutoMod (`503` `automod` : le même message serait bloqué de nouveau, et
