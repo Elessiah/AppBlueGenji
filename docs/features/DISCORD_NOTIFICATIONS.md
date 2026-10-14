@@ -509,7 +509,9 @@ chacun, engagées solo comprises — « Ton match »). Le message ajoute
 coup d'envoi sur Discord — <invitation> ». L'invitation est **une** constante,
 `CHECK_IN_INVITE_URL` dans `lib/shared/discord.ts` (seul fichier autorisé à
 écrire une invitation, `discord-invite-single-source.test.ts`), réexportée par
-`discord-notifications.ts` ; `CHECK_IN_OPENS_MINUTES_BEFORE = 15`, que le
+`discord-notifications.ts`. Elle mène au même serveur que `DISCORD_INVITE_URL`
+mais ouvre directement le salon de check-in (confirmé le 2026-10-14) : les deux
+constantes restent ; `CHECK_IN_OPENS_MINUTES_BEFORE = 15`, que le
 message privé et le push (`matchReminder.checkIn`, paramètre `{minutes}`)
 lisent tous deux. À moins de 15 minutes du coup d'envoi (manche programmée au
 dernier moment, balayage tardif), « ouvre 15 minutes avant » désignerait un
