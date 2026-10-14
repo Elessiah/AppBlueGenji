@@ -10,7 +10,7 @@ import {
   SUPPORT_TICKET_RETENTION_MONTHS,
   WEB_ACCESS_LOG_RETENTION_DAYS,
 } from "@/lib/shared/processing-register";
-import { SITE_MINIMUM_AGE } from "@/lib/shared/terms-of-use";
+import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_UPDATED_AT, TERMS_VERSION, formatTermsDate } from "@/lib/shared/terms-of-use";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import { MATCH_REMINDER_LOOKAHEAD_MS } from "@/lib/shared/discord-notifications";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
@@ -1014,7 +1014,28 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
     expect(declared()).toMatch(/« Mon profil », section Notifications/);
     expect(declared()).toMatch(/dans ton intérêt légitime/);
     expect(declared()).not.toMatch(/obligation légale/);
-    expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/rgpd#retransmission", "/rgpd#messages-de-match"]);
+    expect((entry.links ?? []).map(({ href }) => href)).toEqual([
+      "/rgpd#retransmission",
+      "/rgpd#messages-de-match",
+      TERMS_PATH,
+    ]);
+  });
+
+  // Seul canal qui touche chaque compte une fois (modale à la page suivante,
+  // message privé sinon) : la modale des conditions ne s'ouvre d'elle-même
+  // qu'aux gérants d'équipe, celle de `/connexion` qu'à la connexion suivante.
+  it("prévient chaque compte que les conditions d'utilisation ont changé, version et date en vigueur", () => {
+    expect(entry.audience).toBeUndefined();
+    expect(entry.title).toMatch(/conditions d'utilisation mises à jour/);
+    expect(entry.summary).toMatch(new RegExp(`conditions d'utilisation passent en version ${TERMS_VERSION}`));
+    const terms = entry.details.find((detail) => detail.startsWith("Conditions d'utilisation"));
+    expect(terms).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
+    expect(terms).toMatch(/prochaine connexion/);
+    expect(entry.links?.at(-1)).toEqual({ href: TERMS_PATH, label: "Lire les conditions d'utilisation" });
+    expect(english.title).toMatch(/terms of use updated/);
+    expect(english.summary).toMatch(new RegExp(`terms of use move to version ${TERMS_VERSION}`));
+    expect(english.details.at(-1)).toMatch(new RegExp(`version ${TERMS_VERSION}, in force since 14 October 2026`));
+    expect(english.linkLabels?.at(-1)).toBe("Read the terms of use");
   });
 
   it("se traduit détail pour détail et lien pour lien", () => {
