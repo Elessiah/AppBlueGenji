@@ -264,7 +264,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   salon existe ; supprimé sur demande de l'équipe ou du joueur concerné
   (« Signaler un problème », catégorie RGPD) — registre T16 (pseudo publié déclaré
   en catégorie de données), `/rgpd`, et la fenêtre de suppression du compte
-  (`deletion.residual`), qui le rappelle au joueur. Le bot préfixe `@everyone` et n'autorise que cette mention
+  (`deletion.residual`), qui le rappelle au joueur ; les conditions d'utilisation
+  (section « Retransmission des matchs », `STREAM_NOTICE_LIVE` / `_EN`) disent que
+  le nom neutre ne couvre pas cette annonce. Le bot préfixe `@everyone` et n'autorise que cette mention
   (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
