@@ -573,7 +573,8 @@ instruction (`stillAsRead`, manche, état du tournoi et présence de sa marque) 
 une manche reprogrammée, retirée, d'affiche changée, jouée (score saisi) ou
 d'un tournoi clos **après** sa réservation sort du programme — il ne
 renverrait pas l'ancienne heure après le nouvel horaire poussé aux arbitres.
-Une marque encore là (jouée, tournoi clos) est rendue pour l'horaire lu
+Une marque qui tient encore l'horaire lu (jouée, tournoi clos, manche déplacée
+dans le passé — une date passée n'efface rien) est rendue pour cet horaire
 (`releaseDigestMarks`) ; une marque déjà effacée (reprogrammation, retrait,
 affiche changée — même revenue depuis à l'horaire lu) sort aussi la manche :
 le programme suivant la citera, la citer ici la dirait deux fois. La règle
