@@ -397,6 +397,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the “Match streaming” paragraph", "Read the “Match Discord direct messages” paragraph"],
   },
+  "2026-10-base-pseudo-live-et-automod": {
+    title: "Your username in #live: legal basis clarified",
+    summary:
+      "In a solo tournament, your username in the #live announcement rests on performance of the service you register for, not on legitimate interest; an AutoMod block may pass its text on to the Discord server's moderators.",
+    details: [
+      "#live announcement of a solo tournament: your public username appears in it under performance of the service — the announcement is part of the tournament you register for — and no longer under legitimate interest. Nothing changes in practice: no neutral name for that announcement, not registering remains the way not to be named in it, and a past announcement is deleted on request (“Report a problem”, “GDPR” category).",
+      "If a Discord AutoMod rule blocks a #live announcement, its text (including your username in a solo tournament) may reach the moderation alert channel of the association's Discord server.",
+      "Match direct messages: each now ends with a line saying where to turn them off (“My profile”, Notifications section). The site keeps your choice in your legitimate interest: that is what lets it honour it.",
+    ],
+    linkLabels: ["Read the “Match streaming” paragraph", "Read the “Match Discord direct messages” paragraph"],
+  },
 };
 
 /**

@@ -58,9 +58,11 @@ import {
   openedMatchReminders,
   type MatchReminderOffset,
   type ScheduleAnnouncement,
+  MATCH_DM_SETTINGS_PATH,
 } from "@/lib/shared/discord-notifications";
 import { inBatches } from "@/lib/shared/in-batches";
 import { PLAYED_MATCH_STATUSES, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
+import { siteUrl } from "@/lib/server/site-url";
 import { tournamentPageUrl } from "./app-url";
 import { onPoster, toPoster, type PosterRow } from "./match-poster";
 import { dispatchRefereeDigest } from "./referee-digest";
@@ -528,6 +530,7 @@ async function sendToSide(
   const context = {
     tournamentName: String(match.tournament_name),
     tournamentUrl: tournamentPageUrl(Number(match.tournament_id)),
+    matchDmSettingsUrl: siteUrl(MATCH_DM_SETTINGS_PATH),
     teamName: side.teamName,
     opponentName: side.opponentName,
     roundLabel: matchRoundLabel(String(match.bracket), Number(match.round_number), swiss),
@@ -927,6 +930,7 @@ async function sendWithdrawnNotice(
   const context = {
     tournamentName: match.tournamentName,
     tournamentUrl: tournamentPageUrl(match.tournamentId),
+    matchDmSettingsUrl: siteUrl(MATCH_DM_SETTINGS_PATH),
     teamName,
     opponentName,
     roundLabel: matchRoundLabel(match.bracket, match.roundNumber, match.swiss),

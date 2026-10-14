@@ -10,7 +10,9 @@ export const MATCH_TIME_DM_SCOPE = "annonces d'horaire, rappels et avis de retra
 
 /**
  * Le pseudo public d'un joueur inscrit en tournoi individuel part dans
- * l'annonce #live (registre T16, intérêt légitime) et y survit au compte.
+ * l'annonce #live (registre T16) et y survit au compte. Base : l'exécution du
+ * service auquel il s'inscrit (décision du 2026-10-14), pas l'intérêt légitime
+ * — d'où aucune opposition autre que ne pas s'inscrire.
  */
 export const LIVE_PSEUDO_SCOPE = "annonce #live d'un tournoi individuel, gardée dans le salon Discord jusqu'à sa suppression sur demande";
 
@@ -58,7 +60,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil. Un compte créé par Google avant le 30 septembre 2026 a pu recevoir le nom de ton compte Google : si c'est le cas, remplace-le dans Mon profil",
     base: "Exécution du contrat",
-    extraBases: [{ base: "Intérêt légitime", scope: LIVE_PSEUDO_SCOPE }],
+    extraBases: [{ base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE }],
     duree: "Durée du compte",
   },
   {
@@ -237,7 +239,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels et avis de retrait de match en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil). Exception : le pseudo publié dans l'annonce #live d'un tournoi individuel — s'y opposer revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande.",
+    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels et avis de retrait de match en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande.",
   },
   {
     title: "Droit à la portabilité",

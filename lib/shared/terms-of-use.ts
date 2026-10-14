@@ -40,8 +40,14 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * (réexamen par l'association, puis le juge), base légale de la modération
  * et absence de médiateur de la consommation — la suspension et le recours
  * sont des règles de fond pour qui les subit, d'où une nouvelle acceptation.
+ *
+ * Version 4 : l'annonce #live d'un tournoi individuel nomme le joueur par son
+ * pseudo public au titre de l'exécution du service (pas de nom neutre, ne pas
+ * y être nommé = ne pas s'inscrire) — une règle de fond du tournoi auquel on
+ * s'inscrit ; mise en vigueur au 14 octobre 2026 sur décision de
+ * l'association, la version 3 datant du 1er octobre.
  */
-export const TERMS_VERSION = 3;
+export const TERMS_VERSION = 4;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -54,7 +60,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-10-01";
+export const TERMS_UPDATED_AT = "2026-10-14";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";

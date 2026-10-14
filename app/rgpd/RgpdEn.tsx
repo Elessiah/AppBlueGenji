@@ -794,7 +794,8 @@ export function RgpdEn({
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
             unticking “Discord direct messages about my matches” in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — your push notifications
-            keep their own settings. The site keeps this choice for the lifetime of the account; it appears in the
+            keep their own settings. The site keeps this choice for the lifetime of the account, in your legitimate
+            interest (that is what lets it honour the choice); it appears in the
             export of your data. Referee alerts and the refereeing schedule sent to referees and administrators fall
             under <strong>performance of the service</strong> and are not turned off this way (
             <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
@@ -887,9 +888,12 @@ export function RgpdEn({
             solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile, with no effect on an announcement already posted: unless changed, the Discord username or BattleTag
             taken when the account was created, or even the Google account name for a Google account created before
             September 30, 2026; never the numeric Discord identifier; “a player” for an entry without an account, a deleted account or a
-            registration made before 16 October 2026), the tournament&apos;s name and the stream link. The neutral name applies to
-            the stream only: a player who does not want their username in that announcement does not register for
-            the solo tournament. These announcements stay in
+            registration made before 16 October 2026), the tournament&apos;s name and the stream link. This username is not based on legitimate
+            interest but on <strong>performance of the service</strong>: the announcement is part of the solo
+            tournament the player registers for, and the neutral name applies to the stream only — a player who does
+            not want their username in that announcement does not register for the solo tournament. If a Discord
+            AutoMod rule blocks an announcement, its text (including the username in a solo tournament) may reach the
+            server moderators&apos; alert channel. These announcements stay in
             the channel as long as the #live channel exists; the team or player concerned can ask for their deletion
             through the “Report a problem” button, GDPR category.
           </p>

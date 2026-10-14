@@ -7,7 +7,7 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
-import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_VERSION, formatTermsDateIn } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 
 /** Ce que la modale annonce, dans l'ordre (messages `login.consent`). */
@@ -22,6 +22,11 @@ const CONSENT_ITEMS = [
 interface RgpdConsentModalProps {
   onAccept: () => void;
   onRefuse: () => void;
+  /**
+   * Le navigateur avait accepté une version antérieure des conditions : la
+   * modale revient parce qu'elles ont changé, et le dit (`consent.termsUpdated`).
+   */
+  termsUpdated?: boolean;
 }
 
 /**
@@ -47,7 +52,7 @@ interface RgpdConsentModalProps {
  * accepte (`TERMS_TRANSLATION_NOTE`). La politique de confidentialité est
  * traduite depuis le lot 7b-2 : son lien mène aussi à l'anglais.
  */
-export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentModalProps>) {
+export function RgpdConsentModal({ onAccept, onRefuse, termsUpdated = false }: Readonly<RgpdConsentModalProps>) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
   // données : le site n'a pas de formulaire d'inscription, un compte naît à la
   // première connexion — l'entrée de cette page est donc le seul endroit où les
@@ -104,6 +109,12 @@ export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentMod
         >
           {t("consent.title")}
         </h2>
+
+        {termsUpdated && (
+          <p style={{ color: "var(--ink)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
+            {t("consent.termsUpdated", { version: TERMS_VERSION, date: formatTermsDateIn(text.locale) })}
+          </p>
+        )}
 
         <p style={{ color: "var(--ink-mute)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
           {t("consent.intro")}

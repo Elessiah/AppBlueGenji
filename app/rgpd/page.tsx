@@ -966,7 +966,8 @@ function RgpdFr({
             sur l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
             tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
             mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
-            gardent leurs propres réglages. Le site garde ce choix le temps du compte ; il figure dans
+            gardent leurs propres réglages. Le site garde ce choix le temps du compte, dans votre intérêt
+            légitime (c&apos;est ce qui lui permet de l&apos;honorer) ; il figure dans
             l&apos;export de vos données. Les alertes et le programme d&apos;arbitrage adressés aux
             arbitres et administrateurs relèvent de l&apos;<strong>exécution du service</strong> et ne
             se coupent pas ainsi (<Link href="/rgpd/registre#t04">registre, T04</Link>).
@@ -1074,8 +1075,12 @@ function RgpdFr({
             BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant
             le 30 septembre 2026 ; jamais l&apos;identifiant Discord numérique ; « un joueur » pour une
             entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le
-            lien de la diffusion. Le nom neutre ne vaut que pour la diffusion : un joueur qui ne veut pas
-            voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Ces annonces
+            lien de la diffusion. Ce pseudo ne repose pas sur l&apos;intérêt légitime mais sur
+            l&apos;<strong>exécution du service</strong> : l&apos;annonce fait partie du tournoi individuel
+            auquel le joueur s&apos;inscrit, et le nom neutre ne vaut que pour la diffusion — un joueur qui
+            ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
+            une règle AutoMod de Discord bloque une annonce, son texte (pseudo compris en tournoi
+            individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur. Ces annonces
             restent dans le salon tant que le salon #live existe ;
             l&apos;équipe ou le joueur concerné peut en demander la suppression par le bouton « Signaler
             un problème », catégorie RGPD.

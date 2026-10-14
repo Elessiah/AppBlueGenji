@@ -49,6 +49,13 @@ const LEGACY_ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
  */
 const TERMS_STORAGE_KEY = "bg_terms_consent";
 
+/** La version gardée par le navigateur est-elle une version antérieure des conditions ? */
+function isEarlierTermsVersion(stored: string | null): boolean {
+  if (stored === null || !/^\d+$/.test(stored)) return false;
+  const version = Number(stored);
+  return version > 0 && version < TERMS_VERSION;
+}
+
 /**
  * Contrôles de la connexion par code. Le compte Discord garde le même `id` sur
  * les deux étapes : c'est le champ saisi à la première, montré figé à la
@@ -98,6 +105,9 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // `consentGiven` part à `true` pour ne pas faire clignoter la modale au
   // premier rendu : il ne dit donc rien tant que le stockage n'a pas été lu.
   const [consentRead, setConsentRead] = useState(false);
+  // Une version antérieure des conditions acceptée dans ce navigateur : la
+  // modale revient parce qu'elles ont changé, et le dit.
+  const [termsUpdated, setTermsUpdated] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -111,6 +121,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       // localStorage indisponible (mode privé) : la modale redemande.
     }
     setConsentGiven(stored === NOTICE_VERSION && terms === String(TERMS_VERSION));
+    setTermsUpdated(isEarlierTermsVersion(terms));
     setConsentRead(true);
   }, []);
 
@@ -473,6 +484,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         <RgpdConsentModal
           onAccept={acceptConsent}
           onRefuse={refuseConsent}
+          termsUpdated={termsUpdated}
         />
       )}
       {suspension && <SuspensionNoticeDialog notice={suspension} onClose={() => setSuspension(null)} />}
