@@ -951,40 +951,38 @@ describe("PRIVACY_CHANGES — rappel de check-in et programme d'arbitrage (#443)
 
 describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de match (RGPD-DM-SWITCH)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-pseudo-live-et-messages-de-match")!;
-  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+  const english = PRIVACY_CHANGES_EN["2026-10-pseudo-live-et-messages-de-match"];
 
-  it("est la dernière entrée, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
+  it("ferme la liste : datée du 16 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
-    expect(entry.publishedAt).toBe("2026-10-16");
-    expect(entry.audience).toBeUndefined();
-  });
-
-  it("déclare le pseudo publié, sa limite, la durée et la suppression sur demande", () => {
-    expect(text()).toMatch(/pseudo public BlueGenji remplace « un joueur »/);
-    expect(text()).toMatch(/jamais ton prénom ni ton identifiant Discord/);
-    expect(text()).toMatch(/Un match d'équipes ne nomme toujours que les équipes/);
-    expect(text()).toMatch(/tant qu'il existe/);
-    expect(text()).toMatch(/demander la suppression/);
-  });
-
-  it("dit les bases légales et l'interrupteur, push à part", () => {
-    expect(text()).toMatch(/intérêt légitime, avec un droit d'opposition/);
-    expect(text()).toMatch(/« Messages privés Discord de mes matchs »/);
-    expect(text()).toMatch(/notifications push gardent leurs propres réglages/);
-    expect(text()).toMatch(/exécution du service/);
-    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#retransmission", "/rgpd#notifications"]);
-  });
-
-  it("a son anglais, détail pour détail", () => {
-    const english = PRIVACY_CHANGES_EN[entry.id];
-    expect(english.details).toHaveLength(entry.details.length);
-    expect(english.linkLabels).toHaveLength(entry.links?.length ?? 0);
-    expect(english.details.join(" ")).toMatch(/right to object/);
-    expect(english.details.join(" ")).toMatch(/performance of the service/);
-  });
-
-  it("tient dans un message privé à elle seule", () => {
+    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 1);
+    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-16", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  });
+
+  it("déclare le pseudo publié et sa limite, la durée, la suppression sur demande, les bases légales et l'interrupteur", () => {
+    const declared = [entry.title, entry.summary, ...entry.details].join(" ");
+    for (const pattern of [
+      /pseudo public BlueGenji remplace « un joueur »/,
+      /jamais ton prénom ni ton identifiant Discord/,
+      /Un match d'équipes ne nomme toujours que les équipes/,
+      /tant qu'il existe/,
+      /demander la suppression/,
+      /intérêt légitime, avec un droit d'opposition/,
+      /« Messages privés Discord de mes matchs »/,
+      /notifications push gardent leurs propres réglages/,
+      /exécution du service/,
+    ]) {
+      expect(declared).toMatch(pattern);
+    }
+    expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/rgpd#retransmission", "/rgpd#notifications"]);
+  });
+
+  it("se traduit détail pour détail et lien pour lien", () => {
+    expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
+    const translated = english.details.join(" ");
+    for (const pattern of [/right to object/, /performance of the service/, /never your first name or Discord identifier/]) {
+      expect(translated).toMatch(pattern);
+    }
   });
 });
