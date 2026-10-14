@@ -569,13 +569,15 @@ clé unique, puis `(match_id, start_at) IN …`),
 et elle attend le programme que la prochaine manche due
 ouvrira — sinon elle serait citée en avance et la manche due en ouvrirait un
 second. Juste avant l'envoi, les manches réservées sont **relues** en une
-instruction (`stillAsRead`, manche et état du tournoi) : une manche
-reprogrammée, retirée, d'affiche changée, jouée (score saisi) ou d'un tournoi
-clos **après** sa réservation sort du programme — il ne renverrait pas
-l'ancienne heure après le nouvel horaire poussé aux arbitres — et sa marque est
-rendue pour l'horaire lu (`releaseDigestMarks`) : un retrait n'efface aucune
-marque, et une manche reposée au même horaire ne serait sinon plus jamais
-citée ; la règle « pas de marge seule » s'applique ensuite. Une
+instruction (`stillAsRead`, manche, état du tournoi et présence de sa marque) :
+une manche reprogrammée, retirée, d'affiche changée, jouée (score saisi) ou
+d'un tournoi clos **après** sa réservation sort du programme — il ne
+renverrait pas l'ancienne heure après le nouvel horaire poussé aux arbitres.
+Une marque encore là (jouée, tournoi clos) est rendue pour l'horaire lu
+(`releaseDigestMarks`) ; une marque déjà effacée (reprogrammation, retrait,
+affiche changée — même revenue depuis à l'horaire lu) sort aussi la manche :
+le programme suivant la citera, la citer ici la dirait deux fois. La règle
+« pas de marge seule » s'applique ensuite. Une
 relecture en échec n'empêche pas l'envoi (les marques sont prises). Fenêtre
 résiduelle acceptée : une reprogrammation pendant l'envoi lui-même (quelques
 secondes : appareils, bot) peut encore croiser le programme ; le push
