@@ -146,11 +146,14 @@ describe("runLiveAnnouncementSweep", () => {
     await runLiveAnnouncementSweep(NOW);
     const [sql, params] = query.mock.calls[0];
     const since = soloPseudoRegisteredSince();
-    expect(since).toBe(`${PRIVACY_CHANGES.find((c) => c.id === "2026-10-pseudo-live-et-messages-de-match")?.publishedAt} 00:00:00`);
+    const publishedAt = PRIVACY_CHANGES.find((c) => c.id === "2026-10-pseudo-live-et-messages-de-match")?.publishedAt;
+    // Minuit à Paris du jour de publication (heure d'été : 22 h UTC la veille), en secondes Unix.
+    expect(publishedAt).toBe("2026-10-16");
+    expect(since).toBe(Date.UTC(2026, 9, 15, 22, 0) / 1000);
     // Un joueur inscrit avant a lu « un joueur, jamais un pseudo » : son entrée le reste.
     for (const alias of ["t1", "t2"]) {
       expect(String(sql).replace(/\s+/g, " ")).toContain(
-        `EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.tournament_id = m.tournament_id AND r.team_id = ${alias}.id AND r.registered_at >= ?)`,
+        `EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.tournament_id = m.tournament_id AND r.team_id = ${alias}.id AND UNIX_TIMESTAMP(r.registered_at) >= ?)`,
       );
     }
     expect(params).toEqual([since, since]);
@@ -158,7 +161,7 @@ describe("runLiveAnnouncementSweep", () => {
 
   it("les textes légaux datent le seuil comme le changement publié (FR et EN)", () => {
     // Déplacer `publishedAt` déplace le seuil : ces textes doivent suivre.
-    expect(soloPseudoRegisteredSince()).toBe("2026-10-16 00:00:00");
+    expect(soloPseudoRegisteredSince()).toBe(Date.UTC(2026, 9, 15, 22, 0) / 1000);
     const t16 = (list: typeof PROCESSING_ACTIVITIES) => JSON.stringify(list.find((sheet) => sheet.ref === "T16"));
     expect(t16(PROCESSING_ACTIVITIES)).toContain("inscription antérieure au 16 octobre 2026");
     expect(t16(PROCESSING_ACTIVITIES_EN)).toContain("registration made before 16 October 2026");
