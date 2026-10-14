@@ -588,7 +588,7 @@ Canaux :
   compris : coupé au-delà, le push perdrait ces deux lignes et l'arbitre
   croirait la liste complète ; une seule ligne trop longue est raccourcie ; au-delà
   des lignes affichables, rien n'est mis en forme, le reste est compté), et
-  le corps garde ses retours à la ligne (`clipPushText(…, keepLines)`), puis « … et N autre(s) »
+  le corps garde ses retours à la ligne (`multiline: true` → `clipPushText(…, keepLines)` ; seul ce push les garde, les autres les replient : un nom porteur d'un retour à la ligne n'y ouvre pas de fausse ligne), puis « … et N autre(s) »
   (pluriel ICU), puis une dernière ligne « Heure de Paris » / « Paris time »
   (un arbitre à l'étranger lirait sinon son heure locale ; en dernier, car une
   notification repliée ne montre que la première ligne, qui reste un match) ; chaque ligne nomme
