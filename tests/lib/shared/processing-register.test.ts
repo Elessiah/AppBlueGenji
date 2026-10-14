@@ -128,6 +128,8 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*programme d'arbitrage/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
     expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque arbitre ou administrateur abonné/);
+    expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
+    expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);
     expect(t04.transfers.join(" ")).toMatch(/Discord \(acheminement des messages privés et du canal de logs\)/);
     expect(t04.transfers.join(" ")).toMatch(/service de push[^—]*— Google, Mozilla, Apple et Microsoft/);
     expect(byRef("T05").dataSubjects).toContain(
