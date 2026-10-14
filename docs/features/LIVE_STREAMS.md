@@ -262,7 +262,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   `message` dans son canal de logs quand l'annonce échoue (version du bot qui
   le lit requise : sans elle, la citation porterait les pseudos). **Conservation** : le message reste dans #live tant que le
   salon existe ; supprimé sur demande de l'équipe ou du joueur concerné
-  (« Signaler un problème », catégorie RGPD) — registre T16, `/rgpd`. Le bot préfixe `@everyone` et n'autorise que cette mention
+  (« Signaler un problème », catégorie RGPD) — registre T16 (pseudo publié déclaré
+  en catégorie de données), `/rgpd`, et la fenêtre de suppression du compte
+  (`deletion.residual`), qui le rappelle au joueur. Le bot préfixe `@everyone` et n'autorise que cette mention
   (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
