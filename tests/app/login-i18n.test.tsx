@@ -166,7 +166,8 @@ describe("liste blanche — la connexion est traduite", () => {
   it("la carte « Connexion requise » mène à la connexion de la langue lue, destination préfixe compris", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
     expect(gate).toContain("<LocaleLink href={loginHref}>{text.login}</LocaleLink>");
-    expect(gate).toMatch(/const destination = `\$\{pathname\}\$\{search\}`/);
+    expect(gate).toContain("const loginHref = authGateLoginHref(pathname, query, hash);");
+    expect(gate).toContain("const destination = pathname + search + anchor;");
     expect(gate).toContain("const pathname = usePathname();");
   });
 
@@ -474,7 +475,7 @@ describe("messages `login`", () => {
 describe("modale d'entrée — conditions mises à jour (LEGAL-FOLLOWUP-444)", () => {
   it("dit en français que les conditions ont changé, avec leur version et leur date", () => {
     const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "fr"));
-    expect(text).toContain(
+    expect(text.replace(/\s+/g, " ")).toContain(
       `Les conditions d'utilisation ont changé (version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDateIn("fr")}) : relis-les avant de les accepter de nouveau.`,
     );
     expect(formatTermsDateIn("fr")).toBe("14 octobre 2026");
@@ -482,10 +483,17 @@ describe("modale d'entrée — conditions mises à jour (LEGAL-FOLLOWUP-444)", (
 
   it("le dit en anglais sous /en", () => {
     const text = visibleText(render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "en"));
-    expect(text).toContain(
+    expect(text.replace(/\s+/g, " ")).toContain(
       `The terms of use have changed (version ${TERMS_VERSION}, in force since ${formatTermsDateIn("en")}): read them again before accepting them anew.`,
     );
     expect(formatTermsDateIn("en")).toBe("October 14, 2026");
+  });
+
+  it("« relis-les » / « read them again » mène aux conditions de la langue lue (revue UI/UX #445)", () => {
+    const fr = render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "fr");
+    expect(fr).toMatch(/<a [^>]*href="\/conditions-utilisation"[^>]*>relis-les<\/a>/);
+    const en = render(<RgpdConsentModal onAccept={() => undefined} onRefuse={() => undefined} termsUpdated />, "en");
+    expect(en).toMatch(/<a [^>]*href="\/en\/conditions-utilisation"[^>]*>read them again<\/a>/);
   });
 
   it("se tait à une première acceptation", () => {

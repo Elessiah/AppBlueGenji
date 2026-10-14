@@ -35,6 +35,8 @@ describe("AuthGate — l'ancre de la page demandée suit la connexion", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
     expect(gate).toContain('const [hash, setHash] = useState("");');
     expect(gate).toContain('addEventListener("hashchange", read)');
-    expect(gate).toContain("authGateLoginHref(pathname, searchParams.toString(), hash)");
+    // Relue à chaque navigation client (la mise en page reste montée ; pushState ne déclenche pas hashchange).
+    expect(gate).toContain("}, [pathname, query]);");
+    expect(gate).toContain("authGateLoginHref(pathname, query, hash)");
   });
 });

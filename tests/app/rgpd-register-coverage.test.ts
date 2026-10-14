@@ -52,6 +52,11 @@ describe("/rgpd — couverture du registre", () => {
     expect(page).toContain("d.extraBases?.map((extra) =>");
   });
 
+  it("une base supplémentaire identique à la principale (pseudo dans #live) n'affiche pas un second badge, FR comme EN (revue UI/UX #445)", () => {
+    expect(page).toContain("extra.base === d.base ? null :");
+    expect(readFileSync(join(process.cwd(), "app/rgpd/RgpdEn.tsx"), "utf8")).toContain("extra.base === entry.base ? null :");
+  });
+
   it("dit ce que le journal des connexions ne garde pas", () => {
     const connexions = page.slice(page.indexOf('id="donnees-connexion"'));
     expect(connexions).toMatch(/ni le port source de la connexion/);

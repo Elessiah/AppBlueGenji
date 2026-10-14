@@ -115,10 +115,11 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
     expect(modal).not.toMatch(/[^-]disabled=\{busy/);
     expect(modal).not.toContain("disabled={busy || !checked}");
-    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(2);
+    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(3);
     expect(modal).toContain("aria-busy={busy || undefined}");
-    // Case décochée hors requête seulement : décocher pendant l'envoi ne fait pas perdre le focus.
-    expect(modal).toContain("disabled={!checked && !busy}");
+    // La case est figée pendant l'envoi : « J'accepte » ne peut pas devenir nativement désactivé sous le focus.
+    expect(modal).toContain("if (!busy) setChecked(event.target.checked);");
+    expect(modal).toContain("disabled={!checked}");
   });
 
   it("au repos, « J'accepte » reste désactivé tant que la case n'est pas cochée", () => {
