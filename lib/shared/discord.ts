@@ -36,6 +36,13 @@ export const DISCORD_INVITE_URL = `https://discord.gg/${DISCORD_INVITE_CODE}`;
 export const CHECK_IN_INVITE_URL = "https://discord.gg/Sgdh3p4VhC";
 
 /**
+ * Chemin du site qui renvoie vers {@link CHECK_IN_INVITE_URL}
+ * (`app/check-in/route.ts`) : la cible du push qui porte le check-in, une
+ * notification n'ouvrant que des adresses du site.
+ */
+export const CHECK_IN_PATH = "/check-in";
+
+/**
  * Les invitations que le site a portées avant celle-ci.
  *
  * Elles ne sont pas là par nostalgie : le lien Discord de la page contact est

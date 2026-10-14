@@ -36,7 +36,8 @@ import {
   type ScheduleAnnouncement,
 } from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
-import { tournamentMatchHref } from "./match-anchor";
+import { CHECK_IN_PATH } from "./discord";
+import { tournamentHref, tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
 import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
@@ -219,7 +220,9 @@ export function matchReminderPush(
   return {
     title: announcementTitle(offset, change.rescheduled, text),
     body: checkIn ? `${body} ${text.t("matchReminder.checkIn", { invite: CHECK_IN_INVITE_URL })}` : body,
-    url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
+    // L'adresse écrite dans le texte ne se touche pas : le push du check-in
+    // ouvre l'invitation (par le site, seule origine qu'une notification ouvre).
+    url: checkIn ? CHECK_IN_PATH : localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-reminder`,
   };
 }
@@ -348,7 +351,11 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
 /** Une manche du programme d'arbitrage (`REFEREE_DIGEST`). */
 export type RefereeDigestMatch = {
   matchId: number;
+  tournamentId: number;
   tournamentName: string;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
   team1Name: string;
   team2Name: string;
   solo: boolean;
@@ -376,11 +383,13 @@ function digestTime(startAt: string | Date, locale: Locale): string {
 
 /**
  * Programme d'arbitrage (`REFEREE_DIGEST`) : les matchs à venir (ceux des
- * 10 prochaines heures et la marge de regroupement), un par ligne (heure de Paris, affiche, tournoi), dans
- * l'ordre du coup d'envoi. Équipes nommées ; en tournoi individuel, « Un
- * match » (aucun pseudo de joueur, comme partout). Le lien mène à la liste des
- * tournois ; l'étiquette est propre au programme (un programme suivant ne
- * remplace pas le précédent, qui liste d'autres matchs).
+ * 10 prochaines heures et la marge de regroupement), un par ligne (heure de
+ * Paris, affiche, tournoi et manche), dans l'ordre du coup d'envoi. Équipes
+ * nommées ; en tournoi individuel, « Un match » (aucun pseudo de joueur, comme
+ * partout) — la manche distingue alors les lignes. Le lien mène au tournoi
+ * quand le programme n'en cite qu'un, à la liste des tournois sinon.
+ * L'étiquette nomme toutes les manches citées : un programme suivant, qui en
+ * cite d'autres, ne remplace jamais le précédent sur l'appareil.
  */
 export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
@@ -391,15 +400,18 @@ export function refereeDigestPush(matches: readonly RefereeDigestMatch[], locale
         ? text.t("refereeDigest.pairingSolo")
         : text.t("pairing", { team: match.team1Name, opponent: match.team2Name }),
       tournament: match.tournamentName,
+      round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
     }),
   );
   const hidden = matches.length - shown.length;
   if (hidden > 0) shown.push(text.t("refereeDigest.more", { count: hidden }));
+  const tournaments = new Set(matches.map((match) => match.tournamentId));
+  const [onlyTournament] = tournaments;
   return {
     title: text.t("refereeDigest.title", { count: matches.length }),
     body: shown.join("\n"),
-    url: localeHref("/tournois", locale),
-    tag: `referee-digest-${matches[0]?.matchId ?? 0}`,
+    url: localeHref(tournaments.size === 1 ? tournamentHref(onlyTournament) : "/tournois", locale),
+    tag: `referee-digest-${matches.map((match) => match.matchId).join("-")}`,
   };
 }
 

@@ -303,8 +303,16 @@ export type RefereeDigestLogMatch = {
   startAt: string | Date;
 };
 
-/** Manches citées au plus par la ligne du programme (le canal borne un message). */
+/** Manches citées au plus par la ligne du programme. */
 export const REFEREE_DIGEST_LOG_ENTRIES = 12;
+
+/**
+ * Longueur que la ligne du programme ne dépasse jamais. Discord refuse un
+ * message de plus de 2 000 caractères — et le bot l'envoie tel quel, préfixé
+ * (`[AppBlueGenji] `) : refusé, le programme serait perdu, ses marques déjà
+ * posées. La marge couvre le préfixe.
+ */
+export const REFEREE_DIGEST_LOG_MAX_LENGTH = 1900;
 
 let digestTimeFormat: Intl.DateTimeFormat | null = null;
 
@@ -322,21 +330,34 @@ function digestTime(startAt: string | Date): string {
 /**
  * Programme d'arbitrage (`lib/server/tournaments/referee-digest.ts`) : les
  * matchs à venir (10 prochaines heures et marge de regroupement), **en une ligne** (règle 1), dans l'ordre du
- * coup d'envoi. Engagées par `entrantLabel` (« un joueur » en tournoi
- * individuel), tournoi par son nom et son identifiant. Aucun auteur : c'est le
- * site qui l'envoie, pas un geste du staff.
+ * coup d'envoi, bornée à {@link REFEREE_DIGEST_LOG_ENTRIES} manches et à
+ * {@link REFEREE_DIGEST_LOG_MAX_LENGTH} caractères (« … et N autres »).
+ * Engagées par `entrantLabel` (« un joueur » en tournoi individuel), tournoi
+ * par son nom et son identifiant. Aucun auteur : c'est le site qui l'envoie,
+ * pas un geste du staff.
  */
 export function formatRefereeDigestLog(matches: readonly RefereeDigestLogMatch[]): string {
-  const shown = matches.slice(0, REFEREE_DIGEST_LOG_ENTRIES).map(
-    (match) =>
+  const subject = `${matches.length} match${matches.length > 1 ? "s" : ""} à venir`;
+  const head = `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) : `;
+  const line = (shown: readonly string[]): string => {
+    const hidden = matches.length - shown.length;
+    const rest = hidden > 0 ? [`… et ${hidden} autre${hidden > 1 ? "s" : ""}`] : [];
+    return `${head}${[...shown, ...rest].join(" ; ")}.`;
+  };
+  // Autant de manches que la borne et la longueur le permettent, mention du
+  // reste comprise ; la première toujours, coupée s'il le faut.
+  const shown: string[] = [];
+  for (const match of matches.slice(0, REFEREE_DIGEST_LOG_ENTRIES)) {
+    const entry =
       `${digestTime(match.startAt)} ${entrantLabel(match.team1)} vs ${entrantLabel(match.team2)} ` +
-      `(${tournamentLabel(match.tournament)}, match #${match.matchId})`,
-  );
-  const hidden = matches.length - shown.length;
-  if (hidden > 0) shown.push(`… et ${hidden} autre${hidden > 1 ? "s" : ""}`);
-  const count = `${matches.length} match${matches.length > 1 ? "s" : ""}`;
-  const subject = `${count} à venir`;
-  return `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) : ${shown.join(" ; ")}.`;
+      `(${tournamentLabel(match.tournament)}, match #${match.matchId})`;
+    if (shown.length > 0 && line([...shown, entry]).length > REFEREE_DIGEST_LOG_MAX_LENGTH) break;
+    shown.push(entry);
+  }
+  const result = line(shown);
+  if (result.length <= REFEREE_DIGEST_LOG_MAX_LENGTH) return result;
+  // Coupe sans séparer une paire de substitution (émoji d'un nom).
+  return `${result.slice(0, REFEREE_DIGEST_LOG_MAX_LENGTH - 1).replace(/[\uD800-\uDBFF]$/, "")}…`;
 }
 
 /**

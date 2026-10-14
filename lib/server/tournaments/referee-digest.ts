@@ -37,6 +37,7 @@ import {
 import { PLAYED_MATCH_STATUSES } from "@/lib/shared/match-schedule";
 import { toParticipantType } from "@/lib/shared/participants";
 import { refereeDigestPush } from "@/lib/shared/push-messages";
+import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 type DigestRow = RowDataPacket & {
   id: number;
@@ -44,6 +45,9 @@ type DigestRow = RowDataPacket & {
   tournament_name: string;
   participant_type: string;
   start_at: Date | string;
+  bracket: string;
+  round_number: number;
+  swiss_round: number;
   team1_id: number;
   team2_id: number;
   team1_name: string;
@@ -52,6 +56,7 @@ type DigestRow = RowDataPacket & {
 
 /** Manches à venir non citées, deux engagées connues, jusqu'à la borne donnée. */
 const DIGEST_SELECT = `SELECT m.id, m.tournament_id, m.start_at, m.team1_id, m.team2_id,
+            m.bracket, m.round_number, ${swissRoundSql("m", "t")},
             t.name AS tournament_name, t.participant_type,
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
@@ -115,6 +120,9 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
       team1: { name: String(row.team1_name), participantType },
       team2: { name: String(row.team2_name), participantType },
       startAt: row.start_at,
+      bracket: String(row.bracket),
+      roundNumber: Number(row.round_number),
+      swiss: isSwissRound(row),
     };
   });
   const line = formatRefereeDigestLog(matches);
@@ -128,7 +136,11 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
       refereeDigestPush(
         matches.map((match) => ({
           matchId: match.matchId,
+          tournamentId: match.tournament.id,
           tournamentName: match.tournament.name,
+          bracket: match.bracket,
+          roundNumber: match.roundNumber,
+          swiss: match.swiss,
           team1Name: match.team1.name,
           team2Name: match.team2.name,
           solo: match.team1.participantType === "SOLO",

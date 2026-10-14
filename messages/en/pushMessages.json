@@ -104,7 +104,7 @@
   },
   "refereeDigest": {
     "title": "Refereeing schedule: {count, plural, one {# upcoming match} other {# upcoming matches}}",
-    "line": "{start} · {pairing} ({tournament})",
+    "line": "{start} · {pairing} ({tournament}, {round})",
     "more": "… and {count} more",
     "pairingSolo": "A match"
   }
