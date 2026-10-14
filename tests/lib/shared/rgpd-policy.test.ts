@@ -327,11 +327,15 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
     expect(pseudo?.extraBases).toEqual([{ base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE }]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
-      { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
+      { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request, and AutoMod alert for such an announcement when blocked, kept in the moderators' alert channel until they delete it or on request" },
     ]);
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
     expect(choice?.base).toBe("Intérêt légitime");
     expect(choice?.finalite).toMatch(/Figure dans l'export de tes données, remis au défaut si le compte est anonymisé/);
+    // Revue légale #445 : la ligne dit à qui profite l'intérêt légitime (le joueur), comme T04.
+    expect(choice?.finalite).toMatch(/Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/Kept in your legitimate interest: that is what allows your objection to be honoured/);
+    expect(LIVE_PSEUDO_SCOPE).toMatch(/alerte AutoMod d'une telle annonce bloquée, gardée dans le salon d'alertes des modérateurs/);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/reset to the default if the account is anonymized/);
   });
 
