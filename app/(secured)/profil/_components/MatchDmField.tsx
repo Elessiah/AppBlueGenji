@@ -28,18 +28,25 @@ const UNREACHABLE_ID = "profile-match-dms-unreachable";
  * contre le spam). À `false`, une ligne le dit et mène à la certification
  * (section Discord, `#discord`) ; `null` (état pas encore lu) : rien.
  *
- * `onStored` : la valeur enregistrée remonte à la page, qui en dépend ailleurs
- * (la confirmation du retrait du tag ne promet la fin de ces messages qu'à un
- * joueur qui les reçoit encore).
+ * `onChoice` : ce que montre la case (choix du joueur, puis valeur retenue)
+ * remonte à la page, qui en dépend ailleurs (la confirmation du retrait du tag
+ * ne promet la fin de ces messages qu'à un joueur qui les reçoit encore — y
+ * compris pendant l'envoi de son choix).
  */
+/** Toast du choix enregistré : « activés » ne promet rien sans tag certifié. */
+function outcomeMessage(enabled: boolean, discordReachable: boolean | null) {
+  if (!enabled) return "matchDms.disabled";
+  return discordReachable === false ? "matchDms.enabledNotCertified" : "matchDms.enabled";
+}
+
 export function MatchDmField({
   initial,
   discordReachable = null,
-  onStored,
+  onChoice,
 }: Readonly<{
   initial: boolean | undefined;
   discordReachable?: boolean | null;
-  onStored?: (enabled: boolean) => void;
+  onChoice?: (enabled: boolean) => void;
 }>): React.ReactElement | null {
   const text = useProfileText();
   const { t } = text;
@@ -50,6 +57,11 @@ export function MatchDmField({
   const setEnabled = (value: boolean) => {
     enabledRef.current = value;
     setEnabledState(value);
+  };
+  /** Changement venu d'un geste du joueur : affiché et remonté à la page. */
+  const showChoice = (value: boolean) => {
+    setEnabled(value);
+    onChoice?.(value);
   };
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -87,7 +99,7 @@ export function MatchDmField({
     const next = !enabledRef.current;
     if (busyRef.current) {
       queued.current = next;
-      setEnabled(next);
+      showChoice(next);
       return;
     }
     busyRef.current = true;
@@ -101,15 +113,13 @@ export function MatchDmField({
         queued.current = null;
         return choice;
       },
-      show: setEnabled,
+      show: showChoice,
     });
-    if (outcome.stored) {
-      setChosenHere(true);
-      onStored?.(outcome.saved);
-    }
+    if (outcome.stored) setChosenHere(true);
     // « Activés » / « désactivés » une fois, et seulement si le dernier choix
     // est enregistré : sinon la case reprend l'état gardé en base.
-    if (outcome.confirmed) showSuccess(t(outcome.saved ? "matchDms.enabled" : "matchDms.disabled"));
+    // Activés sans tag certifié : rien ne part encore, le toast le dit.
+    if (outcome.confirmed) showSuccess(t(outcomeMessage(outcome.saved, discordReachable)));
     busyRef.current = false;
     setBusy(false);
   };
