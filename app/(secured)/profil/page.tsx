@@ -135,6 +135,22 @@ function trimmedOrNull(value: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
+/**
+ * Corps de la confirmation « Retirer mon tag ». Seul un tag certifié reçoit
+ * les messages privés de match : la phrase qui dit qu'ils s'arrêtent ne
+ * s'affiche que pour lui — un tag qui ne l'est pas n'en reçoit déjà aucun.
+ */
+function TagRemovalBody({ verified }: Readonly<{ verified: boolean }>) {
+  const { t } = useProfileText();
+  return (
+    <>
+      <p>{t("discord.removalBody")}</p>
+      {verified ? <p>{t("discord.removalBodyDms")}</p> : null}
+      <p>{t("discord.removalBody2")}</p>
+    </>
+  );
+}
+
 export default function ProfilePage() {
   const router = useLocaleRouter();
   const { showError, showSuccess } = useToast();
@@ -1133,8 +1149,7 @@ export default function ProfilePage() {
           onClose={() => setConfirmingTagRemoval(false)}
           onConfirm={onDiscordTagRemove}
         >
-          <p>{t("discord.removalBody")}</p>
-          <p>{t("discord.removalBody2")}</p>
+          <TagRemovalBody verified={discordState.verified} />
         </ConfirmActionDialog>
       ) : null}
       {pendingDeletion ? (

@@ -107,7 +107,8 @@
     "removalTitle": "Retirer ton tag Discord ?",
     "removalConfirm": "Retirer mon tag",
     "removalPending": "Retrait…",
-    "removalBody": "L'organisation ne pourra plus te joindre sur Discord pendant un tournoi, et ta certification est perdue : le bot ne t'enverra plus non plus les messages privés de tes matchs.",
+    "removalBody": "L'organisation ne pourra plus te joindre sur Discord pendant un tournoi, et ta certification est perdue.",
+    "removalBodyDms": "Le bot ne t'enverra plus non plus les messages privés de tes matchs.",
     "removalBody2": "Ta prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera invisible de tous tant que tu ne le certifieras pas de nouveau.",
     "verifiedAlt": "Tag Discord vérifié",
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord."
