@@ -403,7 +403,7 @@
     "checking": "Checking…",
     "validate": "Confirm the code",
     "linked": "Discord linked by code.",
-    "certifyForDms": "Verify your tag (Discord section) to receive direct messages about your matches.",
+    "certifyForDms": "Verify your tag (Discord section): without verification, no match direct message reaches you.",
     "updated": "Discord username updated.",
     "codeSent": "Code sent by Discord direct message (expires at {time}).",
     "bodyLabel": "Discord username for the bot"
