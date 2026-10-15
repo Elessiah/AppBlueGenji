@@ -418,8 +418,8 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "To avoid spam, the bot now only sends the direct messages about your matches to accounts with a certified Discord tag; your push notifications don't change.",
     details: [
-      "Time set, changed or removed, reminders (24 h and 10 h before) and the “Match retiré” notice: these Discord direct messages now only go to a Discord tag certified in “My profile”. A hand-typed tag, never certified, no longer receives any — it cannot point to someone else's Discord account by mistake.",
-      "To keep receiving them, certify your tag in “My profile”, Discord section. Your push notifications, the match direct messages switch and staff messages (referees, administration) don't change.",
+      "Time set, changed or removed, reminders (24 h and 10 h before) and the “Match retiré” notice: these Discord direct messages now only go to a Discord tag certified in “My profile”. An uncertified tag no longer receives any, whether it was typed by hand or linked by signing in with Discord — a typed tag can point to someone else's Discord account by mistake.",
+      "If your tag is already certified, nothing changes for you; otherwise, certify it in “My profile”, Discord section, to keep receiving them. Your push notifications, the match direct messages switch and staff messages (referees, administration) don't change.",
       "No new data is collected: fewer Discord usernames are sent to the bot.",
     ],
     linkLabels: ["Certify my Discord tag", "Read the “Match Discord direct messages” paragraph"],
