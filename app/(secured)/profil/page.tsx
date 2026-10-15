@@ -1074,7 +1074,7 @@ export default function ProfilePage() {
         <MatchDmField
           initial={data?.matchDmEnabled}
           discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
-          onStored={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}
+          onChoice={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}
         />
       </ProfileSection>
 

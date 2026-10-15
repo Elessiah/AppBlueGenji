@@ -145,6 +145,7 @@
     "certifyLink": "Verify my Discord tag",
     "hint": "On by default: the bot messages you privately when one of your matches is scheduled, rescheduled or unscheduled, when a match leaves your schedule, and for its reminders (day before, check-in). Untick to stop receiving them: your push notifications keep their own settings, and referees still get theirs.",
     "enabled": "Match direct messages turned on.",
+    "enabledNotCertified": "Match direct messages turned on: they'll be sent once your Discord tag is verified.",
     "disabled": "Match direct messages turned off."
   },
   "avatarUpdated": "Avatar updated.",
