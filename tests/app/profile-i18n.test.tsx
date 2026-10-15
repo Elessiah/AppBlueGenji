@@ -512,7 +512,7 @@ describe("langue du compte (lot 9-3)", () => {
     expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(data\?\.matchDmEnabled !== false\);\s*setConfirmingTagRemoval\(true\);/);
     // Case décochée : la fin des messages privés de match ne se promet pas à qui
     // ne les reçoit plus ; la valeur enregistrée sur la page remonte à la fiche.
-    expect(page).toContain("onStored={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}");
+    expect(page).toContain("onChoice={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}");
     expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
     expect(page).toContain('<p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>');
     expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified && dms \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
@@ -527,10 +527,20 @@ describe("langue du compte (lot 9-3)", () => {
     const { join } = await import("node:path");
     const source = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/MatchDmField.tsx"), "utf8");
     expect(source).toContain("runQueuedSaves<boolean>");
-    expect(source).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = next;\s*setEnabled\(next\);\s*return;/);
+    expect(source).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = next;\s*showChoice\(next\);\s*return;/);
     expect(source).not.toMatch(/disabled=/);
     // Une relecture de la fiche commencée avant l'envoi ne recouvre pas le choix enregistré ici.
-    expect(source).toMatch(/if \(outcome\.stored\) \{\s*setChosenHere\(true\);\s*onStored\?\.\(outcome\.saved\);\s*\}/);
+    expect(source).toMatch(/if \(outcome\.stored\) setChosenHere\(true\);/);
+    // Ce que montre la case remonte à la page dès le geste (envoi en cours compris),
+    // jamais pendant le rendu (la relecture de la fiche passe par `setEnabled`).
+    expect(source).toMatch(/const showChoice = \(value: boolean\) => \{\s*setEnabled\(value\);\s*onChoice\?\.\(value\);\s*\};/);
+    expect(source).toContain("show: showChoice,");
+    expect(source).toMatch(/if \(initial !== undefined\) setEnabled\(initial\);/);
+    // Activés sans tag certifié : le toast ne promet pas un envoi (FR et EN).
+    expect(source).toMatch(/return discordReachable === false \? "matchDms\.enabledNotCertified" : "matchDms\.enabled";/);
+    const [fr, en] = [(await import("@/messages/fr/profile.json")).default.matchDms, (await import("@/messages/en/profile.json")).default.matchDms];
+    expect(fr.enabledNotCertified).toBe("Messages privés de match activés : ils partiront une fois ton tag Discord certifié.");
+    expect(en.enabledNotCertified).toBe("Match direct messages turned on: they'll be sent once your Discord tag is verified.");
     expect(source).toMatch(/initial !== shown && !busy && \(!chosenHere \|\| initial === undefined\)/);
   });
 

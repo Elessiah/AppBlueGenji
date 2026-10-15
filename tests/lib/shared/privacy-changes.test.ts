@@ -971,6 +971,9 @@ describe("PRIVACY_CHANGES — messages privés de match aux seuls tags certifié
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toMatch(/certified Discord tag/);
     expect(en).toMatch(/An uncertified tag no longer receives any, whether it was typed by hand or linked by signing in with Discord/);
+    // La raison vaut aussi pour un tag rattaché par la connexion Discord (FR et EN).
+    expect(fr).toMatch(/et seule la certification confirme que tu acceptes d'y être joint\./);
+    expect(en).toMatch(/and only certification confirms that you agree to be reached there\./);
     expect(en).toMatch(/If your tag is already certified, nothing changes for you; otherwise, verify it in “My profile”, Discord section, to receive them/);
     // Le réglage est une case à cocher, nommée comme à l'écran.
     expect(fr).toMatch(/la case « Messages privés Discord de mes matchs » et les messages du staff/);
