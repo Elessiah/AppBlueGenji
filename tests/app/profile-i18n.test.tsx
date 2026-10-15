@@ -477,7 +477,7 @@ describe("langue du compte (lot 9-3)", () => {
   it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
     expect(en).toContain("These messages only go to accounts with a certified Discord tag, to avoid spam");
-    expect(en).toContain('<a href="#discord">Certify my Discord tag</a>');
+    expect(en).toMatch(/<a href="#discord" class="[^"]*hintLink[^"]*">Certify my Discord tag<\/a>/);
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
     expectEnglish(en);
@@ -495,6 +495,10 @@ describe("langue du compte (lot 9-3)", () => {
     const { join } = await import("node:path");
     const page = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8");
     expect(page).toMatch(/function matchDmReachable\(discordState: DiscordState\): boolean \| null \{\s*if \(discordState\.linked === null\) return null;\s*return discordState\.verified;/);
+    // Le lien se distingue de la phrase (couleur + soulignement) : le `a` global
+    // n'a ni l'un ni l'autre, et un lien du gris de l'aide ne se voit pas.
+    const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
+    expect(css).toMatch(/\.hintLink \{[^}]*color: var\(--blue-300\);[^}]*text-decoration: underline;/);
   });
 
   it("interrupteur des messages privés de match : un clic pendant l'envoi part à la suite, jamais ignoré", async () => {
