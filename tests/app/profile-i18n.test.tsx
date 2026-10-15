@@ -490,6 +490,10 @@ describe("langue du compte (lot 9-3)", () => {
       "Ces messages ne partent qu'aux comptes dont le tag Discord est certifié, pour éviter le spam : sans tag certifié, ils ne peuvent pas te parvenir.",
     );
     expect(fr.certifyLink).toBe("Certifier mon tag Discord");
+    // Retirer le tag coupe aussi ces messages : la confirmation le dit (FR et EN).
+    const removal = [(await import("@/messages/fr/profile.json")).default.discord.removalBody, (await import("@/messages/en/profile.json")).default.discord.removalBody];
+    expect(removal[0]).toMatch(/le bot ne t'enverra plus non plus les messages privés de tes matchs\.$/);
+    expect(removal[1]).toMatch(/the bot will no longer send you direct messages about your matches either\.$/);
     // La page ne juge atteignable qu'un tag certifié (portée `certified` du serveur).
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");

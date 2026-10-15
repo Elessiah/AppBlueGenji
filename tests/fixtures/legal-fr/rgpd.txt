@@ -26,7 +26,7 @@ FinalitéMise en relation entre joueurs (s'ajouter en jeu) — aucune statistiqu
 Base légaleConsentementExécution du contrat présentation aux joueurs et au caster de ton match, à son lancement
 ConservationDurée du compte
 DonnéePseudo Discord
-FinalitéAuthentification Discord, notifications bot. Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris
+FinalitéAuthentification Discord, notifications bot (messages privés de match : tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris
 Base légaleExécution du contratIntérêt légitime annonces d'horaire, rappels et avis de retrait de match en message privé
 ConservationDurée du compte
 DonnéeCertification du pseudo Discord
@@ -62,7 +62,7 @@ FinalitéFrançais ou anglais : la langue des notifications push. Celle de la pa
 Base légaleExécution du contrat
 ConservationDurée du compte
 DonnéeChoix des messages privés de match
-FinalitéCoché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé
+FinalitéCoché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs, si ton tag Discord est certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé
 Base légaleIntérêt légitime
 ConservationDurée du compte
 DonnéeRésultats de tournois
