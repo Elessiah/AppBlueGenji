@@ -230,7 +230,7 @@ export function DiscordBotHandleDialog({
           }}
         >
           {t("botHandle.intro")} {mode === "UPDATE" ? `${t("botHandle.introUpdate")} ` : ""}
-          {t("botHandle.introOutro")}
+          {t("botHandle.introOutro")} {t("botHandle.matchDms")}
         </p>
 
         {!awaitingCode ? (

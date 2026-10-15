@@ -84,11 +84,18 @@ export function ConnectedAppsSection({
    * bot) : le champ « Tag Discord » de la page le reprend sur-le-champ.
    */
   onDiscordTagChanged,
+  /**
+   * Appelée quand Discord vient d'être détaché : le serveur a retiré la
+   * certification, l'écran la retire sans attendre la relecture de l'état
+   * Discord (qui se tait quand elle échoue).
+   */
+  onDiscordUnlinked,
 }: Readonly<{
   connections: AccountConnection[] | null;
   reload: () => Promise<void>;
   onChanged?: () => void;
   onDiscordTagChanged?: (tag: string) => void;
+  onDiscordUnlinked?: () => void;
 }>): React.ReactElement {
   const { showError, showSuccess } = useToast();
   const text = useProfileText();
@@ -146,6 +153,7 @@ export function ConnectedAppsSection({
       showSuccess(unlinkSuccessMessage(provider, payload.revokedSessions ?? null, text));
       setSessionsVersion((version) => version + 1);
       await reload();
+      if (provider === "DISCORD") onDiscordUnlinked?.();
       onChanged?.();
     } catch (e) {
       // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`

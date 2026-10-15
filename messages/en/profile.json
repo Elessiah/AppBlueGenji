@@ -389,6 +389,7 @@
     "intro": "Enter your Discord username: the BlueGenji bot sends you a six-digit code by direct message, and the code proves this username is yours.",
     "introUpdate": "Only the username of the Discord account already linked is accepted.",
     "introOutro": "A username that changes loses its verification: you can restore it in one click with “Verify my tag”.",
+    "matchDms": "Without verification, the bot sends you no match direct messages.",
     "handle": "Discord username",
     "handlePlaceholder": "your_username",
     "handleHelp": "The bot must share a server with you: <join>join the BlueGenji server</join> if you haven't already.",
