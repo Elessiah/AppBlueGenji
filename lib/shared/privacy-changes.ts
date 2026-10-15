@@ -772,6 +772,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ],
   },
+  // DM-CERTIFIED-ONLY : les messages privés de match ne partent plus qu'aux
+  // tags Discord certifiés (décision du 2026-10-15, contre le spam). Le
+  // destinataire Discord reçoit moins de données — mais un joueur au tag saisi
+  // cesse de recevoir ces messages : il doit le savoir pour certifier son tag.
+  // Publiée le lendemain de la mise en ligne.
+  {
+    id: "2026-10-messages-de-match-tags-certifies",
+    title: "Messages privés de match : seulement avec un tag Discord certifié",
+    publishedAt: "2026-10-16",
+    summary:
+      "Pour éviter le spam, le bot n'envoie plus les messages privés de tes matchs qu'aux comptes dont le tag Discord est certifié ; tes notifications push ne changent pas.",
+    details: [
+      "Horaire posé, changé ou retiré, rappels (24 h et 10 h avant) et « Match retiré » : ces messages privés Discord ne partent plus qu'à un tag Discord certifié dans « Mon profil ». Un tag saisi à la main, jamais certifié, n'en reçoit plus aucun — il ne peut pas désigner par erreur le compte Discord de quelqu'un d'autre.",
+      "Pour continuer à les recevoir, certifie ton tag dans « Mon profil », section Discord. Tes notifications push, l'interrupteur des messages de match et les messages du staff (arbitres, administration) ne changent pas.",
+      "Aucune donnée nouvelle n'est collectée : moins de pseudos Discord sont transmis au bot.",
+    ],
+    links: [
+      { href: "/profil#discord", label: "Certifier mon tag Discord" },
+      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

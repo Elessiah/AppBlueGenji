@@ -970,7 +970,9 @@ function RgpdFr({
           <p id="messages-de-match">
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, en
             français, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
-            rappels (24 h et 10 h avant) et quand vous êtes retiré d&apos;un match. Ces messages reposent
+            rappels (24 h et 10 h avant) et quand vous êtes retiré d&apos;un match — seulement si votre tag
+            Discord est <strong>certifié</strong> : un tag saisi à la main n&apos;en reçoit aucun, pour
+            éviter le spam (vos notifications push, elles, partent quand même). Ces messages reposent
             sur l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
             tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
             mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
