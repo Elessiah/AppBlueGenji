@@ -507,7 +507,9 @@ describe("langue du compte (lot 9-3)", () => {
     // Lecture de l'état Discord en échec (silencieuse) : le profil chargé prend
     // le relais, sinon un joueur non certifié ne serait jamais prévenu.
     expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
-    expect(page).toContain("<TagRemovalBody verified={discordState.verified} />");
+    // Figé à l'ouverture : le texte ne bascule pas pendant « Retrait… ».
+    expect(page).toContain("<TagRemovalBody verified={tagRemovalVerified} />");
+    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setConfirmingTagRemoval\(true\);/);
     expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
     expect(page).toContain('<p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>');
     expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
