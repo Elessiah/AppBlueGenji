@@ -199,8 +199,8 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
   });
 
   it("T04 dit que les messages privés de match ne partent qu'aux tags Discord certifiés (FR et EN)", () => {
-    expect(fr("T04").subPurposes.join(" ")).toMatch(/les messages privés ne partent qu'aux comptes dont le tag Discord est certifié \(un tag saisi à la main n'en reçoit aucun, pour éviter le spam\)/);
-    expect(en("T04").subPurposes.join(" ")).toMatch(/direct messages only go to accounts with a certified Discord tag \(a hand-typed tag receives none, to avoid spam\)/);
+    expect(fr("T04").subPurposes.join(" ")).toMatch(/les messages privés ne partent qu'aux comptes dont le tag Discord est certifié \(un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam\)/);
+    expect(en("T04").subPurposes.join(" ")).toMatch(/direct messages only go to accounts with a certified Discord tag \(an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam\)/);
   });
 
   it("T16 dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande", () => {

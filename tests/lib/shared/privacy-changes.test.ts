@@ -963,13 +963,15 @@ describe("PRIVACY_CHANGES — messages privés de match aux seuls tags certifié
   it("dit la règle, ce qui ne change pas et comment continuer à les recevoir (FR et EN)", () => {
     const fr = [entry.title, entry.summary, ...entry.details].join(" ");
     expect(fr).toMatch(/tag Discord est certifié/);
-    expect(fr).toMatch(/Un tag saisi à la main, jamais certifié, n'en reçoit plus aucun/);
-    expect(fr).toMatch(/certifie ton tag dans « Mon profil », section Discord/);
+    expect(fr).toMatch(/Un tag non certifié n'en reçoit plus aucun, qu'il soit saisi à la main ou rattaché par la connexion Discord/);
+    // L'avis part aussi aux comptes déjà certifiés : il leur dit que rien ne change.
+    expect(fr).toMatch(/Si ton tag est déjà certifié, rien ne change pour toi ; sinon, certifie-le dans « Mon profil », section Discord/);
     expect(fr).toMatch(/notifications push ne changent pas/);
     expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/profil#discord", "/rgpd#messages-de-match"]);
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toMatch(/certified Discord tag/);
-    expect(en).toMatch(/A hand-typed tag, never certified, no longer receives any/);
+    expect(en).toMatch(/An uncertified tag no longer receives any, whether it was typed by hand or linked by signing in with Discord/);
+    expect(en).toMatch(/If your tag is already certified, nothing changes for you; otherwise, certify it in “My profile”, Discord section/);
     expect(english.linkLabels).toHaveLength(2);
   });
 });
