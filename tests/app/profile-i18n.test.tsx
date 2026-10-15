@@ -664,6 +664,8 @@ describe("anglais — écrans", () => {
       effects.armed = true;
       const html = inEnglish(<DiscordVerificationDialog {...props} onClose={() => undefined} onVerified={() => undefined} />);
       expect(html).toContain("Verify my Discord tag");
+      // Sans certification, aucun message privé de match : le dialogue le dit.
+      expect(html).toContain("It also lets the bot send you direct messages about your matches (times, reminders): without it, the bot sends you none.");
       expectEnglish(html);
     }
     // Un tag enregistré avec une commande de direction ne réordonne pas la phrase.
