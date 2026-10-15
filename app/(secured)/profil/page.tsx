@@ -1039,7 +1039,8 @@ export default function ProfilePage() {
         <PushNotificationsPanel />
         {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
         {/* Un compte sans tag Discord certifié ne reçoit aucun de ces
-            messages : la case le dit (`null` tant que l'état n'est pas lu). */}
+            messages : la case le dit (`matchDmReachable`, profil chargé en
+            repli de l'état Discord ; `null` tant qu'aucun des deux n'est lu). */}
         <MatchDmField
           initial={data?.matchDmEnabled}
           discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
