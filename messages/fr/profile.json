@@ -389,6 +389,7 @@
     "intro": "Saisis ton pseudo Discord : le bot BlueGenji t'envoie un code à six chiffres en message privé, et le code prouve que ce pseudo est le tien.",
     "introUpdate": "Seul le pseudo du compte Discord déjà rattaché est accepté.",
     "introOutro": "Un pseudo qui change perd sa certification : tu pourras la redonner d'un clic avec « Certifier mon tag ».",
+    "matchDms": "Sans certification, le bot ne t'envoie aucun message privé de match.",
     "handle": "Pseudo Discord",
     "handlePlaceholder": "ton_pseudo",
     "handleHelp": "Le bot doit partager un serveur avec toi : <join>rejoins le serveur BlueGenji</join> si ce n'est pas déjà fait.",

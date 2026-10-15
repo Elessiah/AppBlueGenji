@@ -1061,7 +1061,13 @@ export default function ProfilePage() {
             // sans quoi l'écran montrerait l'ancien pseudo jusqu'au rechargement.
             setDiscordPseudo(tag);
             setSavedDiscordPseudo(tag);
+            // Un pseudo qui change perd sa certification (comme côté serveur) :
+            // l'écran ne la garde pas si la relecture de l'état Discord échoue.
+            setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));
           }}
+          onDiscordUnlinked={() =>
+            setDiscordState((prev) => ({ ...prev, linked: false, verified: false, attested: false }))
+          }
         />
       </ProfileSection>
 
