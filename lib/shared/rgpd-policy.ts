@@ -110,7 +110,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
     extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
@@ -121,7 +121,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion, au même titre que les deux suivants. La finalité le dit, parce
     // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
     finalite:
-      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires et rappels de match, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre",
+      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires et rappels de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",

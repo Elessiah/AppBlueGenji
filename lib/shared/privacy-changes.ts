@@ -795,7 +795,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     details: [
       "Horaire posé, changé ou retiré, rappels (24 h et 10 h avant) et « Match retiré » : ces messages privés Discord ne partent plus qu'à un tag Discord certifié dans « Mon profil ». Un tag non certifié n'en reçoit plus aucun, qu'il soit saisi à la main ou rattaché par la connexion Discord — un tag saisi peut désigner par erreur le compte Discord de quelqu'un d'autre.",
-      "Si ton tag est déjà certifié, rien ne change pour toi ; sinon, certifie-le dans « Mon profil », section Discord, pour continuer à les recevoir. Tes notifications push, l'interrupteur des messages de match et les messages du staff (arbitres, administration) ne changent pas.",
+      "Si ton tag est déjà certifié, rien ne change pour toi ; sinon, certifie-le dans « Mon profil », section Discord, pour les recevoir. Tes notifications push, la case « Messages privés Discord de mes matchs » et les messages du staff (arbitres, administration) ne changent pas.",
       "Aucune donnée nouvelle n'est collectée : moins de pseudos Discord sont transmis au bot.",
     ],
   },
