@@ -512,6 +512,19 @@ describe("langue du compte (lot 9-3)", () => {
     expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(data\?\.matchDmEnabled !== false\);\s*setConfirmingTagRemoval\(true\);/);
     // Case décochée : la fin des messages privés de match ne se promet pas à qui
     // ne les reçoit plus ; la valeur enregistrée sur la page remonte à la fiche.
+    // Détacher Discord ou changer de pseudo retire la certification : l'écran
+    // la retire aussi, même si la relecture de l'état Discord échoue.
+    expect(page).toContain("setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));");
+    expect(page).toMatch(/onDiscordUnlinked=\{\(\) =>\s*setDiscordState\(\(prev\) => \(\{ \.\.\.prev, linked: false, verified: false, attested: false \}\)\)/);
+    const apps = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/ConnectedAppsSection.tsx"), "utf8");
+    expect(apps).toMatch(/await reload\(\);\s*if \(provider === "DISCORD"\) onDiscordUnlinked\?\.\(\);\s*onChanged\?\.\(\);/);
+    // Le dialogue du code du bot dit aussi la conséquence sur les messages de match (FR et EN).
+    const [frBot, enBot] = [(await import("@/messages/fr/profile.json")).default.botHandle, (await import("@/messages/en/profile.json")).default.botHandle];
+    expect([frBot.matchDms, enBot.matchDms]).toEqual(["Sans certification, le bot ne t'envoie aucun message privé de match.", "Without verification, the bot sends you no match direct messages."]);
+    for (const mode of ["LINK", "UPDATE"] as const) {
+      effects.armed = true;
+      expect(inEnglish(<DiscordBotHandleDialog mode={mode} onClose={() => undefined} onUpdated={() => undefined} />)).toContain(enBot.matchDms);
+    }
     expect(page).toContain("onChoice={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}");
     expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
     expect(page).toContain('<p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>');
