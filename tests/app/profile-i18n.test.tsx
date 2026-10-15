@@ -516,8 +516,8 @@ describe("langue du compte (lot 9-3)", () => {
   it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
     const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
     const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
-    expect(fr).toContain("pour tes matchs, ne partent qu'à un tag certifié, selon la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
-    expect(en).toContain("for your matches, only go to a verified tag, according to the “Discord direct messages about my matches” box (My profile, Notifications section)");
+    expect(fr).toContain("pour tes matchs, ne partent qu'à un tag certifié et suivent la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
+    expect(en).toContain("for your matches, only go to a verified tag and follow the “Discord direct messages about my matches” box (My profile, Notifications section)");
   });
 
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
