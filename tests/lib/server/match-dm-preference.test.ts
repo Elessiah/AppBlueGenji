@@ -61,8 +61,9 @@ describe("recordMatchDmPreference", () => {
 
 describe("loadNotificationRecipients — option matchDm", () => {
   const ROWS = [
-    { id: 1, pseudo: "Kiro", discord_id: "555", discord_pseudo: "kiro", discord_verified_at: null, match_dm_enabled: 1 },
-    { id: 2, pseudo: "Ayla", discord_id: null, discord_pseudo: "ayla", discord_verified_at: null, match_dm_enabled: 0 },
+    { id: 1, pseudo: "Kiro", discord_id: "555", discord_pseudo: "kiro", discord_verified_at: "2026-09-01", match_dm_enabled: 1 },
+    { id: 2, pseudo: "Ayla", discord_id: "777", discord_pseudo: "ayla", discord_verified_at: "2026-09-01", match_dm_enabled: 0 },
+    { id: 3, pseudo: "Nova", discord_id: null, discord_pseudo: "nova", discord_verified_at: null, match_dm_enabled: 1 },
   ];
 
   function mockQuery() {
@@ -73,18 +74,20 @@ describe("loadNotificationRecipients — option matchDm", () => {
 
   it("retire le canal Discord d'un joueur opposé, sans le retirer des destinataires", async () => {
     const query = mockQuery();
-    const recipients = await loadNotificationRecipients([1, 2], "declared", { matchDm: true });
+    const recipients = await loadNotificationRecipients([1, 2, 3], "certified", { matchDm: true });
     expect(String(query.mock.calls[0][0])).toMatch(/match_dm_enabled/);
     expect(recipients).toEqual([
       { userId: 1, discord: { discordId: "555", handle: "kiro", label: "Kiro" } },
       { userId: 2, discord: null },
+      // Tag saisi, jamais certifié : pas de message privé, mais toujours destinataire (push).
+      { userId: 3, discord: null },
     ]);
   });
 
   it("n'en tient pas compte hors messages de match (modération, données, staff)", async () => {
     const query = mockQuery();
-    const recipients = await loadNotificationRecipients([1, 2], "declared");
-    expect(recipients[1]).toEqual({ userId: 2, discord: { discordId: null, handle: "ayla", label: "Ayla" } });
+    const recipients = await loadNotificationRecipients([1, 2], "proven");
+    expect(recipients[1]).toEqual({ userId: 2, discord: { discordId: "777", handle: "ayla", label: "Ayla" } });
     // Colonne non lue : une migration en échec ne coupe pas ces envois.
     expect(String(query.mock.calls[0][0])).not.toMatch(/match_dm_enabled/);
   });
@@ -94,16 +97,17 @@ describe("loadNotificationRecipients — option matchDm", () => {
     const rows = ROWS.map(({ match_dm_enabled: _ignored, ...row }) => row);
     const query = jest.fn<SqlQuery>().mockRejectedValueOnce(missing).mockResolvedValueOnce([rows, []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
-    const recipients = await loadNotificationRecipients([1, 2], "declared", { matchDm: true });
+    const recipients = await loadNotificationRecipients([1, 2, 3], "certified", { matchDm: true });
     expect(query).toHaveBeenCalledTimes(2);
     expect(String(query.mock.calls[1][0])).not.toMatch(/match_dm_enabled/);
-    expect(recipients[1]).toEqual({ userId: 2, discord: { discordId: null, handle: "ayla", label: "Ayla" } });
+    expect(recipients[1]).toEqual({ userId: 2, discord: { discordId: "777", handle: "ayla", label: "Ayla" } });
+    expect(recipients[2]).toEqual({ userId: 3, discord: null });
   });
 
   it("laisse passer toute autre erreur de lecture", async () => {
     const query = jest.fn<SqlQuery>().mockRejectedValue(Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" }));
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
-    await expect(loadNotificationRecipients([1], "declared", { matchDm: true })).rejects.toThrow("lock");
+    await expect(loadNotificationRecipients([1], "certified", { matchDm: true })).rejects.toThrow("lock");
     expect(query).toHaveBeenCalledTimes(1);
   });
 });

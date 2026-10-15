@@ -474,9 +474,10 @@ describe("langue du compte (lot 9-3)", () => {
     );
   });
 
-  it("interrupteur des messages privés de match : sans Discord, une ligne le dit (FR et EN), liée à la case", async () => {
+  it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
-    expect(en).toContain("No Discord account linked and no Discord tag saved");
+    expect(en).toContain("These messages only go to accounts with a certified Discord tag, to avoid spam");
+    expect(en).toContain('<a href="#discord">Certify my Discord tag</a>');
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
     expectEnglish(en);
@@ -485,9 +486,15 @@ describe("langue du compte (lot 9-3)", () => {
       expect(html).not.toContain("profile-match-dms-unreachable");
     }
     const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
-    expect(fr.noDiscord).toBe(
-      "Aucun compte Discord rattaché ni tag Discord renseigné : ces messages ne peuvent pas te parvenir pour l'instant.",
+    expect(fr.notCertified).toBe(
+      "Ces messages ne partent qu'aux comptes dont le tag Discord est certifié, pour éviter le spam : sans tag certifié, ils ne peuvent pas te parvenir.",
     );
+    expect(fr.certifyLink).toBe("Certifier mon tag Discord");
+    // La page ne juge atteignable qu'un tag certifié (portée `certified` du serveur).
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const page = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8");
+    expect(page).toMatch(/function matchDmReachable\(discordState: DiscordState\): boolean \| null \{\s*if \(discordState\.linked === null\) return null;\s*return discordState\.verified;/);
   });
 
   it("interrupteur des messages privés de match : un clic pendant l'envoi part à la suite, jamais ignoré", async () => {
