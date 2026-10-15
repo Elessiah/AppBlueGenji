@@ -820,6 +820,10 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   Le dialogue de certification le dit aussi (`verify.matchDms`, sous
   l'introduction), et l'avis de changement mène à `/profil#discord` par « Voir
   mon tag Discord » (il part aussi aux tags déjà certifiés).
+  Le dialogue du code du bot le rappelle (`botHandle.matchDms`). Détacher
+  Discord (`onDiscordUnlinked`) ou changer de pseudo par le bot retire la
+  certification à l'écran sans attendre la relecture de l'état Discord ;
+  cocher la case sans tag certifié affiche `matchDms.enabledNotCertified`.
 - **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
   `schedule.noticePlanning`, FR + EN) précise que le message privé ne part
   qu'aux joueurs au tag certifié qui n'ont pas coupé ces messages, pour qu'un
