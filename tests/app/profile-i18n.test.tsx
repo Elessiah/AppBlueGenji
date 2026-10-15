@@ -508,11 +508,14 @@ describe("langue du compte (lot 9-3)", () => {
     // le relais, sinon un joueur non certifié ne serait jamais prévenu.
     expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
     // Figé à l'ouverture : le texte ne bascule pas pendant « Retrait… ».
-    expect(page).toContain("<TagRemovalBody verified={tagRemovalVerified} />");
-    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setConfirmingTagRemoval\(true\);/);
+    expect(page).toContain("<TagRemovalBody verified={tagRemovalVerified} dms={tagRemovalDms} />");
+    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(data\?\.matchDmEnabled !== false\);\s*setConfirmingTagRemoval\(true\);/);
+    // Case décochée : la fin des messages privés de match ne se promet pas à qui
+    // ne les reçoit plus ; la valeur enregistrée sur la page remonte à la fiche.
+    expect(page).toContain("onStored={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}");
     expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
     expect(page).toContain('<p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>');
-    expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
+    expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified && dms \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
     // Le lien se distingue de la phrase (couleur + soulignement) : le `a` global
     // n'a ni l'un ni l'autre, et un lien du gris de l'aide ne se voit pas.
     const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
@@ -527,7 +530,7 @@ describe("langue du compte (lot 9-3)", () => {
     expect(source).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = next;\s*setEnabled\(next\);\s*return;/);
     expect(source).not.toMatch(/disabled=/);
     // Une relecture de la fiche commencée avant l'envoi ne recouvre pas le choix enregistré ici.
-    expect(source).toMatch(/if \(outcome\.stored\) setChosenHere\(true\);/);
+    expect(source).toMatch(/if \(outcome\.stored\) \{\s*setChosenHere\(true\);\s*onStored\?\.\(outcome\.saved\);\s*\}/);
     expect(source).toMatch(/initial !== shown && !busy && \(!chosenHere \|\| initial === undefined\)/);
   });
 
