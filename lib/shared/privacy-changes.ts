@@ -148,6 +148,12 @@ export const PRIVACY_CHANGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** Longueur maximale d'un identifiant — la colonne `change_id` est un `VARCHAR(80)`. */
 export const PRIVACY_CHANGE_ID_MAX_LENGTH = 80;
 
+/** Lien vers le paragraphe « Messages privés Discord de match » de `/rgpd`, cité par plusieurs entrées. */
+const MATCH_DM_PARAGRAPH_LINK: PrivacyChangeLink = {
+  href: "/rgpd#messages-de-match",
+  label: "Lire le paragraphe « Messages privés Discord de match »",
+};
+
 /**
  * Le registre, **dans l'ordre de publication** et en ajout seul : une entrée
  * publiée ne se retire ni ne se renomme (son identifiant est en base chez
@@ -728,7 +734,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [
       { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
-      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
+      MATCH_DM_PARAGRAPH_LINK,
       { href: "/conditions-utilisation", label: "Lire les conditions d'utilisation" },
     ],
   },
@@ -769,7 +775,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [
       { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
-      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
+      MATCH_DM_PARAGRAPH_LINK,
     ],
   },
   // DM-CERTIFIED-ONLY : les messages privés de match ne partent plus qu'aux
@@ -783,14 +789,14 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     publishedAt: "2026-10-16",
     summary:
       "Pour éviter le spam, le bot n'envoie plus les messages privés de tes matchs qu'aux comptes dont le tag Discord est certifié ; tes notifications push ne changent pas.",
+    links: [
+      { href: "/profil#discord", label: "Certifier mon tag Discord" },
+      MATCH_DM_PARAGRAPH_LINK,
+    ],
     details: [
       "Horaire posé, changé ou retiré, rappels (24 h et 10 h avant) et « Match retiré » : ces messages privés Discord ne partent plus qu'à un tag Discord certifié dans « Mon profil ». Un tag saisi à la main, jamais certifié, n'en reçoit plus aucun — il ne peut pas désigner par erreur le compte Discord de quelqu'un d'autre.",
       "Pour continuer à les recevoir, certifie ton tag dans « Mon profil », section Discord. Tes notifications push, l'interrupteur des messages de match et les messages du staff (arbitres, administration) ne changent pas.",
       "Aucune donnée nouvelle n'est collectée : moins de pseudos Discord sont transmis au bot.",
-    ],
-    links: [
-      { href: "/profil#discord", label: "Certifier mon tag Discord" },
-      { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ],
   },
 ];
