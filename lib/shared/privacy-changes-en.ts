@@ -422,7 +422,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "If your tag is already certified, nothing changes for you; otherwise, verify it in “My profile”, Discord section, to receive them. Your push notifications, the “Discord direct messages about my matches” box and staff messages (referees, administration) don't change.",
       "No new data is collected: fewer Discord usernames are sent to the bot.",
     ],
-    linkLabels: ["Verify my Discord tag", "Read the “Match Discord direct messages” paragraph"],
+    linkLabels: ["See my Discord tag", "Read the “Match Discord direct messages” paragraph"],
   },
 };
 

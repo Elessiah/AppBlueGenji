@@ -351,6 +351,7 @@
     "title": "Verify my Discord tag",
     "purpose": "The organizers need to be able to reach you during a tournament: rescheduling a round, a score dispute, a forfeit.",
     "intro": "{purpose} Verification is <strong>optional</strong> and only happens through this step — logging in with Discord doesn't grant it: without it, your tag stays invisible to everyone, administrators included.",
+    "matchDms": "It also lets the bot send you direct messages about your matches (times, reminders): without it, the bot sends you none.",
     "exposureTitle": "What verification exposes",
     "exposure": {
       "admins": "The site's administrators can see your Discord tag at all times.",
