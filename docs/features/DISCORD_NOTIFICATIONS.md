@@ -815,7 +815,7 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   l'état Discord échoue, le `discordVerified` du profil chargé en tient lieu.
   La confirmation « Retirer mon tag » ne dit l'arrêt de ces messages
   (`discord.removalBodyDms`) qu'à un tag certifié dont la case est cochée à
-  l'ouverture (le choix enregistré remonte à la page par `onStored`) ; un tag
+  l'ouverture (ce que montre la case remonte à la page par `onChoice`, envoi en cours compris) ; un tag
   qui ne l'est pas lit `discord.removalBodyUnverified`.
   Le dialogue de certification le dit aussi (`verify.matchDms`, sous
   l'introduction), et l'avis de changement mène à `/profil#discord` par « Voir
