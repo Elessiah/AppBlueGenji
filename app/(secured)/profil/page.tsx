@@ -505,6 +505,10 @@ export default function ProfilePage() {
 
   const [discordTagBusy, setDiscordTagBusy] = useState(false);
   const [confirmingTagRemoval, setConfirmingTagRemoval] = useState(false);
+  // Certification lue à l'ouverture de la confirmation : le retrait remet
+  // `verified` à `false` avant la fin de la requête, et le texte du dialogue
+  // ne doit pas basculer sous les yeux du joueur pendant « Retrait… ».
+  const [tagRemovalVerified, setTagRemovalVerified] = useState(false);
 
   /**
    * Retirer son tag Discord — l'annulation de l'exposition.
@@ -724,7 +728,10 @@ export default function ProfilePage() {
       discordStateBusy={discordStateBusy}
       loadDiscordState={loadDiscordState}
       discordTagBusy={discordTagBusy}
-      onDiscordTagRemove={() => setConfirmingTagRemoval(true)}
+      onDiscordTagRemove={() => {
+        setTagRemovalVerified(discordState.verified);
+        setConfirmingTagRemoval(true);
+      }}
       setVerifyOpen={setVerifyOpen}
     />
   );
@@ -1150,7 +1157,7 @@ export default function ProfilePage() {
           onClose={() => setConfirmingTagRemoval(false)}
           onConfirm={onDiscordTagRemove}
         >
-          <TagRemovalBody verified={discordState.verified} />
+          <TagRemovalBody verified={tagRemovalVerified} />
         </ConfirmActionDialog>
       ) : null}
       {pendingDeletion ? (
