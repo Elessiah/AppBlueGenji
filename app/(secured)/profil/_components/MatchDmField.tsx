@@ -23,9 +23,10 @@ const UNREACHABLE_ID = "profile-match-dms-unreachable";
  * focalisable et utilisable (`aria-busy`) : un clic fait pendant l'envoi
  * s'affiche et part à la suite (`runQueuedSaves`), jamais perdu.
  *
- * `discordReachable` : le compte a un Discord rattaché ou un tag renseigné
- * (`toNotificationRecipient`). À `false`, une ligne dit qu'aucun de ces
- * messages ne peut partir pour l'instant ; `null` (état pas encore lu) : rien.
+ * `discordReachable` : le compte a un tag Discord **certifié** — seul un tel
+ * compte reçoit ces messages (`toNotificationRecipient`, portée `certified`,
+ * contre le spam). À `false`, une ligne le dit et mène à la certification
+ * (section Discord, `#discord`) ; `null` (état pas encore lu) : rien.
  */
 export function MatchDmField({
   initial,
@@ -123,7 +124,7 @@ export function MatchDmField({
       </p>
       {unreachable ? (
         <p id={UNREACHABLE_ID} className={s.hint}>
-          {t("matchDms.noDiscord")}
+          {t("matchDms.notCertified")} <a href="#discord">{t("matchDms.certifyLink")}</a>
         </p>
       ) : null}
     </div>

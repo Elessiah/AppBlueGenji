@@ -89,13 +89,14 @@ interface DiscordState {
 }
 
 /**
- * Un message privé de match peut-il joindre ce compte ? Oui avec un Discord
- * rattaché ou un tag enregistré (`toNotificationRecipient`) ; `null` tant que
- * l'état Discord n'est pas lu.
+ * Un message privé de match peut-il joindre ce compte ? Seulement avec un tag
+ * Discord **certifié** (`toNotificationRecipient`, portée `certified`) : un
+ * tag saisi ou un Discord rattaché sans tag certifié ne reçoit rien. `null`
+ * tant que l'état Discord n'est pas lu.
  */
-function matchDmReachable(discordState: DiscordState, savedTag: string): boolean | null {
+function matchDmReachable(discordState: DiscordState): boolean | null {
   if (discordState.linked === null) return null;
-  return discordState.linked || savedTag.trim() !== "";
+  return discordState.verified;
 }
 
 /**
@@ -1038,7 +1039,7 @@ export default function ProfilePage() {
             messages : la case le dit (`null` tant que l'état n'est pas lu). */}
         <MatchDmField
           initial={data?.matchDmEnabled}
-          discordReachable={matchDmReachable(discordState, savedDiscordPseudo)}
+          discordReachable={matchDmReachable(discordState)}
         />
       </ProfileSection>
 
