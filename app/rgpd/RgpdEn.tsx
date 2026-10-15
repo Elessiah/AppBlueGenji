@@ -797,7 +797,7 @@ export function RgpdEn({
           <p id="messages-de-match">
             <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in French, when
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before) and
-            when you are removed from a match — only if your Discord tag is <strong>certified</strong>: a
+            when you are removed from a match — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
             are based on the association&apos;s{" "}
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
