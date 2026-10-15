@@ -199,7 +199,7 @@ async function loadRecipientsByTeam(
     "certified",
     { matchDm: true },
   );
-  // Seuls comptent les joueurs qu'un message atteindrait : un tag Discord, ou
+  // Seuls comptent les joueurs qu'un message atteindrait : un tag Discord certifié, ou
   // un appareil abonné aux rappels. Une engagée sans aucun ne pose pas la
   // marque d'horaire reçu (qui ferait dire « reprogrammé » à des joueurs qui
   // n'ont rien reçu), et ne coûte ni écriture ni lecture d'abonnements.
