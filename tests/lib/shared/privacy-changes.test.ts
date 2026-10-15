@@ -975,8 +975,10 @@ describe("PRIVACY_CHANGES — messages privés de match aux seuls tags certifié
     // Le réglage est une case à cocher, nommée comme à l'écran.
     expect(fr).toMatch(/la case « Messages privés Discord de mes matchs » et les messages du staff/);
     expect(en).toMatch(/the “Discord direct messages about my matches” box and staff messages/);
-    // Le libellé du lien suit le glossaire de l'interface (« certifier » → *verify*).
-    expect(english.linkLabels?.[0]).toBe("Verify my Discord tag");
+    // L'avis part à tous les comptes, certifiés compris : le lien ne promet pas
+    // une certification que la section Discord ne propose plus à un tag certifié.
+    expect(entry.links?.[0]?.label).toBe("Voir mon tag Discord");
+    expect(english.linkLabels?.[0]).toBe("See my Discord tag");
     expect(english.linkLabels).toHaveLength(2);
   });
 });
