@@ -147,15 +147,19 @@ type RecipientRow = RowDataPacket & {
  * - `proven` — identifiant rattaché, ou tag **certifié** : on n'écrit pas à
  *   l'inconnu qu'un tag saisi à la main peut désigner, quand le message parle
  *   du compte (modération, signalement, données) ;
- * - `declared` — tout tag, même saisi : les rappels de match ont toujours
- *   écrit au tag déclaré par le joueur lui-même, et le message ne dit rien de
- *   plus qu'un horaire public.
+ * - `certified` — tag **certifié** seul (`bg_users.discord_verified_at`) : les
+ *   messages privés de match (horaires, rappels, « Match retiré »). Un tag
+ *   saisi, ou un identifiant rattaché sans tag certifié, ne reçoit rien : on
+ *   n'écrit pas en série à un compte Discord que le joueur n'a pas certifié
+ *   (lutte contre le spam). Le joueur garde ses notifications push.
  */
-export type DiscordReach = "proven" | "declared";
+export type DiscordReach = "proven" | "certified";
 
 export function toNotificationRecipient(row: RecipientRow, reach: DiscordReach): NotificationRecipient {
-  const handle = reach === "declared" || row.discord_verified_at ? row.discord_pseudo : null;
-  const discord = row.discord_id || handle ? { discordId: row.discord_id, handle, label: row.pseudo } : null;
+  const certified = Boolean(row.discord_verified_at);
+  const handle = certified ? row.discord_pseudo : null;
+  const discordId = reach === "proven" || certified ? row.discord_id : null;
+  const discord = discordId || handle ? { discordId, handle, label: row.pseudo } : null;
   return { userId: Number(row.id), discord };
 }
 
