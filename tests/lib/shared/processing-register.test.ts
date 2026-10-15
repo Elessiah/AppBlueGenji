@@ -192,8 +192,8 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
   const en = (ref: string) => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref)!;
 
   it("T08 remet l'avis « Match retiré » et nomme les modérateurs destinataires d'une alerte AutoMod", () => {
-    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match \(aux seuls tags Discord certifiés\), avis de retrait d'un match \(« Match retiré »\), avis de modération/);
-    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders \(to certified Discord tags only\), notices of removal from a match \(“Match retiré”\), moderation notices/);
+    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match et avis de retrait d'un match \(« Match retiré » ; ces messages de match aux seuls tags Discord certifiés\), avis de modération/);
+    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders and notices of removal from a match \(“Match retiré”; these match messages to certified Discord tags only\), moderation notices/);
     expect(fr("T08").recipients).toContain("Modérateurs du serveur Discord de l'association, si une règle AutoMod de Discord bloque ou signale une annonce #live (traitement T16)");
     expect(en("T08").recipients).toContain("Moderators of the association's Discord server, if a Discord AutoMod rule blocks or flags a #live announcement (processing activity T16)");
   });
