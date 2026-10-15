@@ -509,13 +509,13 @@ describe("langue du compte (lot 9-3)", () => {
     expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
     // Figé à l'ouverture : le texte ne bascule pas pendant « Retrait… ».
     expect(page).toContain("<TagRemovalBody verified={tagRemovalVerified} dms={tagRemovalDms} />");
-    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(data\?\.matchDmEnabled !== false\);\s*setConfirmingTagRemoval\(true\);/);
+    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);/);
     // Case décochée : la fin des messages privés de match ne se promet pas à qui
     // ne les reçoit plus ; la valeur enregistrée sur la page remonte à la fiche.
     // Détacher Discord ou changer de pseudo retire la certification : l'écran
     // la retire aussi, même si la relecture de l'état Discord échoue.
     expect(page).toContain("setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));");
-    expect(page).toMatch(/onDiscordUnlinked=\{\(\) =>\s*setDiscordState\(\(prev\) => \(\{ \.\.\.prev, linked: false, verified: false, attested: false \}\)\)/);
+    expect(page).toMatch(/onDiscordUnlinked=\{\(\) => \{\s*setDiscordState\(\(prev\) => \(\{ \.\.\.prev, linked: false, verified: false, attested: false \}\)\)/);
     const apps = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/ConnectedAppsSection.tsx"), "utf8");
     expect(apps).toMatch(/await reload\(\);\s*if \(provider === "DISCORD"\) onDiscordUnlinked\?\.\(\);\s*onChanged\?\.\(\);/);
     // Le dialogue du code du bot dit aussi la conséquence sur les messages de match (FR et EN).
@@ -525,7 +525,14 @@ describe("langue du compte (lot 9-3)", () => {
       effects.armed = true;
       expect(inEnglish(<DiscordBotHandleDialog mode={mode} onClose={() => undefined} onUpdated={() => undefined} />)).toContain(enBot.matchDms);
     }
-    expect(page).toContain("onChoice={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}");
+    expect(page).toContain("onChoice={setMatchDmShown}");
+    // Le repli du profil chargé suit aussi (lecture de l'état Discord en échec).
+    expect(page).toContain("? { ...prev, profile: { ...prev.profile, discordVerified: false } }");
+    expect(page).toContain("setData((prev) => (prev ? { ...prev, profile: { ...prev.profile, discordVerified: false } } : prev));");
+    // Rattaché par code : le toast rappelle de certifier (FR et EN).
+    const bot = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/DiscordBotHandleDialog.tsx"), "utf8");
+    expect(bot).toContain('mode === "LINK" ? `${t("botHandle.linked")} ${t("botHandle.certifyForDms")}` : t("botHandle.updated")');
+    expect([frBot.certifyForDms, enBot.certifyForDms]).toEqual(["Certifie ton tag (section Discord) pour recevoir les messages privés de tes matchs.", "Verify your tag (Discord section) to receive direct messages about your matches."]);
     expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
     expect(page).toContain('<p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>');
     expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified && dms \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
@@ -540,14 +547,16 @@ describe("langue du compte (lot 9-3)", () => {
     const { join } = await import("node:path");
     const source = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/_components/MatchDmField.tsx"), "utf8");
     expect(source).toContain("runQueuedSaves<boolean>");
-    expect(source).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = next;\s*showChoice\(next\);\s*return;/);
+    expect(source).toMatch(/if \(busyRef\.current\) \{\s*queued\.current = next;\s*setEnabled\(next\);\s*return;/);
     expect(source).not.toMatch(/disabled=/);
     // Une relecture de la fiche commencée avant l'envoi ne recouvre pas le choix enregistré ici.
     expect(source).toMatch(/if \(outcome\.stored\) setChosenHere\(true\);/);
     // Ce que montre la case remonte à la page dès le geste (envoi en cours compris),
     // jamais pendant le rendu (la relecture de la fiche passe par `setEnabled`).
-    expect(source).toMatch(/const showChoice = \(value: boolean\) => \{\s*setEnabled\(value\);\s*onChoice\?\.\(value\);\s*\};/);
-    expect(source).toContain("show: showChoice,");
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*if \(initial !== undefined\) onChoiceRef\.current\?\.\(enabled\);\s*\}, \[enabled, initial\]\);/);
+    expect(source).toContain("show: setEnabled,");
+    // Le toast lit l'état Discord à la fin de l'envoi, pas celui du clic.
+    expect(source).toContain("outcomeMessage(outcome.saved, reachableRef.current)");
     expect(source).toMatch(/if \(initial !== undefined\) setEnabled\(initial\);/);
     // Activés sans tag certifié : le toast ne promet pas un envoi (FR et EN).
     expect(source).toMatch(/return discordReachable === false \? "matchDms\.enabledNotCertified" : "matchDms\.enabled";/);
