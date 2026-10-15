@@ -30,11 +30,11 @@ FinalitéAuthentification Discord, notifications bot. Enregistré à ta connexio
 Base légaleExécution du contratIntérêt légitime annonces d'horaire, rappels et avis de retrait de match en message privé
 ConservationDurée du compte
 DonnéeCertification du pseudo Discord
-FinalitéOuvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change
+FinalitéOuvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change
 Base légaleConsentementExécution du contrat présentation aux joueurs et au caster de ton match, à son lancement
 ConservationJusqu'au retrait ou au changement du tag, ou durée du compte
 DonnéeID Discord
-FinalitéMoyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires et rappels de match, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre
+FinalitéMoyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires et rappels de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre
 Base légaleExécution du contratIntérêt légitime annonces d'horaire, rappels et avis de retrait de match en message privé
 ConservationDurée du compte
 DonnéeIdentifiant Google
