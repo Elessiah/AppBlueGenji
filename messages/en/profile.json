@@ -138,8 +138,8 @@
   },
   "matchDms": {
     "label": "Discord direct messages about my matches",
-    "notCertified": "These messages only go to accounts with a certified Discord tag, to avoid spam: without a certified tag, they can't reach you.",
-    "certifyLink": "Certify my Discord tag",
+    "notCertified": "These messages only go to accounts with a verified Discord tag, to avoid spam: without a verified tag, they can't reach you.",
+    "certifyLink": "Verify my Discord tag",
     "hint": "On by default: the bot messages you privately when one of your matches is scheduled, rescheduled or unscheduled, when a match leaves your schedule, and for its reminders (day before, check-in). Untick to stop receiving them: your push notifications keep their own settings, and referees still get theirs.",
     "enabled": "Match direct messages turned on.",
     "disabled": "Match direct messages turned off."

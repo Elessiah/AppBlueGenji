@@ -257,10 +257,6 @@
   max-width: 68ch;
 }
 
-/* « Avatar » n'étiquette aucun champ — le `<input type="file">` est caché et
-   les deux contrôles sont des boutons. C'est le nom d'un **groupe**, d'où un
-   `<span>` (un `<label>` sans `for` n'étiquette rien) qui reprend l'apparence
-   de `.field label`. */
 /* Lien posé dans une aide (`.hint`) : le `a` global n'a ni couleur ni
    soulignement, et un lien du même gris que la phrase ne se voit pas — le
    joueur ne saurait pas qu'il mène à la certification. */
@@ -270,6 +266,10 @@
   text-underline-offset: 3px;
 }
 
+/* « Avatar » n'étiquette aucun champ — le `<input type="file">` est caché et
+   les deux contrôles sont des boutons. C'est le nom d'un **groupe**, d'où un
+   `<span>` (un `<label>` sans `for` n'étiquette rien) qui reprend l'apparence
+   de `.field label`. */
 .groupLabel {
   font-size: 13px;
   color: var(--ink-soft);
