@@ -494,7 +494,10 @@ describe("langue du compte (lot 9-3)", () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const page = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8");
-    expect(page).toMatch(/function matchDmReachable\(discordState: DiscordState\): boolean \| null \{\s*if \(discordState\.linked === null\) return null;\s*return discordState\.verified;/);
+    expect(page).toMatch(/function matchDmReachable\(discordState: DiscordState, profileVerified: boolean \| undefined\): boolean \| null \{\s*if \(discordState\.linked !== null\) return discordState\.verified;\s*return profileVerified \?\? null;/);
+    // Lecture de l'état Discord en échec (silencieuse) : le profil chargé prend
+    // le relais, sinon un joueur non certifié ne serait jamais prévenu.
+    expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
     // Le lien se distingue de la phrase (couleur + soulignement) : le `a` global
     // n'a ni l'un ni l'autre, et un lien du gris de l'aide ne se voit pas.
     const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
