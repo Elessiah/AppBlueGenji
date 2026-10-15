@@ -403,6 +403,7 @@
     "checking": "Vérification…",
     "validate": "Valider le code",
     "linked": "Discord rattaché par code.",
+    "certifyForDms": "Certifie ton tag (section Discord) pour recevoir les messages privés de tes matchs.",
     "updated": "Pseudo Discord mis à jour.",
     "codeSent": "Code envoyé en message privé Discord (expiration : {time}).",
     "bodyLabel": "Pseudo Discord du bot"
