@@ -493,6 +493,8 @@ describe("langue du compte (lot 9-3)", () => {
     // Retirer le tag coupe aussi ces messages : la confirmation le dit (FR et EN).
     // Seulement pour un tag certifié : un tag qui ne l'est pas ne reçoit déjà rien.
     const removal = [(await import("@/messages/fr/profile.json")).default.discord.removalBodyDms, (await import("@/messages/en/profile.json")).default.discord.removalBodyDms];
+    const unverified = [(await import("@/messages/fr/profile.json")).default.discord.removalBodyUnverified, (await import("@/messages/en/profile.json")).default.discord.removalBodyUnverified];
+    expect(unverified).toEqual(["Ton tag n'est pas certifié : personne ne le voit, pas même les administrateurs. Le retirer l'efface simplement de ton compte.", "Your tag isn't verified: nobody sees it, not even the administrators. Removing it simply deletes it from your account."]);
     expect(removal).toEqual(["Le bot ne t'enverra plus non plus les messages privés de tes matchs.", "The bot will no longer send you direct messages about your matches either."]);
     // La page ne juge atteignable qu'un tag certifié (portée `certified` du serveur).
     const { readFileSync } = await import("node:fs");
@@ -503,6 +505,7 @@ describe("langue du compte (lot 9-3)", () => {
     // le relais, sinon un joueur non certifié ne serait jamais prévenu.
     expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
     expect(page).toContain("<TagRemovalBody verified={discordState.verified} />");
+    expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
     expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
     // Le lien se distingue de la phrase (couleur + soulignement) : le `a` global
     // n'a ni l'un ni l'autre, et un lien du gris de l'aide ne se voit pas.
