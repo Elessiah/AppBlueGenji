@@ -476,8 +476,8 @@ describe("langue du compte (lot 9-3)", () => {
 
   it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
-    expect(en).toContain("These messages only go to accounts with a certified Discord tag, to avoid spam");
-    expect(en).toMatch(/<a href="#discord" class="[^"]*hintLink[^"]*">Certify my Discord tag<\/a>/);
+    expect(en).toContain("These messages only go to accounts with a verified Discord tag, to avoid spam");
+    expect(en).toMatch(/<a href="#discord" class="[^"]*hintLink[^"]*">Verify my Discord tag<\/a>/);
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
     expectEnglish(en);
@@ -516,8 +516,8 @@ describe("langue du compte (lot 9-3)", () => {
   it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
     const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
     const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
-    expect(fr).toContain("pour tes matchs, la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
-    expect(en).toContain("for your matches, the “Discord direct messages about my matches” box (My profile, Notifications section)");
+    expect(fr).toContain("pour tes matchs, ne partent qu'à un tag certifié, selon la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
+    expect(en).toContain("for your matches, only go to a verified tag, according to the “Discord direct messages about my matches” box (My profile, Notifications section)");
   });
 
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
