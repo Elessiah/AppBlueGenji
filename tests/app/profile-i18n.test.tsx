@@ -474,9 +474,10 @@ describe("langue du compte (lot 9-3)", () => {
     );
   });
 
-  it("interrupteur des messages privés de match : sans Discord, une ligne le dit (FR et EN), liée à la case", async () => {
+  it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
-    expect(en).toContain("No Discord account linked and no Discord tag saved");
+    expect(en).toContain("These messages only go to accounts with a verified Discord tag, to avoid spam");
+    expect(en).toMatch(/<a href="#discord" class="[^"]*hintLink[^"]*">Verify my Discord tag<\/a>/);
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
     expectEnglish(en);
@@ -485,9 +486,60 @@ describe("langue du compte (lot 9-3)", () => {
       expect(html).not.toContain("profile-match-dms-unreachable");
     }
     const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
-    expect(fr.noDiscord).toBe(
-      "Aucun compte Discord rattaché ni tag Discord renseigné : ces messages ne peuvent pas te parvenir pour l'instant.",
+    expect(fr.notCertified).toBe(
+      "Ces messages ne partent qu'aux comptes dont le tag Discord est certifié, pour éviter le spam : sans tag certifié, ils ne peuvent pas te parvenir.",
     );
+    expect(fr.certifyLink).toBe("Certifier mon tag Discord");
+    // Retirer le tag coupe aussi ces messages : la confirmation le dit (FR et EN).
+    // Seulement pour un tag certifié : un tag qui ne l'est pas ne reçoit déjà rien.
+    const removal = [(await import("@/messages/fr/profile.json")).default.discord.removalBodyDms, (await import("@/messages/en/profile.json")).default.discord.removalBodyDms];
+    const unverified = [(await import("@/messages/fr/profile.json")).default.discord.removalBodyUnverified, (await import("@/messages/en/profile.json")).default.discord.removalBodyUnverified];
+    expect(unverified).toEqual(["Ton tag n'est pas certifié : personne ne le voit, pas même les administrateurs.", "Your tag isn't verified: nobody sees it, not even the administrators."]);
+    // Un tag jamais certifié ne lit pas « de nouveau » : il ne l'a jamais été.
+    const unverified2 = [(await import("@/messages/fr/profile.json")).default.discord.removalBody2Unverified, (await import("@/messages/en/profile.json")).default.discord.removalBody2Unverified];
+    expect(unverified2).toEqual(["Ta prochaine connexion par Discord réenregistrera ton pseudo, toujours sans le certifier.", "Your next login with Discord will save your username again, still without verifying it."]);
+    expect(removal).toEqual(["Le bot ne t'enverra plus non plus les messages privés de tes matchs.", "The bot will no longer send you direct messages about your matches either."]);
+    // La page ne juge atteignable qu'un tag certifié (portée `certified` du serveur).
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const page = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8");
+    expect(page).toMatch(/function matchDmReachable\(discordState: DiscordState, profileVerified: boolean \| undefined\): boolean \| null \{\s*if \(discordState\.linked !== null\) return discordState\.verified;\s*return profileVerified \?\? null;/);
+    // Lecture de l'état Discord en échec (silencieuse) : le profil chargé prend
+    // le relais, sinon un joueur non certifié ne serait jamais prévenu.
+    expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
+    // Figé à l'ouverture : le texte ne bascule pas pendant « Retrait… ».
+    expect(page).toContain("<TagRemovalBody verified={tagRemovalVerified} dms={tagRemovalDms} />");
+    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);/);
+    // Case décochée : la fin des messages privés de match ne se promet pas à qui
+    // ne les reçoit plus ; la valeur enregistrée sur la page remonte à la fiche.
+    // Détacher Discord ou changer de pseudo retire la certification : l'écran
+    // la retire aussi, même si la relecture de l'état Discord échoue.
+    expect(page).toContain("setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));");
+    expect(page).toMatch(/onDiscordUnlinked=\{\(\) => \{\s*setDiscordState\(\(prev\) => \(\{ \.\.\.prev, linked: false, verified: false, attested: false \}\)\)/);
+    const apps = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/ConnectedAppsSection.tsx"), "utf8");
+    expect(apps).toMatch(/await reload\(\);\s*if \(provider === "DISCORD"\) onDiscordUnlinked\?\.\(\);\s*onChanged\?\.\(\);/);
+    // Le dialogue du code du bot dit aussi la conséquence sur les messages de match (FR et EN).
+    const [frBot, enBot] = [(await import("@/messages/fr/profile.json")).default.botHandle, (await import("@/messages/en/profile.json")).default.botHandle];
+    expect([frBot.matchDms, enBot.matchDms]).toEqual(["Sans certification, le bot ne t'envoie aucun message privé de match.", "Without verification, the bot sends you no match direct messages."]);
+    for (const mode of ["LINK", "UPDATE"] as const) {
+      effects.armed = true;
+      expect(inEnglish(<DiscordBotHandleDialog mode={mode} onClose={() => undefined} onUpdated={() => undefined} />)).toContain(enBot.matchDms);
+    }
+    expect(page).toContain("onChoice={setMatchDmShown}");
+    // Le repli du profil chargé suit aussi (lecture de l'état Discord en échec).
+    expect(page).toContain("? { ...prev, profile: { ...prev.profile, discordVerified: false } }");
+    expect(page).toContain("setData((prev) => (prev ? { ...prev, profile: { ...prev.profile, discordVerified: false } } : prev));");
+    // Rattaché par code : le toast rappelle de certifier (FR et EN).
+    const bot = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/DiscordBotHandleDialog.tsx"), "utf8");
+    expect(bot).toContain('mode === "LINK" ? `${t("botHandle.linked")} ${t("botHandle.certifyForDms")}` : t("botHandle.updated")');
+    expect([frBot.certifyForDms, enBot.certifyForDms]).toEqual(["Certifie ton tag (section Discord) : sans certification, aucun message privé de match ne te parvient.", "Verify your tag (Discord section): without verification, no match direct message reaches you."]);
+    expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
+    expect(page).toContain('<p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>');
+    expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified && dms \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
+    // Le lien se distingue de la phrase (couleur + soulignement) : le `a` global
+    // n'a ni l'un ni l'autre, et un lien du gris de l'aide ne se voit pas.
+    const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
+    expect(css).toMatch(/\.hintLink \{[^}]*color: var\(--blue-300\);[^}]*text-decoration: underline;/);
   });
 
   it("interrupteur des messages privés de match : un clic pendant l'envoi part à la suite, jamais ignoré", async () => {
@@ -499,14 +551,26 @@ describe("langue du compte (lot 9-3)", () => {
     expect(source).not.toMatch(/disabled=/);
     // Une relecture de la fiche commencée avant l'envoi ne recouvre pas le choix enregistré ici.
     expect(source).toMatch(/if \(outcome\.stored\) setChosenHere\(true\);/);
+    // Ce que montre la case remonte à la page dès le geste (envoi en cours compris),
+    // jamais pendant le rendu (la relecture de la fiche passe par `setEnabled`).
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*if \(initial !== undefined\) onChoiceRef\.current\?\.\(enabled\);\s*\}, \[enabled, initial\]\);/);
+    expect(source).toContain("show: setEnabled,");
+    // Le toast lit l'état Discord à la fin de l'envoi, pas celui du clic.
+    expect(source).toContain("outcomeMessage(outcome.saved, reachableRef.current)");
+    expect(source).toMatch(/if \(initial !== undefined\) setEnabled\(initial\);/);
+    // Activés sans tag certifié : le toast ne promet pas un envoi (FR et EN).
+    expect(source).toMatch(/return discordReachable === false \? "matchDms\.enabledNotCertified" : "matchDms\.enabled";/);
+    const [fr, en] = [(await import("@/messages/fr/profile.json")).default.matchDms, (await import("@/messages/en/profile.json")).default.matchDms];
+    expect(fr.enabledNotCertified).toBe("Messages privés de match activés : ils partiront une fois ton tag Discord certifié.");
+    expect(en.enabledNotCertified).toBe("Match direct messages turned on: they'll be sent once your Discord tag is verified.");
     expect(source).toMatch(/initial !== shown && !busy && \(!chosenHere \|\| initial === undefined\)/);
   });
 
   it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
     const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
     const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
-    expect(fr).toContain("pour tes matchs, la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
-    expect(en).toContain("for your matches, the “Discord direct messages about my matches” box (My profile, Notifications section)");
+    expect(fr).toContain("pour tes matchs, ne partent qu'à un tag certifié et suivent la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
+    expect(en).toContain("for your matches, only go to a verified tag and follow the “Discord direct messages about my matches” box (My profile, Notifications section)");
   });
 
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
@@ -632,6 +696,8 @@ describe("anglais — écrans", () => {
       effects.armed = true;
       const html = inEnglish(<DiscordVerificationDialog {...props} onClose={() => undefined} onVerified={() => undefined} />);
       expect(html).toContain("Verify my Discord tag");
+      // Sans certification, aucun message privé de match : le dialogue le dit.
+      expect(html).toContain("It also lets the bot send you direct messages about your matches (times, reminders): without it, the bot sends you none.");
       expectEnglish(html);
     }
     // Un tag enregistré avec une commande de direction ne réordonne pas la phrase.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Coche } from "@/components/Coche";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
@@ -23,14 +23,31 @@ const UNREACHABLE_ID = "profile-match-dms-unreachable";
  * focalisable et utilisable (`aria-busy`) : un clic fait pendant l'envoi
  * s'affiche et part à la suite (`runQueuedSaves`), jamais perdu.
  *
- * `discordReachable` : le compte a un Discord rattaché ou un tag renseigné
- * (`toNotificationRecipient`). À `false`, une ligne dit qu'aucun de ces
- * messages ne peut partir pour l'instant ; `null` (état pas encore lu) : rien.
+ * `discordReachable` : le compte a un tag Discord **certifié** — seul un tel
+ * compte reçoit ces messages (`toNotificationRecipient`, portée `certified`,
+ * contre le spam). À `false`, une ligne le dit et mène à la certification
+ * (section Discord, `#discord`) ; `null` (état pas encore lu) : rien.
+ *
+ * `onChoice` : ce que montre la case (choix du joueur, valeur retenue, fiche
+ * relue) remonte à la page, qui en dépend ailleurs (la confirmation du retrait
+ * du tag ne promet la fin de ces messages qu'à un joueur qui les reçoit encore
+ * — y compris pendant l'envoi de son choix).
  */
+/** Toast du choix enregistré : « activés » ne promet rien sans tag certifié. */
+function outcomeMessage(enabled: boolean, discordReachable: boolean | null) {
+  if (!enabled) return "matchDms.disabled";
+  return discordReachable === false ? "matchDms.enabledNotCertified" : "matchDms.enabled";
+}
+
 export function MatchDmField({
   initial,
   discordReachable = null,
-}: Readonly<{ initial: boolean | undefined; discordReachable?: boolean | null }>): React.ReactElement | null {
+  onChoice,
+}: Readonly<{
+  initial: boolean | undefined;
+  discordReachable?: boolean | null;
+  onChoice?: (enabled: boolean) => void;
+}>): React.ReactElement | null {
   const text = useProfileText();
   const { t } = text;
   const { showError, showSuccess } = useToast();
@@ -41,6 +58,16 @@ export function MatchDmField({
     enabledRef.current = value;
     setEnabledState(value);
   };
+  // Ce que montre la case remonte à la page après le rendu, jamais pendant.
+  const onChoiceRef = useRef(onChoice);
+  const reachableRef = useRef(discordReachable);
+  useEffect(() => {
+    onChoiceRef.current = onChoice;
+    reachableRef.current = discordReachable;
+  });
+  useEffect(() => {
+    if (initial !== undefined) onChoiceRef.current?.(enabled);
+  }, [enabled, initial]);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   /** Choix fait pendant un envoi : affiché tout de suite, envoyé juste après. */
@@ -96,7 +123,9 @@ export function MatchDmField({
     if (outcome.stored) setChosenHere(true);
     // « Activés » / « désactivés » une fois, et seulement si le dernier choix
     // est enregistré : sinon la case reprend l'état gardé en base.
-    if (outcome.confirmed) showSuccess(t(outcome.saved ? "matchDms.enabled" : "matchDms.disabled"));
+    // Activés sans tag certifié : rien ne part encore, le toast le dit.
+    // (Lu à la fin de l'envoi : l'état Discord a pu arriver entre-temps.)
+    if (outcome.confirmed) showSuccess(t(outcomeMessage(outcome.saved, reachableRef.current)));
     busyRef.current = false;
     setBusy(false);
   };
@@ -123,7 +152,7 @@ export function MatchDmField({
       </p>
       {unreachable ? (
         <p id={UNREACHABLE_ID} className={s.hint}>
-          {t("matchDms.noDiscord")}
+          {t("matchDms.notCertified")} <a href="#discord" className={s.hintLink}>{t("matchDms.certifyLink")}</a>
         </p>
       ) : null}
     </div>

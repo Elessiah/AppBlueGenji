@@ -49,15 +49,15 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord username",
-    "Discord authentication, bot notifications. Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
+    "Discord authentication, bot notifications (match direct messages: certified tag only). Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
   ],
   [
     "Certification of the Discord username",
-    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), players and caster of your match from its launch to its end; other logged-in players only if you tick “Discord tag” (« Tag Discord »). Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
+    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), players and caster of your match from its launch to its end; other logged-in players only if you tick “Discord tag” (« Tag Discord »). Without it, the bot sends you no match direct message. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
   ],
   [
     "Discord ID",
-    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times and reminders, request to join a team you manage). Removable from My profile as long as you have another one left",
+    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times and reminders — only if your tag is certified —, request to join a team you manage). Removable from My profile as long as you have another one left",
   ],
   [
     "Google identifier",
@@ -85,7 +85,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Match direct messages choice",
-    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches; unticked in My profile (your objection), it no longer does. Kept in your legitimate interest: that is what allows your objection to be honoured. Included in the export of your data, reset to the default if the account is anonymized",
+    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches, if your Discord tag is certified; unticked in My profile (your objection), it no longer does. Kept in your legitimate interest: that is what allows your objection to be honoured. Included in the export of your data, reset to the default if the account is anonymized",
   ],
 ];
 

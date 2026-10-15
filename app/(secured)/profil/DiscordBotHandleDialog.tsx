@@ -120,8 +120,10 @@ export function DiscordBotHandleDialog({
         tag?: string;
       };
       if (!response.ok) throw new Error(payload.error ?? "");
+      // Rattaché par code, le tag n'est pas certifié : sans « Certifier mon
+      // tag », aucun message privé de match — le toast le rappelle.
       showSuccess(
-        mode === "LINK" ? t("botHandle.linked") : t("botHandle.updated"),
+        mode === "LINK" ? `${t("botHandle.linked")} ${t("botHandle.certifyForDms")}` : t("botHandle.updated"),
       );
       onUpdated(payload.tag ?? "");
     } catch (e) {
@@ -230,7 +232,7 @@ export function DiscordBotHandleDialog({
           }}
         >
           {t("botHandle.intro")} {mode === "UPDATE" ? `${t("botHandle.introUpdate")} ` : ""}
-          {t("botHandle.introOutro")}
+          {t("botHandle.introOutro")} {t("botHandle.matchDms")}
         </p>
 
         {!awaitingCode ? (

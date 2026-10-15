@@ -393,6 +393,9 @@ export function DiscordVerificationDialog({
             text.rich("verify.intro", { purpose: t("verify.purpose") }, { strong: (chunks) => <strong>{chunks}</strong> }),
           )}
         </p>
+        {/* Seul un tag certifié reçoit les messages privés de match (portée
+            `certified`) : le joueur le lit avant de renoncer. */}
+        <p style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>{t("verify.matchDms")}</p>
 
         <p
           style={{
