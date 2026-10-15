@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Coche } from "@/components/Coche";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
@@ -28,10 +28,10 @@ const UNREACHABLE_ID = "profile-match-dms-unreachable";
  * contre le spam). À `false`, une ligne le dit et mène à la certification
  * (section Discord, `#discord`) ; `null` (état pas encore lu) : rien.
  *
- * `onChoice` : ce que montre la case (choix du joueur, puis valeur retenue)
- * remonte à la page, qui en dépend ailleurs (la confirmation du retrait du tag
- * ne promet la fin de ces messages qu'à un joueur qui les reçoit encore — y
- * compris pendant l'envoi de son choix).
+ * `onChoice` : ce que montre la case (choix du joueur, valeur retenue, fiche
+ * relue) remonte à la page, qui en dépend ailleurs (la confirmation du retrait
+ * du tag ne promet la fin de ces messages qu'à un joueur qui les reçoit encore
+ * — y compris pendant l'envoi de son choix).
  */
 /** Toast du choix enregistré : « activés » ne promet rien sans tag certifié. */
 function outcomeMessage(enabled: boolean, discordReachable: boolean | null) {
@@ -58,11 +58,16 @@ export function MatchDmField({
     enabledRef.current = value;
     setEnabledState(value);
   };
-  /** Changement venu d'un geste du joueur : affiché et remonté à la page. */
-  const showChoice = (value: boolean) => {
-    setEnabled(value);
-    onChoice?.(value);
-  };
+  // Ce que montre la case remonte à la page après le rendu, jamais pendant.
+  const onChoiceRef = useRef(onChoice);
+  const reachableRef = useRef(discordReachable);
+  useEffect(() => {
+    onChoiceRef.current = onChoice;
+    reachableRef.current = discordReachable;
+  });
+  useEffect(() => {
+    if (initial !== undefined) onChoiceRef.current?.(enabled);
+  }, [enabled, initial]);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   /** Choix fait pendant un envoi : affiché tout de suite, envoyé juste après. */
@@ -99,7 +104,7 @@ export function MatchDmField({
     const next = !enabledRef.current;
     if (busyRef.current) {
       queued.current = next;
-      showChoice(next);
+      setEnabled(next);
       return;
     }
     busyRef.current = true;
@@ -113,13 +118,14 @@ export function MatchDmField({
         queued.current = null;
         return choice;
       },
-      show: showChoice,
+      show: setEnabled,
     });
     if (outcome.stored) setChosenHere(true);
     // « Activés » / « désactivés » une fois, et seulement si le dernier choix
     // est enregistré : sinon la case reprend l'état gardé en base.
     // Activés sans tag certifié : rien ne part encore, le toast le dit.
-    if (outcome.confirmed) showSuccess(t(outcomeMessage(outcome.saved, discordReachable)));
+    // (Lu à la fin de l'envoi : l'état Discord a pu arriver entre-temps.)
+    if (outcome.confirmed) showSuccess(t(outcomeMessage(outcome.saved, reachableRef.current)));
     busyRef.current = false;
     setBusy(false);
   };

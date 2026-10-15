@@ -514,6 +514,9 @@ export default function ProfilePage() {
   const [tagRemovalVerified, setTagRemovalVerified] = useState(false);
   // Messages privés de match encore reçus à l'ouverture (case cochée).
   const [tagRemovalDms, setTagRemovalDms] = useState(false);
+  // Ce que montre la case « Messages privés Discord de mes matchs » : la fiche
+  // relue par une sauvegarde du profil peut retarder sur un envoi en cours.
+  const [matchDmShown, setMatchDmShown] = useState<boolean | undefined>(undefined);
 
   /**
    * Retirer son tag Discord — l'annulation de l'exposition.
@@ -735,7 +738,7 @@ export default function ProfilePage() {
       discordTagBusy={discordTagBusy}
       onDiscordTagRemove={() => {
         setTagRemovalVerified(discordState.verified);
-        setTagRemovalDms(data?.matchDmEnabled !== false);
+        setTagRemovalDms((matchDmShown ?? data?.matchDmEnabled) !== false);
         setConfirmingTagRemoval(true);
       }}
       setVerifyOpen={setVerifyOpen}
@@ -1063,11 +1066,18 @@ export default function ProfilePage() {
             setSavedDiscordPseudo(tag);
             // Un pseudo qui change perd sa certification (comme côté serveur) :
             // l'écran ne la garde pas si la relecture de l'état Discord échoue.
+            // Le profil chargé aussi : il sert de repli quand cette lecture échoue.
             setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));
+            setData((prev) =>
+              prev && prev.profile.discordPseudo !== tag
+                ? { ...prev, profile: { ...prev.profile, discordVerified: false } }
+                : prev,
+            );
           }}
-          onDiscordUnlinked={() =>
-            setDiscordState((prev) => ({ ...prev, linked: false, verified: false, attested: false }))
-          }
+          onDiscordUnlinked={() => {
+            setDiscordState((prev) => ({ ...prev, linked: false, verified: false, attested: false }));
+            setData((prev) => (prev ? { ...prev, profile: { ...prev.profile, discordVerified: false } } : prev));
+          }}
         />
       </ProfileSection>
 
@@ -1080,7 +1090,7 @@ export default function ProfilePage() {
         <MatchDmField
           initial={data?.matchDmEnabled}
           discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
-          onChoice={(enabled) => setData((prev) => (prev ? { ...prev, matchDmEnabled: enabled } : prev))}
+          onChoice={setMatchDmShown}
         />
       </ProfileSection>
 
