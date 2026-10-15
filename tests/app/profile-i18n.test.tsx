@@ -491,9 +491,9 @@ describe("langue du compte (lot 9-3)", () => {
     );
     expect(fr.certifyLink).toBe("Certifier mon tag Discord");
     // Retirer le tag coupe aussi ces messages : la confirmation le dit (FR et EN).
-    const removal = [(await import("@/messages/fr/profile.json")).default.discord.removalBody, (await import("@/messages/en/profile.json")).default.discord.removalBody];
-    expect(removal[0]).toMatch(/le bot ne t'enverra plus non plus les messages privés de tes matchs\.$/);
-    expect(removal[1]).toMatch(/the bot will no longer send you direct messages about your matches either\.$/);
+    // Seulement pour un tag certifié : un tag qui ne l'est pas ne reçoit déjà rien.
+    const removal = [(await import("@/messages/fr/profile.json")).default.discord.removalBodyDms, (await import("@/messages/en/profile.json")).default.discord.removalBodyDms];
+    expect(removal).toEqual(["Le bot ne t'enverra plus non plus les messages privés de tes matchs.", "The bot will no longer send you direct messages about your matches either."]);
     // La page ne juge atteignable qu'un tag certifié (portée `certified` du serveur).
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
@@ -502,6 +502,8 @@ describe("langue du compte (lot 9-3)", () => {
     // Lecture de l'état Discord en échec (silencieuse) : le profil chargé prend
     // le relais, sinon un joueur non certifié ne serait jamais prévenu.
     expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
+    expect(page).toContain("<TagRemovalBody verified={discordState.verified} />");
+    expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
     // Le lien se distingue de la phrase (couleur + soulignement) : le `a` global
     // n'a ni l'un ni l'autre, et un lien du gris de l'aide ne se voit pas.
     const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
