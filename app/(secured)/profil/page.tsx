@@ -91,12 +91,15 @@ interface DiscordState {
 /**
  * Un message privé de match peut-il joindre ce compte ? Seulement avec un tag
  * Discord **certifié** (`toNotificationRecipient`, portée `certified`) : un
- * tag saisi ou un Discord rattaché sans tag certifié ne reçoit rien. `null`
- * tant que l'état Discord n'est pas lu.
+ * tag saisi ou un Discord rattaché sans tag certifié ne reçoit rien. Tant que
+ * l'état Discord n'est pas lu — ou si sa lecture a échoué, ce qu'elle fait en
+ * silence —, le profil déjà chargé fait foi (`discordVerified`) : sans lui, un
+ * joueur non certifié ne verrait jamais la ligne qui le prévient. `null` quand
+ * ni l'un ni l'autre n'est connu.
  */
-function matchDmReachable(discordState: DiscordState): boolean | null {
-  if (discordState.linked === null) return null;
-  return discordState.verified;
+function matchDmReachable(discordState: DiscordState, profileVerified: boolean | undefined): boolean | null {
+  if (discordState.linked !== null) return discordState.verified;
+  return profileVerified ?? null;
 }
 
 /**
@@ -1039,7 +1042,7 @@ export default function ProfilePage() {
             messages : la case le dit (`null` tant que l'état n'est pas lu). */}
         <MatchDmField
           initial={data?.matchDmEnabled}
-          discordReachable={matchDmReachable(discordState)}
+          discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
         />
       </ProfileSection>
 
