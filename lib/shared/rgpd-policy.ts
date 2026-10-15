@@ -98,7 +98,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion (contrat), son **exposition** repose sur la certification
     // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot. Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
+      "Authentification Discord, notifications bot (messages privés de match : tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",
@@ -182,7 +182,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // `bg_users.match_dm_enabled` : l'opposition aux messages privés de match
     // (registre T04), exportée et remise au défaut à l'anonymisation.
     finalite:
-      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs, si ton tag Discord est certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
     base: "Intérêt légitime",
     duree: "Durée du compte",
   },
