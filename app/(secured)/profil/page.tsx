@@ -139,7 +139,7 @@ function trimmedOrNull(value: string): string | null {
  * Corps de la confirmation « Retirer mon tag ». Seul un tag certifié est vu
  * de l'organisation et reçoit les messages privés de match : ce qui se perd
  * ne se dit qu'à lui — un tag qui ne l'est pas, invisible de tous, n'a rien
- * de cela à perdre (`removalBodyUnverified`).
+ * de cela à perdre (`removalBodyUnverified`, `removalBody2Unverified`).
  */
 function TagRemovalBody({ verified }: Readonly<{ verified: boolean }>) {
   const { t } = useProfileText();
@@ -147,7 +147,7 @@ function TagRemovalBody({ verified }: Readonly<{ verified: boolean }>) {
     <>
       <p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>
       {verified ? <p>{t("discord.removalBodyDms")}</p> : null}
-      <p>{t("discord.removalBody2")}</p>
+      <p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>
     </>
   );
 }
