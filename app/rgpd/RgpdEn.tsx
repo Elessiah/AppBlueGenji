@@ -215,9 +215,10 @@ export function RgpdEn({
             Discord, the BattleTag from Blizzard (kept up to date at each login as long as the Battle.net
             account is linked), the picture from Google or Discord (copied, and hidden until you show it). What
             you fill in yourself (game usernames entered, certification of the Discord tag, uploaded avatar,
-            adulthood) is optional, and the account works without it, with two limits: a tournament may require,
+            adulthood) is optional, and the account works without it, with three limits: a tournament may require,
             to register, a certified Discord tag or a linked Battle.net account, and a member of the streaming
-            staff cannot register as the caster of a match without both.
+            staff cannot register as the caster of a match without both; lastly, without a certified Discord tag,
+            no match Discord direct message is sent to you.
           </p>
           <p id="age-minimum">
             <strong>Minimum age.</strong> You must be at least {SITE_MINIMUM_AGE} years old to create an account
