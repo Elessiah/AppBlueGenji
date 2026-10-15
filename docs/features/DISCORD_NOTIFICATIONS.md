@@ -808,13 +808,18 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   focalisable et utilisable (`aria-busy`, ni `disabled` ni `aria-disabled`) ; un
   clic fait pendant l'envoi s'affiche et part à la suite (`runQueuedSaves`,
   comme la langue du compte), le toast de succès ne dit que le dernier choix
-  enregistré. Un compte sans Discord rattaché ni tag renseigné voit une ligne
-  de plus (`matchDms.noDiscord`, liée par `aria-describedby`) : aucun de ces
-  messages ne peut lui parvenir.
+  enregistré. Un compte sans tag Discord certifié voit une ligne de plus
+  (`matchDms.notCertified`, liée par `aria-describedby`, avec un lien vers
+  `#discord`) : aucun de ces messages ne peut lui parvenir. Si la lecture de
+  l'état Discord échoue, le `discordVerified` du profil chargé en tient lieu.
+  La confirmation « Retirer mon tag » ne dit l'arrêt de ces messages
+  (`discord.removalBodyDms`) qu'à un tag certifié ; un tag qui ne l'est pas
+  lit `discord.removalBodyUnverified`.
 - **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
-  `schedule.noticePlanning`, FR + EN) précise qu'un joueur qui a coupé ces
-  messages ne reçoit pas le message privé, pour qu'un arbitre ne le tienne pas
-  pour prévenu.
+  `schedule.noticePlanning`, FR + EN) précise que le message privé ne part
+  qu'aux joueurs au tag certifié qui n'ont pas coupé ces messages, pour qu'un
+  arbitre ne tienne pas les autres pour prévenus. L'aide Discord du panneau
+  push (`panel.discordHint`) dit aussi la condition du tag certifié.
 - **Déclaration** : registre T04 (FR + EN), ligne « Choix des messages privés de
   match » du tableau de `/rgpd` (`DONNEES_PROFIL`, intérêt légitime) et droit
   d'opposition (`MATCH_TIME_DM_SCOPE`, qui nomme l'avis de retrait et la case).
