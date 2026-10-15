@@ -644,9 +644,10 @@ message **par engagée**, pas un pour tout le monde : chaque joueur lit « ton
 
 Deux exclusions, silencieuses toutes les deux :
 
-- **Pas d'identité Discord** (ni `discord_id`, ni `discord_pseudo`) : le joueur
-  est simplement écarté. Ce n'est pas une anomalie — un compte créé par Google
-  n'a pas de tag.
+- **Pas de tag Discord certifié** (`discord_verified_at` nul — portée
+  `certified`, voir « Tags certifiés seulement ») : le joueur n'a pas de canal
+  Discord et garde ses push. Un tag saisi, ou un identifiant rattaché sans
+  certification, ne suffit pas.
 - **Pas sur un serveur BlueGenji** : le bot cherche le destinataire sur les
   serveurs `SERV_GENJI` et `SERV_RIVALS` (ou ceux de `GUILD_ID`, surcharge
   facultative) et **ne tente aucun envoi** s'il ne l'y trouve pas. Un tag mal
@@ -662,8 +663,8 @@ produit, sans bruit, depuis la création de ces envois : le bot lisait
 `GUILD_ID`, une variable absente de sa configuration réelle
 (blueGenjiBot#23).
 
-Le tag suffit — le bot résout le membre. L'ID, quand le compte a été lié par code
-Discord, évite cette recherche et reste donc prioritaire.
+Le tag certifié suffit — le bot résout le membre. L'ID du compte certifié, quand
+il est connu, évite cette recherche et reste donc prioritaire.
 
 Seules les manches dont **les deux** engagées sont connues sont rappelées : un
 plateau programmé à l'avance dont les qualifiées ne sont pas désignées n'a
