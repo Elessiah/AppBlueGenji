@@ -817,6 +817,9 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   (`discord.removalBodyDms`) qu'à un tag certifié dont la case est cochée à
   l'ouverture (le choix enregistré remonte à la page par `onStored`) ; un tag
   qui ne l'est pas lit `discord.removalBodyUnverified`.
+  Le dialogue de certification le dit aussi (`verify.matchDms`, sous
+  l'introduction), et l'avis de changement mène à `/profil#discord` par « Voir
+  mon tag Discord » (il part aussi aux tags déjà certifiés).
 - **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
   `schedule.noticePlanning`, FR + EN) précise que le message privé ne part
   qu'aux joueurs au tag certifié qui n'ont pas coupé ces messages, pour qu'un
