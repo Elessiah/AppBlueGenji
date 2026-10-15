@@ -272,9 +272,10 @@ function RgpdFr({
             Battle.net est rattaché), la photo par Google ou Discord (copiée, et masquée
             tant que vous ne l&apos;affichez pas). Ce que vous renseignez vous-même (pseudos de jeu
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
-            et le compte fonctionne sans, à deux limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
+            et le compte fonctionne sans, à trois limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
             compte Battle.net rattaché, et un membre du staff de diffusion ne peut
-            s&apos;inscrire comme caster d&apos;un match sans les deux.
+            s&apos;inscrire comme caster d&apos;un match sans les deux ; sans tag Discord certifié, enfin,
+            aucun message privé Discord de match ne vous est envoyé.
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour
