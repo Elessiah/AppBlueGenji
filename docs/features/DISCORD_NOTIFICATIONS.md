@@ -814,8 +814,9 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   `#discord`) : aucun de ces messages ne peut lui parvenir. Si la lecture de
   l'état Discord échoue, le `discordVerified` du profil chargé en tient lieu.
   La confirmation « Retirer mon tag » ne dit l'arrêt de ces messages
-  (`discord.removalBodyDms`) qu'à un tag certifié ; un tag qui ne l'est pas
-  lit `discord.removalBodyUnverified`.
+  (`discord.removalBodyDms`) qu'à un tag certifié dont la case est cochée à
+  l'ouverture (le choix enregistré remonte à la page par `onStored`) ; un tag
+  qui ne l'est pas lit `discord.removalBodyUnverified`.
 - **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
   `schedule.noticePlanning`, FR + EN) précise que le message privé ne part
   qu'aux joueurs au tag certifié qui n'ont pas coupé ces messages, pour qu'un
