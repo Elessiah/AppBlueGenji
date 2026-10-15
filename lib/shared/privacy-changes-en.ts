@@ -413,6 +413,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Read the terms of use",
     ],
   },
+  "2026-10-messages-de-match-tags-certifies": {
+    title: "Match direct messages: only with a certified Discord tag",
+    summary:
+      "To avoid spam, the bot now only sends the direct messages about your matches to accounts with a certified Discord tag; your push notifications don't change.",
+    details: [
+      "Time set, changed or removed, reminders (24 h and 10 h before) and the “Match retiré” notice: these Discord direct messages now only go to a Discord tag certified in “My profile”. A hand-typed tag, never certified, no longer receives any — it cannot point to someone else's Discord account by mistake.",
+      "To keep receiving them, certify your tag in “My profile”, Discord section. Your push notifications, the match direct messages switch and staff messages (referees, administration) don't change.",
+      "No new data is collected: fewer Discord usernames are sent to the bot.",
+    ],
+    linkLabels: ["Certify my Discord tag", "Read the “Match Discord direct messages” paragraph"],
+  },
 };
 
 /**

@@ -374,9 +374,9 @@ concurrentes déclenchent le même balayage, et sans ce verrou le joueur recevra
 son rappel en double.
 
 **Destinataires atteignables.** Ne comptent que les joueurs qu'un message
-atteindrait : un tag Discord, ou un appareil abonné aux rappels
+atteindrait : un tag Discord **certifié**, ou un appareil abonné aux rappels
 (`usersReachableByPush`, une lecture pour tout le passage, et seulement pour les
-joueurs sans Discord ; même règle que la distribution, écrite une fois dans
+joueurs sans tag certifié ; même règle que la distribution, écrite une fois dans
 `push-subscriptions.ts`). Une engagée que rien n'atteint ne pose pas `TOLD` —
 qui ferait dire « reprogrammé » à des joueurs n'ayant rien reçu — et ne coûte
 ni écriture ni lecture d'abonnements. Si cette lecture échoue, chacun est tenu
@@ -770,9 +770,17 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
 - **Écriture** : `PUT /api/profile/match-dms` `{ "enabled": boolean }` →
   `INVALID_MATCH_DM_PREFERENCE` (400) sinon, `ACCOUNT_DELETED` (409) pour un
   compte supprimé (`lib/server/users/match-dm-preference.ts`).
-- **Lecture** : `loadNotificationRecipients(ids, "declared", { matchDm: true })`
+- **Lecture** : `loadNotificationRecipients(ids, "certified", { matchDm: true })`
   (`lib/server/notify.ts`), appelé par `loadRecipientsByTeam`
-  (`match-reminders.ts`), seul chargeur des destinataires de match. Un joueur
+  (`match-reminders.ts`), seul chargeur des destinataires de match.
+- **Tags certifiés seulement** (décision du 2026-10-15, contre le spam) : la
+  portée `certified` ne garde un canal Discord qu'aux comptes dont
+  `bg_users.discord_verified_at` est posé — le tag certifié et l'identifiant
+  du compte qui l'a certifié. Un tag saisi à la main, ou un identifiant
+  rattaché sans tag certifié, n'a **pas de canal Discord** pour ces messages :
+  il garde ses push. `/profil` le dit sous l'interrupteur (`matchDms.notCertified`,
+  lien vers la section `#discord` pour certifier) dès que l'état Discord lu
+  n'est pas certifié. Le staff (`notifyStaff`) n'est pas concerné. Un joueur
   opposé reste destinataire **sans canal Discord** : ses push (sujet
   `MATCH_REMINDER`) partent comme avant ; sans appareil abonné, il ne compte pas
   comme atteint (pas de marque d'horaire reçu).
@@ -827,4 +835,4 @@ désigne le rôle arbitre, serveur par serveur.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : 24 h puis 10 h avant `bg_matches.start_at` (le second avec le lien du check-in ; les paliers « une semaine » et « 1 h avant » sont retirés), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`). Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser ou changer la date (`setMatchStartAt`) efface ses paliers (un retrait garde toutes les marques), et poser, changer ou retirer l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé / Horaire du match retiré », marque `TOLD` = horaire reçu), aux arbitres (push `MATCH_SCHEDULED`) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.
+- **Messages Discord automatisés** (`lib/shared/discord-notifications.ts` pur + `lib/server/tournaments/match-reminders.ts` / `issue-reports.ts`) : le site **rédige**, le bot **distribue** — le sens des appels reste app → bot. Deux usages. (1) **Rappels de match** : 24 h puis 10 h avant `bg_matches.start_at` (le second avec le lien du check-in ; les paliers « une semaine » et « 1 h avant » sont retirés), en message privé aux joueurs des deux engagées. Chaque palier ne vaut que dans **sa fenêtre** (`[début − palier, début − palier suivant)`). Une date posée **tardivement** ne rattrape pas les paliers manqués : elle donne une **annonce** unique portant la date, puis les paliers restants — le partage tient à la marque `SEEN`, posée à la première observation. Poser ou changer la date (`setMatchStartAt`) efface ses paliers (un retrait garde toutes les marques), et poser, changer ou retirer l'annonce aussitôt aux joueurs (« Match programmé / reprogrammé / Horaire du match retiré », marque `TOLD` = horaire reçu), aux arbitres (push `MATCH_SCHEDULED`) et au journal Discord (`schedule-notices.ts`). Aucun ordonnanceur : le balayage est entraîné par le trafic depuis `listTournamentBuckets`, étranglé à 1 min, et la ligne `bg_match_reminders (match_id, offset_key)` est **réservée avant l'envoi** — c'est la clé unique qui interdit le doublon. Un joueur sans tag Discord **certifié** est écarté du message privé — il reçoit le rappel en **push** s'il a abonné un appareil (`notifyUsers`, voir `docs/features/PUSH_NOTIFICATIONS.md`) ; un joueur absent des serveurs BlueGenji (`SERV_GENJI` / `SERV_RIVALS` côté bot, `GUILD_ID` en surcharge) ne reçoit **aucune tentative** d'envoi — et un bot qui ne joint **aucun** de ces serveurs répond `503`, jamais un « tous introuvables » en `200` que le site garderait pour définitif. (2) **Signalement d'un problème** : bouton dans l'en-tête du tournoi et sur chaque match, **réservé aux engagés** (`myTeamId`, revérifié serveur) ; part au canal de logs **et** au rôle arbitre configuré par `/set-referee-role`. Un bot injoignable est remonté en 503, jamais avalé. Voir `docs/features/DISCORD_NOTIFICATIONS.md`.

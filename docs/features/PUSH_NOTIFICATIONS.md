@@ -50,7 +50,8 @@ ait un producteur côté serveur.
 
 Un compte **sans** moyen Discord est désormais un destinataire : il peut avoir
 un appareil abonné. Le message privé, lui, garde ses règles (`proven` : un
-identifiant ou un tag certifié ; `declared` pour les seuls rappels de match).
+identifiant ou un tag certifié ; `certified` — tag certifié seul — pour les
+messages de match : un tag saisi n'a que ses push).
 
 ## Départ de match
 
