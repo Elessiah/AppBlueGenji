@@ -815,7 +815,7 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   l'état Discord échoue, le `discordVerified` du profil chargé en tient lieu.
   La confirmation « Retirer mon tag » ne dit l'arrêt de ces messages
   (`discord.removalBodyDms`) qu'à un tag certifié dont la case est cochée à
-  l'ouverture (ce que montre la case remonte à la page par `onChoice`, envoi en cours compris) ; un tag
+  l'ouverture (ce que montre la case remonte à la page par `onChoice`, envoi en cours et fiche relue compris) ; un tag
   qui ne l'est pas lit `discord.removalBodyUnverified`.
   Le dialogue de certification le dit aussi (`verify.matchDms`, sous
   l'introduction), et l'avis de changement mène à `/profil#discord` par « Voir
@@ -823,7 +823,9 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   Le dialogue du code du bot le rappelle (`botHandle.matchDms`). Détacher
   Discord (`onDiscordUnlinked`) ou changer de pseudo par le bot retire la
   certification à l'écran sans attendre la relecture de l'état Discord ;
-  cocher la case sans tag certifié affiche `matchDms.enabledNotCertified`.
+  cocher la case sans tag certifié affiche `matchDms.enabledNotCertified`
+  (état Discord lu à la fin de l'envoi). Un rattachement par code rappelle
+  de certifier le tag dans son toast (`botHandle.certifyForDms`).
 - **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
   `schedule.noticePlanning`, FR + EN) précise que le message privé ne part
   qu'aux joueurs au tag certifié qui n'ont pas coupé ces messages, pour qu'un
