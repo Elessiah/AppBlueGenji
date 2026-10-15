@@ -532,7 +532,7 @@ describe("langue du compte (lot 9-3)", () => {
     // Rattaché par code : le toast rappelle de certifier (FR et EN).
     const bot = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/DiscordBotHandleDialog.tsx"), "utf8");
     expect(bot).toContain('mode === "LINK" ? `${t("botHandle.linked")} ${t("botHandle.certifyForDms")}` : t("botHandle.updated")');
-    expect([frBot.certifyForDms, enBot.certifyForDms]).toEqual(["Certifie ton tag (section Discord) pour recevoir les messages privés de tes matchs.", "Verify your tag (Discord section) to receive direct messages about your matches."]);
+    expect([frBot.certifyForDms, enBot.certifyForDms]).toEqual(["Certifie ton tag (section Discord) : sans certification, aucun message privé de match ne te parvient.", "Verify your tag (Discord section): without verification, no match direct message reaches you."]);
     expect(page).toContain('<p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>');
     expect(page).toContain('<p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>');
     expect(page).toMatch(/function TagRemovalBody\([^)]*\)[^{]*\{[\s\S]*?\{verified && dms \? <p>\{t\("discord\.removalBodyDms"\)\}<\/p> : null\}/);
