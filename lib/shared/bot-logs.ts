@@ -347,7 +347,8 @@ export function formatRefereeDigestLog(matches: readonly RefereeDigestLogMatch[]
   const line = (shown: readonly string[], cited: number): string => {
     const hidden = matches.length - cited;
     const rest = hidden > 0 ? [`… et ${hidden} autre${hidden > 1 ? "s" : ""}`] : [];
-    return `${head}\n- ${[...shown, ...rest].join("\n- ")}`;
+    const entries = [...shown, ...rest];
+    return `${head}${entries.join(" ; ")}${entries.length > 0 ? "." : ""}`;
   };
   // Autant de manches que la borne et la longueur le permettent, mention du
   // reste comprise ; la première toujours, coupée s'il le faut.
