@@ -266,7 +266,9 @@ describe("formatRefereeDigestLog", () => {
   it("borne les manches citées", () => {
     const many = Array.from({ length: REFEREE_DIGEST_LOG_ENTRIES + 2 }, (_, index) => entry(index + 1));
     expect(formatRefereeDigestLog(many)).toContain("… et 2 autres.");
-    expect(formatRefereeDigestLog([entry(1)])).toContain("1 match à venir");
+    const single = formatRefereeDigestLog([entry(1)]);
+    expect(single).toContain("1 match à venir");
+    expect(single.endsWith(".")).toBe(true);
   });
 
   it("écrit « un joueur » en tournoi individuel", () => {

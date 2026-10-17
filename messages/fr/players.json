@@ -106,6 +106,7 @@
     "verifiedAlt": "Tag Discord vérifié",
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
     "teamsTitle": "Historique équipes",
+    "teamsEmpty": "Aucune appartenance à une équipe pour le moment.",
     "teamsColumn": {
       "team": "Équipe",
       "roles": "Rôles",
@@ -114,6 +115,7 @@
     },
     "active": "Actif",
     "tournamentsTitle": "Historique tournois",
+    "tournamentsEmpty": "Aucun tournoi joué pour le moment.",
     "tournamentsColumn": {
       "tournament": "Tournoi",
       "state": "Statut",

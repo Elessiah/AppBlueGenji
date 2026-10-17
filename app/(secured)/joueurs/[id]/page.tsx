@@ -47,6 +47,10 @@ function tournamentStateLabel(text: PlayersText, state: string): string {
   return isTournamentState(state) ? text.t(`page.state.${state}`) : state;
 }
 
+function HistoryEmpty({ empty, message }: { empty: boolean; message: string }) {
+  return empty ? <p className={styles.historyEmpty}>{message}</p> : null;
+}
+
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useLocaleRouter();
@@ -162,14 +166,14 @@ export default function PlayerDetailPage() {
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >
                   {activeTeam ? (
-                    <LocaleLink
-                      href={`/equipes/${activeTeam.teamId}`}
+                    <TeamLink
+                      teamId={activeTeam.teamId}
                       className="badge"
                       style={{ fontSize: 11 }}
                       title={t("page.viewTeam", { name: activeTeam.teamName })}
                     >
                       {activeTeam.teamName}
-                    </LocaleLink>
+                    </TeamLink>
                   ) : (
                     <span className="badge" style={{ fontSize: 11, opacity: 0.7 }} title={t("page.noTeamTitle")}>
                       {t("page.noTeam")}
@@ -310,6 +314,7 @@ export default function PlayerDetailPage() {
               </span>
             </div>
           ))}
+          <HistoryEmpty empty={data.teamsTimeline.length === 0} message={t("page.teamsEmpty")} />
         </div>
       </div>
 
@@ -338,6 +343,7 @@ export default function PlayerDetailPage() {
               <span data-label={t("page.tournamentsColumn.rank")}>{finalRankLabel(locale, entry.finalRank, (form, rank) => t(`page.rank.${form}`, { rank }))}</span>
             </div>
           ))}
+          <HistoryEmpty empty={data.tournaments.length === 0} message={t("page.tournamentsEmpty")} />
         </div>
       </div>
     </section>

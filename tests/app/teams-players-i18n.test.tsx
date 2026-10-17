@@ -466,12 +466,21 @@ describe("anglais", () => {
       tournaments: [{ tournamentId: 9, tournamentName: "Winter Cup", state: "RUNNING", finalRank: null, wins: 1, losses: 0, playedAt: "2026-02-02T00:00:00.000Z" }],
     });
     const html = inEnglish(<PlayerDetailPage />);
+    expect(html).toContain('href="/en/equipes/4"');
     expect(html).toContain("Referee");
     expect(html).toContain("Owner, Support");
     expect(html).toContain("In progress");
     expect(html).toContain("Hidden from the public");
     expect(html).toContain("Verified Discord tag");
     expect(html).toContain("Statistics");
+    expectEnglish(html);
+  });
+
+  it("fiche joueur sans historique : indique les deux états vides", () => {
+    mockPlayer = fullProfileResponse({ profile: { pseudo: "Nova" }, teamsTimeline: [], tournaments: [] });
+    const html = inEnglish(<PlayerDetailPage />);
+    expect(html).toContain("No team memberships yet.");
+    expect(html).toContain("No tournaments played yet.");
     expectEnglish(html);
   });
 
@@ -602,6 +611,15 @@ describe("revue UI/UX", () => {
     } finally {
       loader.useResourceLoader = original;
     }
+  });
+
+  it("fiche joueur en français sans historique : indique les deux états vides", () => {
+    mockLocale = "fr";
+    mockPlayer = fullProfileResponse({ profile: { pseudo: "Nova" }, teamsTimeline: [], tournaments: [] });
+    const html = renderToStaticMarkup(<PlayerDetailPage />);
+    expect(html).toContain("Aucune appartenance à une équipe pour le moment.");
+    expect(html).toContain("Aucun tournoi joué pour le moment.");
+    mockLocale = "en";
   });
 
   it("fiche joueur en français : « 3e », « 3 V – 1 D »", () => {

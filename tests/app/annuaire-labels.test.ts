@@ -39,7 +39,8 @@ describe("Fiche joueur — badge d'appartenance", () => {
   });
 
   it("affiche l'équipe courante en lien vers sa fiche", () => {
-    expect(playerDetail).toContain("href={`/equipes/${activeTeam.teamId}`}");
+    expect(playerDetail).toContain("<TeamLink");
+    expect(playerDetail).toContain("teamId={activeTeam.teamId}");
     expect(playerDetail).toContain("<LocaleLink");
     expect(playerDetail).toContain("{activeTeam.teamName}");
   });
