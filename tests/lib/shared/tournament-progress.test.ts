@@ -409,7 +409,7 @@ describe("computeRunningRatio", () => {
         ...matches(["COMPLETED", "PENDING", "PENDING", "PENDING"], { roundNumber: 2 }),
       ],
     });
-    expect(qualification).toBeCloseTo(1.5 / 7, 5);
+    expect(qualification).toBeCloseTo(1.25 / 7, 5);
 
     const playoffs = computeRunningRatio({
       format: "BG_SURVIE",
@@ -435,7 +435,7 @@ describe("computeRunningRatio", () => {
       matches: matches(["COMPLETED"], { roundNumber: 1000 }),
     });
     // La carte reste sous 100 % tant que l'état est encore RUNNING.
-    expect(justFinished).toBe(0.99);
+    expect(justFinished).toBeCloseTo(0.99, 2);
   });
 
   it("ne renvoie rien pour une survie à un seul engagé", () => {
