@@ -8,6 +8,7 @@ import type {
   TournamentPhase,
   TournamentState,
 } from "@/lib/shared/types";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 /**
  * Cycle de vie d'un tournoi, du moment où il n'existe pour personne jusqu'à sa
@@ -268,6 +269,12 @@ export type RunningProgressInput = {
   swiss?: Pick<SwissMeta, "totalRounds" | "currentRound"> | null;
   survivalStandings?: Pick<SurvivalStandingRow, "status">[] | null;
   enduranceStandings?: Pick<EnduranceStandingRow, "status">[] | null;
+  enduranceProgress?: {
+    currentRound: number;
+    maxRounds: number | null;
+    playoffSize: number;
+    playoffsStarted: boolean;
+  } | null;
   phases?: Pick<TournamentPhase, "id" | "state" | "format" | "swissTotalRounds">[] | null;
   currentPhaseId?: number | null;
 };
@@ -372,6 +379,40 @@ export function computeRunningRatio(input: RunningProgressInput): number | null 
   }
 
   if (input.format === "BG_SURVIE") {
+    const progress = input.enduranceProgress;
+    if (progress?.maxRounds && progress.maxRounds > 0) {
+      const maxRounds = Math.floor(progress.maxRounds);
+      const playoffRounds = Math.ceil(Math.log2(Math.max(2, progress.playoffSize)));
+      const totalRounds = maxRounds + playoffRounds;
+      const qualificationRound = Math.min(maxRounds, Math.max(0, Math.floor(progress.currentRound)));
+      const currentQualification = qualificationRound + 1;
+      const qualificationInner = progress.playoffsStarted
+        ? 0
+        : completedRatio(
+            input.matches.filter(
+              (match) => match.roundNumber === currentQualification && match.phaseId === 0,
+            ),
+          ) ?? 0;
+      const qualificationProgress = progress.playoffsStarted
+        ? maxRounds
+        : Math.min(maxRounds, qualificationRound + qualificationInner);
+
+      let playoffProgress = 0;
+      if (progress.playoffsStarted) {
+        for (let index = 0; index < playoffRounds; index += 1) {
+          const roundMatches = input.matches.filter(
+            (match) => match.roundNumber === PLAYOFF_ROUND_OFFSET + index,
+          );
+          if (!roundMatches.length) break;
+          const inner = completedRatio(roundMatches) ?? 0;
+          playoffProgress += inner;
+          if (inner < 1) break;
+        }
+      }
+      // Un tournoi en cours ne doit pas afficher 100 %, même si le dernier
+      // match vient de finir et que sa clôture n'a pas encore été propagée.
+      return Math.min(clamp01((qualificationProgress + playoffProgress) / totalRounds), 0.99);
+    }
     return eliminationRatio(input.enduranceStandings ?? []);
   }
 
