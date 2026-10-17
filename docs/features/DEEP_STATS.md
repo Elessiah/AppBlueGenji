@@ -160,6 +160,10 @@ Trois conséquences voulues :
 - un match opposant deux de ses équipes n'est compté qu'une fois, sinon il
   ajouterait à la fois une victoire et une défaite.
 
+La fiche joueur garde ses historiques d'équipes et de tournois séparés, avec un
+état vide explicite dans chaque rubrique. L'équipe active passe par `TeamLink`,
+comme celles de l'historique, afin de préserver la localisation du chemin.
+
 ### La carte d'annuaire descend du même chargeur
 
 `/joueurs` comptait ses victoires et ses défaites avec **sa propre requête**, et
