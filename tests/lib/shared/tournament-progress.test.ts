@@ -395,6 +395,49 @@ describe("computeRunningRatio", () => {
     expect(ratio).toBe(1);
   });
 
+  it("mesure les manches qualificatives puis les play-offs prévisibles de BG Survie", () => {
+    const qualification = computeRunningRatio({
+      format: "BG_SURVIE",
+      enduranceProgress: {
+        currentRound: 1,
+        maxRounds: 4,
+        playoffSize: 8,
+        playoffsStarted: false,
+      },
+      matches: [
+        ...matches(["COMPLETED", "COMPLETED"], { roundNumber: 1 }),
+        ...matches(["COMPLETED", "PENDING", "PENDING", "PENDING"], { roundNumber: 2 }),
+      ],
+    });
+    expect(qualification).toBeCloseTo(1.25 / 7, 5);
+
+    const playoffs = computeRunningRatio({
+      format: "BG_SURVIE",
+      enduranceProgress: {
+        currentRound: 2,
+        maxRounds: 4,
+        playoffSize: 8,
+        playoffsStarted: true,
+      },
+      matches: matches(["COMPLETED", "PENDING"], { roundNumber: 1000 }),
+    });
+    // Les deux manches qualificatives restantes sont comptées comme sautées.
+    expect(playoffs).toBeCloseTo(4.5 / 7, 5);
+
+    const justFinished = computeRunningRatio({
+      format: "BG_SURVIE",
+      enduranceProgress: {
+        currentRound: 1,
+        maxRounds: 1,
+        playoffSize: 2,
+        playoffsStarted: true,
+      },
+      matches: matches(["COMPLETED"], { roundNumber: 1000 }),
+    });
+    // La carte reste sous 100 % tant que l'état est encore RUNNING.
+    expect(justFinished).toBeCloseTo(0.99, 2);
+  });
+
   it("ne renvoie rien pour une survie à un seul engagé", () => {
     expect(
       computeRunningRatio({

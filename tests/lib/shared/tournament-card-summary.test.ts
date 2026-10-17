@@ -22,6 +22,10 @@ function source(overrides: Partial<RunningProgressSource> = {}): RunningProgress
     matchCounts: [],
     survivalStatuses: [],
     enduranceStatuses: [],
+    enduranceCurrentRound: 0,
+    enduranceMaxRounds: null,
+    endurancePlayoffSize: 8,
+    endurancePlayoffsStarted: false,
     phases: [],
     ...overrides,
   };

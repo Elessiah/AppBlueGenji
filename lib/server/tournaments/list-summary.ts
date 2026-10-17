@@ -79,6 +79,10 @@ type TournamentMetaRow = RowDataPacket & {
   swiss_total_rounds: number | null;
   swiss_current_round: number;
   current_phase_id: number | null;
+  endurance_current_round: number;
+  endurance_max_rounds: number | null;
+  endurance_playoff_size: number | null;
+  endurance_playoffs_started: number;
 };
 
 type MatchCountSqlRow = RowDataPacket & {
@@ -111,19 +115,27 @@ async function loadRunningProgress(
   const idsOf = (formats: TournamentCard["format"][]) =>
     cards.filter((card) => formats.includes(card.format)).map((card) => card.id);
 
-  // Survie et BG Survie se mesurent à leurs éliminations : leurs matchs ne
-  // servent à rien, et ce sont les plateaux les plus longs.
-  const matchIds = idsOf(["SINGLE", "DOUBLE", "SWISS", "MULTI"]);
+  // La Survie se mesure aux éliminations. BG Survie avec plafond de manches
+  // suit les manches qualificatives puis les tours prévisibles des play-offs.
   const survivalIds = idsOf(["SURVIVAL"]);
   const enduranceIds = idsOf(["BG_SURVIE"]);
   const multiIds = idsOf(["MULTI"]);
 
-  const [[metaRows], matchRows, survivalRows, enduranceRows, phaseRows] = await Promise.all([
-    db.execute<TournamentMetaRow[]>(
-      `SELECT id, swiss_total_rounds, swiss_current_round, current_phase_id
-       FROM bg_tournaments WHERE id IN (${sqlPlaceholders(ids.length)})`,
-      ids,
-    ),
+  const [metaRows] = await db.execute<TournamentMetaRow[]>(
+    `SELECT id, swiss_total_rounds, swiss_current_round, current_phase_id,
+            endurance_current_round, endurance_max_rounds, endurance_playoff_size,
+            endurance_playoffs_started
+     FROM bg_tournaments WHERE id IN (${sqlPlaceholders(ids.length)})`,
+    ids,
+  );
+  const metaById = new Map(metaRows.map((row) => [Number(row.id), row]));
+  const cappedEnduranceIds = cards
+    .filter((card) => card.format === "BG_SURVIE")
+    .filter((card) => Number(metaById.get(card.id)?.endurance_max_rounds ?? 0) > 0)
+    .map((card) => card.id);
+  const matchIds = [...idsOf(["SINGLE", "DOUBLE", "SWISS", "MULTI"]), ...cappedEnduranceIds];
+
+  const [matchRows, survivalRows, enduranceRows, phaseRows] = await Promise.all([
     matchIds.length
       ? db
           .execute<MatchCountSqlRow[]>(
@@ -167,7 +179,6 @@ async function loadRunningProgress(
       : Promise.resolve([] as PhaseSqlRow[]),
   ]);
 
-  const metaById = new Map(metaRows.map((row) => [Number(row.id), row]));
   const matchesById = groupBy(matchRows, (row) => Number(row.tournament_id));
   const survivalById = groupBy(survivalRows, (row) => Number(row.tournament_id));
   const enduranceById = groupBy(enduranceRows, (row) => Number(row.tournament_id));
@@ -195,6 +206,13 @@ async function loadRunningProgress(
       matchCounts,
       survivalStatuses: (survivalById.get(card.id) ?? []).map((row) => row.status),
       enduranceStatuses: (enduranceById.get(card.id) ?? []).map((row) => row.status),
+      enduranceCurrentRound: Number(meta?.endurance_current_round ?? 0),
+      enduranceMaxRounds:
+        meta?.endurance_max_rounds === null || meta?.endurance_max_rounds === undefined
+          ? null
+          : Number(meta.endurance_max_rounds),
+      endurancePlayoffSize: Number(meta?.endurance_playoff_size ?? 8),
+      endurancePlayoffsStarted: Number(meta?.endurance_playoffs_started ?? 0) === 1,
       phases: (phasesById.get(card.id) ?? []).map((row) => ({
         id: Number(row.id),
         state: row.state,

@@ -8,6 +8,7 @@ import type {
   TournamentPhase,
   TournamentState,
 } from "@/lib/shared/types";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 /**
  * Cycle de vie d'un tournoi, du moment où il n'existe pour personne jusqu'à sa
@@ -268,6 +269,12 @@ export type RunningProgressInput = {
   swiss?: Pick<SwissMeta, "totalRounds" | "currentRound"> | null;
   survivalStandings?: Pick<SurvivalStandingRow, "status">[] | null;
   enduranceStandings?: Pick<EnduranceStandingRow, "status">[] | null;
+  enduranceProgress?: {
+    currentRound: number;
+    maxRounds: number | null;
+    playoffSize: number;
+    playoffsStarted: boolean;
+  } | null;
   phases?: Pick<TournamentPhase, "id" | "state" | "format" | "swissTotalRounds">[] | null;
   currentPhaseId?: number | null;
 };
@@ -328,6 +335,58 @@ function eliminationRatio(standings: { status: string }[]): number | null {
   return clamp01(out / (standings.length - 1));
 }
 
+type EnduranceProgressPlan = {
+  currentRound: number;
+  maxRounds: number | null;
+  playoffSize: number;
+  playoffsStarted: boolean;
+};
+
+function qualificationProgress(
+  matches: Pick<BracketMatch, "status" | "roundNumber" | "phaseId">[],
+  progress: EnduranceProgressPlan,
+  maxRounds: number,
+): number {
+  if (progress.playoffsStarted) return maxRounds;
+
+  const completedRounds = Math.min(maxRounds, Math.max(0, Math.floor(progress.currentRound)));
+  const currentRound = completedRounds + 1;
+  const currentRoundRatio =
+    completedRatio(
+      matches.filter((match) => match.roundNumber === currentRound && match.phaseId === 0),
+    ) ?? 0;
+  return Math.min(maxRounds, completedRounds + currentRoundRatio);
+}
+
+function playoffProgress(
+  matches: Pick<BracketMatch, "status" | "roundNumber">[],
+  expectedRounds: number,
+): number {
+  let progress = 0;
+  for (let index = 0; index < expectedRounds; index += 1) {
+    const roundMatches = matches.filter((match) => match.roundNumber === PLAYOFF_ROUND_OFFSET + index);
+    if (!roundMatches.length) break;
+
+    const roundRatio = completedRatio(roundMatches) ?? 0;
+    progress += roundRatio;
+    if (roundRatio < 1) break;
+  }
+  return progress;
+}
+
+function cappedEnduranceRatio(
+  matches: Pick<BracketMatch, "status" | "roundNumber" | "phaseId">[],
+  progress: EnduranceProgressPlan,
+): number {
+  const maxRounds = Math.floor(progress.maxRounds ?? 0);
+  const playoffRounds = Math.ceil(Math.log2(Math.max(2, progress.playoffSize)));
+  const completedQualifications = qualificationProgress(matches, progress, maxRounds);
+  const completedPlayoffs = progress.playoffsStarted ? playoffProgress(matches, playoffRounds) : 0;
+
+  // Une carte encore « En cours » ne doit pas afficher 100 % avant sa clôture.
+  return Math.min(clamp01((completedQualifications + completedPlayoffs) / (maxRounds + playoffRounds)), 0.99);
+}
+
 /**
  * Avancement interne d'un tournoi en cours, de 0 à 1 — `null` quand rien ne
  * permet encore de le situer.
@@ -372,6 +431,10 @@ export function computeRunningRatio(input: RunningProgressInput): number | null 
   }
 
   if (input.format === "BG_SURVIE") {
+    const progress = input.enduranceProgress;
+    if (progress?.maxRounds && progress.maxRounds > 0) {
+      return cappedEnduranceRatio(input.matches, progress);
+    }
     return eliminationRatio(input.enduranceStandings ?? []);
   }
 
