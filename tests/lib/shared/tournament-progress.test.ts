@@ -423,6 +423,19 @@ describe("computeRunningRatio", () => {
     });
     // Les deux manches qualificatives restantes sont comptées comme sautées.
     expect(playoffs).toBeCloseTo(4.5 / 7, 5);
+
+    const justFinished = computeRunningRatio({
+      format: "BG_SURVIE",
+      enduranceProgress: {
+        currentRound: 1,
+        maxRounds: 1,
+        playoffSize: 2,
+        playoffsStarted: true,
+      },
+      matches: matches(["COMPLETED"], { roundNumber: 1000 }),
+    });
+    // La carte reste sous 100 % tant que l'état est encore RUNNING.
+    expect(justFinished).toBe(0.99);
   });
 
   it("ne renvoie rien pour une survie à un seul engagé", () => {
