@@ -481,6 +481,15 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
               swiss,
               survivalStandings: survival?.standings ?? null,
               enduranceStandings: endurance?.standings ?? null,
+              enduranceProgress:
+                card.format === "BG_SURVIE" && endurance
+                  ? {
+                      currentRound: endurance.currentRound,
+                      maxRounds: endurance.maxRounds,
+                      playoffSize: endurance.playoffSize,
+                      playoffsStarted: endurance.playoffsStarted,
+                    }
+                  : null,
               phases,
               currentPhaseId,
             })

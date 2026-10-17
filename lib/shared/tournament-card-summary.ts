@@ -63,6 +63,10 @@ export type RunningProgressSource = {
   matchCounts: readonly MatchCountRow[];
   survivalStatuses: readonly SurvivalStandingRow["status"][];
   enduranceStatuses: readonly EnduranceStandingRow["status"][];
+  enduranceCurrentRound: number;
+  enduranceMaxRounds: number | null;
+  endurancePlayoffSize: number;
+  endurancePlayoffsStarted: boolean;
   phases: readonly {
     id: number;
     state: PhaseState;
@@ -110,6 +114,15 @@ export function runningProgressFrom(source: RunningProgressSource): number | nul
         : null,
     survivalStandings: source.survivalStatuses.map((status) => ({ status })),
     enduranceStandings: source.enduranceStatuses.map((status) => ({ status })),
+    enduranceProgress:
+      source.format === "BG_SURVIE"
+        ? {
+            currentRound: source.enduranceCurrentRound,
+            maxRounds: source.enduranceMaxRounds,
+            playoffSize: source.endurancePlayoffSize,
+            playoffsStarted: source.endurancePlayoffsStarted,
+          }
+        : null,
     phases: source.phases.map((phase) => ({ ...phase })),
     currentPhaseId: source.currentPhaseId,
   });

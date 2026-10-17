@@ -17,6 +17,15 @@ inchangé : ce sont deux formats distincts.
 | Effectif des play-offs | 8 | `endurance_playoff_size` |
 | Manches maximum | aucune | `endurance_max_rounds` (`NULL` = aucune) |
 
+### Progression sur la carte de tournoi
+
+Avec un plafond de manches qualificatives, la progression de la carte compte
+les manches jouées sur ce plafond, puis les tours de play-offs prévisibles à
+partir de l'effectif configuré. Si les qualifications s'arrêtent plus tôt parce
+que l'effectif cible est atteint, les manches restantes sont comptées comme
+sautées. Le tour en cours avance selon ses matchs terminés. Sans plafond, la
+carte conserve la mesure fondée sur les équipes sorties.
+
 - Le barème se compte **map par map**, dans les deux sens : un 3-0 rapporte
   trois points au vainqueur et en coûte trois au perdant, un 3-2 n'en déplace
   qu'un. Ce n'est pas un point par match gagné.

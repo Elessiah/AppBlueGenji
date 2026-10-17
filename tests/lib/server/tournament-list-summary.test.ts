@@ -94,7 +94,7 @@ describe("loadCardSummaries", () => {
     expect(summaries.get(2)?.runningProgress).toBeCloseTo(1 / 4);
   });
 
-  it("ne lit que les tables utiles à chaque format", async () => {
+  it("lit les manches de BG Survie et les tables utiles aux autres formats", async () => {
     const { execute, pool } = database({
       "FROM bg_tournaments": [
         { id: 1, swiss_total_rounds: null, swiss_current_round: 0, current_phase_id: null },
@@ -117,13 +117,41 @@ describe("loadCardSummaries", () => {
     ]);
 
     const sql = sqlOf(execute);
-    // Survie et BG Survie se mesurent à leurs éliminations : aucun match lu.
+    // Les tournois sans plafond n'ont pas besoin de lire leurs manches.
     expect(sql.some((query) => query.includes("FROM bg_matches"))).toBe(false);
     expect(sql.some((query) => query.includes("bg_tournament_phases"))).toBe(false);
     expect(sql.find((query) => query.includes("bg_survival_standings"))).toMatch(/phase_id = 0/);
 
     expect(summaries.get(1)?.runningProgress).toBeCloseTo(1 / 2);
     expect(summaries.get(2)?.runningProgress).toBe(1);
+  });
+
+  it("ne lit les matchs de BG Survie que si les manches sont plafonnées", async () => {
+    const { execute, pool } = database({
+      "FROM bg_tournaments": [
+        {
+          id: 9,
+          swiss_total_rounds: null,
+          swiss_current_round: 0,
+          current_phase_id: null,
+          endurance_current_round: 1,
+          endurance_max_rounds: 4,
+          endurance_playoff_size: 8,
+          endurance_playoffs_started: 0,
+        },
+      ],
+      "FROM bg_matches": [
+        { tournament_id: 9, phase_id: 0, round_number: 1, total: 2, completed: 2 },
+        { tournament_id: 9, phase_id: 0, round_number: 2, total: 4, completed: 2 },
+      ],
+    });
+
+    const summaries = await loadCardSummaries(pool, [
+      card({ id: 9, state: "RUNNING", format: "BG_SURVIE" }),
+    ]);
+
+    expect(sqlOf(execute).some((query) => query.includes("FROM bg_matches"))).toBe(true);
+    expect(summaries.get(9)?.runningProgress).toBeCloseTo(1.5 / 7, 5);
   });
 
   it("mesure un multi-phases sur ses phases et sa phase courante", async () => {
