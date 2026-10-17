@@ -106,6 +106,7 @@
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
     "teamsTitle": "Team history",
+    "teamsEmpty": "No team memberships yet.",
     "teamsColumn": {
       "team": "Team",
       "roles": "Roles",
@@ -114,6 +115,7 @@
     },
     "active": "Active",
     "tournamentsTitle": "Tournament history",
+    "tournamentsEmpty": "No tournaments played yet.",
     "tournamentsColumn": {
       "tournament": "Tournament",
       "state": "Status",
