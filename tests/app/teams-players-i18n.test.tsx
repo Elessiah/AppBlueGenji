@@ -477,7 +477,7 @@ describe("anglais", () => {
   });
 
   it("fiche joueur sans historique : indique les deux états vides", () => {
-    mockPlayer = fullProfileResponse({ teamsTimeline: [], tournaments: [] });
+    mockPlayer = fullProfileResponse({ profile: { pseudo: "Nova" }, teamsTimeline: [], tournaments: [] });
     const html = inEnglish(<PlayerDetailPage />);
     expect(html).toContain("No team memberships yet.");
     expect(html).toContain("No tournaments played yet.");
@@ -615,7 +615,7 @@ describe("revue UI/UX", () => {
 
   it("fiche joueur en français sans historique : indique les deux états vides", () => {
     mockLocale = "fr";
-    mockPlayer = fullProfileResponse({ teamsTimeline: [], tournaments: [] });
+    mockPlayer = fullProfileResponse({ profile: { pseudo: "Nova" }, teamsTimeline: [], tournaments: [] });
     const html = renderToStaticMarkup(<PlayerDetailPage />);
     expect(html).toContain("Aucune appartenance à une équipe pour le moment.");
     expect(html).toContain("Aucun tournoi joué pour le moment.");

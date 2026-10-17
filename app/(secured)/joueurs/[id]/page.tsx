@@ -47,6 +47,10 @@ function tournamentStateLabel(text: PlayersText, state: string): string {
   return isTournamentState(state) ? text.t(`page.state.${state}`) : state;
 }
 
+function HistoryEmpty({ empty, message }: { empty: boolean; message: string }) {
+  return empty ? <p className={styles.historyEmpty}>{message}</p> : null;
+}
+
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useLocaleRouter();
@@ -300,20 +304,17 @@ export default function PlayerDetailPage() {
             <span>{t("page.teamsColumn.start")}</span>
             <span>{t("page.teamsColumn.end")}</span>
           </div>
-          {data.teamsTimeline.length === 0 ? (
-            <p className={styles.historyEmpty}>{t("page.teamsEmpty")}</p>
-          ) : (
-            data.teamsTimeline.map((entry) => (
-              <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
-                <TeamLink teamId={entry.teamId} podiumTier={deleted ? null : undefined}>{entry.teamName}</TeamLink>
-                <span data-label={t("page.teamsColumn.roles")}>{formatTeamRoles(entry.roles as TeamRole[], locale)}</span>
-                <span data-label={t("page.teamsColumn.start")}>{formatLocalDate(entry.joinedAt, locale)}</span>
-                <span data-label={t("page.teamsColumn.end")}>
-                  {entry.leftAt ? formatLocalDate(entry.leftAt, locale) : t("page.active")}
-                </span>
-              </div>
-            ))
-          )}
+          {data.teamsTimeline.map((entry) => (
+            <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
+              <TeamLink teamId={entry.teamId} podiumTier={deleted ? null : undefined}>{entry.teamName}</TeamLink>
+              <span data-label={t("page.teamsColumn.roles")}>{formatTeamRoles(entry.roles as TeamRole[], locale)}</span>
+              <span data-label={t("page.teamsColumn.start")}>{formatLocalDate(entry.joinedAt, locale)}</span>
+              <span data-label={t("page.teamsColumn.end")}>
+                {entry.leftAt ? formatLocalDate(entry.leftAt, locale) : t("page.active")}
+              </span>
+            </div>
+          ))}
+          <HistoryEmpty empty={data.teamsTimeline.length === 0} message={t("page.teamsEmpty")} />
         </div>
       </div>
 
@@ -328,24 +329,21 @@ export default function PlayerDetailPage() {
             <span>{t("page.tournamentsColumn.record")}</span>
             <span>{t("page.tournamentsColumn.rank")}</span>
           </div>
-          {data.tournaments.length === 0 ? (
-            <p className={styles.historyEmpty}>{t("page.tournamentsEmpty")}</p>
-          ) : (
-            data.tournaments.map((entry) => (
-              <div className="table-row" key={`${entry.tournamentId}-${entry.playedAt}`}>
-                <LocaleLink href={`/tournois/${entry.tournamentId}`}>{entry.tournamentName}</LocaleLink>
-                <span data-label={t("page.tournamentsColumn.state")}>{tournamentStateLabel(text, entry.state)}</span>
-                <span data-label={t("page.tournamentsColumn.record")}>
-                  {richNodes(
-                    text.rich("page.record", { wins: entry.wins, losses: entry.losses }, {
-                      loss: (chunks) => <span className="result-loss">{chunks}</span>,
-                    }),
-                  )}
-                </span>
-                <span data-label={t("page.tournamentsColumn.rank")}>{finalRankLabel(locale, entry.finalRank, (form, rank) => t(`page.rank.${form}`, { rank }))}</span>
-              </div>
-            ))
-          )}
+          {data.tournaments.map((entry) => (
+            <div className="table-row" key={`${entry.tournamentId}-${entry.playedAt}`}>
+              <LocaleLink href={`/tournois/${entry.tournamentId}`}>{entry.tournamentName}</LocaleLink>
+              <span data-label={t("page.tournamentsColumn.state")}>{tournamentStateLabel(text, entry.state)}</span>
+              <span data-label={t("page.tournamentsColumn.record")}>
+                {richNodes(
+                  text.rich("page.record", { wins: entry.wins, losses: entry.losses }, {
+                    loss: (chunks) => <span className="result-loss">{chunks}</span>,
+                  }),
+                )}
+              </span>
+              <span data-label={t("page.tournamentsColumn.rank")}>{finalRankLabel(locale, entry.finalRank, (form, rank) => t(`page.rank.${form}`, { rank }))}</span>
+            </div>
+          ))}
+          <HistoryEmpty empty={data.tournaments.length === 0} message={t("page.tournamentsEmpty")} />
         </div>
       </div>
     </section>
