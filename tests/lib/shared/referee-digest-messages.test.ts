@@ -231,13 +231,12 @@ describe("formatRefereeDigestLog", () => {
     roundNumber: 1,
   });
 
-  it("tient en une ligne, sans auteur", () => {
+  it("présente chaque match sur sa propre ligne, sans auteur", () => {
     const line = formatRefereeDigestLog([entry(1), entry(2)]);
-    expect(line).not.toContain("\n");
     expect(line).toBe(
-      "📋 Programme d'arbitrage — 2 matchs à venir (heure de Paris) : " +
-        "jeu. 20:00 Renards 1 vs Nova 1 (« Coupe » (#7), Manche 1, match #1) ; " +
-        "jeu. 20:00 Renards 2 vs Nova 2 (« Coupe » (#7), Manche 1, match #2).",
+      "📋 Programme d'arbitrage — 2 matchs à venir (heure de Paris) :\n" +
+        "- jeu. 20:00 Renards 1 vs Nova 1 (« Coupe » (#7), Manche 1, match #1)\n" +
+        "- jeu. 20:00 Renards 2 vs Nova 2 (« Coupe » (#7), Manche 1, match #2).",
     );
     expect(line).not.toContain("staff");
   });
