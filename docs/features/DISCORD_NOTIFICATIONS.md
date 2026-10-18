@@ -613,7 +613,7 @@ Canaux :
   liste écrite en entier y serait coupée et deux programmes au même début
   confondus), pour qu'un programme suivant ne remplace jamais sur l'appareil
   un précédent qui en cite d'autres ;
-- une **ligne** au canal de logs Discord (`sendBotLog`), là où les arbitres
+- un message au canal de logs Discord (`sendBotLog`), là où les arbitres
   suivent déjà les horaires posés — `formatRefereeDigestLog` : engagées par
   `entrantLabel` (« un joueur » en solo — et pour toute entrée solo,
   `bg_teams.solo_user_id`, même si le type du tournoi est illisible, comme
@@ -621,7 +621,7 @@ Canaux :
   (c'est le site qui l'envoie), chaque entrée avec sa manche
   (`matchRoundLabel`) ; en solo, les matchs consécutifs d'un même créneau,
   tournoi et manche en une entrée « 8 matchs (« Coupe » (#7), Manche 1) » ;
-  douze entrées au plus **et 1 900 caractères**
+  une puce par entrée, douze entrées au plus **et 1 900 caractères**
   (`REFEREE_DIGEST_LOG_MAX_LENGTH`) : Discord refuse un message de plus de
   2 000 caractères, que le bot envoie sans le découper — le programme, ses
   marques déjà posées, serait perdu. Les manches qui ne tiennent pas sont
