@@ -334,7 +334,8 @@ function digestTime(startAt: string | Date): string {
 
 /**
  * Programme d'arbitrage (`lib/server/tournaments/referee-digest.ts`) : les
- * matchs à venir (10 prochaines heures et marge de regroupement), **en une ligne** (règle 1), dans l'ordre du
+ * matchs à venir (10 prochaines heures et marge de regroupement), sous forme
+ * de liste à puces, dans l'ordre du
  * coup d'envoi, bornée à {@link REFEREE_DIGEST_LOG_ENTRIES} manches et à
  * {@link REFEREE_DIGEST_LOG_MAX_LENGTH} caractères (« … et N autres »).
  * Engagées par `entrantLabel` (« un joueur » en tournoi individuel), tournoi
@@ -343,17 +344,17 @@ function digestTime(startAt: string | Date): string {
  */
 export function formatRefereeDigestLog(matches: readonly RefereeDigestLogMatch[]): string {
   const subject = `${matches.length} match${matches.length > 1 ? "s" : ""} à venir`;
-  const head = `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) : `;
+  const head = `${leadOn("📋", "Programme d'arbitrage", subject)} (heure de Paris) :`;
   const line = (shown: readonly string[], cited: number): string => {
     const hidden = matches.length - cited;
     const rest = hidden > 0 ? [`… et ${hidden} autre${hidden > 1 ? "s" : ""}`] : [];
-    return `${head}${[...shown, ...rest].join(" ; ")}.`;
+    return `${head}\n${[...shown, ...rest].map((entry) => `- ${entry}`).join("\n")}.`;
   };
   // Autant de manches que la borne et la longueur le permettent, mention du
   // reste comprise ; la première toujours, coupée s'il le faut.
   // Une entrée par match ; en solo (aucun nom à citer), une par créneau,
   // tournoi et manche quand ils se suivent : « 8 matchs », pas huit entrées
-  // « un joueur vs un joueur » qui pousseraient les autres hors de la ligne.
+  // « un joueur vs un joueur » qui pousseraient les autres hors du message.
   const groups: { first: RefereeDigestLogMatch; time: string; round: string; count: number }[] = [];
   for (const match of matches) {
     const time = digestTime(match.startAt);
