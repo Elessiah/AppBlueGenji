@@ -153,7 +153,8 @@ Sans caster, ou pour le caster lui-même (arbitre qui caste), rien n'est relu.
 Une relecture qui échoue passagèrement (réseau, 5xx, quota) garde ce qui est
 affiché, sans notification, et se retente jusqu'à 3 fois toutes les 10 s
 (`shouldRetryReread`, compteur remis à zéro par chaque nouvelle relecture ;
-jamais avant l'attente qu'un refus de quota demande, `Retry-After`) ; un refus définitif (`isFinalRefusal` : plus partie du
+jamais avant l'attente qu'un refus de quota demande, `Retry-After`) ; un échec
+passager de la première lecture est notifié une fois, puis retenté de même ; un refus définitif (`isFinalRefusal` : plus partie du
 match, déconnecté) retire les contacts affichés. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
