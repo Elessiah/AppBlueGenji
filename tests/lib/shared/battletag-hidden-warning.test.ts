@@ -7,6 +7,7 @@ import frLogin from "@/messages/fr/login.json";
 import enLogin from "@/messages/en/login.json";
 import { TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
 import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 
 /**
  * CONTACTS-FOLLOWUP (décisions du 2026-10-19) : masqué, le BattleTag ne se lit
@@ -89,6 +90,8 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(TERMS_SECTIONS_EN.map((s) => s.id)).toEqual(TERMS_SECTIONS.map((s) => s.id));
     const text = en?.paragraphs.join(" ") ?? "";
     expect(text).toContain("**even when hidden**");
+    // L'annonce v5 (PRIVACY_CHANGES) donne la même marche pour un BattleTag reçu de Battle.net.
+    expect(JSON.stringify(PRIVACY_CHANGES.at(-1))).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(text).toContain("once the Battle.net account is unlinked, which requires another means of logging in)");
     expect(text).toContain("**only while the match is being played**, from its start to its end");
     expect(text).toContain("a hidden BattleTag is readable nowhere else on the site, by anyone — referees and administrators included");

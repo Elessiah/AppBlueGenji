@@ -280,6 +280,6 @@ describe("fiches de contact — noms cliquables", () => {
     // Phase du serveur à la lecture ; un horaire changé fait relire la modale.
     expect(source).toContain("contactsShown={matchUnderway(launch.phase)}");
     // La note parle du caster : jamais montrée au caster lui-même (arbitre qui caste compris).
-    expect(source).toContain('contactsLaterText={casterContactsPending(launch) ? t("contacts.casterLater") : undefined}');
+    expect(source).toContain('contactsLaterText={launch.viewer.role === "CASTER" ? undefined : t("contacts.casterLater")}');
   });
 });
