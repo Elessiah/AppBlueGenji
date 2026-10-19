@@ -93,24 +93,32 @@ export function casterRereadDelay(launch: MatchLaunchInfo, serverDate: string | 
   return Math.min(start - server + 1_000, MAX_TIMER_MS);
 }
 
+/** Horaire du match tel que la carte le reçoit (écritures annoncées par le flux). */
+export type CardSchedule = { startAt: string | null; launchedAt: string | null };
+
 /**
- * Relire la modale ouverte quand la carte change de phase ? Quand le match
- * part par une écriture (lancement forcé, ouvert avant l'heure) et que les
- * contacts du caster attendent encore ; ou quand il revient avant son départ
- * (reprogrammé) alors que la lecture le tenait pour parti, pour que la
- * relecture du nouveau départ porte sur le caster du moment. Pas sans caster,
- * pas à la fin du match (un refus non demandé), ni à chaque rendu.
+ * Relire la modale ouverte quand l'horaire de la carte change ? Un lancement
+ * forcé (`launchedAt`), un match reprogrammé ou remis à planifier (`startAt`)
+ * sont des écritures : la lecture du caster (contacts, ou note d'attente) et
+ * l'heure de la relecture suivante en dépendent. Rien sans caster ; jamais à
+ * l'horloge du navigateur, que la relecture à l'heure du serveur couvre.
  */
-export function rereadOnPhaseChange(
-  previous: MatchLaunchPhase | null,
-  next: MatchLaunchPhase | null,
+export function rereadOnScheduleChange(
+  previous: CardSchedule,
+  next: CardSchedule,
   launch: MatchLaunchInfo | null,
 ): boolean {
   if (launch === null || launch.caster === null) return false;
-  const starts = matchUnderway(next) && !matchUnderway(previous) && casterContactsPending(launch);
-  const backBeforeStart =
-    matchUnderway(previous) && (next === "SCHEDULED" || next === "TO_PLAN") && matchUnderway(launch.phase);
-  return starts || backBeforeStart;
+  return previous.startAt !== next.startAt || previous.launchedAt !== next.launchedAt;
+}
+
+/**
+ * Refus définitif d'une relecture (plus partie du match, déconnecté…) : les
+ * contacts affichés sont retirés. Tout autre échec (réseau, 5xx, quota) est
+ * passager : l'affichage reste et la relecture se retente.
+ */
+export function isFinalRefusal(code: string | null): boolean {
+  return code === "MATCH_CONTACTS_UNAVAILABLE" || code === "UNAUTHORIZED" || code === "INVALID_MATCH_ID";
 }
 
 type ContactsRead = { launch: MatchLaunchInfo; serverDate: string | null } | { error: string | null };
@@ -174,20 +182,16 @@ export function MatchContactsDialog({
   onClose,
   startAt = null,
   launchedAt = null,
-  phase = null,
 }: Readonly<{
   matchId: number;
   matchLabel: string;
   onClose: () => void;
-  /** Heure de départ du match : un match pas encore lancé est relu à la frontière. */
+  /**
+   * Horaire de la carte : un match pas encore lancé est relu à la frontière du
+   * départ ; un changement (lancement forcé, reprogrammé) fait relire la modale.
+   */
   startAt?: string | null;
   launchedAt?: string | null;
-  /**
-   * Phase de la carte : un match parti par une écriture (lancement forcé) fait
-   * relire une modale dont les contacts du caster attendent ; un match revenu
-   * avant son départ (reprogrammé) les masque de nouveau.
-   */
-  phase?: MatchLaunchPhase | null;
 }>) {
   const text = useLaunchText();
   const { t } = text;
@@ -208,14 +212,15 @@ export function MatchContactsDialog({
   const [serverDate, setServerDate] = useState<string | null>(null);
   const launch = state.kind === "ready" ? state.launch : null;
   const [rereadFailures, setRereadFailures] = useState(0);
-  // Phase de la carte vue par la dernière lecture réussie : un changement
+  // Horaire de la carte vu par la dernière lecture réussie : un changement
   // survenu pendant la première lecture compte à son arrivée.
-  const previousPhase = useRef(phase);
+  const previousSchedule = useRef<CardSchedule>({ startAt, launchedAt });
   useEffect(() => {
     if (!launch) return;
-    if (rereadOnPhaseChange(previousPhase.current, phase, launch)) setReadKey((key) => key + 1);
-    previousPhase.current = phase;
-  }, [phase, launch]);
+    const schedule = { startAt, launchedAt };
+    if (rereadOnScheduleChange(previousSchedule.current, schedule, launch)) setReadKey((key) => key + 1);
+    previousSchedule.current = schedule;
+  }, [startAt, launchedAt, launch]);
 
   // Relecture échouée : quelques nouvelles tentatives espacées.
   useEffect(() => {
@@ -236,8 +241,8 @@ export function MatchContactsDialog({
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
-    // Une relecture (départ du match) garde à l'écran ce qui est déjà lu si
-    // elle échoue : seuls les contacts du caster y manquaient.
+    // Une relecture (départ, horaire changé) qui échoue passagèrement garde à
+    // l'écran ce qui est déjà lu : seuls les contacts du caster y manquaient.
     const reread = readKey > 0;
     void (async () => {
       try {
@@ -247,7 +252,7 @@ export function MatchContactsDialog({
         });
         if (!alive) return;
         if ("error" in read) {
-          if (reread) {
+          if (reread && !isFinalRefusal(read.error)) {
             setRereadFailures((count) => count + 1);
             return;
           }
@@ -340,7 +345,7 @@ export function MatchContactsDialog({
                   // Les contacts du caster ne sortent que le temps du match
                   // (`exposesCaster`) : avant, une note plutôt que deux « — »
                   // qui laisseraient croire qu'il n'en a pas.
-                  contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}
+                  contactsShown={matchUnderway(launch.phase)}
                   // Pas au caster lui-même (arbitre compris) : la note parle de lui.
                   contactsLaterText={casterContactsPending(launch) ? t("contacts.casterLater") : undefined}
                   noCasterText={t("contacts.noCaster")}
