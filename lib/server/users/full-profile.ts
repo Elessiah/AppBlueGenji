@@ -151,9 +151,6 @@ export async function getFullProfile(
   // un tag rendu visible aussi, le lecteur ordinaire ne voit de toute façon
   // pas, et une requête de plus sur chaque fiche consultée n'aurait servi à
   // personne.
-  // La question est partagée avec le BattleTag ci-dessous : posée une fois au plus.
-  let activeTournament: Promise<boolean> | null = null;
-  const targetInActiveTournament = () => (activeTournament ??= isInActiveTournament(targetUserId));
 
   const discordVisible = profile.visibility.discord;
   const needsTournamentCheck =
@@ -166,7 +163,7 @@ export async function getFullProfile(
     userId: targetUserId,
     verified: discordVerified,
     visible: discordVisible,
-    inActiveTournament: needsTournamentCheck ? await targetInActiveTournament() : false,
+    inActiveTournament: needsTournamentCheck ? await isInActiveTournament(targetUserId) : false,
   });
 
   // **Le BattleTag masqué l'est pour tous** sur la fiche, arbitres et
