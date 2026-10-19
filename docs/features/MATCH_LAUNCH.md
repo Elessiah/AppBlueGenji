@@ -54,9 +54,17 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   un match lancé d'office **sans score noté** que l'arbitre reporte dans le
   futur (ou rend à planifier) quitte le lancement — `launched_at` effacé
   (`leavesLaunch`, `match-schedule.ts`), sans quoi un score se saisirait avant
-  la nouvelle heure. De même, allumer la planification par l'arbitrage rend à
-  planifier les matchs sans date lancés d'office, sans score
-  (`setRefereeScheduling`).
+  la nouvelle heure. Seul un lancement **venu de l'horaire** (`launched_at` ≥
+  ancienne heure, ou sans heure hors planification) et une date qui **change**
+  sont concernés : un lancement forcé avant l'heure, ou la même date
+  réenregistrée, restent. De même, allumer la planification par l'arbitrage
+  rend à planifier les matchs sans date lancés d'office, sans score
+  (`setRefereeScheduling`). « Forcer le lancement » et le retrait d'un caster
+  inéligible jugent la phase allumée (lancé = `launched_at` posé) : à l'heure
+  passée, avant la passe de l'entretien, forcer enregistre le lancement au lieu
+  de le refuser. Un report de score refusé faute de `launched_at` (horloge de
+  l'appareil en avance) rend `MATCH_NOT_STARTED` (« le match n'a pas encore
+  commencé », FR + EN), jamais la phrase des « Prêt » (`MATCH_NOT_LAUNCHED`).
 - **Allumée** : exactement le comportement décrit ci-dessous.
 - **Absente** d'un appel (`launchPhase` non passé) : allumée — la règle
   d'origine ; au pire un instant de « Lancement » affiché, que l'entretien
