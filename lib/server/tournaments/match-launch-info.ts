@@ -429,13 +429,16 @@ function revokeIneligibleCasters(
   visible: readonly VisibleLaunch[],
   users: Map<number, UserRow>,
   revokedCasts: { matchId: number; casterId: number }[],
+  casterPlays: (row: CandidateRow, casterId: number) => boolean = () => false,
 ): Set<number> {
   const now = Date.now();
   const revoked = new Set<number>();
   for (const { row } of visible) {
     if (row.caster_user_id === null) continue;
     const casterId = Number(row.caster_user_id);
-    if (castEligibilityBlock(users.get(casterId)) !== null) {
+    // Un caster devenu joueur du match ne donnera jamais son « Prêt » de
+    // caster : comme un caster inéligible, il est tu et son inscription retirée.
+    if (castEligibilityBlock(users.get(casterId)) !== null || casterPlays(row, casterId)) {
       revoked.add(Number(row.id));
       // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
       // un tournoi sans phase de lancement, un match à l'heure passée se lit
@@ -618,7 +621,16 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const { rosterTeamIds, userIds } = collectContactIds(checked);
     const rosters = await loadRosters(connection, rosterTeamIds);
     const users = await loadUsers(connection, userIds);
-    const revoked = revokeIneligibleCasters(checked, users, revokedCasts);
+    // Le caster joue-t-il le match ? Pour le lecteur, ses équipes ; pour un
+    // autre, les rosters et entrées solo lus pour les contacts.
+    const casterPlays = (row: CandidateRow, casterId: number) =>
+      (casterId === viewer.id && viewerPlaysMatch(row, teams)) ||
+      ([1, 2] as const).some((index) => {
+        const side = rowSide(row, index);
+        if (side.soloUserId !== null) return Number(side.soloUserId) === casterId;
+        return (rosters.get(Number(side.teamId)) ?? []).some((member) => Number(member.user_id) === casterId);
+      });
+    const revoked = revokeIneligibleCasters(checked, users, revokedCasts, casterPlays);
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, exposes } of visible) {

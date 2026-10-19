@@ -518,7 +518,14 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
     // lancement (heure passée, entretien pas encore passé : pas encore lancé).
     const phase = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now());
     if (phase !== "TO_PLAN" && phase !== "SCHEDULED" && phase !== "LOBBY") return;
-    if ((await loadCastEligibility(connection, casterId)) === null) return;
+    // Un caster devenu joueur du match (équipe rejointe après l'inscription,
+    // que `CASTER_IS_PLAYER` ne contrôle qu'à l'inscription) ne donnera jamais
+    // son « Prêt » de caster : son inscription bloquerait le départ jusqu'au
+    // lancement d'office.
+    const released =
+      (await loadCastEligibility(connection, casterId)) !== null ||
+      (await resolveTeamParty(connection, row, casterId)) !== null;
+    if (!released) return;
 
     await connection.execute(
       `UPDATE bg_matches SET caster_user_id = NULL, caster_ready_at = NULL WHERE id = ? AND caster_user_id = ?`,
