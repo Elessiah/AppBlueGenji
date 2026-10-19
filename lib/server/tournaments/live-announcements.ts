@@ -430,6 +430,24 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
   }
 }
 
+/**
+ * Date les réservations du groupe dans la soirée qui les publie : elles sont
+ * prises **avant** son ouverture (`started_at = NOW()`, à la seconde), parfois
+ * plusieurs secondes avant quand l'envoi d'un autre public passe d'abord. Plus
+ * anciennes qu'elle, elles ne compteraient pas parmi ses matchs annoncés : le
+ * match sortirait du message à la modification suivante, et après un envoi
+ * incertain la soirée se croirait sans annonce — une seconde notification.
+ */
+async function stampClaims(rows: readonly LiveCandidateRow[], startedAt: Date | string): Promise<void> {
+  const db = await getDatabase();
+  const placeholders = rows.map(() => "(?, ?)").join(", ");
+  const params = rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]);
+  await db.execute(
+    `UPDATE bg_live_announcements SET sent_at = GREATEST(sent_at, ?) WHERE (match_id, pairing) IN (${placeholders})`,
+    [startedAt, ...params],
+  );
+}
+
 /** Matchs réservés par un passage pour un même public (chaîne officielle ou non). */
 interface AnnouncementGroup {
   target: LiveMentionTarget;
@@ -656,11 +674,16 @@ function alreadyAnnounced(group: AnnouncementGroup, others: readonly LiveCandida
 /**
  * Un engagé d'une ligne de soirée : un tournoi qui compte une entrée
  * individuelle est un tournoi individuel, même au type illisible — son invité
- * sans compte ne part pas sous son nom.
+ * sans compte ne part pas sous son nom, y compris dans un match entre deux
+ * invités (`soloTournaments` : tournois dont un match lu en compte une).
  */
-function eveningEntrant(row: LiveCandidateRow, side: 1 | 2, withPseudo: boolean): string | null {
-  const solo = row.team1_solo_user_id != null || row.team2_solo_user_id != null;
-  const participantType = solo ? "SOLO" : row.participant_type;
+function eveningEntrant(
+  row: LiveCandidateRow,
+  side: 1 | 2,
+  withPseudo: boolean,
+  soloTournaments: ReadonlySet<number>,
+): string | null {
+  const participantType = soloTournaments.has(Number(row.tournament_id)) ? "SOLO" : row.participant_type;
   if (side === 1) {
     const pseudo = withPseudo ? row.team1_pseudo : null;
     return liveEntrantName(row.team1_solo_user_id, row.team1_name, pseudo, participantType);
@@ -684,6 +707,7 @@ async function announce(
   let others: LiveCandidateRow[];
   try {
     evening = await openEvening(group.target);
+    await stampClaims(group.rows, evening.started_at);
     others = await loadEveningMatches(evening);
   } catch (error) {
     // La base est en cause, pas le bot : seul ce public attend (l'autre est
@@ -694,6 +718,11 @@ async function announce(
     return { posted: 0, postponed: null };
   }
   const streams = eveningStreams(group, others, now);
+  const soloTournaments = new Set(
+    [...group.rows, ...others]
+      .filter((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
+      .map((row) => Number(row.tournament_id)),
+  );
   // Soirée sans message connu, mais dont un autre match a déjà une annonce
   // (issue incertaine, bot trop ancien, identifiant non gardé) : son public a
   // peut-être déjà été notifié — un nouveau message part, sans notification.
@@ -707,8 +736,8 @@ async function announce(
           startsAt: at,
           live,
           tournamentName: String(row.tournament_name),
-          team1Name: eveningEntrant(row, 1, withPseudo),
-          team2Name: eveningEntrant(row, 2, withPseudo),
+          team1Name: eveningEntrant(row, 1, withPseudo, soloTournaments),
+          team2Name: eveningEntrant(row, 2, withPseudo, soloTournaments),
           url,
         }),
       ),

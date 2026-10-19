@@ -270,9 +270,14 @@ export function parisClock(at: number): string {
 /** En-tête d'une annonce de soirée. */
 const EVENING_HEADER = "🔴 **Les lives de la soirée**";
 
-/** Un nom ne forge pas de jeton de lien (`{{lien:N}}`, remplacé par le bot). */
+/**
+ * Un nom ne forge pas de jeton de lien (`{{lien:N}}`, remplacé par le bot) :
+ * une espace de largeur nulle suit **chaque** accolade suivie d'une autre —
+ * remplacer les paires seulement laisserait `{{{lien:1}}` devenir
+ * `{U+200B{{lien:1}}`, qui en contient encore un.
+ */
 function noLinkTokens(text: string): string {
-  return text.replace(/\{\{/g, "{​{");
+  return text.replace(/\{(?=\{)/g, "{​");
 }
 
 /** Bloc d'un match, sans son jeton de lien : heure (et « En direct »), affiche et tournoi. */
