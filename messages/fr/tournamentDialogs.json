@@ -100,6 +100,7 @@
         "scheduledAtDirect": "Ce match démarre le {date} : le score se saisit dès qu'il a démarré.",
         "scheduledDirect": "Ce match n'a pas encore démarré : le score se saisit dès qu'il a démarré.",
         "startingDirect": "Le match démarre : le score se saisit dans un instant.",
+        "unavailable": "Le score ne peut pas être saisi pour l'instant.",
         "lobby": "Le score se saisit une fois le match lancé : toutes les parties doivent s'être déclarées prêtes."
       },
       "theirs": {

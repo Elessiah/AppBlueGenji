@@ -109,6 +109,7 @@ export function closedNoticeText(
   phase: MatchLaunchPhase,
   startAtFull: string | null,
   launchPhaseEnabled = true,
+  launchedAt: string | null = null,
 ): string {
   if (phase === "TO_PLAN") return text.t("score.player.closed.toPlan");
   if (phase === "SCHEDULED") {
@@ -120,8 +121,11 @@ export function closedNoticeText(
     return startAtFull ? text.t("score.player.closed.scheduledAt", { date: startAtFull }) : text.t("score.player.closed.scheduled");
   }
   // Sans lancement, l'heure passée : le match part, le score suit à la
-  // prochaine mise à jour — jamais de « Prêt » à attendre.
-  if (!launchPhaseEnabled) return text.t("score.player.closed.startingDirect");
+  // prochaine mise à jour — jamais de « Prêt » à attendre. Déjà lancé (page
+  // figée, droits retirés…), rien n'arrivera « dans un instant » : avis neutre.
+  if (!launchPhaseEnabled) {
+    return text.t(launchedAt === null ? "score.player.closed.startingDirect" : "score.player.closed.unavailable");
+  }
   return text.t("score.player.closed.lobby");
 }
 
@@ -469,7 +473,7 @@ export function PlayerScoreDialog({
             </>
           ) : (
             <p className={styles.formatHint}>
-              {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale), launchPhaseEnabled)}
+              {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale), launchPhaseEnabled, match.launchedAt)}
             </p>
           )}
 

@@ -100,6 +100,7 @@
         "scheduledAtDirect": "This match starts on {date}: the score can be entered as soon as it has started.",
         "scheduledDirect": "This match hasn't started yet: the score can be entered as soon as it has started.",
         "startingDirect": "The match is starting: the score can be entered in a moment.",
+        "unavailable": "The score can't be entered right now.",
         "lobby": "The score can be entered once the match is launched: every party must have declared itself ready."
       },
       "theirs": {
