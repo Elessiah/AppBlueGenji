@@ -44,7 +44,7 @@
   },
   "scoreAutoValidated": {
     "title": "Score confirmed automatically",
-    "body": "The score entered for your match ({tournament}) was confirmed automatically: the other team did not answer within 2 hours."
+    "body": "The score entered for your match ({tournament}) was confirmed automatically: no one confirmed or disputed it within 2 hours."
   },
   "tournamentStart": {
     "title": "The tournament is starting",

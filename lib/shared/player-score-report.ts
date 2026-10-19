@@ -265,7 +265,7 @@ export function pendingReportNotice(match: PendingReportMatch): string | null {
   const reporter = state.reporter ?? `Équipe ${state.side}`;
   const deadline = autoValidateTimeText(state.deadlineAt, "fr");
   return deadline
-    ? `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · validé automatiquement à ${deadline} sans réponse`
+    ? `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · validé automatiquement à ${deadline} (heure de Paris) sans réponse`
     : `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · à confirmer`;
 }
 

@@ -489,10 +489,12 @@ export function PlayerScoreDialog({
               <button
                 type="button"
                 className={styles.link}
-                onClick={() => setForfeitOpen(!forfeitOpen)}
+                onClick={() => {
+                  if (!submitting) setForfeitOpen(!forfeitOpen);
+                }}
                 aria-expanded={forfeitOpen}
                 aria-controls="player-score-forfeit"
-                disabled={submitting}
+                aria-disabled={submitting || undefined}
               >
                 {forfeitOpen ? t("score.player.forfeit.close") : t("score.player.forfeit.open")}
               </button>
@@ -507,7 +509,8 @@ export function PlayerScoreDialog({
                       className={styles.forfeit}
                       aria-describedby="player-score-forfeit-hint"
                       onClick={() => void submitForfeit()}
-                      disabled={submitting}
+                      aria-disabled={submitting || undefined}
+                      aria-busy={submitting || undefined}
                     >
                       {submitting ? "…" : t("score.player.forfeit.confirm", { name: myName })}
                     </button>
@@ -532,8 +535,10 @@ export function PlayerScoreDialog({
             <button
               type="button"
               className={`${styles.link} ${styles.close}`}
-              onClick={onClose}
-              disabled={submitting}
+              onClick={() => {
+                if (!submitting) onClose();
+              }}
+              aria-disabled={submitting || undefined}
             >
               {t("score.close")}
             </button>
@@ -541,7 +546,9 @@ export function PlayerScoreDialog({
               <button
                 type="submit"
                 className="btn"
-                disabled={nothingEntered || unchangedMine || submitting}
+                disabled={nothingEntered || unchangedMine}
+                aria-disabled={submitting || undefined}
+                aria-busy={submitting || undefined}
               >
                 {submitting ? "…" : submitLabel}
               </button>
