@@ -49,7 +49,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord username",
-    "Discord authentication, bot notifications (certified tag only). Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
+    "Discord authentication, bot notifications (certified tag only; before certification, a typed tag is only used to send you the code that gives it). Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
   ],
   [
     "Certification of the Discord username",
@@ -57,7 +57,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord ID",
-    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times and reminders — only if your tag is certified —, request to join a team you manage). Removable from My profile as long as you have another one left",
+    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times, reminders and removal — only if your tag is certified —, request to join a team you manage, suspension or moderation notices, information about your data). Removable from My profile as long as you have another one left",
   ],
   [
     "Google identifier",

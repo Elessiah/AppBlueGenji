@@ -98,7 +98,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion (contrat), son **exposition** repose sur la certification
     // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
+      "Authentification Discord, notifications bot (tag certifié seulement ; avant la certification, un tag saisi ne sert qu'à t'envoyer le code qui la donne). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",
@@ -121,7 +121,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion, au même titre que les deux suivants. La finalité le dit, parce
     // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
     finalite:
-      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires et rappels de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre",
+      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels et retrait de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",
