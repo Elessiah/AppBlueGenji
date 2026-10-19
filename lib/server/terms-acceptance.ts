@@ -87,53 +87,55 @@ export async function assertTermsAccepted(userId: number, executor?: Executor): 
 }
 
 /**
- * Ce compte gère-t-il une équipe sans avoir accepté les conditions en vigueur ?
+ * Ce compte connecté doit-il accepter les conditions en vigueur ?
  *
- * C'est la question que pose la mise en page racine pour présenter les
- * conditions à qui vient de **recevoir** la main sur une équipe (propriété
- * transférée, rôle de gérant, fantôme confiée) : il n'a fait aucun geste qui
- * permette de lui demander son accord à ce moment-là, on le lui demande donc
- * au passage suivant. Une équipe dissoute, une entrée solo (sans membre) ne
- * comptent pas.
+ * Depuis la version 5 (décision du 2026-10-19), **tout** compte en retard
+ * d'une version les réaccepte, gérant d'équipe ou non : la mise en page racine
+ * pose la question à chaque page et présente une fenêtre bloquante
+ * (`TermsAcceptanceModal`). Avant, seuls les gérants d'équipe étaient
+ * concernés (ils recevaient la main sans geste où demander leur accord).
  *
- * Posée à **chaque page**, elle tient en une requête — version acceptée et
- * rôles en cours, par une jointure — et sa réponse est gardée
- * `TERMS_NEED_TTL_MS` par compte : un rôle reçu à l'instant fait paraître la
- * modale au plus une demi-minute plus tard, ce qui ne change rien à la règle
- * (les gestes de gestion sont refusés côté serveur dans l'intervalle).
- * L'acceptation vide la réponse gardée.
+ * Posée à **chaque page**, elle tient en une requête et sa réponse est gardée
+ * `TERMS_NEED_TTL_MS` par compte ; l'acceptation vide la réponse gardée.
  *
  * @returns `null` si rien n'est à demander, sinon pourquoi on le demande
  *   (`FIRST` : jamais acceptées ; `UPDATED` : une version antérieure l'a été) —
  *   la modale ne dit pas la même chose à l'un et à l'autre.
  */
-export async function needsTermsForTeamManagement(userId: number): Promise<TermsRequest | null> {
+export async function needsTermsAcceptance(userId: number): Promise<TermsRequest | null> {
   return cached(termsNeedKey(userId), TERMS_NEED_TTL_MS, async () => {
     const db = await getDatabase();
-    const [rows] = await db.execute<
-      (RowDataPacket & { terms_version: number | null; roles_json: unknown; team_id: number | null })[]
-    >(
-      `SELECT u.terms_version, tm.roles_json, t.id AS team_id
-       FROM bg_users u
-       LEFT JOIN bg_team_members tm ON tm.user_id = u.id AND tm.left_at IS NULL
-       LEFT JOIN bg_teams t ON t.id = tm.team_id AND t.deleted_at IS NULL AND t.solo_user_id IS NULL
-       WHERE u.id = ? AND u.is_deleted = 0`,
+    const [rows] = await db.execute<(RowDataPacket & { terms_version: number | null })[]>(
+      `SELECT terms_version FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
       [userId],
     );
     if (rows.length === 0) return null;
-    const version = rows[0].terms_version === null ? null : Number(rows[0].terms_version);
-    const request = termsRequestFor(version);
-    if (request === null) return null;
-    // Les rôles sont jugés par `hasTeamManagementRole`, l'unique implémentation
-    // de « qui gère une équipe » : réécrite en SQL, la règle aurait une seconde
-    // version.
-    return rows.some((row) => row.team_id !== null && hasTeamManagementRole(parseRoles(row.roles_json)))
-      ? request
-      : null;
+    return termsRequestFor(rows[0].terms_version === null ? null : Number(rows[0].terms_version));
   });
 }
 
-/** Durée pendant laquelle la réponse de `needsTermsForTeamManagement` est gardée. */
+/**
+ * Le compte gère-t-il une équipe (propriétaire ou gérant d'une équipe non
+ * dissoute, hors entrée solo) ? Sert à dire **d'où** vient une acceptation
+ * donnée dans la fenêtre des conditions : `TEAM_MANAGEMENT` pour un gérant,
+ * `SIGNED_IN` pour tout autre compte.
+ */
+export async function managesTeam(userId: number, executor?: Executor): Promise<boolean> {
+  const db = executor ?? (await getDatabase());
+  const [rows] = await db.execute<(RowDataPacket & { roles_json: unknown })[]>(
+    `SELECT tm.roles_json
+     FROM bg_team_members tm
+     JOIN bg_teams t ON t.id = tm.team_id AND t.deleted_at IS NULL AND t.solo_user_id IS NULL
+     WHERE tm.user_id = ? AND tm.left_at IS NULL`,
+    [userId],
+  );
+  // Les rôles sont jugés par `hasTeamManagementRole`, l'unique implémentation
+  // de « qui gère une équipe » : réécrite en SQL, la règle aurait une seconde
+  // version.
+  return rows.some((row) => hasTeamManagementRole(parseRoles(row.roles_json)));
+}
+
+/** Durée pendant laquelle la réponse de `needsTermsAcceptance` est gardée. */
 export const TERMS_NEED_TTL_MS = 30_000;
 
 function termsNeedKey(userId: number): string {

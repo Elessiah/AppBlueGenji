@@ -101,7 +101,7 @@
     "hidden": "Hidden",
     "adultYes": "Yes (18+)",
     "adultNo": "No (minor)",
-    "battletagHiddenSelf": "Hidden from everyone: it can only be read in the “Contacts” window of your matches — by both teams and the referees, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played.",
+    "battletagHiddenSelf": "Hidden from everyone: it can only be read in the “Contacts” window of your matches and in their launch window — by both teams and the referees, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played.",
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
     "teamsTitle": "Team history",

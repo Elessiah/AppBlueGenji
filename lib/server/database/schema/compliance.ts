@@ -102,7 +102,7 @@ const COMPLIANCE_TABLES: readonly string[] = [
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       user_id BIGINT NOT NULL,
       version INT NOT NULL,
-      context ENUM('SIGNUP', 'LOGIN', 'TEAM_CREATION', 'TEAM_MANAGEMENT') NOT NULL,
+      context ENUM('SIGNUP', 'LOGIN', 'TEAM_CREATION', 'TEAM_MANAGEMENT', 'SIGNED_IN') NOT NULL,
       accepted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_bg_terms_acceptances_user (user_id),
       CONSTRAINT fk_bg_terms_acceptances_user FOREIGN KEY (user_id)

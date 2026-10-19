@@ -19,7 +19,7 @@ import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCent
 import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
-import { needsTermsForTeamManagement } from "@/lib/server/terms-acceptance";
+import { needsTermsAcceptance } from "@/lib/server/terms-acceptance";
 import type { TermsRequest } from "@/lib/shared/terms-of-use";
 import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deletion-journal";
 import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
@@ -32,8 +32,6 @@ import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
-  TERMS_POSTPONED_COOKIE,
-  isTermsPostponed,
   recruitmentModalSilenced,
   termsModalDueOnLoad,
 } from "@/lib/shared/global-modals";
@@ -127,7 +125,8 @@ async function pendingChangesFor(userId: number | undefined): Promise<PrivacyCha
 }
 
 /**
- * Le compte gère-t-il une équipe sans avoir accepté les conditions en vigueur ?
+ * Le compte a-t-il accepté les conditions en vigueur ? (Tout compte connecté,
+ * gérant d'équipe ou non, depuis la version 5.)
  * Même tolérance que la lecture des changements de confidentialité : une panne
  * ne fait pas tomber la page, la question sera reposée au chargement suivant —
  * et les gestes de gestion restent refusés côté serveur entre-temps.
@@ -135,7 +134,7 @@ async function pendingChangesFor(userId: number | undefined): Promise<PrivacyCha
 async function termsRequestFor(userId: number | undefined): Promise<TermsRequest | null> {
   if (userId === undefined) return null;
   try {
-    return await needsTermsForTeamManagement(userId);
+    return await needsTermsAcceptance(userId);
   } catch (error) {
     console.error("[terms] lecture impossible", error);
     return null;
@@ -233,12 +232,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   scheduleAccountDeletionJournalPrune();
   const termsRequest = await termsRequestFor(user?.id);
   const termsRequired = termsRequest !== null;
-  // « Plus tard » tient douze heures (cookie) : sans quoi la modale revenait
-  // à chaque chargement complet. Un geste de gestion refusé la rouvre malgré lui.
-  const termsPostponed = isTermsPostponed(cookieStore.get(TERMS_POSTPONED_COOKIE)?.value);
+  // Bloquante pour tout compte connecté en retard d'une version (pas de report).
   const termsDueOnLoad = termsModalDueOnLoad({
     termsRequired,
-    postponed: termsPostponed,
     pathname: requestedPath,
   });
   // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
@@ -304,7 +300,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <PrivacyChangesModal changes={localizedPrivacyChanges(privacyChanges, locale)} />
           {user && (
             <TermsAcceptanceModal
-              initiallyRequired={termsRequired && !termsPostponed}
+              initiallyRequired={termsRequired}
               request={termsRequest}
               privacyPending={privacyChanges.length > 0}
               translationNote={locale === DEFAULT_LOCALE ? null : TERMS_TRANSLATION_NOTE}

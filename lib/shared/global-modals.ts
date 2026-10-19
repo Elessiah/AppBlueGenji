@@ -19,30 +19,13 @@ import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 export const LOGIN_PATH = "/connexion";
 
 /**
- * Cookie posé par « Plus tard » sur la modale des conditions : sans lui, le
- * report ne vivait que dans l'état React et la modale revenait à chaque
- * chargement complet (F5, nouvel onglet, lien ouvert depuis Discord). Il ne
- * contient que `1`, aucun identifiant ; il dure au plus
- * {@link TERMS_POSTPONED_MAX_AGE_SECONDS}, tombe à chaque connexion et
- * déconnexion, et un geste de gestion refusé rouvre la modale malgré lui.
+ * Ancien cookie de report « Plus tard » de la modale des conditions (douze
+ * heures). Depuis la version 5 (2026-10-19), la modale est **bloquante** pour
+ * tout compte connecté : plus aucun report n'est posé ni lu. Le nom reste
+ * pour que connexion et déconnexion effacent un cookie déjà posé par un
+ * navigateur (`lib/server/auth.ts`).
  */
 export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
-
-/**
- * Durée du report : douze heures. Un cookie de session sans `max-age` ne
- * « disparaît à la fermeture du navigateur » que si la restauration de session
- * est coupée — activée, il revient au redémarrage et le report tiendrait tant
- * que dure la session du site (30 jours). La durée est donc posée, pas espérée.
- */
-export const TERMS_POSTPONED_MAX_AGE_SECONDS = 12 * 60 * 60;
-
-/** Valeur unique du cookie de report. */
-export const TERMS_POSTPONED_VALUE = "1";
-
-/** Le cookie de report est-il posé ? */
-export function isTermsPostponed(cookieValue: string | undefined): boolean {
-  return cookieValue === TERMS_POSTPONED_VALUE;
-}
 
 /**
  * Pages où la modale des conditions se tait : celle des conditions elle-même
@@ -59,10 +42,9 @@ export function termsModalSilencedOn(pathname: string | null | undefined): boole
  */
 export function termsModalDueOnLoad(input: {
   termsRequired: boolean;
-  postponed: boolean;
   pathname: string | null | undefined;
 }): boolean {
-  return input.termsRequired && !input.postponed && !termsModalSilencedOn(input.pathname);
+  return input.termsRequired && !termsModalSilencedOn(input.pathname);
 }
 
 /**

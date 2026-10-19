@@ -172,16 +172,16 @@
   "termsModal": {
     "eyebrow": "CONDITIONS D'UTILISATION",
     "titleUpdated": "Les conditions d'utilisation ont changé",
-    "titleFirst": "Tu gères désormais une équipe",
+    "titleFirst": "Accepte les conditions d'utilisation",
     "bodyLabel": "Présentation des conditions",
-    "textUpdated": "Tu es propriétaire ou gérant d'une équipe. Les conditions d'utilisation du site ont été mises à jour (version {version}, en vigueur depuis le {date}) : accepte-les pour continuer à gérer ton équipe — logo, membres, invitations.",
-    "textFirst": "Tu es propriétaire ou gérant d'une équipe. Avant de la gérer — logo, membres, invitations —, accepte les conditions d'utilisation du site.",
-    "rights": "Elles rappellent notamment que <strong>tu garantis détenir les droits</strong> sur le logo et les contenus que tu publies pour ton équipe : un logo de club, de marque ou d'éditeur de jeu ne se reprend pas sans l'accord de son titulaire.",
+    "textUpdated": "Les conditions d'utilisation du site ont été mises à jour (version {version}, en vigueur depuis le {date}) : accepte-les pour continuer à utiliser le site.",
+    "textFirst": "Avant de continuer à utiliser le site, accepte ses conditions d'utilisation.",
+    "rights": "Elles disent notamment à qui sont communiqués tes contacts pendant un match de tournoi, et rappellent que <strong>tu garantis détenir les droits</strong> sur les logos et contenus que tu publies, pour ton équipe notamment : un logo de club, de marque ou d'éditeur de jeu ne se reprend pas sans l'accord de son titulaire.",
     "checkbox": "J'ai lu et j'accepte les conditions d'utilisation (<terms>lire les conditions</terms>).",
-    "later": "Plus tard",
+    "logout": "Me déconnecter",
     "accept": "J'accepte",
     "saving": "Enregistrement…",
-    "accepted": "Merci, tu peux gérer ton équipe.",
+    "accepted": "Merci, tu peux continuer.",
     "failed": "Ton acceptation n'a pas pu être enregistrée. Recharge la page, puis réessaie."
   },
   "privacyModal": {

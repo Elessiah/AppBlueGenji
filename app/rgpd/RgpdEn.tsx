@@ -448,10 +448,10 @@ export function RgpdEn({
               first lasts seven days, the second the duration of your visit.
             </li>
             <li>
-              <strong>bg_terms_later</strong> — set only <strong>if you postpone accepting the terms of
-              use</strong> (“Later” button), so as not to ask you again on every page. It only contains the value
-              “1”, never a personal identifier, lasts twelve hours at most, and disappears earlier at each login or
-              logout, or as soon as you accept.
+              <strong>bg_terms_later</strong> — <strong>no longer set</strong> since 19 October 2026: accepting
+              the terms of use can no longer be postponed. A cookie set before that date (value “1”, never a
+              personal identifier) expires twelve hours at most after it was set, and is cleared earlier at login or
+              logout.
             </li>
             <li>
               <strong>bg_a11y</strong> — set only <strong>if you turn on an accessibility setting</strong> (button

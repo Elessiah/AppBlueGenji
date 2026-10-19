@@ -17,7 +17,10 @@
  * - en **recevant la main sur une équipe** (propriété transférée, rôle de
  *   gérant, équipe fantôme confiée) : celui qui la reçoit n'a rien fait, il
  *   accepte donc au premier passage sur le site ensuite, et la gestion lui est
- *   refusée tant qu'il ne l'a pas fait.
+ *   refusée tant qu'il ne l'a pas fait ;
+ * - **connecté**, dans la fenêtre bloquante de la mise en page racine, pour
+ *   tout compte en retard d'une version (`SIGNED_IN`, depuis la version 5 ;
+ *   `TEAM_MANAGEMENT` si le compte gère une équipe).
  *
  * Module pur, importable partout.
  */
@@ -72,13 +75,14 @@ export const TERMS_UPDATED_AT = "2026-10-19";
 export const TERMS_PATH = "/conditions-utilisation";
 
 /** Où une acceptation a été donnée. */
-export type TermsAcceptanceContext = "SIGNUP" | "LOGIN" | "TEAM_CREATION" | "TEAM_MANAGEMENT";
+export type TermsAcceptanceContext = "SIGNUP" | "LOGIN" | "TEAM_CREATION" | "TEAM_MANAGEMENT" | "SIGNED_IN";
 
 export const TERMS_ACCEPTANCE_CONTEXTS: readonly TermsAcceptanceContext[] = [
   "SIGNUP",
   "LOGIN",
   "TEAM_CREATION",
   "TEAM_MANAGEMENT",
+  "SIGNED_IN",
 ];
 
 export function isTermsAcceptanceContext(value: unknown): value is TermsAcceptanceContext {
@@ -250,7 +254,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "Contacts de match",
     paragraphs: [
       "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin ; celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match.",
-      "Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de cette fenêtre : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.",
+      "Ce partage passe par la seule fenêtre « Contacts » du match et par sa fenêtre de lancement, qui la reprend au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de ces fenêtres : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.",
     ],
     links: [{ href: "/rgpd#donnees-collectees", label: "Politique de confidentialité — données collectées" }],
   },

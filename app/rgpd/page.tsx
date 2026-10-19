@@ -579,11 +579,11 @@ function RgpdFr({
               votre visite.
             </li>
             <li>
-              <strong>bg_terms_later</strong> — déposé uniquement <strong>si vous reportez
-              l&apos;acceptation des conditions d&apos;utilisation</strong> (bouton « Plus tard »),
-              pour ne pas vous la redemander à chaque page. Il ne contient que la valeur « 1 »,
-              jamais d&apos;identifiant de personne, dure douze heures au plus, et disparaît plus
-              tôt à chaque connexion ou déconnexion, ou dès que vous acceptez.
+              <strong>bg_terms_later</strong> — <strong>n&apos;est plus déposé</strong> depuis le
+              19 octobre 2026 : l&apos;acceptation des conditions d&apos;utilisation ne se reporte
+              plus. Un cookie déposé avant cette date (valeur « 1 », jamais d&apos;identifiant de
+              personne) expire au plus douze heures après son dépôt, et est effacé plus tôt à la
+              connexion ou à la déconnexion.
             </li>
             <li>
               <strong>bg_a11y</strong> — déposé uniquement <strong>si vous activez un réglage

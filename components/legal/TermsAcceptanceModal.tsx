@@ -6,7 +6,7 @@ import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
-import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
+import { useLogout } from "@/components/use-logout";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import type { TermsTranslationNote } from "@/lib/shared/french-version-prevails";
@@ -17,39 +17,20 @@ import {
   formatTermsDateIn,
   type TermsRequest,
 } from "@/lib/shared/terms-of-use";
-import {
-  TERMS_POSTPONED_COOKIE,
-  TERMS_POSTPONED_MAX_AGE_SECONDS,
-  TERMS_POSTPONED_VALUE,
-  termsModalSilencedOn,
-} from "@/lib/shared/global-modals";
+import { termsModalSilencedOn } from "@/lib/shared/global-modals";
 import styles from "./TermsAcceptanceModal.module.css";
 
-/**
- * Pose (douze heures au plus) ou efface le report « Plus tard ».
- * `lax` et non `strict` : un lien ouvert depuis Discord est une navigation
- * venue d'un autre site, qui n'emporte pas un cookie `strict` — la modale
- * reviendrait justement dans le cas que le report doit couvrir.
- */
-function writePostponedCookie(postponed: boolean): void {
-  try {
-    document.cookie = postponed
-      ? `${TERMS_POSTPONED_COOKIE}=${TERMS_POSTPONED_VALUE}; path=/; samesite=lax; max-age=${TERMS_POSTPONED_MAX_AGE_SECONDS}`
-      : `${TERMS_POSTPONED_COOKIE}=; path=/; samesite=lax; max-age=0`;
-  } catch {
-    // Cookies refusés : le report reste effectif pour la vue courante.
-  }
-}
+/** Échap et le voile ne ferment pas une fenêtre bloquante. */
+const KEEP_OPEN = () => undefined;
 
 interface TermsAcceptanceModalProps {
-  /** Le compte gère une équipe sans avoir accepté les conditions en vigueur. */
+  /** Le compte n'a pas accepté les conditions en vigueur. */
   initiallyRequired: boolean;
   /**
    * Pourquoi la mise en page racine demande l'acceptation : `UPDATED` quand le
-   * compte avait accepté une version antérieure — « tu gères désormais une
-   * équipe » serait faux pour un gérant de longue date. `null` (rien de dû au
-   * chargement, fenêtre rouverte par un geste refusé) : texte d'une première
-   * acceptation.
+   * compte avait accepté une version antérieure, `FIRST` s'il n'en a accepté
+   * aucune. `null` (rien de dû au chargement, fenêtre rouverte par un geste
+   * refusé) : texte d'une première acceptation.
    */
   request?: TermsRequest | null;
   /** Une modale de confidentialité attend une réponse : celle-ci passe après. */
@@ -63,16 +44,14 @@ interface TermsAcceptanceModalProps {
 }
 
 /**
- * Conditions d'utilisation présentées à qui **reçoit** la main sur une équipe
- * (propriété transférée, rôle de gérant, fantôme confiée).
+ * Conditions d'utilisation présentées à **tout compte connecté** qui n'a pas
+ * accepté la version en vigueur (version 5 : décision du 2026-10-19, tous les
+ * comptes la réacceptent, pas seulement les gérants d'équipe).
  *
- * Celui qui la reçoit n'a fait aucun geste où l'on aurait pu lui demander son
- * accord : on le lui demande donc au passage suivant, sur n'importe quelle
- * page. « Plus tard » ferme la fenêtre sans rien accepter, pour douze heures
- * (cookie `bg_terms_later`, lu par la mise en page racine) — gardé dans le seul
- * état React, le report tombait à chaque chargement complet. Les gestes de
- * gestion restent refusés (`TERMS_ACCEPTANCE_REQUIRED`), et la fenêtre revient
- * dès que l'un d'eux est tenté (`TERMS_REQUIRED_EVENT`), report ou non.
+ * La fenêtre est **bloquante** : ni « Plus tard », ni Échap, ni clic sur le
+ * voile — on accepte, ou on se déconnecte. Les gestes de gestion restent en
+ * outre refusés côté serveur (`TERMS_ACCEPTANCE_REQUIRED`), et ce refus la
+ * rouvre (`TERMS_REQUIRED_EVENT`).
  *
  * Elle se tait sur la page des conditions elle-même, qu'elle invite à lire, et
  * sur la connexion, dont la modale de consentement doit rester seule.
@@ -115,13 +94,8 @@ export function TermsAcceptanceModal({
   }, [privacyPending]);
 
   const open = mounted && requested && privacyAnswered && !termsModalSilencedOn(pathname);
-  const later = () => {
-    if (busy) return;
-    writePostponedCookie(true);
-    setRequested(false);
-  };
-  const dialogRef = useDialogBehavior({ open, onClose: later, locked: busy });
-  const backdrop = useBackdropDismiss(later, busy);
+  const { leaving, logout } = useLogout();
+  const dialogRef = useDialogBehavior({ open, onClose: KEEP_OPEN, locked: busy });
 
   if (!open) return null;
 
@@ -135,7 +109,6 @@ export function TermsAcceptanceModal({
         body: JSON.stringify({ version: TERMS_VERSION }),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      writePostponedCookie(false);
       setRequested(false);
       showSuccess(t("termsModal.accepted"));
     } catch {
@@ -146,7 +119,7 @@ export function TermsAcceptanceModal({
   };
 
   return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation" {...backdrop}>
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation">
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
@@ -204,15 +177,19 @@ export function TermsAcceptanceModal({
         )}
         {/* Pendant la requête, `aria-disabled` + `aria-busy` plutôt que `disabled` :
             le focus reste sur le bouton pressé (un échec se retente au clavier) ;
-            `later` et `accept` ignorent déjà un geste tant que `busy`. */}
+            `accept` ignore déjà un geste tant que `busy`, la déconnexion un
+            second clic (`useLogout`). */}
         <div className={styles.actions}>
           <CyberButton
             type="button"
             variant="ghost"
-            onClick={later}
-            aria-disabled={busy || undefined}
+            onClick={() => {
+              if (!busy) void logout();
+            }}
+            aria-disabled={busy || leaving || undefined}
+            aria-busy={leaving || undefined}
           >
-            {t("termsModal.later")}
+            {t("termsModal.logout")}
           </CyberButton>
           <CyberButton
             type="button"
