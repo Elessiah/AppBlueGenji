@@ -96,6 +96,8 @@ type LiveCandidateRow = RowDataPacket & {
   team2_score: number | null;
   forfeit_team_id: number | null;
   double_forfeit: number | boolean | null;
+  /** Date de l'annonce de l'affiche courante (lectures de soirée seulement) ; `null` sinon. */
+  announced_at?: Date | string | null;
 };
 
 /**
@@ -237,14 +239,26 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
     [evening.started_at, evening.window_end],
     EVENING_TOURNAMENT_STATES,
+    ANNOUNCED_AT_SQL,
   );
 }
+
+/**
+ * Date de l'annonce de l'affiche courante : l'heure d'un match `MANUAL` dont
+ * l'antenne est fermée (`live_started_at` effacé), qui sinon prendrait l'heure
+ * de chaque relecture — un texte changé à chaque minute, une modification à
+ * chaque mise à jour.
+ */
+const ANNOUNCED_AT_SQL = `(SELECT MAX(a.sent_at) FROM bg_live_announcements a
+            WHERE a.match_id = m.id
+              AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))) AS announced_at`;
 
 /** Lecture commune des matchs annonçables : affiche, tournoi, pseudos publiables. */
 async function selectMatches(
   where: string,
   params: readonly unknown[],
   tournamentStates: string = RUNNING_TOURNAMENTS,
+  extraColumn: string = "NULL AS announced_at",
 ): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
   // Le pseudo n'est lu que pour une inscription faite sous la mention qui
@@ -261,7 +275,7 @@ async function selectMatches(
             t1.name AS team1_name, t2.name AS team2_name,
             t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
             u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo,
-            m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit
+            m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit, ${extraColumn}
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
                             AND ${tournamentStates} AND t.start_visibility_at <= NOW()
@@ -321,7 +335,8 @@ function instant(value: Date | string | null): number | null {
  */
 function streamTime(row: LiveCandidateRow, now: number): number {
   const launched = row.launch_pairing === row.pairing ? instant(row.launched_at) : null;
-  if (row.live_trigger === "MANUAL") return instant(row.live_started_at) ?? now;
+  // Antenne fermée : l'heure de son annonce, jamais celle de la relecture.
+  if (row.live_trigger === "MANUAL") return instant(row.live_started_at) ?? instant(row.announced_at ?? null) ?? now;
   if (row.live_trigger === "AUTO") return launched ?? now;
   const start = instant(row.start_at) ?? now;
   // Devenu jouable après son heure : il passe à l'antenne à son lancement.
@@ -768,21 +783,26 @@ interface EveningStreamRow {
 
 /**
  * Place d'un match dans la soirée : à l'antenne ; programmé (`START_TIME` à
- * venir) ; **terminé** — score rendu (`COMPLETED`, ou en attente de
- * confirmation) ou antenne fermée d'un match annoncé (`MANUAL`), il reste au
- * message, marqué « Terminé » ; `null` sinon (revenu en attente, rouvert).
+ * venir) ; antenne fermée (`MANUAL`, pas encore joué) ; **terminé** — score
+ * rendu (`COMPLETED`, ou en attente de confirmation), il reste au message,
+ * marqué « Terminé » ; `null` sinon (revenu en attente, rouvert).
  */
-function eveningRowState(row: LiveCandidateRow, live: boolean, now: number): "live" | "scheduled" | "finished" | null {
+function eveningRowState(
+  row: LiveCandidateRow,
+  live: boolean,
+  now: number,
+): "live" | "scheduled" | "paused" | "finished" | null {
   if (live) return "live";
   if (row.status === "COMPLETED" || row.status === "AWAITING_CONFIRMATION") return "finished";
   const startsLater = (instant(row.start_at) ?? 0) > now;
   if (row.live_trigger === "START_TIME" && (row.status === "PENDING" || row.status === "READY") && startsLater) {
     return "scheduled";
   }
-  // Antenne fermée (`MANUAL`) d'un match annoncé : son direct est fini. Un
-  // match `AUTO` sans lancement de l'affiche courante a été rouvert : il
-  // n'est plus listé, il reviendra à son prochain lancement.
-  return row.status === "READY" && row.live_trigger === "MANUAL" ? "finished" : null;
+  // Antenne fermée (`MANUAL`) d'un match annoncé mais pas joué : coupure ou
+  // pause, rien ne dit qu'il est fini — listé à son heure, sans « En direct »
+  // ni « Terminé ». Un match `AUTO` sans lancement de l'affiche courante a été
+  // rouvert : il n'est plus listé, il reviendra à son prochain lancement.
+  return row.status === "READY" && row.live_trigger === "MANUAL" ? "paused" : null;
 }
 
 /**
@@ -1011,6 +1031,26 @@ const LIVE_EVENING_REFRESH_MAX_RETRIES = 3;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let refreshRetries = 0;
 
+/** Programme la mise à jour au terme du délai, si aucune ne l'est déjà. */
+function scheduleRefresh(): void {
+  if (refreshTimer) return;
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    void exclusive(() => refreshLiveEvenings()).catch((error: unknown) => {
+      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", error);
+      retryRefresh();
+    });
+  }, LIVE_EVENING_REFRESH_DELAY_MS);
+  refreshTimer.unref?.();
+}
+
+/** Relance une mise à jour reportée, {@link LIVE_EVENING_REFRESH_MAX_RETRIES} fois au plus depuis la dernière fin de match. */
+function retryRefresh(): void {
+  if (refreshRetries >= LIVE_EVENING_REFRESH_MAX_RETRIES) return;
+  refreshRetries += 1;
+  scheduleRefresh();
+}
+
 /**
  * Demande la mise à jour des soirées ouvertes après une fin de match (score
  * rendu ou arbitré, antenne fermée) : regroupée sur
@@ -1018,14 +1058,10 @@ let refreshRetries = 0;
  * sont désactivées. Ne lit rien : la lecture vient au terme du délai.
  */
 export function requestLiveEveningRefresh(): void {
-  if (refreshTimer || !liveAnnouncementsEnabled()) return;
-  refreshTimer = setTimeout(() => {
-    refreshTimer = null;
-    void exclusive(() => refreshLiveEvenings()).catch((error: unknown) => {
-      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", error);
-    });
-  }, LIVE_EVENING_REFRESH_DELAY_MS);
-  refreshTimer.unref?.();
+  if (!liveAnnouncementsEnabled()) return;
+  // Une nouvelle fin de match rend ses essais à la mise à jour.
+  refreshRetries = 0;
+  scheduleRefresh();
 }
 
 /**
@@ -1039,7 +1075,13 @@ export function requestLiveEveningRefresh(): void {
  * @returns Le nombre de messages modifiés.
  */
 export async function refreshLiveEvenings(now: number = Date.now()): Promise<number> {
-  if (!liveAnnouncementsEnabled() || isBotCircuitOpen()) return 0;
+  if (!liveAnnouncementsEnabled()) return 0;
+  // Bot en panne : rien ne pourrait partir, rien n'est lu — la mise à jour
+  // est relancée, la fin de match n'est pas perdue.
+  if (isBotCircuitOpen()) {
+    retryRefresh();
+    return 0;
+  }
   const db = await getDatabase();
   const [evenings] = await db.query<RefreshableEvening[]>(
     `SELECT id, target, started_at, window_end, discord_message_id, silent, notified, closed FROM bg_live_evenings
@@ -1049,25 +1091,33 @@ export async function refreshLiveEvenings(now: number = Date.now()): Promise<num
   let edited = 0;
   let retry = false;
   for (const evening of evenings) {
-    // Soirée en pause (refus de Discord, base illisible) : le balayage la reprend.
-    if (isHeld(evening.target)) continue;
-    const result = await refreshEvening(evening, now);
+    // Soirée en pause (refus de Discord, base illisible) : relancée plus tard.
+    if (isHeld(evening.target)) {
+      retry = true;
+      continue;
+    }
+    let result: RefreshResult;
+    try {
+      result = await refreshEvening(evening, now);
+    } catch (error) {
+      // Une soirée illisible n'empêche pas l'autre public d'être mis à jour.
+      warnOnce(`refresh read ${Number(evening.id)}`, `[live-announce] soirée ${Number(evening.id)} illisible, mise à jour reportée`, error);
+      result = "retry";
+    }
     if (result === "edited") edited += 1;
-    if (result === "retry") retry = true;
+    if (result === "retry" || result === "shared-retry") retry = true;
+    // Bot ou salon en cause : l'autre public essuierait le même refus.
+    if (result === "shared-retry") break;
   }
-  if (!retry) refreshRetries = 0;
-  else if (refreshRetries < LIVE_EVENING_REFRESH_MAX_RETRIES) {
-    refreshRetries += 1;
-    requestLiveEveningRefresh();
-  }
+  if (retry) retryRefresh();
   return edited;
 }
 
+/** Issue de la mise à jour d'une soirée. */
+type RefreshResult = "edited" | "unchanged" | "retry" | "shared-retry" | "dropped";
+
 /** Remet à jour une soirée ; `retry` si l'envoi est reporté (rien n'est parti). */
-async function refreshEvening(
-  evening: RefreshableEvening,
-  now: number,
-): Promise<"edited" | "unchanged" | "retry" | "dropped"> {
+async function refreshEvening(evening: RefreshableEvening, now: number): Promise<RefreshResult> {
   const group: AnnouncementGroup = { target: evening.target, rows: [] };
   const others = await loadEveningMatches(evening);
   const { message, urls, logMessage } = eveningTexts(group, others, now);
@@ -1108,9 +1158,12 @@ async function refreshEvening(
     console.error(`[live-announce] soirée ${Number(evening.id)} : mise à jour non confirmée (${outcome}), non réessayée`);
     return "dropped";
   }
-  const cause = POSTPONED_CAUSES[outcome as PostponedOutcome] ?? POSTPONED_CAUSES.unavailable;
-  warnOnce(`refresh ${outcome} ${Number(evening.id)}`, `[live-announce] soirée ${Number(evening.id)} : mise à jour reportée (${cause})`);
-  return "retry";
+  const postponed: PostponedOutcome = outcome in POSTPONED_CAUSES ? (outcome as PostponedOutcome) : "unavailable";
+  warnOnce(
+    `refresh ${postponed} ${Number(evening.id)}`,
+    `[live-announce] soirée ${Number(evening.id)} : mise à jour reportée (${POSTPONED_CAUSES[postponed] ?? POSTPONED_CAUSES.unavailable})`,
+  );
+  return SHARED_POSTPONEMENTS.has(postponed) ? "shared-retry" : "retry";
 }
 
 /**
