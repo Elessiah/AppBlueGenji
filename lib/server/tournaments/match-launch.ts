@@ -36,6 +36,8 @@ export type LaunchMatchRow = RowDataPacket & {
   tournament_state: string;
   /** Option du tournoi : matchs planifiés par l'arbitrage (1). */
   referee_scheduling: number | null;
+  /** Option du tournoi : phase de lancement (« Prêt », modale) allumée (1). */
+  match_launch_phase: number | null;
   status: MatchStatus;
   is_bye: number;
   team1_id: number | null;
@@ -54,7 +56,8 @@ export type LaunchMatchRow = RowDataPacket & {
 };
 
 const LAUNCH_MATCH_COLUMNS = `
-  m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, m.status, m.is_bye,
+  m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, t.match_launch_phase,
+  m.status, m.is_bye,
   m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
   m.team2_ready_at, m.caster_user_id, m.caster_ready_at, m.host_team_id`;
@@ -97,6 +100,7 @@ export function toLaunchInput(row: LaunchMatchRow): MatchLaunchInput {
     startAt: toIso(row.start_at),
     launchedAt: rowLaunchState(row).launchedAt,
     refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
+    launchPhase: Number(row.match_launch_phase ?? 0) === 1,
   };
 }
 
@@ -195,6 +199,7 @@ async function lockLaunchMatch(
     (RowDataPacket & {
       tournament_state: string | null;
       referee_scheduling: number | null;
+      match_launch_phase: number | null;
       team1_is_ghost: number | null;
       team2_is_ghost: number | null;
     })[]
@@ -202,9 +207,16 @@ async function lockLaunchMatch(
     `SELECT
        (SELECT state FROM bg_tournaments WHERE id = ?) AS tournament_state,
        (SELECT referee_scheduling FROM bg_tournaments WHERE id = ?) AS referee_scheduling,
+       (SELECT match_launch_phase FROM bg_tournaments WHERE id = ?) AS match_launch_phase,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team1_is_ghost,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost`,
-    [row.tournament_id, row.tournament_id, nullableId(row.team1_id), nullableId(row.team2_id)],
+    [
+      row.tournament_id,
+      row.tournament_id,
+      row.tournament_id,
+      nullableId(row.team1_id),
+      nullableId(row.team2_id),
+    ],
   );
   // Même effet que l'ancienne jointure interne : un match dont le tournoi a
   // disparu n'est pas un match à lancer.
@@ -212,6 +224,7 @@ async function lockLaunchMatch(
   if (tournamentState === null) return null;
   row.tournament_state = tournamentState;
   row.referee_scheduling = context[0]?.referee_scheduling ?? 0;
+  row.match_launch_phase = context[0]?.match_launch_phase ?? 0;
   row.team1_is_ghost = context[0]?.team1_is_ghost ?? null;
   row.team2_is_ghost = context[0]?.team2_is_ghost ?? null;
   return row;
@@ -537,6 +550,15 @@ export async function setMatchHost(matchId: number, teamId: number | null): Prom
 }
 
 /**
+ * Le match a-t-il atteint son lancement (heure passée ou absente, pas encore
+ * lancé) ? Jugé phase de lancement **allumée**, quelle que soit l'option du
+ * tournoi : c'est le moment où un tournoi sans lancement part d'office.
+ */
+function enteredLaunch(row: LaunchMatchRow, now: number): boolean {
+  return matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now) === "LOBBY";
+}
+
+/**
  * Entretien du lancement d'un tournoi en cours, appelé par la synchronisation
  * passive (`syncTournamentState`) dans **sa** transaction :
  *
@@ -544,7 +566,9 @@ export async function setMatchHost(matchId: number, teamId: number | null): Prom
  *   (c'est l'origine du délai de lancement d'office) ;
  * - lance ceux dont toutes les parties sont prêtes — deux fantômes le sont
  *   d'office, et personne ne cliquerait pour elles ;
- * - lance d'office ceux dont le délai est écoulé.
+ * - lance d'office ceux dont le délai est écoulé ;
+ * - sur un tournoi **sans phase de lancement** (`match_launch_phase = 0`),
+ *   lance aussitôt tout match qui atteint son heure (ou jouable sans heure).
  *
  * La phase est décidée en mémoire par le module pur, jamais réécrite en SQL :
  * la requête ne fait que réduire les candidats.
@@ -578,15 +602,21 @@ export async function maintainMatchLaunches(
     // avant toute écriture : un « Prêt » validé entre les deux serait sinon
     // effacé par la remise à zéro d'un appariement lu périmé, ou un lancement
     // décidé sur un « Prêt » tout juste retiré.
-    if (matchLaunchPhase(toLaunchInput(candidate), now) !== "LOBBY") continue;
+    //
+    // La phase est jugée **comme si le lancement était allumé** : sur un
+    // tournoi qui l'a éteint, le match que la règle dit déjà « lancé » n'a pas
+    // encore son `launched_at` — c'est ici qu'il le reçoit, à la première
+    // passe, comme un lancement d'office sans délai. Diffusions, annonces et
+    // notifications, qui lisent `launched_at`, partent ainsi à l'identique.
+    if (!enteredLaunch(candidate, now)) continue;
     const row = await lockLaunchMatch(connection, Number(candidate.id));
-    if (row?.status !== "READY" || matchLaunchPhase(toLaunchInput(row), now) !== "LOBBY") {
-      continue;
-    }
+    if (row?.status !== "READY" || !enteredLaunch(row, now)) continue;
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
     await adoptCurrentPairing(connection, row);
     const launch =
-      allPartiesReady(rowReadiness(row)) || isAutoLaunchDue(toIso(row.lobby_opened_at), now);
+      Number(row.match_launch_phase ?? 0) !== 1 ||
+      allPartiesReady(rowReadiness(row)) ||
+      isAutoLaunchDue(toIso(row.lobby_opened_at), now);
     if (launch) {
       await connection.execute(
         `UPDATE bg_matches

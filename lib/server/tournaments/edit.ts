@@ -58,6 +58,8 @@ export type EditableTournamentValues = {
   enduranceMaxRounds: number | null;
   /** BG Survie : sortie « hors course » anticipée (option, éteinte par défaut). */
   enduranceEarlyExit: boolean;
+  /** Phase de lancement des matchs (option, éteinte par défaut). */
+  launchPhase: boolean;
   matchFormat: MatchFormat | null;
   /** BG Survie : format de l'arbre final (`null` = celui du tournoi). */
   endurancePlayoffFormat: MatchFormat | null;
@@ -97,7 +99,7 @@ async function loadEditRow(
       match_format_max_maps, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement,
-      registration_min_players, referee_scheduling
+      registration_min_players, referee_scheduling, match_launch_phase
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -142,6 +144,7 @@ function toValues(
     endurancePlayoffSize: num(row.endurance_playoff_size),
     enduranceMaxRounds: num(row.endurance_max_rounds),
     enduranceEarlyExit: Number(row.endurance_early_exit) === 1,
+    launchPhase: Number(row.match_launch_phase) === 1,
     matchFormat: parseMatchFormat(
       row.match_format_type,
       row.match_format_value,
@@ -291,7 +294,7 @@ export async function updateTournament(
         match_format_max_maps = ?, match_format_draws = ?,
         endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
         registration_discord_requirement = ?, registration_blizzard_requirement = ?,
-        registration_min_players = ?
+        registration_min_players = ?, match_launch_phase = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -326,6 +329,7 @@ export async function updateTournament(
         valid.registrationFilters.discordRequirement,
         valid.registrationFilters.blizzardRequirement,
         valid.registrationFilters.minPlayers,
+        valid.launchPhase ? 1 : 0,
         tournamentId,
       ],
     );
@@ -392,6 +396,7 @@ function validateEditedValues(next: EditableTournamentValues): {
     endurancePlayoffSize: next.endurancePlayoffSize ?? undefined,
     enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
     enduranceEarlyExit: next.enduranceEarlyExit,
+    launchPhase: next.launchPhase,
     matchFormatType: next.matchFormat?.type ?? null,
     matchFormatValue: next.matchFormat?.value ?? null,
     matchFormatMaxMaps: next.matchFormat?.maxMaps ?? null,

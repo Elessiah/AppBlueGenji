@@ -61,6 +61,15 @@ export type MatchLaunchInput = {
    * d'un match que l'arbitrage n'a pas encore planifié.
    */
   refereeScheduling: boolean;
+  /**
+   * Option du tournoi « phase de lancement » (`bg_tournaments.match_launch_phase`).
+   * `false` : ni « Prêt » ni modale — un match jouable dont l'heure est
+   * atteinte (ou sans heure) est **lancé** d'emblée, comme parti d'office.
+   * Absent = allumée (le comportement d'origine) : un appelant qui l'oublie
+   * montre au pire un lancement que l'entretien serveur
+   * (`maintainMatchLaunches`) referme aussitôt en posant `launched_at`.
+   */
+  launchPhase?: boolean;
 };
 
 function isoTime(iso: string | null | undefined): number | null {
@@ -84,7 +93,7 @@ export function matchLaunchPhase(match: MatchLaunchInput, now: number): MatchLau
   const start = isoTime(match.startAt);
   if (start === null && match.refereeScheduling) return "TO_PLAN";
   if (start !== null && start > now) return "SCHEDULED";
-  return "LOBBY";
+  return match.launchPhase === false ? "LAUNCHED" : "LOBBY";
 }
 
 /**

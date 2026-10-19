@@ -186,6 +186,8 @@ export type TournamentInputBody = {
   registrationMinPlayers?: number | null;
   /** Matchs planifiés par l'arbitrage ; absent = option éteinte. */
   refereeScheduling?: boolean | null;
+  /** Phase de lancement des matchs ; absente = option éteinte (le défaut). */
+  launchPhase?: boolean | null;
 };
 
 export type ValidatedTournamentInput = {
@@ -237,6 +239,8 @@ export type ValidatedTournamentInput = {
   registrationFilters: RegistrationFilters;
   /** Matchs planifiés par l'arbitrage (`lib/shared/match-planning.ts`). */
   refereeScheduling: boolean;
+  /** Phase de lancement des matchs — « Prêt », modale (`docs/features/MATCH_LAUNCH.md`). */
+  launchPhase: boolean;
 };
 
 /** Issue d'un contrôle : un code d'erreur, ou la valeur validée. */
@@ -306,6 +310,7 @@ export function validateTournamentInput(
       endurancePlayoffFormat: endurancePlayoffFormat.value,
       registrationFilters: registration.value,
       refereeScheduling: body.refereeScheduling === true,
+      launchPhase: body.launchPhase === true,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
       // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :
@@ -443,6 +448,9 @@ function validateRegistrationSettings(body: TournamentInputBody): Checked<Regist
     typeof body.refereeScheduling !== "boolean"
   ) {
     return { error: "INVALID_REFEREE_SCHEDULING" };
+  }
+  if (body.launchPhase !== undefined && body.launchPhase !== null && typeof body.launchPhase !== "boolean") {
+    return { error: "INVALID_LAUNCH_PHASE" };
   }
   const registrationFilters: RegistrationFilters = {
     discordRequirement: isPlayerRequirement(body.registrationDiscordRequirement)

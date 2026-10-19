@@ -119,6 +119,7 @@ function seedTournamentInsertParams({
     def.registrationBlizzardRequirement ?? DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
     def.registrationMinPlayers ?? DEFAULT_REGISTRATION_FILTERS.minPlayers,
     def.refereeScheduling === true ? 1 : 0,
+    def.launchPhase === true ? 1 : 0,
     def.maxTeams,
     insertState,
     regOpenAt,
@@ -223,9 +224,9 @@ export async function createTournament(
       match_format_type, match_format_value, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement, registration_min_players,
-      referee_scheduling,
+      referee_scheduling, match_launch_phase,
       max_teams, state, start_visibility_at, registration_open_at, registration_close_at, start_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     seedTournamentInsertParams({
       organizerId,
       def,

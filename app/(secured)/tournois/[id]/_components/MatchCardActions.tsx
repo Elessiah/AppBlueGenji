@@ -16,8 +16,10 @@ import {
   Radio,
   Settings,
   TriangleAlert,
+  Users,
   type LucideIcon,
 } from "lucide-react";
+import { MatchContactsDialog } from "@/components/match-launch/MatchContactsDialog";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
@@ -54,6 +56,7 @@ async function send(url: string, method: string, body?: unknown): Promise<void> 
 const ICONS: Record<MatchCardActionId, LucideIcon> = {
   playerScore: Pencil,
   openLaunch: Info,
+  contacts: Users,
   plan: CalendarPlus,
   adminScore: Pencil,
   schedule: CalendarClock,
@@ -193,6 +196,7 @@ export function MatchCardActions({
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -337,6 +341,7 @@ export function MatchCardActions({
     playerScore: onPlayerScore,
     openLaunch: () =>
       window.dispatchEvent(new CustomEvent(MATCH_LAUNCH_OPEN_EVENT, { detail: { matchId: match.id } })),
+    contacts: () => setContactsOpen(true),
     plan: () => openSchedule(match),
     adminScore: onAdminScore,
     schedule: () => openSchedule(match),
@@ -484,6 +489,9 @@ export function MatchCardActions({
             <p>{t("cardActions.forceConfirm.unplanned")}</p>
           )}
         </ConfirmActionDialog>
+      )}
+      {contactsOpen && (
+        <MatchContactsDialog matchId={match.id} matchLabel={matchLabel} onClose={() => setContactsOpen(false)} />
       )}
     </div>
   );

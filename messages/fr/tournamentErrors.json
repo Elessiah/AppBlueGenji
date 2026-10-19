@@ -102,6 +102,7 @@
     "INVALID_SURVIVAL_FIRST_CUT": "Première coupe de survie invalide : 1 à 50 manches avant elle.",
     "INVALID_ENDURANCE_SETTINGS": "Réglages d'endurance invalides : capital de 1 à 99, gain et perte de 1 à 20, play-offs de 2 à 32 équipes, plafond de 1 à 50 manches.",
     "INVALID_ENDURANCE_EARLY_EXIT": "Valeur invalide pour la sortie anticipée « hors course » : cochez ou décochez la case.",
+    "INVALID_LAUNCH_PHASE": "Valeur invalide pour la phase de lancement des matchs : cochez ou décochez la case.",
     "MISSING_PHASES": "Un tournoi multi-phases doit décrire ses phases.",
     "INVALID_PHASE_COUNT": "Nombre de phases invalide : 2 à 8 phases attendues.",
     "INVALID_PHASE_POSITIONS": "Positions des phases invalides.",

@@ -102,6 +102,7 @@
     "INVALID_SURVIVAL_FIRST_CUT": "Invalid first survival cut: 1 to 50 rounds before it.",
     "INVALID_ENDURANCE_SETTINGS": "Invalid endurance settings: pool from 1 to 99, gain and loss from 1 to 20, playoffs of 2 to 32 teams, cap of 1 to 50 rounds.",
     "INVALID_ENDURANCE_EARLY_EXIT": "Invalid value for the early “out of contention” exit: tick or untick the box.",
+    "INVALID_LAUNCH_PHASE": "Invalid value for the match launch phase: tick or untick the box.",
     "MISSING_PHASES": "A multi-stage tournament must describe its stages.",
     "INVALID_PHASE_COUNT": "Invalid number of stages: 2 to 8 stages expected.",
     "INVALID_PHASE_POSITIONS": "Invalid stage positions.",

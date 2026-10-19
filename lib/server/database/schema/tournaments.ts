@@ -38,6 +38,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       registration_min_players INT NOT NULL DEFAULT 5,
       -- Matchs planifiés par l'arbitrage (\`lib/shared/match-planning.ts\`).
       referee_scheduling TINYINT(1) NOT NULL DEFAULT 0,
+      -- Phase de lancement des matchs (« Prêt », modale) : option éteinte par
+      -- défaut (\`docs/features/MATCH_LAUNCH.md\`).
+      match_launch_phase TINYINT(1) NOT NULL DEFAULT 0,
       match_format_type ENUM('BO', 'FT') NULL,
       match_format_value INT NULL,
       match_format_max_maps INT NULL,

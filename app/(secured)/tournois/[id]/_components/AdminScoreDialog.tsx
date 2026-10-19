@@ -168,8 +168,8 @@ export function AdminScoreDialog({
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
   // attente de départ » s'ouvre de lui-même à l'heure dite.
-  const { refereeScheduling } = useLiveControls();
-  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
+  const { refereeScheduling, launchPhase: launchPhaseEnabled } = useLiveControls();
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling, launchPhase: launchPhaseEnabled });
   const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
   // Déclaré avant le formulaire : un refus de map s'y rattache à son champ.
   // Les `id` couvrent tout plafond de lignes possible (`mapListLimit`).

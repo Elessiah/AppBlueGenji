@@ -137,6 +137,7 @@ type LiveMatchRow = RowDataPacket & {
   launched_at: Date | string | null;
   launch_pairing: string | null;
   referee_scheduling: number | null;
+  match_launch_phase: number | null;
 };
 
 /**
@@ -244,7 +245,8 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         m.live_started_at,
         m.launched_at,
         m.launch_pairing,
-        t.referee_scheduling
+        t.referee_scheduling,
+        t.match_launch_phase
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -273,6 +275,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           startAt: toIso(row.start_at),
           launchedAt: currentLaunchedAt(row),
           refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
+          launchPhase: Number(row.match_launch_phase ?? 0) === 1,
         },
         now,
       ),

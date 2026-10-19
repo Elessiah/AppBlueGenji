@@ -18,12 +18,20 @@ export type LaunchStripViewer = {
   canSchedule: boolean;
   viewerUserId: number | null;
   myTeamId: number | null;
+  /**
+   * Option du tournoi « phase de lancement » : éteinte, la modale de lancement
+   * ne présente pas ses matchs, et « Infos du match » n'ouvrirait rien.
+   * Absente = allumée.
+   */
+  launchPhase?: boolean;
 };
 
 export type LaunchStripControls = {
   isCaster: boolean;
   /** Ouvrir la modale de lancement (parties du match seulement). */
   showOpen: boolean;
+  /** Ouvrir les contacts du match (parties du match, programmé ou en cours). */
+  showContacts: boolean;
   /** S'inscrire comme caster. */
   showClaim: boolean;
   /** Se retirer du cast, ou retirer le caster (arbitrage). */
@@ -41,6 +49,12 @@ export type LaunchStripControls = {
 /** Phases où l'arbitrage peut forcer le départ : tout ce qui précède le lancement effectif. */
 const FORCEABLE_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY"]);
 
+/**
+ * Phases où le bouton « Contacts » est offert : match programmé, en lancement
+ * ou lancé — celles où la lecture serveur les expose (`match-launch-info.ts`).
+ */
+const CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["SCHEDULED", "LOBBY", "LAUNCHED"]);
+
 export function launchStripControls(
   match: StripMatch,
   phase: MatchLaunchPhase,
@@ -57,7 +71,8 @@ export function launchStripControls(
   const showHost = phase !== "NONE";
   return {
     isCaster,
-    showOpen: (isCaster || isPlayer) && (phase === "LOBBY" || phase === "LAUNCHED"),
+    showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && (phase === "LOBBY" || phase === "LAUNCHED"),
+    showContacts: (isCaster || isPlayer) && CONTACT_PHASES.has(phase),
     showClaim: viewer.canManage && castable && match.casterUserId === null,
     showRelease: open && match.casterUserId !== null && (isCaster || viewer.canSchedule),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",

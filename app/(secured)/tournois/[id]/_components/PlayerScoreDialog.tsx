@@ -197,8 +197,8 @@ export function PlayerScoreDialog({
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
   // saisissable (à planifier, en attente de départ, en lancement).
-  const { refereeScheduling } = useLiveControls();
-  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
+  const { refereeScheduling, launchPhase: launchPhaseEnabled } = useLiveControls();
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling, launchPhase: launchPhaseEnabled });
   const [submitting, setSubmitting] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: submitting });
   const backdrop = useBackdropDismiss(onClose, submitting);

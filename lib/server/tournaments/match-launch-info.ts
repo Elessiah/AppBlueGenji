@@ -139,13 +139,27 @@ function hasRunningTournament(): Promise<boolean> {
  * **dans** la requête : un lecteur qui n'a aucun match — le cas courant — ne
  * coûte qu'une lecture, et ses rôles ne sont relus que s'il en a un.
  */
-async function loadCandidates(connection: PoolConnection, userId: number): Promise<CandidateRow[]> {
+async function loadCandidates(
+  connection: PoolConnection,
+  userId: number,
+  matchId: number | null,
+): Promise<CandidateRow[]> {
+  // Deux lectures : la modale de lancement (tous les matchs du lecteur qui
+  // approchent, sur les seuls tournois qui ont la phase de lancement), et le
+  // bouton « Contacts » d'une carte (un seul match, quelle que soit l'option et
+  // quel que soit son horaire). La règle de qui en est partie ne change pas.
+  const scope =
+    matchId === null
+      ? `AND (m.start_at IS NULL OR m.start_at <= NOW() + INTERVAL ${LAUNCH_LOOKAHEAD_MINUTES} MINUTE)
+         AND t.match_launch_phase = 1`
+      : `AND m.id = ?`;
   const viewerTeams = `(SELECT tm.team_id FROM bg_team_members tm
                         WHERE tm.user_id = ? AND tm.left_at IS NULL
                         UNION SELECT st.id FROM bg_teams st WHERE st.solo_user_id = ?)`;
   const [rows] = await connection.execute<CandidateRow[]>(
     `SELECT
-       m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, m.status, m.is_bye,
+       m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, t.match_launch_phase,
+       m.status, m.is_bye,
        m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
        m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at, m.team2_ready_at,
        m.caster_user_id, m.caster_ready_at, m.host_team_id,
@@ -160,7 +174,7 @@ async function loadCandidates(connection: PoolConnection, userId: number): Promi
      WHERE t.state = 'RUNNING'
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
-       AND (m.start_at IS NULL OR m.start_at <= NOW() + INTERVAL ${LAUNCH_LOOKAHEAD_MINUTES} MINUTE)
+       ${scope}
        -- Un match à planifier n'a rien à présenter : ni heure à guetter, ni
        -- « Prêt » à donner, ni contacts à exposer.
        AND (m.start_at IS NOT NULL OR t.referee_scheduling = 0)
@@ -168,7 +182,9 @@ async function loadCandidates(connection: PoolConnection, userId: number): Promi
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
      ORDER BY m.start_at IS NULL, m.start_at, m.id`,
-    [userId, userId, userId, userId, userId],
+    matchId === null
+      ? [userId, userId, userId, userId, userId]
+      : [matchId, userId, userId, userId, userId, userId],
   );
   return rows;
 }
@@ -270,7 +286,7 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
 }
 
 type LaunchPhase = ReturnType<typeof matchLaunchPhase>;
-type VisibleLaunch = { row: CandidateRow; phase: LaunchPhase };
+type VisibleLaunch = { row: CandidateRow; phase: LaunchPhase; exposes: boolean };
 
 /** Ce qu'il faut pour rédiger la présentation d'un match au lecteur. */
 type LaunchContext = {
@@ -279,12 +295,19 @@ type LaunchContext = {
   rosters: Map<number, MemberRow[]>;
   castRevoked: boolean;
   readiness: ReturnType<typeof rowReadiness>;
-  /** Contacts : seulement pour les matchs en lancement ou lancés. */
+  /** Contacts : seulement pour les matchs où `exposesContacts` les ouvre. */
   exposes: boolean;
 };
 
-function exposesContacts(phase: LaunchPhase): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED";
+/**
+ * Les contacts sortent-ils pour ce match ? Dans la modale de lancement, en
+ * lancement ou lancé ; par le bouton « Contacts » d'une carte, dès qu'il est
+ * **programmé** (heure fixée, deux engagées connues) — les parties
+ * s'organisent avant l'heure, surtout sans phase de lancement. Mêmes
+ * destinataires dans les deux cas : les seules parties du match.
+ */
+function exposesContacts(phase: LaunchPhase, forCard: boolean): boolean {
+  return phase === "LOBBY" || phase === "LAUNCHED" || (forCard && phase === "SCHEDULED");
 }
 
 /** Un côté du match tel que la ligne le décrit. */
@@ -307,7 +330,7 @@ function collectContactIds(visible: readonly VisibleLaunch[]): {
   rosterTeamIds: Set<number>;
   userIds: Set<number>;
 } {
-  const exposed = visible.filter(({ phase }) => exposesContacts(phase));
+  const exposed = visible.filter(({ exposes }) => exposes);
   const rosterTeamIds = new Set<number>();
   const userIds = new Set<number>();
   for (const { row } of visible) {
@@ -494,22 +517,47 @@ function buildLaunchInfo(
 }
 
 /** Matchs du lecteur à présenter dans la modale de lancement. */
-export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaunchInfo[]> {
+export function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaunchInfo[]> {
+  return readViewerLaunches(viewer, null);
+}
+
+/**
+ * Contacts d'**un** match pour le bouton « Contacts » de sa carte : la même
+ * présentation que la modale de lancement, aux mêmes destinataires (les
+ * parties du match, caster éligible compris), mais dès que le match est
+ * programmé et que le tournoi ait ou non la phase de lancement.
+ *
+ * @returns `null` quand le lecteur n'est pas partie du match, ou que le match
+ *   n'est ni programmé, ni en lancement, ni lancé (`MATCH_CONTACTS_UNAVAILABLE`).
+ */
+export async function loadViewerMatchContacts(
+  viewer: LaunchViewer,
+  matchId: number,
+): Promise<MatchLaunchInfo | null> {
+  const [info] = await readViewerLaunches(viewer, matchId);
+  return info ?? null;
+}
+
+async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null): Promise<MatchLaunchInfo[]> {
   if (!(await hasRunningTournament())) return [];
+  const forCard = matchId !== null;
 
   const revokedCasts: { matchId: number; casterId: number }[] = [];
   const launches = await withConnection(async (connection) => {
-    let rows = await loadCandidates(connection, viewer.id);
+    let rows = await loadCandidates(connection, viewer.id, matchId);
     if (rows.length === 0) return [];
     if (await maintainIfDue(connection, rows)) {
-      rows = await loadCandidates(connection, viewer.id);
+      rows = await loadCandidates(connection, viewer.id, matchId);
       if (rows.length === 0) return [];
     }
     const teams = await loadViewerTeams(connection, viewer.id);
 
     const now = Date.now();
     const visible = rows
-      .map((row) => ({ row, phase: matchLaunchPhase(toLaunchInput(row), now) }))
+      .map((row) => {
+        const phase = matchLaunchPhase(toLaunchInput(row), now);
+        return { row, phase, exposes: exposesContacts(phase, forCard) };
+      })
       .filter(({ phase }) => phase !== "NONE" && phase !== "TO_PLAN");
     if (visible.length === 0) return [];
 
@@ -519,7 +567,7 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
     const revoked = revokeIneligibleCasters(visible, users, revokedCasts);
 
     const result: MatchLaunchInfo[] = [];
-    for (const { row, phase } of visible) {
+    for (const { row, phase, exposes } of visible) {
       const castRevoked = revoked.has(Number(row.id));
       const party = viewerRole(row, viewer.id, teams, castRevoked);
       if (!party) continue;
@@ -530,7 +578,7 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
           rosters,
           castRevoked,
           readiness: rowReadiness(row),
-          exposes: exposesContacts(phase),
+          exposes,
         }),
       );
     }

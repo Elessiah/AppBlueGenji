@@ -349,7 +349,8 @@
       "maxSolo": "{count, plural, one {# joueur} other {# joueurs}}",
       "maxLabel": "Effectif maximal",
       "matchFormat": "Format des matchs",
-      "seeding": "Ordre de départ"
+      "seeding": "Ordre de départ",
+      "launchPhase": "Phase de lancement des matchs"
     },
     "conditions": {
       "minRoster": "Effectif minimal du roster",
