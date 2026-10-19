@@ -77,6 +77,9 @@ describe("modale d'horaire — ce que la date produit", () => {
   it("option éteinte : vider la date lance le match tout de suite — l'aide le dit (FR et EN)", () => {
     expect(frDialogs.schedule.hintDirect).toMatch(/lancé tout de suite, sans retour possible/);
     expect(enDialogs.schedule.hintDirect).toMatch(/launched right away, with no going back/);
+    // Adversaire encore inconnu : rien ne part tout de suite.
+    expect(startAtHint(FR, false, false, false, false)).toMatch(/^Sans jour ni mois = aucun horaire : le match sera lancé dès que ses deux adversaires seront connus/);
+    expect(enDialogs.schedule.hintDirectTbd).toMatch(/as soon as both its opponents are known/);
   });
 
   it("match déjà lancé : la date ne le fait pas attendre (FR et EN)", () => {
@@ -125,6 +128,8 @@ describe("formulaire et règles", () => {
   it("le délai d'office vient de LAUNCH_AUTO_DELAY_MINUTES", () => {
     expect(frForm.form.launchPhase.description).toContain("{launchDelay} minutes");
     expect(enForm.form.launchPhase.description).toContain("{launchDelay} minutes");
+    expect(frForm.form.launchPhase.description).toMatch(/un match sans heure, dès que ses deux adversaires sont connus/);
+    expect(enForm.form.launchPhase.description).toMatch(/a match with no time, as soon as both its opponents are known/);
     expect(read("app/(secured)/tournois/_components/LaunchPhaseField.tsx")).toContain(
       "launchDelay: LAUNCH_AUTO_DELAY_MINUTES",
     );
