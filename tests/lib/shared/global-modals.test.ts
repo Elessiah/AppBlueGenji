@@ -14,7 +14,7 @@ describe("termsModalSilencedOn", () => {
     expect(termsModalSilencedOn(LOGIN_PATH)).toBe(true);
   });
 
-  it("conditions v5 : laisse lire les pages légales, exporter ou supprimer son compte sans accepter", () => {
+  it("conditions v6 : laisse lire les pages légales, exporter ou supprimer son compte sans accepter", () => {
     for (const path of ["/rgpd", "/rgpd/registre", "/mentions-legales", "/accessibilite", "/profil"]) {
       expect(termsModalSilencedOn(path)).toBe(true);
     }
@@ -77,7 +77,7 @@ describe("câblage des modales globales", () => {
     expect(layout).toContain("termsModalDue: termsDueOnLoad");
   });
 
-  it("conditions v5 : la mise en page ouvre la fenêtre à tout compte en retard, sans report", () => {
+  it("conditions v6 : la mise en page ouvre la fenêtre à tout compte en retard, sans report", () => {
     expect(layout).toContain("initiallyRequired={termsRequired}");
     expect(layout).toContain("needsTermsAcceptance(userId)");
     expect(layout).not.toContain("isTermsPostponed");

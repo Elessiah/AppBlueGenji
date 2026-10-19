@@ -96,7 +96,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     const text = en?.paragraphs.join(" ") ?? "";
     expect(text).toContain("**even when hidden**");
     // L'annonce v5 (PRIVACY_CHANGES) donne la même marche pour un BattleTag reçu de Battle.net.
-    expect(JSON.stringify(PRIVACY_CHANGES.at(-1))).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
+    expect(JSON.stringify(PRIVACY_CHANGES.find((c) => c.id === "2026-10-contacts-de-match-caster-et-conditions-v5"))).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(text).toContain("once the Battle.net account is unlinked, which requires another means of logging in)");
     expect(text).toContain("**only while the match is being played**, from its start to its end");
     expect(text).toContain("a hidden BattleTag is readable nowhere else on the site, by anyone — referees and administrators included");
@@ -133,7 +133,7 @@ describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
     expectBoth(enPlayers.page.battletagHiddenSelf, EN_CONTACTS, EN_LAUNCH);
   });
 
-  it("conditions v5, annonce PRIVACY_CHANGES et registre", () => {
+  it("conditions v6, annonce PRIVACY_CHANGES et registre", () => {
     const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
     expectBoth(fr, FR_CONTACTS, FR_LAUNCH);
@@ -151,10 +151,10 @@ describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
     for (const line of enLines) expect(line).toMatch(EN_LAUNCH);
   });
 
-  it("annonce v5 : chaque compte devra accepter les conditions (FR et EN)", () => {
-    expect(JSON.stringify(PRIVACY_CHANGES.at(-1))).toContain("chaque compte devra les accepter à sa prochaine visite");
+  it("annonce v6 : chaque compte connecté doit accepter les conditions (FR et EN)", () => {
+    expect(JSON.stringify(PRIVACY_CHANGES.at(-1))).toContain("chaque compte connecté doit désormais les accepter");
     expect(JSON.stringify(PRIVACY_CHANGES_EN[PRIVACY_CHANGES.at(-1)?.id ?? ""])).toContain(
-      "every account will be asked to accept them on its next visit",
+      "every logged-in account must now accept them",
     );
   });
 });

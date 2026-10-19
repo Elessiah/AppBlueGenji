@@ -80,7 +80,7 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(read("app/(secured)/equipes/creer/CreateTeamForm.tsx")).toContain("termsVersion: TERMS_VERSION,");
   });
 
-  it("tout compte connecté les accepte depuis n'importe quelle page (conditions v5)", () => {
+  it("tout compte connecté les accepte depuis n'importe quelle page (conditions v6)", () => {
     const layout = read("app/layout.tsx");
     expect(layout).toContain("<TermsAcceptanceModal");
     expect(layout).toContain("needsTermsAcceptance");

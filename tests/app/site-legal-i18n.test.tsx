@@ -110,7 +110,7 @@ describe("français : le texte qui fait foi ne bouge pas", () => {
   });
 
   it("la version des conditions n'avance pas pour une traduction", () => {
-    expect(TERMS_VERSION).toBe(5);
+    expect(TERMS_VERSION).toBe(6);
   });
 });
 

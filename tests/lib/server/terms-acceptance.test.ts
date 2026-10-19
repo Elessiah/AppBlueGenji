@@ -127,7 +127,7 @@ describe("needsTermsAcceptance", () => {
     expect(params).toEqual([42]);
   });
 
-  it("redemande la version 5 à un simple joueur qui n'a accepté qu'une version antérieure, en le disant", async () => {
+  it("redemande la version 6 à un simple joueur qui n'a accepté qu'une version antérieure, en le disant", async () => {
     execute.mockResolvedValueOnce([[row(TERMS_VERSION - 1)]]);
     await expect(needsTermsAcceptance(45)).resolves.toBe("UPDATED");
   });

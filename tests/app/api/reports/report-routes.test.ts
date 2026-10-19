@@ -518,7 +518,7 @@ describe("POST /api/profile/terms", () => {
     expect(recordTermsAcceptance).toHaveBeenCalledWith(5, "TEAM_MANAGEMENT");
   });
 
-  it("conditions v5 : enregistre aussi l'acceptation d'un compte qui ne gère rien (SIGNED_IN)", async () => {
+  it("conditions v6 : enregistre aussi l'acceptation d'un compte qui ne gère rien (SIGNED_IN)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(member);
     jest.mocked(managesTeam).mockResolvedValue(false);
     jest.mocked(recordTermsAcceptance).mockResolvedValue(true);
