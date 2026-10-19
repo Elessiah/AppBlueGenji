@@ -1297,7 +1297,7 @@ describe("soirées d'annonces", () => {
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(pushLiveEvening).not.toHaveBeenCalled();
     expect(releasesOf(execute)).toEqual([]);
-    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("soirée 3 close (message supprimé de #live)");
+    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("soirée 3 close (message supprimé de #live, ou bot trop ancien)");
     // Ni datation des réservations ni lecture des matchs : la soirée est close.
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_live_announcements SET sent_at"))).toBe(false);
     expect(evening.mock.calls.some(([sql]) => sql.includes("a.sent_at >= ?"))).toBe(false);
@@ -1328,6 +1328,16 @@ describe("soirées d'annonces", () => {
     execute.mockClear();
     await runLiveAnnouncementSweep(NOW);
     expect(claimsOf(execute)).not.toContainEqual([40, "1:2"]);
+  });
+
+  it("bot antérieur aux soirées : premier message sans identifiant, la soirée est close — le direct suivant ne renotifie pas", async () => {
+    jest.mocked(pushLiveEvening).mockResolvedValue({ outcome: "posted", messageId: null });
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(pushLiveEvening).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls.some(([sql]) => sql === "UPDATE bg_live_evenings SET closed = 1 WHERE id = ?")).toBe(true);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("refused = 1"))).toBe(false);
   });
 
   it("la version de logs d'une soirée ôte les pseudos", async () => {
@@ -1463,6 +1473,22 @@ describe("mise à jour de la soirée aux fins de match", () => {
     await refreshLiveEvenings(NOW);
     const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_live_evenings SET discord_message_id"));
     expect(update?.[1]).toEqual(["223456789012345678", 1, 3]);
+  });
+
+  it("bot antérieur aux soirées (envoi réussi sans identifiant) : la soirée est close, plus aucun message `@everyone`", async () => {
+    jest.mocked(pushLiveEvening).mockResolvedValue({ outcome: "posted", messageId: null });
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockRefresh([OPEN], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(0);
+    expect(execute.mock.calls.some(([sql]) => sql === "UPDATE bg_live_evenings SET closed = 1 WHERE id = ?")).toBe(true);
+    // Rien n'est marqué refusé : le message est parti.
+    expect(execute.mock.calls.some(([sql]) => sql.includes("refused = 1"))).toBe(false);
+  });
+
+  it("bot à jour (identifiant rendu) : la soirée n'est pas close", async () => {
+    const { execute } = mockRefresh([OPEN], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(1);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET closed = 1"))).toBe(false);
   });
 
   it("rafale de fins de match : une seule mise à jour par public au bout d'une minute", async () => {
