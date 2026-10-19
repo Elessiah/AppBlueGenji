@@ -277,8 +277,8 @@ describe("fiches de contact — noms cliquables", () => {
 
   it("la modale « Contacts » ne montre les contacts du caster que le temps du match", () => {
     const source = readFileSync(join(process.cwd(), "components/match-launch/MatchContactsDialog.tsx"), "utf8");
-    // Phase du serveur à la lecture, et de la carte depuis (match reprogrammé).
-    expect(source).toContain("contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}");
+    // Phase du serveur à la lecture ; un horaire changé fait relire la modale.
+    expect(source).toContain("contactsShown={matchUnderway(launch.phase)}");
     // La note parle du caster : jamais montrée au caster lui-même (arbitre qui caste compris).
     expect(source).toContain('contactsLaterText={casterContactsPending(launch) ? t("contacts.casterLater") : undefined}');
   });
