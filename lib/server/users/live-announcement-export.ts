@@ -6,7 +6,7 @@ import type { PersonalDataExport } from "@/lib/shared/types";
 /**
  * Traces d'annonce #live d'un match de l'une de ses entrées en tournoi
  * individuel (`bg_live_announcements`, registre T16) : le match, son tournoi,
- * la date et si elle n'a pas été publiée (refus du bot ou d'AutoMod, soirée close). Droit d'accès (art. 15) : la trace est une donnée détenue, que
+ * la date et si le passage à l'antenne n'a pas été annoncé (refus du bot ou d'AutoMod, soirée close). Droit d'accès (art. 15) : la trace est une donnée détenue, que
  * l'annonce ait abouti ou non, et qu'elle ait porté le pseudo (inscription
  * depuis le 16 octobre 2026) ou « un joueur ». Une trace effacée (avec son
  * match, ou retirée pour un nouvel essai) n'est plus rendue : le site ne la

@@ -143,7 +143,7 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   premier direct annoncé pour ce public (`bg_live_evenings` : public, ouverture,
   fin de fenêtre, identifiant du message Discord, `silent` si ce message est
   parti sans mention, `notified` si un envoi qui notifie est parti vers le
-  bot ; aucune donnée personnelle, effacée un jour après la fin de la
+  bot ; pas son texte, effacée un jour après la fin de la
   fenêtre par `purgeEndedEvenings`, au plus une fois par heure à chaque appel
   de `dispatchLiveAnnouncements` — annonces désactivées comprises : la durée
   annoncée par `/rgpd` tient même sans annonce pendant des semaines). Quatre heures couvrent une soirée de tournoi (19 h – 23 h) sans
