@@ -145,7 +145,7 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   parti sans mention ; aucune donnée personnelle, effacée un jour après la fin
   de la fenêtre). Quatre heures couvrent une soirée de tournoi (19 h – 23 h)
   sans fondre deux soirées. La fenêtre repart de l'envoi du **premier message
-  qui notifie** : des essais reportés avant lui (bot injoignable) ne la
+  gardé** de la soirée : des essais reportés avant lui (bot injoignable) ne la
   raccourcissent pas, et ce premier message liste déjà les matchs programmés
   jusqu'à cette nouvelle fin.
 - **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
