@@ -89,8 +89,19 @@ adversaires sont connus — **à planifier** (`TO_PLAN`), **programmé**
 (`SCHEDULED`), en lancement ou lancé — ; au **caster inscrit**, **le temps du
 match** seulement — en lancement (`LOBBY`) ou lancé (`LAUNCHED`), jusqu'à la fin
 (décision de l'utilisateur, 2026-10-19 : il n'a rien à organiser avec les équipes
-avant l'heure). Action principale d'un joueur qui n'a ni score à saisir ni
-lancement à suivre.
+avant l'heure) ; aux **arbitres** (permission `tournaments`, administrateurs
+compris : `canSchedule` de la carte) aux mêmes phases que les joueurs
+(décision de l'utilisateur, 2026-10-19). Action principale d'un joueur qui n'a
+ni score à saisir ni lancement à suivre.
+
+**Arbitre** : `readViewerLaunches` pose `referee` (`can(viewer, "tournaments")`)
+pour la seule lecture d'une carte ; la requête du match lève alors la clause
+« partie du match » (`1 = 1 OR …`), `exposesContacts` le traite comme un joueur,
+et `viewerRole` lui rend le rôle `REFEREE` (`MatchLaunchViewerRole`), sans
+« Prêt ». La modale de lancement ne lui présente rien. Les contacts du caster
+lui sont tus avant le départ comme aux équipes ; la modale « Contacts » dit
+alors « Ses contacts s'afficheront au départ du match » (`contacts.casterLater`)
+au lieu de deux « — ».
 
 Elle ouvre `MatchContactsDialog` (portail `document.body`,
 `useDialogBehavior`, `useBackdropDismiss`, `ScrollArea`, focus sur « Fermer »),
