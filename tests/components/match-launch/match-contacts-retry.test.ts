@@ -5,7 +5,10 @@ import {
   casterContactsPending,
   casterRereadDelay,
   readMatchContacts,
+  REREAD_RETRIES,
+  REREAD_RETRY_MS,
   rereadOnPhaseChange,
+  shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
 import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
@@ -139,8 +142,12 @@ describe("readMatchContacts", () => {
 });
 
 const CASTER = { userId: 9, pseudo: "Voix", contact: null } as unknown as MatchLaunchInfo["caster"];
-const info = (phase: MatchLaunchInfo["phase"], caster: MatchLaunchInfo["caster"] = CASTER, startAt: string | null = START) =>
-  ({ matchId: 7, phase, startAt, caster }) as unknown as MatchLaunchInfo;
+const info = (
+  phase: MatchLaunchInfo["phase"],
+  caster: MatchLaunchInfo["caster"] = CASTER,
+  startAt: string | null = START,
+  role: MatchLaunchInfo["viewer"]["role"] = "TEAM1",
+) => ({ matchId: 7, phase, startAt, caster, viewer: { role } }) as unknown as MatchLaunchInfo;
 
 describe("contacts du caster en attente, modale ouverte", () => {
   it("en attente : caster inscrit sur un match pas encore parti au serveur", () => {
@@ -149,6 +156,28 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(casterContactsPending(info("LOBBY"))).toBe(false);
     expect(casterContactsPending(info("LAUNCHED"))).toBe(false);
     expect(casterContactsPending(info("SCHEDULED", null))).toBe(false);
+  });
+
+  it("pas pour le caster lui-même (arbitre qui caste) : aucune note ni relecture sur sa propre fiche", () => {
+    const own = info("SCHEDULED", CASTER, START, "CASTER");
+    expect(casterContactsPending(own)).toBe(false);
+    expect(casterRereadDelay(own, SERVER_BEFORE)).toBeNull();
+    expect(rereadOnPhaseChange("SCHEDULED", "LOBBY", own)).toBe(false);
+    expect(casterContactsPending(info("SCHEDULED", CASTER, START, "REFEREE"))).toBe(true);
+  });
+
+  it("relecture échouée : retentée au plus REREAD_RETRIES fois", () => {
+    expect(shouldRetryReread(0)).toBe(false);
+    for (let failures = 1; failures <= REREAD_RETRIES; failures += 1) expect(shouldRetryReread(failures)).toBe(true);
+    expect(shouldRetryReread(REREAD_RETRIES + 1)).toBe(false);
+    expect(REREAD_RETRY_MS).toBeGreaterThanOrEqual(5_000);
+  });
+
+  it("match reprogrammé (carte revenue avant le départ) : relu pour le caster du moment", () => {
+    expect(rereadOnPhaseChange("LOBBY", "SCHEDULED", info("LOBBY"))).toBe(true);
+    expect(rereadOnPhaseChange("LAUNCHED", "TO_PLAN", info("LAUNCHED"))).toBe(true);
+    expect(rereadOnPhaseChange("LOBBY", "SCHEDULED", info("LOBBY", null))).toBe(false);
+    expect(rereadOnPhaseChange("LOBBY", "SCHEDULED", info("SCHEDULED"))).toBe(false);
   });
 
   it("relecture à l'heure de départ du serveur, plus une seconde (horloge du navigateur en avance)", () => {
@@ -184,9 +213,10 @@ describe("contacts du caster en attente, modale ouverte", () => {
     const dialog = readSource("components/match-launch/MatchContactsDialog.tsx");
     expect(dialog).toContain("}, [matchId, readKey]);");
     expect(dialog).toContain("rereadOnPhaseChange(previousPhase.current, phase, launch)");
+    expect(dialog).toContain("}, [phase, launch]);");
+    expect(dialog).toContain("shouldRetryReread(rereadFailures)");
     expect(dialog).toContain("casterRereadDelay(launch, serverDate)");
-    expect(dialog).toMatch(/if \("error" in read\) \{\n\s*if \(reread\) return;/);
-    expect(dialog).toContain("if (!alive || reread) return;");
+    expect(dialog.match(/if \(reread\) \{\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*return;/g)).toHaveLength(2);
     expect(dialog).toContain("contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?phase=\{phase\}[\s\S]*?\/>/);
