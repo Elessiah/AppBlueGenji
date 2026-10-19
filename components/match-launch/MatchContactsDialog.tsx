@@ -57,10 +57,22 @@ export function matchUnderway(phase: MatchLaunchPhase | null): boolean {
 /**
  * Les contacts du caster attendent-ils le départ ? Un caster inscrit, sur un
  * match pas encore parti à l'heure du serveur (`launch.phase`) : sa fiche porte
- * alors une note plutôt que ses contacts.
+ * alors une note plutôt que ses contacts. Pas pour le caster lui-même (arbitre
+ * qui caste) : rien à attendre sur sa propre fiche.
  */
 export function casterContactsPending(launch: MatchLaunchInfo): boolean {
-  return launch.caster !== null && !matchUnderway(launch.phase);
+  return launch.caster !== null && launch.viewer.role !== "CASTER" && !matchUnderway(launch.phase);
+}
+
+/** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
+export const REREAD_RETRIES = 3;
+
+/** Attente entre deux de ces relectures. */
+export const REREAD_RETRY_MS = 10_000;
+
+/** Relancer une relecture après `failures` échecs consécutifs ? */
+export function shouldRetryReread(failures: number): boolean {
+  return failures > 0 && failures <= REREAD_RETRIES;
 }
 
 /** Plus longue attente que `setTimeout` accepte (≈ 24,8 jours). */
@@ -82,17 +94,23 @@ export function casterRereadDelay(launch: MatchLaunchInfo, serverDate: string | 
 }
 
 /**
- * Relire la modale ouverte quand la carte change de phase ? Une fois, quand le
- * match part par une écriture (lancement forcé, ouvert avant l'heure) et que
- * les contacts du caster attendent encore : pas sans caster, pas à la fin du
- * match (un refus non demandé), ni à chaque rendu.
+ * Relire la modale ouverte quand la carte change de phase ? Quand le match
+ * part par une écriture (lancement forcé, ouvert avant l'heure) et que les
+ * contacts du caster attendent encore ; ou quand il revient avant son départ
+ * (reprogrammé) alors que la lecture le tenait pour parti, pour que la
+ * relecture du nouveau départ porte sur le caster du moment. Pas sans caster,
+ * pas à la fin du match (un refus non demandé), ni à chaque rendu.
  */
 export function rereadOnPhaseChange(
   previous: MatchLaunchPhase | null,
   next: MatchLaunchPhase | null,
   launch: MatchLaunchInfo | null,
 ): boolean {
-  return launch !== null && casterContactsPending(launch) && matchUnderway(next) && !matchUnderway(previous);
+  if (launch === null || launch.caster === null) return false;
+  const starts = matchUnderway(next) && !matchUnderway(previous) && casterContactsPending(launch);
+  const backBeforeStart =
+    matchUnderway(previous) && (next === "SCHEDULED" || next === "TO_PLAN") && matchUnderway(launch.phase);
+  return starts || backBeforeStart;
 }
 
 type ContactsRead = { launch: MatchLaunchInfo; serverDate: string | null } | { error: string | null };
@@ -189,13 +207,22 @@ export function MatchContactsDialog({
   const [readKey, setReadKey] = useState(0);
   const [serverDate, setServerDate] = useState<string | null>(null);
   const launch = state.kind === "ready" ? state.launch : null;
+  const [rereadFailures, setRereadFailures] = useState(0);
+  // Phase de la carte vue par la dernière lecture réussie : un changement
+  // survenu pendant la première lecture compte à son arrivée.
   const previousPhase = useRef(phase);
   useEffect(() => {
+    if (!launch) return;
     if (rereadOnPhaseChange(previousPhase.current, phase, launch)) setReadKey((key) => key + 1);
     previousPhase.current = phase;
-    // Seul le changement de phase de la carte compte ici.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, launch]);
+
+  // Relecture échouée : quelques nouvelles tentatives espacées.
+  useEffect(() => {
+    if (!shouldRetryReread(rereadFailures)) return;
+    const timer = setTimeout(() => setReadKey((key) => key + 1), REREAD_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [rereadFailures]);
 
   // Contacts du caster en attente : une relecture à l'heure de départ du serveur.
   useEffect(() => {
@@ -220,15 +247,23 @@ export function MatchContactsDialog({
         });
         if (!alive) return;
         if ("error" in read) {
-          if (reread) return;
+          if (reread) {
+            setRereadFailures((count) => count + 1);
+            return;
+          }
           setState({ kind: "failed" });
           showError(contactsErrorText(text, read.error));
           return;
         }
         setServerDate(read.serverDate);
+        setRereadFailures(0);
         setState({ kind: "ready", launch: read.launch });
       } catch {
-        if (!alive || reread) return;
+        if (!alive) return;
+        if (reread) {
+          setRereadFailures((count) => count + 1);
+          return;
+        }
         setState({ kind: "failed" });
         showError(contactsErrorText(text, null));
       }
