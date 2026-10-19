@@ -4,7 +4,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
 import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { autoValidateTimeText } from "@/lib/shared/score-dispute";
+import { SCORE_LOCKED_DISPUTE, autoValidateTimeText } from "@/lib/shared/score-dispute";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
@@ -188,6 +188,18 @@ function theirsPendingStatus(
   return text.t("score.player.theirs.withoutMaps", values);
 }
 
+/** Avis de verrou dans sa région d'état, vide hors litige (`PlayerScoreDialog`). */
+function LockedNotice({ locked, text }: Readonly<{ locked: boolean; text: string }>) {
+  return (
+    <output id="player-score-locked" className={locked ? `${styles.conflict} ${styles.notice}` : undefined}>
+      {locked ? text : null}
+    </output>
+  );
+}
+
+/** Refus qui disent que l'état lu est périmé : la modale relit le serveur. */
+const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE]);
+
 /** Envoyer la saisie ouvrirait-il un litige ? Face à la proposition adverse, une saisie valide qui en diffère. */
 function sendingOpensDispute(
   canEnterScore: boolean,
@@ -362,8 +374,10 @@ export function PlayerScoreDialog({
       const code = (error as Error).message;
       flagRefusal(code);
       showError(mapError(code));
-      // Proposition changée ou expirée : la modale se recharge sur la nouvelle.
-      if (code === "PROPOSAL_STALE") void Promise.resolve(onRefresh()).catch(() => undefined);
+      // Proposition changée ou expirée, ou litige ouvert entre-temps : la modale
+      // se recharge sur l'état du serveur sans attendre le flux (peut-être en
+      // reconnexion), plutôt que de laisser réessayer en vain.
+      if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
     } finally {
       setSubmitting(false);
     }
@@ -383,7 +397,9 @@ export function PlayerScoreDialog({
       onSubmitted();
       onClose();
     } catch (error) {
-      showError(mapError((error as Error).message));
+      const code = (error as Error).message;
+      showError(mapError(code));
+      if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
     } finally {
       setSubmitting(false);
     }
@@ -477,11 +493,10 @@ export function PlayerScoreDialog({
             </div>
           )}
 
-          {disputeLocked && (
-            <output id="player-score-locked" className={`${styles.conflict} ${styles.notice}`}>
-              {t("score.player.locked")}
-            </output>
-          )}
+          {/* Région d'état **toujours montée** : un litige arrivé par le flux la
+              remplit, et c'est ce remplissage qu'un lecteur d'écran annonce — où
+              que soit le focus. Montée déjà pleine, elle ne l'était pas toujours. */}
+          <LockedNotice locked={disputeLocked} text={t("score.player.locked")} />
 
           {canEnterScore ? (
             <>

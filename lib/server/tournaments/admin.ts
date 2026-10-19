@@ -379,13 +379,6 @@ async function checkAdminMaps(
   return { format, score: check.score };
 }
 
-/**
- * Note l'avancement d'un match par l'arbitrage, sans le trancher. L'arbitre
- * s'en saisit : la validation d'office d'un report seul s'arrête là
- * (`score_deadline_at = NULL`, `SCORE_DISPUTE_LOCK.md`) — sans quoi elle
- * écraserait, deux heures plus tard, le score qu'il vient d'enregistrer. Une
- * nouvelle saisie du déclarant la relance.
- */
 export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
@@ -454,8 +447,7 @@ export async function adminSaveMatchScores(
       `UPDATE bg_matches
        SET team1_score = ?,
            team2_score = ?,
-           forfeit_team_id = ?,
-           score_deadline_at = NULL
+           forfeit_team_id = ?
        WHERE id = ?`,
       [scores.team1Score, scores.team2Score, forfeitTeamId, matchId],
     );
@@ -474,8 +466,7 @@ export async function adminSaveMatchScores(
     `UPDATE bg_matches
      SET team1_score = ?,
          team2_score = ?,
-         forfeit_team_id = NULL,
-         score_deadline_at = NULL
+         forfeit_team_id = NULL
      WHERE id = ?`,
     [derived.team1, derived.team2, matchId],
   );

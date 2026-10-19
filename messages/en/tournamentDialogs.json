@@ -115,7 +115,7 @@
       "minePending": "You proposed {score}. Waiting for {opponent} to confirm.",
       "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed automatically at {deadline} (Paris time).",
       "locked": "Score disputed: score entry is locked for both teams, forfeits included. Only a referee or an administrator can settle this match — set the final score or declare a forfeit.",
-      "counterWarning": "This score differs from {opponent}'s proposal: sending it opens a dispute and locks score entry for both teams until a referee settles it.",
+      "counterWarning": "This entry differs from {opponent}'s proposal (score or map details): sending it opens a dispute and locks score entry for both teams until a referee settles it.",
       "autoValidateAt": "With no answer, this score will be confirmed automatically at {deadline} (Paris time).",
       "willConfirm": "{opponent} will have to confirm the score you send.",
       "confirm": "Confirm the score",
