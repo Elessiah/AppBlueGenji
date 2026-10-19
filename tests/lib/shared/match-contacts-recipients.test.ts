@@ -149,3 +149,15 @@ describe("T01 — base légale du BattleTag masqué lu entre parties d'un match"
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.legalBasis).toMatch(/performance of the service \(contract\) for the reading of the BattleTag, even when hidden, between parties to the same match .*see T04/);
   });
 });
+
+describe("certification Discord et caster retiré", () => {
+  it("l'avis de confidentialité du profil compte les parties du match parmi les lecteurs du tag certifié (FR et EN)", () => {
+    expect(frProfile.privacy.discordNotice).toContain("et, comme contact, aux membres des deux équipes et au caster de ton match dès que ses deux adversaires sont connus");
+    expect(enProfile.privacy.discordNotice).toContain("and, as a contact, to the members of both teams and the caster of your match from the moment both its opponents are known");
+  });
+
+  it("T04 dit qu'un caster devenu inéligible est retiré à la lecture des contacts (FR et EN)", () => {
+    expect(T04?.retention.join("\n")).toMatch(/un caster qui ne remplit plus les conditions de son inscription .* en est retiré à la lecture suivante des contacts/);
+    expect(T04_EN?.retention.join("\n")).toMatch(/a caster who no longer meets the conditions of their sign-up .* is removed at the next read of the contacts/);
+  });
+});
