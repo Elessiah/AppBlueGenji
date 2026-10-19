@@ -863,6 +863,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
     ],
   },
+  // Annonces #live regroupées par soirée : mêmes noms (équipes, ou pseudo
+  // public en tournoi individuel), mais un match programmé y figure **avant**
+  // son passage à l'antenne, et le message est modifié au fil de la soirée —
+  // un changement de « quand », à annoncer. La notification change aussi de
+  // destinataires (rôle StreamViewer hors chaîne officielle).
+  {
+    id: "2026-10-annonces-live-par-soiree",
+    title: "Annonces #live : un message par soirée",
+    publishedAt: "2026-10-20",
+    summary:
+      "Les annonces des matchs diffusés dans le salon #live sont regroupées en un message par soirée, qui liste à leur heure les matchs déjà en direct et ceux programmés d'ici la fin de la soirée (quatre heures après le premier direct), et qui est modifié à chaque nouveau match.",
+    details: [
+      "Les noms ne changent pas : le nom des équipes, ou, en tournoi individuel, ton pseudo public BlueGenji. Ce qui change, c'est le moment : un match diffusé programmé dans la soirée figure dans le message avant même de commencer, avec son heure.",
+      "Le message de la soirée est modifié quand un autre match commence, et reprend alors le pseudo public du moment : un pseudo changé avant cette modification y apparaît à la place de l'ancien.",
+      "Seule une diffusion sur la chaîne officielle BlueGenji notifie tout le serveur (@everyone) ; une autre chaîne ne notifie que les membres qui ont le rôle StreamViewer. Le message reste lisible par tous les membres du salon, comme avant.",
+      "Le site garde l'identifiant du message de la soirée (aucune donnée te concernant), effacé un jour après la fin de la soirée.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

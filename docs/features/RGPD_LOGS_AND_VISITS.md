@@ -63,6 +63,12 @@ y compris la citation d'une annonce échouée au canal de logs du bot, faite sur
 la version sans pseudo que le site joint (`logMessage`) — dès que le bot déployé
 la lit ; avant, la citation porte les pseudos (annonces #live coupées en
 production tant que `LIVE_ANNOUNCEMENTS_ENABLED` n'est pas posée).
+Depuis 2026-10-20, l'annonce est **un message par soirée** (`LIVE_STREAMS.md`) :
+un match programmé de la soirée y figure, pseudo compris, avant son passage à
+l'antenne, et chaque modification du message reprend le pseudo du moment
+(entrée `2026-10-annonces-live-par-soiree` de `PRIVACY_CHANGES`). Le site ne
+garde de la soirée que l'identifiant du message (`bg_live_evenings`, aucune
+donnée personnelle, effacée un jour après la fin de la soirée).
 
 - **Un rédacteur ne reçoit jamais un nom nu** : les formateurs prennent un
   `LogEntrant` (`{ name, participantType }`) et le rendent par `entrantLabel`.
