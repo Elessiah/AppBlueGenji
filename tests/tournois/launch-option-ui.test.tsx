@@ -40,7 +40,14 @@ describe("modale de score — pourquoi le score attend", () => {
     expect(closedNoticeText(EN, "SCHEDULED", null, false)).toBe(enDialogs.score.player.closed.scheduledDirect);
   });
 
+  it("option éteinte, l'heure passée avant la mise à jour : pas de « Prêt »", () => {
+    expect(closedNoticeText(FR, "LAUNCHED", null, false)).toBe(frDialogs.score.player.closed.startingDirect);
+    expect(closedNoticeText(EN, "LAUNCHED", null, false)).toBe(enDialogs.score.player.closed.startingDirect);
+    expect(enDialogs.score.player.closed.startingDirect).not.toMatch(/\bready\b/i);
+  });
+
   it("option allumée ou absente : la règle d'origine", () => {
+    expect(closedNoticeText(FR, "LOBBY", null)).toBe(frDialogs.score.player.closed.lobby);
     expect(closedNoticeText(FR, "SCHEDULED", null)).toBe(frDialogs.score.player.closed.scheduled);
     expect(closedNoticeText(FR, "SCHEDULED", null, true)).toBe(frDialogs.score.player.closed.scheduled);
     expect(closedNoticeText(FR, "TO_PLAN", null, false)).toBe(frDialogs.score.player.closed.toPlan);
@@ -58,6 +65,15 @@ describe("modale d'horaire — ce que la date produit", () => {
     for (const text of [enDialogs.schedule.hintDirect, enDialogs.schedule.hintPlanningDirect]) {
       expect(text).not.toMatch(/breadyb/i);
     }
+  });
+
+  it("match déjà lancé : la date ne le fait pas attendre (FR et EN)", () => {
+    expect(startAtHint(FR, false, true, false, false, true)).toBe(
+      `${frDialogs.schedule.hintLaunched} ${frDialogs.schedule.notice}`,
+    );
+    expect(startAtHint(EN, false, true, false, true, true)).toMatch(/^The match has already launched/);
+    // Joué : l'archive seule.
+    expect(startAtHint(FR, false, true, true, false, true)).toBe(frDialogs.schedule.hintDirect);
   });
 
   it("option allumée ou absente : l'entrée en lancement", () => {

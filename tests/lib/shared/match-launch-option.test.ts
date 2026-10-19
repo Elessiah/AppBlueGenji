@@ -62,6 +62,15 @@ describe("matchLaunchPhase — option éteinte", () => {
     expect(canPlayersReportScore({ ...input(), launchPhase: false, startAt: FUTURE }, NOW)).toBe(false);
     expect(isScoreEntryOpen(input({ launchPhase: false }), NOW)).toBe(true);
   });
+
+  it("planification par l'arbitrage : un match sans date attend sa date, pas de score", () => {
+    const undated = { ...input(), launchPhase: false, startAt: null };
+    expect(canPlayersReportScore({ ...undated, refereeScheduling: true }, NOW)).toBe(false);
+    expect(canPlayersReportScore({ ...undated, refereeScheduling: false }, NOW)).toBe(true);
+    expect(canPlayersReportScore(undated, NOW)).toBe(true);
+    // Lancé par écriture : la planification ne le referme pas.
+    expect(canPlayersReportScore({ ...undated, refereeScheduling: true, launchedAt: PAST }, NOW)).toBe(true);
+  });
 });
 
 describe("matchLaunchPhase — option allumée, ou absente", () => {
