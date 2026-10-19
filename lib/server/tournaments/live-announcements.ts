@@ -527,15 +527,17 @@ function describeGroup(
   group: AnnouncementGroup,
   eveningId?: number,
 ): { label: string; context: string; plural: boolean } {
-  const [first] = group.rows;
   const ids = matchIdsOf(group);
+  // Un groupe réunit un public, donc parfois plusieurs tournois : tous sont nommés.
+  const tournaments = [...new Set(group.rows.map((row) => Number(row.tournament_id)))];
   const plural = ids.length > 1;
   const noun = plural ? "matchs" : "match";
   const evening = eveningId === undefined ? "" : `soiree-${eveningId} `;
+  const tournamentNoun = tournaments.length > 1 ? "tournois" : "tournoi";
   return {
-    label: `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`,
+    label: `${noun} ${ids.join(", ")} (${tournamentNoun} ${tournaments.join(", ")})`,
     // Le tournoi en tête : le staff ouvre `/tournois/<id>` depuis le canal de logs.
-    context: `live-announce ${evening}tournoi-${Number(first.tournament_id)} match-${contextIds(ids)}`,
+    context: `live-announce ${evening}tournoi-${contextIds(tournaments)} match-${contextIds(ids)}`,
     plural,
   };
 }
@@ -639,9 +641,12 @@ async function announce(
     evening = await openEvening(group.target);
     others = await loadEveningMatches(evening);
   } catch (error) {
+    // La base est en cause, pas le bot : seul ce public attend (l'autre est
+    // essayé), et pm2 ne parle pas d'un bot injoignable.
     warnOnce(`evening ${group.target}`, `[live-announce] soirée ${group.target} illisible, annonce reportée`, error);
-    await postpone(group, "unavailable");
-    return { posted: 0, postponed: "unavailable" };
+    holdGroup(group);
+    await releaseAnnouncements(group.rows, describeGroup(group).label);
+    return { posted: 0, postponed: null };
   }
   const streams = eveningStreams(group, others, now);
   // Soirée sans message connu, mais dont un autre match a déjà une annonce
