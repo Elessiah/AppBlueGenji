@@ -812,6 +812,22 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       expect(seen?.caster).toBeNull();
     });
 
+    it("hors lancement, garde présenté le caster devenu joueur (programmé, puis lancé)", async () => {
+      state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
+      state.users = [casterUser(VIEWER)];
+      const later = new Date(Date.now() + 3 * 3_600_000).toISOString();
+      for (const row of [
+        candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, caster_user_id: VIEWER }),
+        candidate({ match_launch_phase: 0, caster_user_id: VIEWER, launched_at: OPENED }),
+      ]) {
+        state.candidates = [row];
+        const info = await loadViewerMatchContacts(viewer, 42);
+        expect(info?.viewer).toMatchObject({ role: "TEAM1", isCaster: true });
+        expect(info?.caster).toMatchObject({ userId: VIEWER });
+      }
+      expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toEqual([]);
+    });
+
     it("dit au lecteur qu'il est le caster", async () => {
       state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER })];
       state.users = [casterUser(VIEWER)];
