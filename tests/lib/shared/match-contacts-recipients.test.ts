@@ -97,3 +97,19 @@ describe("tag Discord d'un caster et BattleTag masqué dans l'avis", () => {
     expect(PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join("\n")).toContain("the BattleTag, even if hidden, of one or two members");
   });
 });
+
+describe("registre et avis — tout ce que montre une fiche de contact", () => {
+  it("T04 déclare rôles d'équipe et statut de certification des contacts, T01 les membres des deux équipes (FR et EN)", () => {
+    expect(T04?.dataCategories.join("\n")).toMatch(/Rôles d'équipe et statut de certification/);
+    expect(T04_EN?.dataCategories.join("\n")).toMatch(/Team roles and certification status/);
+    const t01 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01");
+    const t01En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01");
+    expect(t01?.recipients.join("\n")).toMatch(/Membres des deux équipes d'un même match, tant que le tournoi/);
+    expect(t01En?.recipients.join("\n")).toMatch(/Members of both teams of the same match, until/);
+  });
+
+  it("l'avis dit que « les joueurs » des anciens textes étaient tous les membres des deux équipes (FR et EN)", () => {
+    expect(PRIVACY_CHANGES.find((c) => c.id === ENTRY_ID)?.details.join("\n")).toMatch(/Nos textes disaient « les joueurs »/);
+    expect(PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join("\n")).toMatch(/Our texts said “the players”/);
+  });
+});
