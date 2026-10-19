@@ -347,7 +347,9 @@ export function MatchContactsDialog({
                   // qui laisseraient croire qu'il n'en a pas.
                   contactsShown={matchUnderway(launch.phase)}
                   // Pas au caster lui-même (arbitre compris) : la note parle de lui.
-                  contactsLaterText={casterContactsPending(launch) ? t("contacts.casterLater") : undefined}
+                  // Hors de là, toujours, même quand la phase de la carte et celle
+                  // du serveur divergent : jamais une fiche vide.
+                  contactsLaterText={launch.viewer.role === "CASTER" ? undefined : t("contacts.casterLater")}
                   noCasterText={t("contacts.noCaster")}
                   linkNames
                 />
