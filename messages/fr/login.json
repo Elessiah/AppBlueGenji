@@ -28,7 +28,7 @@
   "oauth": {
     "continueWith": "Continuer avec {provider}",
     "discordNote": "Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite d'un clic dans « Mon profil », {audience}",
-    "blizzardNote": "Renseigne ton BattleTag automatiquement. Tu peux masquer ton BattleTag aux yeux de tous, arbitres et administrateurs compris : il ne reste visible que dans la fenêtre « Contacts » de tes matchs de tournoi, pour les deux équipes dès que les deux adversaires sont connus et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil.",
+    "blizzardNote": "Renseigne ton BattleTag automatiquement. Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net).",
     "tagAudience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes, le temps du match seulement) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre."
   },
   "environment": {

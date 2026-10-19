@@ -433,6 +433,13 @@ export type LaunchCaster = {
 
 export type LaunchViewerRole = "TEAM1" | "TEAM2" | "CASTER";
 
+/**
+ * Rôle du lecteur dans une présentation de match : une partie, ou un arbitre
+ * (permission `tournaments`), qui ne lit que les contacts de la carte et n'a
+ * pas de « Prêt » à donner.
+ */
+export type MatchLaunchViewerRole = LaunchViewerRole | "REFEREE";
+
 export type MatchLaunchInfo = {
   matchId: number;
   tournamentId: number;
@@ -447,7 +454,7 @@ export type MatchLaunchInfo = {
   team2: LaunchSide;
   caster: LaunchCaster | null;
   viewer: {
-    role: LaunchViewerRole;
+    role: MatchLaunchViewerRole;
     /** Le lecteur peut-il cliquer « Prêt » pour sa partie ? */
     canDeclareReady: boolean;
     /** Sa partie est-elle déjà déclarée prête ? */

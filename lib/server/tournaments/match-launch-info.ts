@@ -30,10 +30,10 @@ import {
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
-  type LaunchViewerRole,
   type MatchLaunchInfo,
+  type MatchLaunchViewerRole,
 } from "@/lib/shared/match-launch";
-import type { PlatformRole } from "@/lib/shared/permissions";
+import { can, type PlatformRole } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import {
@@ -149,6 +149,7 @@ async function loadCandidates(
   connection: PoolConnection,
   userId: number,
   matchId: number | null,
+  referee = false,
 ): Promise<CandidateRow[]> {
   // Deux lectures : la modale de lancement (tous les matchs du lecteur qui
   // approchent, sur les seuls tournois qui ont la phase de lancement), et le
@@ -185,7 +186,7 @@ async function loadCandidates(
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        ${scope}
-       AND (m.caster_user_id = ?
+       AND (${referee ? "1 = 1 OR " : ""}m.caster_user_id = ?
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
      ORDER BY m.start_at IS NULL, m.start_at, m.id`,
@@ -246,7 +247,8 @@ function viewerRole(
   userId: number,
   teams: ViewerTeams,
   castRevoked: boolean,
-): { role: LaunchViewerRole; canDeclareReady: boolean } | null {
+  referee: boolean,
+): { role: MatchLaunchViewerRole; canDeclareReady: boolean } | null {
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
   for (const [role, teamId] of [
     ["TEAM1", row.team1_id],
@@ -260,6 +262,8 @@ function viewerRole(
   if (!castRevoked && row.caster_user_id !== null && Number(row.caster_user_id) === userId) {
     return { role: "CASTER", canDeclareReady: true };
   }
+  // Un arbitre n'a pas de « Prêt » à donner : il lit les contacts, rien de plus.
+  if (referee) return { role: "REFEREE", canDeclareReady: false };
   return null;
 }
 
@@ -512,7 +516,7 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
 function buildLaunchInfo(
   row: CandidateRow,
   phase: LaunchPhase,
-  party: { role: LaunchViewerRole; canDeclareReady: boolean },
+  party: { role: MatchLaunchViewerRole; canDeclareReady: boolean },
   ctx: LaunchContext,
 ): MatchLaunchInfo {
   const { readiness } = ctx;
@@ -543,6 +547,7 @@ function buildLaunchInfo(
         CASTER: readiness.casterReady,
         TEAM1: readiness.team1Ready,
         TEAM2: readiness.team2Ready,
+        REFEREE: false,
       }[party.role],
     },
   };
@@ -576,13 +581,17 @@ export async function loadViewerMatchContacts(
 async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null): Promise<MatchLaunchInfo[]> {
   const forCard = matchId !== null;
   if (!(await hasRunningTournament(!forCard))) return [];
+  // Arbitre (permission `tournaments`) : par la carte seulement, les mêmes
+  // contacts, à la même heure, que les joueurs du match (décision de
+  // l'utilisateur, 2026-10-19). La modale de lancement ne lui présente rien.
+  const referee = forCard && can(viewer, "tournaments");
 
   const revokedCasts: { matchId: number; casterId: number }[] = [];
   const launches = await withConnection(async (connection) => {
-    let rows = await loadCandidates(connection, viewer.id, matchId);
+    let rows = await loadCandidates(connection, viewer.id, matchId, referee);
     if (rows.length === 0) return [];
     if (await maintainIfDue(connection, rows)) {
-      rows = await loadCandidates(connection, viewer.id, matchId);
+      rows = await loadCandidates(connection, viewer.id, matchId, referee);
       if (rows.length === 0) return [];
     }
     const teams = await loadViewerTeams(connection, viewer.id);
@@ -591,7 +600,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const visible = rows
       .map((row) => {
         const phase = matchLaunchPhase(toLaunchInput(row), now);
-        return { row, phase, exposes: exposesContacts(phase, forCard && viewerPlaysMatch(row, teams)) };
+        return { row, phase, exposes: exposesContacts(phase, forCard && (referee || viewerPlaysMatch(row, teams))) };
       })
       // Par la carte, un match sans contacts à montrer n'est pas rendu : le
       // caster d'un match pas encore parti reçoit le même refus qu'un tiers.
@@ -606,7 +615,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, exposes } of visible) {
       const castRevoked = revoked.has(Number(row.id));
-      const party = viewerRole(row, viewer.id, teams, castRevoked);
+      const party = viewerRole(row, viewer.id, teams, castRevoked, referee);
       if (!party) continue;
       result.push(
         buildLaunchInfo(row, phase, party, {
