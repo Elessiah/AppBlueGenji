@@ -122,11 +122,15 @@ async function loadViewerTeams(connection: PoolConnection, userId: number): Prom
  * retard ne tient qu'à une bascule d'état que personne n'a encore écrite, et
  * aucun match n'existe alors en base pour ce tournoi.
  */
-function hasRunningTournament(): Promise<boolean> {
-  return cachedTournamentList("running-exists", () =>
+function hasRunningTournament(withLaunchPhase: boolean): Promise<boolean> {
+  // La modale ne lit que les tournois qui ont la phase de lancement (option
+  // désactivée par défaut) : sans ce filtre, un seul tournoi en cours sans
+  // l'option ferait payer à chaque onglet la lecture complète, pour rien.
+  const filter = withLaunchPhase ? " AND match_launch_phase = 1" : "";
+  return cachedTournamentList(withLaunchPhase ? "running-launch-phase-exists" : "running-exists", () =>
     withConnection(async (connection) => {
       const [rows] = await connection.execute<(RowDataPacket & { running: number })[]>(
-        `SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING') AS running`,
+        `SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING'${filter}) AS running`,
       );
       return Number(rows[0]?.running ?? 0) === 1;
     }),
@@ -543,8 +547,8 @@ export async function loadViewerMatchContacts(
 }
 
 async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null): Promise<MatchLaunchInfo[]> {
-  if (!(await hasRunningTournament())) return [];
   const forCard = matchId !== null;
+  if (!(await hasRunningTournament(!forCard))) return [];
 
   const revokedCasts: { matchId: number; casterId: number }[] = [];
   const launches = await withConnection(async (connection) => {
