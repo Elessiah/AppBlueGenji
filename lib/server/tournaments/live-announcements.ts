@@ -215,11 +215,15 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
 async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRow[]> {
   const announcedSince = `EXISTS (SELECT 1 FROM bg_live_announcements ea
                                    WHERE ea.match_id = m.id AND ea.sent_at >= ?) AS evening_announced`;
+  // Sans message encore parti, celui-ci peut être le premier qui notifie : la
+  // fenêtre repartira de son envoi (`rememberEveningMessage`), il liste donc
+  // les matchs programmés jusqu'à cette fin-là.
+  const until = evening.discord_message_id ? "?" : `GREATEST(?, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`;
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a WHERE a.match_id = m.id AND a.sent_at >= ?)
              OR (m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
-                 AND m.start_at > NOW() AND m.start_at <= ?))`,
+                 AND m.start_at > NOW() AND m.start_at <= ${until}))`,
     [evening.started_at, evening.window_end],
     { column: announcedSince, params: [evening.started_at] },
   );
