@@ -324,11 +324,10 @@ export function MatchContactsDialog({
     const controller = new AbortController();
     // Un échec passager garde à l'écran ce qui est déjà lu (seuls les contacts
     // du caster y manquaient) ; sans rien de lu, la modale reste en chargement
-    // tant qu'une nouvelle tentative suit. Notification et « non affichés »
-    // seulement au refus définitif ou aux tentatives épuisées.
+    // le temps de la **première** nouvelle tentative (un raté isolé), puis
+    // notifie l'échec — les tentatives suivantes continuent sans bruit.
     const shown = state.kind === "ready";
-    const keepWaiting = (transient: boolean) =>
-      transient && (shown || shouldRetryReread(rereadFailures + 1));
+    const keepWaiting = (transient: boolean) => transient && (shown || rereadFailures === 0);
     void (async () => {
       try {
         const read = await readMatchContacts(matchId, {
