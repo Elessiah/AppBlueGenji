@@ -141,9 +141,12 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   l'autre. Les deux publics ont chacun leur message de soirée.
 - **Soirée** : `LIVE_EVENING_WINDOW_HOURS` = **4 h**, comptées depuis le
   premier direct annoncé pour ce public (`bg_live_evenings` : public, ouverture,
-  fin de fenêtre, identifiant du message Discord ; aucune donnée personnelle,
-  effacée un jour après la fin de la fenêtre). Quatre heures couvrent une
-  soirée de tournoi (19 h – 23 h) sans fondre deux soirées.
+  fin de fenêtre, identifiant du message Discord, `silent` si ce message est
+  parti sans mention ; aucune donnée personnelle, effacée un jour après la fin
+  de la fenêtre). Quatre heures couvrent une soirée de tournoi (19 h – 23 h)
+  sans fondre deux soirées. La fenêtre repart de l'envoi du **premier message
+  qui notifie** : des essais reportés avant lui (bot injoignable) ne la
+  raccourcissent pas.
 - **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
   soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
   Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
@@ -161,7 +164,11 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   lecture préalable du message). Message supprimé entre-temps, pas du bot, ou
   qui ne se modifie plus (plafond de modifications de Discord sur un message
   vieux d'une heure, code `30046`) : une **suite** part, sans mention ni
-  notification, et son identifiant remplace l'ancien. Un bot d'une version antérieure ne rend pas
+  notification, et son identifiant remplace l'ancien. Un message parti sans
+  mention (suite, envoi `notify: false`, permission absente) est gardé
+  `silent` : ses modifications envoient `notify: false` et n'écrivent pas de
+  mention de tête — une mention grise qui n'a notifié personne aurait l'air
+  d'une panne. Un bot d'une version antérieure ne rend pas
   d'identifiant : chaque match repart alors dans un nouveau message (d'où
   l'ordre de déploiement : **bot d'abord**). Une publication incertaine
   (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
