@@ -944,23 +944,17 @@ describe("soirées d'annonces", () => {
     // sans message encore parti, jusqu'à la fin de la fenêtre qui repartira de cet envoi.
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
     expect(read?.[0]).toContain("m.start_at <= GREATEST(?, NOW() + INTERVAL 4 HOUR)");
-    expect(read?.[1]).toEqual([
-      EVENING.started_at,
-      expect.any(Number),
-      expect.any(Number),
-      EVENING.started_at,
-      EVENING.window_end,
-    ]);
+    expect(read?.[1]).toEqual([expect.any(Number), expect.any(Number), EVENING.started_at, EVENING.window_end]);
   });
 
-  it("soirée sans message connu dont un autre match du même public a déjà une annonce : nouveau message sans notification", async () => {
+  it("soirée marquée notifiée sans message connu : nouveau message sans notification", async () => {
     // Premier envoi d'issue incertaine (délai écoulé) : aucun identifiant gardé,
     // mais le public a peut-être déjà été notifié — jamais deux fois par soirée.
     const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
     const { evening } = mockDb([joined]);
-    const announced = { ...AUTO_LIVE, launched_at: "2026-10-14T19:00:00Z", evening_announced: 1 };
+    const announced = { ...AUTO_LIVE, launched_at: "2026-10-14T19:00:00Z" };
     evening.mockImplementation(async (sql) =>
-      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[announced, { ...joined, evening_announced: 1 }]],
+      sql.includes("FROM bg_live_evenings") ? [[{ ...EVENING, notified: 1 }]] : [[announced, joined]],
     );
     expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
     const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
@@ -971,11 +965,13 @@ describe("soirées d'annonces", () => {
     );
   });
 
-  it("notifie quand seul le groupe lui-même, ou un match d'un autre public, a une annonce dans la soirée", async () => {
+  it("notifie quand la soirée n'est pas marquée, même si un match annoncé a changé de public depuis", async () => {
+    // Match annoncé sur une chaîne StreamViewer, puis passé sur la chaîne
+    // officielle : la soirée officielle n'est pas notifiée pour autant.
     const { evening } = mockDb([AUTO_LIVE]);
-    const otherAudience = { ...AUTO_LIVE, id: 42, live_url: OFFICIAL, pairing: "5:6", launch_pairing: "5:6", evening_announced: 1 };
+    const movedHere = { ...AUTO_LIVE, id: 42, pairing: "5:6", launch_pairing: "5:6", launched_at: "2026-10-14T19:00:00Z" };
     evening.mockImplementation(async (sql) =>
-      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[{ ...AUTO_LIVE, evening_announced: 1 }, otherAudience]],
+      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[AUTO_LIVE, movedHere]],
     );
     await runLiveAnnouncementSweep(NOW);
     const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
@@ -988,7 +984,7 @@ describe("soirées d'annonces", () => {
     evening.mockImplementation(async (sql) =>
       sql.includes("FROM bg_live_evenings")
         ? [[{ ...EVENING, discord_message_id: "123456789012345678" }]]
-        : [[{ ...AUTO_LIVE, evening_announced: 1 }, joined]],
+        : [[AUTO_LIVE, joined]],
     );
     await runLiveAnnouncementSweep(NOW);
     const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
@@ -1011,10 +1007,10 @@ describe("soirées d'annonces", () => {
     const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
     const first = mockDb([joined]);
     first.evening.mockImplementation(async (sql) =>
-      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[{ ...AUTO_LIVE, evening_announced: 1 }, joined]],
+      sql.includes("FROM bg_live_evenings") ? [[{ ...EVENING, notified: 1 }]] : [[AUTO_LIVE, joined]],
     );
     await runLiveAnnouncementSweep(NOW);
-    const quietUpdate = first.execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
+    const quietUpdate = first.execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings SET discord_message_id"));
     expect(quietUpdate?.[1]).toEqual(["123456789012345678", 1, 3]);
     // Premier message gardé, même muet : la fenêtre part de son envoi (elle couvre ce qu'il liste).
     expect(quietUpdate?.[0]).toContain("window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR)");
@@ -1104,7 +1100,7 @@ describe("soirées d'annonces", () => {
     await runLiveAnnouncementSweep(NOW);
     const mark = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_live_evenings SET notified = 1"));
     expect(mark?.[0]).toBe(
-      "UPDATE bg_live_evenings SET notified = 1, window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR) WHERE id = ?",
+      "UPDATE bg_live_evenings SET notified = 1, window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR) WHERE id = ? AND notified = 0",
     );
     expect(mark?.[1]).toEqual([3]);
     const markOrder = execute.mock.invocationCallOrder[execute.mock.calls.indexOf(mark!)];
@@ -1122,6 +1118,20 @@ describe("soirées d'annonces", () => {
     await runLiveAnnouncementSweep(NOW);
     expect(jest.mocked(pushLiveEvening).mock.calls[0][0].notify).toBe(false);
     expect(execute.mock.calls.some(([sql]) => sql.includes("SET notified"))).toBe(false);
+  });
+
+  it("marque déjà prise par un autre envoi (affectedRows 0) : nouveau message sans notification, marque gardée", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("rejected");
+    const { execute } = mockDb([AUTO_LIVE]);
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.startsWith("UPDATE bg_live_evenings SET notified = 1")) return [{ affectedRows: 0 }];
+      return base(sql, params);
+    });
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveEvening).mock.calls[0][0].notify).toBe(false);
+    // Refus d'un envoi qui ne notifiait pas : la marque de l'autre envoi reste.
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET notified = 0"))).toBe(false);
   });
 
   it("marque de la soirée impossible : rien ne part, réservation rendue", async () => {
