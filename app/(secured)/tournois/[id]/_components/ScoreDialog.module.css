@@ -174,7 +174,7 @@
   border-style: solid;
 }
 
-.forfeit:hover:not(:disabled) {
+.forfeit:hover:not(:disabled, [aria-disabled="true"]) {
   background: rgba(var(--amber-rgb), 0.12);
 }
 
@@ -189,7 +189,8 @@
   outline-offset: 2px;
 }
 
-.forfeit:disabled {
+.forfeit:disabled,
+.forfeit[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -208,7 +209,7 @@
   transition: color 0.15s ease;
 }
 
-.link:hover:not(:disabled) {
+.link:hover:not(:disabled, [aria-disabled="true"]) {
   color: var(--ink, var(--ink));
 }
 
@@ -218,7 +219,8 @@
   border-radius: 3px;
 }
 
-.link:disabled {
+.link:disabled,
+.link[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -264,21 +266,23 @@
   background: rgba(90, 200, 255, 0.3);
 }
 
-.actions :global(.btn:not(.ghost):hover:not(:disabled)) {
+.actions :global(.btn:not(.ghost):hover:not(:disabled, [aria-disabled="true"])) {
   background: rgba(90, 200, 255, 0.42);
 }
 
 /* `.btn` global n'a pas d'état désactivé : sans ça, « Valider le résultat »
    gardait l'apparence d'un bouton cliquable alors qu'il refusait le clic, et
    rien à l'écran ne disait pourquoi. */
-.actions :global(.btn:disabled) {
+.actions :global(.btn:disabled),
+.actions :global(.btn[aria-disabled="true"]) {
   opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
 }
 
-.actions :global(.btn:disabled:hover) {
+.actions :global(.btn:disabled:hover),
+.actions :global(.btn[aria-disabled="true"]:hover) {
   transform: none;
   box-shadow: none;
 }
