@@ -203,7 +203,9 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
 }
 
 /**
- * Matchs castés d'une soirée : ceux annoncés depuis son ouverture, et ceux
+ * Matchs castés d'une soirée : ceux dont l'affiche **courante** a été annoncée
+ * depuis son ouverture (un match rouvert pour d'autres engagés n'y revient que
+ * par l'annonce de sa nouvelle affiche — refusée, il n'y figure plus), et ceux
  * programmés (`START_TIME`) d'ici sa fin — leur heure figure dans le message.
  * Le public (chaîne officielle ou non) se trie ensuite en mémoire.
  */
@@ -214,7 +216,9 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
   const until = evening.discord_message_id ? "?" : `GREATEST(?, ${WINDOW_FROM_NOW})`;
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
-        AND (EXISTS (SELECT 1 FROM bg_live_announcements a WHERE a.match_id = m.id AND a.sent_at >= ?)
+        AND (EXISTS (SELECT 1 FROM bg_live_announcements a
+                      WHERE a.match_id = m.id AND a.sent_at >= ?
+                        AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
              OR (m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
     [evening.started_at, evening.window_end],
@@ -302,9 +306,13 @@ function streamTime(row: LiveCandidateRow, now: number): number {
 /**
  * Ouvre — ou reprend — la soirée d'un public : la dernière dont la fenêtre
  * ({@link LIVE_EVENING_WINDOW_HOURS} heures depuis le premier direct annoncé)
- * court encore. Les soirées finies depuis un jour sont oubliées au passage.
+ * court encore, ou celle dont le message listait déjà, à son heure, un match
+ * programmé du groupe passé à l'antenne en retard, après la fin de la fenêtre
+ * (`scheduledAt`, sa première heure prévue) : il rejoint ce message au lieu
+ * d'ouvrir une soirée qui notifierait une seconde fois. Les soirées finies
+ * depuis un jour sont oubliées au passage.
  */
-async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
+async function openEvening(target: LiveMentionTarget, scheduledAt: SqlDateTime | null): Promise<LiveEvening> {
   const db = await getDatabase();
   try {
     await db.execute(`DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY`);
@@ -312,17 +320,36 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
     // Ménage seulement : réessayé au passage suivant.
   }
   const select = `SELECT id, started_at, window_end, discord_message_id, silent, notified FROM bg_live_evenings
-                   WHERE target = ? AND window_end > NOW() ORDER BY id DESC LIMIT 1`;
-  const [open] = await db.query<LiveEvening[]>(select, [target]);
+                   WHERE target = ? AND (window_end > NOW()${
+                     scheduledAt === null
+                       ? ""
+                       : " OR (discord_message_id IS NOT NULL AND started_at <= ? AND window_end >= ?)"
+                   }) ORDER BY id DESC LIMIT 1`;
+  const params = scheduledAt === null ? [target] : [target, scheduledAt, scheduledAt];
+  const [open] = await db.query<LiveEvening[]>(select, params);
   if (open[0]) return open[0];
   await db.execute(
     `INSERT INTO bg_live_evenings (target, started_at, window_end)
      VALUES (?, NOW(), ${WINDOW_FROM_NOW})`,
     [target],
   );
-  const [created] = await db.query<LiveEvening[]>(select, [target]);
+  const [created] = await db.query<LiveEvening[]>(select, params);
   if (!created[0]) throw new Error("soirée d'annonces introuvable après sa création");
   return created[0];
+}
+
+/** Valeur `DATETIME` telle que `mysql2` la rend. */
+type SqlDateTime = Date | string;
+
+/** Première heure prévue des matchs programmés (`START_TIME`) du groupe, telle que lue ; `null` sans. */
+function earliestScheduledStart(rows: readonly LiveCandidateRow[]): SqlDateTime | null {
+  let earliest: { at: number; value: SqlDateTime } | null = null;
+  for (const row of rows) {
+    if (row.live_trigger !== "START_TIME" || row.start_at === null) continue;
+    const at = instant(row.start_at);
+    if (at !== null && (earliest === null || at < earliest.at)) earliest = { at, value: row.start_at };
+  }
+  return earliest?.value ?? null;
 }
 
 /** Trace pm2 : comment le groupe a rejoint #live (nouveau message, modification, suite). */
@@ -798,7 +825,7 @@ async function announce(
   let evening: LiveEvening;
   let others: LiveCandidateRow[];
   try {
-    evening = await openEvening(group.target);
+    evening = await openEvening(group.target, earliestScheduledStart(group.rows));
     await stampClaims(group.rows, evening.started_at);
     others = await loadEveningMatches(evening);
   } catch (error) {
