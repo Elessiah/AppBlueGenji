@@ -433,23 +433,23 @@ function revokeIneligibleCasters(
 ): Set<number> {
   const now = Date.now();
   const revoked = new Set<number>();
-  for (const { row, phase } of visible) {
+  for (const { row } of visible) {
     if (row.caster_user_id === null) continue;
     const casterId = Number(row.caster_user_id);
+    // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
+    // un tournoi sans phase de lancement, un match à l'heure passée se lit
+    // lancé avant que l'entretien ne l'écrive, et c'est la dernière occasion
+    // de retirer l'inscription, qu'un match lancé garde ensuite. Un report en
+    // attente vaut lancé, des deux côtés : rien n'est mis en file pour rien.
+    const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
     // Un caster devenu joueur du match ne donnera jamais son « Prêt » de
-    // caster : en lancement — seule phase où ce « Prêt » compte, et où tout
-    // lecteur lit les rosters, modale comme carte —, il est tu et son
-    // inscription retirée, comme un caster inéligible. Avant, il reste
-    // présenté (il est inscrit) ; lancé, il garde sa place.
-    const playsMatch = phase === "LOBBY" && casterPlays(row, casterId);
+    // caster : avant le lancement, dès qu'une lecture le constate (le sien,
+    // ou les rosters lus pour les contacts), il est tu et son inscription
+    // retirée, comme un caster inéligible — sous verrou, `releaseIneligibleCast`
+    // rejoue la même règle. Lancé, il garde sa place.
+    const playsMatch = recorded !== "LAUNCHED" && casterPlays(row, casterId);
     if (castEligibilityBlock(users.get(casterId)) !== null || playsMatch) {
       revoked.add(Number(row.id));
-      // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
-      // un tournoi sans phase de lancement, un match à l'heure passée se lit
-      // lancé avant que l'entretien ne l'écrive, et c'est la dernière occasion
-      // de retirer l'inscription, qu'un match lancé garde ensuite. Un report en
-      // attente vaut lancé, des deux côtés : rien n'est mis en file pour rien.
-      const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
       if (recorded !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
     }
   }
