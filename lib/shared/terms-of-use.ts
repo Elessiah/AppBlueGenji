@@ -46,8 +46,14 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * y être nommé = ne pas s'inscrire) — une règle de fond du tournoi auquel on
  * s'inscrit ; mise en vigueur au 14 octobre 2026 sur décision de
  * l'association, la version 3 datant du 1er octobre.
+ *
+ * Version 5 : section « Contacts de match » — les coordonnées de contact
+ * (tag Discord certifié, BattleTag même masqué, rôle d'équipe) sont
+ * communiquées aux deux équipes d'un match et à son caster le temps du match,
+ * au titre de l'organisation du tournoi (base « exécution du contrat » du
+ * registre T04) ; en vigueur au 19 octobre 2026 (décision de l'utilisateur).
  */
-export const TERMS_VERSION = 4;
+export const TERMS_VERSION = 5;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -60,7 +66,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-10-14";
+export const TERMS_UPDATED_AT = "2026-10-19";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";
@@ -235,6 +241,18 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       `${STREAM_NOTICE_OBJECTION} ${STREAM_NOTICE_LIVE} La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.`,
     ],
     links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Politique de confidentialité — retransmission des matchs" }],
+  },
+  // Version 5 (2026-10-19) : la base « exécution du contrat » des contacts de
+  // match (registre T04, `/rgpd`) renvoie à cette section. Elle suit le code :
+  // `match-launch-info.ts` (qui, quand) et `battletag-visibility.ts`.
+  {
+    id: "contacts-de-match",
+    title: "Contacts de match",
+    paragraphs: [
+      "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — et celles du caster inscrit sont communiquées aux **membres des deux équipes** du match, dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin.",
+      "Le BattleTag d'un joueur engagé reste aussi lisible, même masqué, des membres des deux équipes de ses matchs tant que le tournoi n'est pas terminé. Masquer son BattleTag ne le retire que de la vue du public : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché). Un tag Discord non certifié n'est jamais communiqué.",
+    ],
+    links: [{ href: "/rgpd#destinataires", label: "Politique de confidentialité — destinataires et transferts" }],
   },
   {
     id: "signalement",

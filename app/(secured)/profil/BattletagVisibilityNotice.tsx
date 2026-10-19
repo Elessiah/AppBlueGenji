@@ -81,6 +81,10 @@ export function BattletagVisibilityNotice({ onClose }: Readonly<{ onClose: () =>
         </h2>
 
         <div id="battletag-visibility-body">
+          {/* La phrase à retenir d'abord, en clair ; le détail des publics suit. */}
+          <p style={{ color: "var(--ink)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
+            <strong>{t("battletagNotice.warning")}</strong>
+          </p>
           <p style={{ color: "var(--ink-mute)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
             {t("battletagNotice.intro")}
           </p>

@@ -30,7 +30,10 @@ export type LaunchStripControls = {
   isCaster: boolean;
   /** Ouvrir la modale de lancement (parties du match seulement). */
   showOpen: boolean;
-  /** Ouvrir les contacts du match (parties du match, deux adversaires connus, pas terminé). */
+  /**
+   * Ouvrir les contacts du match, pas terminé : joueurs dès que les deux
+   * adversaires sont connus, caster le temps du match seulement.
+   */
   showContacts: boolean;
   /** S'inscrire comme caster. */
   showClaim: boolean;
@@ -50,11 +53,17 @@ export type LaunchStripControls = {
 const FORCEABLE_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY"]);
 
 /**
- * Phases où le bouton « Contacts » est offert : dès que les deux adversaires
- * sont connus — à planifier, programmé, en lancement ou lancé —, celles où la
- * lecture serveur les expose (`match-launch-info.ts`).
+ * Phases où le bouton « Contacts » est offert à un joueur du match : dès que
+ * les deux adversaires sont connus — à planifier, programmé, en lancement ou
+ * lancé —, celles où la lecture serveur les expose (`match-launch-info.ts`).
  */
 const CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
+
+/**
+ * Phases où il l'est au caster inscrit : le temps du match seulement, du
+ * départ (lancement ouvert, ou lancé) à la fin — la même borne qu'au serveur.
+ */
+const CASTER_CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["LOBBY", "LAUNCHED"]);
 
 export function launchStripControls(
   match: StripMatch,
@@ -73,7 +82,7 @@ export function launchStripControls(
   return {
     isCaster,
     showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && (phase === "LOBBY" || phase === "LAUNCHED"),
-    showContacts: (isCaster || isPlayer) && CONTACT_PHASES.has(phase),
+    showContacts: isPlayer ? CONTACT_PHASES.has(phase) : isCaster && CASTER_CONTACT_PHASES.has(phase),
     showClaim: viewer.canManage && castable && match.casterUserId === null,
     showRelease: open && match.casterUserId !== null && (isCaster || viewer.canSchedule),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",

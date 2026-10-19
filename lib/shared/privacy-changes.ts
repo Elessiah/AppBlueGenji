@@ -817,6 +817,30 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "La phase de lancement (« Prêt » et fenêtre de lancement) devient une option de chaque tournoi, éteinte par défaut : sans elle, un match part à son heure et aucun « Prêt » n'est enregistré.",
     ],
   },
+  // CONTACTS-FOLLOWUP (décisions de l'utilisateur du 2026-10-19) : le caster
+  // inscrit ne reçoit plus les contacts d'un match que le temps du match (moins
+  // tôt qu'annoncé par l'entrée précédente, publiée le même jour et désormais
+  // figée) ; BattleTag masqué lu par les parties d'un match = exécution du
+  // service, plus le consentement ; conditions d'utilisation en version 5
+  // (section « Contacts de match »). Annoncées une fois à tous par ce registre,
+  // comme la version 4 (`2026-10-base-pseudo-live-et-automod`). Datée du jour
+  // de la fusion prévue.
+  {
+    id: "2026-10-contacts-de-match-caster-et-conditions-v5",
+    title: "Contacts de match : le caster seulement pendant le match, conditions d'utilisation mises à jour",
+    publishedAt: "2026-10-19",
+    summary:
+      "Le caster inscrit d'un match ne voit plus ses contacts que le temps du match, de son départ à sa fin ; ton BattleTag, même masqué, reste visible de tes adversaires pendant un match de tournoi. Les conditions d'utilisation passent en version 5 pour le dire.",
+    details: [
+      "Caster : il ne voit le tag Discord certifié, le BattleTag (même masqué) et le rôle d'équipe des contacts d'un match que le temps du match — dès son départ (fenêtre de lancement ouverte, ou match lancé) et jusqu'à sa fin —, et plus dès que les deux adversaires sont connus. Les membres des deux équipes gardent l'accès dès que les deux adversaires sont connus, « À planifier » compris, au leur comme à celui du caster.",
+      "BattleTag masqué : tu peux le masquer aux yeux de tous, mais il reste visible pour tes adversaires pendant un match de tournoi (et des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé). Si tu ne veux pas qu'ils le voient, retire-le de ton profil. Cette lecture repose sur l'exécution du service — l'organisation du tournoi —, et non sur ton consentement : le réglage « BattleTag OW » ne vaut que pour le public.",
+      "Conditions d'utilisation : la version 5, en vigueur depuis le 19 octobre 2026, ajoute la section « Contacts de match », qui prévoit ce partage. Relis-les : la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur et, si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion.",
+    ],
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

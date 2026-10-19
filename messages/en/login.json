@@ -28,8 +28,8 @@
   "oauth": {
     "continueWith": "Continue with {provider}",
     "discordNote": "Saves your Discord username without certifying it: it stays hidden from everyone, admins included. If you certify it later with one click in “My profile”, {audience}",
-    "blizzardNote": "Fills in your BattleTag automatically.",
-    "tagAudience": "admins can see it at any time, referees while you are registered for a tournament that is not finished (from the moment registration opens), and the members of both teams and the caster of your match from the moment both opponents of the match are known until its end (and, if you cast a match, both its teams); other players only if you make it visible in your privacy settings. Never anyone else."
+    "blizzardNote": "Fills in your BattleTag automatically. You can hide your BattleTag from everyone, but it stays visible to your opponents during a tournament match. If you don't want them to see it, remove it from your profile.",
+    "tagAudience": "admins can see it at any time, referees while you are registered for a tournament that is not finished (from the moment registration opens), the members of both teams of your match from the moment both its opponents are known until its end, and its caster only while the match is being played (and, if you cast a match, both its teams, from the moment both its opponents are known); other players only if you make it visible in your privacy settings. Never anyone else."
   },
   "environment": {
     "notice": {

@@ -7,7 +7,8 @@
  * **Exposition bornée.** Les contacts (tag Discord certifié, BattleTag) ne sont
  * rendus qu'aux parties d'un match : dans la modale, **en lancement ou lancé** ;
  * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
- * connus (`exposesContacts`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
+ * connus pour ses joueurs, le temps du match seulement pour son caster
+ * (`exposesContacts`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
  * `sharesLiveMatch` de `canViewBattletag`, que ce module est seul à établir.
  * Un match terminé sort de la liste, et ses contacts avec lui.
  *
@@ -307,14 +308,24 @@ type LaunchContext = {
 
 /**
  * Les contacts sortent-ils pour ce match ? Dans la modale de lancement, en
- * lancement ou lancé ; par le bouton « Contacts » d'une carte, **dès que les
- * deux adversaires sont connus** — à planifier (décision de l'utilisateur,
- * 2026-10-19) ou programmé — : les parties s'organisent avant l'heure, surtout
- * sans phase de lancement. Mêmes destinataires dans les deux cas : les seules
- * parties du match.
+ * lancement ou lancé ; par le bouton « Contacts » d'une carte, pour un
+ * **joueur** (membre d'une des deux engagées), dès que les deux adversaires
+ * sont connus — à planifier (décision de l'utilisateur, 2026-10-19) ou
+ * programmé — : les parties s'organisent avant l'heure, surtout sans phase de
+ * lancement. Le **caster** inscrit, lui, ne les reçoit que **le temps du
+ * match** — du départ (lancement ouvert, ou lancé) à sa fin —, par la modale
+ * comme par la carte (décision de l'utilisateur, 2026-10-19) : il n'a rien à
+ * organiser avec les équipes avant l'heure.
  */
-function exposesContacts(phase: LaunchPhase, forCard: boolean): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED" || (forCard && (phase === "SCHEDULED" || phase === "TO_PLAN"));
+function exposesContacts(phase: LaunchPhase, cardForPlayer: boolean): boolean {
+  return (
+    phase === "LOBBY" || phase === "LAUNCHED" || (cardForPlayer && (phase === "SCHEDULED" || phase === "TO_PLAN"))
+  );
+}
+
+/** Le lecteur représente-t-il une des deux engagées du match ? */
+function viewerPlaysMatch(row: CandidateRow, teams: ViewerTeams): boolean {
+  return [row.team1_id, row.team2_id].some((teamId) => teamId !== null && teams.has(Number(teamId)));
 }
 
 /** Un côté du match tel que la ligne le décrit. */
@@ -538,11 +549,12 @@ export function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaun
 /**
  * Contacts d'**un** match pour le bouton « Contacts » de sa carte : la même
  * présentation que la modale de lancement, aux mêmes destinataires (les
- * parties du match, caster éligible compris), mais dès que les deux
- * adversaires sont connus (à planifier compris), que le tournoi ait ou non la
- * phase de lancement.
+ * parties du match, caster éligible compris), que le tournoi ait ou non la
+ * phase de lancement : dès que les deux adversaires sont connus (à planifier
+ * compris) pour un joueur, le temps du match seulement pour le caster.
  *
- * @returns `null` quand le lecteur n'est pas partie du match, ou que le match
+ * @returns `null` quand le lecteur n'est pas partie du match, qu'il en est le
+ *   caster et que le match n'est pas encore parti, ou que le match
  *   n'a pas ses deux adversaires, est terminé, ou son tournoi n'est pas en
  *   cours (`MATCH_CONTACTS_UNAVAILABLE`).
  */
@@ -572,9 +584,11 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const visible = rows
       .map((row) => {
         const phase = matchLaunchPhase(toLaunchInput(row), now);
-        return { row, phase, exposes: exposesContacts(phase, forCard) };
+        return { row, phase, exposes: exposesContacts(phase, forCard && viewerPlaysMatch(row, teams)) };
       })
-      .filter(({ phase }) => phase !== "NONE" && (forCard || phase !== "TO_PLAN"));
+      // Par la carte, un match sans contacts à montrer n'est pas rendu : le
+      // caster d'un match pas encore parti reçoit le même refus qu'un tiers.
+      .filter(({ phase, exposes }) => phase !== "NONE" && (forCard ? exposes : phase !== "TO_PLAN"));
     if (visible.length === 0) return [];
 
     const { rosterTeamIds, userIds } = collectContactIds(visible);

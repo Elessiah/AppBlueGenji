@@ -30,7 +30,7 @@
  * un visiteur sans compte, et c'est la seule phrase qui le dise au joueur.
  */
 export const DISCORD_TAG_AUDIENCE =
-  "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les membres des deux équipes et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin (et, si tu castes un match, ses deux équipes) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
+  "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes, dès que ses deux adversaires sont connus) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
 
 /**
  * Ce que la connexion par Discord fait du pseudo — dit **sous le bouton**, avant
@@ -56,7 +56,7 @@ export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le c
  * (`canViewDiscordTag`), ce que le joueur doit lire avant de la cocher.
  */
 export const DISCORD_PLAYER_VISIBILITY_NOTICE =
-  "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes et au caster de ton match dès que ses deux adversaires sont connus (et, si tu castes un match, à ses deux équipes) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
+  "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes de ton match dès que ses deux adversaires sont connus, et à son caster le temps du match seulement (et, si tu castes un match, à ses deux équipes) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
 
 /**
  * Ajout à la phrase précédente quand la case est cochée sur un tag **non**

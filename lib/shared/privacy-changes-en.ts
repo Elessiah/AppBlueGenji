@@ -434,6 +434,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The launch phase (“Ready” and the launch window) becomes an option of each tournament, off by default: without it, a match starts at its time and no “Ready” is recorded.",
     ],
   },
+  "2026-10-contacts-de-match-caster-et-conditions-v5": {
+    title: "Match contacts: the caster only during the match, terms of use updated",
+    summary:
+      "A match's registered caster now only sees its contacts while the match is being played, from its start to its end; your BattleTag, even when hidden, stays visible to your opponents during a tournament match. The terms of use move to version 5 to say so.",
+    details: [
+      "Caster: they only see the certified Discord tag, the BattleTag (even when hidden) and the team role of a match's contacts while the match is being played — from its start (launch window opened, or match launched) to its end —, no longer as soon as both opponents are known. The members of both teams keep access as soon as both opponents are known, “To schedule” included, to their own contacts as to the caster's.",
+      "Hidden BattleTag: you can hide it from everyone, but it stays visible to your opponents during a tournament match (and to the members of both teams of your matches until the tournament is over). If you don't want them to see it, remove it from your profile. This reading is based on the performance of the service — running the tournament —, not on your consent: the “OW BattleTag” setting only applies to the public.",
+      "Terms of use: version 5, in force since 19 October 2026, adds the “Match contacts” section, which provides for this sharing. Read them again: the login page shows them to you anew as long as they have not been accepted in your browser and, if you manage a team and have not already accepted them, before your next management action.",
+    ],
+    linkLabels: ["Read the “Match contacts” section", "Read the “Recipients and transfers” section"],
+  },
 };
 
 /**
