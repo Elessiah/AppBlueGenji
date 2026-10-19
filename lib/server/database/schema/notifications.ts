@@ -136,7 +136,8 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
     // Discord à modifier quand un autre match de la soirée passe à l'antenne,
     // et `silent` si ce message est parti sans mention (ses modifications n'en
     // écrivent pas), `notified` si un envoi qui notifie est parti vers le bot
-    // (même d'issue incertaine). Aucune donnée personnelle ; effacée un jour
+    // (même d'issue incertaine), `closed` si son message a été supprimé de
+    // #live (plus rien n'y est publié). Aucune donnée personnelle ; effacée un jour
     // après la fin de la soirée.
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_live_evenings (
@@ -147,6 +148,7 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
         discord_message_id VARCHAR(20) NULL,
         silent BOOLEAN NOT NULL DEFAULT FALSE,
         notified BOOLEAN NOT NULL DEFAULT FALSE,
+        closed BOOLEAN NOT NULL DEFAULT FALSE,
         KEY idx_bg_live_evenings_target (target, window_end)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);

@@ -34,7 +34,7 @@
  * chaîne le seul rôle StreamViewer. Le message liste les matchs de la soirée
  * — à l'antenne, puis programmés, chacun à son heure (Paris). Un match qui
  * passe ensuite à l'antenne dans la fenêtre **modifie** ce message (le bot
- * rend son identifiant), sans nouvelle notification ; si le message a disparu,
+ * rend son identifiant), sans nouvelle notification ; s'il ne se modifie plus,
  * le bot poste une suite sans mention. Chaque affiche garde sa réservation.
  *
  * **Fraîcheur : deux heures.** Un match n'est annoncé que dans les deux heures
@@ -265,6 +265,9 @@ const WINDOW_FROM_NOW = `NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR`;
 /** Fenêtre de la soirée repartie de maintenant, jamais raccourcie (SQL). */
 const WINDOW_RESTART = `window_end = GREATEST(window_end, ${WINDOW_FROM_NOW})`;
 
+/** Booléen MySQL tel que `mysql2` le rend (`TINYINT(1)`). */
+type SqlFlag = number | boolean | null;
+
 /** Soirée d'annonces ouverte pour un public (`bg_live_evenings`). */
 interface LiveEvening extends RowDataPacket {
   id: number;
@@ -272,13 +275,18 @@ interface LiveEvening extends RowDataPacket {
   window_end: Date | string;
   discord_message_id: string | null;
   /** `1` : le message gardé est parti sans mention (ses modifications n'en écrivent pas). */
-  silent?: number | boolean | null;
+  silent?: SqlFlag;
   /**
    * `1` : un envoi qui notifie est parti vers le bot pour cette soirée (posé
    * **avant** l'envoi, retiré si rien n'est parti) — même sans identifiant
    * gardé, son public a peut-être déjà été notifié.
    */
-  notified?: number | boolean | null;
+  notified?: SqlFlag;
+  /**
+   * `1` : le message de la soirée a été supprimé de #live — plus rien n'y est
+   * publié pour ce public jusqu'à la fin de la fenêtre (suppression respectée).
+   */
+  closed?: SqlFlag;
 }
 
 /** Instant d'une colonne `DATETIME`, en millisecondes ; `null` si vide. */
@@ -311,7 +319,7 @@ function streamTime(row: LiveCandidateRow, now: number): number {
  */
 async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   const db = await getDatabase();
-  const select = `SELECT id, started_at, window_end, discord_message_id, silent, notified FROM bg_live_evenings
+  const select = `SELECT id, started_at, window_end, discord_message_id, silent, notified, closed FROM bg_live_evenings
                    WHERE target = ? AND window_end > NOW() ORDER BY id DESC LIMIT 1`;
   const [open] = await db.query<LiveEvening[]>(select, [target]);
   if (open[0]) return open[0];
@@ -328,7 +336,7 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
 /** Trace pm2 : comment le groupe a rejoint #live (nouveau message, modification, suite). */
 function howPosted(evening: LiveEvening, quiet: boolean, messageId: string | null): string {
   if (isFollowUp(evening, messageId)) {
-    return "dans une suite sans notifier, le message de la soirée ayant disparu ou ne se modifiant plus";
+    return "dans une suite sans notifier, le message de la soirée ne se modifiant plus";
   }
   if (evening.discord_message_id) return "ajoutés au message de la soirée";
   if (quiet) return "dans un nouveau message sans notifier, la soirée ayant déjà une annonce";
@@ -378,13 +386,30 @@ async function forgetEveningSend(
   }
 }
 
+/**
+ * Ferme la soirée dont le message a été supprimé de #live (souvent par le
+ * staff, sur demande) : plus rien n'y est publié pour ce public jusqu'à la fin
+ * de sa fenêtre — une suite republierait le texte, pseudos compris. Les
+ * réservations du groupe sont marquées refusées (rien n'est parti).
+ */
+async function closeEvening(evening: LiveEvening, rows: readonly LiveCandidateRow[]): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.execute(`UPDATE bg_live_evenings SET closed = 1 WHERE id = ?`, [Number(evening.id)]);
+  } catch (error) {
+    // Le match suivant retentera la modification, que le bot refusera de même.
+    console.error(`[live-announce] soirée ${Number(evening.id)} : fermeture non enregistrée`, error);
+  }
+  await forgetEveningSend(evening, rows, false);
+}
+
 /** Vrai si le message gardé de la soirée est parti sans mention : sa modification n'en écrit pas. */
 function editsSilentMessage(evening: LiveEvening): boolean {
   return Boolean(evening.discord_message_id) && Number(evening.silent) === 1;
 }
 
 /**
- * Vrai si le bot a posté une suite (message disparu ou plus modifiable) : il
+ * Vrai si le bot a posté une suite (message pas du bot ou plus modifiable) : il
  * rend un autre identifiant que celui à modifier, et la suite part sans mention.
  */
 function isFollowUp(evening: LiveEvening, messageId: string | null): boolean {
@@ -591,6 +616,8 @@ export function liveEntrantName(
  */
 const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
   rejected: "annonce refusée par le bot, abandonnée",
+  "evening-deleted":
+    "message de la soirée supprimé de #live : plus rien n'y est publié pour ce public jusqu'à la fin de la soirée (suppression respectée), annonce abandonnée",
   "discord-refused":
     "une règle AutoMod du serveur a bloqué l'annonce (détail au canal de logs du bot, ou dans ses journaux si la règle a bloqué aussi le signalement), abandonnée : le même message serait bloqué de nouveau",
   // L'envoi est terminé : ce que montre #live fait foi.
@@ -802,6 +829,16 @@ async function announce(
   } catch (error) {
     return holdUnreadableEvening(group, error);
   }
+  if (Number(evening.closed) === 1) {
+    // Message de la soirée supprimé : rien ne le republie, même sans pseudo.
+    // Réservations gardées : le match n'est pas réessayé.
+    const { label, context } = describeGroup(group, Number(evening.id));
+    warnOnce(
+      `closed ${context}`,
+      `[live-announce] ${label} : soirée ${Number(evening.id)} close (message supprimé de #live), annonce non publiée`,
+    );
+    return { posted: 0, postponed: null };
+  }
   // Premier message de la soirée : il notifie s'il prend la marque `notified`
   // (avant l'envoi, en une instruction). Soirée déjà marquée sans message
   // connu (issue incertaine, bot trop ancien, identifiant non gardé) : son
@@ -858,6 +895,7 @@ async function settleUnposted(
     // `@everyone` serait pire qu'une annonce perdue). Réservations gardées ;
     // un refus (rien n'est parti) sort de la soirée.
     if (REFUSED_OUTCOMES.has(outcome)) await forgetEveningSend(evening, group.rows, notifying);
+    if (outcome === "evening-deleted") await closeEvening(evening, group.rows);
     console.error(`[live-announce] ${label} : ${abandoned}`);
     return { posted: 0, postponed: null };
   }

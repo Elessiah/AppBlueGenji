@@ -259,6 +259,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Annonces #live refusées (rien n'est parti, jamais réessayées) : hors des
     // soirées, sans fausser leur date.
     `ALTER TABLE bg_live_announcements ADD COLUMN refused BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Soirées #live — message supprimé de #live : la soirée se ferme, rien ne
+    // le republie.
+    `ALTER TABLE bg_live_evenings ADD COLUMN closed BOOLEAN NOT NULL DEFAULT FALSE`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

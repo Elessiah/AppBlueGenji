@@ -632,6 +632,7 @@ export type LiveAnnouncementOutcome =
   | "discord-held"
   | "discord-unreachable"
   | "discord-refused"
+  | "evening-deleted"
   | "uncertain"
   | "timed-out"
   | "interrupted"
@@ -652,7 +653,15 @@ const DISCORD_REFUSED_REASONS = new Set(["automod"]);
 async function classifyUnavailable(
   response: Response,
 ): Promise<
-  "channel-closed" | "discord-held" | "discord-unreachable" | "discord-refused" | "uncertain" | "timed-out" | "unauthorized" | "unavailable"
+  | "channel-closed"
+  | "discord-held"
+  | "discord-unreachable"
+  | "discord-refused"
+  | "evening-deleted"
+  | "uncertain"
+  | "timed-out"
+  | "unauthorized"
+  | "unavailable"
 > {
   let body: { error?: unknown; reason?: unknown } | null;
   try {
@@ -672,6 +681,9 @@ async function classifyUnavailable(
   // Bloqué par AutoMod : le renvoyer tel quel serait bloqué de nouveau, et
   // chaque essai alerterait la modération.
   if (DISCORD_REFUSED_REASONS.has(reason)) return "discord-refused";
+  // Message de la soirée supprimé de #live (souvent sur demande) : le bot ne
+  // le republie pas, la soirée de ce public se ferme.
+  if (reason === "message-deleted") return "evening-deleted";
   // Discord muet en lisant le salon : la panne vaut pour tout envoi.
   if (reason === "discord-unreachable") return "discord-unreachable";
   return "discord-held";
