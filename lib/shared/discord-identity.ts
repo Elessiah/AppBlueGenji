@@ -218,7 +218,7 @@ export function discordVerificationNeedsCode(linkedDiscordId: string | null | un
 export const DISCORD_VERIFICATION_EXPOSURE: readonly string[] = [
   "Les administrateurs du site voient ton tag Discord en permanence.",
   "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
-  "Les membres des deux équipes et le caster de ton match le voient dès que les deux adversaires du match sont connus et jusqu'à sa fin — pour s'ajouter et créer le salon.",
+  "Les membres des deux équipes et le caster de ton match le voient dès que les deux adversaires du match sont connus et jusqu'à sa fin — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes voient le tien sur la même durée.",
   "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique.",
   "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie.",
 ];

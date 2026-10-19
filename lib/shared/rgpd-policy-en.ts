@@ -62,7 +62,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Certification of the Discord username",
-    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), members of both teams and caster of your match from the moment both its opponents are known to its end; other logged-in players only if you tick “Discord tag” (« Tag Discord »). Without it, the bot sends you no match direct message. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
+    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), members of both teams and caster of your match from the moment both its opponents are known to its end (and, if you cast a match, both its teams for the same period); other logged-in players only if you tick “Discord tag” (« Tag Discord »). Without it, the bot sends you no match direct message. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
   ],
   [
     "Discord ID",

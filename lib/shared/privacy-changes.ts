@@ -812,7 +812,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Les membres des deux équipes et le caster de ton match peuvent voir les contacts présentés au lancement dès que les deux adversaires du match sont connus, avant même que son horaire soit fixé, par le bouton « Contacts » de la carte du match.",
     details: [
-      "Ce sont les mêmes informations qu'au lancement d'un match — le tag Discord certifié et le BattleTag d'un ou deux membres par équipe (joueur, coach, manager ou propriétaire), et ceux du caster inscrit —, montrées aux mêmes personnes : les seules parties du match (membres des deux équipes et caster inscrit).",
+      "Ce sont les mêmes informations qu'au lancement d'un match — le tag Discord certifié et le BattleTag, même masqué, d'un ou deux membres par équipe (joueur, coach, manager ou propriétaire), et ceux du caster inscrit —, montrées aux mêmes personnes : les seules parties du match (membres des deux équipes et caster inscrit).",
       "Ce qui change, c'est le moment : dès que le match a ses deux adversaires, horaire fixé ou non, et non plus seulement à son lancement, pour pouvoir s'organiser avant l'heure. Elles cessent d'être visibles quand le match est terminé.",
       "La phase de lancement (« Prêt » et fenêtre de lancement) devient une option de chaque tournoi, éteinte par défaut : sans elle, un match part à son heure et aucun « Prêt » n'est enregistré.",
     ],

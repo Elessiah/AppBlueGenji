@@ -116,7 +116,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes et caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes et caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin (et, si tu castes un match, ses deux équipes sur la même durée) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
     // La certification décide aussi qui reçoit les messages privés de match,
     // qui reposent sur l'intérêt légitime (opposition par la case du profil).

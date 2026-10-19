@@ -358,7 +358,7 @@
     "exposure": {
       "admins": "The site's administrators can see your Discord tag at all times.",
       "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after.",
-      "match": "The members of both teams and the caster of your match can see it from the moment both opponents of the match are known until its end — to add each other and create the channel.",
+      "match": "The members of both teams and the caster of your match can see it from the moment both opponents of the match are known until its end — to add each other and create the channel. If you cast a match, both its teams see yours for the same period.",
       "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page.",
       "undo": "You can cancel at any time by removing your tag from “My profile”: the verification is lost, and the exposure with it. Logging in with Discord then saves your username again, but without verifying it: only this step verifies it."
     },
