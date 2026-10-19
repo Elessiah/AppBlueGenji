@@ -44,7 +44,7 @@
   },
   "scoreAutoValidated": {
     "title": "Score validé automatiquement",
-    "body": "Le score saisi pour votre match ({tournament}) a été validé automatiquement : personne ne l'a confirmé ni contesté dans les 2 h."
+    "body": "Le score saisi pour votre match ({tournament}) a été validé automatiquement : personne ne l'a confirmé ni contesté avant l'échéance."
   },
   "tournamentStart": {
     "title": "Le tournoi commence",

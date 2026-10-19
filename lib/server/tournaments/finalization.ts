@@ -594,6 +594,7 @@ async function claimAutoValidation(
          winner_team_id = ?,
          loser_team_id = ?,
          status = 'COMPLETED',
+         forfeit_team_id = NULL,
          team1_report_score = NULL,
          team1_report_opponent_score = NULL,
          team1_reported_at = NULL,
