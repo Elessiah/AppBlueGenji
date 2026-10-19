@@ -57,8 +57,10 @@ celui de la fenêtre (côté client) ; seul le serveur des gestes de gestion
 refuse de lui-même.
 
 Qui refuse doit pouvoir partir : la fenêtre laisse passer `/rgpd` (et
-`/rgpd/registre`), `/mentions-legales`, `/accessibilite` et `/profil` (export
-des données, suppression du compte) — `TERMS_FREE_PATHS` de
+`/rgpd/registre`), `/mentions-legales`, `/accessibilite`, les pages légales du
+bot (`/privacy-policy-bot`, `/terms-of-service-bot`) et `/profil` (export
+des données, suppression du compte — la page entière reste ouverte, ce que
+disent les conditions : « ouvrir son profil ») — `TERMS_FREE_PATHS` de
 `lib/shared/global-modals.ts`, en plus de `/conditions-utilisation` et
 `/connexion`. Les conditions (« Acceptation », FR et EN), l'entrée v6 de
 `PRIVACY_CHANGES`, `/rgpd` (FR et EN) et la fiche T13 du registre décrivent
@@ -116,8 +118,10 @@ compte connecté voit en plus la fenêtre bloquante `TermsAcceptanceModal` titr�
 « Les conditions d'utilisation ont changé » (`UPDATED`) ; jusqu'à la version 5,
 seul le gérant d'une équipe la voyait.
 
-**Prévenir tout le monde** (version 4, demande de l'association) : ni l'une ni
-l'autre modale n'atteint un compte connecté qui ne gère rien — sa session dure
+**Prévenir tout le monde** (version 4, demande de l'association) : jusqu'à la
+version 5, ni l'une ni l'autre modale n'atteignait un compte connecté qui ne
+gérait rien (depuis la version 6, la fenêtre bloquante l'atteint, mais n'explique
+pas ce qui change) — sa session dure
 30 jours sans repasser par `/connexion`. L'annonce passe donc par le registre
 `PRIVACY_CHANGES` (`PRIVACY_CHANGES_CONSENT.md`), le seul canal qui touche
 **chaque** compte une fois et le garde par compte : l'entrée
