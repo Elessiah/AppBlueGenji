@@ -91,6 +91,11 @@ type LiveCandidateRow = RowDataPacket & {
   /** Pseudo public du joueur d'une entrée individuelle (`null` : équipe, ou compte supprimé). */
   team1_pseudo: string | null;
   team2_pseudo: string | null;
+  /**
+   * Lecture d'une soirée seulement : `1` si le match a déjà une annonce
+   * réservée depuis l'ouverture de la soirée (publiée, ou d'issue incertaine).
+   */
+  evening_announced?: number | string | null;
 };
 
 /**
@@ -208,17 +213,24 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
  * Le public (chaîne officielle ou non) se trie ensuite en mémoire.
  */
 async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRow[]> {
+  const announcedSince = `EXISTS (SELECT 1 FROM bg_live_announcements ea
+                                   WHERE ea.match_id = m.id AND ea.sent_at >= ?) AS evening_announced`;
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a WHERE a.match_id = m.id AND a.sent_at >= ?)
              OR (m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ?))`,
     [evening.started_at, evening.window_end],
+    { column: announcedSince, params: [evening.started_at] },
   );
 }
 
 /** Lecture commune des matchs annonçables : affiche, tournoi, pseudos publiables. */
-async function selectMatches(where: string, params: readonly unknown[]): Promise<LiveCandidateRow[]> {
+async function selectMatches(
+  where: string,
+  params: readonly unknown[],
+  extra: { column: string; params: readonly unknown[] } | null = null,
+): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
   // Le pseudo n'est lu que pour une inscription faite sous la mention qui
   // l'annonce (`soloPseudoRegisteredSince`) ; sinon `NULL`, « un joueur ».
@@ -233,7 +245,7 @@ async function selectMatches(where: string, params: readonly unknown[]): Promise
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
             t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
-            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo
+            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo${extra ? `, ${extra.column}` : ""}
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
                             AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
@@ -243,7 +255,7 @@ async function selectMatches(where: string, params: readonly unknown[]): Promise
        LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0 AND ${registeredSince("t2")}
       WHERE ${where}
       ORDER BY m.id`,
-    [since, since, ...params],
+    [...(extra?.params ?? []), since, since, ...params],
   );
   return rows;
 }
@@ -582,6 +594,19 @@ function eveningStreams(
 }
 
 /**
+ * Vrai si un match de la soirée, hors du groupe et du même public, a déjà une
+ * annonce réservée depuis son ouverture : une notification a pu partir.
+ */
+function alreadyAnnounced(group: AnnouncementGroup, others: readonly LiveCandidateRow[]): boolean {
+  const claimed = new Set(group.rows.map((row) => Number(row.id)));
+  return others.some((row) => {
+    if (claimed.has(Number(row.id)) || Number(row.evening_announced) !== 1) return false;
+    const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
+    return url !== null && liveMentionTarget(url) === group.target;
+  });
+}
+
+/**
  * Un engagé d'une ligne de soirée : un tournoi qui compte une entrée
  * individuelle est un tournoi individuel, même au type illisible — son invité
  * sans compte ne part pas sous son nom.
@@ -619,6 +644,10 @@ async function announce(
     return { posted: 0, postponed: "unavailable" };
   }
   const streams = eveningStreams(group, others, now);
+  // Soirée sans message connu, mais dont un autre match a déjà une annonce
+  // (issue incertaine, bot trop ancien, identifiant non gardé) : son public a
+  // peut-être déjà été notifié — un nouveau message part, sans notification.
+  const quiet = !evening.discord_message_id && alreadyAnnounced(group, others);
   // `withPseudo: false` : ce que le bot cite à son canal de logs si l'annonce
   // échoue — le même texte, pseudos ôtés : l'exception vaut pour #live seulement.
   const text = (withPseudo: boolean) =>
@@ -644,13 +673,16 @@ async function announce(
     context,
     ...(logMessage === message ? {} : { logMessage }),
     ...(evening.discord_message_id ? { editMessageId: String(evening.discord_message_id) } : {}),
+    ...(quiet ? { notify: false as const } : {}),
   });
   if (outcome === "posted" || outcome === "posted-silent") {
     await rememberEveningMessage(evening, messageId);
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
-    const how = evening.discord_message_id ? "ajoutés au message de la soirée" : "dans un nouveau message";
+    let how = "dans un nouveau message";
+    if (evening.discord_message_id) how = "ajoutés au message de la soirée";
+    else if (quiet) how = "dans un nouveau message sans notifier, la soirée ayant déjà une annonce";
     console.info(`[live-announce] ${label} ${announced} dans #live (soirée ${Number(evening.id)}, ${how})${silent}`);
     return { posted: group.rows.length, postponed: null };
   }

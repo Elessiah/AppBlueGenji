@@ -749,6 +749,11 @@ export interface LiveEveningPush {
   logMessage?: string;
   /** Message de la soirée déjà publié : le bot le modifie, sans notifier. */
   editMessageId?: string;
+  /**
+   * `false` : nouveau message sans mention ni notification (soirée dont le
+   * public a peut-être déjà été notifié, sans message connu à modifier).
+   */
+  notify?: false;
 }
 
 /** Issue d'une annonce de soirée, et l'identifiant du message publié ou modifié. */
