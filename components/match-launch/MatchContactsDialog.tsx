@@ -55,15 +55,47 @@ export function matchUnderway(phase: MatchLaunchPhase | null): boolean {
 }
 
 /**
- * Relire la modale ouverte ? Une fois, quand la carte passe au départ : la
- * note « contacts du caster au départ » laisse alors place à ses contacts. Pas
- * à la fin du match (un refus non demandé), ni à chaque rendu.
+ * Les contacts du caster attendent-ils le départ ? Un caster inscrit, sur un
+ * match pas encore parti à l'heure du serveur (`launch.phase`) : sa fiche porte
+ * alors une note plutôt que ses contacts.
  */
-export function rereadOnPhaseChange(previous: MatchLaunchPhase | null, next: MatchLaunchPhase | null): boolean {
-  return matchUnderway(next) && !matchUnderway(previous);
+export function casterContactsPending(launch: MatchLaunchInfo): boolean {
+  return launch.caster !== null && !matchUnderway(launch.phase);
 }
 
-type ContactsRead = { launch: MatchLaunchInfo } | { error: string | null };
+/** Plus longue attente que `setTimeout` accepte (≈ 24,8 jours). */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/**
+ * Attente avant de relire une modale ouverte dont les contacts du caster
+ * attendent le départ, `null` sans relecture : jusqu'à l'heure de départ **du
+ * serveur** (en-tête `Date` de la réponse), plus une seconde — l'en-tête est
+ * tronqué à la seconde, et l'horloge du navigateur peut avancer. Sans caster,
+ * sans heure ou départ déjà passé au serveur, rien n'est relu.
+ */
+export function casterRereadDelay(launch: MatchLaunchInfo, serverDate: string | null): number | null {
+  if (!casterContactsPending(launch) || launch.startAt === null || serverDate === null) return null;
+  const start = Date.parse(launch.startAt);
+  const server = Date.parse(serverDate);
+  if (!Number.isFinite(start) || !Number.isFinite(server) || start <= server) return null;
+  return Math.min(start - server + 1_000, MAX_TIMER_MS);
+}
+
+/**
+ * Relire la modale ouverte quand la carte change de phase ? Une fois, quand le
+ * match part par une écriture (lancement forcé, ouvert avant l'heure) et que
+ * les contacts du caster attendent encore : pas sans caster, pas à la fin du
+ * match (un refus non demandé), ni à chaque rendu.
+ */
+export function rereadOnPhaseChange(
+  previous: MatchLaunchPhase | null,
+  next: MatchLaunchPhase | null,
+  launch: MatchLaunchInfo | null,
+): boolean {
+  return launch !== null && casterContactsPending(launch) && matchUnderway(next) && !matchUnderway(previous);
+}
+
+type ContactsRead = { launch: MatchLaunchInfo; serverDate: string | null } | { error: string | null };
 
 type ReadOptions = {
   /** Heure de départ d'un match **pas encore lancé** ; `null` sinon. */
@@ -96,7 +128,7 @@ export async function readMatchContacts(matchId: number, options: ReadOptions): 
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(`/api/matches/${matchId}/contacts`, { cache: "no-store", signal });
     const payload = (await response.json().catch(() => ({}))) as { launch?: MatchLaunchInfo; error?: string };
-    if (response.ok && payload.launch) return { launch: payload.launch };
+    if (response.ok && payload.launch) return { launch: payload.launch, serverDate: response.headers.get("date") };
     const error = payload.error ?? null;
     const delay =
       attempt === 0 && error === "MATCH_CONTACTS_UNAVAILABLE"
@@ -133,9 +165,9 @@ export function MatchContactsDialog({
   startAt?: string | null;
   launchedAt?: string | null;
   /**
-   * Phase de la carte : la modale relit **une** fois quand le match part
-   * (lancement ouvert, ou lancé) pendant qu'elle est ouverte, pour que les
-   * contacts du caster, qui ne sortent qu'alors, remplacent la note d'attente.
+   * Phase de la carte : un match parti par une écriture (lancement forcé) fait
+   * relire une modale dont les contacts du caster attendent ; un match revenu
+   * avant son départ (reprogrammé) les masque de nouveau.
    */
   phase?: MatchLaunchPhase | null;
 }>) {
@@ -154,16 +186,32 @@ export function MatchContactsDialog({
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose: close });
   const backdrop = useBackdropDismiss(close);
-  const previousPhase = useRef(phase);
   const [readKey, setReadKey] = useState(0);
+  const [serverDate, setServerDate] = useState<string | null>(null);
+  const launch = state.kind === "ready" ? state.launch : null;
+  const previousPhase = useRef(phase);
   useEffect(() => {
-    if (rereadOnPhaseChange(previousPhase.current, phase)) setReadKey((key) => key + 1);
+    if (rereadOnPhaseChange(previousPhase.current, phase, launch)) setReadKey((key) => key + 1);
     previousPhase.current = phase;
+    // Seul le changement de phase de la carte compte ici.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // Contacts du caster en attente : une relecture à l'heure de départ du serveur.
+  useEffect(() => {
+    if (!launch) return;
+    const delay = casterRereadDelay(launch, serverDate);
+    if (delay === null) return;
+    const timer = setTimeout(() => setReadKey((key) => key + 1), delay);
+    return () => clearTimeout(timer);
+  }, [launch, serverDate]);
 
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
+    // Une relecture (départ du match) garde à l'écran ce qui est déjà lu si
+    // elle échoue : seuls les contacts du caster y manquaient.
+    const reread = readKey > 0;
     void (async () => {
       try {
         const read = await readMatchContacts(matchId, {
@@ -172,13 +220,15 @@ export function MatchContactsDialog({
         });
         if (!alive) return;
         if ("error" in read) {
+          if (reread) return;
           setState({ kind: "failed" });
           showError(contactsErrorText(text, read.error));
           return;
         }
+        setServerDate(read.serverDate);
         setState({ kind: "ready", launch: read.launch });
       } catch {
-        if (!alive) return;
+        if (!alive || reread) return;
         setState({ kind: "failed" });
         showError(contactsErrorText(text, null));
       }
@@ -203,7 +253,6 @@ export function MatchContactsDialog({
 
   if (!mounted) return null;
 
-  const launch = state.kind === "ready" ? state.launch : null;
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={styles.backdrop} {...backdrop}>
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
@@ -256,7 +305,7 @@ export function MatchContactsDialog({
                   // Les contacts du caster ne sortent que le temps du match
                   // (`exposesCaster`) : avant, une note plutôt que deux « — »
                   // qui laisseraient croire qu'il n'en a pas.
-                  contactsShown={launch.phase === "LOBBY" || launch.phase === "LAUNCHED"}
+                  contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}
                   contactsLaterText={t("contacts.casterLater")}
                   noCasterText={t("contacts.noCaster")}
                   linkNames
