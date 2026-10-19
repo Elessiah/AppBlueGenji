@@ -215,9 +215,9 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
 async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRow[]> {
   const announcedSince = `EXISTS (SELECT 1 FROM bg_live_announcements ea
                                    WHERE ea.match_id = m.id AND ea.sent_at >= ?) AS evening_announced`;
-  // Sans message encore parti, celui-ci peut être le premier qui notifie : la
-  // fenêtre repartira de son envoi (`rememberEveningMessage`), il liste donc
-  // les matchs programmés jusqu'à cette fin-là.
+  // Sans message encore gardé, celui-ci est le premier : la fenêtre repartira
+  // de son envoi (`rememberEveningMessage`), il liste donc les matchs
+  // programmés jusqu'à cette fin-là.
   const until = evening.discord_message_id ? "?" : `GREATEST(?, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`;
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
@@ -337,9 +337,9 @@ function isFollowUp(evening: LiveEvening, messageId: string | null): boolean {
 
 /**
  * Garde l'identifiant du message publié (ou de la suite qui le remplace), et
- * s'il est parti sans mention. Le premier message qui notifie fait partir la
- * fenêtre de la soirée de son envoi : des essais reportés (bot injoignable) ne
- * l'ont pas raccourcie.
+ * s'il est parti sans mention. Le premier message gardé de la soirée fait
+ * partir la fenêtre de son envoi : des essais reportés (bot injoignable) ne
+ * l'ont pas raccourcie, et elle couvre les matchs programmés qu'il liste.
  */
 async function rememberEveningMessage(
   evening: LiveEvening,
@@ -347,8 +347,7 @@ async function rememberEveningMessage(
   silent: boolean,
 ): Promise<void> {
   if (!messageId || messageId === evening.discord_message_id) return;
-  const firstNotified = !evening.discord_message_id && !silent;
-  const window = firstNotified
+  const window = !evening.discord_message_id
     ? `, window_end = GREATEST(window_end, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`
     : "";
   try {
