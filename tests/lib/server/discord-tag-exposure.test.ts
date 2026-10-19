@@ -241,30 +241,13 @@ describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans 
     expect(update.sql).not.toContain("discord_verified_at");
   });
 
-  it("relit le Discord quand le compte trouvé l'a détaché entre-temps : la session va à son nouveau titulaire", async () => {
-    // Première lecture : compte 7 ; il détache ce Discord, que le compte 8
-    // rattache ; l'écriture bornée à `discord_id = ?` ne touche rien sur 7.
+  it("refuse la connexion quand le compte trouvé a détaché ce Discord entre-temps", async () => {
+    // Lecture : compte 7 ; il détache ce Discord avant l'écriture, bornée à
+    // `discord_id = ?`, qui ne touche donc rien. Pas de session pour 7, et pas
+    // de seconde lecture : un nouveau titulaire n'a pas passé le contrôle de
+    // suspension.
     let lookups = 0;
-    const { queries } = fakeDb((q, params) => {
-      if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) {
-        lookups += 1;
-        return [[{ id: lookups === 1 ? 7 : 8 }]];
-      }
-      if (q.startsWith("UPDATE bg_users")) return [{ affectedRows: params[2] === 7 ? 0 : 1 }];
-      return undefined;
-    });
-
-    const userId = await createOrGetDiscordUser("900000000000000001", undefined, "keryan", {
-      method: "OAUTH", termsAccepted: true,
-    });
-
-    expect(userId).toBe(8);
-    expect(queries.filter((q) => q.sql.startsWith("UPDATE bg_users"))).toHaveLength(2);
-  });
-
-  it("ne relit qu'une fois : une seconde écriture vide rend le compte relu, sans boucler", async () => {
-    let lookups = 0;
-    fakeDb((q) => {
+    const { queries } = fakeDb((q) => {
       if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) {
         lookups += 1;
         return [[{ id: 7 }]];
@@ -275,8 +258,9 @@ describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans 
 
     await expect(
       createOrGetDiscordUser("900000000000000001", undefined, "keryan", { method: "OAUTH", termsAccepted: true }),
-    ).resolves.toBe(7);
-    expect(lookups).toBe(2);
+    ).rejects.toThrow("DISCORD_AUTH_FAILED");
+    expect(lookups).toBe(1);
+    expect(queries.filter((q) => q.sql.startsWith("UPDATE bg_users"))).toHaveLength(1);
   });
 
   it("crée un compte neuf avec son tag enregistré, jamais certifié", async () => {
