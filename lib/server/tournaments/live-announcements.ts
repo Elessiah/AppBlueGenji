@@ -217,7 +217,7 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a
-                      WHERE a.match_id = m.id AND a.sent_at >= ?
+                      WHERE a.match_id = m.id AND a.sent_at >= ? AND a.refused = 0
                         AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
              OR (m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
@@ -356,9 +356,10 @@ async function markEveningNotified(evening: LiveEvening): Promise<boolean> {
 
 /**
  * Rien n'est parti (refus, report) : la soirée n'est plus notifiée, et les
- * réservations du groupe sortent de la soirée (datées juste avant son
- * ouverture). Un refus gardé ne revient pas dans le message de la soirée — il y
- * ferait refuser chaque match suivant — et ne la fait pas croire notifiée.
+ * réservations du groupe sont marquées `refused` — elles sortent des soirées
+ * sans que leur date (`sent_at`, donnée à l'export RGPD) soit faussée. Un refus
+ * gardé ne revient pas dans le message de la soirée — il y ferait refuser
+ * chaque match suivant — et ne la fait pas croire notifiée.
  */
 async function forgetEveningSend(
   evening: LiveEvening,
@@ -370,10 +371,7 @@ async function forgetEveningSend(
     if (wasNotifying) await db.execute(`UPDATE bg_live_evenings SET notified = 0 WHERE id = ?`, [Number(evening.id)]);
     if (rows.length === 0) return;
     const claims = claimFilter(rows);
-    await db.execute(`UPDATE bg_live_announcements SET sent_at = ? - INTERVAL 1 SECOND WHERE ${claims.sql}`, [
-      evening.started_at,
-      ...claims.params,
-    ]);
+    await db.execute(`UPDATE bg_live_announcements SET refused = 1 WHERE ${claims.sql}`, claims.params);
   } catch (error) {
     // Au pire, le match suivant de la soirée part sans notification.
     console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, error);
@@ -1010,19 +1008,28 @@ const EVENING_PURGE_INTERVAL_MS = 60 * 60 * 1000;
 
 let lastEveningPurgeAt = 0;
 
+/** Délai avant de retenter une purge échouée (base en panne, table absente). */
+const EVENING_PURGE_RETRY_MS = 5 * 60 * 1000;
+
 /**
  * Efface les soirées finies depuis un jour (`bg_live_evenings`), comme
  * l'annoncent la page RGPD et le registre — au plus une fois par heure, à
  * chaque évènement qui appelle {@link dispatchLiveAnnouncements}, annonces
  * activées ou non : sans annonce pendant des semaines, une soirée ne reste pas
- * des semaines. Notée après le succès seulement : un échec se retente au
- * passage suivant.
+ * des semaines. L'essai est noté **avant** la requête (deux appels proches
+ * n'en lancent qu'une) ; un échec se retente cinq minutes plus tard, pas à
+ * chaque lecture de page.
  */
 export async function purgeEndedEvenings(now: number = Date.now()): Promise<void> {
   if (now - lastEveningPurgeAt < EVENING_PURGE_INTERVAL_MS) return;
-  const db = await getDatabase();
-  await db.execute(`DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY`);
   lastEveningPurgeAt = now;
+  try {
+    const db = await getDatabase();
+    await db.execute(`DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY`);
+  } catch (error) {
+    lastEveningPurgeAt = now - EVENING_PURGE_INTERVAL_MS + EVENING_PURGE_RETRY_MS;
+    throw error;
+  }
 }
 let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 /** Instant visé par `trailingTimer`. */

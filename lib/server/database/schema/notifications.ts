@@ -121,6 +121,7 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
         match_id BIGINT NOT NULL,
         pairing VARCHAR(48) NOT NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        refused BOOLEAN NOT NULL DEFAULT FALSE,
         UNIQUE KEY uniq_bg_live_announcements (match_id, pairing),
         CONSTRAINT fk_bg_live_announcements_match FOREIGN KEY (match_id)
           REFERENCES bg_matches(id) ON DELETE CASCADE

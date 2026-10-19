@@ -280,10 +280,20 @@ function noLinkTokens(text: string): string {
   return text.replace(/\{(?=\{)/g, "{​");
 }
 
+/**
+ * Début de ligne qu'un nom ferait lire comme une liste numérotée (`1. `,
+ * `2) `) : l'affiche commence une ligne, et Discord renumérote et décale la
+ * ligne — `discordInline` n'échappe que le balisage en ligne.
+ */
+const ORDERED_LIST_START = /^(\d+)([.)])/;
+
 /** Bloc d'un match, sans son jeton de lien : heure (et « En direct »), affiche et tournoi. */
 function eveningBlock(stream: LiveEveningStream): string {
   const when = `**${parisClock(stream.startsAt)}**${stream.live ? " · En direct" : ""}`;
-  const pairing = pairingLine(publishableName(stream.team1Name), publishableName(stream.team2Name));
+  const pairing = pairingLine(publishableName(stream.team1Name), publishableName(stream.team2Name)).replace(
+    ORDERED_LIST_START,
+    (_match, digits: string, mark: string) => `${digits}\\${mark}`,
+  );
   return noLinkTokens(`\n\n${when}\n${pairing} — ${discordInline(stream.tournamentName)}\n`);
 }
 

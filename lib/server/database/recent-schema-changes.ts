@@ -256,6 +256,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Soirées #live — envoi qui notifie parti (issue incertaine comprise) : le
     // match suivant ne notifie pas une seconde fois.
     `ALTER TABLE bg_live_evenings ADD COLUMN notified BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Annonces #live refusées (rien n'est parti, jamais réessayées) : hors des
+    // soirées, sans fausser leur date.
+    `ALTER TABLE bg_live_announcements ADD COLUMN refused BOOLEAN NOT NULL DEFAULT FALSE`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
