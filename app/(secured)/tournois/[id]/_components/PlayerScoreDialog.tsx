@@ -130,8 +130,10 @@ export function closedNoticeText(
  * Ce que l'arbitrage n'a pas, et qui fait tout le cycle : les **propositions**.
  * Un score envoyé ici n'écrit pas le résultat, il le propose ; l'adversaire le
  * confirme d'un clic (la modale s'ouvre sur sa proposition), ou en saisit un
- * autre — ce qui alerte l'arbitrage. Sans réponse, la proposition fait foi à
- * l'échéance du délai. La modale dit donc toujours **où en est le cycle**, ce
+ * autre — ce qui ouvre un **litige** : saisie verrouillée pour les deux équipes,
+ * forfait compris, jusqu'à l'arbitrage (`SCORE_DISPUTE_LOCK.md`). Sans réponse,
+ * la proposition est validée d'office à l'échéance (au moins 2 h après la
+ * dernière saisie). La modale dit donc toujours **où en est le cycle**, ce
  * que l'ancien formulaire en ligne taisait : un score envoyé n'y laissait
  * aucune trace, ni chez qui l'avait envoyé, ni chez qui devait le confirmer.
  *
@@ -198,16 +200,22 @@ function LockedNotice({ locked, text }: Readonly<{ locked: boolean; text: string
 }
 
 /** Refus qui disent que l'état lu est périmé : la modale relit le serveur. */
-const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE]);
+// `MATCH_ALREADY_COMPLETED` : la validation d'office a pu passer à l'heure dite.
+const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"]);
 
 /** Envoyer la saisie ouvrirait-il un litige ? Face à la proposition adverse, une saisie valide qui en diffère. */
 function sendingOpensDispute(
   canEnterScore: boolean,
-  phase: string | undefined,
-  form: { entered: unknown; confirmsAsIs: boolean; error: unknown },
+  view: { phase: string; theirs: MatchScoreReport | null } | null,
+  form: { entered: { team1Score: number; team2Score: number } | null; confirmsAsIs: boolean; error: unknown },
 ): boolean {
-  if (!canEnterScore || phase !== "THEIRS_PENDING") return false;
-  return form.entered !== null && !form.confirmsAsIs && !form.error;
+  if (!canEnterScore || view?.phase !== "THEIRS_PENDING" || !view.theirs) return false;
+  if (form.entered === null || form.error) return false;
+  // Détail adverse connu : toute retouche le contredit. Encore en lecture ou
+  // illisible, seul un **score** différent se sait contradictoire — le serveur
+  // compare lui-même le détail, et une saisie identique y confirmerait.
+  if ((view.theirs.maps ?? []).length > 0) return !form.confirmsAsIs;
+  return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;
 }
 
 export function PlayerScoreDialog({
@@ -319,7 +327,7 @@ export function PlayerScoreDialog({
   }, [disputeLocked, dialogRef]);
   // Contre-proposition : l'envoyer ouvre un litige sans retour possible côté
   // joueurs — le dire avant l'envoi, pas après.
-  const opensDispute = sendingOpensDispute(canEnterScore, view?.phase, { entered, confirmsAsIs, error: check.error });
+  const opensDispute = sendingOpensDispute(canEnterScore, view, { entered, confirmsAsIs, error: check.error });
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
