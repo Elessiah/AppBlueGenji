@@ -85,7 +85,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin si tu fais partie des contacts présentés (et, si tu castes un match, de ses deux équipes sur la même durée), et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin si tu fais partie des contacts présentés (et, si tu castes un match, de ses deux équipes sur la même durée), et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé",
     base: "Consentement",
     extraBases: [{ base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" }],
     duree: "Durée du compte",

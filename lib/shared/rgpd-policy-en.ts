@@ -54,7 +54,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Overwatch username",
-    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it remains readable by the players of your matches until the tournament is over, by the caster of your match from the moment both its opponents are known to its end if you are one of the contacts presented (and, if you cast a match, by both its teams for the same period), and by the referees while you are registered for a tournament that is not over",
+    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it remains readable by the members of both teams of your matches until the tournament is over, by the caster of your match from the moment both its opponents are known to its end if you are one of the contacts presented (and, if you cast a match, by both its teams for the same period), and by the referees while you are registered for a tournament that is not over",
   ],
   [
     "Discord username",

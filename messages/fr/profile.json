@@ -341,7 +341,7 @@
     "eyebrow": "VISIBILITÉ · BATTLETAG",
     "title": "Masqué, mais pas pour tout le monde",
     "intro": "Ton BattleTag n'apparaîtra plus sur ta fiche publique ni dans l'annuaire des joueurs. Il reste en revanche lisible là où il sert à jouer :",
-    "players": "<strong>Les autres joueurs de chaque match que tu disputes</strong>, le temps du tournoi — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
+    "players": "<strong>Les membres des deux équipes de chaque match de ton équipe</strong>, le temps du tournoi — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
     "caster": "<strong>Le caster de ton match</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin, si tu fais partie des contacts présentés.",
     "asCaster": "<strong>Les deux équipes d'un match que tu castes</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin.",
     "staff": "<strong>Les arbitres et les administrateurs</strong>, tant que tu es inscrit à un tournoi qui n'est pas terminé — dès l'ouverture des inscriptions.",

@@ -215,6 +215,10 @@ export function MatchCardActions({
   // sans cette remise à zéro, la modale se rouvrirait seule au retour de
   // « Forcer » (instantané du flux), sans clic.
   if (confirmForce && !hasForce) setConfirmForce(false);
+  // Les contacts ne restent pas affichés quand le match ne les offre plus
+  // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
+  // l'action, et la modale se ferme avec elle.
+  if (contactsOpen && !actions.some((a) => a.id === "contacts")) setContactsOpen(false);
   // Ouvert **et** encore quelque chose à montrer : un instantané du flux qui
   // retire le panneau ne doit pas le laisser « ouvert » en mémoire, prêt à
   // reparaître déplié sans clic au retour d'une action.
