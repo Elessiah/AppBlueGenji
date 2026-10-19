@@ -120,6 +120,9 @@ describe("DONNEES_PROFIL", () => {
     const tag = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Discord");
     expect(tag?.finalite).toMatch(/Enregistré à ta connexion par Discord, ou saisi par toi/);
     expect(tag?.finalite).toMatch(/sans certification, invisible de tous, administrateurs compris/);
+    // DM-CERTIFIED-ONLY (revue légale) : le bot ne reçoit le tag que certifié, pour toute notification.
+    expect(tag?.finalite).toMatch(/notifications bot \(tag certifié seulement\)/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord username")?.finalite).toMatch(/bot notifications \(certified tag only\)/);
   });
 
   it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {

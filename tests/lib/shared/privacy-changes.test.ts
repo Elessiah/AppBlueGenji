@@ -953,10 +953,10 @@ describe("PRIVACY_CHANGES — messages privés de match aux seuls tags certifié
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-messages-de-match-tags-certifies")!;
   const english = PRIVACY_CHANGES_EN["2026-10-messages-de-match-tags-certifies"];
 
-  it("ferme la liste : datée du 16 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
+  it("ferme la liste : datée du 19 octobre 2026 (jour de la fusion), pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
     expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 1);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-16", undefined]);
+    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-19", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
 
@@ -983,6 +983,9 @@ describe("PRIVACY_CHANGES — messages privés de match aux seuls tags certifié
     expect(entry.links?.[0]?.label).toBe("Voir mon tag Discord");
     expect(english.linkLabels?.[0]).toBe("See my Discord tag");
     expect(english.linkLabels).toHaveLength(2);
+    // Revue légale : l'identifiant d'un compte rattaché sans tag certifié ne part plus non plus.
+    expect(fr).toMatch(/moins de pseudos et d'identifiants Discord sont transmis au bot/);
+    expect(en).toMatch(/fewer Discord usernames and IDs are sent to the bot/);
   });
 });
 
