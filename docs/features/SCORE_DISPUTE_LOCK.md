@@ -42,13 +42,26 @@ administrateur — la permission de plateforme `tournaments`, pas l'organisateur
 Le bouton dit « Voir le litige » même à qui ne peut que déclarer forfait
 (`playerScoreButtonKey` lit le litige d'abord) : la modale n'offre plus ce
 geste. Litige arrivé par le flux pendant une saisie : le focus, resté sur un
-champ qui disparaît, revient à la modale.
+champ qui disparaît, revient à la modale, décrite alors par l'avis de verrou
+(`aria-describedby`). L'avis dit ce que l'arbitrage peut faire depuis la carte :
+fixer le score final ou prononcer un forfait (aucune remise à zéro par match
+n'existe ; le retour en arrière du tournoi en est une, plus large).
+
+**Abandon du tournoi.** Le verrou vise le forfait **du match** ; l'abandon du
+tournoi (Survie, Ronde suisse, BG Survie, phase MULTI) reste ouvert et clôt la
+manche en litige comme une défaite de l'équipe qui abandonne — elle concède,
+personne d'autre n'y perd. /regles le dit « aucun forfait sur ce match ».
+
+**Arbitre saisi du match.** « Enregistrer » (avancement, sans trancher) remet
+`score_deadline_at` à `NULL` (`adminSaveMatchScores`) : la validation d'office
+s'arrête, faute de quoi le report attendu écraserait deux heures plus tard le
+score noté par l'arbitre. Une nouvelle saisie du déclarant la relance.
 
 **Avant l'envoi.** Une contre-proposition ne se corrige plus : face à la
 proposition adverse, toute saisie qui en diffère affiche, au-dessus des
 actions, « Ce score diffère de la proposition de … : l'envoyer ouvre un litige
 et verrouille la saisie des deux équipes jusqu'à l'arbitrage » (FR + EN,
-`score.player.counterWarning`), et la phrase d'état (`theirs.withMaps` /
+`score.player.counterWarning`, rattaché au bouton d'envoi par `aria-describedby`), et la phrase d'état (`theirs.withMaps` /
 `withoutMaps`) le dit dès l'ouverture. Pendant un envoi, les boutons
 `aria-disabled` se grisent comme `:disabled` (`ScoreDialog.module.css`).
 
