@@ -8,6 +8,12 @@ import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
  */
 export const MATCH_TIME_DM_SCOPE = "annonces d'horaire, rappels et avis de retrait de match en message privé";
 
+/** Avis de suspension ou de modération en message privé : intérêt légitime à faire respecter les conditions (registre T11). */
+export const MODERATION_DM_SCOPE = "avis de suspension ou de modération en message privé";
+
+/** Information sur les données en message privé : obligation légale d'information (registre T10). */
+export const DATA_NOTICE_DM_SCOPE = "information sur tes données en message privé";
+
 /**
  * Le pseudo public d'un joueur inscrit en tournoi individuel part dans
  * l'annonce #live (registre T16) et y survit au compte. Base : l'exécution du
@@ -98,7 +104,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion (contrat), son **exposition** repose sur la certification
     // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot (tag certifié seulement ; avant la certification, un tag saisi ne sert qu'à t'envoyer un code (connexion, rattachement ou certification)). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
+      "Authentification Discord, codes du bot en message privé (connexion, rattachement, certification), notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",
@@ -128,7 +134,11 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels et retrait de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: "Exécution du contrat",
-    extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
+    extraBases: [
+      { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
+      { base: "Intérêt légitime", scope: MODERATION_DM_SCOPE },
+      { base: "Obligation légale", scope: DATA_NOTICE_DM_SCOPE },
+    ],
     duree: "Durée du compte",
   },
   {

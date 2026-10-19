@@ -26,7 +26,7 @@ FinalitéMise en relation entre joueurs (s'ajouter en jeu) — aucune statistiqu
 Base légaleConsentementExécution du contrat présentation aux joueurs et au caster de ton match, à son lancement
 ConservationDurée du compte
 DonnéePseudo Discord
-FinalitéAuthentification Discord, notifications bot (tag certifié seulement ; avant la certification, un tag saisi ne sert qu'à t'envoyer un code (connexion, rattachement ou certification)). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris
+FinalitéAuthentification Discord, codes du bot en message privé (connexion, rattachement, certification), notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris
 Base légaleExécution du contratIntérêt légitime annonces d'horaire, rappels et avis de retrait de match en message privé
 ConservationDurée du compte
 DonnéeCertification du pseudo Discord
@@ -35,7 +35,7 @@ Base légaleConsentementExécution du contrat présentation aux joueurs et au ca
 ConservationJusqu'au retrait ou au changement du tag, ou durée du compte
 DonnéeID Discord
 FinalitéMoyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels et retrait de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre
-Base légaleExécution du contratIntérêt légitime annonces d'horaire, rappels et avis de retrait de match en message privé
+Base légaleExécution du contratIntérêt légitime annonces d'horaire, rappels et avis de retrait de match en message privéIntérêt légitime avis de suspension ou de modération en message privéObligation légale information sur tes données en message privé
 ConservationDurée du compte
 DonnéeIdentifiant Google
 FinalitéMoyen de connexion (bouton Google) — identifiant technique opaque. Aucune adresse e-mail n'est demandée ni conservée, et le nom de ton compte Google n'est pas repris. Retirable depuis Mon profil tant qu'il t'en reste un autre

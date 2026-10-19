@@ -9,7 +9,14 @@
 
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
-import { AUTOMOD_ALERT_SCOPE, DONNEES_PROFIL, LIVE_PSEUDO_SCOPE, MATCH_TIME_DM_SCOPE } from "@/lib/shared/rgpd-policy";
+import {
+  AUTOMOD_ALERT_SCOPE,
+  DATA_NOTICE_DM_SCOPE,
+  DONNEES_PROFIL,
+  LIVE_PSEUDO_SCOPE,
+  MATCH_TIME_DM_SCOPE,
+  MODERATION_DM_SCOPE,
+} from "@/lib/shared/rgpd-policy";
 import type { DonneEntry, DroitEntry, LegalBase } from "@/lib/shared/rgpd-policy";
 
 /** The four legal bases (GDPR, art. 6.1), in English. */
@@ -32,6 +39,8 @@ const SCOPE_EN: Record<string, string> = {
   "présentation aux joueurs et au caster de ton match, à son lancement":
     "presentation to the players and caster of your match, at its launch",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
+  [MODERATION_DM_SCOPE]: "suspension or moderation notices by direct message",
+  [DATA_NOTICE_DM_SCOPE]: "information about your data by direct message",
   [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request",
   [AUTOMOD_ALERT_SCOPE]:
     "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request",
@@ -49,7 +58,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord username",
-    "Discord authentication, bot notifications (certified tag only; before certification, a typed tag is only used to send you a code (login, linking or certification)). Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
+    "Discord authentication, bot codes by direct message (login, linking, certification), bot notifications (certified tag only). Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
   ],
   [
     "Certification of the Discord username",
