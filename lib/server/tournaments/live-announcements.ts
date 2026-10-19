@@ -762,6 +762,22 @@ function eveningEntrant(
 }
 
 /**
+ * Soirée close (message supprimé de #live) : rien n'est publié, réservations
+ * gardées — le match n'est pas réessayé —, et pm2 le dit, une fois par heure.
+ */
+function skipClosedEvening(
+  group: AnnouncementGroup,
+  evening: LiveEvening,
+): { posted: number; postponed: PostponedOutcome | null } {
+  const { label, context } = describeGroup(group, Number(evening.id));
+  warnOnce(
+    `closed ${context}`,
+    `[live-announce] ${label} : soirée ${Number(evening.id)} close (message supprimé de #live), annonce non publiée`,
+  );
+  return { posted: 0, postponed: null };
+}
+
+/**
  * Soirée illisible ou non marquable : la base est en cause, pas le bot — seul
  * ce public attend (l'autre est essayé), ses réservations sont rendues, et pm2
  * ne parle pas d'un bot injoignable.
@@ -822,36 +838,25 @@ async function announce(
 ): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
   let evening: LiveEvening;
   let others: LiveCandidateRow[];
+  let notifying = false;
   try {
     evening = await openEvening(group.target);
+    // Message de la soirée supprimé : rien ne le republie, même sans pseudo —
+    // et rien n'est relu pour rien.
+    if (Number(evening.closed) === 1) return skipClosedEvening(group, evening);
     await stampClaims(group.rows, evening.started_at);
     others = await loadEveningMatches(evening);
+    // Premier message de la soirée : il notifie s'il prend la marque
+    // `notified` (avant l'envoi, en une instruction ; sans elle, une issue
+    // incertaine laisserait notifier deux fois). Soirée déjà marquée sans
+    // message connu (issue incertaine, bot trop ancien, identifiant non
+    // gardé) : son public a peut-être déjà été notifié — un nouveau message
+    // part, sans notification.
+    if (!evening.discord_message_id && Number(evening.notified) !== 1) {
+      notifying = await markEveningNotified(evening);
+    }
   } catch (error) {
     return holdUnreadableEvening(group, error);
-  }
-  if (Number(evening.closed) === 1) {
-    // Message de la soirée supprimé : rien ne le republie, même sans pseudo.
-    // Réservations gardées : le match n'est pas réessayé.
-    const { label, context } = describeGroup(group, Number(evening.id));
-    warnOnce(
-      `closed ${context}`,
-      `[live-announce] ${label} : soirée ${Number(evening.id)} close (message supprimé de #live), annonce non publiée`,
-    );
-    return { posted: 0, postponed: null };
-  }
-  // Premier message de la soirée : il notifie s'il prend la marque `notified`
-  // (avant l'envoi, en une instruction). Soirée déjà marquée sans message
-  // connu (issue incertaine, bot trop ancien, identifiant non gardé) : son
-  // public a peut-être déjà été notifié — un nouveau message part, sans
-  // notification.
-  let notifying = false;
-  if (!evening.discord_message_id && Number(evening.notified) !== 1) {
-    try {
-      notifying = await markEveningNotified(evening);
-    } catch (error) {
-      // Sans la marque, une issue incertaine laisserait notifier deux fois.
-      return holdUnreadableEvening(group, error);
-    }
   }
   const quiet = !evening.discord_message_id && !notifying;
   const { message, urls, logMessage } = eveningTexts(group, others, now);
