@@ -623,6 +623,16 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toHaveLength(1);
   });
 
+  it("ne met pas en file le retrait du caster d'un match au report en attente", async () => {
+    state.candidates = [candidate({ status: "AWAITING_CONFIRMATION", caster_user_id: CASTER })];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(CASTER, { platform_roles_json: null })];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.caster).toBeNull();
+    expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toEqual([]);
+    expect(state.reads.filter((sql) => sql.includes("FOR UPDATE"))).toEqual([]);
+  });
+
   it("garde la phase de lancement d'un tournoi qui l'a allumée", async () => {
     state.members = [verifiedCaptain()];
     const info = await loadViewerMatchContacts(viewer, 42);
