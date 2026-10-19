@@ -24,7 +24,7 @@ import {
   createDiscordLoginChallenge,
   discardDiscordChallenge,
 } from "@/lib/server/users/discord-challenges";
-import { fakePool } from "../../helpers/sql-double";
+import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
  * La certification du tag Discord.
@@ -97,6 +97,16 @@ function fakeDb(state: UserState, otherAccountHolds: string | null = null) {
         throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
       }
       writes.push({ sql: q, params });
+      // Écriture de la certification par code : son `WHERE` refuse un autre
+      // Discord rattaché entre la relecture et l'écriture.
+      if (
+        q.includes("AND (discord_id IS NULL OR discord_id = ?)") &&
+        q.includes("discord_id = COALESCE(discord_id, ?)") &&
+        state.discord_id !== null &&
+        state.discord_id !== params.at(-1)
+      ) {
+        return [{ affectedRows: 0 }];
+      }
       // `COALESCE(discord_id, ?)` : l'identifiant n'est posé que s'il manquait.
       state.discord_id = state.discord_id ?? String(params[0]);
       state.discord_pseudo = String(params[1]);
@@ -380,6 +390,42 @@ describe("confirmDiscordVerification", () => {
     // après, mais rien n'est écrit.
     expect(db.writes).toHaveLength(0);
 
+  });
+});
+
+describe("confirmDiscordVerification — Discord rattaché pendant la confirmation", () => {
+  /**
+   * La relecture voit un compte sans Discord ; une connexion Discord dans un
+   * autre onglet en rattache un autre avant l'écriture. Sans la garde du
+   * `WHERE`, le tag du défi serait certifié sur l'identifiant de cet autre
+   * compte — où partiraient ses messages privés de match.
+   */
+  it("refuse (DISCORD_ID_MISMATCH) et ne certifie rien", async () => {
+    const db = fakeDb({ ...GOOGLE_ACCOUNT });
+    consumeMock.mockImplementation(async () => {
+      db.state.discord_id = "900000000000000001";
+      return { handle: "keryan", discordId: "900000000000000002" };
+    });
+
+    await expect(confirmDiscordVerification(7, CHALLENGE, "123456")).rejects.toThrow("DISCORD_ID_MISMATCH");
+    expect(db.state).toEqual({ ...GOOGLE_ACCOUNT, discord_id: "900000000000000001" });
+    expect(db.writes[0].sql).toContain("WHERE id = ? AND is_deleted = 0 AND (discord_id IS NULL OR discord_id = ?)");
+    expect(db.writes[0].params.at(-1)).toBe("900000000000000002");
+  });
+
+  it("dit PROFILE_NOT_FOUND quand le compte a disparu entre-temps", async () => {
+    consumeMock.mockResolvedValue({ handle: "keryan", discordId: "900000000000000002" });
+    // Première relecture : le compte existe ; l'écriture ne touche rien (compte
+    // supprimé entre-temps) ; la seconde relecture ne le trouve plus.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ ...GOOGLE_ACCOUNT }]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([[]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(confirmDiscordVerification(7, CHALLENGE, "123456")).rejects.toThrow("PROFILE_NOT_FOUND");
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 });
 
