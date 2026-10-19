@@ -144,7 +144,9 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   fin de fenêtre, identifiant du message Discord, `silent` si ce message est
   parti sans mention, `notified` si un envoi qui notifie est parti vers le
   bot ; aucune donnée personnelle, effacée un jour après la fin de la
-  fenêtre). Quatre heures couvrent une soirée de tournoi (19 h – 23 h) sans
+  fenêtre par `purgeEndedEvenings`, au plus une fois par heure à chaque appel
+  de `dispatchLiveAnnouncements` — annonces désactivées comprises : la durée
+  annoncée par `/rgpd` tient même sans annonce pendant des semaines). Quatre heures couvrent une soirée de tournoi (19 h – 23 h) sans
   fondre deux soirées. La fenêtre repart du **premier envoi qui notifie** (posé
   juste avant l'appel au bot, quelle qu'en soit l'issue) et du premier message
   gardé : des essais reportés avant lui (bot injoignable) ne la raccourcissent
