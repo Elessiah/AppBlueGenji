@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   CONTACTS_RETRY_MAX_WAIT_MS,
   contactsRetryDelay,
+  casterContactsPending,
+  casterRereadDelay,
   readMatchContacts,
   rereadOnPhaseChange,
 } from "@/components/match-launch/MatchContactsDialog";
@@ -59,7 +61,7 @@ describe("readMatchContacts", () => {
   it("succès d'emblée : une lecture, aucune attente", async () => {
     const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue(json(200, { launch: LAUNCH }));
     const wait = noWait();
-    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({ launch: LAUNCH });
+    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toMatchObject({ launch: LAUNCH });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("/api/matches/7/contacts", { cache: "no-store", signal: undefined });
     expect(wait).not.toHaveBeenCalled();
@@ -71,7 +73,7 @@ describe("readMatchContacts", () => {
       .mockResolvedValueOnce(unavailable(SERVER_BEFORE))
       .mockResolvedValueOnce(json(200, { launch: LAUNCH }));
     const wait = noWait();
-    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({ launch: LAUNCH });
+    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toMatchObject({ launch: LAUNCH });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(wait).toHaveBeenCalledWith(11_000, undefined);
   });
@@ -136,25 +138,56 @@ describe("readMatchContacts", () => {
   });
 });
 
-describe("relecture au départ du match, modale ouverte", () => {
-  it("une fois, quand la carte passe au lancement ou au lancé", () => {
-    expect(rereadOnPhaseChange("SCHEDULED", "LOBBY")).toBe(true);
-    expect(rereadOnPhaseChange("SCHEDULED", "LAUNCHED")).toBe(true);
-    expect(rereadOnPhaseChange("TO_PLAN", "LAUNCHED")).toBe(true);
+const CASTER = { userId: 9, pseudo: "Voix", contact: null } as unknown as MatchLaunchInfo["caster"];
+const info = (phase: MatchLaunchInfo["phase"], caster: MatchLaunchInfo["caster"] = CASTER, startAt: string | null = START) =>
+  ({ matchId: 7, phase, startAt, caster }) as unknown as MatchLaunchInfo;
+
+describe("contacts du caster en attente, modale ouverte", () => {
+  it("en attente : caster inscrit sur un match pas encore parti au serveur", () => {
+    expect(casterContactsPending(info("SCHEDULED"))).toBe(true);
+    expect(casterContactsPending(info("TO_PLAN"))).toBe(true);
+    expect(casterContactsPending(info("LOBBY"))).toBe(false);
+    expect(casterContactsPending(info("LAUNCHED"))).toBe(false);
+    expect(casterContactsPending(info("SCHEDULED", null))).toBe(false);
   });
 
-  it("jamais à la fin du match, ni entre deux phases du match parti, ni sans changement", () => {
-    expect(rereadOnPhaseChange("LAUNCHED", "NONE")).toBe(false);
-    expect(rereadOnPhaseChange("LOBBY", "LAUNCHED")).toBe(false);
-    expect(rereadOnPhaseChange("SCHEDULED", "SCHEDULED")).toBe(false);
-    expect(rereadOnPhaseChange("TO_PLAN", "SCHEDULED")).toBe(false);
-    expect(rereadOnPhaseChange(null, null)).toBe(false);
+  it("relecture à l'heure de départ du serveur, plus une seconde (horloge du navigateur en avance)", () => {
+    expect(casterRereadDelay(info("SCHEDULED"), SERVER_BEFORE)).toBe(11_000);
+    expect(casterRereadDelay(info("SCHEDULED"), "Mon, 19 Oct 2026 16:00:00 GMT")).toBe(2 * 3_600_000 + 1_000);
   });
 
-  it("la carte donne sa phase, et la lecture dépend du compteur de relecture", () => {
+  it("aucune relecture sans caster, sans heure, départ passé au serveur, ou contacts déjà là", () => {
+    expect(casterRereadDelay(info("SCHEDULED", null), SERVER_BEFORE)).toBeNull();
+    expect(casterRereadDelay(info("TO_PLAN", CASTER, null), SERVER_BEFORE)).toBeNull();
+    expect(casterRereadDelay(info("SCHEDULED"), SERVER_AFTER)).toBeNull();
+    expect(casterRereadDelay(info("SCHEDULED"), null)).toBeNull();
+    expect(casterRereadDelay(info("LOBBY"), SERVER_BEFORE)).toBeNull();
+  });
+
+  it("au départ par une écriture (carte au lancement), une fois, si le caster attend", () => {
+    const pending = info("SCHEDULED");
+    expect(rereadOnPhaseChange("SCHEDULED", "LOBBY", pending)).toBe(true);
+    expect(rereadOnPhaseChange("SCHEDULED", "LAUNCHED", pending)).toBe(true);
+    expect(rereadOnPhaseChange("TO_PLAN", "LAUNCHED", info("TO_PLAN"))).toBe(true);
+  });
+
+  it("jamais sans caster, contacts déjà là, à la fin du match, entre deux phases du match parti", () => {
+    expect(rereadOnPhaseChange("SCHEDULED", "LOBBY", info("SCHEDULED", null))).toBe(false);
+    expect(rereadOnPhaseChange("SCHEDULED", "LOBBY", info("LOBBY"))).toBe(false);
+    expect(rereadOnPhaseChange("SCHEDULED", "LOBBY", null)).toBe(false);
+    expect(rereadOnPhaseChange("LAUNCHED", "NONE", info("SCHEDULED"))).toBe(false);
+    expect(rereadOnPhaseChange("LOBBY", "LAUNCHED", info("SCHEDULED"))).toBe(false);
+    expect(rereadOnPhaseChange("TO_PLAN", "SCHEDULED", info("TO_PLAN"))).toBe(false);
+  });
+
+  it("câblage : phase de la carte transmise, relecture silencieuse, contacts du caster masqués si la carte revient avant le départ", () => {
     const dialog = readSource("components/match-launch/MatchContactsDialog.tsx");
     expect(dialog).toContain("}, [matchId, readKey]);");
-    expect(dialog).toContain("rereadOnPhaseChange(previousPhase.current, phase)");
+    expect(dialog).toContain("rereadOnPhaseChange(previousPhase.current, phase, launch)");
+    expect(dialog).toContain("casterRereadDelay(launch, serverDate)");
+    expect(dialog).toMatch(/if \("error" in read\) \{\n\s*if \(reread\) return;/);
+    expect(dialog).toContain("if (!alive || reread) return;");
+    expect(dialog).toContain("contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?phase=\{phase\}[\s\S]*?\/>/);
   });

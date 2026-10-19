@@ -277,7 +277,8 @@ describe("fiches de contact — noms cliquables", () => {
 
   it("la modale « Contacts » ne montre les contacts du caster que le temps du match", () => {
     const source = readFileSync(join(process.cwd(), "components/match-launch/MatchContactsDialog.tsx"), "utf8");
-    expect(source).toContain('contactsShown={launch.phase === "LOBBY" || launch.phase === "LAUNCHED"}');
+    // Phase du serveur à la lecture, et de la carte depuis (match reprogrammé).
+    expect(source).toContain("contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}");
     expect(source).toContain('contactsLaterText={t("contacts.casterLater")}');
   });
 });
