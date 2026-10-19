@@ -148,7 +148,7 @@ export function TermsAcceptanceModal({
           <p className={styles.text}>
             {richNodes(
               rich("termsModal.exits", {}, {
-                privacy: (children) => <LocaleLink href="/rgpd">{richNodes(children)}</LocaleLink>,
+                policy: (children) => <LocaleLink href="/rgpd">{richNodes(children)}</LocaleLink>,
                 profile: (children) => <LocaleLink href="/profil">{richNodes(children)}</LocaleLink>,
               }),
             )}
