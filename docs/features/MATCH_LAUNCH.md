@@ -63,7 +63,10 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   passée, avant la passe de l'entretien, forcer enregistre le lancement au lieu
   de le refuser, et une lecture (modale, « Contacts ») retire encore le caster
   devenu inéligible (`revokeIneligibleCasters` juge la phase allumée, comme
-  `releaseIneligibleCast`, pas la phase affichée). Un report de score refusé faute de `launched_at` (horloge de
+  `releaseIneligibleCast`, pas la phase affichée). Un caster **devenu joueur** du
+  match (roster rejoint après l'inscription, `CASTER_IS_PLAYER` n'étant contrôlé
+  qu'à l'inscription) est traité de même : tu, inscription retirée avant le
+  lancement — son « Prêt » de caster ne viendrait jamais (`casterPlays`). Un report de score refusé faute de `launched_at` (horloge de
   l'appareil en avance) rend `MATCH_NOT_STARTED` (« le match n'a pas encore
   commencé », FR + EN), jamais la phrase des « Prêt » (`MATCH_NOT_LAUNCHED`).
 - **Allumée** : exactement le comportement décrit ci-dessous.
