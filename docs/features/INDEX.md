@@ -169,7 +169,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `BOT_ACTIVITY_LOG.md` — Journal d'activité : une ligne par fait accompli.
 - `REFEREE_ALERTS.md` — Alertes au rôle arbitre.
 - `PUSH_NOTIFICATIONS.md` — Notifications push, registre `PUSH_TOPICS`, `notifyUsers` / `notifyStaff`.
-- `LIVE_STREAMS.md` — Diffusion en direct, vocabulaire « En cours » / « En direct », annonce des lives sur Discord (#live, `@everyone`).
+- `LIVE_STREAMS.md` — Diffusion en direct, vocabulaire « En cours » / « En direct », annonce des lives sur Discord (#live, un message par soirée, `@everyone` pour la chaîne officielle, rôle StreamViewer sinon).
 - `MATCH_START_DATES.md` — Dates de début des matchs (saisie jour/mois/quart d'heure, mois courant et 21:00 par défaut, année déduite).
 - `MATCH_REPLAYS.md` — Rediff YouTube d'un match terminé.
 

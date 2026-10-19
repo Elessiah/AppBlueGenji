@@ -1,7 +1,8 @@
 /**
  * Annonce des lives sur Discord : au **début** d'un match diffusé, le bot poste
- * dans le salon #live du serveur BlueGenji un message `@everyone` qui nomme les
- * deux engagés, le tournoi, et donne le lien de la diffusion.
+ * dans le salon #live du serveur BlueGenji le message de la soirée (`@everyone`
+ * pour la chaîne officielle, rôle StreamViewer sinon) qui nomme les deux
+ * engagés, le tournoi, l'heure, et donne le lien de la diffusion.
  *
  * **« Début du match » = passage à l'antenne**, tel que le site le dérive
  * (`isMatchLive`, `lib/shared/live-streams.ts`) : au lancement du match en
@@ -27,11 +28,14 @@
  * relancé est annoncé de nouveau. Une affiche changée (ré-appariement) est une
  * autre rencontre, donc une autre annonce.
  *
- * **Un message par diffusion, pas par match.** Les matchs d'un même tournoi
- * qu'un même passage trouve à l'antenne sur le même lien (une ronde lancée
- * d'un coup, repliée sur la chaîne officielle) partent en un seul message :
- * le serveur ne reçoit pas quatre `@everyone` en quelques secondes vers la
- * même chaîne. Chaque affiche garde sa propre réservation.
+ * **Un message par soirée et par public, pas par match.** Le premier direct
+ * ouvre une soirée de `LIVE_EVENING_WINDOW_HOURS` heures (`bg_live_evenings`)
+ * pour son public : la chaîne officielle notifie `@everyone`, toute autre
+ * chaîne le seul rôle StreamViewer. Le message liste les matchs de la soirée
+ * — à l'antenne, puis programmés, chacun à son heure (Paris). Un match qui
+ * passe ensuite à l'antenne dans la fenêtre **modifie** ce message (le bot
+ * rend son identifiant), sans nouvelle notification ; s'il ne se modifie plus,
+ * le bot poste une suite sans mention. Chaque affiche garde sa réservation.
  *
  * **Fraîcheur : deux heures.** Un match n'est annoncé que dans les deux heures
  * qui suivent son passage à l'antenne (`LIVE_ANNOUNCE_MAX_AGE_MINUTES`) : un
@@ -46,12 +50,21 @@
  * `https` : il faut en plus `LIVE_ANNOUNCEMENTS_ENABLED=1`, que seul le `.env`
  * de production pose, et un `APP_URL` en `https` sur un nom de domaine.
  */
+import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { siteBaseUrl } from "@/lib/server/site-url";
-import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
+import { toIso } from "@/lib/server/serialization";
+import {
+  formatLiveEvening,
+  LIVE_EVENING_WINDOW_HOURS,
+  liveAnnouncementUrl,
+  liveMentionTarget,
+  type LiveEveningStream,
+  type LiveMentionTarget,
+} from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { parisInstant } from "@/lib/shared/match-start-entry";
 import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
@@ -79,6 +92,13 @@ type LiveCandidateRow = RowDataPacket & {
   /** Pseudo public du joueur d'une entrée individuelle (`null` : équipe, ou compte supprimé). */
   team1_pseudo: string | null;
   team2_pseudo: string | null;
+  /** Score rendu (« Terminé · 2-1 » une fois le match `COMPLETED`). */
+  team1_score: number | null;
+  team2_score: number | null;
+  forfeit_team_id: number | null;
+  double_forfeit: number | boolean | null;
+  /** Date de l'annonce de l'affiche courante (lectures de soirée seulement) ; `null` sinon. */
+  announced_at?: Date | string | null;
 };
 
 /**
@@ -173,6 +193,12 @@ export function soloPseudoRegisteredSince(): number | null {
 /** Seuil d'un changement introuvable : aucune inscription ne l'atteint (9999-12-31). */
 const NEVER_REGISTERED_SINCE = 253_402_300_799;
 
+/** Tournois lus par les annonces : en cours. */
+const RUNNING_TOURNAMENTS = "t.state = 'RUNNING'";
+
+/** Tournois lus par une soirée : en cours, ou clos depuis (son dernier match y reste, terminé). */
+const EVENING_TOURNAMENT_STATES = "t.state IN ('RUNNING', 'FINISHED')";
+
 /**
  * Matchs castés, jouables, d'un tournoi en cours, passés à l'antenne depuis
  * moins de deux heures, dont l'affiche courante n'a pas encore été annoncée. Le passage à l'antenne se décide ensuite **en
@@ -180,6 +206,63 @@ const NEVER_REGISTERED_SINCE = 253_402_300_799;
  * marginal, et aucune requête ne réimplémente la règle en SQL.
  */
 async function loadCandidates(): Promise<LiveCandidateRow[]> {
+  return selectMatches(
+    `m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
+        AND ${FRESH_ON_AIR_SQL}
+        AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
+                         WHERE a.match_id = m.id
+                           AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))`,
+    [],
+  );
+}
+
+/**
+ * Matchs castés d'une soirée : ceux dont l'affiche **courante** a été annoncée
+ * depuis son ouverture (un match rouvert pour d'autres engagés n'y revient que
+ * par l'annonce de sa nouvelle affiche — refusée, il n'y figure plus), et ceux
+ * programmés (`START_TIME`) d'ici sa fin — leur heure figure dans le message.
+ * Le public (chaîne officielle ou non) se trie ensuite en mémoire.
+ */
+async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRow[]> {
+  // Sans message encore gardé, celui-ci est le premier : la fenêtre repartira
+  // de son envoi (`rememberEveningMessage`), il liste donc les matchs
+  // programmés jusqu'à cette fin-là.
+  const until = evening.discord_message_id ? "?" : `GREATEST(?, ${WINDOW_FROM_NOW})`;
+  // Un match annoncé reste au message une fois terminé, même si son tournoi
+  // s'est clos avec lui (dernier match) ; un match programmé, seulement d'un
+  // tournoi en cours.
+  return selectMatches(
+    `m.live_trigger IS NOT NULL AND m.is_bye = 0
+        AND (EXISTS (SELECT 1 FROM bg_live_announcements a
+                      WHERE a.match_id = m.id AND a.sent_at >= ? AND a.sent_at < ? AND a.refused = 0
+                        AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
+             OR (t.state = 'RUNNING' AND m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
+                 AND m.start_at > NOW() AND m.start_at <= ${until}))`,
+    // Réservations de la fenêtre seulement : une soirée finie, encore mise à
+    // jour, ne reprend pas les matchs de la soirée suivante.
+    [evening.started_at, evening.window_end, evening.window_end],
+    EVENING_TOURNAMENT_STATES,
+    ANNOUNCED_AT_SQL,
+  );
+}
+
+/**
+ * Date de l'annonce de l'affiche courante : l'heure d'un match `MANUAL` dont
+ * l'antenne est fermée (`live_started_at` effacé), qui sinon prendrait l'heure
+ * de chaque relecture — un texte changé à chaque minute, une modification à
+ * chaque mise à jour.
+ */
+const ANNOUNCED_AT_SQL = `(SELECT MAX(a.sent_at) FROM bg_live_announcements a
+            WHERE a.match_id = m.id
+              AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))) AS announced_at`;
+
+/** Lecture commune des matchs annonçables : affiche, tournoi, pseudos publiables. */
+async function selectMatches(
+  where: string,
+  params: readonly unknown[],
+  tournamentStates: string = RUNNING_TOURNAMENTS,
+  extraColumn: string = "NULL AS announced_at",
+): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
   // Le pseudo n'est lu que pour une inscription faite sous la mention qui
   // l'annonce (`soloPseudoRegisteredSince`) ; sinon `NULL`, « un joueur ».
@@ -194,23 +277,204 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
             t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
-            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo
+            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo,
+            m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit, ${extraColumn}
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
-                            AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
+                            AND ${tournamentStates} AND t.start_visibility_at <= NOW()
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
        LEFT JOIN bg_users u1 ON u1.id = t1.solo_user_id AND u1.is_deleted = 0 AND ${registeredSince("t1")}
        LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0 AND ${registeredSince("t2")}
-      WHERE m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
-        AND ${FRESH_ON_AIR_SQL}
-        AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
-                         WHERE a.match_id = m.id
-                           AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
+      WHERE ${where}
       ORDER BY m.id`,
-    [since, since],
+    [since, since, ...params],
   );
   return rows;
+}
+
+/** Fin de fenêtre d'une soirée comptée de maintenant (SQL). */
+const WINDOW_FROM_NOW = `NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR`;
+
+/** Fenêtre de la soirée repartie de maintenant, jamais raccourcie (SQL). */
+const WINDOW_RESTART = `window_end = GREATEST(window_end, ${WINDOW_FROM_NOW})`;
+
+/** Booléen MySQL tel que `mysql2` le rend (`TINYINT(1)`). */
+type SqlFlag = number | boolean | null;
+
+/** Soirée d'annonces ouverte pour un public (`bg_live_evenings`). */
+interface LiveEvening extends RowDataPacket {
+  id: number;
+  started_at: Date | string;
+  window_end: Date | string;
+  discord_message_id: string | null;
+  /** `1` : le message gardé est parti sans mention (ses modifications n'en écrivent pas). */
+  silent?: SqlFlag;
+  /**
+   * `1` : un envoi qui notifie est parti vers le bot pour cette soirée (posé
+   * **avant** l'envoi, retiré si rien n'est parti) — même sans identifiant
+   * gardé, son public a peut-être déjà été notifié.
+   */
+  notified?: SqlFlag;
+  /**
+   * `1` : le message de la soirée a été supprimé de #live — plus rien n'y est
+   * publié pour ce public jusqu'à la fin de la fenêtre (suppression respectée).
+   */
+  closed?: SqlFlag;
+}
+
+/** Instant d'une colonne `DATETIME`, en millisecondes ; `null` si vide. */
+function instant(value: Date | string | null): number | null {
+  const iso = toIso(value);
+  if (!iso) return null;
+  const at = Date.parse(iso);
+  return Number.isNaN(at) ? null : at;
+}
+
+/**
+ * Heure affichée d'un match de la soirée : son passage à l'antenne (lancement
+ * en `AUTO`, heure dite en `START_TIME`, ouverture d'antenne en `MANUAL`), ou
+ * l'heure prévue d'un match à venir.
+ */
+function streamTime(row: LiveCandidateRow, now: number): number {
+  const launched = row.launch_pairing === row.pairing ? instant(row.launched_at) : null;
+  // Antenne fermée : l'heure de son annonce, jamais celle de la relecture.
+  if (row.live_trigger === "MANUAL") return instant(row.live_started_at) ?? instant(row.announced_at ?? null) ?? now;
+  if (row.live_trigger === "AUTO") return launched ?? now;
+  const start = instant(row.start_at) ?? now;
+  // Devenu jouable après son heure : il passe à l'antenne à son lancement.
+  return launched !== null && launched > start ? launched : start;
+}
+
+/**
+ * Ouvre — ou reprend — la soirée d'un public : la dernière dont la fenêtre
+ * ({@link LIVE_EVENING_WINDOW_HOURS} heures depuis le premier direct annoncé)
+ * court encore. Les soirées finies depuis un jour sont oubliées par
+ * {@link purgeEndedEvenings}.
+ */
+async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
+  const db = await getDatabase();
+  const select = `SELECT id, started_at, window_end, discord_message_id, silent, notified, closed FROM bg_live_evenings
+                   WHERE target = ? AND window_end > NOW() ORDER BY id DESC LIMIT 1`;
+  const [open] = await db.query<LiveEvening[]>(select, [target]);
+  if (open[0]) return open[0];
+  await db.execute(
+    `INSERT INTO bg_live_evenings (target, started_at, window_end)
+     VALUES (?, NOW(), ${WINDOW_FROM_NOW})`,
+    [target],
+  );
+  const [created] = await db.query<LiveEvening[]>(select, [target]);
+  if (!created[0]) throw new Error("soirée d'annonces introuvable après sa création");
+  return created[0];
+}
+
+/** Trace pm2 : comment le groupe a rejoint #live (nouveau message, modification, suite). */
+function howPosted(evening: LiveEvening, quiet: boolean, messageId: string | null): string {
+  if (isFollowUp(evening, messageId)) {
+    return "dans une suite sans notifier, le message de la soirée ne se modifiant plus";
+  }
+  if (evening.discord_message_id) return "ajoutés au message de la soirée";
+  if (quiet) return "dans un nouveau message sans notifier, la soirée ayant déjà une annonce";
+  return "dans un nouveau message";
+}
+
+/**
+ * Réserve la notification de la soirée juste avant l'envoi qui notifie, en une
+ * instruction (`… AND notified = 0` + `affectedRows`), et fait repartir sa
+ * fenêtre de cet envoi : une issue incertaine (délai écoulé, bot tombé) ne
+ * laisse pas d'identifiant, mais le public a pu être notifié — le match suivant
+ * part sans notification, même si son tournoi est fini depuis ou s'il passe à
+ * l'antenne juste après la fin de la fenêtre d'avant.
+ *
+ * @returns `false` si la soirée était déjà notifiée (un autre envoi l'a prise).
+ */
+async function markEveningNotified(evening: LiveEvening): Promise<boolean> {
+  const db = await getDatabase();
+  const [result] = await db.execute(
+    `UPDATE bg_live_evenings SET notified = 1, ${WINDOW_RESTART} WHERE id = ? AND notified = 0`,
+    [Number(evening.id)],
+  );
+  return (result as { affectedRows?: number }).affectedRows === 1;
+}
+
+/**
+ * Rien n'est parti (refus, report) : la soirée n'est plus notifiée, et les
+ * réservations du groupe sont marquées `refused` — elles sortent des soirées
+ * sans que leur date (`sent_at`, donnée à l'export RGPD) soit faussée. Un refus
+ * gardé ne revient pas dans le message de la soirée — il y ferait refuser
+ * chaque match suivant — et ne la fait pas croire notifiée.
+ */
+async function forgetEveningSend(
+  evening: LiveEvening,
+  rows: readonly LiveCandidateRow[],
+  wasNotifying: boolean,
+): Promise<void> {
+  try {
+    const db = await getDatabase();
+    if (wasNotifying) await db.execute(`UPDATE bg_live_evenings SET notified = 0 WHERE id = ?`, [Number(evening.id)]);
+    if (rows.length === 0) return;
+    const claims = claimFilter(rows);
+    await db.execute(`UPDATE bg_live_announcements SET refused = 1 WHERE ${claims.sql}`, claims.params);
+  } catch (error) {
+    // Au pire, le match suivant de la soirée part sans notification.
+    console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, error);
+  }
+}
+
+/**
+ * Ferme la soirée dont le message a été supprimé de #live (souvent par le
+ * staff, sur demande) : plus rien n'y est publié pour ce public jusqu'à la fin
+ * de sa fenêtre — une suite republierait le texte, pseudos compris. Les
+ * réservations du groupe sont marquées refusées (rien n'est parti).
+ */
+async function closeEvening(evening: LiveEvening, rows: readonly LiveCandidateRow[]): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.execute(`UPDATE bg_live_evenings SET closed = 1 WHERE id = ?`, [Number(evening.id)]);
+  } catch (error) {
+    // Le match suivant retentera la modification, que le bot refusera de même.
+    console.error(`[live-announce] soirée ${Number(evening.id)} : fermeture non enregistrée`, error);
+  }
+  await forgetEveningSend(evening, rows, false);
+}
+
+/** Vrai si le message gardé de la soirée est parti sans mention : sa modification n'en écrit pas. */
+function editsSilentMessage(evening: LiveEvening): boolean {
+  return Boolean(evening.discord_message_id) && Number(evening.silent) === 1;
+}
+
+/**
+ * Vrai si le bot a posté une suite (message pas du bot ou plus modifiable) : il
+ * rend un autre identifiant que celui à modifier, et la suite part sans mention.
+ */
+function isFollowUp(evening: LiveEvening, messageId: string | null): boolean {
+  return Boolean(evening.discord_message_id) && messageId !== null && messageId !== evening.discord_message_id;
+}
+
+/**
+ * Garde l'identifiant du message publié (ou de la suite qui le remplace), et
+ * s'il est parti sans mention. Le premier message gardé de la soirée fait
+ * partir la fenêtre de son envoi : des essais reportés (bot injoignable) ne
+ * l'ont pas raccourcie, et elle couvre les matchs programmés qu'il liste.
+ */
+async function rememberEveningMessage(
+  evening: LiveEvening,
+  messageId: string | null,
+  silent: boolean,
+): Promise<void> {
+  if (!messageId || messageId === evening.discord_message_id) return;
+  const window = !evening.discord_message_id ? `, ${WINDOW_RESTART}` : "";
+  try {
+    const db = await getDatabase();
+    await db.execute(`UPDATE bg_live_evenings SET discord_message_id = ?, silent = ?${window} WHERE id = ?`, [
+      messageId,
+      silent ? 1 : 0,
+      Number(evening.id),
+    ]);
+  } catch (error) {
+    // Le prochain match de la soirée partira dans un nouveau message.
+    console.error(`[live-announce] soirée ${Number(evening.id)} : identifiant du message non gardé`, error);
+  }
 }
 
 /** Vrai si le match est à l'antenne maintenant, lancement de l'affiche courante seulement. */
@@ -239,6 +503,14 @@ function announceKey(pairing: string): string {
   return first <= second ? `${first}:${second}` : `${second}:${first}`;
 }
 
+/** Filtre SQL des réservations d'un groupe (clé `(match_id, pairing)`), et ses paramètres. */
+function claimFilter(rows: readonly LiveCandidateRow[]): { sql: string; params: (number | string)[] } {
+  return {
+    sql: `(match_id, pairing) IN (${rows.map(() => "(?, ?)").join(", ")})`,
+    params: rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]),
+  };
+}
+
 /** Réserve l'annonce d'une affiche ; `false` si un autre passage l'a prise. */
 async function claimAnnouncement(matchId: number, pairing: string): Promise<boolean> {
   const db = await getDatabase();
@@ -259,9 +531,8 @@ async function claimAnnouncement(matchId: number, pairing: string): Promise<bool
 async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: string): Promise<boolean> {
   try {
     const db = await getDatabase();
-    const placeholders = rows.map(() => "(?, ?)").join(", ");
-    const params = rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]);
-    await db.execute(`DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (${placeholders})`, params);
+    const claims = claimFilter(rows);
+    await db.execute(`DELETE FROM bg_live_announcements WHERE ${claims.sql}`, claims.params);
     return true;
   } catch (error) {
     const lost = rows.length > 1 ? "annonces non réessayées" : "annonce non réessayée";
@@ -270,9 +541,26 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
   }
 }
 
-/** Matchs réservés d'un même tournoi, à l'antenne sur un même lien. */
+/**
+ * Date les réservations du groupe dans la soirée qui les publie : elles sont
+ * prises **avant** son ouverture (`started_at = NOW()`, à la seconde), parfois
+ * plusieurs secondes avant quand l'envoi d'un autre public passe d'abord. Plus
+ * anciennes qu'elle, elles ne compteraient pas parmi ses matchs annoncés : le
+ * match sortirait du message à la modification suivante, et après un envoi
+ * incertain la soirée se croirait sans annonce — une seconde notification.
+ */
+async function stampClaims(rows: readonly LiveCandidateRow[], startedAt: Date | string): Promise<void> {
+  const db = await getDatabase();
+  const claims = claimFilter(rows);
+  await db.execute(`UPDATE bg_live_announcements SET sent_at = GREATEST(sent_at, ?) WHERE ${claims.sql}`, [
+    startedAt,
+    ...claims.params,
+  ]);
+}
+
+/** Matchs réservés par un passage pour un même public (chaîne officielle ou non). */
 interface AnnouncementGroup {
-  url: string;
+  target: LiveMentionTarget;
   rows: LiveCandidateRow[];
 }
 
@@ -363,6 +651,8 @@ export function liveEntrantName(
  */
 const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
   rejected: "annonce refusée par le bot, abandonnée",
+  "evening-deleted":
+    "message de la soirée supprimé de #live : plus rien n'y est publié pour ce public jusqu'à la fin de la soirée (suppression respectée), annonce abandonnée",
   "discord-refused":
     "une règle AutoMod du serveur a bloqué l'annonce (détail au canal de logs du bot, ou dans ses journaux si la règle a bloqué aussi le signalement), abandonnée : le même message serait bloqué de nouveau",
   // L'envoi est terminé : ce que montre #live fait foi.
@@ -375,6 +665,9 @@ const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
   interrupted:
     "bot tombé avant sa réponse (connexion coupée, redémarrage ?), annonce peut-être publiée, non réessayée — vérifier #live",
 };
+
+/** Issues abandonnées où rien n'est parti (refus du bot ou d'AutoMod). */
+const REFUSED_OUTCOMES: ReadonlySet<LiveAnnouncementOutcome> = new Set(["rejected", "discord-refused"]);
 
 /** Cause pm2 d'un refus ou d'un silence de Discord rapporté par le bot. */
 const DISCORD_HELD_CAUSE =
@@ -408,15 +701,21 @@ const SHARED_POSTPONEMENTS: ReadonlySet<PostponedOutcome> = new Set<PostponedOut
 ]);
 
 /** Ce que les traces pm2 et le bot disent d'un groupe : ses matchs et son tournoi. */
-function describeGroup(group: AnnouncementGroup): { label: string; context: string; plural: boolean } {
-  const [first] = group.rows;
+function describeGroup(
+  group: AnnouncementGroup,
+  eveningId?: number,
+): { label: string; context: string; plural: boolean } {
   const ids = matchIdsOf(group);
+  // Un groupe réunit un public, donc parfois plusieurs tournois : tous sont nommés.
+  const tournaments = [...new Set(group.rows.map((row) => Number(row.tournament_id)))];
   const plural = ids.length > 1;
   const noun = plural ? "matchs" : "match";
+  const evening = eveningId === undefined ? "" : `soiree-${eveningId} `;
+  const tournamentNoun = tournaments.length > 1 ? "tournois" : "tournoi";
   return {
-    label: `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`,
+    label: `${noun} ${ids.join(", ")} (${tournamentNoun} ${tournaments.join(", ")})`,
     // Le tournoi en tête : le staff ouvre `/tournois/<id>` depuis le canal de logs.
-    context: `live-announce tournoi-${Number(first.tournament_id)} match-${contextIds(ids)}`,
+    context: `live-announce ${evening}tournoi-${contextIds(tournaments)} match-${contextIds(ids)}`,
     plural,
   };
 }
@@ -429,10 +728,10 @@ function describeGroup(group: AnnouncementGroup): { label: string; context: stri
  * pour les seuls matchs du groupe sinon : un refus qui peut tenir au message ne
  * retarde pas les autres tournois.
  */
-async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Promise<void> {
+async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome, eveningId?: number): Promise<void> {
   if (SHARED_POSTPONEMENTS.has(outcome)) postponeRetries();
   else holdGroup(group);
-  const { label, context, plural } = describeGroup(group);
+  const { label, context, plural } = describeGroup(group, eveningId);
   if (!(await releaseAnnouncements(group.rows, label))) return;
   const retry = plural
     ? "annonces reportées, réessayées tant que les matchs ont commencé depuis moins de deux heures"
@@ -446,44 +745,464 @@ async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Pr
  *
  * @returns Le nombre de matchs publiés, et l'issue si l'annonce est reportée.
  */
-async function announce(group: AnnouncementGroup): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
-  const [first] = group.rows;
-  // Un groupe qui compte une entrée individuelle est un tournoi individuel,
-  // même au type illisible : son invité sans compte ne part pas sous son nom.
-  const participantType = group.rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
-    ? "SOLO"
-    : first.participant_type;
-  // `withPseudo: false` : ce que le bot cite à son canal de logs si l'annonce
-  // échoue — le même texte, pseudos ôtés : l'exception vaut pour #live seulement.
+/**
+ * Matchs d'une soirée pour le public du groupe : les matchs réservés par ce
+ * passage (même si leur trace date d'avant l'ouverture de la soirée), puis
+ * ceux déjà annoncés ou programmés d'ici la fin de la fenêtre, sur une chaîne
+ * du même public.
+ */
+function eveningStreams(
+  group: AnnouncementGroup,
+  others: readonly LiveCandidateRow[],
+  now: number,
+): EveningStreamRow[] {
+  const seen = new Set<number>();
+  const streams: EveningStreamRow[] = [];
+  for (const row of [...group.rows, ...others]) {
+    const id = Number(row.id);
+    if (seen.has(id)) continue;
+    const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
+    if (!url || liveMentionTarget(url) !== group.target) continue;
+    seen.add(id);
+    const live = isOnAir(row, now);
+    const state = eveningRowState(row, live, now);
+    // Un match rouvert pour une autre affiche n'est plus lu (réservation de
+    // l'affiche courante seulement) ; un match revenu en attente n'y figure plus.
+    if (state === null) continue;
+    const at = streamTime(row, now);
+    streams.push(state === "finished" ? { row, url, live: false, at, finished: { score: finalScore(row) } } : { row, url, live, at });
+  }
+  return streams;
+}
+
+/** Un match de la soirée, prêt à rédiger. */
+interface EveningStreamRow {
+  row: LiveCandidateRow;
+  url: string;
+  live: boolean;
+  at: number;
+  finished?: { score: readonly [number, number] | null };
+}
+
+/**
+ * Place d'un match dans la soirée : à l'antenne ; programmé (`START_TIME` à
+ * venir) ; antenne fermée (`MANUAL`, pas encore joué) ; **terminé** — score
+ * rendu (`COMPLETED`, ou en attente de confirmation), il reste au message,
+ * marqué « Terminé » ; `null` sinon (revenu en attente, rouvert).
+ */
+function eveningRowState(
+  row: LiveCandidateRow,
+  live: boolean,
+  now: number,
+): "live" | "scheduled" | "paused" | "finished" | null {
+  if (live) return "live";
+  if (row.status === "COMPLETED" || row.status === "AWAITING_CONFIRMATION") return "finished";
+  const startsLater = (instant(row.start_at) ?? 0) > now;
+  if (row.live_trigger === "START_TIME" && (row.status === "PENDING" || row.status === "READY") && startsLater) {
+    return "scheduled";
+  }
+  // Antenne fermée (`MANUAL`) d'un match annoncé mais pas joué : coupure ou
+  // pause, rien ne dit qu'il est fini — listé à son heure, sans « En direct »
+  // ni « Terminé ». Un match `AUTO` sans lancement de l'affiche courante a été
+  // rouvert : il n'est plus listé, il reviendra à son prochain lancement.
+  return row.status === "READY" && row.live_trigger === "MANUAL" ? "paused" : null;
+}
+
+/**
+ * Score d'un match terminé, dans l'ordre de l'affiche ; `null` pour un forfait
+ * (aucun score joué), un score en attente de confirmation ou incomplet.
+ */
+function finalScore(row: LiveCandidateRow): readonly [number, number] | null {
+  if (row.status !== "COMPLETED" || row.forfeit_team_id != null || Number(row.double_forfeit) === 1) return null;
+  if (row.team1_score == null || row.team2_score == null) return null;
+  const first = Number(row.team1_score);
+  const second = Number(row.team2_score);
+  return Number.isInteger(first) && Number.isInteger(second) ? [first, second] : null;
+}
+
+/**
+ * Un engagé d'une ligne de soirée : un tournoi qui compte une entrée
+ * individuelle est un tournoi individuel, même au type illisible — son invité
+ * sans compte ne part pas sous son nom, y compris dans un match entre deux
+ * invités (`soloTournaments` : tournois dont un match lu en compte une).
+ */
+function eveningEntrant(
+  row: LiveCandidateRow,
+  side: 1 | 2,
+  withPseudo: boolean,
+  soloTournaments: ReadonlySet<number>,
+): string | null {
+  const participantType = soloTournaments.has(Number(row.tournament_id)) ? "SOLO" : row.participant_type;
+  if (side === 1) {
+    const pseudo = withPseudo ? row.team1_pseudo : null;
+    return liveEntrantName(row.team1_solo_user_id, row.team1_name, pseudo, participantType);
+  }
+  const pseudo = withPseudo ? row.team2_pseudo : null;
+  return liveEntrantName(row.team2_solo_user_id, row.team2_name, pseudo, participantType);
+}
+
+/**
+ * Soirée close (message supprimé de #live) : rien n'est publié, réservations
+ * gardées — le match n'est pas réessayé — et marquées refusées comme celles
+ * du groupe qui a fermé la soirée (non publiées, ce que dit l'export RGPD), et
+ * pm2 le dit, une fois par heure.
+ */
+async function skipClosedEvening(
+  group: AnnouncementGroup,
+  evening: LiveEvening,
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
+  await forgetEveningSend(evening, group.rows, false);
+  const { label, context } = describeGroup(group, Number(evening.id));
+  warnOnce(
+    `closed ${context}`,
+    `[live-announce] ${label} : soirée ${Number(evening.id)} close (message supprimé de #live), annonce non publiée`,
+  );
+  return { posted: 0, postponed: null };
+}
+
+/**
+ * Soirée illisible ou non marquable : la base est en cause, pas le bot — seul
+ * ce public attend (l'autre est essayé), ses réservations sont rendues, et pm2
+ * ne parle pas d'un bot injoignable.
+ */
+async function holdUnreadableEvening(
+  group: AnnouncementGroup,
+  error: unknown,
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
+  warnOnce(`evening ${group.target}`, `[live-announce] soirée ${group.target} illisible, annonce reportée`, error);
+  holdGroup(group);
+  await releaseAnnouncements(group.rows, describeGroup(group).label);
+  return { posted: 0, postponed: null };
+}
+
+/**
+ * Texte de la soirée (pseudos compris, pour #live) et sa version de logs
+ * (pseudos ôtés : ce que le bot cite à son canal de logs si l'annonce échoue —
+ * l'exception vaut pour #live seulement).
+ */
+function eveningTexts(
+  group: AnnouncementGroup,
+  others: readonly LiveCandidateRow[],
+  now: number,
+): { message: string; urls: string[]; logMessage: string } {
+  const streams = eveningStreams(group, others, now);
+  const soloTournaments = new Set(
+    [...group.rows, ...others]
+      .filter((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
+      .map((row) => Number(row.tournament_id)),
+  );
   const text = (withPseudo: boolean) =>
-    formatLiveAnnouncementGroup({
-      tournamentName: String(first.tournament_name),
-      pairings: group.rows.map((row) => ({
-        team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, withPseudo ? row.team1_pseudo : null, participantType),
-        team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, withPseudo ? row.team2_pseudo : null, participantType),
-      })),
-    });
-  const message = text(true);
-  const logMessage = text(false);
-  const { label, context, plural } = describeGroup(group);
-  const outcome = await pushLiveAnnouncement(message, group.url, context, ...(logMessage === message ? [] : [logMessage]));
+    formatLiveEvening(
+      streams.map(
+        ({ row, url, live, at, finished }): LiveEveningStream => ({
+          startsAt: at,
+          live,
+          ...(finished ? { finished } : {}),
+          tournamentName: String(row.tournament_name),
+          team1Name: eveningEntrant(row, 1, withPseudo, soloTournaments),
+          team2Name: eveningEntrant(row, 2, withPseudo, soloTournaments),
+          url,
+        }),
+      ),
+    );
+  const { text: message, urls } = text(true);
+  return { message, urls, logMessage: text(false).text };
+}
+
+/**
+ * Annonce un groupe réservé : ouvre ou reprend la soirée de son public, puis
+ * publie le message de la soirée (premier direct : notification) ou le modifie
+ * (matchs suivants : aucune nouvelle notification).
+ *
+ * @returns Le nombre de matchs publiés, et l'issue si l'annonce est reportée.
+ */
+async function announce(
+  group: AnnouncementGroup,
+  now: number,
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
+  let evening: LiveEvening;
+  let others: LiveCandidateRow[];
+  let notifying = false;
+  try {
+    evening = await openEvening(group.target);
+    // Message de la soirée supprimé : rien ne le republie, même sans pseudo —
+    // et rien n'est relu pour rien.
+    if (Number(evening.closed) === 1) return skipClosedEvening(group, evening);
+    await stampClaims(group.rows, evening.started_at);
+    others = await loadEveningMatches(evening);
+    // Premier message de la soirée : il notifie s'il prend la marque
+    // `notified` (avant l'envoi, en une instruction ; sans elle, une issue
+    // incertaine laisserait notifier deux fois). Soirée déjà marquée sans
+    // message connu (issue incertaine, bot trop ancien, identifiant non
+    // gardé) : son public a peut-être déjà été notifié — un nouveau message
+    // part, sans notification.
+    if (!evening.discord_message_id && Number(evening.notified) !== 1) {
+      notifying = await markEveningNotified(evening);
+    }
+  } catch (error) {
+    return holdUnreadableEvening(group, error);
+  }
+  const quiet = !evening.discord_message_id && !notifying;
+  const { message, urls, logMessage } = eveningTexts(group, others, now);
+  const { label, context, plural } = describeGroup(group, Number(evening.id));
+  const { outcome, messageId } = await pushLiveEvening({
+    message,
+    streamUrls: urls,
+    mention: group.target,
+    context,
+    ...(logMessage === message ? {} : { logMessage }),
+    ...(evening.discord_message_id ? { editMessageId: String(evening.discord_message_id) } : {}),
+    ...(quiet || editsSilentMessage(evening) ? { notify: false as const } : {}),
+  });
   if (outcome === "posted" || outcome === "posted-silent") {
+    await rememberEveningMessage(evening, messageId, quiet || outcome === "posted-silent" || isFollowUp(evening, messageId));
+    rememberEveningText(evening, message, urls);
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
-    const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner @everyone absente)" : "";
+    const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
-    console.info(`[live-announce] ${label} ${announced} dans #live${silent}`);
+    const how = howPosted(evening, quiet, messageId);
+    console.info(`[live-announce] ${label} ${announced} dans #live (soirée ${Number(evening.id)}, ${how})${silent}`);
     return { posted: group.rows.length, postponed: null };
   }
+  return settleUnposted(group, evening, outcome, notifying, label);
+}
+
+/**
+ * Issue d'une annonce qui n'est pas (sûrement) partie : abandonnée, ou
+ * reportée. Rien n'est parti après un refus ou un report : la soirée n'est
+ * alors plus tenue pour notifiée.
+ */
+async function settleUnposted(
+  group: AnnouncementGroup,
+  evening: LiveEvening,
+  outcome: LiveAnnouncementOutcome,
+  notifying: boolean,
+  label: string,
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
   const abandoned = ABANDONED_OUTCOMES[outcome];
   if (abandoned) {
     // Rien à renvoyer : refusé tel quel, ou peut-être déjà publié (un second
-    // `@everyone` serait pire qu'une annonce perdue). Réservations gardées.
+    // `@everyone` serait pire qu'une annonce perdue). Réservations gardées ;
+    // un refus (rien n'est parti) sort de la soirée.
+    if (REFUSED_OUTCOMES.has(outcome)) await forgetEveningSend(evening, group.rows, notifying);
+    if (outcome === "evening-deleted") await closeEvening(evening, group.rows);
     console.error(`[live-announce] ${label} : ${abandoned}`);
     return { posted: 0, postponed: null };
   }
   const postponed: PostponedOutcome = outcome in POSTPONED_CAUSES ? (outcome as PostponedOutcome) : "unavailable";
-  await postpone(group, postponed);
+  // Rien n'est parti : la soirée n'est pas notifiée (réservations rendues par le report).
+  if (notifying) await forgetEveningSend(evening, [], true);
+  await postpone(group, postponed, Number(evening.id));
   return { posted: 0, postponed };
+}
+
+/**
+ * Empreinte du dernier texte publié de chaque soirée (texte et liens), par
+ * processus : une mise à jour qui le rendrait à l'identique n'appelle pas le
+ * bot. Une empreinte, jamais le texte : la mémoire du serveur ne garde aucun
+ * pseudo au-delà de la soirée (le site ne garde que l'identifiant du message).
+ * Perdu au redémarrage — la mise à jour suivante modifie alors une fois pour
+ * rien, sans notifier.
+ */
+const lastEveningText = new Map<number, string>();
+
+/** Taille au-delà de laquelle les textes retenus sont oubliés (soirées finies). */
+const LAST_EVENING_TEXT_MAX = 50;
+
+/** Clé d'un texte de soirée : l'empreinte SHA-256 du texte et de ses liens. */
+export function eveningTextKey(message: string, urls: readonly string[]): string {
+  return createHash("sha256").update(`${message}\n${urls.join("\n")}`).digest("hex");
+}
+
+/** Retient le texte publié (ou modifié) d'une soirée. */
+function rememberEveningText(evening: LiveEvening, message: string, urls: readonly string[]): void {
+  if (lastEveningText.size >= LAST_EVENING_TEXT_MAX) lastEveningText.clear();
+  lastEveningText.set(Number(evening.id), eveningTextKey(message, urls));
+}
+
+/** Soirée ouverte qui a un message à tenir à jour. */
+interface RefreshableEvening extends LiveEvening {
+  target: LiveMentionTarget;
+  /** 1 : fenêtre finie (soirée encore mise à jour, ses matchs se terminant après). */
+  ended?: number | null;
+}
+
+/**
+ * Délai de regroupement des mises à jour de fin de match : la première fin de
+ * match programme **une** mise à jour une minute plus tard, et toutes celles
+ * de la minute la rejoignent — une ronde qui se termine d'un coup donne une
+ * modification par public, pas une par match.
+ */
+export const LIVE_EVENING_REFRESH_DELAY_MS = 60_000;
+
+/**
+ * Essais d'une mise à jour reportée (bot injoignable, Discord réticent), une
+ * minute d'écart, avant d'attendre l'évènement suivant : une demi-heure, qui
+ * couvre un redémarrage ou un déploiement du bot après la dernière fin de
+ * match de la soirée. Coupe-circuit ouvert : ni lecture ni appel au bot.
+ */
+export const LIVE_EVENING_REFRESH_MAX_RETRIES = 30;
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let refreshRetries = 0;
+
+/** Programme la mise à jour au terme du délai, si aucune ne l'est déjà. */
+function scheduleRefresh(): void {
+  if (refreshTimer) return;
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    void exclusive(() => refreshLiveEvenings()).catch((error: unknown) => {
+      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", error);
+      retryRefresh();
+    });
+  }, LIVE_EVENING_REFRESH_DELAY_MS);
+  refreshTimer.unref?.();
+}
+
+/** Relance une mise à jour reportée, {@link LIVE_EVENING_REFRESH_MAX_RETRIES} fois au plus depuis la dernière fin de match. */
+function retryRefresh(): void {
+  if (refreshRetries >= LIVE_EVENING_REFRESH_MAX_RETRIES) return;
+  refreshRetries += 1;
+  scheduleRefresh();
+}
+
+/**
+ * Demande la mise à jour des soirées ouvertes après une fin de match (score
+ * rendu ou arbitré, antenne fermée) : regroupée sur
+ * {@link LIVE_EVENING_REFRESH_DELAY_MS}, jamais attendue, rien si les annonces
+ * sont désactivées. Ne lit rien : la lecture vient au terme du délai.
+ */
+export function requestLiveEveningRefresh(): void {
+  if (!liveAnnouncementsEnabled()) return;
+  // Une nouvelle fin de match rend ses essais à la mise à jour.
+  refreshRetries = 0;
+  scheduleRefresh();
+}
+
+/**
+ * Remet à jour le message de chaque soirée ouverte (fenêtre en cours, message
+ * gardé, non close) : un match fini y passe « Terminé » avec son score. Une
+ * **modification** seulement — jamais de notification, mention gardée telle
+ * que le message l'a publiée (`silent`) — et seulement si le texte change.
+ * Une soirée dont la fenêtre est finie depuis moins de
+ * {@link LIVE_EVENING_WINDOW_HOURS} heures reste mise à jour (un match lancé
+ * en fin de fenêtre se termine souvent après), mais seulement si ce processus
+ * a publié son texte : après un redémarrage, rien ne dit ce qui y manque, et
+ * une modification pour rien d'un vieux message pourrait poster une suite.
+ *
+ * @param now Instant de référence, injectable pour les tests.
+ * @returns Le nombre de messages modifiés.
+ */
+export async function refreshLiveEvenings(now: number = Date.now()): Promise<number> {
+  if (!liveAnnouncementsEnabled()) return 0;
+  // Bot en panne : rien ne pourrait partir, rien n'est lu — la mise à jour
+  // est relancée, la fin de match n'est pas perdue.
+  if (isBotCircuitOpen()) {
+    retryRefresh();
+    return 0;
+  }
+  const db = await getDatabase();
+  const [evenings] = await db.query<RefreshableEvening[]>(
+    `SELECT id, target, started_at, window_end, discord_message_id, silent, notified, closed,
+            window_end <= NOW() AS ended FROM bg_live_evenings
+      WHERE window_end > NOW() - INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR AND closed = 0 AND discord_message_id IS NOT NULL
+      ORDER BY id`,
+  );
+  let edited = 0;
+  let retry = false;
+  for (const evening of evenings) {
+    const result = await refreshListedEvening(evening, now);
+    if (result === "edited") edited += 1;
+    if (result === "retry" || result === "shared-retry") retry = true;
+    // Bot ou salon en cause : l'autre public essuierait le même refus.
+    if (result === "shared-retry") break;
+  }
+  if (retry) retryRefresh();
+  return edited;
+}
+
+/** Issue de la mise à jour d'une soirée. */
+type RefreshResult = "edited" | "unchanged" | "retry" | "shared-retry" | "dropped";
+
+/** Met à jour une soirée lue par {@link refreshLiveEvenings}, ou la laisse. */
+async function refreshListedEvening(evening: RefreshableEvening, now: number): Promise<RefreshResult> {
+  // Soirée finie dont ce processus n'a pas publié le texte : rien à corriger de sûr.
+  if (Number(evening.ended) === 1 && !lastEveningText.has(Number(evening.id))) return "unchanged";
+  // Soirée en pause (refus de Discord, base illisible) : relancée plus tard.
+  if (isHeld(evening.target)) return "retry";
+  try {
+    return await refreshEvening(evening, now);
+  } catch (error) {
+    // Une soirée illisible n'empêche pas l'autre public d'être mis à jour.
+    warnOnce(`refresh read ${Number(evening.id)}`, `[live-announce] soirée ${Number(evening.id)} illisible, mise à jour reportée`, error);
+    return "retry";
+  }
+}
+
+/** Remet à jour une soirée ; `retry` si l'envoi est reporté (rien n'est parti). */
+async function refreshEvening(evening: RefreshableEvening, now: number): Promise<RefreshResult> {
+  const group: AnnouncementGroup = { target: evening.target, rows: [] };
+  const others = await loadEveningMatches(evening);
+  const { message, urls, logMessage } = eveningTexts(group, others, now);
+  // Plus aucun match lisible (tournoi supprimé) : le message reste tel quel.
+  if (urls.length === 0) return "unchanged";
+  if (lastEveningText.get(Number(evening.id)) === eveningTextKey(message, urls)) return "unchanged";
+  const listed: AnnouncementGroup = {
+    target: evening.target,
+    rows: eveningStreams(group, others, now).map(({ row }) => row),
+  };
+  const { label, context } = describeGroup(listed, Number(evening.id));
+  const { outcome, messageId } = await pushLiveEvening({
+    message,
+    streamUrls: urls,
+    mention: evening.target,
+    context: context.replace(/^live-announce /, "live-refresh "),
+    ...(logMessage === message ? {} : { logMessage }),
+    editMessageId: String(evening.discord_message_id),
+    ...(editsSilentMessage(evening) ? { notify: false as const } : {}),
+    refresh: true,
+  });
+  if (outcome === "posted" || outcome === "posted-silent") {
+    // Suite (message plus modifiable) : sans mention, son identifiant remplace l'ancien.
+    await rememberEveningMessage(evening, messageId, editsSilentMessage(evening) || isFollowUp(evening, messageId));
+    rememberEveningText(evening, message, urls);
+    console.info(`[live-announce] soirée ${Number(evening.id)} mise à jour dans #live (${label}, fins de match)`);
+    return "edited";
+  }
+  if (outcome === "evening-deleted") {
+    await closeEvening(evening, []);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : message supprimé de #live, soirée close`);
+    return "dropped";
+  }
+  if (outcome in ABANDONED_OUTCOMES) {
+    // Refusé (bot, AutoMod) : le même texte n'est pas renvoyé — il le serait
+    // de nouveau. Peut-être parti (`uncertain`, `timed-out`, `interrupted`) :
+    // pas retenu, la mise à jour suivante le renvoie — une modification ne
+    // notifie jamais, et une soirée finie n'aurait sinon plus de quoi se corriger.
+    if (REFUSED_OUTCOMES.has(outcome)) rememberEveningText(evening, message, urls);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : mise à jour non confirmée (${outcome}), non réessayée tout de suite`);
+    return "dropped";
+  }
+  const postponed: PostponedOutcome = outcome in POSTPONED_CAUSES ? (outcome as PostponedOutcome) : "unavailable";
+  warnOnce(
+    `refresh ${postponed} ${Number(evening.id)}`,
+    `[live-announce] soirée ${Number(evening.id)} : mise à jour reportée (${POSTPONED_CAUSES[postponed] ?? POSTPONED_CAUSES.unavailable})`,
+  );
+  return SHARED_POSTPONEMENTS.has(postponed) ? "shared-retry" : "retry";
+}
+
+/**
+ * File unique des envois de soirée : un balayage et une mise à jour ne
+ * rédigent jamais en même temps — la seconde relit la base après le premier,
+ * sans quoi une mise à jour lue avant une annonce effacerait son match.
+ */
+let eveningQueue: Promise<unknown> = Promise.resolve();
+
+/** Exécute `task` après les envois de soirée en cours. */
+function exclusive<T>(task: () => Promise<T>): Promise<T> {
+  const run = eveningQueue.then(task, task);
+  eveningQueue = run.catch(() => undefined);
+  return run;
 }
 
 /**
@@ -527,18 +1246,18 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
       );
       continue;
     }
-    const key = groupKey(Number(row.tournament_id), url);
-    // Diffusion refusée par Discord il y a moins d'une minute : elle attend,
-    // et tout match qui la rejoint attend avec elle (un seul `@everyone`).
-    if (isHeld(key)) continue;
+    const target = liveMentionTarget(url);
+    // Soirée refusée par Discord il y a moins d'une minute : elle attend, et
+    // tout match qui la rejoint attend avec elle (une seule notification).
+    if (isHeld(target)) continue;
     // Bot en panne : ne rien réserver qu'on sait ne pas pouvoir envoyer.
     if (isBotCircuitOpen()) break;
     if (!(await tryClaim(row))) continue;
-    const group = groups.get(key);
+    const group = groups.get(target);
     if (group) group.rows.push(row);
-    else groups.set(key, { url, rows: [row] });
+    else groups.set(target, { target, rows: [row] });
   }
-  return announceGroups(groups.values());
+  return announceGroups(groups.values(), now);
 }
 
 
@@ -549,7 +1268,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
  *
  * @returns Le nombre de matchs publiés.
  */
-async function announceGroups(groups: Iterable<AnnouncementGroup>): Promise<number> {
+async function announceGroups(groups: Iterable<AnnouncementGroup>, now: number): Promise<number> {
   let posted = 0;
   let postponed: PostponedOutcome | null = null;
   for (const group of groups) {
@@ -557,7 +1276,7 @@ async function announceGroups(groups: Iterable<AnnouncementGroup>): Promise<numb
       await postpone(group, postponed);
       continue;
     }
-    const result = await announce(group);
+    const result = await announce(group, now);
     posted += result.posted;
     if (result.postponed && SHARED_POSTPONEMENTS.has(result.postponed)) postponed = result.postponed;
   }
@@ -578,29 +1297,24 @@ export const LIVE_ANNOUNCE_RETRY_DELAY_MS = 60_000;
 let retryNotBefore = 0;
 
 /**
- * Diffusions (tournoi et lien) dont l'annonce a été refusée par Discord, et
- * l'instant de leur prochain essai. Par diffusion et non par match : un match
- * lancé pendant la pause sur la même chaîne attend avec les autres, et tous
- * partent en un seul message.
+ * Publics (`everyone`, `stream-viewer`) dont l'annonce de soirée a été refusée
+ * par Discord, ou dont la soirée est illisible, et l'instant de leur prochain
+ * essai. Par public et non par match : un match de ce public lancé pendant la
+ * pause attend avec les autres, et tous partent dans le message de la soirée.
  */
 const heldUntil = new Map<string, number>();
 
-/** Clé d'une diffusion : un message par tournoi et par lien. */
-function groupKey(tournamentId: number, url: string): string {
-  return `${tournamentId} ${url}`;
-}
-
-/** Met en pause la seule diffusion d'un groupe refusé. */
+/** Met en pause la seule soirée (le public) d'un groupe refusé. */
 function holdGroup(group: AnnouncementGroup): void {
   const now = Date.now();
-  // Une diffusion terminée n'est plus relue : sa pause échue s'oublie ici.
+  // Une pause échue s'oublie ici.
   for (const [key, at] of heldUntil) if (at <= now) heldUntil.delete(key);
-  heldUntil.set(groupKey(Number(group.rows[0].tournament_id), group.url), now + LIVE_ANNOUNCE_RETRY_DELAY_MS);
+  heldUntil.set(group.target, now + LIVE_ANNOUNCE_RETRY_DELAY_MS);
   scheduleTrailingSweep(LIVE_ANNOUNCE_RETRY_DELAY_MS);
 }
 
 /**
- * Vrai si la diffusion attend encore son prochain essai : la relève est alors
+ * Vrai si le public attend encore son prochain essai : la relève est alors
  * programmée à son terme, pour qu'il ne dépende pas d'un prochain évènement.
  * Oublie une pause échue.
  */
@@ -625,6 +1339,35 @@ function postponeRetries(): void {
 
 let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
+
+/** Délai entre deux purges des soirées finies, par processus. */
+const EVENING_PURGE_INTERVAL_MS = 60 * 60 * 1000;
+
+let lastEveningPurgeAt = 0;
+
+/** Délai avant de retenter une purge échouée (base en panne, table absente). */
+const EVENING_PURGE_RETRY_MS = 5 * 60 * 1000;
+
+/**
+ * Efface les soirées finies depuis un jour (`bg_live_evenings`), comme
+ * l'annoncent la page RGPD et le registre — au plus une fois par heure, à
+ * chaque évènement qui appelle {@link dispatchLiveAnnouncements}, annonces
+ * activées ou non : sans annonce pendant des semaines, une soirée ne reste pas
+ * des semaines. L'essai est noté **avant** la requête (deux appels proches
+ * n'en lancent qu'une) ; un échec se retente cinq minutes plus tard, pas à
+ * chaque lecture de page.
+ */
+export async function purgeEndedEvenings(now: number = Date.now()): Promise<void> {
+  if (now - lastEveningPurgeAt < EVENING_PURGE_INTERVAL_MS) return;
+  lastEveningPurgeAt = now;
+  try {
+    const db = await getDatabase();
+    await db.execute(`DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY`);
+  } catch (error) {
+    lastEveningPurgeAt = now - EVENING_PURGE_INTERVAL_MS + EVENING_PURGE_RETRY_MS;
+    throw error;
+  }
+}
 let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 /** Instant visé par `trailingTimer`. */
 let trailingAt = 0;
@@ -666,6 +1409,9 @@ function rearmPendingRetries(): void {
  * @returns Le nombre d'annonces publiées (0 si étranglé ou désactivé).
  */
 export async function dispatchLiveAnnouncements(): Promise<number> {
+  purgeEndedEvenings().catch((error: unknown) => {
+    if (!isMissingTableError(error)) console.error("[live-announce] purge des soirées finies impossible", error);
+  });
   if (!liveAnnouncementsEnabled()) {
     // En production, une variable oubliée au déploiement se lit dans pm2.
     if (process.env.NODE_ENV === "production" && !disabledNoticeShown) {
@@ -691,7 +1437,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
     scheduleTrailingSweep(LIVE_ANNOUNCE_THROTTLE_MS - sinceLast);
     return 0;
   }
-  pendingSweep = runLiveAnnouncementSweep().catch((error: unknown) => {
+  pendingSweep = exclusive(() => runLiveAnnouncementSweep()).catch((error: unknown) => {
     if (!isMissingTableError(error)) console.error("[live-announce] balayage en échec", error);
     return 0;
   });
@@ -706,10 +1452,16 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetLiveAnnouncementThrottle(): void {
   lastSweepAt = 0;
+  lastEveningPurgeAt = 0;
   retryNotBefore = 0;
   disabledNoticeShown = false;
   heldUntil.clear();
   lastWarnAt.clear();
+  lastEveningText.clear();
+  refreshRetries = 0;
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = null;
+  eveningQueue = Promise.resolve();
   pendingSweep = null;
   if (trailingTimer) clearTimeout(trailingTimer);
   trailingTimer = null;

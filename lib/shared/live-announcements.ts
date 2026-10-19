@@ -176,3 +176,189 @@ function announceable(url: string | null): string | null {
   if (REDIRECT_PATHS.test(path.replace(/[\\/]+/g, "/"))) return null;
   return EMBEDDED_ADDRESS.test(path) || EMBEDDED_ADDRESS.test(rest) ? null : url;
 }
+
+/**
+ * Chaîne officielle BlueGenji : seule une diffusion sur elle notifie tout le
+ * serveur (`@everyone`) ; toute autre chaîne notifie le seul rôle StreamViewer
+ * (mention posée par le bot, `STREAM_VIEWER_ROLE_ID` côté bot).
+ */
+export const OFFICIAL_LIVE_CHANNEL_URL = "https://www.twitch.tv/bluegenjiesport";
+
+/** Public notifié par une annonce de soirée. */
+export type LiveMentionTarget = "everyone" | "stream-viewer";
+
+/**
+ * Chemin sans ses barres finales — boucle plutôt qu'une expression `/\/+$/`,
+ * dont le retour arrière est quadratique sur un chemin fait de barres
+ * (SonarCloud S8786).
+ */
+function trimTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path.charCodeAt(end - 1) === 47 /* "/" */) end -= 1;
+  return path.slice(0, end);
+}
+
+/** Hôte sans `www.` ni `m.`, chemin sans barre finale, le tout en minuscules. */
+function channelKey(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/^(www|m)\./, "");
+    const path = trimTrailingSlashes(parsed.pathname.toLowerCase());
+    return `${host}${path}`;
+  } catch {
+    return null;
+  }
+}
+
+const OFFICIAL_CHANNEL_KEY = channelKey(OFFICIAL_LIVE_CHANNEL_URL);
+
+/**
+ * Public d'une diffusion : `everyone` pour la chaîne officielle (hôte et chemin
+ * comparés sans casse, `www.`/`m.` et barre finale ignorés, requête ignorée),
+ * `stream-viewer` pour toute autre.
+ */
+export function liveMentionTarget(url: string): LiveMentionTarget {
+  return channelKey(url) === OFFICIAL_CHANNEL_KEY ? "everyone" : "stream-viewer";
+}
+
+/**
+ * Durée d'une **soirée** d'annonces, en heures, comptée depuis le premier
+ * direct annoncé : tout match qui passe à l'antenne dans cette fenêtre, pour
+ * le même public, rejoint le message de la soirée (modifié, sans nouvelle
+ * notification) au lieu d'en poster un autre. Quatre heures couvrent une
+ * soirée de tournoi (19 h – 23 h) sans fondre deux soirées en une.
+ */
+export const LIVE_EVENING_WINDOW_HOURS = 4;
+
+/** Nombre maximal de liens distincts d'une annonce de soirée (plafond du bot). */
+export const LIVE_EVENING_MAX_LINKS = 10;
+
+/** Un match de la soirée : à l'antenne, ou programmé dans la fenêtre. */
+export interface LiveEveningStream {
+  /** Heure de passage à l'antenne (ou heure prévue), en millisecondes Unix. */
+  startsAt: number;
+  /** `true` : à l'antenne maintenant. */
+  live: boolean;
+  /**
+   * Match annoncé dans la soirée puis terminé (score rendu, ou antenne
+   * fermée) : il reste au message, marqué « Terminé ». Absent : à l'antenne
+   * ou programmé.
+   */
+  finished?: {
+    /** Score dans l'ordre de l'affiche (`[2, 1]` : « 2-1 ») ; `null` sans score (forfait, en attente). */
+    score: readonly [number, number] | null;
+  };
+  tournamentName: string;
+  team1Name: string | null;
+  team2Name: string | null;
+  /** Lien validé de la diffusion. */
+  url: string;
+}
+
+/** Texte d'une soirée et ses liens, placés par les jetons `{{lien:N}}`. */
+export interface LiveEveningText {
+  text: string;
+  urls: string[];
+}
+
+const PARIS_TIME = new Intl.DateTimeFormat("fr-FR", {
+  timeZone: "Europe/Paris",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** « 21:05 », heure de Paris. */
+export function parisClock(at: number): string {
+  const parts = PARIS_TIME.formatToParts(new Date(at));
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return `${hour}:${minute}`;
+}
+
+/** En-tête d'une annonce de soirée. */
+const EVENING_HEADER = "🔴 **Les lives de la soirée**";
+
+/**
+ * Un nom ne forge pas de jeton de lien (`{{lien:N}}`, remplacé par le bot) :
+ * une espace de largeur nulle suit **chaque** accolade suivie d'une autre —
+ * remplacer les paires seulement laisserait `{{{lien:1}}` devenir
+ * `{U+200B{{lien:1}}`, qui en contient encore un.
+ */
+function noLinkTokens(text: string): string {
+  return text.replace(/\{(?=\{)/g, "{​");
+}
+
+/**
+ * Début de ligne qu'un nom ferait lire comme une liste numérotée (`1. `,
+ * `2) `) : l'affiche commence une ligne, et Discord renumérote et décale la
+ * ligne — `discordInline` n'échappe que le balisage en ligne.
+ */
+const ORDERED_LIST_START = /^(\d+)([.)])/;
+
+/** État d'un bloc après l'heure : « · En direct », « · Terminé · 2-1 », « · Terminé », ou rien (programmé). */
+function eveningState(stream: LiveEveningStream): string {
+  if (stream.finished) {
+    const score = stream.finished.score;
+    return score ? ` · Terminé · ${score[0]}-${score[1]}` : " · Terminé";
+  }
+  return stream.live ? " · En direct" : "";
+}
+
+/** Rang d'un bloc : à l'antenne, puis programmé, puis terminé. */
+function eveningRank(stream: LiveEveningStream): number {
+  if (stream.finished) return 2;
+  return stream.live ? 0 : 1;
+}
+
+/** Bloc d'un match, sans son jeton de lien : heure (et son état), affiche et tournoi. */
+function eveningBlock(stream: LiveEveningStream): string {
+  const when = `**${parisClock(stream.startsAt)}**${eveningState(stream)}`;
+  const pairing = pairingLine(publishableName(stream.team1Name), publishableName(stream.team2Name)).replace(
+    ORDERED_LIST_START,
+    (_match, digits: string, mark: string) => `${digits}\\${mark}`,
+  );
+  return noLinkTokens(`\n\n${when}\n${pairing} — ${discordInline(stream.tournamentName)}\n`);
+}
+
+/** Dernière ligne d'une soirée trop longue. */
+function eveningRest(count: number): string {
+  return `\n\n… et ${otherMatches(count)} ce soir`;
+}
+
+/**
+ * Texte d'une annonce de soirée, sans la mention (ajoutée par le bot) :
+ * l'en-tête, puis un bloc par match — l'heure en gras (Paris) et « En direct »
+ * pour un match à l'antenne, l'affiche et le tournoi, le lien seul sur sa
+ * ligne — séparés par une ligne vide. Les matchs à l'antenne d'abord, puis les
+ * programmés par heure, puis les terminés (« · Terminé · 2-1 », « · Terminé »
+ * sans score) par heure : une soirée trop longue perd ses matchs finis avant
+ * ceux à venir. Au-delà de {@link LIVE_ANNOUNCEMENT_MAX_LENGTH} (liens
+ * comptés en entier) ou de {@link LIVE_EVENING_MAX_LINKS} liens, la liste
+ * s'arrête **à la fin d'un bloc** et une dernière ligne compte le reste.
+ *
+ * @param streams Les matchs de la soirée (au moins un).
+ * @returns Le texte, avec ses jetons de lien, et les liens dans l'ordre des jetons.
+ */
+export function formatLiveEvening(streams: readonly LiveEveningStream[]): LiveEveningText {
+  const ordered = [...streams].sort((a, b) => eveningRank(a) - eveningRank(b) || a.startsAt - b.startsAt);
+  const urls: string[] = [];
+  let text = EVENING_HEADER;
+  let realLength = text.length;
+  let shown = 0;
+  for (const stream of ordered) {
+    const known = urls.indexOf(stream.url);
+    if (known < 0 && urls.length >= LIVE_EVENING_MAX_LINKS) break;
+    const body = eveningBlock(stream);
+    const rest = ordered.length - shown - 1;
+    const tail = rest > 0 ? eveningRest(rest).length : 0;
+    // Au moins un bloc : l'annonce dit toujours quelque chose.
+    if (shown > 0 && realLength + body.length + stream.url.length + tail > LIVE_ANNOUNCEMENT_MAX_LENGTH) break;
+    if (known < 0) urls.push(stream.url);
+    text += `${body}{{lien:${known < 0 ? urls.length : known + 1}}}`;
+    realLength += body.length + stream.url.length;
+    shown += 1;
+  }
+  if (shown < ordered.length) text += eveningRest(ordered.length - shown);
+  return { text, urls };
+}

@@ -7,6 +7,7 @@ import type {
   SiteVisitStats,
 } from "@/lib/shared/types";
 import { normalizeBotServersPayload, normalizeBotStats } from "@/lib/shared/bot-message-window";
+import type { LiveMentionTarget } from "@/lib/shared/live-announcements";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
 const DEFAULT_BOT_INTERNAL_PORT = "4400";
@@ -631,6 +632,7 @@ export type LiveAnnouncementOutcome =
   | "discord-held"
   | "discord-unreachable"
   | "discord-refused"
+  | "evening-deleted"
   | "uncertain"
   | "timed-out"
   | "interrupted"
@@ -651,7 +653,15 @@ const DISCORD_REFUSED_REASONS = new Set(["automod"]);
 async function classifyUnavailable(
   response: Response,
 ): Promise<
-  "channel-closed" | "discord-held" | "discord-unreachable" | "discord-refused" | "uncertain" | "timed-out" | "unauthorized" | "unavailable"
+  | "channel-closed"
+  | "discord-held"
+  | "discord-unreachable"
+  | "discord-refused"
+  | "evening-deleted"
+  | "uncertain"
+  | "timed-out"
+  | "unauthorized"
+  | "unavailable"
 > {
   let body: { error?: unknown; reason?: unknown } | null;
   try {
@@ -671,6 +681,9 @@ async function classifyUnavailable(
   // Bloqué par AutoMod : le renvoyer tel quel serait bloqué de nouveau, et
   // chaque essai alerterait la modération.
   if (DISCORD_REFUSED_REASONS.has(reason)) return "discord-refused";
+  // Message de la soirée supprimé de #live (souvent sur demande) : le bot ne
+  // le republie pas, la soirée de ce public se ferme.
+  if (reason === "message-deleted") return "evening-deleted";
   // Discord muet en lisant le salon : la panne vaut pour tout envoi.
   if (reason === "discord-unreachable") return "discord-unreachable";
   return "discord-held";
@@ -717,14 +730,64 @@ async function discardBody(response: Response): Promise<void> {
   }
 }
 
-/** Lit `mentionEveryone` du bilan du bot ; un corps illisible vaut une mention faite. */
-async function announcedWithoutMention(response: Response): Promise<boolean> {
+/** Identifiant de message Discord (snowflake) rendu par le bot. */
+const DISCORD_MESSAGE_ID = /^\d{17,20}$/;
+
+/**
+ * Lit le bilan du bot : `mentionEveryone` (un corps illisible vaut une mention
+ * faite) et l'identifiant du message publié ou modifié (`null` : bot d'une
+ * version sans annonces de soirée, ou corps illisible).
+ */
+async function readAnnounceReport(response: Response): Promise<{ silent: boolean; messageId: string | null }> {
   try {
-    const body = (await response.json()) as { mentionEveryone?: unknown } | null;
-    return body?.mentionEveryone === false;
+    const body = (await response.json()) as { mentionEveryone?: unknown; messageId?: unknown } | null;
+    const messageId = typeof body?.messageId === "string" && DISCORD_MESSAGE_ID.test(body.messageId) ? body.messageId : null;
+    return { silent: body?.mentionEveryone === false, messageId };
   } catch {
-    return false;
+    return { silent: false, messageId: null };
   }
+}
+
+/** Corps d'une annonce de soirée (`POST /internal/announce/live`). */
+export interface LiveEveningPush {
+  /** Texte de `formatLiveEvening`, jetons `{{lien:N}}` compris. */
+  message: string;
+  /** Liens des jetons, dans l'ordre ; le premier est aussi `streamUrl`. */
+  streamUrls: string[];
+  /** Public : `everyone` (chaîne officielle) ou `stream-viewer`. */
+  mention: LiveMentionTarget;
+  context: string;
+  /** Version sans pseudo, citée au canal de logs ; omise si identique. */
+  logMessage?: string;
+  /** Message de la soirée déjà publié : le bot le modifie, sans notifier. */
+  editMessageId?: string;
+  /**
+   * `false` : nouveau message sans mention ni notification (soirée dont le
+   * public a peut-être déjà été notifié, sans message connu à modifier).
+   */
+  notify?: false;
+  /**
+   * `true` : simple mise à jour (fins de match) d'un message déjà publié,
+   * avec `editMessageId` — le bot n'invite pas le staff à la poster à la main
+   * si elle échoue. Un bot plus ancien ignore le champ.
+   */
+  refresh?: true;
+}
+
+/** Issue d'une annonce de soirée, et l'identifiant du message publié ou modifié. */
+export interface LiveEveningPushResult {
+  outcome: LiveAnnouncementOutcome;
+  messageId: string | null;
+}
+
+/**
+ * Demande au bot de publier — ou de modifier — l'annonce d'une soirée dans
+ * #live. Mêmes issues que {@link pushLiveAnnouncement}, plus l'identifiant du
+ * message, gardé par le site pour les modifications suivantes.
+ */
+export async function pushLiveEvening(request: LiveEveningPush): Promise<LiveEveningPushResult> {
+  const { streamUrls, ...rest } = request;
+  return postLiveAnnouncement({ ...rest, streamUrl: streamUrls[0], streamUrls });
 }
 
 /**
@@ -748,7 +811,17 @@ export async function pushLiveAnnouncement(
   context: string,
   logMessage?: string,
 ): Promise<LiveAnnouncementOutcome> {
-  if (isCircuitOpen()) return "unavailable";
+  const body = logMessage === undefined ? { message, streamUrl, context } : { message, streamUrl, context, logMessage };
+  return (await postLiveAnnouncement(body)).outcome;
+}
+
+/** Envoi commun des annonces : issue classée et identifiant du message. */
+async function postLiveAnnouncement(body: Record<string, unknown>): Promise<LiveEveningPushResult> {
+  const outcome = (value: LiveAnnouncementOutcome, messageId: string | null = null): LiveEveningPushResult => ({
+    outcome: value,
+    messageId,
+  });
+  if (isCircuitOpen()) return outcome("unavailable");
 
   const baseUrl = resolveBotInternalUrl();
   try {
@@ -758,48 +831,49 @@ export async function pushLiveAnnouncement(
         "content-type": "application/json",
         ...getInternalHeaders(),
       },
-      body: JSON.stringify(logMessage === undefined ? { message, streamUrl, context } : { message, streamUrl, context, logMessage }),
+      body: JSON.stringify(body),
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_NOTIFY_FETCH_TIMEOUT_MS),
     });
     if (response.ok) {
       recordSuccess();
-      return (await announcedWithoutMention(response)) ? "posted-silent" : "posted";
+      const report = await readAnnounceReport(response);
+      return outcome(report.silent ? "posted-silent" : "posted", report.messageId);
     }
     // Un refus du corps n'est pas une panne du bot : il a répondu.
     if (response.status === 400) {
       recordSuccess();
       await discardBody(response);
-      return "rejected";
+      return outcome("rejected");
     }
     // Un bot d'une version antérieure ne connaît pas la route, ou le salon
     // #live lui est fermé (`503`, permission retirée) : il a répondu, le
     // coupe-circuit n'a pas à s'ouvrir — il suspendrait les rappels et alertes
     // de fond pour un réglage de salon ; l'annonce attendra.
-    if (response.status === 503) return classifyUnavailable(response);
+    if (response.status === 503) return outcome(await classifyUnavailable(response));
     // Jeton interne refusé : une configuration à corriger, pas un bot en
     // panne — le coupe-circuit des autres appels n'a pas à s'ouvrir.
     if (response.status === 401) {
       await discardBody(response);
-      return "unauthorized";
+      return outcome("unauthorized");
     }
     // Corps non lu : le relâcher rend la connexion au pool, au lieu de la
     // laisser occupée jusqu'au ramasse-miettes à chaque nouvel essai.
     await discardBody(response);
-    if (response.status === 404) return "unavailable";
+    if (response.status === 404) return outcome("unavailable");
     recordFailure();
     // Un `500` du bot (`LIVE_ANNOUNCEMENT_FAILED`) naît avant l'envoi : toute
     // erreur de l'envoi lui-même revient en `503` classé (`discord-down`…).
-    return "unavailable";
+    return outcome("unavailable");
   } catch (error) {
     // Le délai écoulé ne dit pas que rien n'est parti : la requête a pu
     // atteindre le bot, qui publie encore (Discord lent ou limitant #live). Il
     // n'est pas compté comme une panne : quelques envois lents dans un salon ne
     // doivent pas suspendre les rappels et alertes de fond.
-    if (isTimeoutError(error)) return "timed-out";
+    if (isTimeoutError(error)) return outcome("timed-out");
     recordFailure();
     // Connexion coupée en route (bot redémarré par un déploiement après son
     // envoi, avant sa réponse) : l'annonce a pu partir.
-    return failedBeforeSending(error) ? "unavailable" : "interrupted";
+    return outcome(failedBeforeSending(error) ? "unavailable" : "interrupted");
   }
 }

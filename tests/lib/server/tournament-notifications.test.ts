@@ -43,6 +43,17 @@ jest.mock("@/lib/server/live", () => ({
   publishTournamentEvent: (event: unknown) => publishEvent(event),
 }));
 
+const requestEveningRefresh = jest.fn();
+
+jest.mock("@/lib/server/tournaments/live-announcements", () => ({
+  dispatchLiveAnnouncements: async () => 0,
+  requestLiveEveningRefresh: () => requestEveningRefresh(),
+}));
+
+jest.mock("@/lib/server/tournaments/player-pushes", () => ({
+  dispatchMatchStartNotices: async () => 0,
+}));
+
 import {
   publishMatchUpdatedEvent,
   publishScoreReportedEvent,
@@ -197,5 +208,18 @@ describe("notifications — événements publiés", () => {
     publishUpdatedEvent(7);
     const event = publishEvent.mock.calls[0][0] as { emittedAt: string };
     expect(Number.isNaN(Date.parse(event.emittedAt))).toBe(false);
+  });
+});
+
+describe("notifications — message #live de la soirée", () => {
+  it("chaque fin de match possible (score rendu ou arbitré, match ou tournoi changé) demande sa mise à jour", async () => {
+    requestEveningRefresh.mockReset();
+    publishScoreReportedEvent(7, 3);
+    publishScoreResolvedEvent(7, 3);
+    publishMatchUpdatedEvent(7, { landingLive: true });
+    publishUpdatedEvent(7);
+    // Import dynamique : la demande part au tour suivant, jamais attendue par l'écriture.
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(requestEveningRefresh).toHaveBeenCalledTimes(4);
   });
 });

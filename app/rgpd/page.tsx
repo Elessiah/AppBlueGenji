@@ -1083,9 +1083,12 @@ function RgpdFr({
             ou supprimée. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
-            l&apos;association, avec une mention @everyone : le nom des deux équipes (jamais le pseudo
+            l&apos;association, en un message par soirée (quatre heures depuis le premier direct) qui liste à
+            leur heure les matchs en direct, ceux programmés d&apos;ici la fin de la soirée et ceux terminés
+            (« Terminé », avec leur score), et qui est modifié à chaque début et à chaque fin de match, jusqu&apos;à quatre heures après la fin de la soirée (quand il ne peut plus être modifié, un nouveau message sans mention prend le relais ; l&apos;ancien reste dans le salon) ; il mentionne @everyone pour la chaîne officielle de
+            l&apos;association, le seul rôle StreamViewer pour toute autre chaîne. Il donne le nom des deux équipes (jamais le pseudo
             de leurs joueurs) ou, en tournoi individuel, le <strong>pseudo public BlueGenji</strong> des
-            deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur une annonce déjà publiée : sans changement, le pseudo Discord ou le
+            deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur un message de soirée qui n'est plus modifié : sans changement, le pseudo Discord ou le
             BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant
             le 30 septembre 2026 ; jamais l&apos;identifiant Discord numérique ; « un joueur » pour une
             entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le

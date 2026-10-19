@@ -122,14 +122,159 @@ Une seule boucle de sondage alimente les deux : `useLandingLive`, appelé par le
 `Hero` (`components/cyber/landing/`). Deux sondages séparés les feraient diverger
 le temps d'un tick — une carte annonçant un direct au-dessus d'un bouton absent.
 
-## Annonce sur Discord (#live, `@everyone`)
+## Annonce sur Discord (#live, par soirée)
 
 Au **début** d'un match diffusé, le bot poste dans le salon #live du serveur
 BlueGenji esport (constante `LIVE_ANNOUNCE_CHANNEL_ID` côté bot,
-`src/notifications/liveAnnouncement.ts`) un message qui mentionne `@everyone`,
-nomme les deux engagés et le tournoi, et donne le lien de la diffusion —
-demande de l'association : deux matchs à la suite font donc deux annonces.
+`src/notifications/liveAnnouncement.ts`) le **message de la soirée** : il
+nomme les engagés et le tournoi de chaque match, son heure, et donne le lien
+de chaque diffusion. Les matchs suivants de la soirée **modifient** ce message
+au lieu d'en poster un autre (demande de l'association, 2026-10-19).
 
+- **Qui est notifié** : seule une diffusion sur la chaîne officielle
+  (`OFFICIAL_LIVE_CHANNEL_URL`, `https://www.twitch.tv/bluegenjiesport` —
+  hôte et chemin comparés sans casse, `www.`/`m.` et barre finale ignorés,
+  `liveMentionTarget`) mentionne `@everyone`. Toute autre chaîne (caster,
+  Kick, YouTube) mentionne le seul rôle **StreamViewer**
+  (`STREAM_VIEWER_ROLE_ID` côté bot, `1210173681771479060`) :
+  `allowedMentions` n'autorise que `everyone` pour l'une, que ce rôle pour
+  l'autre. Les deux publics ont chacun leur message de soirée.
+- **Soirée** : `LIVE_EVENING_WINDOW_HOURS` = **4 h**, comptées depuis le
+  premier direct annoncé pour ce public (`bg_live_evenings` : public, ouverture,
+  fin de fenêtre, identifiant du message Discord, `silent` si ce message est
+  parti sans mention, `notified` si un envoi qui notifie est parti vers le
+  bot ; pas son texte, effacée un jour après la fin de la
+  fenêtre par `purgeEndedEvenings`, au plus une fois par heure à chaque appel
+  de `dispatchLiveAnnouncements` — annonces désactivées comprises : la durée
+  annoncée par `/rgpd` tient même sans annonce pendant des semaines). Quatre heures couvrent une soirée de tournoi (19 h – 23 h) sans
+  fondre deux soirées. La fenêtre repart du **premier envoi qui notifie** (posé
+  juste avant l'appel au bot, quelle qu'en soit l'issue) et du premier message
+  gardé : des essais reportés avant lui (bot injoignable) ne la raccourcissent
+  pas — un premier envoi incertain juste avant la fin de la fenêtre ne laisse
+  pas une nouvelle soirée notifier une minute plus tard —, et ce premier
+  message liste déjà les matchs programmés jusqu'à cette nouvelle fin. Un
+  match qui passe à l'antenne après la fin de la fenêtre — même programmé et
+  listé par le message de la soirée, puis lancé en retard — ouvre une nouvelle
+  soirée, qui notifie : la soirée est la fenêtre de quatre heures, rien de
+  plus.
+- **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
+  soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
+  Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
+  l'antenne, de « · Terminé · 2-1 » pour un match **terminé** (score lu sur
+  le match, dans l'ordre de l'affiche) ou de « · Terminé » seul sans score
+  (forfait, score en attente de confirmation) ; un match `MANUAL` annoncé dont
+  l'antenne est fermée sans score (coupure, pause) n'a ni « En direct » ni
+  « Terminé », à l'heure de son annonce (`live_started_at` effacé, l'heure
+  vient de sa réservation — jamais celle de la relecture, qui changerait le
+  texte à chaque minute) ;
+  l'affiche et le tournoi ; le lien seul sur sa ligne. Les directs d'abord,
+  puis les matchs **programmés** (`START_TIME`, castés, d'ici la fin de la
+  fenêtre) par heure, puis les matchs terminés par heure : l'heure des streams
+  à venir se lit d'un coup d'œil, et une soirée trop longue compte ses matchs
+  finis avant ceux à venir. Un match annoncé **reste** au message une fois
+  terminé (décision de l'utilisateur, 2026-10-19), même si son tournoi s'est
+  clos avec lui (les matchs annoncés se lisent sur un tournoi `RUNNING` ou
+  `FINISHED`, les programmés sur un tournoi `RUNNING` seulement). Un match
+  rouvert pour une autre affiche, ou revenu en attente, n'est plus listé :
+  seul un match `START_TIME` figure avant son direct, à son heure — jamais un
+  match à une heure inventée. Une annonce ne fait relire un match que pour son
+  affiche **courante** (`pairing`) : un match rouvert pour d'autres engagés n'y
+  revient que par l'annonce de sa nouvelle affiche. Les liens partent
+  à part (`streamUrls`, dix au plus) et le texte les place par des jetons
+  `{{lien:N}}` que le bot remplace après ses neutralisations ; un nom ne peut
+  pas forger de jeton (une espace de largeur nulle suit chaque accolade suivie
+  d'une autre : `{{{lien:1}}` n'en forge pas non plus).
+- **Modifier plutôt que reposter** : le bot rend l'identifiant du message
+  (`messageId`), gardé dans `bg_live_evenings`. Le match suivant de la soirée
+  envoie `editMessageId` : le bot **modifie** le message — aucune nouvelle
+  notification (Discord ne notifie jamais sur une modification ; la mention de
+  tête reste autorisée pour garder son surlignage) —, en un seul appel à Discord (aucune
+  lecture préalable du message). Message pas du bot, ou
+  qui ne se modifie plus (plafond de modifications de Discord sur un message
+  vieux d'une heure, code `30046`) : une **suite** part, sans mention ni
+  notification, et son identifiant remplace l'ancien. Message **supprimé** de
+  #live (`10008`, souvent par le staff sur demande, par exemple d'un joueur
+  nommé) : rien ne le republie — le bot répond `503` `message-deleted`
+  (issue `evening-deleted`), le site ferme la soirée de ce public
+  (`bg_live_evenings.closed`) jusqu'à la fin de sa fenêtre, réservations
+  gardées et marquées refusées ; pm2 le dit pour chaque match non publié. Un message parti sans
+  mention (suite, envoi `notify: false`, permission absente) est gardé
+  `silent` : ses modifications envoient `notify: false` et n'écrivent pas de
+  mention de tête — une mention grise qui n'a notifié personne aurait l'air
+  d'une panne. Un bot d'une version antérieure ignore `mention`,
+  `streamUrls`, `editMessageId` et `notify`, et ne rend pas d'identifiant :
+  chaque direct et chaque fin de match (mise à jour) repartent dans un nouveau
+  message **`@everyone`**, public
+  StreamViewer compris, jetons `{{lien:N}}` laissés bruts. D'où l'ordre de
+  déploiement : **bot d'abord**, et jamais de retour à un bot antérieur tant
+  que `LIVE_ANNOUNCEMENTS_ENABLED` est posé. Une publication incertaine
+  (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
+  match suivant de la même soirée repart dans un nouveau message.
+- **Mise à jour aux fins de match** (`requestLiveEveningRefresh`,
+  `refreshLiveEvenings`) : un score rendu ou arbitré, un match ou un tournoi
+  changé (antenne fermée, forfait) — les évènements `score_reported`,
+  `score_resolved`, `match_updated` et `updated` de
+  `lib/server/tournaments/notifications.ts` — demandent la mise à jour des
+  soirées ouvertes, sans rien lire sur le moment (aucune requête ajoutée à une
+  lecture de page) et rien si les annonces sont désactivées. La première
+  demande programme **une** mise à jour une minute plus tard
+  (`LIVE_EVENING_REFRESH_DELAY_MS`) ; toutes celles de la minute la
+  rejoignent : une ronde qui se termine d'un coup donne une modification par
+  public. La mise à jour lit les soirées qui ont un message gardé, ne sont pas
+  closes et dont la fenêtre court ou s'est fermée depuis moins de
+  `LIVE_EVENING_WINDOW_HOURS` heures (`window_end > NOW() - INTERVAL 4 HOUR`,
+  `closed = 0`) : un match lancé en fin de fenêtre se termine souvent après.
+  Une soirée finie n'est modifiée que si ce processus a publié son texte
+  (après un redémarrage, rien ne dit ce qui y manque — une modification pour
+  rien d'un vieux message pourrait poster une suite) ; ses matchs sont ceux
+  réservés **dans** sa fenêtre (`a.sent_at < window_end`, strict : une réservation datée de la seconde
+  d'ouverture de la soirée suivante n'est qu'à celle-ci), jamais ceux de la
+  soirée suivante. Elle rédige leur texte et ne
+  l'envoie que s'il diffère du **dernier texte publié** (retenu par
+  processus, annonces de direct comprises ; perdu au redémarrage, au pire une
+  modification à l'identique). Toujours une **modification**
+  (`editMessageId`, `refresh: true`, étiquette `live-refresh soiree-N …`) :
+  jamais de notification, mention de tête gardée comme le message l'a publiée
+  (`notify: false` pour un message `silent`). Mêmes chemins que la
+  modification d'une annonce : suite sans mention si le message ne se modifie
+  plus (`30046`, `50005`, identifiant remplacé), soirée close si le message a
+  été supprimé (`10008`). Un refus (bot, AutoMod) ne renvoie pas le même
+  texte ; une issue incertaine (`uncertain`, `timed-out`, `interrupted`) ne le
+  retient pas : la mise à jour suivante le renvoie (une modification ne
+  notifie jamais ; une soirée finie n'aurait sinon plus de quoi se corriger),
+  sans relance immédiate ; un report (bot injoignable, salon fermé, Discord réticent, soirée
+  en pause, coupe-circuit du bot ouvert — rien n'est alors lu —, lecture en
+  échec) est relancé une minute plus tard, trente fois au plus depuis la
+  dernière fin de match (`LIVE_EVENING_REFRESH_MAX_RETRIES` : une demi-heure,
+  qui couvre un redémarrage ou un déploiement du bot ; chaque nouvel évènement
+  en redonne autant, toujours une mise à jour par minute au plus). Un
+  report qui tient au bot ou au salon arrête le passage : l'autre public
+  n'essuie pas le même refus ; une soirée illisible n'empêche pas l'autre. Balayage et mise à
+  jour passent par une **file unique** : une mise à jour ne rédige jamais en
+  même temps qu'une annonce (elle effacerait son match du message).
+- **Jamais deux notifications par public et par soirée** : le premier envoi
+  qui notifie **prend** la marque `notified` juste avant l'appel au bot, en une
+  instruction (`UPDATE … SET notified = 1 … WHERE id = ? AND notified = 0` +
+  `affectedRows`). Soirée sans identifiant gardé mais déjà marquée (premier
+  envoi d'issue incertaine, bot trop ancien, identifiant non enregistré — même
+  si le tournoi de ce match est fini depuis, ou si son lien a changé de public)
+  — le site envoie `notify: false` et le bot poste un nouveau message **sans
+  mention écrite ni notification**. Les réservations d'un passage, prises
+  avant l'ouverture de la soirée (parfois de plusieurs secondes, quand l'envoi
+  de l'autre public passe d'abord), sont datées dans la soirée
+  (`sent_at = GREATEST(sent_at, started_at)`) avant la lecture de ses matchs :
+  sinon le match sortirait du message à la modification suivante, et ce
+  garde-fou ne le verrait pas. Un envoi **refusé** (`rejected`, AutoMod) ou
+  **reporté** n'a rien publié : la marque `notified` qu'il avait posée est
+  retirée, et un refus (réservation gardée, jamais réessayé) sort de la soirée
+  (`bg_live_announcements.refused`, sa date `sent_at` — donnée à l'export
+  RGPD — restant vraie) — sinon chaque match suivant
+  reprendrait le nom bloqué et serait refusé à son tour, et la soirée se
+  croirait notifiée.
+- **Longueur** : le texte, liens comptés en entier, tient dans
+  `LIVE_ANNOUNCEMENT_MAX_LENGTH` (1 500) ; au-delà, la liste s'arrête **à la
+  fin d'un bloc** et une dernière ligne compte le reste (« … et 3 autres matchs
+  ce soir ») — pas de second message : un seul message par soirée se modifie.
 - **Début du match = passage à l'antenne**, tel que `isMatchLive` le dérive :
   lancement en `AUTO`, heure dite en `START_TIME`, clic « Lancer le direct » en
   `MANUAL`. Le lancement compte pour l'**affiche courante** seulement
@@ -148,16 +293,16 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   les dix secondes au plus, quel que soit le nombre de spectateurs ; aucune
   tant que le coupe-circuit du bot est ouvert. Un `START_TIME` dont l'heure
   n'est pas venue n'est pas lu.
-- **Un message par diffusion, pas par match** : les matchs d'un même tournoi
-  qu'un même balayage trouve à l'antenne sur le **même lien** (une ronde
-  lancée d'un coup, repliée sur la chaîne officielle) partent en un seul
-  message : « 🔴 En direct — Tournoi : » puis une affiche par ligne
-  (« • A contre B ») — un nom d'équipe peut contenir « et » ou une virgule,
-  jamais un saut de ligne ; passé 1 500 caractères
-  (`LIVE_ANNOUNCEMENT_MAX_LENGTH`), une dernière ligne compte le reste
-  (« • et 3 autres matchs ») plutôt que de laisser le bot couper un nom. Un
-  tournoi individuel énumère ses affiches de pseudos de la même façon. Chaque affiche
-  garde sa réservation. Deux matchs **à la suite** restent deux annonces.
+- **Un message par soirée et par public, pas par match** : les matchs qu'un
+  même balayage trouve à l'antenne pour un même public (chaîne officielle ou
+  non), quels que soient leur tournoi et leur lien, partent dans le message de
+  la soirée, une seule notification. Chaque affiche garde sa réservation. Une
+  pause après un refus de Discord vaut pour la soirée de ce public seulement.
+  Une soirée **illisible** (`bg_live_evenings` absente ou lecture en échec)
+  rend les réservations du groupe et ne met en pause que ce public : l'autre
+  part quand même, et pm2 le dit (« soirée … illisible ») sans accuser le bot.
+  Les traces pm2 et l'étiquette envoyée au bot nomment **tous** les tournois
+  du groupe (`tournoi-4,5`).
 - **Une annonce par match et par affiche** : `bg_live_announcements`
   (clé unique `(match_id, pairing)`, `pairing` = les deux engagés **sans
   ordre**, `5:7` pour `7:5` : un plateau réécrit qui inverse les deux mêmes
@@ -174,9 +319,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   fermé ou Discord muet en lisant le salon (`discord-unreachable`), la pause
   vaut pour tout le processus et les groupes suivants du même passage sont
   rendus sans appel au bot ; après un refus de Discord (`discord-held`, qui
-  peut tenir au message), elle ne vaut que pour cette diffusion (tournoi et
-  lien) — un match qui la rejoint pendant la pause attend avec elle, un seul
-  message part — et les autres tournois partent sans attendre. Une relève
+  peut tenir au message), elle ne vaut que pour ce public (sa soirée) — un
+  match qui la rejoint pendant la pause attend avec elle, un seul message
+  part — et l'autre public part sans attendre. Une relève
   tombe au terme de la pause, sans attendre un nouvel évènement. Le tout tant que
   le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un blocage par
@@ -246,7 +391,9 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   fantôme nommé par le staff) — seul un pseudo de compte part. Plusieurs affiches d'un tournoi individuel s'énumèrent comme
   celles d'équipes. Si aucune ne porte de nom publiable, le texte compte les
   matchs (« N matchs »). Une entrée individuelle dans le groupe fait lire le
-  tournoi comme individuel, même au type illisible. **Inscriptions d'avant** :
+  tournoi comme individuel, même au type illisible — dans l'annonce de soirée,
+  toute entrée individuelle d'un match lu du même tournoi : un match entre deux
+  invités y reste « un joueur contre un joueur ». **Inscriptions d'avant** :
   le pseudo n'est lu que pour une inscription (`bg_tournament_registrations.registered_at`)
   faite depuis la publication du changement de confidentialité qui l'annonce
   (`soloPseudoRegisteredSince`, `publishedAt` de `2026-10-pseudo-live-et-messages-de-match`) :
@@ -266,8 +413,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   en catégorie de données), `/rgpd`, et la fenêtre de suppression du compte
   (`deletion.residual`), qui le rappelle au joueur ; les conditions d'utilisation
   (section « Retransmission des matchs », `STREAM_NOTICE_LIVE` / `_EN`) disent que
-  le nom neutre ne couvre pas cette annonce. Le bot préfixe `@everyone` et n'autorise que cette mention
-  (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
+  le nom neutre ne couvre pas cette annonce. Le bot préfixe la mention du public (`@everyone` ou le rôle StreamViewer) et n'autorise qu'elle
+  (`{ parse: ["everyone"] }` ou `{ roles: [StreamViewer] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
 - **Production seulement, activée explicitement, sur le site public**
@@ -304,7 +451,14 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   aboutir »). Les deux dernières ne demandent pas de poster l'annonce à la
   main : l'envoi du bot a pu partir, ou partir encore. Après un `400` ou un
   blocage par AutoMod, rien n'est parti : la poster à la main (règle
-  corrigée) ne fait pas de doublon. Côté bot, voir ci-dessus (une fois par
+  corrigée) ne fait pas de doublon — **sans aucune mention** pour une
+  annonce de soirée (le signalement du bot le dit) : une modification ou un
+  envoi `notify: false` suivent un message qui a pu notifier, et après un
+  premier message refusé le site rend la marque `notified` — le prochain
+  direct de la soirée notifiera. Si le site avait déjà cessé d'attendre la
+  réponse (`timed-out`), il garde la marque et reprend le match au direct
+  suivant : un premier message se poste alors à la main **avec** la mention de
+  son public, une modification ou un envoi muet ne se postent pas. Côté bot, voir ci-dessus (une fois par
   heure par cause réessayée ; chaque blocage AutoMod, envoi incertain ou
   requête coupée par le site ; un `400` n'est pas signalé au canal de logs). Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est

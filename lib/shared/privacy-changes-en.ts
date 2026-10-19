@@ -456,6 +456,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the “Acceptance” section", "Read the “Match contacts” section"],
   },
+  "2026-10-annonces-live-par-soiree": {
+    title: "#live announcements: one message per evening",
+    summary:
+      "Announcements of streamed matches in the #live channel are grouped into one message per evening, which lists with their times the matches already live, those scheduled until the end of the evening (four hours after the first live stream) and those finished, marked “Terminé” with their score, and which is edited at each match start and end.",
+    details: [
+      "The names do not change: the teams' names or, in a solo tournament, your public BlueGenji username. What changes is when: a streamed match scheduled that evening appears in the message even before it starts, with its time.",
+      "The evening's message is edited when another match starts or ends, and then shows the public username of that moment: a username changed before that edit appears instead of the old one. These edits continue up to four hours after the evening ends; when the message can no longer be edited, a new message without a mention takes over, and the old one stays in the channel.",
+      "Only a stream on the official BlueGenji channel notifies the whole server (@everyone); another channel only notifies the members who have the StreamViewer role. The message can still be read by every member of the channel, as before.",
+      "The site keeps the ID of the evening's message (not its text), deleted one day after the evening ends. On the record of a match's announcement, it also notes whether its going live was not announced (refused by the bot or AutoMod, or evening closed after its message was deleted; the match may have appeared in the message before as scheduled): that record is kept, without a new attempt, until the match is deleted, and appears in the export of your data.",
+    ],
+  },
 };
 
 /**

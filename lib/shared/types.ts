@@ -1034,11 +1034,13 @@ export type PersonalDataExport = {
   }[];
   /**
    * Traces d'annonce #live d'un match de ses entrées en tournoi individuel
-   * (`bg_live_announcements`, T16) : match, tournoi, date. Une trace dit
+   * (`bg_live_announcements`, T16) : match, tournoi, date, et `refused` si
+   * son passage à l'antenne n'a pas été annoncé (il a pu figurer avant comme programmé), sans nouvel essai (refus du bot ou d'AutoMod,
+   * ou soirée close après suppression de son message). Une trace dit
    * qu'une annonce a été tentée ; elle ne porte le pseudo que pour une
    * inscription faite depuis le 16 octobre 2026. Effacée avec le match.
    */
-  liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null }[];
+  liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null; refused: boolean }[];
   /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.

@@ -113,6 +113,9 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
  * la reprend au départ du match), en français comme en anglais.
  */
 describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
+  // L'annonce des conditions v6 : lue par son identifiant, des entrées
+  // ultérieures (annonces #live par soirée) pouvant la suivre.
+  const V6_ENTRY_ID = "2026-10-conditions-v6-acceptation-pour-tous";
   const FR_CONTACTS = /fenêtre « Contacts »/;
   const FR_LAUNCH = /fenêtre de lancement/;
   const EN_CONTACTS = /“Contacts” window/;
@@ -138,8 +141,8 @@ describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
     expectBoth(fr, FR_CONTACTS, FR_LAUNCH);
     expectBoth(en, EN_CONTACTS, EN_LAUNCH);
-    const entryFr = JSON.stringify(PRIVACY_CHANGES.at(-1));
-    const entryEn = JSON.stringify(PRIVACY_CHANGES_EN[PRIVACY_CHANGES.at(-1)?.id ?? ""]);
+    const entryFr = JSON.stringify(PRIVACY_CHANGES.find((c) => c.id === V6_ENTRY_ID));
+    const entryEn = JSON.stringify(PRIVACY_CHANGES_EN[V6_ENTRY_ID]);
     expectBoth(entryFr, FR_CONTACTS, FR_LAUNCH);
     expectBoth(entryEn, EN_CONTACTS, EN_LAUNCH);
     // Chaque phrase du registre qui cite la fenêtre « Contacts » nomme aussi la fenêtre de lancement.
@@ -152,8 +155,8 @@ describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
   });
 
   it("annonce v6 : chaque compte connecté doit accepter les conditions (FR et EN)", () => {
-    expect(JSON.stringify(PRIVACY_CHANGES.at(-1))).toContain("chaque compte connecté doit désormais les accepter");
-    expect(JSON.stringify(PRIVACY_CHANGES_EN[PRIVACY_CHANGES.at(-1)?.id ?? ""])).toContain(
+    expect(JSON.stringify(PRIVACY_CHANGES.find((c) => c.id === V6_ENTRY_ID))).toContain("chaque compte connecté doit désormais les accepter");
+    expect(JSON.stringify(PRIVACY_CHANGES_EN[V6_ENTRY_ID])).toContain(
       "every logged-in account must now accept them",
     );
   });

@@ -250,6 +250,18 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // qui ne gère aucune équipe (`SIGNED_IN`).
     `ALTER TABLE bg_terms_acceptances MODIFY COLUMN context
        ENUM('SIGNUP', 'LOGIN', 'TEAM_CREATION', 'TEAM_MANAGEMENT', 'SIGNED_IN') NOT NULL`,
+    // Soirées #live — message parti sans mention : ses modifications n'en
+    // écrivent pas (bases de dev créées avant la colonne).
+    `ALTER TABLE bg_live_evenings ADD COLUMN silent BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Soirées #live — envoi qui notifie parti (issue incertaine comprise) : le
+    // match suivant ne notifie pas une seconde fois.
+    `ALTER TABLE bg_live_evenings ADD COLUMN notified BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Annonces #live refusées (rien n'est parti, jamais réessayées) : hors des
+    // soirées, sans fausser leur date.
+    `ALTER TABLE bg_live_announcements ADD COLUMN refused BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Soirées #live — message supprimé de #live : la soirée se ferme, rien ne
+    // le republie.
+    `ALTER TABLE bg_live_evenings ADD COLUMN closed BOOLEAN NOT NULL DEFAULT FALSE`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

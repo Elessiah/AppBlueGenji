@@ -1,0 +1,183 @@
+import { describe, expect, it } from "@jest/globals";
+import {
+  LIVE_ANNOUNCEMENT_MAX_LENGTH,
+  LIVE_EVENING_MAX_LINKS,
+  LIVE_EVENING_WINDOW_HOURS,
+  OFFICIAL_LIVE_CHANNEL_URL,
+  formatLiveEvening,
+  liveMentionTarget,
+  parisClock,
+  type LiveEveningStream,
+} from "@/lib/shared/live-announcements";
+
+/** Annonce de soirée : public notifié, heures de Paris, blocs, liens et coupe propre. */
+
+const AT_21 = Date.parse("2026-10-14T19:00:00Z");
+
+function stream(patch: Partial<LiveEveningStream> = {}): LiveEveningStream {
+  return {
+    startsAt: AT_21,
+    live: true,
+    tournamentName: "Coupe d'hiver",
+    team1Name: "Renards",
+    team2Name: "Nova",
+    url: "https://www.twitch.tv/caster",
+    ...patch,
+  };
+}
+
+describe("liveMentionTarget", () => {
+  it("@everyone pour la seule chaîne officielle, sans casse, www, m. ni barre finale", () => {
+    expect(OFFICIAL_LIVE_CHANNEL_URL).toBe("https://www.twitch.tv/bluegenjiesport");
+    for (const url of [
+      OFFICIAL_LIVE_CHANNEL_URL,
+      "https://twitch.tv/BlueGenjiEsport",
+      "https://m.twitch.tv/bluegenjiesport/",
+      "https://www.twitch.tv/bluegenjiesport?ref=x",
+      "https://www.twitch.tv/bluegenjiesport///",
+    ]) {
+      expect(liveMentionTarget(url)).toBe("everyone");
+    }
+  });
+
+  it("le rôle StreamViewer pour toute autre chaîne, même voisine", () => {
+    for (const url of [
+      "https://www.twitch.tv/caster",
+      "https://www.twitch.tv/bluegenjiesport2",
+      "https://www.twitch.tv/bluegenjiesport/videos",
+      "https://kick.com/bluegenjiesport",
+      "https://www.youtube.com/@bluegenjiesport",
+      "pas une adresse",
+    ]) {
+      expect(liveMentionTarget(url)).toBe("stream-viewer");
+    }
+  });
+
+  it("une longue suite de barres finales se rogne en temps linéaire (SonarCloud S8786)", () => {
+    const started = Date.now();
+    expect(liveMentionTarget(`${OFFICIAL_LIVE_CHANNEL_URL}${"/".repeat(50_000)}`)).toBe("everyone");
+    expect(liveMentionTarget(`https://www.twitch.tv/${"/".repeat(50_000)}x`)).toBe("stream-viewer");
+    expect(liveMentionTarget("https://www.twitch.tv/")).toBe("stream-viewer");
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+});
+
+describe("parisClock", () => {
+  it("écrit l'heure de Paris sur 24 h, heure d'été et d'hiver", () => {
+    expect(parisClock(AT_21)).toBe("21:00");
+    expect(parisClock(Date.parse("2026-12-01T08:05:00Z"))).toBe("09:05");
+    expect(parisClock(Date.parse("2026-10-14T22:30:00Z"))).toBe("00:30");
+  });
+});
+
+describe("formatLiveEvening", () => {
+  it("un bloc par match : heure en gras, « En direct », affiche et tournoi, lien seul sur sa ligne", () => {
+    const { text, urls } = formatLiveEvening([stream()]);
+    expect(text).toBe("🔴 **Les lives de la soirée**\n\n**21:00** · En direct\nRenards contre Nova — Coupe d'hiver\n{{lien:1}}");
+    expect(urls).toEqual(["https://www.twitch.tv/caster"]);
+  });
+
+  it("les directs d'abord, puis les matchs à venir par heure, séparés par une ligne vide", () => {
+    const { text, urls } = formatLiveEvening([
+      stream({ startsAt: AT_21 + 2 * 3_600_000, live: false, team1Name: "C", team2Name: "D", url: "https://kick.com/b" }),
+      stream({ startsAt: AT_21 + 3_600_000, live: false, team1Name: "E", team2Name: "F" }),
+      stream({ startsAt: AT_21 + 30 * 60_000, team1Name: "A", team2Name: "B" }),
+    ]);
+    expect(text).toBe(
+      "🔴 **Les lives de la soirée**" +
+        "\n\n**21:30** · En direct\nA contre B — Coupe d'hiver\n{{lien:1}}" +
+        "\n\n**22:00**\nE contre F — Coupe d'hiver\n{{lien:1}}" +
+        "\n\n**23:00**\nC contre D — Coupe d'hiver\n{{lien:2}}",
+    );
+    expect(urls).toEqual(["https://www.twitch.tv/caster", "https://kick.com/b"]);
+  });
+
+  it("neutralise mentions, balisage et faux jetons de lien dans les noms", () => {
+    const { text } = formatLiveEvening([
+      stream({ team1Name: "@everyone", team2Name: "[x](https://piege.example) {{lien:2}}", tournamentName: "**Open** <@&1>" }),
+    ]);
+    expect(text).not.toMatch(/@everyone|\]\(https:|<@&|\{\{lien:2\}\}/);
+    expect(text.match(/\{\{lien:\d+\}\}/g)).toEqual(["{{lien:1}}"]);
+  });
+
+  it("aucune suite d'accolades d'un nom ne forge un jeton de lien", () => {
+    for (const forged of ["{{{lien:1}}", "{{{{lien:1}}}}", "x{{{{{lien:2}}", "{{lien:1}}{{lien:2}}"]) {
+      const { text } = formatLiveEvening([
+        stream({ team1Name: forged, team2Name: forged, tournamentName: forged }),
+        stream({ url: "https://kick.com/b", team1Name: "C", team2Name: "D" }),
+      ]);
+      expect(text.match(/\{\{lien:\d+\}\}/g)).toEqual(["{{lien:1}}", "{{lien:2}}"]);
+    }
+  });
+
+  it("un nom en tête de ligne ne fait pas une liste numérotée", () => {
+    const { text } = formatLiveEvening([stream({ team1Name: "1. Champions" }), stream({ team1Name: "2) Kev", startsAt: AT_21 + 1 })]);
+    expect(text).toContain("\n1\\. Champions contre Nova — ");
+    expect(text).toContain("\n2\\) Kev contre Nova — ");
+    expect(text).not.toMatch(/\n\d+[.)] /);
+  });
+
+  it("« un joueur » sans nom publiable", () => {
+    expect(formatLiveEvening([stream({ team1Name: null })]).text).toContain("\nun joueur contre Nova — ");
+  });
+
+  it("trop long : s'arrête à la fin d'un bloc, liens comptés en entier, et compte le reste", () => {
+    const longUrl = `https://www.twitch.tv/${"c".repeat(200)}`;
+    const streams = Array.from({ length: 30 }, (_, i) =>
+      stream({ startsAt: AT_21 + i * 60_000, team1Name: `Equipe${i}`, url: i % 2 ? longUrl : "https://kick.com/b" }),
+    );
+    const { text, urls } = formatLiveEvening(streams);
+    const filled = text.replace(/\{\{lien:(\d+)\}\}/g, (_t, n: string) => urls[Number(n) - 1]);
+    expect(filled.length).toBeLessThanOrEqual(LIVE_ANNOUNCEMENT_MAX_LENGTH);
+    const shown = (text.match(/\{\{lien:/g) ?? []).length;
+    expect(text.endsWith(`\n\n… et ${30 - shown} autres matchs ce soir`)).toBe(true);
+    expect(text).toMatch(/\{\{lien:\d+\}\}\n\n… et/);
+  });
+
+  it("au plus dix liens distincts : les matchs d'une onzième chaîne sont comptés", () => {
+    const streams = Array.from({ length: LIVE_EVENING_MAX_LINKS + 2 }, (_, i) =>
+      stream({ startsAt: AT_21 + i * 60_000, team1Name: `E${i}`, url: `https://kick.com/c${i}` }),
+    );
+    const { text, urls } = formatLiveEvening(streams);
+    expect(urls).toHaveLength(LIVE_EVENING_MAX_LINKS);
+    expect(text.endsWith("\n\n… et 2 autres matchs ce soir")).toBe(true);
+  });
+
+  it("une soirée dure quatre heures", () => {
+    expect(LIVE_EVENING_WINDOW_HOURS).toBe(4);
+  });
+});
+
+describe("formatLiveEvening — matchs terminés", () => {
+  const AT_22 = AT_21 + 60 * 60 * 1000;
+
+  it("« Terminé · 2-1 » avec le score, « Terminé » seul sans score, jamais « En direct »", () => {
+    const { text } = formatLiveEvening([
+      stream({ live: false, finished: { score: [2, 1] } }),
+      stream({ live: false, finished: { score: null }, team1Name: "Forfait" }),
+    ]);
+    expect(text).toContain("**21:00** · Terminé · 2-1\nRenards contre Nova — Coupe d'hiver\n{{lien:1}}");
+    expect(text).toContain("**21:00** · Terminé\nForfait contre Nova");
+    expect(text).not.toContain("En direct");
+  });
+
+  it("à l'antenne, puis programmés, puis terminés, chacun par heure", () => {
+    const { text } = formatLiveEvening([
+      stream({ live: false, finished: { score: [0, 2] }, team1Name: "Fini" }),
+      stream({ live: false, startsAt: AT_22, team1Name: "Plus tard" }),
+      stream({ team1Name: "Direct" }),
+    ]);
+    const order = ["Direct", "Plus tard", "Fini"].map((name) => text.indexOf(`${name} contre`));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("trop long : les matchs terminés sont comptés avant les matchs à venir", () => {
+    const finished = Array.from({ length: 30 }, (_, i) =>
+      stream({ live: false, finished: { score: [1, 0] }, team1Name: `Fini${i}`, startsAt: AT_21 - i }),
+    );
+    const { text } = formatLiveEvening([...finished, stream({ live: false, startsAt: AT_22, team1Name: "Ensuite" })]);
+    expect(text.length).toBeLessThanOrEqual(LIVE_ANNOUNCEMENT_MAX_LENGTH);
+    expect(text).toContain("Ensuite contre Nova");
+    expect(text).toMatch(/… et \d+ autres matchs ce soir$/);
+  });
+});
