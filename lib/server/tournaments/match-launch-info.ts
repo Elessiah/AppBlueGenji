@@ -187,7 +187,7 @@ async function loadCandidates(
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        ${scope}
-       AND (${referee ? "1 = 1 OR " : ""}m.caster_user_id = ?
+       AND (${referee && matchId !== null ? "1 = 1 OR " : ""}m.caster_user_id = ?
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
      ORDER BY m.start_at IS NULL, m.start_at, m.id`,
@@ -607,10 +607,11 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     // Par la carte, un match sans contacts à montrer n'est pas rendu : le
     // caster d'un match pas encore parti reçoit le même refus qu'un tiers.
     const visible = read.filter(({ phase, exposes }) => (forCard ? exposes : phase !== "TO_PLAN"));
-    // Son éligibilité est pourtant rejouée sur **tout** ce qui a été lu : un
-    // caster devenu inéligible qui ouvre la carte avant l'heure perd son
-    // inscription à cette lecture-là, sans attendre celle d'un joueur.
-    const dropped = read.filter((launch) => !visible.includes(launch));
+    // Par la carte, son éligibilité est pourtant rejouée sur ce qui a été lu :
+    // un caster devenu inéligible qui l'ouvre avant l'heure perd son
+    // inscription à cette lecture-là, sans attendre celle d'un joueur. La
+    // modale, qui interroge en boucle, n'en paie pas le coût.
+    const dropped = forCard ? read.filter(({ exposes }) => !exposes) : [];
     if (visible.length === 0 && !dropped.some(({ row }) => row.caster_user_id !== null)) return [];
 
     const { rosterTeamIds, userIds } = collectContactIds(visible);
@@ -619,7 +620,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     }
     const rosters = await loadRosters(connection, rosterTeamIds);
     const users = await loadUsers(connection, userIds);
-    const revoked = revokeIneligibleCasters(read, users, revokedCasts);
+    const revoked = revokeIneligibleCasters([...visible, ...dropped], users, revokedCasts);
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, exposes } of visible) {
