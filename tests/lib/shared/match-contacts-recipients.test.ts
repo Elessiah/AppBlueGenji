@@ -70,3 +70,15 @@ describe("modale « Contacts » — fermée quand l'action disparaît", () => {
     expect(source.indexOf(reset)).toBeLessThan(source.indexOf("{contactsOpen && ("));
   });
 });
+
+describe("textes joueur et règles — mêmes lecteurs que le code", () => {
+  it("l'indication du BattleTag masqué compte le caster, en français et en anglais", () => {
+    expect(readSource("messages/fr/players.json")).toContain("seuls les membres des deux équipes de tes matchs, leur caster et l'arbitrage le lisent");
+    expect(readSource("messages/en/players.json")).toContain("only the members of both teams in your matches, their caster and the referees can read it");
+  });
+
+  it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
+    expect(readSource("messages/fr/rules.json")).toContain("le bouton « Contacts » de la carte du match montre déjà dès que ses deux adversaires sont connus");
+    expect(readSource("messages/en/rules.json")).toContain("the match card's “Contacts” button already shows as soon as both its opponents are known");
+  });
+});
