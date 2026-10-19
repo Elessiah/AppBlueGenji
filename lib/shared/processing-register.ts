@@ -770,12 +770,12 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Acceptation des conditions d'utilisation",
     purpose: "Garder la preuve que les conditions d'utilisation du site ont été acceptées, et laquelle de leurs versions",
     subPurposes: [
-      "Recueillir l'acceptation à la création du compte, à la création d'une équipe, en recevant la gestion d'une équipe et à une connexion lancée depuis la page de connexion (clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord) dans les dix minutes où les conditions y ont été acceptées (une acceptation seulement gardée par le navigateur n'est pas reportée sur un compte existant)",
+      "Recueillir l'acceptation à la création du compte, à la création d'une équipe, en recevant la gestion d'une équipe, dans la fenêtre d'acceptation présentée à tout compte connecté qui n'a pas accepté la version en vigueur (depuis la version 5) et à une connexion lancée depuis la page de connexion (clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord) dans les dix minutes où les conditions y ont été acceptées (une acceptation seulement gardée par le navigateur n'est pas reportée sur un compte existant)",
       "Redemander l'acceptation quand les conditions changent de version",
     ],
     legalBasis: "Exécution du service demandé par le joueur (contrat)",
     dataSubjects: ["Joueurs inscrits sur le site"],
-    dataCategories: ["Version acceptée, contexte de l'acceptation (création du compte, connexion, création ou gestion d'une équipe), date"],
+    dataCategories: ["Version acceptée, contexte de l'acceptation (création du compte, connexion, création ou gestion d'une équipe, fenêtre d'acceptation d'un compte connecté), date"],
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",

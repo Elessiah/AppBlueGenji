@@ -636,7 +636,8 @@ function RgpdFr({
               numéro de version : une nouvelle version vous les présente de nouveau.
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
               numéro de version, quand vous les acceptez : à la création de votre compte ou d&apos;une
-              équipe, pour gérer une équipe, ou à une connexion lancée depuis la page de connexion
+              équipe, pour gérer une équipe, dans la fenêtre d&apos;acceptation présentée à tout
+              compte connecté qui n&apos;a pas accepté la version en vigueur, ou à une connexion lancée depuis la page de connexion
               (clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord) dans les dix
               minutes où vous les y avez acceptées (une acceptation seulement gardée par le navigateur,
               peut-être celle d&apos;une autre personne, n&apos;est pas reportée sur un compte existant).

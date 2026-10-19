@@ -495,7 +495,8 @@ export function RgpdEn({
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
               on our servers, with its version number, when you accept them: when your account or a team is created,
-              to manage a team, or at a login started from the login page (click on Google, Discord or Blizzard, or
+              to manage a team, in the acceptance window shown to any logged-in account that has not accepted
+              the version in force, or at a login started from the login page (click on Google, Discord or Blizzard, or
               submission of the code received on Discord) within ten minutes of accepting them
               there (an acceptance only kept by the browser, possibly another person&apos;s, is not carried
               over to an existing account).

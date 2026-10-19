@@ -28,12 +28,23 @@ export const LOGIN_PATH = "/connexion";
 export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
 
 /**
+ * Pages où la fenêtre bloquante des conditions laisse passer, depuis la
+ * version 5 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
+ * la politique de confidentialité et les pages légales, exporter ses
+ * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
+ */
+export const TERMS_FREE_PATHS: readonly string[] = ["/rgpd", "/mentions-legales", "/accessibilite", "/profil"];
+
+/**
  * Pages où la modale des conditions se tait : celle des conditions elle-même
- * (qu'elle invite à lire) et la connexion, dont la modale de consentement doit
- * rester seule à l'écran.
+ * (qu'elle invite à lire), la connexion, dont la modale de consentement doit
+ * rester seule à l'écran, et les pages de {@link TERMS_FREE_PATHS} (et leurs
+ * sous-pages, `/rgpd/registre` compris).
  */
 export function termsModalSilencedOn(pathname: string | null | undefined): boolean {
-  return pathname === TERMS_PATH || pathname === LOGIN_PATH;
+  if (pathname === TERMS_PATH || pathname === LOGIN_PATH) return true;
+  if (!pathname) return false;
+  return TERMS_FREE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 /**

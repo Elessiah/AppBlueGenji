@@ -100,7 +100,7 @@ export function TermsAcceptanceModal({
   if (!open) return null;
 
   const accept = async () => {
-    if (busy || !checked) return;
+    if (busy || leaving || !checked) return;
     setBusy(true);
     try {
       const response = await fetch("/api/profile/terms", {
@@ -196,7 +196,7 @@ export function TermsAcceptanceModal({
             variant="primary"
             onClick={accept}
             disabled={!checked}
-            aria-disabled={busy || undefined}
+            aria-disabled={busy || leaving || undefined}
             aria-busy={busy || undefined}
           >
             {busy ? t("termsModal.saving") : t("termsModal.accept")}

@@ -591,12 +591,12 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Acceptance of the terms of use",
     purpose: "Keeping proof that the site's terms of use have been accepted, and which version of them",
     subPurposes: [
-      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received and at a login started from the login page (click on Google, Discord or Blizzard, or submission of the code received on Discord) within ten minutes of accepting the terms there (an acceptance only kept by the browser is not carried over to an existing account)",
+      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received, in the acceptance window shown to any logged-in account that has not accepted the version in force (since version 5) and at a login started from the login page (click on Google, Discord or Blizzard, or submission of the code received on Discord) within ten minutes of accepting the terms there (an acceptance only kept by the browser is not carried over to an existing account)",
       "Asking for acceptance again when the terms change version",
     ],
     legalBasis: "Performance of the service requested by the player (contract)",
     dataSubjects: ["Players registered on the site"],
-    dataCategories: ["Version accepted, context of the acceptance (account creation, login, team creation or management), date"],
+    dataCategories: ["Version accepted, context of the acceptance (account creation, login, team creation or management, acceptance window of a logged-in account), date"],
     sensitiveData: "None",
     retention: [
       "Lifetime of the account",
