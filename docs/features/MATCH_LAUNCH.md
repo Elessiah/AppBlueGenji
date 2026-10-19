@@ -111,10 +111,14 @@ les équipes ne reçoivent les contacts **du caster** que le temps du match
 (`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens. Qui
 n'est pas partie du match, le caster d'un match pas encore parti, ou
 un match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
-la réponse ne dit pas qui joue quoi. Ce refus est relu **une fois** après
-3 s (`readMatchContacts`, `CONTACTS_RETRY_DELAY_MS`) : la carte décide du bouton
-à l'horloge du navigateur, le serveur à la sienne, et un caster dont l'horloge
-avance verrait sinon un refus à l'heure du départ. Un refus part en notification ; le corps
+la réponse ne dit pas qui joue quoi. La carte décide du bouton à l'horloge du
+navigateur, le serveur à la sienne : un caster dont l'horloge avance verrait
+sinon un refus à l'heure du départ. Ce refus est donc relu **une fois**
+(`readMatchContacts`) quand le match n'est pas lancé et que l'heure du serveur
+(en-tête `Date` du refus) précède son départ d'au plus 30 s
+(`contactsRetryDelay`, `CONTACTS_RETRY_MAX_WAIT_MS`), à l'heure du départ plus
+une seconde ; tout autre refus (match terminé, sans heure, tiers) part aussitôt.
+Fermer la modale coupe l'attente et la lecture (`AbortSignal`). Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
 tournoi. Dans l'ordre de l'action principale, « Contacts » vient **après** les
