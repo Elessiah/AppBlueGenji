@@ -12,7 +12,7 @@ règle de fond = avancer `TERMS_VERSION`**, ce qui redemande l'acceptation.
 | Création du compte | case de la modale d'entrée de `/connexion` (avec le consentement RGPD) | `SIGNUP` |
 | Connexion suivante, modale acceptée **dans la page** | idem, si la version courante n'était pas encore acceptée — une acceptation seulement relue du navigateur (`bg_terms_consent`, peut-être celle d'une autre personne sur un ordinateur partagé) n'est pas attribuée à un compte existant | `LOGIN` |
 | Création d'une équipe | case du formulaire `/equipes/creer`, exigée par `POST /api/teams` | `TEAM_CREATION` |
-| Compte connecté en retard d'une version (depuis la v5 : **tout compte**) | fenêtre bloquante `TermsAcceptanceModal` (mise en page racine) | `TEAM_MANAGEMENT` s'il gère une équipe (`managesTeam`), `SIGNED_IN` sinon |
+| Compte connecté en retard d'une version (depuis la v6 : **tout compte**) | fenêtre bloquante `TermsAcceptanceModal` (mise en page racine) | `TEAM_MANAGEMENT` s'il gère une équipe (`managesTeam`), `SIGNED_IN` sinon |
 
 Le site n'a pas de formulaire d'inscription : un compte naît à la première
 connexion. L'acceptation voyage donc avec la connexion — `terms=<version>` scellé dans le
@@ -43,7 +43,7 @@ connecte toujours.
 
 **Tout compte connecté** dont la version acceptée est antérieure à
 `TERMS_VERSION` (ou nulle) reçoit les conditions — décision de l'utilisateur du
-2026-10-19 pour la version 5 ; jusqu'à la version 4, seuls les gérants d'équipe
+2026-10-19 pour la version 6 ; jusqu'à la version 5, seuls les gérants d'équipe
 étaient concernés. La mise en page racine pose la question à chaque chargement
 (`needsTermsAcceptance` : une requête sur `bg_users`, gardée 30 s par compte,
 vidée à l'acceptation) et présente une fenêtre **bloquante** : ni « Plus tard »,
@@ -60,7 +60,7 @@ Qui refuse doit pouvoir partir : la fenêtre laisse passer `/rgpd` (et
 `/rgpd/registre`), `/mentions-legales`, `/accessibilite` et `/profil` (export
 des données, suppression du compte) — `TERMS_FREE_PATHS` de
 `lib/shared/global-modals.ts`, en plus de `/conditions-utilisation` et
-`/connexion`. Les conditions (« Acceptation », FR et EN), l'entrée v5 de
+`/connexion`. Les conditions (« Acceptation », FR et EN), l'entrée v6 de
 `PRIVACY_CHANGES`, `/rgpd` (FR et EN) et la fiche T13 du registre décrivent
 cette fenêtre et son contexte `SIGNED_IN`.
 
@@ -104,15 +104,16 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 2 | 1er octobre 2026 | Changements de fond : âge minimum, licence, responsabilité des gérants, juridiction. Tout compte qui avait accepté la version 1 la réaccepte — à la connexion par la case de `/connexion`, ou par la modale s'il gère une équipe ; ses gestes de gestion sont refusés en 409 d'ici là. |
 | 3 | 1er octobre 2026 | Suspension d'un compte, voies de recours, base légale de la modération, absence de médiateur. |
 | 4 | 14 octobre 2026 | Annonce #live d'un tournoi individuel : le pseudo public du joueur y figure au titre de l'exécution du service (pas de nom neutre ; ne pas y être nommé = ne pas s'inscrire). Date d'entrée en vigueur fixée par l'association (décision du 2026-10-14), non le lendemain de la mise en ligne. |
-| 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la fenêtre « Contacts » et la fenêtre de lancement du match (détail ci-dessous). **Réacceptée par tout compte** (fenêtre bloquante). |
+| 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la fenêtre « Contacts » du match (détail ci-dessous). Redemandée comme la version 4 (connexion, gestion d'équipe). |
+| 6 | 19 octobre 2026 | « Acceptation » : **tout compte connecté** les accepte dans une fenêtre bloquante pour continuer à utiliser le site (plus de report « Plus tard ») ; « Contacts de match » : le BattleTag masqué se lit aussi dans la fenêtre de lancement. La version 5, déjà en ligne, n'est pas réécrite : nouvelle version et nouvelle entrée `PRIVACY_CHANGES` (`2026-10-conditions-v6-acceptation-pour-tous`). |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
 plus la courante ; si c'était une version **antérieure**, elle l'annonce en tête
 (`login.consent.termsUpdated` : « Les conditions d'utilisation ont changé
-(version N, en vigueur depuis le …) », FR et EN). Depuis la version 5, **tout**
+(version N, en vigueur depuis le …) », FR et EN). Depuis la version 6, **tout**
 compte connecté voit en plus la fenêtre bloquante `TermsAcceptanceModal` titrée
-« Les conditions d'utilisation ont changé » (`UPDATED`) ; jusqu'à la version 4,
+« Les conditions d'utilisation ont changé » (`UPDATED`) ; jusqu'à la version 5,
 seul le gérant d'une équipe la voyait.
 
 **Prévenir tout le monde** (version 4, demande de l'association) : ni l'une ni
@@ -132,17 +133,28 @@ et rôle d'équipe communiqués aux deux équipes d'un match et à ses arbitres
 (permission `tournaments`, administrateurs compris) dès que ses adversaires
 sont connus, et à son caster le temps du match seulement (ceux du caster aux
 équipes sur ce même temps), par la fenêtre « Contacts » du match et par sa
-fenêtre de lancement, qui la reprend au départ du match — un
+fenêtre de lancement, qui la reprend au départ du match (précision de la
+version 6) — un
 BattleTag masqué n'est lisible nulle part ailleurs, arbitres et administrateurs
 compris —, au titre de l'organisation du tournoi. C'est la clause que citent la base « exécution du
 contrat » du registre T01 / T04 et de `/rgpd` (`MATCH_CONTACTS_SCOPE`,
 `BATTLETAG_MATCH_SCOPE`). Annoncée une fois à tous par l'entrée
 `2026-10-contacts-de-match-caster-et-conditions-v5`, comme la version 4, qui dit
-aussi que chaque compte devra les accepter à sa prochaine visite. **Tout compte
-la réaccepte** dans la fenêtre bloquante (décision du 2026-10-19).
+comment la réaccepter (connexion, prochain geste de gestion). Cette entrée,
+déployée avec #451, est figée.
+
+**Version 6** (2026-10-19, CONTACTS-FOLLOWUP-2) : section « Acceptation » —
+**tout compte connecté** en retard d'une version accepte dans la fenêtre
+bloquante (contexte `SIGNED_IN` s'il ne gère aucune équipe), sans report ;
+section « Contacts de match » — la fenêtre de lancement est nommée à côté de
+la fenêtre « Contacts ». Annoncée par l'entrée
+`2026-10-conditions-v6-acceptation-pour-tous` (FR et EN), qui dit aussi la
+fin du cookie `bg_terms_later` et la phrase d'avertissement du BattleTag
+masqué. **Tout compte la réaccepte** dans la fenêtre bloquante (décision du
+2026-10-19).
 
 Tout texte qui dit où se lit un BattleTag masqué (avertissement, modale de
-masquage, fiche joueur, conditions v5, `/rgpd`, registre, `PRIVACY_CHANGES`)
+masquage, fiche joueur, conditions v6, `/rgpd`, registre, `PRIVACY_CHANGES`)
 nomme **les deux** fenêtres : « Contacts » de la carte du match et fenêtre de
 lancement (équipes et caster ; les arbitres n'ont que la première). La phrase
 d'avertissement (profil, rattachement et connexion Battle.net, modale de
