@@ -91,11 +91,6 @@ type LiveCandidateRow = RowDataPacket & {
   /** Pseudo public du joueur d'une entrée individuelle (`null` : équipe, ou compte supprimé). */
   team1_pseudo: string | null;
   team2_pseudo: string | null;
-  /**
-   * Lecture d'une soirée seulement : `1` si le match a déjà une annonce
-   * réservée depuis l'ouverture de la soirée (publiée, ou d'issue incertaine).
-   */
-  evening_announced?: number | string | null;
 };
 
 /**
@@ -213,19 +208,16 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
  * Le public (chaîne officielle ou non) se trie ensuite en mémoire.
  */
 async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRow[]> {
-  const announcedSince = `EXISTS (SELECT 1 FROM bg_live_announcements ea
-                                   WHERE ea.match_id = m.id AND ea.sent_at >= ?) AS evening_announced`;
   // Sans message encore gardé, celui-ci est le premier : la fenêtre repartira
   // de son envoi (`rememberEveningMessage`), il liste donc les matchs
   // programmés jusqu'à cette fin-là.
-  const until = evening.discord_message_id ? "?" : `GREATEST(?, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`;
+  const until = evening.discord_message_id ? "?" : `GREATEST(?, ${WINDOW_FROM_NOW})`;
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a WHERE a.match_id = m.id AND a.sent_at >= ?)
              OR (m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
     [evening.started_at, evening.window_end],
-    { column: announcedSince, params: [evening.started_at] },
   );
 }
 
@@ -233,7 +225,6 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
 async function selectMatches(
   where: string,
   params: readonly unknown[],
-  extra: { column: string; params: readonly unknown[] } | null = null,
 ): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
   // Le pseudo n'est lu que pour une inscription faite sous la mention qui
@@ -249,7 +240,7 @@ async function selectMatches(
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
             t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
-            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo${extra ? `, ${extra.column}` : ""}
+            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
                             AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
@@ -259,10 +250,16 @@ async function selectMatches(
        LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0 AND ${registeredSince("t2")}
       WHERE ${where}
       ORDER BY m.id`,
-    [...(extra?.params ?? []), since, since, ...params],
+    [since, since, ...params],
   );
   return rows;
 }
+
+/** Fin de fenêtre d'une soirée comptée de maintenant (SQL). */
+const WINDOW_FROM_NOW = `NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR`;
+
+/** Fenêtre de la soirée repartie de maintenant, jamais raccourcie (SQL). */
+const WINDOW_RESTART = `window_end = GREATEST(window_end, ${WINDOW_FROM_NOW})`;
 
 /** Soirée d'annonces ouverte pour un public (`bg_live_evenings`). */
 interface LiveEvening extends RowDataPacket {
@@ -320,7 +317,7 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   if (open[0]) return open[0];
   await db.execute(
     `INSERT INTO bg_live_evenings (target, started_at, window_end)
-     VALUES (?, NOW(), NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`,
+     VALUES (?, NOW(), ${WINDOW_FROM_NOW})`,
     [target],
   );
   const [created] = await db.query<LiveEvening[]>(select, [target]);
@@ -339,18 +336,22 @@ function howPosted(evening: LiveEvening, quiet: boolean, messageId: string | nul
 }
 
 /**
- * Marque la soirée notifiée juste avant l'envoi qui notifie, et fait repartir
- * sa fenêtre de cet envoi : une issue incertaine (délai écoulé, bot tombé) ne
+ * Réserve la notification de la soirée juste avant l'envoi qui notifie, en une
+ * instruction (`… AND notified = 0` + `affectedRows`), et fait repartir sa
+ * fenêtre de cet envoi : une issue incertaine (délai écoulé, bot tombé) ne
  * laisse pas d'identifiant, mais le public a pu être notifié — le match suivant
  * part sans notification, même si son tournoi est fini depuis ou s'il passe à
  * l'antenne juste après la fin de la fenêtre d'avant.
+ *
+ * @returns `false` si la soirée était déjà notifiée (un autre envoi l'a prise).
  */
-async function markEveningNotified(evening: LiveEvening): Promise<void> {
+async function markEveningNotified(evening: LiveEvening): Promise<boolean> {
   const db = await getDatabase();
-  await db.execute(
-    `UPDATE bg_live_evenings SET notified = 1, window_end = GREATEST(window_end, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR) WHERE id = ?`,
+  const [result] = await db.execute(
+    `UPDATE bg_live_evenings SET notified = 1, ${WINDOW_RESTART} WHERE id = ? AND notified = 0`,
     [Number(evening.id)],
   );
+  return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
 /**
@@ -368,12 +369,11 @@ async function forgetEveningSend(
     const db = await getDatabase();
     if (wasNotifying) await db.execute(`UPDATE bg_live_evenings SET notified = 0 WHERE id = ?`, [Number(evening.id)]);
     if (rows.length === 0) return;
-    const placeholders = rows.map(() => "(?, ?)").join(", ");
-    const params = rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]);
-    await db.execute(
-      `UPDATE bg_live_announcements SET sent_at = ? - INTERVAL 1 SECOND WHERE (match_id, pairing) IN (${placeholders})`,
-      [evening.started_at, ...params],
-    );
+    const claims = claimFilter(rows);
+    await db.execute(`UPDATE bg_live_announcements SET sent_at = ? - INTERVAL 1 SECOND WHERE ${claims.sql}`, [
+      evening.started_at,
+      ...claims.params,
+    ]);
   } catch (error) {
     // Au pire, le match suivant de la soirée part sans notification.
     console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, error);
@@ -405,9 +405,7 @@ async function rememberEveningMessage(
   silent: boolean,
 ): Promise<void> {
   if (!messageId || messageId === evening.discord_message_id) return;
-  const window = !evening.discord_message_id
-    ? `, window_end = GREATEST(window_end, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`
-    : "";
+  const window = !evening.discord_message_id ? `, ${WINDOW_RESTART}` : "";
   try {
     const db = await getDatabase();
     await db.execute(`UPDATE bg_live_evenings SET discord_message_id = ?, silent = ?${window} WHERE id = ?`, [
@@ -447,6 +445,14 @@ function announceKey(pairing: string): string {
   return first <= second ? `${first}:${second}` : `${second}:${first}`;
 }
 
+/** Filtre SQL des réservations d'un groupe (clé `(match_id, pairing)`), et ses paramètres. */
+function claimFilter(rows: readonly LiveCandidateRow[]): { sql: string; params: (number | string)[] } {
+  return {
+    sql: `(match_id, pairing) IN (${rows.map(() => "(?, ?)").join(", ")})`,
+    params: rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]),
+  };
+}
+
 /** Réserve l'annonce d'une affiche ; `false` si un autre passage l'a prise. */
 async function claimAnnouncement(matchId: number, pairing: string): Promise<boolean> {
   const db = await getDatabase();
@@ -467,9 +473,8 @@ async function claimAnnouncement(matchId: number, pairing: string): Promise<bool
 async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: string): Promise<boolean> {
   try {
     const db = await getDatabase();
-    const placeholders = rows.map(() => "(?, ?)").join(", ");
-    const params = rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]);
-    await db.execute(`DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (${placeholders})`, params);
+    const claims = claimFilter(rows);
+    await db.execute(`DELETE FROM bg_live_announcements WHERE ${claims.sql}`, claims.params);
     return true;
   } catch (error) {
     const lost = rows.length > 1 ? "annonces non réessayées" : "annonce non réessayée";
@@ -488,12 +493,11 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
  */
 async function stampClaims(rows: readonly LiveCandidateRow[], startedAt: Date | string): Promise<void> {
   const db = await getDatabase();
-  const placeholders = rows.map(() => "(?, ?)").join(", ");
-  const params = rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]);
-  await db.execute(
-    `UPDATE bg_live_announcements SET sent_at = GREATEST(sent_at, ?) WHERE (match_id, pairing) IN (${placeholders})`,
-    [startedAt, ...params],
-  );
+  const claims = claimFilter(rows);
+  await db.execute(`UPDATE bg_live_announcements SET sent_at = GREATEST(sent_at, ?) WHERE ${claims.sql}`, [
+    startedAt,
+    ...claims.params,
+  ]);
 }
 
 /** Matchs réservés par un passage pour un même public (chaîne officielle ou non). */
@@ -712,19 +716,6 @@ function eveningStreams(
 }
 
 /**
- * Vrai si un match de la soirée, hors du groupe et du même public, a déjà une
- * annonce réservée depuis son ouverture : une notification a pu partir.
- */
-function alreadyAnnounced(group: AnnouncementGroup, others: readonly LiveCandidateRow[]): boolean {
-  const claimed = new Set(group.rows.map((row) => Number(row.id)));
-  return others.some((row) => {
-    if (claimed.has(Number(row.id)) || Number(row.evening_announced) !== 1) return false;
-    const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
-    return url !== null && liveMentionTarget(url) === group.target;
-  });
-}
-
-/**
  * Un engagé d'une ligne de soirée : un tournoi qui compte une entrée
  * individuelle est un tournoi individuel, même au type illisible — son invité
  * sans compte ne part pas sous son nom, y compris dans un match entre deux
@@ -813,24 +804,23 @@ async function announce(
   } catch (error) {
     return holdUnreadableEvening(group, error);
   }
-  // Soirée sans message connu, mais dont un autre match a déjà une annonce
-  // (issue incertaine, bot trop ancien, identifiant non gardé) : son public a
-  // peut-être déjà été notifié — un nouveau message part, sans notification.
-  const quiet =
-    !evening.discord_message_id && (Number(evening.notified) === 1 || alreadyAnnounced(group, others));
-  // Premier message de la soirée, qui notifie : la soirée est marquée avant
-  // l'envoi, pour qu'une issue incertaine ne laisse pas notifier deux fois.
-  const notifying = !evening.discord_message_id && !quiet;
-  const { message, urls, logMessage } = eveningTexts(group, others, now);
-  const { label, context, plural } = describeGroup(group, Number(evening.id));
-  if (notifying) {
+  // Premier message de la soirée : il notifie s'il prend la marque `notified`
+  // (avant l'envoi, en une instruction). Soirée déjà marquée sans message
+  // connu (issue incertaine, bot trop ancien, identifiant non gardé) : son
+  // public a peut-être déjà été notifié — un nouveau message part, sans
+  // notification.
+  let notifying = false;
+  if (!evening.discord_message_id && Number(evening.notified) !== 1) {
     try {
-      await markEveningNotified(evening);
+      notifying = await markEveningNotified(evening);
     } catch (error) {
       // Sans la marque, une issue incertaine laisserait notifier deux fois.
       return holdUnreadableEvening(group, error);
     }
   }
+  const quiet = !evening.discord_message_id && !notifying;
+  const { message, urls, logMessage } = eveningTexts(group, others, now);
+  const { label, context, plural } = describeGroup(group, Number(evening.id));
   const { outcome, messageId } = await pushLiveEvening({
     message,
     streamUrls: urls,
