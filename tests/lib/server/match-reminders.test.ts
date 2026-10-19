@@ -51,7 +51,15 @@ type Recipient = {
   discord_pseudo: string | null;
   /** `bg_users.match_dm_enabled` : absent = activé (défaut de la colonne). */
   match_dm_enabled?: number;
+  /** `bg_users.discord_verified_at` : absent = certifié dès qu'il y a un tag. */
+  discord_verified_at?: string | null;
 };
+
+/** Seul un tag certifié reçoit un message privé de match (portée `certified`). */
+function certifiedAt(r: Recipient): string | null {
+  if (r.discord_verified_at !== undefined) return r.discord_verified_at;
+  return r.discord_pseudo ? "2026-09-01" : null;
+}
 
 const RECIPIENTS: Recipient[] = [
   { team_id: 101, id: 1, pseudo: "Kiro", discord_id: "555000111", discord_pseudo: "kiro" },
@@ -92,7 +100,7 @@ async function mockDb(options: {
     .fn<() => Promise<unknown>>()
     .mockResolvedValueOnce([matches])
     .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
-    .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+    .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
   const execute = executeDouble(options);
 
   const { getDatabase } = await import("@/lib/server/database");
@@ -603,6 +611,38 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1], [3]]);
   });
 
+  it("n'écrit qu'aux tags Discord certifiés : un tag saisi ou un identifiant non certifié n'a que le push", async () => {
+    await mockDb({
+      recipients: [
+        { team_id: 101, id: 1, pseudo: "Kiro", discord_id: "555000111", discord_pseudo: "kiro", discord_verified_at: null },
+        { team_id: 101, id: 2, pseudo: "Ayla", discord_id: null, discord_pseudo: "ayla_bg", discord_verified_at: null },
+        { team_id: 102, id: 3, pseudo: "Nova", discord_id: "555000333", discord_pseudo: "nova" },
+      ],
+    });
+
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
+    // Seule l'engagée de Nova (certifiée) reçoit un message privé.
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    const [, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(recipients).toEqual([{ discordId: "555000333", handle: "nova", label: "Nova" }]);
+    // Le push part à tous, certifiés ou non.
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2], [3]]);
+  });
+
+  it("un joueur certifié qui a coupé les messages de match n'en reçoit pas, mais garde son push", async () => {
+    await mockDb({
+      recipients: [
+        { team_id: 101, id: 1, pseudo: "Kiro", discord_id: "555000111", discord_pseudo: "kiro", match_dm_enabled: 0 },
+        { team_id: 102, id: 3, pseudo: "Nova", discord_id: "555000333", discord_pseudo: "nova" },
+      ],
+    });
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    const labels = jest.mocked(pushDiscordDirectMessages).mock.calls.flatMap(([, list]) => list.map((r) => r.label));
+    expect(labels).toEqual(["Nova"]);
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1], [3]]);
+  });
+
   it("pousse le rappel sous le sujet des rappels, vers le match", async () => {
     await mockDb({});
 
@@ -753,7 +793,7 @@ describe("announceMatchSchedule — horaire posé ou changé par l'arbitrage", (
     const query = jest
       .fn<() => Promise<unknown>>()
       .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
-      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
     const execute = executeDouble(options);
     const { getDatabase } = await import("@/lib/server/database");
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -949,7 +989,7 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
     const query = jest
       .fn<() => Promise<unknown>>()
       .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
-      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
     const execute = executeDouble({ told: options.told === undefined ? START : options.told, current: null });
     const { getDatabase } = await import("@/lib/server/database");
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -1076,7 +1116,7 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
       .mockResolvedValueOnce([current])
       .mockResolvedValueOnce([names])
       .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
-      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
     const { getDatabase } = await import("@/lib/server/database");
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: jest.fn() }));
     return query;
@@ -1477,7 +1517,7 @@ describe("messages privés de match coupés par le joueur (droit d'opposition)",
     const query = jest
       .fn<() => Promise<unknown>>()
       .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
-      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
+      .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
     const { getDatabase } = await import("@/lib/server/database");
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble({}) }));
     expect(await announceMatchSchedule(notice(), { rescheduled: false }, TEN_DAYS_BEFORE)).toBe(2);

@@ -108,6 +108,9 @@
     "removalConfirm": "Retirer mon tag",
     "removalPending": "Retrait…",
     "removalBody": "L'organisation ne pourra plus te joindre sur Discord pendant un tournoi, et ta certification est perdue.",
+    "removalBodyUnverified": "Ton tag n'est pas certifié : personne ne le voit, pas même les administrateurs.",
+    "removalBody2Unverified": "Ta prochaine connexion par Discord réenregistrera ton pseudo, toujours sans le certifier.",
+    "removalBodyDms": "Le bot ne t'enverra plus non plus les messages privés de tes matchs.",
     "removalBody2": "Ta prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera invisible de tous tant que tu ne le certifieras pas de nouveau.",
     "verifiedAlt": "Tag Discord vérifié",
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord."
@@ -138,9 +141,11 @@
   },
   "matchDms": {
     "label": "Messages privés Discord de mes matchs",
-    "noDiscord": "Aucun compte Discord rattaché ni tag Discord renseigné : ces messages ne peuvent pas te parvenir pour l'instant.",
+    "notCertified": "Ces messages ne partent qu'aux comptes dont le tag Discord est certifié, pour éviter le spam : sans tag certifié, ils ne peuvent pas te parvenir.",
+    "certifyLink": "Certifier mon tag Discord",
     "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, et pour ses rappels (veille, check-in). Décoche pour ne plus les recevoir : tes notifications push gardent leurs propres réglages, et les arbitres reçoivent toujours les leurs.",
     "enabled": "Messages privés de match activés.",
+    "enabledNotCertified": "Messages privés de match activés : ils partiront une fois ton tag Discord certifié.",
     "disabled": "Messages privés de match coupés."
   },
   "avatarUpdated": "Avatar mis à jour.",
@@ -347,6 +352,7 @@
     "title": "Certifier mon tag Discord",
     "purpose": "L'organisation doit pouvoir te joindre pendant un tournoi : reprogrammation d'une manche, litige de score, forfait.",
     "intro": "{purpose} La certification est <strong>facultative</strong> et ne se fait que par ce geste — se connecter par Discord ne la donne pas : sans elle, ton tag reste invisible pour tout le monde, administrateurs compris.",
+    "matchDms": "Elle permet aussi au bot de t'envoyer en privé les messages de tes matchs (horaires, rappels) : sans elle, il ne t'en envoie aucun.",
     "exposureTitle": "Ce que la certification expose",
     "exposure": {
       "admins": "Les administrateurs du site voient ton tag Discord en permanence.",
@@ -383,6 +389,7 @@
     "intro": "Saisis ton pseudo Discord : le bot BlueGenji t'envoie un code à six chiffres en message privé, et le code prouve que ce pseudo est le tien.",
     "introUpdate": "Seul le pseudo du compte Discord déjà rattaché est accepté.",
     "introOutro": "Un pseudo qui change perd sa certification : tu pourras la redonner d'un clic avec « Certifier mon tag ».",
+    "matchDms": "Sans certification, le bot ne t'envoie aucun message privé de match.",
     "handle": "Pseudo Discord",
     "handlePlaceholder": "ton_pseudo",
     "handleHelp": "Le bot doit partager un serveur avec toi : <join>rejoins le serveur BlueGenji</join> si ce n'est pas déjà fait.",
@@ -396,6 +403,7 @@
     "checking": "Vérification…",
     "validate": "Valider le code",
     "linked": "Discord rattaché par code.",
+    "certifyForDms": "Certifie ton tag (section Discord) : sans certification, aucun message privé de match ne te parvient.",
     "updated": "Pseudo Discord mis à jour.",
     "codeSent": "Code envoyé en message privé Discord (expiration : {time}).",
     "bodyLabel": "Pseudo Discord du bot"

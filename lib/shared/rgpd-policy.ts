@@ -8,6 +8,12 @@ import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
  */
 export const MATCH_TIME_DM_SCOPE = "annonces d'horaire, rappels et avis de retrait de match en message privé";
 
+/** Avis de suspension ou de modération en message privé : intérêt légitime à faire respecter les conditions (registre T11). */
+export const MODERATION_DM_SCOPE = "avis de suspension ou de modération en message privé";
+
+/** Information sur les données en message privé : obligation légale d'information (registre T10). */
+export const DATA_NOTICE_DM_SCOPE = "information sur tes données en message privé";
+
 /**
  * Le pseudo public d'un joueur inscrit en tournoi individuel part dans
  * l'annonce #live (registre T16) et y survit au compte. Base : l'exécution du
@@ -98,7 +104,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion (contrat), son **exposition** repose sur la certification
     // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot. Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
+      "Authentification Discord, codes du bot en message privé (connexion, rattachement, certification), notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",
@@ -110,9 +116,14 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
-    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
+    // La certification décide aussi qui reçoit les messages privés de match,
+    // qui reposent sur l'intérêt légitime (opposition par la case du profil).
+    extraBases: [
+      { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" },
+      { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
+    ],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },
   {
@@ -121,9 +132,13 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion, au même titre que les deux suivants. La finalité le dit, parce
     // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
     finalite:
-      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires et rappels de match, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre",
+      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels et retrait de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: "Exécution du contrat",
-    extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
+    extraBases: [
+      { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
+      { base: "Intérêt légitime", scope: MODERATION_DM_SCOPE },
+      { base: "Obligation légale", scope: DATA_NOTICE_DM_SCOPE },
+    ],
     duree: "Durée du compte",
   },
   {
@@ -182,7 +197,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // `bg_users.match_dm_enabled` : l'opposition aux messages privés de match
     // (registre T04), exportée et remise au défaut à l'anonymisation.
     finalite:
-      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs, si ton tag Discord est certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
     base: "Intérêt légitime",
     duree: "Durée du compte",
   },

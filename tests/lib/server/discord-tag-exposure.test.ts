@@ -205,7 +205,7 @@ describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans 
     // Une certification déjà donnée survit au même pseudo, tombe s'il change.
     expect(update!.sql).toContain("WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END");
     expect(update!.sql).toContain("discord_pseudo_from_discord = 1");
-    expect(update!.params).toEqual(["keryan", "keryan", 7]);
+    expect(update!.params).toEqual(["keryan", "keryan", 7, "900000000000000001"]);
     // La porte est notée au passage, et le code en message privé ne dégrade
     // jamais un rattachement déjà noué par le bouton.
     expect(update!.sql).toContain("discord_link_method = COALESCE(discord_link_method, 'DM_CODE')");
@@ -235,10 +235,32 @@ describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans 
     });
 
     const update = find(queries, "UPDATE bg_users")!;
-    expect(update.params).toEqual([7]);
+    expect(update.params).toEqual([7, "900000000000000001"]);
     expect(update.sql).toContain("discord_link_method = 'OAUTH'");
     expect(update.sql).not.toContain("discord_pseudo");
     expect(update.sql).not.toContain("discord_verified_at");
+  });
+
+  it("refuse la connexion quand le compte trouvé a détaché ce Discord entre-temps", async () => {
+    // Lecture : compte 7 ; il détache ce Discord avant l'écriture, bornée à
+    // `discord_id = ?`, qui ne touche donc rien. Pas de session pour 7, et pas
+    // de seconde lecture : un nouveau titulaire n'a pas passé le contrôle de
+    // suspension.
+    let lookups = 0;
+    const { queries } = fakeDb((q) => {
+      if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) {
+        lookups += 1;
+        return [[{ id: 7 }]];
+      }
+      if (q.startsWith("UPDATE bg_users")) return [{ affectedRows: 0 }];
+      return undefined;
+    });
+
+    await expect(
+      createOrGetDiscordUser("900000000000000001", undefined, "keryan", { method: "OAUTH", termsAccepted: true }),
+    ).rejects.toThrow("DISCORD_AUTH_FAILED");
+    expect(lookups).toBe(1);
+    expect(queries.filter((q) => q.sql.startsWith("UPDATE bg_users"))).toHaveLength(1);
   });
 
   it("crée un compte neuf avec son tag enregistré, jamais certifié", async () => {

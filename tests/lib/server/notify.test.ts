@@ -130,11 +130,21 @@ describe("destinataires", () => {
     discord_verified_at: null,
   } as unknown as Parameters<typeof toNotificationRecipient>[0];
 
-  it("n'écrit à un tag saisi que pour un message qui n'engage rien (declared)", () => {
+  it("n'écrit jamais à un tag saisi, quelle que soit la portée", () => {
     expect(toNotificationRecipient(row, "proven")).toEqual({ userId: 5, discord: null });
-    expect(toNotificationRecipient(row, "declared")).toEqual({
+    expect(toNotificationRecipient(row, "certified")).toEqual({ userId: 5, discord: null });
+  });
+
+  it("certified : un tag certifié seul ouvre le canal, avec l'identifiant du compte qui l'a certifié", () => {
+    const certified = { ...row, discord_id: "1", discord_verified_at: "2026-09-01" } as typeof row;
+    expect(toNotificationRecipient(certified, "certified")).toEqual({
       userId: 5,
-      discord: { discordId: null, handle: "nova", label: "Nova" },
+      discord: { discordId: "1", handle: "nova", label: "Nova" },
+    });
+    // Identifiant rattaché sans tag certifié : pas de message de match (contre le spam).
+    expect(toNotificationRecipient({ ...row, discord_id: "1" } as typeof row, "certified")).toEqual({
+      userId: 5,
+      discord: null,
     });
   });
 

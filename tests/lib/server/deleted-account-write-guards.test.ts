@@ -192,9 +192,10 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
       .mockResolvedValue([{ affectedRows: 0 }]);
     await mockDb(execute);
 
-    await createOrGetDiscordUser("100000000000000001", undefined, "nova", {
-      method: "DM_CODE", termsAccepted: true,
-    });
+    // L'écriture ne touche rien : la connexion est refusée, aucune session.
+    await expect(
+      createOrGetDiscordUser("100000000000000001", undefined, "nova", { method: "DM_CODE", termsAccepted: true }),
+    ).rejects.toThrow("DISCORD_AUTH_FAILED");
 
     const update = execute.mock.calls.find(([sql]) =>
       String(sql).includes("discord_verified_at = CASE"),

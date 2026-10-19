@@ -283,8 +283,8 @@ describe("français inchangé — les messages égalent les textes d'origine", (
 
   it("horaire de match : le staff sait qu'un joueur peut avoir coupé les messages privés de ses matchs", () => {
     for (const key of ["notice", "noticePlanning"] as const) {
-      expect(frDialogs.schedule[key]).toMatch(/message privé Discord, sauf pour un joueur qui a coupé ceux de ses matchs, et notification push/);
-      expect(enDialogs.schedule[key]).toMatch(/Discord direct message, except for a player who turned off those about their matches, and push notification/);
+      expect(frDialogs.schedule[key]).toMatch(/\(notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs\)/);
+      expect(enDialogs.schedule[key]).toMatch(/\(push notification, and Discord direct message to players with a verified Discord tag, unless they turned off those about their matches\)/);
     }
   });
 

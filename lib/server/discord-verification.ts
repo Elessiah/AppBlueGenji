@@ -131,7 +131,9 @@ function isAttestedTag(row: UserDiscordRow | null): boolean {
  * instruction : ce sont les deux faces d'une preuve unique, et une base où l'un
  * serait passé sans l'autre ne voudrait rien dire. `discord_id` n'est posé que
  * s'il manquait (`COALESCE`) — l'appelant a déjà refusé le cas où il diffère,
- * mais la garde vaut d'être portée par l'écriture elle-même.
+ * et le `WHERE` refuse celui où un autre Discord s'est rattaché depuis cette
+ * relecture (`DISCORD_ID_MISMATCH`) : le contrôle préalable est séparé de
+ * l'écriture par des `await`.
  *
  * L'unicité de `discord_id` est la borne qui tranche la **course** entre deux
  * comptes du site qui certifieraient le même Discord au même instant : le
@@ -154,6 +156,7 @@ function isAttestedTag(row: UserDiscordRow | null): boolean {
 async function writeVerifiedTag(userId: number, discordId: string, tag: string): Promise<void> {
   const method: ConnectionMethod = "DM_CODE";
   const db = await getDatabase();
+  let affected: number;
   try {
     const [result] = await db.execute<ResultSetHeader>(
       `UPDATE bg_users
@@ -162,13 +165,20 @@ async function writeVerifiedTag(userId: number, discordId: string, tag: string):
            discord_verified_at = NOW(),
            discord_pseudo_from_discord = 1,
            discord_link_method = COALESCE(discord_link_method, ?)
-       WHERE id = ? AND is_deleted = 0`,
-      [discordId, tag, method, userId],
+       WHERE id = ? AND is_deleted = 0 AND (discord_id IS NULL OR discord_id = ?)`,
+      [discordId, tag, method, userId, discordId],
     );
-    if (Number(result.affectedRows) === 0) throw new Error("PROFILE_NOT_FOUND");
+    affected = Number(result.affectedRows);
   } catch (error) {
     if (isDuplicateEntryError(error)) throw new Error("DISCORD_ALREADY_LINKED");
     throw error;
+  }
+  if (affected === 0) {
+    // Un autre Discord rattaché entre la relecture et l'écriture (connexion
+    // Discord dans un autre onglet) : le tag certifié resterait sinon posé sur
+    // l'identifiant de cet autre compte, où partiraient ses messages de match.
+    if (!(await loadDiscordRow(userId))) throw new Error("PROFILE_NOT_FOUND");
+    throw new Error("DISCORD_ID_MISMATCH");
   }
 }
 

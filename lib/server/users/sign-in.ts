@@ -308,17 +308,25 @@ export async function createOrGetDiscordUser(
     // que Discord ait nommé un pseudo affichable ou pas. Les deux dans la même
     // instruction, plutôt qu'une seconde écriture qui laisserait un `await`
     // entre elles.
-    await db.execute(
+    const [refreshed] = await db.execute<ResultSetHeader>(
+      // `discord_id = ?` : le compte a pu détacher ce Discord (et en rattacher
+      // un autre) depuis la lecture — son pseudo, alors nommé « par Discord »,
+      // deviendrait certifiable d'un clic sur l'identifiant de l'autre.
       handle
         ? `UPDATE bg_users
            SET ${DISCORD_NAMED_PSEUDO_SQL},
                discord_link_method = ${methodSql}
-           WHERE id = ? AND is_deleted = 0`
+           WHERE id = ? AND is_deleted = 0 AND discord_id = ?`
         : `UPDATE bg_users
            SET discord_link_method = ${methodSql}
-           WHERE id = ? AND is_deleted = 0`,
-      handle ? [handle, handle, userId] : [userId],
+           WHERE id = ? AND is_deleted = 0 AND discord_id = ?`,
+      handle ? [handle, handle, userId, discordId] : [userId, discordId],
     );
+    // Rien d'écrit : ce compte n'a plus ce Discord (détaché entre-temps, ou
+    // compte supprimé). Pas de session par une porte qu'il n'a plus, et pas de
+    // seconde lecture : son nouveau titulaire n'a pas passé le contrôle de
+    // suspension fait sur celui-ci. Le joueur recommence la connexion.
+    if (Number(refreshed.affectedRows) === 0) throw new Error("DISCORD_AUTH_FAILED");
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     await settleTermsAfterLogin(userId, false, door);
     return userId;

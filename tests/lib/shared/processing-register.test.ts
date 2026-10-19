@@ -192,10 +192,15 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
   const en = (ref: string) => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref)!;
 
   it("T08 remet l'avis « Match retiré » et nomme les modérateurs destinataires d'une alerte AutoMod", () => {
-    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match, avis de retrait d'un match \(« Match retiré »\), avis de modération/);
-    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders, notices of removal from a match \(“Match retiré”\), moderation notices/);
+    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match et avis de retrait d'un match \(« Match retiré » ; ces messages de match aux seuls tags Discord certifiés\), avis de modération/);
+    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders and notices of removal from a match \(“Match retiré”; these match messages to certified Discord tags only\), moderation notices/);
     expect(fr("T08").recipients).toContain("Modérateurs du serveur Discord de l'association, si une règle AutoMod de Discord bloque ou signale une annonce #live (traitement T16)");
     expect(en("T08").recipients).toContain("Moderators of the association's Discord server, if a Discord AutoMod rule blocks or flags a #live announcement (processing activity T16)");
+  });
+
+  it("T04 dit que les messages privés de match ne partent qu'aux tags Discord certifiés (FR et EN)", () => {
+    expect(fr("T04").subPurposes.join(" ")).toMatch(/les messages privés ne partent qu'aux comptes dont le tag Discord est certifié \(un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam\)/);
+    expect(en("T04").subPurposes.join(" ")).toMatch(/direct messages only go to accounts with a certified Discord tag \(an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam\)/);
   });
 
   it("T16 dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande", () => {

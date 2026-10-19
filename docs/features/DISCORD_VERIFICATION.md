@@ -217,7 +217,18 @@ Un compte dont le `discord_id` est posé le garde. Un tag qui résout vers un au
 compte Discord est refusé (`DISCORD_ID_MISMATCH`, 409) plutôt que de faire glisser
 l'identité de connexion d'un compte Discord à un autre — `discord_id` **est** un
 moyen de connexion. L'état est relu à la confirmation, le compte ayant pu se
-rattacher entre-temps.
+rattacher entre-temps ; l'écriture le redit dans son `WHERE`
+(`discord_id IS NULL OR discord_id = ?`), une connexion Discord dans un autre
+onglet pouvant se glisser entre cette relecture et elle — sans quoi le tag du
+défi serait certifié sur l'identifiant d'un autre compte Discord, où partiraient
+les messages privés de match. Les deux autres écrivains de `discord_id` portent
+la même garde : le rattachement OAuth (`UNMOVED_SUBJECT_SQL`, pour les trois
+fournisseurs — 0 ligne → `PROVIDER_ALREADY_LINKED`) et le rafraîchissement du
+pseudo à la connexion Discord (`AND discord_id = ?`), qui sinon nommerait « par
+Discord » sur un autre identifiant le pseudo d'un Discord détaché entre-temps.
+Ce rafraîchissement sans effet refuse la connexion (`DISCORD_AUTH_FAILED`) :
+pas de session pour le compte qui vient de détacher ce Discord, ni pour un
+nouveau titulaire relu sans contrôle de suspension — le joueur recommence.
 
 Un Discord déjà certifié par un **autre compte du site** est refusé de même
 (`DISCORD_ALREADY_LINKED`, 409) — mais **à la confirmation seulement**, par

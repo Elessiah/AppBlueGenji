@@ -108,6 +108,9 @@
     "removalConfirm": "Remove my tag",
     "removalPending": "Removing…",
     "removalBody": "The organizers will no longer be able to reach you on Discord during a tournament, and your verification is lost.",
+    "removalBodyUnverified": "Your tag isn't verified: nobody sees it, not even the administrators.",
+    "removalBody2Unverified": "Your next login with Discord will save your username again, still without verifying it.",
+    "removalBodyDms": "The bot will no longer send you direct messages about your matches either.",
     "removalBody2": "Your next login with Discord will save your username again, but without verifying it: it will stay invisible to everyone until you verify it again.",
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account."
@@ -138,9 +141,11 @@
   },
   "matchDms": {
     "label": "Discord direct messages about my matches",
-    "noDiscord": "No Discord account linked and no Discord tag saved: these messages can't reach you for now.",
+    "notCertified": "These messages only go to accounts with a verified Discord tag, to avoid spam: without a verified tag, they can't reach you.",
+    "certifyLink": "Verify my Discord tag",
     "hint": "On by default: the bot messages you privately when one of your matches is scheduled, rescheduled or unscheduled, when a match leaves your schedule, and for its reminders (day before, check-in). Untick to stop receiving them: your push notifications keep their own settings, and referees still get theirs.",
     "enabled": "Match direct messages turned on.",
+    "enabledNotCertified": "Match direct messages turned on: they'll be sent once your Discord tag is verified.",
     "disabled": "Match direct messages turned off."
   },
   "avatarUpdated": "Avatar updated.",
@@ -347,6 +352,7 @@
     "title": "Verify my Discord tag",
     "purpose": "The organizers need to be able to reach you during a tournament: rescheduling a round, a score dispute, a forfeit.",
     "intro": "{purpose} Verification is <strong>optional</strong> and only happens through this step — logging in with Discord doesn't grant it: without it, your tag stays invisible to everyone, administrators included.",
+    "matchDms": "It also lets the bot send you direct messages about your matches (times, reminders): without it, the bot sends you none.",
     "exposureTitle": "What verification exposes",
     "exposure": {
       "admins": "The site's administrators can see your Discord tag at all times.",
@@ -383,6 +389,7 @@
     "intro": "Enter your Discord username: the BlueGenji bot sends you a six-digit code by direct message, and the code proves this username is yours.",
     "introUpdate": "Only the username of the Discord account already linked is accepted.",
     "introOutro": "A username that changes loses its verification: you can restore it in one click with “Verify my tag”.",
+    "matchDms": "Without verification, the bot sends you no match direct messages.",
     "handle": "Discord username",
     "handlePlaceholder": "your_username",
     "handleHelp": "The bot must share a server with you: <join>join the BlueGenji server</join> if you haven't already.",
@@ -396,6 +403,7 @@
     "checking": "Checking…",
     "validate": "Confirm the code",
     "linked": "Discord linked by code.",
+    "certifyForDms": "Verify your tag (Discord section): without verification, no match direct message reaches you.",
     "updated": "Discord username updated.",
     "codeSent": "Code sent by Discord direct message (expires at {time}).",
     "bodyLabel": "Discord username for the bot"

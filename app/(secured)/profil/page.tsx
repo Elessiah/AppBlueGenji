@@ -89,13 +89,17 @@ interface DiscordState {
 }
 
 /**
- * Un message privé de match peut-il joindre ce compte ? Oui avec un Discord
- * rattaché ou un tag enregistré (`toNotificationRecipient`) ; `null` tant que
- * l'état Discord n'est pas lu.
+ * Un message privé de match peut-il joindre ce compte ? Seulement avec un tag
+ * Discord **certifié** (`toNotificationRecipient`, portée `certified`) : un
+ * tag saisi ou un Discord rattaché sans tag certifié ne reçoit rien. Tant que
+ * l'état Discord n'est pas lu — ou si sa lecture a échoué, ce qu'elle fait en
+ * silence —, le profil déjà chargé fait foi (`discordVerified`) : sans lui, un
+ * joueur non certifié ne verrait jamais la ligne qui le prévient. `null` quand
+ * ni l'un ni l'autre n'est connu.
  */
-function matchDmReachable(discordState: DiscordState, savedTag: string): boolean | null {
-  if (discordState.linked === null) return null;
-  return discordState.linked || savedTag.trim() !== "";
+function matchDmReachable(discordState: DiscordState, profileVerified: boolean | undefined): boolean | null {
+  if (discordState.linked !== null) return discordState.verified;
+  return profileVerified ?? null;
 }
 
 /**
@@ -129,6 +133,26 @@ function adultChoice(isAdult: boolean | null): string {
 function trimmedOrNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * Corps de la confirmation « Retirer mon tag ». Seul un tag certifié est vu
+ * de l'organisation et reçoit les messages privés de match : ce qui se perd
+ * ne se dit qu'à lui — un tag qui ne l'est pas, invisible de tous, n'a rien
+ * de cela à perdre (`removalBodyUnverified`, `removalBody2Unverified`). La
+ * fin des messages privés de match ne se promet qu'à qui les reçoit encore
+ * (`dms` : tag certifié et case « Messages privés Discord de mes matchs »
+ * cochée).
+ */
+function TagRemovalBody({ verified, dms }: Readonly<{ verified: boolean; dms: boolean }>) {
+  const { t } = useProfileText();
+  return (
+    <>
+      <p>{t(verified ? "discord.removalBody" : "discord.removalBodyUnverified")}</p>
+      {verified && dms ? <p>{t("discord.removalBodyDms")}</p> : null}
+      <p>{t(verified ? "discord.removalBody2" : "discord.removalBody2Unverified")}</p>
+    </>
+  );
 }
 
 export default function ProfilePage() {
@@ -484,6 +508,20 @@ export default function ProfilePage() {
 
   const [discordTagBusy, setDiscordTagBusy] = useState(false);
   const [confirmingTagRemoval, setConfirmingTagRemoval] = useState(false);
+  // Certification lue à l'ouverture de la confirmation : le retrait remet
+  // `verified` à `false` avant la fin de la requête, et le texte du dialogue
+  // ne doit pas basculer sous les yeux du joueur pendant « Retrait… ».
+  const [tagRemovalVerified, setTagRemovalVerified] = useState(false);
+  // Messages privés de match encore reçus à l'ouverture (case cochée).
+  const [tagRemovalDms, setTagRemovalDms] = useState(false);
+  // Ce que montre la case « Messages privés Discord de mes matchs » : la fiche
+  // relue par une sauvegarde du profil peut retarder sur un envoi en cours.
+  // Une référence, pas un état : seul le clic « Retirer » la lit, et un état
+  // ferait rendre toute la page à chaque coche (et au chargement de la fiche).
+  const matchDmShown = useRef<boolean | undefined>(undefined);
+  const reportMatchDmChoice = useRef((enabled: boolean) => {
+    matchDmShown.current = enabled;
+  }).current;
 
   /**
    * Retirer son tag Discord — l'annulation de l'exposition.
@@ -703,7 +741,11 @@ export default function ProfilePage() {
       discordStateBusy={discordStateBusy}
       loadDiscordState={loadDiscordState}
       discordTagBusy={discordTagBusy}
-      onDiscordTagRemove={() => setConfirmingTagRemoval(true)}
+      onDiscordTagRemove={() => {
+        setTagRemovalVerified(discordState.verified);
+        setTagRemovalDms((matchDmShown.current ?? data?.matchDmEnabled) !== false);
+        setConfirmingTagRemoval(true);
+      }}
       setVerifyOpen={setVerifyOpen}
     />
   );
@@ -1027,6 +1069,19 @@ export default function ProfilePage() {
             // sans quoi l'écran montrerait l'ancien pseudo jusqu'au rechargement.
             setDiscordPseudo(tag);
             setSavedDiscordPseudo(tag);
+            // Un pseudo qui change perd sa certification (comme côté serveur) :
+            // l'écran ne la garde pas si la relecture de l'état Discord échoue.
+            // Le profil chargé aussi : il sert de repli quand cette lecture échoue.
+            setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));
+            setData((prev) =>
+              prev && prev.profile.discordPseudo !== tag
+                ? { ...prev, profile: { ...prev.profile, discordVerified: false } }
+                : prev,
+            );
+          }}
+          onDiscordUnlinked={() => {
+            setDiscordState((prev) => ({ ...prev, linked: false, verified: false, attested: false }));
+            setData((prev) => (prev ? { ...prev, profile: { ...prev.profile, discordVerified: false } } : prev));
           }}
         />
       </ProfileSection>
@@ -1034,11 +1089,13 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
         {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
-        {/* Un compte sans Discord rattaché ni tag ne reçoit aucun de ces
-            messages : la case le dit (`null` tant que l'état n'est pas lu). */}
+        {/* Un compte sans tag Discord certifié ne reçoit aucun de ces
+            messages : la case le dit (`matchDmReachable`, profil chargé en
+            repli de l'état Discord ; `null` tant qu'aucun des deux n'est lu). */}
         <MatchDmField
           initial={data?.matchDmEnabled}
-          discordReachable={matchDmReachable(discordState, savedDiscordPseudo)}
+          discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
+          onChoice={reportMatchDmChoice}
         />
       </ProfileSection>
 
@@ -1128,8 +1185,7 @@ export default function ProfilePage() {
           onClose={() => setConfirmingTagRemoval(false)}
           onConfirm={onDiscordTagRemove}
         >
-          <p>{t("discord.removalBody")}</p>
-          <p>{t("discord.removalBody2")}</p>
+          <TagRemovalBody verified={tagRemovalVerified} dms={tagRemovalDms} />
         </ConfirmActionDialog>
       ) : null}
       {pendingDeletion ? (

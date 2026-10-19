@@ -10,6 +10,8 @@ import {
   AUTOMOD_ALERT_SCOPE,
   LIVE_PSEUDO_SCOPE,
   MATCH_TIME_DM_SCOPE,
+  MODERATION_DM_SCOPE,
+  DATA_NOTICE_DM_SCOPE,
 } from "@/lib/shared/rgpd-policy";
 import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
@@ -33,9 +35,9 @@ describe("contacts du lancement d'un match — base légale", () => {
     for (const donnee of ["Certification du pseudo Discord", "Pseudo Overwatch"]) {
       const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
       expect(entry?.base).toBe("Consentement");
-      expect(entry?.extraBases).toEqual([
+      expect(entry?.extraBases?.[0]).toEqual(
         { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" },
-      ]);
+      );
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
   });
@@ -120,6 +122,16 @@ describe("DONNEES_PROFIL", () => {
     const tag = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Discord");
     expect(tag?.finalite).toMatch(/Enregistré à ta connexion par Discord, ou saisi par toi/);
     expect(tag?.finalite).toMatch(/sans certification, invisible de tous, administrateurs compris/);
+    // DM-CERTIFIED-ONLY (revue légale) : le bot ne reçoit le tag que certifié, pour toute notification.
+    expect(tag?.finalite).toMatch(/codes du bot en message privé \(connexion, rattachement, certification\), notifications bot \(tag certifié seulement\)/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord username")?.finalite).toMatch(/bot codes by direct message \(login, linking, certification\), bot notifications \(certified tag only\)/);
+    // La certification filtre les messages de match : la base de ceux-ci (intérêt légitime) y figure.
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "Certification du pseudo Discord")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE });
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders and match removal notices by direct message" });
+    // L'ID sert aussi, certifié ou non, aux avis passant par la portée « proven ».
+    const id = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
+    expect(id?.finalite).toMatch(/horaires, rappels et retrait de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders and removal — only if your tag is certified —, request to join a team you manage, suspension or moderation notices, information about your data/);
   });
 
   it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {
@@ -299,8 +311,14 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     for (const donnee of ["Pseudo Discord", "ID Discord"]) {
       const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
       expect(entry?.base).toBe("Exécution du contrat");
-      expect(entry?.extraBases).toEqual([{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }]);
+      expect(entry?.extraBases?.[0]).toEqual({ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE });
     }
+    // Revue légale DM-CERTIFIED-ONLY : l'ID sert aussi aux avis de modération (T11) et sur les données (T10).
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "ID Discord")?.extraBases).toEqual([
+      { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
+      { base: "Intérêt légitime", scope: MODERATION_DM_SCOPE },
+      { base: "Obligation légale", scope: DATA_NOTICE_DM_SCOPE },
+    ]);
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04");
     // Les messages vont à tous les membres actifs des équipes, pas aux seuls joueurs.
     expect(t04?.dataSubjects).toContain("Autres membres des équipes engagées (coachs, managers, propriétaires)");
@@ -362,6 +380,8 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     const entry = DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID");
     expect(entry?.extraBases).toEqual([
       { base: "Intérêt légitime", scope: "match time notices, reminders and match removal notices by direct message" },
+      { base: "Intérêt légitime", scope: "suspension or moderation notices by direct message" },
+      { base: "Obligation légale", scope: "information about your data by direct message" },
     ]);
   });
 });

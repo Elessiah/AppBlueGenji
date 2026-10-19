@@ -119,9 +119,10 @@ function leadOn(emoji: string, kind: string, subject: string): string {
  * Toutes celles que `/connexion` propose, et il n'y en a pas d'autre : le compte
  * se crée à la première connexion, jamais par un formulaire d'inscription. La
  * voie figure sur la ligne parce qu'elle décide de ce qu'on peut faire du
- * compte ensuite — un compte né par Discord porte un identifiant Discord, donc
- * reçoit les rappels de match en message privé ; un compte né par Google n'en a
- * aucun tant que le joueur ne l'a pas rattaché depuis `/profil`.
+ * compte ensuite — un compte né par Discord porte un identifiant Discord (les
+ * rappels de match en message privé demandent en plus un tag certifié) ; un
+ * compte né par Google n'en a aucun tant que le joueur ne l'a pas rattaché
+ * depuis `/profil`.
  *
  * C'est **la liste des fournisseurs OAuth, sans copie** : une seconde énumération
  * ici aurait oublié Blizzard le jour de son ajout, et la ligne du journal aurait

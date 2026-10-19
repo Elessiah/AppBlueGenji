@@ -272,9 +272,10 @@ function RgpdFr({
             Battle.net est rattaché), la photo par Google ou Discord (copiée, et masquée
             tant que vous ne l&apos;affichez pas). Ce que vous renseignez vous-même (pseudos de jeu
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
-            et le compte fonctionne sans, à deux limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
+            et le compte fonctionne sans, à trois limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
             compte Battle.net rattaché, et un membre du staff de diffusion ne peut
-            s&apos;inscrire comme caster d&apos;un match sans les deux.
+            s&apos;inscrire comme caster d&apos;un match sans les deux ; sans tag Discord certifié, enfin,
+            aucun message privé Discord de match ne vous est envoyé.
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour
@@ -970,7 +971,10 @@ function RgpdFr({
           <p id="messages-de-match">
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, en
             français, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
-            rappels (24 h et 10 h avant) et quand vous êtes retiré d&apos;un match. Ces messages reposent
+            rappels (24 h et 10 h avant) et quand vous êtes retiré d&apos;un match — seulement si votre tag
+            Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
+            n&apos;en reçoit aucun, pour
+            éviter le spam (vos notifications push, elles, partent quand même). Ces messages reposent
             sur l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
             tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
             mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push

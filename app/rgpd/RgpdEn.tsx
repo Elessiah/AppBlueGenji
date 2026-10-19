@@ -215,9 +215,10 @@ export function RgpdEn({
             Discord, the BattleTag from Blizzard (kept up to date at each login as long as the Battle.net
             account is linked), the picture from Google or Discord (copied, and hidden until you show it). What
             you fill in yourself (game usernames entered, certification of the Discord tag, uploaded avatar,
-            adulthood) is optional, and the account works without it, with two limits: a tournament may require,
+            adulthood) is optional, and the account works without it, with three limits: a tournament may require,
             to register, a certified Discord tag or a linked Battle.net account, and a member of the streaming
-            staff cannot register as the caster of a match without both.
+            staff cannot register as the caster of a match without both; lastly, without a certified Discord tag,
+            no match Discord direct message is sent to you.
           </p>
           <p id="age-minimum">
             <strong>Minimum age.</strong> You must be at least {SITE_MINIMUM_AGE} years old to create an account
@@ -797,7 +798,9 @@ export function RgpdEn({
           <p id="messages-de-match">
             <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in French, when
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before) and
-            when you are removed from a match. These messages are based on the association&apos;s{" "}
+            when you are removed from a match — only if your Discord tag is <strong>certified</strong>: an
+            uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
+            are based on the association&apos;s{" "}
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
             unticking “Discord direct messages about my matches” in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — your push notifications

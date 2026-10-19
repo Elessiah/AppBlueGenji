@@ -489,7 +489,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (début d'un match diffusé : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (start of a streamed match: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["15 octobre 2026", "15 October 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["19 octobre 2026", "19 October 2026"]);
   });
 });
 
@@ -512,6 +512,10 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   it("les conditions du bot citent aussi l'avis « Match retiré » parmi les messages remis (FR et EN)", () => {
     expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("rappels de match et avis de retrait d'un match (« Match retiré »)");
     expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("match reminders and notices of removal from a match (“Match retiré”)");
+    // DM-CERTIFIED-ONLY (revue légale) : les conditions disent, comme la politique, que ces messages de match ne partent qu'aux tags certifiés.
+    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("— ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —");
+    expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("— these match messages only to accounts with a Discord tag certified on the website —");
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["19 octobre 2026", "19 October 2026"]);
   });
 
   it("déclare qu'un blocage ou un signalement AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {

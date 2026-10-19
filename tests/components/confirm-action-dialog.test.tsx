@@ -238,7 +238,7 @@ describe("plus de window.confirm", () => {
 
   it("/profil confirme le retrait du tag Discord et la suppression du compte", () => {
     const page = readSource("app/(secured)/profil/page.tsx");
-    expect(page).toContain("onDiscordTagRemove={() => setConfirmingTagRemoval(true)}");
+    expect(page).toMatch(/onDiscordTagRemove=\{\(\) => \{\s*setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown\.current \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);\s*\}\}/);
     expect(page).toContain("onConfirm={onDiscordTagRemove}");
     expect(page).toContain("setPendingDeletion({ subject, previewed });");
     // Lot 9-2 : textes de la langue de la page (`profile.deletion`).

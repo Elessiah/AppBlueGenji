@@ -182,11 +182,11 @@ function startRefereeDigest(now: Date): void {
 /**
  * Destinataires d'un match, par engagée.
  *
- * Le tag déclaré suffit (`declared`) — le bot résout le membre sur le serveur
- * BlueGenji, et le message ne dit rien de plus qu'un horaire public. L'ID,
- * quand le compte a été lié par Discord, évite ce balayage et reste prioritaire.
- * Un joueur sans Discord reste un destinataire : il peut avoir un appareil
- * abonné aux notifications push.
+ * Seul un tag Discord **certifié** reçoit un message privé (`certified`) : un
+ * tag saisi à la main, jamais prouvé, n'en reçoit aucun (lutte contre le
+ * spam). L'ID du compte certifié évite au bot de balayer le serveur et reste
+ * prioritaire. Un joueur sans tag certifié reste un destinataire : il peut
+ * avoir un appareil abonné aux notifications push.
  */
 async function loadRecipientsByTeam(
   teamIds: number[],
@@ -196,10 +196,10 @@ async function loadRecipientsByTeam(
   // Discord ici — il reste atteignable par push s'il y est abonné.
   const recipients = await loadNotificationRecipients(
     [...playersByTeam.values()].flat(),
-    "declared",
+    "certified",
     { matchDm: true },
   );
-  // Seuls comptent les joueurs qu'un message atteindrait : un tag Discord, ou
+  // Seuls comptent les joueurs qu'un message atteindrait : un tag Discord certifié, ou
   // un appareil abonné aux rappels. Une engagée sans aucun ne pose pas la
   // marque d'horaire reçu (qui ferait dire « reprogrammé » à des joueurs qui
   // n'ont rien reçu), et ne coûte ni écriture ni lecture d'abonnements.

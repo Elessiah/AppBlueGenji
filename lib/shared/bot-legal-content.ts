@@ -79,17 +79,18 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "15 octobre 2026";
-const LAST_UPDATED_EN = "15 October 2026";
+const LAST_UPDATED_FR = "19 octobre 2026";
+const LAST_UPDATED_EN = "19 October 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
 // matchs diffusés dans #live, la politique seule ; le pseudo solo dans #live et
 // l'interrupteur des messages de match (RGPD-DM-SWITCH), la politique seule ;
 // base du pseudo solo, AutoMod et avis « Match retiré » (LEGAL-FOLLOWUP-444),
-// les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions).
-const PRIVACY_LAST_UPDATED_FR = "15 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "15 October 2026";
+// les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions) ;
+// messages de match aux seuls tags certifiés (DM-CERTIFIED-ONLY), les deux (article 01).
+const PRIVACY_LAST_UPDATED_FR = "19 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "19 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
@@ -154,7 +155,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match et avis de retrait d'un match (« Match retiré »), alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
+            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match et avis de retrait d'un match (« Match retiré ») — ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
           },
         ],
       },
@@ -293,7 +294,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders and notices of removal from a match (“Match retiré”), referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
+            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders and notices of removal from a match (“Match retiré”) — these match messages only to accounts with a Discord tag certified on the website —, referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
           },
         ],
       },
@@ -479,7 +480,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages du site BlueGenji" },
           {
             kind: "p",
-            text: `Le site transmet au Bot un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire et le message à remettre (code de connexion, horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), alerte d'arbitrage, signalement ; avis de modération — signalement vous désignant, logo d'équipe masqué, retiré ou supprimé — ; demande d'adhésion à une équipe que vous gérez ; information sur les données) ; le Bot remet les messages personnels (code, horaire, rappel, retrait d'un match, avis de modération, demande d'adhésion, information) en message privé **sans les enregistrer** ; un joueur peut couper ceux de ses matchs (horaire, rappel, retrait d'un match) dans « Mon profil » sur le site. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Au début d'un match diffusé, le site transmet aussi au Bot une annonce (noms des deux équipes — en tournoi individuel, le pseudo public BlueGenji de chaque joueur, « un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026 —, nom du tournoi et lien de la diffusion), que le Bot publie dans le salon #live du serveur Discord de l'association avec une mention @everyone. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
+            text: `Le site transmet au Bot un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire et le message à remettre (code de connexion, horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), alerte d'arbitrage, signalement ; avis de modération — signalement vous désignant, logo d'équipe masqué, retiré ou supprimé — ; demande d'adhésion à une équipe que vous gérez ; information sur les données) ; le Bot remet les messages personnels (code, horaire, rappel, retrait d'un match, avis de modération, demande d'adhésion, information) en message privé **sans les enregistrer** ; ceux des matchs (horaire, rappel, retrait d'un match) ne partent qu'aux comptes dont le tag Discord est certifié sur le site — un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam ; un joueur peut couper ceux de ses matchs (horaire, rappel, retrait d'un match) dans « Mon profil » sur le site. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Au début d'un match diffusé, le site transmet aussi au Bot une annonce (noms des deux équipes — en tournoi individuel, le pseudo public BlueGenji de chaque joueur, « un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026 —, nom du tournoi et lien de la diffusion), que le Bot publie dans le salon #live du serveur Discord de l'association avec une mention @everyone. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
           },
           { kind: "subhead", text: "Journaux" },
           {
@@ -691,7 +692,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages from the BlueGenji website" },
           {
             kind: "p",
-            text: `The website sends the Bot a Discord ID or username, the recipient's BlueGenji username and the message to deliver (login code, match time or reminder, notice of removal from a match (“Match retiré”), referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, match time, reminder, removal from a match, moderation notice, join request, data-protection notice) by direct message **without storing them**; a player can turn off those about their matches (time, reminder, removal from a match) in “My profile” on the website. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. When a streamed match starts, the website also sends the Bot an announcement (names of both teams — in a solo tournament, each player's public BlueGenji username, “a player” for an entry without an account, a deleted account or a registration made before 16 October 2026 —, tournament name and stream link), which the Bot posts in the #live channel of the association's Discord server with an @everyone mention. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}).`,
+            text: `The website sends the Bot a Discord ID or username, the recipient's BlueGenji username and the message to deliver (login code, match time or reminder, notice of removal from a match (“Match retiré”), referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, match time, reminder, removal from a match, moderation notice, join request, data-protection notice) by direct message **without storing them**; those about matches (time, reminder, removal from a match) only go to accounts with a Discord tag certified on the website — an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam; a player can turn off those about their matches (time, reminder, removal from a match) in “My profile” on the website. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. When a streamed match starts, the website also sends the Bot an announcement (names of both teams — in a solo tournament, each player's public BlueGenji username, “a player” for an entry without an account, a deleted account or a registration made before 16 October 2026 —, tournament name and stream link), which the Bot posts in the #live channel of the association's Discord server with an @everyone mention. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}).`,
           },
           { kind: "subhead", text: "Logs" },
           {
