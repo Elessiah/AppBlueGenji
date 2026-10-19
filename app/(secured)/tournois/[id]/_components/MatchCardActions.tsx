@@ -509,9 +509,7 @@ export function MatchCardActions({
         <MatchContactsDialog
           matchId={match.id}
           matchLabel={matchLabel}
-          startAt={match.startAt}
-          launchedAt={match.launchedAt}
-          casterUserId={match.casterUserId}
+          card={match}
           onClose={() => setContactsOpen(false)}
         />
       )}

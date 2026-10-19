@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo, type MatchLaunchPhase } from "@/lib/shared/match-launch";
+import type { BracketMatch } from "@/lib/shared/types";
 import { CasterCard, SideCard } from "./LaunchContactCards";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import launchStyles from "./MatchLaunchCenter.module.css";
@@ -116,26 +117,49 @@ export function casterRereadDelay(launch: MatchLaunchInfo, serverDate: string | 
   return Math.min(untilServerStart(start, server), MAX_TIMER_MS);
 }
 
-/** Horaire et caster du match tels que la carte les reçoit (écritures annoncées par le flux). */
-export type CardSchedule = { startAt: string | null; launchedAt: string | null; casterUserId: number | null };
+/**
+ * Ce que la modale montre et que la carte reçoit par le flux (écritures) :
+ * horaire, lancement, caster, adversaires, hôte, « Prêt ».
+ */
+export type ContactsCard = Pick<
+  BracketMatch,
+  | "startAt"
+  | "launchedAt"
+  | "casterUserId"
+  | "team1Id"
+  | "team2Id"
+  | "hostTeamId"
+  | "team1Ready"
+  | "team2Ready"
+  | "casterReady"
+>;
+
+const CARD_FIELDS = [
+  "startAt",
+  "launchedAt",
+  "casterUserId",
+  "team1Id",
+  "team2Id",
+  "hostTeamId",
+  "team1Ready",
+  "team2Ready",
+  "casterReady",
+] as const satisfies readonly (keyof ContactsCard)[];
+
+/** Empreinte de la carte : change à chaque écriture qui touche la modale. */
+export function contactsCardKey(card: ContactsCard | null): string {
+  return card === null ? "" : JSON.stringify(CARD_FIELDS.map((field) => card[field]));
+}
 
 /**
- * Relire la modale ouverte quand l'horaire de la carte change ? Un lancement
- * forcé (`launchedAt`), un match reprogrammé ou remis à planifier (`startAt`)
- * sont des écritures : la lecture du caster (contacts, ou note d'attente) et
- * l'heure de la relecture suivante en dépendent. Rien sans caster ; jamais à
- * l'horloge du navigateur, que la relecture à l'heure du serveur couvre.
+ * Relire la modale ouverte quand la carte change ? À chaque écriture qui touche
+ * ce qu'elle montre — lancement forcé, match reprogrammé ou remis à planifier,
+ * caster qui s'inscrit ou se retire, adversaire corrigé, hôte changé, « Prêt » —,
+ * une lecture par écriture ; jamais à l'horloge du navigateur, que la relecture
+ * à l'heure du serveur couvre. Rien tant que la première lecture n'a pas abouti.
  */
-export function rereadOnScheduleChange(
-  previous: CardSchedule,
-  next: CardSchedule,
-  launch: MatchLaunchInfo | null,
-): boolean {
-  if (launch === null) return false;
-  // Un caster qui s'inscrit ou se retire : sa fiche (contacts, note) change.
-  if (previous.casterUserId !== next.casterUserId) return true;
-  if (launch.caster === null) return false;
-  return previous.startAt !== next.startAt || previous.launchedAt !== next.launchedAt;
+export function rereadOnCardChange(previousKey: string, nextKey: string, launch: MatchLaunchInfo | null): boolean {
+  return launch !== null && previousKey !== nextKey;
 }
 
 /**
@@ -206,21 +230,16 @@ export function MatchContactsDialog({
   matchId,
   matchLabel,
   onClose,
-  startAt = null,
-  launchedAt = null,
-  casterUserId = null,
+  card = null,
 }: Readonly<{
   matchId: number;
   matchLabel: string;
   onClose: () => void;
   /**
-   * Horaire de la carte : un match pas encore lancé est relu à la frontière du
-   * départ ; un changement (lancement forcé, reprogrammé) fait relire la modale.
+   * Le match tel que la carte le reçoit : un match pas encore lancé est relu à
+   * la frontière du départ ; une écriture qui touche la modale la fait relire.
    */
-  startAt?: string | null;
-  launchedAt?: string | null;
-  /** Caster inscrit selon la carte : une inscription ou un retrait fait relire. */
-  casterUserId?: number | null;
+  card?: ContactsCard | null;
 }>) {
   const text = useLaunchText();
   const { t } = text;
@@ -241,10 +260,13 @@ export function MatchContactsDialog({
   const [serverDate, setServerDate] = useState<string | null>(null);
   const launch = state.kind === "ready" ? state.launch : null;
   const [rereadFailures, setRereadFailures] = useState(0);
-  // Horaire de la carte vu par la dernière lecture réussie : un changement
+  const startAt = card?.startAt ?? null;
+  const launchedAt = card?.launchedAt ?? null;
+  // Empreinte de la carte vue par la dernière lecture réussie : un changement
   // survenu pendant la première lecture compte à son arrivée.
-  const previousSchedule = useRef<CardSchedule>({ startAt, launchedAt, casterUserId });
-  // Nouvelle relecture (départ, horaire ou caster changé) : ses échecs se
+  const cardKey = contactsCardKey(card);
+  const previousCardKey = useRef(cardKey);
+  // Nouvelle relecture (départ, carte changée) : ses échecs se
   // comptent de zéro, quels qu'aient été ceux d'une relecture précédente.
   const rereadNow = () => {
     setRereadFailures(0);
@@ -252,10 +274,9 @@ export function MatchContactsDialog({
   };
   useEffect(() => {
     if (!launch) return;
-    const schedule = { startAt, launchedAt, casterUserId };
-    if (rereadOnScheduleChange(previousSchedule.current, schedule, launch)) rereadNow();
-    previousSchedule.current = schedule;
-  }, [startAt, launchedAt, casterUserId, launch]);
+    if (rereadOnCardChange(previousCardKey.current, cardKey, launch)) rereadNow();
+    previousCardKey.current = cardKey;
+  }, [cardKey, launch]);
 
   // Relecture échouée : quelques nouvelles tentatives espacées.
   useEffect(() => {
