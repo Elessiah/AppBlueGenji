@@ -266,6 +266,8 @@ interface LiveEvening extends RowDataPacket {
   started_at: Date | string;
   window_end: Date | string;
   discord_message_id: string | null;
+  /** `1` : le message gardé est parti sans mention (ses modifications n'en écrivent pas). */
+  silent?: number | boolean | null;
 }
 
 /** Instant d'une colonne `DATETIME`, en millisecondes ; `null` si vide. */
@@ -302,7 +304,7 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   } catch {
     // Ménage seulement : réessayé au passage suivant.
   }
-  const select = `SELECT id, started_at, window_end, discord_message_id FROM bg_live_evenings
+  const select = `SELECT id, started_at, window_end, discord_message_id, silent FROM bg_live_evenings
                    WHERE target = ? AND window_end > NOW() ORDER BY id DESC LIMIT 1`;
   const [open] = await db.query<LiveEvening[]>(select, [target]);
   if (open[0]) return open[0];
@@ -316,12 +318,29 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   return created[0];
 }
 
-/** Garde l'identifiant du message publié (ou de la suite qui le remplace). */
-async function rememberEveningMessage(evening: LiveEvening, messageId: string | null): Promise<void> {
+/**
+ * Garde l'identifiant du message publié (ou de la suite qui le remplace), et
+ * s'il est parti sans mention. Le premier message qui notifie fait partir la
+ * fenêtre de la soirée de son envoi : des essais reportés (bot injoignable) ne
+ * l'ont pas raccourcie.
+ */
+async function rememberEveningMessage(
+  evening: LiveEvening,
+  messageId: string | null,
+  silent: boolean,
+): Promise<void> {
   if (!messageId || messageId === evening.discord_message_id) return;
+  const firstNotified = !evening.discord_message_id && !silent;
+  const window = firstNotified
+    ? `, window_end = GREATEST(window_end, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`
+    : "";
   try {
     const db = await getDatabase();
-    await db.execute(`UPDATE bg_live_evenings SET discord_message_id = ? WHERE id = ?`, [messageId, Number(evening.id)]);
+    await db.execute(`UPDATE bg_live_evenings SET discord_message_id = ?, silent = ?${window} WHERE id = ?`, [
+      messageId,
+      silent ? 1 : 0,
+      Number(evening.id),
+    ]);
   } catch (error) {
     // Le prochain match de la soirée partira dans un nouveau message.
     console.error(`[live-announce] soirée ${Number(evening.id)} : identifiant du message non gardé`, error);
@@ -550,10 +569,10 @@ function describeGroup(
  * pour les seuls matchs du groupe sinon : un refus qui peut tenir au message ne
  * retarde pas les autres tournois.
  */
-async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Promise<void> {
+async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome, eveningId?: number): Promise<void> {
   if (SHARED_POSTPONEMENTS.has(outcome)) postponeRetries();
   else holdGroup(group);
-  const { label, context, plural } = describeGroup(group);
+  const { label, context, plural } = describeGroup(group, eveningId);
   if (!(await releaseAnnouncements(group.rows, label))) return;
   const retry = plural
     ? "annonces reportées, réessayées tant que les matchs ont commencé depuis moins de deux heures"
@@ -678,10 +697,14 @@ async function announce(
     context,
     ...(logMessage === message ? {} : { logMessage }),
     ...(evening.discord_message_id ? { editMessageId: String(evening.discord_message_id) } : {}),
-    ...(quiet ? { notify: false as const } : {}),
+    // Un message parti sans mention n'en reçoit pas à sa modification.
+    ...(quiet || (evening.discord_message_id && Number(evening.silent) === 1) ? { notify: false as const } : {}),
   });
   if (outcome === "posted" || outcome === "posted-silent") {
-    await rememberEveningMessage(evening, messageId);
+    // Sans mention : envoi muet, permission absente, ou suite d'un message
+    // disparu (le bot rend un autre identifiant que celui à modifier).
+    const followUp = Boolean(evening.discord_message_id) && messageId !== null && messageId !== evening.discord_message_id;
+    await rememberEveningMessage(evening, messageId, quiet || outcome === "posted-silent" || followUp);
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
@@ -699,7 +722,7 @@ async function announce(
     return { posted: 0, postponed: null };
   }
   const postponed: PostponedOutcome = outcome in POSTPONED_CAUSES ? (outcome as PostponedOutcome) : "unavailable";
-  await postpone(group, postponed);
+  await postpone(group, postponed, Number(evening.id));
   return { posted: 0, postponed };
 }
 
@@ -795,10 +818,10 @@ export const LIVE_ANNOUNCE_RETRY_DELAY_MS = 60_000;
 let retryNotBefore = 0;
 
 /**
- * Diffusions (tournoi et lien) dont l'annonce a été refusée par Discord, et
- * l'instant de leur prochain essai. Par diffusion et non par match : un match
- * lancé pendant la pause sur la même chaîne attend avec les autres, et tous
- * partent en un seul message.
+ * Publics (`everyone`, `stream-viewer`) dont l'annonce de soirée a été refusée
+ * par Discord, ou dont la soirée est illisible, et l'instant de leur prochain
+ * essai. Par public et non par match : un match de ce public lancé pendant la
+ * pause attend avec les autres, et tous partent dans le message de la soirée.
  */
 const heldUntil = new Map<string, number>();
 
@@ -812,7 +835,7 @@ function holdGroup(group: AnnouncementGroup): void {
 }
 
 /**
- * Vrai si la diffusion attend encore son prochain essai : la relève est alors
+ * Vrai si le public attend encore son prochain essai : la relève est alors
  * programmée à son terme, pour qu'il ne dépende pas d'un prochain évènement.
  * Oublie une pause échue.
  */

@@ -132,8 +132,10 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
   try {
     // Une ligne par soirée d'annonces #live et par public (`everyone` pour la
     // chaîne officielle, `stream-viewer` sinon) : l'identifiant du message
-    // Discord à modifier quand un autre match de la soirée passe à l'antenne.
-    // Aucune donnée personnelle ; effacée un jour après la fin de la soirée.
+    // Discord à modifier quand un autre match de la soirée passe à l'antenne,
+    // et `silent` si ce message est parti sans mention (ses modifications n'en
+    // écrivent pas). Aucune donnée personnelle ; effacée un jour après la fin
+    // de la soirée.
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_live_evenings (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -141,6 +143,7 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
         started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         window_end DATETIME NOT NULL,
         discord_message_id VARCHAR(20) NULL,
+        silent BOOLEAN NOT NULL DEFAULT FALSE,
         KEY idx_bg_live_evenings_target (target, window_end)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
