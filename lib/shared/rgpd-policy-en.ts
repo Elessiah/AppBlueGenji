@@ -49,7 +49,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord username",
-    "Discord authentication, bot notifications (certified tag only; before certification, a typed tag is only used to send you the code that gives it). Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
+    "Discord authentication, bot notifications (certified tag only; before certification, a typed tag is only used to send you a code (login, linking or certification)). Recorded when you log in through Discord, or entered by you (account without Discord linked); without certification, invisible to everyone, administrators included",
   ],
   [
     "Certification of the Discord username",

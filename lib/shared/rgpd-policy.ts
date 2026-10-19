@@ -98,7 +98,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion (contrat), son **exposition** repose sur la certification
     // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot (tag certifié seulement ; avant la certification, un tag saisi ne sert qu'à t'envoyer le code qui la donne). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
+      "Authentification Discord, notifications bot (tag certifié seulement ; avant la certification, un tag saisi ne sert qu'à t'envoyer un code (connexion, rattachement ou certification)). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",
@@ -112,7 +112,12 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
-    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
+    // La certification décide aussi qui reçoit les messages privés de match,
+    // qui reposent sur l'intérêt légitime (opposition par la case du profil).
+    extraBases: [
+      { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" },
+      { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
+    ],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },
   {
