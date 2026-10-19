@@ -62,8 +62,8 @@ describe("conditions d'utilisation", () => {
     expect(termsRequestFor(5)).toBeNull();
   });
 
-  it("reconnaît les quatre écrans d'acceptation", () => {
-    expect(TERMS_ACCEPTANCE_CONTEXTS).toEqual(["SIGNUP", "LOGIN", "TEAM_CREATION", "TEAM_MANAGEMENT"]);
+  it("reconnaît les cinq écrans d'acceptation", () => {
+    expect(TERMS_ACCEPTANCE_CONTEXTS).toEqual(["SIGNUP", "LOGIN", "TEAM_CREATION", "TEAM_MANAGEMENT", "SIGNED_IN"]);
     expect(isTermsAcceptanceContext("LOGIN")).toBe(true);
     expect(isTermsAcceptanceContext("ADMIN")).toBe(false);
   });

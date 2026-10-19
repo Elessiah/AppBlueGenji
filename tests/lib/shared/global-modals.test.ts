@@ -1,24 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   LOGIN_PATH,
-  TERMS_POSTPONED_MAX_AGE_SECONDS,
-  TERMS_POSTPONED_VALUE,
-  isTermsPostponed,
   recruitmentModalSilenced,
   termsModalDueOnLoad,
   termsModalSilencedOn,
 } from "@/lib/shared/global-modals";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { readSource } from "../../helpers/read-source";
-
-describe("isTermsPostponed", () => {
-  it("ne reconnaît que la valeur posée par « Plus tard »", () => {
-    expect(isTermsPostponed(TERMS_POSTPONED_VALUE)).toBe(true);
-    expect(isTermsPostponed(undefined)).toBe(false);
-    expect(isTermsPostponed("")).toBe(false);
-    expect(isTermsPostponed("0")).toBe(false);
-  });
-});
 
 describe("termsModalSilencedOn", () => {
   it("se tait sur la page des conditions et sur la connexion", () => {
@@ -35,18 +23,14 @@ describe("termsModalSilencedOn", () => {
 });
 
 describe("termsModalDueOnLoad", () => {
-  const base = { termsRequired: true, postponed: false, pathname: "/" };
+  const base = { termsRequired: true, pathname: "/" };
 
-  it("s'ouvre quand les conditions sont dues et non reportées", () => {
+  it("s'ouvre quand les conditions sont dues (aucun report possible)", () => {
     expect(termsModalDueOnLoad(base)).toBe(true);
   });
 
   it("ne s'ouvre pas sans conditions dues", () => {
     expect(termsModalDueOnLoad({ ...base, termsRequired: false })).toBe(false);
-  });
-
-  it("ne s'ouvre pas une fois reportée pour la session", () => {
-    expect(termsModalDueOnLoad({ ...base, postponed: true })).toBe(false);
   });
 
   it("ne s'ouvre pas sur les pages où elle se tait", () => {
@@ -84,26 +68,22 @@ describe("câblage des modales globales", () => {
     expect(layout).toContain("termsModalDue: termsDueOnLoad");
   });
 
-  it("la mise en page n'ouvre pas les conditions reportées pour la session", () => {
-    expect(layout).toContain("initiallyRequired={termsRequired && !termsPostponed}");
+  it("conditions v5 : la mise en page ouvre la fenêtre à tout compte en retard, sans report", () => {
+    expect(layout).toContain("initiallyRequired={termsRequired}");
+    expect(layout).toContain("needsTermsAcceptance(userId)");
+    expect(layout).not.toContain("isTermsPostponed");
   });
 
-  it("« Plus tard » pose le cookie de session, l'acceptation l'efface", () => {
-    expect(terms).toMatch(/const later = \(\) => \{[\s\S]*?writePostponedCookie\(true\)/);
-    expect(terms).toContain("writePostponedCookie(false)");
-    expect(terms).toContain("max-age=${TERMS_POSTPONED_MAX_AGE_SECONDS}");
+  it("la fenêtre est bloquante : ni « Plus tard », ni Échap, ni voile — accepter ou se déconnecter", () => {
+    expect(terms).not.toContain("writePostponedCookie");
+    expect(terms).not.toContain("useBackdropDismiss");
+    expect(terms).not.toContain('t("termsModal.later")');
+    expect(terms).toContain("onClose: KEEP_OPEN");
+    expect(terms).toContain('t("termsModal.logout")');
+    expect(terms).toContain("useLogout()");
   });
 
-  it("borne le report à douze heures (la restauration de session garde un cookie sans durée)", () => {
-    expect(TERMS_POSTPONED_MAX_AGE_SECONDS).toBe(12 * 60 * 60);
-  });
-
-  it("le report survit à un lien ouvert depuis un autre site (lax, jamais strict)", () => {
-    expect(terms).toContain("samesite=lax");
-    expect(terms).not.toContain("samesite=strict");
-  });
-
-  it("le report tombe à l'ouverture et à la fermeture d'une session", () => {
+  it("un ancien cookie de report tombe à l'ouverture et à la fermeture d'une session", () => {
     const auth = readSource("lib/server/auth.ts");
     const create = auth.match(/export async function createSession[\s\S]*?\n\}/)?.[0] ?? "";
     const clear = auth.match(/export async function clearSession[\s\S]*?\n\}/)?.[0] ?? "";

@@ -8,6 +8,11 @@ import enLogin from "@/messages/en/login.json";
 import { TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
 import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import frPlayers from "@/messages/fr/players.json";
+import enPlayers from "@/messages/en/players.json";
 
 /**
  * CONTACTS-FOLLOWUP (décisions du 2026-10-19) : masqué, le BattleTag ne se lit
@@ -17,9 +22,9 @@ import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
  * de la case « BattleTag OW »), avec la même phrase en français et en anglais.
  */
 const FR =
-  "Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, si tu fais partie des contacts présentés : pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).";
+  "Tu peux masquer ton BattleTag : il reste visible pour tes adversaires, les admins et les arbitres pendant un match de tournoi, ainsi que pour son caster, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, si tu fais partie des contacts présentés. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).";
 const EN =
-  "You can hide your BattleTag: it then only stays visible in the “Contacts” window of your tournament matches, if you're among the contacts shown: to both teams and the referees from the moment both opponents are known, and to the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).";
+  "You can hide your BattleTag: it stays visible to your opponents, admins and referees during a tournament match, and to its caster, in the match's “Contacts” window and its launch window, if you're among the contacts shown. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).";
 
 const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -73,7 +78,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(enProfile.battletagNotice.outro).toContain("after adding another way to log in if it is your only one");
     expect(frProfile.battletagLock.change).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(enProfile.battletagLock.change).toContain("after adding another way to log in if it is your only one");
-    expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris.");
+    expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match et par sa fenêtre de lancement, qui la reprend au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris.");
     expect(text).toContain("celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match");
     expect(text).toContain("le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi");
   });
@@ -99,5 +104,57 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(text).toContain("a map's replay code, visible to any logged-in user on the tournament page");
     expect(text).toContain("the caster's is shared with both teams and the referees over that same match time");
     expect(en?.paragraphs).toHaveLength(fr?.paragraphs.length ?? -1);
+  });
+});
+
+/**
+ * Décision du 2026-10-19 : tout texte qui dit où se lit un BattleTag masqué
+ * nomme la fenêtre « Contacts » du match **et** sa fenêtre de lancement (qui
+ * la reprend au départ du match), en français comme en anglais.
+ */
+describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
+  const FR_CONTACTS = /fenêtre « Contacts »/;
+  const FR_LAUNCH = /fenêtre de lancement/;
+  const EN_CONTACTS = /“Contacts” window/;
+  const EN_LAUNCH = /launch window/;
+
+  const expectBoth = (text: string, contacts: RegExp, launch: RegExp) => {
+    expect(text).toMatch(contacts);
+    expect(text).toMatch(launch);
+  };
+
+  it("avertissement, modale de masquage et fiche joueur", () => {
+    expect(frProfile.battletagNotice.intro).toMatch(FR_LAUNCH);
+    expectBoth(frProfile.battletagNotice.intro, FR_CONTACTS, FR_LAUNCH);
+    expectBoth(enProfile.battletagNotice.intro, EN_CONTACTS, EN_LAUNCH);
+    expectBoth(frProfile.battletagNotice.staff, FR_CONTACTS, FR_LAUNCH);
+    expectBoth(enProfile.battletagNotice.staff, EN_CONTACTS, EN_LAUNCH);
+    expectBoth(frPlayers.page.battletagHiddenSelf, FR_CONTACTS, FR_LAUNCH);
+    expectBoth(enPlayers.page.battletagHiddenSelf, EN_CONTACTS, EN_LAUNCH);
+  });
+
+  it("conditions v5, annonce PRIVACY_CHANGES et registre", () => {
+    const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
+    const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
+    expectBoth(fr, FR_CONTACTS, FR_LAUNCH);
+    expectBoth(en, EN_CONTACTS, EN_LAUNCH);
+    const entryFr = JSON.stringify(PRIVACY_CHANGES.at(-1));
+    const entryEn = JSON.stringify(PRIVACY_CHANGES_EN[PRIVACY_CHANGES.at(-1)?.id ?? ""]);
+    expectBoth(entryFr, FR_CONTACTS, FR_LAUNCH);
+    expectBoth(entryEn, EN_CONTACTS, EN_LAUNCH);
+    // Chaque phrase du registre qui cite la fenêtre « Contacts » nomme aussi la fenêtre de lancement.
+    const frLines = JSON.stringify(PROCESSING_ACTIVITIES).split('","').filter((line) => FR_CONTACTS.test(line));
+    const enLines = JSON.stringify(PROCESSING_ACTIVITIES_EN).split('","').filter((line) => EN_CONTACTS.test(line));
+    expect(frLines.length).toBeGreaterThan(0);
+    expect(enLines.length).toBeGreaterThan(0);
+    for (const line of frLines) expect(line).toMatch(FR_LAUNCH);
+    for (const line of enLines) expect(line).toMatch(EN_LAUNCH);
+  });
+
+  it("annonce v5 : chaque compte devra accepter les conditions (FR et EN)", () => {
+    expect(JSON.stringify(PRIVACY_CHANGES.at(-1))).toContain("chaque compte devra les accepter à sa prochaine visite");
+    expect(JSON.stringify(PRIVACY_CHANGES_EN[PRIVACY_CHANGES.at(-1)?.id ?? ""])).toContain(
+      "every account will be asked to accept them on its next visit",
+    );
   });
 });
