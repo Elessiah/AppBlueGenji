@@ -151,10 +151,10 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   pas — un premier envoi incertain juste avant la fin de la fenêtre ne laisse
   pas une nouvelle soirée notifier une minute plus tard —, et ce premier
   message liste déjà les matchs programmés jusqu'à cette nouvelle fin. Un
-  match programmé que ce message listait déjà, passé à l'antenne en retard
-  après la fin de la fenêtre, **rejoint** ce message (soirée reprise : message
-  gardé, ouverte avant son heure prévue, fenêtre finie après elle) au lieu
-  d'ouvrir une soirée qui notifierait une seconde fois.
+  match qui passe à l'antenne après la fin de la fenêtre — même programmé et
+  listé par le message de la soirée, puis lancé en retard — ouvre une nouvelle
+  soirée, qui notifie : la soirée est la fenêtre de quatre heures, rien de
+  plus.
 - **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
   soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
   Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
