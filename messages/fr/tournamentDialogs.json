@@ -105,17 +105,17 @@
       },
       "theirs": {
         "readOnly": "{opponent} propose {score}. En attente de la confirmation d'un responsable de {mine}.",
-        "withMaps": "{opponent} propose {score}. Confirme-le, ou saisis le score constaté : un désaccord ouvre un litige, qui verrouille la saisie des deux équipes jusqu'à l'arbitrage.",
+        "withMaps": "{opponent} propose {score}. Confirme-le, ou saisis le score constaté : un désaccord ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
         "loading": "{opponent} propose {score}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas.",
-        "withoutMaps": "{opponent} propose {score}, mais le détail de ses maps n'a pas pu être lu. Actualise la page pour le confirmer : un score saisi à la place ouvre un litige, qui verrouille la saisie des deux équipes jusqu'à l'arbitrage."
+        "withoutMaps": "{opponent} propose {score}, mais le détail de ses maps n'a pas pu être lu. Actualise la page pour le confirmer : un score saisi à la place ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage."
       },
       "confirmed": "Score confirmé : {team1} {score1} – {score2} {team2}",
       "submitted": "Score transmis : {team1} {score1} – {score2} {team2}",
       "forfeitRecorded": "Forfait enregistré : {opponent} remporte le match.",
       "minePending": "Tu as proposé {score}. En attente de la confirmation de {opponent}.",
       "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
-      "locked": "Score en litige : la saisie est verrouillée pour les deux équipes, forfait compris. Seul un arbitre ou un administrateur peut trancher ce match — fixer le score final ou prononcer un forfait.",
-      "counterWarning": "Cette saisie diffère de la proposition de {opponent} (score ou détail des maps) : l'envoyer ouvre un litige et verrouille la saisie des deux équipes jusqu'à l'arbitrage.",
+      "locked": "Score en litige : la saisie est verrouillée pour les deux adversaires, forfait compris. Seul un arbitre ou un administrateur peut trancher ce match — fixer le score final ou prononcer un forfait.",
+      "counterWarning": "Cette saisie diffère de la proposition de {opponent} (score ou détail des maps) : l'envoyer ouvre un litige et verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
       "autoValidateAt": "Sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
       "willConfirm": "{opponent} devra confirmer le score que tu envoies.",
       "confirm": "Confirmer le score",
