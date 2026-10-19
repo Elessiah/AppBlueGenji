@@ -121,8 +121,10 @@ refaire à chaque version qui change une règle de fond pour tous les comptes.
 **Version 5** (2026-10-19, CONTACTS-FOLLOWUP) : section **« Contacts de match »**
 (`contacts-de-match`, FR et EN) — tag Discord certifié, BattleTag **même masqué**
 et rôle d'équipe communiqués aux deux équipes d'un match dès que ses adversaires
-sont connus, et à son caster le temps du match seulement, au titre de
-l'organisation du tournoi. C'est la clause que citent la base « exécution du
+sont connus, et à son caster le temps du match seulement (ceux du caster aux
+équipes sur ce même temps), par la seule fenêtre « Contacts » du match — un
+BattleTag masqué n'est lisible nulle part ailleurs, arbitres et administrateurs
+compris —, au titre de l'organisation du tournoi. C'est la clause que citent la base « exécution du
 contrat » du registre T01 / T04 et de `/rgpd` (`MATCH_CONTACTS_SCOPE`,
 `BATTLETAG_MATCH_SCOPE`). Annoncée une fois à tous par l'entrée
 `2026-10-contacts-de-match-caster-et-conditions-v5`, comme la version 4.

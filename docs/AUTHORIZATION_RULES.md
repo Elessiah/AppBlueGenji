@@ -350,24 +350,29 @@ geste le bouton qui permet de le retirer sur signalement. Le sélecteur de cible
 ouvert à tout membre qui rédige un signalement, lui, applique `visibleAvatarUrl`
 comme partout ailleurs.
 
-**Le BattleTag masqué a un public restreint, pas nul.** Masqué, il quitte la
-fiche publique et l'annuaire, mais reste lisible là où il sert à jouer — ce que
-la modale ouverte à la bascule (`BattletagVisibilityNotice.tsx`) annonce au
-joueur. `canViewBattletag` (`lib/shared/battletag-visibility.ts`) le repose sur
-la fiche (`getFullProfile`), dans cet ordre. Cette lecture repose sur l'exécution
-du service — section « Contacts de match » des conditions d'utilisation (v5) —,
-pas sur le consentement : le réglage ne vaut que pour le public, et l'avertir
-est dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
+**Le BattleTag masqué ne se lit que dans la fenêtre « Contacts » d'un match**
+(décision de l'utilisateur, 2026-10-19). Masqué, il quitte la fiche, l'annuaire
+et les rosters **pour tous**, arbitres et administrateurs compris : la fiche
+(`getFullProfile`) ne le repose plus pour personne. `canViewBattletag`
+(`lib/shared/battletag-visibility.ts`) ne l'ouvre qu'avec `sharesLiveMatch`, que
+seul `lib/server/tournaments/match-launch-info.ts` pose en présentant les
+contacts d'un match — aux mêmes durées que la fenêtre elle-même. Cette lecture
+repose sur l'exécution du service — section « Contacts de match » des
+conditions d'utilisation (v5) —, pas sur le consentement ; l'avertissement est
+dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
 `battletagNotice.warning`, notes Blizzard de `/connexion` et du profil).
 
 
-| Lecteur                                                           | Voit un BattleTag masqué |
-| ----------------------------------------------------------------- | :----------------------: |
-| Le propriétaire du compte                                         | ✅                        |
-| Un joueur engagé dans un **même match** d'un tournoi vivant       | ✅ (coéquipiers compris)  |
-| Le **caster inscrit** sur ce match, en lancement ou lancé         | ✅ (contacts de la modale ou du bouton « Contacts », le temps du match seulement) |
-| Permission `tournaments`, titulaire engagé dans un tournoi vivant | ✅                        |
-| Administrateur hors de ce cas, `casting`, joueur, visiteur        | ❌                        |
+| Lecteur                                                                     | Voit un BattleTag masqué |
+| --------------------------------------------------------------------------- | :----------------------: |
+| Le propriétaire du compte                                                   | ✅                        |
+| Membre d'une des deux équipes, fenêtre « Contacts » (deux adversaires connus → fin du match), contact présenté | ✅ |
+| **Caster inscrit**, fenêtre « Contacts », en lancement ou lancé              | ✅ (le temps du match seulement) |
+| Arbitre, administrateur, `casting`, joueur, visiteur — partout ailleurs     | ❌                        |
+
+Les contacts **du caster** (tag Discord certifié, BattleTag) ne sont présentés
+aux équipes que le temps du match, symétriquement ; avant, la carte montre les
+contacts des équipes sans les siens.
 
 **Le caster d'un match est une partie du match, pas un titulaire de
 `casting`.** La modale de lancement (`GET /api/me/match-launches`,
@@ -953,7 +958,7 @@ paramètre `viewerManagesGhostTeams` des fonctions de `lib/server/teams/` :
   dérogation s'éteint avec elle ;
 - ❌ il ne peut **pas** faire d'un joueur le propriétaire d'une fantôme sans son
   accord : engagé malgré lui dans un tournoi vivant, le joueur verrait son tag
-  Discord certifié et son BattleTag masqué ouverts à l'arbitrage (§2.3) ;
+  Discord certifié ouvert à l'arbitrage (§2.3) ;
 - ❌ la dérogation ne s'applique **jamais** à une équipe réelle : le même staff
   n'a aucun droit sur une équipe qui a des membres (le retrait d'un logo par la
   modération, §6.1, relève d'une autre permission et d'un autre geste).

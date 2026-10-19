@@ -282,7 +282,11 @@ les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 **pseudo** du caster, publics comme tout pseudo du site.
 
 Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
-contacts, et les équipes le sien. `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
+contacts, et les équipes le sien — dans les deux sens **le temps du match
+seulement** (`exposesCaster`, lancement ouvert ou lancé) ; avant, la carte
+montre aux équipes leurs contacts sans ceux du caster. Hors de cette fenêtre, un
+BattleTag masqué n'est lisible de personne, arbitres et administrateurs compris
+(`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
 comme une ligne à part, distincte de la permission `casting`, qui n'ouvre
 rien sur la fiche d'un joueur.
 
