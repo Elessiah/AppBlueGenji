@@ -233,11 +233,13 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a
-                      WHERE a.match_id = m.id AND a.sent_at >= ? AND a.refused = 0
+                      WHERE a.match_id = m.id AND a.sent_at >= ? AND a.sent_at <= ? AND a.refused = 0
                         AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
              OR (t.state = 'RUNNING' AND m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
-    [evening.started_at, evening.window_end],
+    // Réservations de la fenêtre seulement : une soirée finie, encore mise à
+    // jour, ne reprend pas les matchs de la soirée suivante.
+    [evening.started_at, evening.window_end, evening.window_end],
     EVENING_TOURNAMENT_STATES,
     ANNOUNCED_AT_SQL,
   );
@@ -1015,6 +1017,8 @@ function rememberEveningText(evening: LiveEvening, message: string, urls: readon
 /** Soirée ouverte qui a un message à tenir à jour. */
 interface RefreshableEvening extends LiveEvening {
   target: LiveMentionTarget;
+  /** 1 : fenêtre finie (soirée encore mise à jour, ses matchs se terminant après). */
+  ended?: number | null;
 }
 
 /**
@@ -1025,8 +1029,13 @@ interface RefreshableEvening extends LiveEvening {
  */
 export const LIVE_EVENING_REFRESH_DELAY_MS = 60_000;
 
-/** Essais d'une mise à jour reportée (bot injoignable, Discord réticent) avant d'attendre l'évènement suivant. */
-const LIVE_EVENING_REFRESH_MAX_RETRIES = 3;
+/**
+ * Essais d'une mise à jour reportée (bot injoignable, Discord réticent), une
+ * minute d'écart, avant d'attendre l'évènement suivant : une demi-heure, qui
+ * couvre un redémarrage ou un déploiement du bot après la dernière fin de
+ * match de la soirée. Coupe-circuit ouvert : ni lecture ni appel au bot.
+ */
+export const LIVE_EVENING_REFRESH_MAX_RETRIES = 30;
 
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let refreshRetries = 0;
@@ -1069,7 +1078,11 @@ export function requestLiveEveningRefresh(): void {
  * gardé, non close) : un match fini y passe « Terminé » avec son score. Une
  * **modification** seulement — jamais de notification, mention gardée telle
  * que le message l'a publiée (`silent`) — et seulement si le texte change.
- * Après la fin de la fenêtre, plus rien n'est modifié.
+ * Une soirée dont la fenêtre est finie depuis moins de
+ * {@link LIVE_EVENING_WINDOW_HOURS} heures reste mise à jour (un match lancé
+ * en fin de fenêtre se termine souvent après), mais seulement si ce processus
+ * a publié son texte : après un redémarrage, rien ne dit ce qui y manque, et
+ * une modification pour rien d'un vieux message pourrait poster une suite.
  *
  * @param now Instant de référence, injectable pour les tests.
  * @returns Le nombre de messages modifiés.
@@ -1084,26 +1097,15 @@ export async function refreshLiveEvenings(now: number = Date.now()): Promise<num
   }
   const db = await getDatabase();
   const [evenings] = await db.query<RefreshableEvening[]>(
-    `SELECT id, target, started_at, window_end, discord_message_id, silent, notified, closed FROM bg_live_evenings
-      WHERE window_end > NOW() AND closed = 0 AND discord_message_id IS NOT NULL
+    `SELECT id, target, started_at, window_end, discord_message_id, silent, notified, closed,
+            window_end <= NOW() AS ended FROM bg_live_evenings
+      WHERE window_end > NOW() - INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR AND closed = 0 AND discord_message_id IS NOT NULL
       ORDER BY id`,
   );
   let edited = 0;
   let retry = false;
   for (const evening of evenings) {
-    // Soirée en pause (refus de Discord, base illisible) : relancée plus tard.
-    if (isHeld(evening.target)) {
-      retry = true;
-      continue;
-    }
-    let result: RefreshResult;
-    try {
-      result = await refreshEvening(evening, now);
-    } catch (error) {
-      // Une soirée illisible n'empêche pas l'autre public d'être mis à jour.
-      warnOnce(`refresh read ${Number(evening.id)}`, `[live-announce] soirée ${Number(evening.id)} illisible, mise à jour reportée`, error);
-      result = "retry";
-    }
+    const result = await refreshListedEvening(evening, now);
     if (result === "edited") edited += 1;
     if (result === "retry" || result === "shared-retry") retry = true;
     // Bot ou salon en cause : l'autre public essuierait le même refus.
@@ -1115,6 +1117,21 @@ export async function refreshLiveEvenings(now: number = Date.now()): Promise<num
 
 /** Issue de la mise à jour d'une soirée. */
 type RefreshResult = "edited" | "unchanged" | "retry" | "shared-retry" | "dropped";
+
+/** Met à jour une soirée lue par {@link refreshLiveEvenings}, ou la laisse. */
+async function refreshListedEvening(evening: RefreshableEvening, now: number): Promise<RefreshResult> {
+  // Soirée finie dont ce processus n'a pas publié le texte : rien à corriger de sûr.
+  if (Number(evening.ended) === 1 && !lastEveningText.has(Number(evening.id))) return "unchanged";
+  // Soirée en pause (refus de Discord, base illisible) : relancée plus tard.
+  if (isHeld(evening.target)) return "retry";
+  try {
+    return await refreshEvening(evening, now);
+  } catch (error) {
+    // Une soirée illisible n'empêche pas l'autre public d'être mis à jour.
+    warnOnce(`refresh read ${Number(evening.id)}`, `[live-announce] soirée ${Number(evening.id)} illisible, mise à jour reportée`, error);
+    return "retry";
+  }
+}
 
 /** Remet à jour une soirée ; `retry` si l'envoi est reporté (rien n'est parti). */
 async function refreshEvening(evening: RefreshableEvening, now: number): Promise<RefreshResult> {
