@@ -82,3 +82,18 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
     expect(readSource("messages/en/rules.json")).toContain("the match card's “Contacts” button already shows as soon as both its opponents are known");
   });
 });
+
+describe("tag Discord d'un caster et BattleTag masqué dans l'avis", () => {
+  it("les textes de certification disent que les équipes d'un match casté voient le tag du caster (FR et EN)", () => {
+    expect(readSource("lib/shared/discord-identity.ts")).toContain("Si tu castes un match, ses deux équipes voient le tien sur la même durée.");
+    expect(frProfile.verify.exposure.match).toContain("Si tu castes un match, ses deux équipes voient le tien sur la même durée.");
+    expect(enProfile.verify.exposure.match).toContain("If you cast a match, both its teams see yours for the same period.");
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("jusqu'à sa fin (et, si tu castes un match, ses deux équipes sur la même durée) ;");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("to its end (and, if you cast a match, both its teams for the same period);");
+  });
+
+  it("l'avis de changement dit que le BattleTag présenté peut être masqué (FR et EN)", () => {
+    expect(PRIVACY_CHANGES.find((c) => c.id === ENTRY_ID)?.details.join("\n")).toContain("le BattleTag, même masqué, d'un ou deux membres");
+    expect(PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join("\n")).toContain("the BattleTag, even if hidden, of one or two members");
+  });
+});
