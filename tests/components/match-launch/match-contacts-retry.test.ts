@@ -288,8 +288,10 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toContain("shouldRetryReread(rereadFailures)");
     expect(dialog).toContain("casterRereadDelay(launch, serverDate)");
     // Échec passager de la première lecture aussi : retenté (notification une fois).
-    expect(dialog).toMatch(/if \(transient\) \{\n\s*setRereadWait\(read\.retryAfterMs \?\? 0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*\}\n\s*if \(reread && transient\) return;/);
-    expect(dialog).toMatch(/setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*if \(reread\) return;/);
+    expect(dialog).toMatch(/if \(transient\) \{\n\s*setRereadWait\(read\.retryAfterMs \?\? 0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*\}\n\s*if \(keepWaiting\(transient\)\) return;/);
+    expect(dialog).toMatch(/setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*if \(keepWaiting\(true\)\) return;/);
+    // Rien de lu : chargement tant qu'une tentative suit, notification à la fin seulement.
+    expect(dialog).toContain("transient && (shown || shouldRetryReread(rereadFailures + 1));");
     expect(dialog).toContain("contactsShown={matchUnderway(launch.phase)}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
