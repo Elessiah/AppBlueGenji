@@ -669,6 +669,7 @@ export function TournamentForm({
             warnUndoesLaunches={
               tournamentState === "RUNNING" && values.refereeScheduling && !initialValues.refereeScheduling
             }
+            launchPhase={values.launchPhase}
             onChange={(checked) => set("refereeScheduling", checked)}
           />
 

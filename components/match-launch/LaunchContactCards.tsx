@@ -69,7 +69,11 @@ function IdentityLine({
   );
 }
 
-function ContactRow({ contact, onCopy }: Readonly<{ contact: LaunchContact; onCopy: CopyFn }>) {
+function ContactRow({
+  contact,
+  onCopy,
+  linkName,
+}: Readonly<{ contact: LaunchContact; onCopy: CopyFn; linkName: boolean }>) {
   const { t } = useLaunchText();
   // Dans l'ordre de la priorité de choix (capitaine, manager, propriétaire),
   // pas dans l'ordre de saisie : la pastille la plus parlante vient en tête.
@@ -77,9 +81,13 @@ function ContactRow({ contact, onCopy }: Readonly<{ contact: LaunchContact; onCo
   return (
     <li className={styles.contact}>
       <div className={styles.contactHead}>
-        <PlayerLink userId={contact.userId} className={styles.pseudo}>
-          {contact.pseudo}
-        </PlayerLink>
+        {linkName ? (
+          <PlayerLink userId={contact.userId} className={styles.pseudo}>
+            {contact.pseudo}
+          </PlayerLink>
+        ) : (
+          <span className={styles.pseudo}>{contact.pseudo}</span>
+        )}
         {roles.map((label) => (
           <span key={label} className={styles.role}>
             {label}
@@ -98,6 +106,7 @@ export function SideCard({
   phase,
   onCopy,
   contactsShown = phase !== "SCHEDULED",
+  linkNames = false,
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
@@ -105,6 +114,11 @@ export function SideCard({
   onCopy: CopyFn;
   /** Contacts montrés ; par défaut, pas avant le lancement (modale de lancement). */
   contactsShown?: boolean;
+  /**
+   * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
+   * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
+   */
+  linkNames?: boolean;
 }>) {
   const { t } = useLaunchText();
   return (
@@ -119,7 +133,7 @@ export function SideCard({
           )}
         </span>
         <span className={styles.sideName}>
-          <SideName side={side} />
+          {linkNames ? <SideName side={side} /> : side.name}
         </span>
         <ReadyChip ready={side.ready} phase={phase} />
       </div>
@@ -128,7 +142,7 @@ export function SideCard({
           <span aria-hidden="true">🏠</span> {t("host")}
         </p>
       )}
-      <SideContacts side={side} onCopy={onCopy} shown={contactsShown} />
+      <SideContacts side={side} onCopy={onCopy} shown={contactsShown} linkNames={linkNames} />
     </section>
   );
 }
@@ -148,10 +162,12 @@ function SideContacts({
   side,
   onCopy,
   shown,
+  linkNames,
 }: Readonly<{
   side: LaunchSide;
   onCopy: CopyFn;
   shown: boolean;
+  linkNames: boolean;
 }>) {
   const { t } = useLaunchText();
   if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
@@ -160,7 +176,7 @@ function SideContacts({
   return (
     <ul className={styles.contacts}>
       {side.contacts.map((contact) => (
-        <ContactRow key={contact.userId} contact={contact} onCopy={onCopy} />
+        <ContactRow key={contact.userId} contact={contact} onCopy={onCopy} linkName={linkNames} />
       ))}
     </ul>
   );
@@ -172,6 +188,7 @@ export function CasterCard({
   onCopy,
   contactsShown = phase !== "SCHEDULED",
   noCasterText,
+  linkNames = false,
 }: Readonly<{
   caster: LaunchCaster | null;
   phase: MatchLaunchInfo["phase"];
@@ -179,6 +196,8 @@ export function CasterCard({
   contactsShown?: boolean;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
+  /** Pseudo cliquable (modale « Contacts » seulement, voir `SideCard`). */
+  linkNames?: boolean;
 }>) {
   const { t } = useLaunchText();
   if (!caster) {
@@ -198,7 +217,7 @@ export function CasterCard({
         </span>
         <span className={styles.sideName}>
           <span className={styles.casterLabel}>{t("caster")}</span>{" "}
-          <PlayerLink userId={caster.userId}>{caster.pseudo}</PlayerLink>
+          {linkNames ? <PlayerLink userId={caster.userId}>{caster.pseudo}</PlayerLink> : caster.pseudo}
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>

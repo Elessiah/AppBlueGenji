@@ -178,7 +178,8 @@
       "finished": "Le tournoi est terminé : l'option n'est plus modifiable.",
       "create": "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
       "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
-      "warning": "À l'enregistrement, les matchs sans date et pas encore lancés quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire. Les matchs déjà lancés continuent."
+      "warning": "À l'enregistrement, les matchs sans date et pas encore lancés quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire. Les matchs déjà lancés continuent.",
+      "warningDirect": "À l'enregistrement, les matchs sans date et pas encore lancés attendent qu'un arbitre fixe leur horaire. Les matchs déjà lancés continuent."
     },
     "launchPhase": {
       "label": "Phase de lancement des matchs",

@@ -18,12 +18,7 @@ export function contactsErrorText(text: LaunchText, code: string | null | undefi
   return text.t("contacts.failed");
 }
 
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "ready"; launch: MatchLaunchInfo }
-  // Le refus reste écrit dans la modale : « Aucun contact » laisserait croire,
-  // une fois la notification partie, que les adversaires n'en ont pas.
-  | { kind: "failed"; code: string | null };
+type LoadState = { kind: "loading" } | { kind: "ready"; launch: MatchLaunchInfo } | { kind: "failed" };
 
 /**
  * Modale « Contacts » d'une carte de match (`docs/features/MATCH_LAUNCH.md`
@@ -65,14 +60,14 @@ export function MatchContactsDialog({
         const payload = (await response.json().catch(() => ({}))) as { launch?: MatchLaunchInfo; error?: string };
         if (!alive) return;
         if (!response.ok || !payload.launch) {
-          setState({ kind: "failed", code: payload.error ?? null });
+          setState({ kind: "failed" });
           showError(contactsErrorText(text, payload.error));
           return;
         }
         setState({ kind: "ready", launch: payload.launch });
       } catch {
         if (!alive) return;
-        setState({ kind: "failed", code: null });
+        setState({ kind: "failed" });
         showError(contactsErrorText(text, null));
       }
     })();
@@ -113,7 +108,10 @@ export function MatchContactsDialog({
         <ScrollArea orientation="y" className={styles.scroll} ariaLabel={t("contacts.scrollAria")}>
           <div className={styles.content}>
             {state.kind === "loading" && <p className={styles.note}>{t("contacts.loading")}</p>}
-            {state.kind === "failed" && <p className={styles.note}>{contactsErrorText(text, state.code)}</p>}
+            {/* Le refus part en notification (jamais en ligne) ; le corps reste
+                neutre — « aucun contact » laisserait croire que les adversaires
+                n'en ont pas. */}
+            {state.kind === "failed" && <p className={styles.note}>{t("contacts.notShown")}</p>}
             {launch && (
               <>
                 <div className={launchStyles.sides}>
@@ -123,6 +121,7 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     contactsShown
+                    linkNames
                   />
                   <div className={launchStyles.divider} aria-hidden="true">
                     {t("vs")}
@@ -133,6 +132,7 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     contactsShown
+                    linkNames
                   />
                 </div>
                 <CasterCard
@@ -141,6 +141,7 @@ export function MatchContactsDialog({
                   onCopy={copy}
                   contactsShown
                   noCasterText={t("contacts.noCaster")}
+                  linkNames
                 />
               </>
             )}

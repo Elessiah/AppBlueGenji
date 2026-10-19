@@ -254,6 +254,7 @@
       "confirm": "Activer",
       "pending": "Activation…",
       "consequence": "{count, plural, =1 {1 match, sans date et pas encore lancé, quitte le lancement — ses « Prêt » sont effacés — et attend qu'un arbitre fixe son horaire.} other {# matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.}}",
+      "consequenceDirect": "{count, plural, =1 {1 match, sans date et pas encore lancé, attend qu'un arbitre fixe son horaire.} other {# matchs, sans date et pas encore lancés, attendent qu'un arbitre fixe leur horaire.}}",
       "next": "Les matchs déjà lancés continuent, et les manches suivantes naîtront à planifier."
     },
     "errors": {

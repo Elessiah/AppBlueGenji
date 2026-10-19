@@ -254,6 +254,7 @@
       "confirm": "Turn on",
       "pending": "Turning on…",
       "consequence": "{count, plural, =1 {1 match, with no date and not launched yet, leaves the launch — its “Ready” calls are cleared — and waits for a referee to set its time.} other {# matches, with no date and not launched yet, leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time.}}",
+      "consequenceDirect": "{count, plural, =1 {1 match, with no date and not launched yet, waits for a referee to set its time.} other {# matches, with no date and not launched yet, wait for a referee to set their time.}}",
       "next": "Matches already launched carry on, and the next rounds will start out to be scheduled."
     },
     "errors": {

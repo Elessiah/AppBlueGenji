@@ -178,7 +178,8 @@
       "finished": "The tournament is finished: this option can no longer be changed.",
       "create": "Can be changed later, until the tournament closes — even while it's in progress.",
       "edit": "Can be changed until the tournament closes — even while it's in progress.",
-      "warning": "On saving, matches with no date that haven't launched yet leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time. Matches already launched carry on."
+      "warning": "On saving, matches with no date that haven't launched yet leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time. Matches already launched carry on.",
+      "warningDirect": "On saving, matches with no date that haven't launched yet wait for a referee to set their time. Matches already launched carry on."
     },
     "launchPhase": {
       "label": "Match launch phase",

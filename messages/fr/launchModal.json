@@ -76,9 +76,10 @@
   "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Visibles des seuls joueurs et du caster de ce match, pour s'organiser avant le départ.",
+    "lead": "Fiches montrées aux joueurs et au caster de ce match, pour s'organiser avant le départ.",
     "scrollAria": "Contacts du match",
     "loading": "Chargement des contacts…",
+    "notShown": "Contacts non affichés.",
     "noCaster": "Aucun caster inscrit sur ce match.",
     "unavailable": "Les contacts ne sont visibles que des joueurs et du caster d'un match programmé ou en cours.",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."

@@ -43,6 +43,8 @@ const POLL_IDLE_MS = 60_000;
  * qu'une rafale d'instantanés ne vaille qu'une lecture.
  */
 const REFRESH_EVENT_COALESCE_MS = 300;
+/** Cadence du guet d'une autre modale qui retient l'ouverture d'office. */
+const MODAL_RECHECK_MS = 1_000;
 /** Un match lancé depuis moins longtemps que cela est annoncé d'office. */
 const LAUNCH_ANNOUNCE_WINDOW_MS = 10 * 60_000;
 const DISMISSED_STORAGE_KEY = "bg_match_launch_dismissed";
@@ -165,6 +167,8 @@ export function MatchLaunchCenter({
   const readyRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const dismissedRef = useRef<Set<string> | null>(null);
+  // Relance de l'ouverture d'office, retenue par une autre modale ouverte.
+  const [modalRecheck, setModalRecheck] = useState(0);
 
   // Ouverture demandée ailleurs (carte du match).
   useEffect(() => {
@@ -190,20 +194,25 @@ export function MatchLaunchCenter({
 
   useEffect(() => {
     if (waiting || current !== null) return;
-    // Jamais par-dessus une autre modale (« Contacts », score…) : deux pièges
-    // de focus se disputeraient Tab et Échap. L'annonce attend la relève
-    // suivante — la modale « Contacts » en demande une à sa fermeture.
-    if (anotherModalOpen()) return;
     dismissedRef.current ??= readDismissed();
     const now = Date.now();
     const next = launches.find(
       (info) => wantsAutoOpen(info, now) && !dismissedRef.current?.has(launchModalKey(info)),
     );
-    if (next) {
-      setConfirming(false);
-      setOpenMatchId(next.matchId);
+    if (!next) return;
+    // Jamais par-dessus une autre modale (« Contacts », score…) : deux pièges
+    // de focus se disputeraient Tab et Échap. L'annonce attend sa fermeture,
+    // guettée chaque seconde (horloges actives), sinon la relève suivante.
+    if (anotherModalOpen()) {
+      if (!clocks) return;
+      const timer = setInterval(() => {
+        if (!anotherModalOpen()) setModalRecheck((n) => n + 1);
+      }, MODAL_RECHECK_MS);
+      return () => clearInterval(timer);
     }
-  }, [launches, current, waiting]);
+    setConfirming(false);
+    setOpenMatchId(next.matchId);
+  }, [launches, current, waiting, clocks, modalRecheck]);
 
   useEffect(() => {
     if (!privacyPending) return;
