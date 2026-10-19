@@ -142,3 +142,10 @@ describe("caster et équipes entre eux, fiches de contact", () => {
     expect(PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join("\n")).toContain("with the team role and whether the BattleTag comes from a linked Battle.net account");
   });
 });
+
+describe("T01 — base légale du BattleTag masqué lu entre parties d'un match", () => {
+  it("ajoute l'exécution du service, renvoyant à T04 (FR et EN)", () => {
+    expect(PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.legalBasis).toMatch(/exécution du service \(contrat\) pour la lecture du BattleTag, même masqué, entre parties d'un même match .*voir T04/);
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.legalBasis).toMatch(/performance of the service \(contract\) for the reading of the BattleTag, even when hidden, between parties to the same match .*see T04/);
+  });
+});
