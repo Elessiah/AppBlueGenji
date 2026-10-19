@@ -150,7 +150,11 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   gardé : des essais reportés avant lui (bot injoignable) ne la raccourcissent
   pas — un premier envoi incertain juste avant la fin de la fenêtre ne laisse
   pas une nouvelle soirée notifier une minute plus tard —, et ce premier
-  message liste déjà les matchs programmés jusqu'à cette nouvelle fin.
+  message liste déjà les matchs programmés jusqu'à cette nouvelle fin. Un
+  match programmé que ce message listait déjà, passé à l'antenne en retard
+  après la fin de la fenêtre, **rejoint** ce message (soirée reprise : message
+  gardé, ouverte avant son heure prévue, fenêtre finie après elle) au lieu
+  d'ouvrir une soirée qui notifierait une seconde fois.
 - **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
   soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
   Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
@@ -160,7 +164,9 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   d'œil. Un match fini depuis son annonce, ou sorti de l'antenne (rouvert pour
   une autre affiche, antenne fermée en `MANUAL`), n'est plus listé : seul un
   match `START_TIME` figure avant son direct, à son heure — jamais un match à
-  une heure inventée. Les liens partent
+  une heure inventée. Une annonce ne fait relire un match que pour son
+  affiche **courante** (`pairing`) : un match rouvert pour d'autres engagés n'y
+  revient que par l'annonce de sa nouvelle affiche. Les liens partent
   à part (`streamUrls`, dix au plus) et le texte les place par des jetons
   `{{lien:N}}` que le bot remplace après ses neutralisations ; un nom ne peut
   pas forger de jeton (une espace de largeur nulle suit chaque accolade suivie
@@ -383,7 +389,10 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   aboutir »). Les deux dernières ne demandent pas de poster l'annonce à la
   main : l'envoi du bot a pu partir, ou partir encore. Après un `400` ou un
   blocage par AutoMod, rien n'est parti : la poster à la main (règle
-  corrigée) ne fait pas de doublon. Côté bot, voir ci-dessus (une fois par
+  corrigée) ne fait pas de doublon — avec la mention de son public (tout le
+  serveur, ou le rôle StreamViewer), et **sans aucune mention** pour une
+  modification de la soirée ou un envoi `notify: false` (le signalement du bot
+  le dit). Côté bot, voir ci-dessus (une fois par
   heure par cause réessayée ; chaque blocage AutoMod, envoi incertain ou
   requête coupée par le site ; un `400` n'est pas signalé au canal de logs). Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est
