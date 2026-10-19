@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration", () => ({
   isBotCircuitOpen: jest.fn(),
-  pushLiveAnnouncement: jest.fn(),
+  pushLiveEvening: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import {
   LIVE_ANNOUNCE_MAX_AGE_MINUTES,
   LIVE_ANNOUNCE_RETRY_DELAY_MS,
@@ -25,6 +25,9 @@ import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 const NOW = Date.parse("2026-10-14T20:00:00Z");
+
+/** Chaîne officielle : seule à notifier @everyone, les autres notifient le rôle StreamViewer. */
+const OFFICIAL = "https://www.twitch.tv/bluegenjiesport";
 
 /** Match `AUTO` lancé pour son affiche courante : à l'antenne. */
 const AUTO_LIVE = {
@@ -49,21 +52,46 @@ const AUTO_LIVE = {
   team2_pseudo: null,
 };
 
-type Db = { query: jest.Mock<SqlQuery>; execute: jest.Mock<SqlQuery> };
+/**
+ * Envoi au bot, vu comme avant la soirée : texte, premier lien, étiquette et
+ * version de logs — le simulacre de `pushLiveEvening` le rejoue.
+ */
+const pushLiveAnnouncement = jest.fn<(message: string, url: string, context: string, logMessage?: string) => Promise<LiveAnnouncementOutcome>>();
+
+/** Texte de soirée d'un seul match à l'antenne depuis 21:58 (Paris). */
+function single(line: string, at = "21:58"): string {
+  return `🔴 **Les lives de la soirée**
+
+**${at}** · En direct
+${line}
+{{lien:1}}`;
+}
+
+/** Soirée simulée : ouverte à 19:58 UTC, sans message publié. */
+const EVENING = { id: 3, started_at: "2026-10-14T19:58:00Z", window_end: "2026-10-14T23:58:00Z", discord_message_id: null };
+
+type Db = { query: jest.Mock<SqlQuery>; execute: jest.Mock<SqlQuery>; evening: jest.Mock<SqlQuery> };
 
 /** `query` rend les candidats ; `execute` rejoue les réservations (`claims`) et les rendus. */
 function mockDb(candidates: unknown[], claims: boolean[] = []): Db {
   const queue = [...claims];
   const query = jest.fn<SqlQuery>().mockResolvedValue([candidates]);
+  // Lectures de la soirée (la soirée elle-même, puis ses matchs) : à part, pour
+  // que `query` ne compte que la lecture des candidats.
+  const evening = jest.fn<SqlQuery>(async (sql) => (sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [candidates]));
+  const route = jest.fn<SqlQuery>(async (sql, params) =>
+    sql.includes("bg_live_evenings") || sql.includes("a.sent_at >= ?") ? evening(sql, params) : query(sql, params),
+  );
   const execute = jest.fn<SqlQuery>(async (sql) => {
+    if (sql.includes("bg_live_evenings")) return [{ affectedRows: 1 }];
     if (sql.startsWith("INSERT IGNORE INTO bg_live_announcements")) {
       return [{ affectedRows: (queue.length > 0 ? queue.shift() : true) ? 1 : 0 }];
     }
     if (sql.startsWith("DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (")) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
-  return { query, execute };
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: route, execute }));
+  return { query, execute, evening };
 }
 
 function claimsOf(execute: Db["execute"]): unknown[] {
@@ -73,7 +101,7 @@ function claimsOf(execute: Db["execute"]): unknown[] {
 /** Réservations rendues, une paire `[match, affiche]` par ligne (une requête par groupe). */
 function releasesOf(execute: Db["execute"]): unknown[] {
   return execute.mock.calls
-    .filter(([sql]) => sql.startsWith("DELETE"))
+    .filter(([sql]) => sql.startsWith("DELETE FROM bg_live_announcements"))
     .flatMap(([, params]) => {
       const flat = params as unknown[];
       const pairs: unknown[] = [];
@@ -92,7 +120,17 @@ beforeEach(() => {
     LIVE_ANNOUNCEMENTS_ENABLED: "1",
   });
   jest.mocked(isBotCircuitOpen).mockReturnValue(false);
-  jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
+  pushLiveAnnouncement.mockReset();
+  pushLiveAnnouncement.mockResolvedValue("posted");
+  jest.mocked(pushLiveEvening).mockImplementation(async (request) => ({
+    outcome: await pushLiveAnnouncement(
+      request.message,
+      request.streamUrls[0],
+      request.context,
+      ...(request.logMessage === undefined ? [] : [request.logMessage]),
+    ),
+    messageId: "123456789012345678",
+  }));
   jest.spyOn(console, "info").mockImplementation(() => undefined);
   jest.spyOn(console, "warn").mockImplementation(() => undefined);
   jest.spyOn(console, "error").mockImplementation(() => undefined);
@@ -111,13 +149,13 @@ describe("runLiveAnnouncementSweep", () => {
 
     expect(claimsOf(execute)).toEqual([[40, "1:2"]]);
     expect(pushLiveAnnouncement).toHaveBeenCalledWith(
-      "🔴 En direct : Renards contre Nova — Coupe d'hiver",
+      single("Renards contre Nova — Coupe d'hiver"),
       "https://www.twitch.tv/caster",
-      "live-announce tournoi-4 match-40",
+      "live-announce soiree-3 tournoi-4 match-40",
     );
     expect(releasesOf(execute)).toEqual([]);
     // Trace pm2 : identifiants, aucun nom.
-    expect(console.info).toHaveBeenCalledWith("[live-announce] match 40 (tournoi 4) annoncé dans #live");
+    expect(console.info).toHaveBeenCalledWith("[live-announce] match 40 (tournoi 4) annoncé dans #live (soirée 3, dans un nouveau message)");
   });
 
   it("nomme une entrée individuelle par le pseudo du compte, pas par le nom de l'entrée, même au type illisible", async () => {
@@ -134,7 +172,7 @@ describe("runLiveAnnouncementSweep", () => {
       },
     ]);
     await runLiveAnnouncementSweep(NOW);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : Alpha contre Bravo — Coupe d'hiver");
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe(single("Alpha contre Bravo — Coupe d'hiver"));
     // Le pseudo vient du compte vivant de l'entrée solo, jamais d'un compte supprimé.
     const sql = String(query.mock.calls[0][0]);
     expect(sql).toMatch(/LEFT JOIN bg_users u1 ON u1\.id = t1\.solo_user_id AND u1\.is_deleted = 0/);
@@ -174,8 +212,8 @@ describe("runLiveAnnouncementSweep", () => {
     mockDb([{ ...AUTO_LIVE, participant_type: "SOLO", team1_solo_user_id: 7, team2_solo_user_id: 8, team1_pseudo: "Kiro", team2_pseudo: "Ayla" }]);
     await runLiveAnnouncementSweep(NOW);
     const [message, , , logMessage] = jest.mocked(pushLiveAnnouncement).mock.calls[0];
-    expect(message).toBe("🔴 En direct : Kiro contre Ayla — Coupe d'hiver");
-    expect(logMessage).toBe("🔴 En direct : un joueur contre un joueur — Coupe d'hiver");
+    expect(message).toBe(single("Kiro contre Ayla — Coupe d'hiver"));
+    expect(logMessage).toBe(single("un joueur contre un joueur — Coupe d'hiver"));
   });
 
   it("n'envoie pas de version de logs quand l'annonce ne nomme que des équipes", async () => {
@@ -187,7 +225,7 @@ describe("runLiveAnnouncementSweep", () => {
   it("écrit « un joueur » pour une entrée individuelle dont le compte est supprimé", async () => {
     mockDb([{ ...AUTO_LIVE, team1_name: "Anonyme-1", team2_name: "Bravo", team1_solo_user_id: 7, team2_solo_user_id: 8, team2_pseudo: "Bravo" }]);
     await runLiveAnnouncementSweep(NOW);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe(single("un joueur contre Bravo — Coupe d'hiver"));
   });
 
   it("tournoi individuel : un invité sans compte (fantôme nommé par le staff) s'écrit « un joueur », jamais son nom", async () => {
@@ -196,14 +234,14 @@ describe("runLiveAnnouncementSweep", () => {
     ]);
     await runLiveAnnouncementSweep(NOW);
     const message = jest.mocked(pushLiveAnnouncement).mock.calls[0][0];
-    expect(message).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+    expect(message).toBe(single("un joueur contre Bravo — Coupe d'hiver"));
     expect(message).not.toContain("Lucas");
   });
 
   it("type illisible mais entrée individuelle dans le groupe : l'invité sans compte reste « un joueur »", async () => {
     mockDb([{ ...AUTO_LIVE, participant_type: null, team1_name: "Lucas Martin", team2_solo_user_id: 8, team2_pseudo: "Bravo" }]);
     await runLiveAnnouncementSweep(NOW);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : un joueur contre Bravo — Coupe d'hiver");
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe(single("un joueur contre Bravo — Coupe d'hiver"));
   });
 
   it("liveEntrantName : équipe par son nom, entrée solo par son pseudo, sinon « un joueur » (null)", () => {
@@ -324,7 +362,7 @@ describe("runLiveAnnouncementSweep", () => {
 
   it("un autre match reporté pour la même cause laisse aussi sa trace", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("channel-closed");
-    mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 55, tournament_id: 7, pairing: "5:6", launch_pairing: "5:6" }]);
+    mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 55, tournament_id: 7, pairing: "5:6", launch_pairing: "5:6", live_url: OFFICIAL }]);
     await runLiveAnnouncementSweep(NOW);
     await runLiveAnnouncementSweep(NOW);
     const warnings = jest.mocked(console.warn).mock.calls.map(([text]) => String(text));
@@ -393,14 +431,24 @@ describe("runLiveAnnouncementSweep", () => {
     expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
     expect(releasesOf(execute)).toEqual([]);
     expect(console.info).toHaveBeenCalledWith(
-      "[live-announce] match 40 (tournoi 4) annoncé dans #live sans notifier (permission de mentionner @everyone absente)",
+      "[live-announce] match 40 (tournoi 4) annoncé dans #live (soirée 3, dans un nouveau message) sans notifier (permission de mentionner absente)",
     );
   });
 
-  it("un seul @everyone pour les matchs d'un tournoi à l'antenne ensemble sur le même lien", async () => {
+  it("un seul message pour les matchs d'une soirée d'un même public, quels que soient tournoi et lien", async () => {
     const { execute } = mockDb([
       { ...AUTO_LIVE, live_url: null },
-      { ...AUTO_LIVE, id: 41, live_url: null, pairing: "3:4", launch_pairing: "3:4", team1_name: "Orques", team2_name: "Lynx" },
+      {
+        ...AUTO_LIVE,
+        id: 41,
+        tournament_id: 5,
+        tournament_name: "Coupe d'été",
+        live_url: "https://kick.com/autre",
+        pairing: "3:4",
+        launch_pairing: "3:4",
+        team1_name: "Orques",
+        team2_name: "Lynx",
+      },
     ]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(2);
     // Chaque affiche garde sa réservation, un seul message part.
@@ -410,21 +458,32 @@ describe("runLiveAnnouncementSweep", () => {
     ]);
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
     expect(pushLiveAnnouncement).toHaveBeenCalledWith(
-      "🔴 En direct — Coupe d'hiver :\n• Renards contre Nova\n• Orques contre Lynx",
+      "🔴 **Les lives de la soirée**\n\n**21:58** · En direct\nRenards contre Nova — Coupe d'hiver\n{{lien:1}}" +
+        "\n\n**21:58** · En direct\nOrques contre Lynx — Coupe d'été\n{{lien:2}}",
       "https://twitch.tv/bluegenji",
-      "live-announce tournoi-4 match-40,41",
+      "live-announce soiree-3 tournoi-4 match-40,41",
     );
-    expect(console.info).toHaveBeenCalledWith("[live-announce] matchs 40, 41 (tournoi 4) annoncés dans #live");
+    expect(jest.mocked(pushLiveEvening).mock.calls[0][0]).toMatchObject({
+      mention: "stream-viewer",
+      streamUrls: ["https://twitch.tv/bluegenji", "https://kick.com/autre"],
+    });
+    // Première annonce de la soirée : aucun message à modifier.
+    expect(jest.mocked(pushLiveEvening).mock.calls[0][0].editMessageId).toBeUndefined();
+    expect(console.info).toHaveBeenCalledWith("[live-announce] matchs 40, 41 (tournoi 4) annoncés dans #live (soirée 3, dans un nouveau message)");
   });
 
-  it("des liens différents, ou des tournois différents, font des messages différents", async () => {
+  it("la chaîne officielle (@everyone) et les autres chaînes (StreamViewer) font deux messages", async () => {
     mockDb([
       AUTO_LIVE,
       { ...AUTO_LIVE, id: 41, live_url: "https://kick.com/autre", pairing: "3:4", launch_pairing: "3:4" },
-      { ...AUTO_LIVE, id: 42, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" },
+      { ...AUTO_LIVE, id: 42, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6", live_url: "https://TWITCH.tv/BlueGenjiEsport/" },
     ]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(3);
-    expect(pushLiveAnnouncement).toHaveBeenCalledTimes(3);
+    const calls = jest.mocked(pushLiveEvening).mock.calls.map(([request]) => [request.mention, request.context]);
+    expect(calls).toEqual([
+      ["stream-viewer", "live-announce soiree-3 tournoi-4 match-40,41"],
+      ["everyone", "live-announce soiree-3 tournoi-5 match-42"],
+    ]);
   });
 
   it("réservation impossible à rendre : la trace pm2 nomme les matchs et ne promet pas d'essai", async () => {
@@ -456,7 +515,7 @@ describe("runLiveAnnouncementSweep", () => {
     });
     expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]).toBe("live-announce tournoi-4 match-41");
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]).toBe("live-announce soiree-3 tournoi-4 match-41");
     expect(String(jest.mocked(console.error).mock.calls[0][0])).toBe(
       "[live-announce] match 40 (tournoi 4) : réservation impossible, réessayée à chaque passage pendant les deux heures qui suivent le début du direct (avertissement répété au plus une fois par heure)",
     );
@@ -496,7 +555,7 @@ describe("runLiveAnnouncementSweep", () => {
     await runLiveAnnouncementSweep(NOW);
     const context = String(jest.mocked(pushLiveAnnouncement).mock.calls[0][2]);
     expect(context.length).toBeLessThanOrEqual(200);
-    const match = /^live-announce tournoi-4 match-([\d,]+),…\+(\d+)$/.exec(context);
+    const match = /^live-announce soiree-3 tournoi-4 match-([\d,]+),…\+(\d+)$/.exec(context);
     expect(match).not.toBeNull();
     const shown = match![1].split(",");
     expect(shown.every((id, i) => id === String(10_000 + i))).toBe(true);
@@ -508,7 +567,7 @@ describe("runLiveAnnouncementSweep", () => {
     const { execute } = mockDb([
       AUTO_LIVE,
       { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4", live_url: "https://www.twitch.tv/autre" },
-      { ...AUTO_LIVE, id: 42, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" },
+      { ...AUTO_LIVE, id: 42, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6", live_url: OFFICIAL },
     ]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
@@ -519,13 +578,13 @@ describe("runLiveAnnouncementSweep", () => {
     ]);
     // Chaque match reporté garde sa trace pm2, avec la cause constatée.
     const warned = jest.mocked(console.warn).mock.calls.map(([text]) => String(text));
-    expect(warned).toHaveLength(3);
+    expect(warned).toHaveLength(2);
     for (const text of warned) expect(text).toContain("salon #live fermé au bot");
   });
 
   it("Discord muet en lisant le salon vaut pour tout le passage : les groupes suivants sont rendus sans appel", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("discord-unreachable");
-    const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" }]);
+    const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6", live_url: OFFICIAL }]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(1);
     expect(releasesOf(execute)).toEqual([
@@ -536,7 +595,7 @@ describe("runLiveAnnouncementSweep", () => {
 
   it("un refus de Discord propre au message n'empêche pas les autres groupes de partir", async () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held").mockResolvedValueOnce("posted");
-    const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" }]);
+    const { execute } = mockDb([AUTO_LIVE, { ...AUTO_LIVE, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6", live_url: OFFICIAL }]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
     expect(pushLiveAnnouncement).toHaveBeenCalledTimes(2);
     expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
@@ -593,13 +652,13 @@ describe("runLiveAnnouncementSweep", () => {
     await runLiveAnnouncementSweep(NOW);
     const text = String(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]);
     expect(text).not.toMatch(/@everyone|\]\(https:|https:\/\/piege/);
-    expect(text).toMatch(/^🔴 En direct : .+ contre .+ — Coupe d'hiver$/);
+    expect(text).toMatch(/^🔴 \*\*Les lives de la soirée\*\*\n\n\*\*\d\d:\d\d\*\* · En direct\n.+ contre .+ — Coupe d.hiver\n\{\{lien:1\}\}$/);
   });
 
   it("garde les seuls noms d'équipe pour un match d'équipes", async () => {
     mockDb([{ ...AUTO_LIVE, team1_pseudo: "NePasPublier", team2_pseudo: "NonPlus" }]);
     await runLiveAnnouncementSweep(NOW);
-    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe("🔴 En direct : Renards contre Nova — Coupe d'hiver");
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][0]).toBe(single("Renards contre Nova — Coupe d'hiver"));
   });
 });
 
@@ -705,7 +764,7 @@ describe("dispatchLiveAnnouncements", () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ["nextTick", "setImmediate"] });
     try {
       const held = { ...AUTO_LIVE, launched_at: new Date(NOW - 60_000).toISOString() };
-      const other = { ...held, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" };
+      const other = { ...held, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6", live_url: OFFICIAL };
       jest.mocked(pushLiveAnnouncement).mockResolvedValueOnce("discord-held");
       const { query } = mockDb([held]);
       await dispatchLiveAnnouncements();
@@ -715,8 +774,8 @@ describe("dispatchLiveAnnouncements", () => {
       jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
       expect(await dispatchLiveAnnouncements()).toBe(1);
       expect(jest.mocked(pushLiveAnnouncement).mock.calls.map(([, , context]) => context)).toEqual([
-        "live-announce tournoi-4 match-40",
-        "live-announce tournoi-5 match-57",
+        "live-announce soiree-3 tournoi-4 match-40",
+        "live-announce soiree-3 tournoi-5 match-57",
       ]);
       // Sa pause échue, le match refusé est réessayé seul, sans nouvel évènement.
       query.mockResolvedValue([[held]]);
@@ -746,7 +805,7 @@ describe("dispatchLiveAnnouncements", () => {
       // Au terme de la pause, les deux partent ensemble.
       await jest.advanceTimersByTimeAsync(LIVE_ANNOUNCE_RETRY_DELAY_MS);
       expect(pushLiveAnnouncement).toHaveBeenCalledTimes(2);
-      expect(jest.mocked(pushLiveAnnouncement).mock.calls[1][2]).toBe("live-announce tournoi-4 match-40,44");
+      expect(jest.mocked(pushLiveAnnouncement).mock.calls[1][2]).toBe("live-announce soiree-3 tournoi-4 match-40,44");
     } finally {
       jest.useRealTimers();
     }
@@ -758,14 +817,14 @@ describe("dispatchLiveAnnouncements", () => {
       // Trois secondes plus tard, un autre tournoi lance un match : appel étranglé.
       const { held, query } = await holdFirstDiffusion();
       expect(await dispatchLiveAnnouncements()).toBe(0);
-      const other = { ...held, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6" };
+      const other = { ...held, id: 57, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6", live_url: OFFICIAL };
       query.mockResolvedValue([[held, other]]);
       jest.mocked(pushLiveAnnouncement).mockResolvedValue("posted");
       // La relève tombe à dix secondes du premier passage, pas à la fin de la pause.
       await jest.advanceTimersByTimeAsync(8_000);
       expect(jest.mocked(pushLiveAnnouncement).mock.calls.map(([, , context]) => context)).toEqual([
-        "live-announce tournoi-4 match-40",
-        "live-announce tournoi-5 match-57",
+        "live-announce soiree-3 tournoi-4 match-40",
+        "live-announce soiree-3 tournoi-5 match-57",
       ]);
     } finally {
       jest.useRealTimers();
@@ -808,5 +867,101 @@ describe("dispatchLiveAnnouncements", () => {
   it("n'échoue jamais : une panne de lecture rend 0", async () => {
     jest.mocked(getDatabase).mockRejectedValue(new Error("DB_DOWN"));
     await expect(dispatchLiveAnnouncements()).resolves.toBe(0);
+  });
+});
+
+describe("soirées d'annonces", () => {
+  it("ouvre une soirée quand aucune ne court, puis garde l'identifiant du message publié", async () => {
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    evening.mockImplementation(async (sql) => {
+      if (!sql.includes("FROM bg_live_evenings")) return [[AUTO_LIVE]];
+      const created = execute.mock.calls.some(([text]) => text.startsWith("INSERT INTO bg_live_evenings"));
+      return [created ? [EVENING] : []];
+    });
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    const sqls = execute.mock.calls.map(([text]) => text.replace(/\s+/g, " "));
+    expect(sqls).toContain(
+      "INSERT INTO bg_live_evenings (target, started_at, window_end) VALUES (?, NOW(), NOW() + INTERVAL 4 HOUR)",
+    );
+    const update = execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
+    expect(update?.[1]).toEqual(["123456789012345678", 3]);
+    // Les soirées finies depuis un jour sont oubliées.
+    expect(sqls).toContain("DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY");
+  });
+
+  it("soirée déjà annoncée : modifie son message, sans nouvelle notification, et le dit dans pm2", async () => {
+    const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
+    const { evening } = mockDb([joined]);
+    const announced = { ...AUTO_LIVE, launched_at: "2026-10-14T19:00:00Z" };
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings")
+        ? [[{ ...EVENING, discord_message_id: "123456789012345678" }]]
+        : [[announced, joined]],
+    );
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.editMessageId).toBe("123456789012345678");
+    // Le match déjà annoncé reste dans le message, à son heure.
+    expect(request.message).toContain("**21:00** · En direct\nRenards contre Nova");
+    expect(request.message).toContain("**21:58** · En direct\nRenards contre Nova");
+    expect(console.info).toHaveBeenCalledWith(
+      "[live-announce] match 41 (tournoi 4) annoncé dans #live (soirée 3, ajoutés au message de la soirée)",
+    );
+  });
+
+  it("liste à leur heure les matchs programmés d'ici la fin de la soirée, du même public seulement", async () => {
+    const { evening } = mockDb([AUTO_LIVE]);
+    const upcoming = {
+      ...AUTO_LIVE,
+      id: 70,
+      status: "PENDING",
+      live_trigger: "START_TIME",
+      launched_at: null,
+      start_at: "2026-10-14T21:30:00Z",
+      team1_name: "Orques",
+      team2_name: "Lynx",
+    };
+    const official = { ...upcoming, id: 71, live_url: OFFICIAL, team1_name: "Hors", team2_name: "Public" };
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[AUTO_LIVE, upcoming, official]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.message).toBe(
+      "🔴 **Les lives de la soirée**\n\n**21:58** · En direct\nRenards contre Nova — Coupe d'hiver\n{{lien:1}}" +
+        "\n\n**23:30**\nOrques contre Lynx — Coupe d'hiver\n{{lien:1}}",
+    );
+    // La lecture de la soirée prend les annonces depuis son ouverture et les matchs jusqu'à sa fin.
+    const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
+    expect(read?.[1]).toEqual([expect.any(Number), expect.any(Number), EVENING.started_at, EVENING.window_end]);
+  });
+
+  it("un match fini depuis son annonce n'est plus listé, un match réservé par ce passage l'est toujours", async () => {
+    const { evening } = mockDb([AUTO_LIVE]);
+    const finished = { ...AUTO_LIVE, id: 39, status: "COMPLETED", team1_name: "Fini" };
+    evening.mockImplementation(async (sql) => (sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[finished]]));
+    await runLiveAnnouncementSweep(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.message).not.toContain("Fini");
+    expect(request.message).toContain("Renards contre Nova");
+  });
+
+  it("soirée illisible : réservation rendue, annonce reportée", async () => {
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    evening.mockRejectedValue(new Error("DB_DOWN"));
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(pushLiveEvening).not.toHaveBeenCalled();
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+  });
+
+  it("la version de logs d'une soirée ôte les pseudos", async () => {
+    mockDb([
+      { ...AUTO_LIVE, participant_type: "SOLO", team1_solo_user_id: 7, team2_solo_user_id: 8, team1_pseudo: "Kiro", team2_pseudo: "Ayla" },
+    ]);
+    await runLiveAnnouncementSweep(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.message).toContain("Kiro contre Ayla");
+    expect(request.logMessage).toContain("un joueur contre un joueur");
+    expect(request.logMessage).not.toMatch(/Kiro|Ayla/);
   });
 });
