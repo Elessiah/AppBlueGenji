@@ -272,22 +272,6 @@ export async function createOrGetDiscordUser(
     acceptedNow?: boolean;
   },
 ): Promise<number> {
-  return resolveDiscordSignIn(discordId, pseudoInput, verifiedHandle, door, false);
-}
-
-/**
- * Corps de {@link createOrGetDiscordUser}. `retried` : la lecture a déjà été
- * refaite une fois parce que le compte trouvé ne portait plus ce Discord au
- * moment d'écrire (détaché entre-temps, peut-être rattaché ailleurs) — on ne
- * lui ouvre pas de session par une porte qu'il n'a plus.
- */
-async function resolveDiscordSignIn(
-  discordId: string,
-  pseudoInput: string | undefined,
-  verifiedHandle: string | null | undefined,
-  door: Parameters<typeof createOrGetDiscordUser>[3],
-  retried: boolean,
-): Promise<number> {
   const db = await getDatabase();
   const handle = normalizeDiscordHandle(verifiedHandle);
   const avatarUrl = door.avatarUrl;
@@ -338,11 +322,11 @@ async function resolveDiscordSignIn(
            WHERE id = ? AND is_deleted = 0 AND discord_id = ?`,
       handle ? [handle, handle, userId, discordId] : [userId, discordId],
     );
-    // Rien d'écrit : ce compte n'a plus ce Discord (ou vient d'être supprimé).
-    // Une seconde lecture dit à qui il appartient désormais — ou à personne.
-    if (Number(refreshed.affectedRows) === 0 && !retried) {
-      return resolveDiscordSignIn(discordId, pseudoInput, verifiedHandle, door, true);
-    }
+    // Rien d'écrit : ce compte n'a plus ce Discord (détaché entre-temps, ou
+    // compte supprimé). Pas de session par une porte qu'il n'a plus, et pas de
+    // seconde lecture : son nouveau titulaire n'a pas passé le contrôle de
+    // suspension fait sur celui-ci. Le joueur recommence la connexion.
+    if (Number(refreshed.affectedRows) === 0) throw new Error("DISCORD_AUTH_FAILED");
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     await settleTermsAfterLogin(userId, false, door);
     return userId;
