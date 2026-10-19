@@ -200,8 +200,22 @@ async function subjectTakenByAnother(
 export type OAuthLinkOutcome = "LINKED" | "REFRESHED";
 
 /**
+ * Garde de chaque écriture de rattachement : la porte est encore vide, ou déjà
+ * celle-ci. Le contrôle de `linkOAuthIdentity` la lit deux `await` plus tôt ;
+ * une autre porte posée entre-temps (code Discord, autre onglet) serait sinon
+ * écrasée — et, pour Discord, un tag certifié resterait sur l'identifiant d'un
+ * autre compte, où partiraient ses messages privés de match. Un paramètre : le
+ * nouvel identifiant.
+ */
+const UNMOVED_SUBJECT_SQL: Record<OAuthProvider, string> = {
+  GOOGLE: "(google_sub IS NULL OR google_sub = ?)",
+  DISCORD: "(discord_id IS NULL OR discord_id = ?)",
+  BLIZZARD: "(blizzard_sub IS NULL OR blizzard_sub = ?)",
+};
+
+/**
  * Écrit l'identité rattachée — une instruction par fournisseur, chacune bornée
- * à `is_deleted = 0` (voir `linkOAuthIdentity`).
+ * à `is_deleted = 0` et à une porte inchangée (voir `linkOAuthIdentity`).
  */
 async function writeLinkedIdentity(
   db: Pool,
@@ -228,11 +242,13 @@ async function writeLinkedIdentity(
         ? `UPDATE bg_users
              SET discord_id = ?, ${DISCORD_NAMED_PSEUDO_SQL},
                  discord_link_method = 'OAUTH'
-             WHERE id = ? AND is_deleted = 0`
+             WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.DISCORD}`
         : `UPDATE bg_users
              SET discord_id = ?, discord_link_method = 'OAUTH'
-             WHERE id = ? AND is_deleted = 0`,
-      handle ? [identity.subject, handle, handle, userId] : [identity.subject, userId],
+             WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.DISCORD}`,
+      handle
+        ? [identity.subject, handle, handle, userId, identity.subject]
+        : [identity.subject, userId, identity.subject],
     );
     return result;
   }
@@ -242,15 +258,16 @@ async function writeLinkedIdentity(
     const tag = normalizeBattletag(identity.handle);
     const [result] = await db.execute<ResultSetHeader>(
       tag
-        ? `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`
-        : `UPDATE bg_users SET blizzard_sub = ? WHERE id = ? AND is_deleted = 0`,
-      tag ? [identity.subject, tag, userId] : [identity.subject, userId],
+        ? `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ?
+           WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.BLIZZARD}`
+        : `UPDATE bg_users SET blizzard_sub = ? WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.BLIZZARD}`,
+      tag ? [identity.subject, tag, userId, identity.subject] : [identity.subject, userId, identity.subject],
     );
     return result;
   }
   const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET google_sub = ? WHERE id = ? AND is_deleted = 0`,
-    [identity.subject, userId],
+    `UPDATE bg_users SET google_sub = ? WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.GOOGLE}`,
+    [identity.subject, userId, identity.subject],
   );
   return result;
 }
@@ -291,12 +308,18 @@ export async function linkOAuthIdentity(
   // `PROFILE_NOT_FOUND` déjà rendu par la lecture : c'est la même réponse pour
   // le même fait.
   const db = await getDatabase();
+  let affected: number;
   try {
-    const result = await writeLinkedIdentity(db, userId, identity);
-    if (Number(result.affectedRows) === 0) throw new Error("PROFILE_NOT_FOUND");
+    affected = Number((await writeLinkedIdentity(db, userId, identity)).affectedRows);
   } catch (error) {
     if (isDuplicateEntryError(error)) throw new Error("IDENTITY_ALREADY_LINKED");
     throw error;
+  }
+  // Rien d'écrit : compte supprimé entre-temps, ou une autre porte du même
+  // fournisseur posée depuis la lecture (`UNMOVED_SUBJECT_SQL`).
+  if (affected === 0) {
+    if (!(await loadIdentityRow(userId))) throw new Error("PROFILE_NOT_FOUND");
+    throw new Error("PROVIDER_ALREADY_LINKED");
   }
 
   // La photo ne remplace jamais un avatar téléversé, et son échec ne remet pas

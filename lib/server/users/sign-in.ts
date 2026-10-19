@@ -309,15 +309,18 @@ export async function createOrGetDiscordUser(
     // instruction, plutôt qu'une seconde écriture qui laisserait un `await`
     // entre elles.
     await db.execute(
+      // `discord_id = ?` : le compte a pu détacher ce Discord (et en rattacher
+      // un autre) depuis la lecture — son pseudo, alors nommé « par Discord »,
+      // deviendrait certifiable d'un clic sur l'identifiant de l'autre.
       handle
         ? `UPDATE bg_users
            SET ${DISCORD_NAMED_PSEUDO_SQL},
                discord_link_method = ${methodSql}
-           WHERE id = ? AND is_deleted = 0`
+           WHERE id = ? AND is_deleted = 0 AND discord_id = ?`
         : `UPDATE bg_users
            SET discord_link_method = ${methodSql}
-           WHERE id = ? AND is_deleted = 0`,
-      handle ? [handle, handle, userId] : [userId],
+           WHERE id = ? AND is_deleted = 0 AND discord_id = ?`,
+      handle ? [handle, handle, userId, discordId] : [userId, discordId],
     );
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     await settleTermsAfterLogin(userId, false, door);
