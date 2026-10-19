@@ -274,7 +274,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Certified username: until it is changed or the account is deleted",
       "Choice of match direct messages: until it is changed; reset to the default when the account is deleted",
       "Records of reminders, alerts and refereeing schedules sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
-      "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played; a caster who no longer meets the conditions of their sign-up (broadcast permission, certified Discord tag, Battle.net account) is removed, as long as the match is not launched, at the next read of the contacts or when another caster signs up; a caster whose team joins the match is removed too",
+      "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches that are not over; a caster who no longer meets the conditions of their sign-up (broadcast permission, certified Discord tag, Battle.net account) is removed, as long as the match is not launched, at the next read of the contacts or when another caster signs up; a caster whose team joins the match is removed too",
     ],
     recipients: [
       "The association's administrators and referees",
