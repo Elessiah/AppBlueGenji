@@ -154,9 +154,10 @@ Une relecture qui échoue passagèrement (réseau, 5xx, quota) garde ce qui est
 affiché, sans notification, et se retente jusqu'à 3 fois toutes les 10 s
 (`shouldRetryReread`, compteur remis à zéro par chaque nouvelle relecture ;
 jamais avant l'attente qu'un refus de quota demande, `Retry-After`) ; un échec
-passager de la première lecture est retenté de même, la modale restant en
-chargement — notification et « Contacts non affichés » seulement une fois les
-tentatives épuisées ; un refus définitif (`isFinalRefusal` : plus partie du
+passager de la première lecture est retenté de même : la modale reste en
+chargement le temps de la première nouvelle tentative, puis notifie l'échec
+(« Contacts non affichés ») si elle échoue aussi, les suivantes continuant sans
+bruit ; un refus définitif (`isFinalRefusal` : plus partie du
 match, déconnecté) retire les contacts affichés. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
