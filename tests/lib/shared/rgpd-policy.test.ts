@@ -33,9 +33,9 @@ describe("contacts du lancement d'un match — base légale", () => {
     for (const donnee of ["Certification du pseudo Discord", "Pseudo Overwatch"]) {
       const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
       expect(entry?.base).toBe("Consentement");
-      expect(entry?.extraBases).toEqual([
+      expect(entry?.extraBases?.[0]).toEqual(
         { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" },
-      ]);
+      );
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
   });
@@ -121,8 +121,11 @@ describe("DONNEES_PROFIL", () => {
     expect(tag?.finalite).toMatch(/Enregistré à ta connexion par Discord, ou saisi par toi/);
     expect(tag?.finalite).toMatch(/sans certification, invisible de tous, administrateurs compris/);
     // DM-CERTIFIED-ONLY (revue légale) : le bot ne reçoit le tag que certifié, pour toute notification.
-    expect(tag?.finalite).toMatch(/notifications bot \(tag certifié seulement ; avant la certification, un tag saisi ne sert qu'à t'envoyer le code qui la donne\)/);
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord username")?.finalite).toMatch(/bot notifications \(certified tag only; before certification, a typed tag is only used to send you the code that gives it\)/);
+    expect(tag?.finalite).toMatch(/notifications bot \(tag certifié seulement ; avant la certification, un tag saisi ne sert qu'à t'envoyer un code \(connexion, rattachement ou certification\)\)/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord username")?.finalite).toMatch(/bot notifications \(certified tag only; before certification, a typed tag is only used to send you a code \(login, linking or certification\)\)/);
+    // La certification filtre les messages de match : la base de ceux-ci (intérêt légitime) y figure.
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "Certification du pseudo Discord")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE });
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders and match removal notices by direct message" });
     // L'ID sert aussi, certifié ou non, aux avis passant par la portée « proven ».
     const id = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
     expect(id?.finalite).toMatch(/horaires, rappels et retrait de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données/);
