@@ -126,16 +126,17 @@ function candidateContextRows(world: World, params: unknown[]) {
   ];
 }
 
+/** Drapeau « un tournoi est en cours » ; la modale ne compte que la phase de lancement. */
+function runningFlag(world: World, sql: string): boolean {
+  if (!sql.includes("match_launch_phase = 1")) return world.running;
+  return world.runningWithLaunchPhase ?? world.running;
+}
+
 function connectionFor(world: World): PoolConnection {
   const execute = async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     world.reads.push(sql);
-    if (sql.includes("AS running")) {
-      const running = sql.includes("match_launch_phase = 1")
-        ? (world.runningWithLaunchPhase ?? world.running)
-        : world.running;
-      return [[{ running: Number(running) }], []];
-    }
+    if (sql.includes("AS running")) return [[{ running: Number(runningFlag(world, sql)) }], []];
     if (sql.startsWith("UPDATE")) {
       world.writes.push(sql);
       return [{ affectedRows: 1 }, []];
