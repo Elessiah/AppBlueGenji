@@ -63,7 +63,8 @@ qu'un arbitre enregistre reste une décision à prendre.
 
 **Avant l'envoi.** Une contre-proposition ne se corrige plus : face à la
 proposition adverse, toute saisie qui en diffère (score, ou seulement le détail
-des maps) affiche, au-dessus des actions, « Cette saisie diffère de la
+des maps ; détail adverse encore en lecture ou illisible : seulement un score
+différent, le serveur comparant lui-même le détail) affiche, au-dessus des actions, « Cette saisie diffère de la
 proposition de … (score ou détail des maps) : l'envoyer ouvre un litige
 et verrouille la saisie des deux équipes jusqu'à l'arbitrage » (FR + EN,
 `score.player.counterWarning`, rattaché au bouton d'envoi par `aria-describedby`), et la phrase d'état (`theirs.withMaps` /
@@ -71,7 +72,8 @@ et verrouille la saisie des deux équipes jusqu'à l'arbitrage » (FR + EN,
 `aria-disabled` se grisent comme `:disabled` (`ScoreDialog.module.css`).
 L'avis de verrou vit dans une région d'état **toujours montée**, vide hors
 litige : un litige arrivé par le flux est annoncé où que soit le focus. Un refus
-`SCORE_LOCKED_DISPUTE` (envoi ou forfait) relit l'état comme `PROPOSAL_STALE`,
+`SCORE_LOCKED_DISPUTE` ou `MATCH_ALREADY_COMPLETED` (validation d'office passée
+à l'heure dite ; envoi ou forfait) relit l'état comme `PROPOSAL_STALE`,
 sans attendre un flux peut-être en reconnexion.
 
 ## 2. Validation d'office après 2 h de silence
