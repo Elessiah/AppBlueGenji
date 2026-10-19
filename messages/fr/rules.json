@@ -154,7 +154,7 @@
     {
       "title": "Lancement d'un match",
       "body": [
-        "Un match jouable ne commence pas d'emblée : à son heure de début (ou dès qu'il est jouable s'il n'a pas d'horaire), il entre en <b>lancement</b>. Une fenêtre s'ouvre alors pour les joueurs des deux équipes, avec l'équipe hôte et les contacts utiles.",
+        "Un match jouable ne commence pas d'emblée : à son heure de début (ou dès qu'il est jouable s'il n'a pas d'horaire), il entre en <b>lancement</b>. Une fenêtre s'ouvre alors pour les membres des deux équipes et le caster inscrit, avec l'équipe hôte et les contacts utiles — contacts que le bouton « Contacts » de la carte du match montre déjà dès que ses deux adversaires sont connus.",
         "Cette phase n'a lieu que si le tournoi l'active (voir ses réglages) : sinon, le match est lancé directement à son heure de début, sans « Prêt »."
       ],
       "bullets": [

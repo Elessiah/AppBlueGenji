@@ -154,7 +154,7 @@
     {
       "title": "Match launch",
       "body": [
-        "A playable match doesn't start right away: at its start time (or as soon as it becomes playable if it has no schedule), it enters <b>launch</b>. A window then opens for the players of both teams, showing the host team and the useful contacts.",
+        "A playable match doesn't start right away: at its start time (or as soon as it becomes playable if it has no schedule), it enters <b>launch</b>. A window then opens for the members of both teams and the signed-up caster, showing the host team and the useful contacts — contacts that the match card's “Contacts” button already shows as soon as both its opponents are known.",
         "This phase only happens if the tournament turns it on (see its settings): otherwise, the match is launched directly at its start time, with no “Ready”."
       ],
       "bullets": [
