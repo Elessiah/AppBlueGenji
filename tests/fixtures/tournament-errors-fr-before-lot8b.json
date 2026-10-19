@@ -1,5 +1,5 @@
 {
-  "count": 167,
+  "count": 168,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "MATCH_NOT_FOUND": "Match introuvable.",
@@ -7,6 +7,7 @@
     "MATCH_NOT_LAUNCHABLE": "Ce match ne peut pas être lancé : ses deux engagées ne sont pas connues ou il est terminé.",
     "MATCH_ALREADY_LAUNCHED": "Ce match est déjà lancé.",
     "MATCH_NOT_LAUNCHED": "Le match n'est pas encore lancé : toutes les parties doivent se déclarer prêtes.",
+    "MATCH_NOT_STARTED": "Le match n'a pas encore commencé : le score s'ouvre à son heure de départ.",
     "MATCH_NOT_IN_LAUNCH": "Le score ne se saisit qu'à partir du lancement du match : planifie-le ou attends son heure de début. Un forfait reste possible.",
     "NOT_MATCH_PARTY": "Tu ne joues ni ne castes ce match.",
     "NOT_TEAM_READY_ROLE": "Seul le capitaine, un manager ou le propriétaire peut déclarer l'équipe prête.",

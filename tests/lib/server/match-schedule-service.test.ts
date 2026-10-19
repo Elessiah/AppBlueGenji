@@ -569,6 +569,34 @@ describe("setMatchStartAt", () => {
       expect(resets(writes)).toBe(true);
     });
 
+    it("sans phase de lancement, lancement forcé avant l'heure puis reporté : il reste lancé", async () => {
+      const { writes } = world({
+        row: matchRow({ start_at: new Date("2099-08-28T21:00:00Z"), launched_at: new Date("2099-08-28T20:30:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(false);
+    });
+
+    it("sans phase de lancement, même date réenregistrée : rien n'est défait", async () => {
+      const { writes } = world({
+        row: matchRow({ start_at: new Date(FUTURE), launched_at: new Date("2099-08-29T18:00:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(false);
+    });
+
+    it("sans phase de lancement, match à planifier lancé de force puis daté : il reste lancé", async () => {
+      const { writes } = world({
+        row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z") }),
+        refereeScheduling: true,
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(false);
+    });
+
     it("sans phase de lancement, date passée : le match lancé le reste", async () => {
       const { writes } = world({
         row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z") }),

@@ -722,6 +722,17 @@ describe("phase de lancement éteinte (`match_launch_phase = 0`)", () => {
     expect(state.match?.team1_ready_at).toBeNull();
   });
 
+  it("forcer un match à l'heure passée que l'entretien n'a pas encore écrit l'enregistre", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: new Date(Date.now() - 5_000).toISOString() });
+    await forceLaunchMatch(42);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("forcer un match dont le lancement est déjà écrit reste refusé", async () => {
+    state.match = matchState({ match_launch_phase: 0, launched_at: STAMP });
+    await expect(forceLaunchMatch(42)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
+  });
+
   it("allumée, le même match entre en lancement sans partir", async () => {
     state.match = matchState({ match_launch_phase: 1 });
     await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(1);

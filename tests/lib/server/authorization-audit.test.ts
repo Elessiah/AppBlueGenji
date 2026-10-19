@@ -30,13 +30,15 @@ type MatchOverrides = {
   winner_team_id?: number | null;
   launched_at?: string | null;
   launch_pairing?: string | null;
+  /** Option du tournoi (`match_launch_phase`), lue au seul refus ; allumée par défaut. */
+  launchPhase?: number;
 };
 
 /**
  * Connexion factice servant un match de « BlueGenji Survie », seul mode où
  * l'égalité est enregistrable (`lib/server/tournaments/validation.ts`).
  */
-function fakeConnection(overrides: MatchOverrides = {}): {
+function fakeConnection({ launchPhase = 1, ...overrides }: MatchOverrides = {}): {
   conn: PoolConnection;
   writes: string[];
 } {
@@ -72,6 +74,9 @@ function fakeConnection(overrides: MatchOverrides = {}): {
       if (q.startsWith("UPDATE")) {
         writes.push(q);
         return [{ affectedRows: 1 }, []];
+      }
+      if (q.startsWith("SELECT match_launch_phase FROM bg_tournaments")) {
+        return [[{ match_launch_phase: launchPhase }], []];
       }
       if (q.includes("FROM bg_tournaments")) {
         return [
@@ -156,6 +161,15 @@ describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé"
     const { conn, writes } = fakeConnection({ launched_at: null });
 
     await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).rejects.toThrow("MATCH_NOT_LAUNCHED");
+    expect(writes).toHaveLength(0);
+  });
+
+  it("sans phase de lancement, un report avant l'heure dit que le match n'a pas commencé, sans parler de « Prêt »", async () => {
+    // Horloge de l'appareil en avance : la page a ouvert la saisie, l'entretien
+    // n'a encore rien lancé.
+    const { conn, writes } = fakeConnection({ launched_at: null, launchPhase: 0 });
+
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).rejects.toThrow("MATCH_NOT_STARTED");
     expect(writes).toHaveLength(0);
   });
 
