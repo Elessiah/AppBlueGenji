@@ -220,9 +220,15 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   demande programme **une** mise à jour une minute plus tard
   (`LIVE_EVENING_REFRESH_DELAY_MS`) ; toutes celles de la minute la
   rejoignent : une ronde qui se termine d'un coup donne une modification par
-  public. La mise à jour lit les soirées dont la fenêtre court, qui ont un
-  message gardé et ne sont pas closes (`window_end > NOW()`, `closed = 0`) —
-  rien n'est modifié après la fin de la fenêtre —, rédige leur texte et ne
+  public. La mise à jour lit les soirées qui ont un message gardé, ne sont pas
+  closes et dont la fenêtre court ou s'est fermée depuis moins de
+  `LIVE_EVENING_WINDOW_HOURS` heures (`window_end > NOW() - INTERVAL 4 HOUR`,
+  `closed = 0`) : un match lancé en fin de fenêtre se termine souvent après.
+  Une soirée finie n'est modifiée que si ce processus a publié son texte
+  (après un redémarrage, rien ne dit ce qui y manque — une modification pour
+  rien d'un vieux message pourrait poster une suite) ; ses matchs sont ceux
+  réservés **dans** sa fenêtre (`a.sent_at <= window_end`), jamais ceux de la
+  soirée suivante. Elle rédige leur texte et ne
   l'envoie que s'il diffère du **dernier texte publié** (retenu par
   processus, annonces de direct comprises ; perdu au redémarrage, au pire une
   modification à l'identique). Toujours une **modification**
@@ -234,8 +240,10 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   été supprimé (`10008`). Un refus ou une issue incertaine ne renvoie pas le
   même texte ; un report (bot injoignable, salon fermé, Discord réticent, soirée
   en pause, coupe-circuit du bot ouvert — rien n'est alors lu —, lecture en
-  échec) est relancé une minute plus tard, trois fois au plus depuis la
-  dernière fin de match (chaque nouvelle fin de match en redonne trois). Un
+  échec) est relancé une minute plus tard, trente fois au plus depuis la
+  dernière fin de match (`LIVE_EVENING_REFRESH_MAX_RETRIES` : une demi-heure,
+  qui couvre un redémarrage ou un déploiement du bot ; chaque nouvel évènement
+  en redonne autant, toujours une mise à jour par minute au plus). Un
   report qui tient au bot ou au salon arrête le passage : l'autre public
   n'essuie pas le même refus ; une soirée illisible n'empêche pas l'autre. Balayage et mise à
   jour passent par une **file unique** : une mise à jour ne rédige jamais en
