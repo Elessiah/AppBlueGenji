@@ -586,13 +586,15 @@ describe("rendu anglais — aucun français dans les gestes", () => {
 
   it("score (engagé) : une contre-proposition s'annonce comme un litige, le focus suit le verrou", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
-    expect(source).toContain('if (!canEnterScore || phase !== "THEIRS_PENDING") return false;');
-    expect(source).toContain("return form.entered !== null && !form.confirmsAsIs && !form.error;");
+    expect(source).toContain('if (!canEnterScore || view?.phase !== "THEIRS_PENDING" || !view.theirs) return false;');
+    // Détail adverse inconnu (en lecture, illisible) : seul un score différent s'annonce comme un litige.
+    expect(source).toContain("if ((view.theirs.maps ?? []).length > 0) return !form.confirmsAsIs;");
+    expect(source).toContain("return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;");
     expect(source).toContain('t("score.player.counterWarning", { opponent: opponentName })');
     // Avertissement et verrou rattachés : lus au bouton d'envoi, et avec la modale quand le focus y revient.
     expect(source).toContain('aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}');
     // Refus « litige ouvert » : la modale relit l'état, à l'envoi comme au forfait.
-    expect(source).toContain('new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE])');
+    expect(source).toContain('new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"])');
     expect(source.match(/if \(REFRESH_ON_REFUSAL\.has\(code\)\)/g)).toHaveLength(2);
     // Litige arrivé par le flux : focus rendu à la modale si l'élément focalisé a disparu.
     expect(source).toMatch(/disputeLocked && !wasLocked\.current && dialog && !dialog\.contains\(document\.activeElement\)\) dialog\.focus\(\)/);
